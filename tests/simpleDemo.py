@@ -35,10 +35,21 @@ def getMITBatteryPapers():
     # 5) Synthesizing markup tools for each step in the plan, in case the user wants to manually annotate the data.
     # 6) Synthesizing the executable steps and compiling them into a runtime plan.
     compileStats = processor.compile()
-    print("CompileStats", compileStats)
+
+    # Pretty print the compileStats dict
+    print("CompileStats:")
+    for k, v in compileStats.items():
+        print(f"  {k}: {v}")
+
 
     print()
+    print("Logical tree:")
     processor.dumpLogicalTree()
+
+    print()
+    print("Physical operator tree:")
+    rootPhysicalOp = compileStats["rootPhysicalOp"]
+    rootPhysicalOp.dump(verbose=False)
 
     # This section is the actual execution. It executes the above runtime plan
     #

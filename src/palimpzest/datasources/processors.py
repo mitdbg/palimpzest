@@ -1,5 +1,6 @@
 from palimpzest.elements import *
 from .loaders import *
+from .physical import *
 
 class Processor():
     """A processor applies an extractor to a particular input"""
@@ -20,9 +21,25 @@ class Processor():
             #print(" " * idx, f"{idx} countDepth({element})")
             return 1 + max([0] + list(countDepth(x, idx=idx+1) for x in element.children))
 
+        # Let's enumerate all the tasks in the logical tree.
+        def getPhysicalOperators(nodeTuple):
+            label, nodeElt, childNodes = nodeTuple
+            if nodeElt in self.populatedElements:
+                return PopulateOp(nodeElt, self.populatedElements[nodeElt])
+            elif len(childNodes) == 1:
+                return MapOp(nodeElt, getPhysicalOperators(childNodes[0]))
+            elif len(childNodes) > 1:
+                return AggregateOp(node, [getPhysicalOperators(x) for x in childNodes])
+            else:
+                raise Exception("Leaf logical nodes should have been populated by now")
+
+        rootPhysicalOp = getPhysicalOperators(self.rootElement.getLogicalTree())
+        #rootPhysicalOp.dump()
+
         return {"steps": countSteps(self.rootElement),
                 "depth": countDepth(self.rootElement),
-                "rootElement": self.rootElement,
+                "rootLogicalElement": self.rootElement,
+                "rootPhysicalOp": rootPhysicalOp,
                 "leafSources": self.populatedElements,
                 "exampleRepos": self.exampleRepos,
                 "streaming": self.streaming}

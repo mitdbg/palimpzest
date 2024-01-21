@@ -1,6 +1,6 @@
 # Palimpzest
 Palimpzest is a document processing and programming framework. It will help you:
-- Build reusable and composable extractors
+- Build reusable, composable, shareable extractors
 - Get ancillary material for free: annotation tools, accuracy reports, data version updates, useful provenance records, etc
 - Build datasets that are easy (schema-wise, storage-wise, quality-wise) to pipe into ready-to-go search, chat, and dashboard tools
 - Enjoy the free quality benefits that come from riding the LLM technology curve: better models, prompting procedures, and labeled datasets
