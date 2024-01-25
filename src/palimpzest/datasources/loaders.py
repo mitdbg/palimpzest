@@ -16,7 +16,7 @@ class DirectorySource(DataSource):
     """DirectorySource returns multiple File objects from a real-world source (a directory on disk)"""
     def __init__(self, path, desc=None):
         self.path = path
-        self.basicElement = File(desc=f"A file loaded from {path}", required=True)
+        self.basicElement = File(desc=f"A file loaded from {path}")
         super().__init__(self.basicElement, desc=desc)
 
     def __iter__(self):

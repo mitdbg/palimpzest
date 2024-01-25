@@ -4,8 +4,8 @@ class ScientificPaper(pz.File):
    """Represents a scientific research paper, usually from a PDF file"""
    def __init__(self):
        super().__init__(desc="A scientific research paper, usually from a PDF file")
-       self.title = pz.Field(required=True, desc="The title of the paper. This is a natural language title, not a number or letter.")
-       self.publicationYear = pz.Field(required=False, desc="The year the paper was published. This is a number.")
+       self.title = pz.Field(desc="The title of the paper. This is a natural language title, not a number or letter.")
+       self.publicationYear = pz.Field(desc="The year the paper was published. This is a number.")
 
 def getMITBatteryPapers():
     #
@@ -37,19 +37,38 @@ def getMITBatteryPapers():
     compileStats = processor.compile()
 
     # Pretty print the compileStats dict
-    print("CompileStats:")
-    for k, v in compileStats.items():
-        print(f"  {k}: {v}")
+    #print("CompileStats:")
+    #for k, v in compileStats.items():
+    #    print(f"  {k}: {v}")
 
 
-    print()
-    print("Logical tree:")
-    processor.dumpLogicalTree()
+    #print()
+    #print("Logical tree:")
+    #processor.dumpLogicalTree()
 
     print()
     print("Physical operator tree:")
     rootPhysicalOp = compileStats["rootPhysicalOp"]
     rootPhysicalOp.dump(verbose=False)
+
+    jsonSchema = goodAuthorPapers.schema()
+    print()
+    print("JSON SCHEMA")
+    # Convert the dict to a string and print it
+    import json
+    print(json.dumps(jsonSchema, indent=2))
+
+    #
+    # FUTURE WORK
+    #
+
+    # Indicate that the author must have an ORCID, which matches the ORCID database
+
+    # (Or, in a different setting: indicate that the git commit must contain a URL that points to a valid git repo)
+
+    # (Or, in a different setting: indicate that the gene must be drawn from a standard list of genes)
+
+
 
     # This section is the actual execution. It executes the above runtime plan
     #

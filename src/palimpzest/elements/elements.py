@@ -8,8 +8,7 @@ from typing import List, Set
 #####################################################
 class Element():
     """Base class for all document elements"""
-    def __init__(self, required=False, desc=None):
-        self._required = required
+    def __init__(self, desc=None):
         self._desc = desc
 
         # after it's populated, contents are available
@@ -17,7 +16,7 @@ class Element():
         self._data = None
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(desc={self._desc}, required={self._required})"
+        return f"{self.__class__.__name__}(desc={self._desc})"
 
     def populate(self, dataDict):
         """Populate the Element with data. This is an abstract function."""
@@ -39,6 +38,10 @@ class Element():
         """The child Elements of this Element"""
         return []
     
+    def schema(self):
+        """The JSON representation of the schema of this Element"""
+        return ""
+    
     @property
     def isPopulated(self):
         """Whether this Element has been populated by a Processor"""
@@ -49,11 +52,6 @@ class Element():
         """A description of the Element"""
         return self._desc
     
-    @property
-    def required(self):
-        """Whether this Element is required to be present in a document"""
-        return self._required
-
 class DataRecord:
     def __init__(self, element, **kwargs):
         self._element = element
@@ -116,12 +114,10 @@ class TypeFilter(Filter):
         """For TypeFilter, we don't need to wait for the compiler. We know how to implement it at authoring time."""
         return isinstance(target, type(self.target))
 
-
-
 class AtomicElement(Element):
     """An Element that can only have one value. It's the Element version of a basic type"""
-    def __init__(self, required=False, desc=None):
-        super().__init__(required=required, desc=desc)
+    def __init__(self, desc=None):
+        super().__init__(desc=desc)
         self._data = None
 
     def populate(self, dataDict):
@@ -133,27 +129,38 @@ class AtomicElement(Element):
     def getLogicalTree(self):
         """Return the logical tree of this Element."""
         return (self.__repr__(), self, [])
+    
+    def schema(self):
+        return {"description": self._desc, 
+                "type": "string"}
 
 class Field(AtomicElement):
     """A Field is a SingletonElement that contains a single value. It's untyped but probably usually a string."""
-    def __init__(self, required=False, desc=None):
-        super().__init__(required=required, desc=desc)
+    def __init__(self, desc=None):
+        super().__init__(desc=desc)
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(desc={self._desc}, required={self._required})"
+        return f"{self.__class__.__name__}(desc={self._desc})"
 
 class BytesField(Field):
     """A BytesField is a Field that is definitely an array of bytes."""
-    def __init__(self, required=False, desc=None):
-        super().__init__(required=required, desc=desc)
+    def __init__(self, desc=None):
+        super().__init__(desc=desc)
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(desc={self._desc}, required={self._required})"
+        return f"{self.__class__.__name__}(desc={self._desc})"
+
+    def schema(self):
+        return {"description": self._desc, 
+                "type": "string",
+                "contentEncoding": "base64",
+                "contentMediaType": "application/octet-stream"}
 
 class MultipartElement(Element):
     """A record that contains multiple Fields"""
-    def __init__(self, required=False, desc=None):
-        super().__init__(required=required, desc=desc)
+    def __init__(self, desc=None):
+        super().__init__(desc=desc)
+        self._required = set()
 
     def populate(self, dataDict):
         """This populates the Element's subfields"""
@@ -183,14 +190,34 @@ class MultipartElement(Element):
             children.append(self.__dict__[k])
         return children
 
+    def setRequired(self, *args):
+        """Set the specified fields as required"""
+        for f in args:
+            self._required.add(f)
+
+    def schema(self):
+        """The JSON representation of the schema of this Element"""
+        schema = {"description": self._desc, 
+                  "type": "object",
+                  "properties": {}}
+        for k in self.__dict__:
+            if k.startswith("_"):
+                continue
+            schema["properties"][k] = self.__dict__[k].schema()
+        # indicate whether each field was required or not
+        # The _required set contains fields.
+        # We just want to emit the field names
+        schema["required"] = [f for f in self._required]
+        return schema
+
 #####################################################
 # An Element that can be one of multiple other Element kinds.
 # For example, I might want to process Any([PDF, WordDoc, TextFile])
 #####################################################
 class Any(Element):
     """This represents ANY of the specified Element types. For example, you may not know if a document is a PDF or a Word document, but you know it's one of those two."""
-    def __init__(self, possibleElements, required=False, desc=None):
-        super().__init__(required=required, desc=desc)
+    def __init__(self, possibleElements, desc=None):
+        super().__init__(desc=desc)
         self._possibleElements = possibleElements
 
     @property
@@ -202,8 +229,8 @@ class Any(Element):
 #####################################################
 class Collection(Element):
     """A Collection is an Element that contains multiple other Elements. It can be iterated over."""
-    def __init__(self, basicElt, input=None, required=False, desc=None, filters=[]):
-        super().__init__(required=required, desc=desc)
+    def __init__(self, basicElt, input=None, desc=None, filters=[]):
+        super().__init__(desc=desc)
         self._basicElt = basicElt
         self._input = input
         self._filters = filters
@@ -224,6 +251,23 @@ class Collection(Element):
     @property
     def children(self):
         return [self._basicElt]
+    
+    def schema(self):
+        """The JSON representation of the schema of this Element"""
+        # First, figure out if there is actually a schema difference between this elt and its child
+        # Sometimes, we have chained relations that just reflect selections (filters)
+        # In that case, we don't want to generate a schema for the intermediate elt
+        # Check if the child is also a collection
+        if isinstance(self._basicElt, Collection):
+            childSchema = self._basicElt.schema()
+            # Add current filtered relation's description to the child schema before returning
+            childSchema["description"] = str(self._desc) + ". It takes as raw input (" + childSchema["description"] + ")"
+            return childSchema
+        else:
+            schema = {"description": self._desc, 
+                  "type": "array",
+                  "items": self._basicElt.schema()}
+            return schema
 
 #    def __iter__(self):
 #        """Abstract function that returns an iterator over all contents of the Collection that are of the specified type. Providing 'Element' means 'all contents'"""
@@ -252,21 +296,29 @@ class Collection(Element):
 
 class List(Collection):
     """A List is an ordered Collection that contains multiple other Elements. It can be iterated over."""
-    def __init__(self, basicElt: Element, input=None, required=False, desc=None, filters=[]):
-        super().__init__(basicElt, input=input, required=required, desc=desc, filters=filters)
+    def __init__(self, basicElt: Element, input=None, filters=[]):
+        if len(filters) == 0:
+            desc = "A List"
+        else:
+            desc = "A List of elements that satisfy these conditions: [" + " and ".join([f.filterCondition for f in filters] + "]")
+        super().__init__(basicElt, input=input, desc=desc, filters=filters)
 
     def addFilter(self, f: Filter):
         """Add a filter to the Collection. This filter will possibly restrict the items that are returned later."""
-        return List(self, input=self, required=self._required, desc="Filter(" + str(f.filterCondition) + ")", filters=[f])
+        return List(self, input=self, filters=[f])
 
 class Set(Collection):
     """A Set is an unordered Collection that contains multiple other Elements. It can be iterated over."""
-    def __init__(self, basicElt: Element, input=None, required=False, desc=None, filters=[]):
-        super().__init__(basicElt, input=input, required=required, desc=desc, filters=filters)
+    def __init__(self, basicElt: Element, input=None, filters=[]):
+        if len(filters) == 0:
+            desc = "A Set"
+        else:
+            desc = "A Set of elements that satisfy these conditions: [" + " and ".join([f.filterCondition for f in filters]) + "]"
+        super().__init__(basicElt, input=input, desc=desc, filters=filters)
 
     def addFilter(self, f: Filter):
         """Add a filter to the Collection. This filter will possibly restrict the items that are returned later."""
-        return Set(self, input=self, required=self._required, desc="Filter(" + str(f.filterCondition) + ")", filters=[f])
+        return Set(self, input=self, filters=[f])
 
 
 ###################################################################################
@@ -275,24 +327,25 @@ class Set(Collection):
 ###################################################################################
 class File(MultipartElement):
     """A File is a record that comprises a filename and the contents of the file."""
-    filename = Field(required=True, desc="The UNIX-style name of the file")
-    contents = BytesField(required=True, desc="The contents of the file")
+    filename = Field(desc="The UNIX-style name of the file")
+    contents = BytesField(desc="The contents of the file")
+    #setRequired(filename, contents)
 
-    def __init__(self, required=False, desc=None):
-        super().__init__(required=required, desc=desc)
+    def __init__(self, desc=None):
+        super().__init__(desc=desc)
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(desc={self._desc}, filename={self.filename}, contents={self.contents}, required={self._required})"
+        return f"{self.__class__.__name__}(desc={self._desc}, filename={self.filename}, contents={self.contents})"
 
 class TextFile(File):
     """A text file is a File that contains only text. No binary data."""
-    def __init__(self, required=False, desc=None):
-        super().__init__(required=required, desc=desc)
+    def __init__(self, desc=None):
+        super().__init__(desc=desc)
 
 class PDFFile(File):
     """A PDF file is a File that is a PDF. It has specialized fields, font information, etc."""
     # This class is currently very impoverished. It needs a lot more fields before it can correctly represent a PDF.
 
-    def __init__(self, required=False, desc=None):
-        super().__init__(required=required, desc=desc)
+    def __init__(self, desc=None):
+        super().__init__(desc=desc)
 

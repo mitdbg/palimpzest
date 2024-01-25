@@ -15,6 +15,10 @@ class PopulateOp(PhysicalOp):
         if verbose:
             print(" " * idx, self.makeDataFreePrompt())
 
+    # TODO 1/21: there's something odd going on with the PopulateOp. 
+    # I am getting NONE for the description of the source and target elements.
+    # The descriptions are not getting populated correctly
+
     def makeDataFreePrompt(self):
         prompt = ("You are mapping a data object from one representation to another. "
                   "You will be given an object called INPUT and be asked to generate an object called OUTPUT. "
@@ -33,6 +37,8 @@ class MapOp(PhysicalOp):
 
     def dump(self, idx=0, verbose=False):
         print(" " * idx, f"MapOp({self.element}, <child>)")
+        print(" " * idx, f"Emits {self.element.schema} from {self.childOp.element.schema}")
+
         if verbose:
             print(" " * idx, self.makeDataFreePrompt())
         print()
