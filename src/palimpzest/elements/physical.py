@@ -1,4 +1,7 @@
 from .elements import *
+from .records import *
+
+from .core import *
 
 class PhysicalOp:
     def __init__(self, outputElementType):
@@ -8,6 +11,9 @@ class PhysicalOp:
         raise NotImplementedError("Abstract method")
     
     def finalize(self, datasource):
+        raise NotImplementedError("Abstract method")
+    
+    def dumpPhysicalTree(self):
         raise NotImplementedError("Abstract method")
 
 class InduceFromCandidateOp(PhysicalOp):
@@ -21,23 +27,40 @@ class InduceFromCandidateOp(PhysicalOp):
     def finalize(self, datasource):
         self.datasource = datasource
 
-    def getNext(self):
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, None)
+
+    def __iter__(self):
         if self.datasource is None:
             raise Exception("InduceFromCandidateOp has not been finalized with a datasource")
-        
-        while True:
-            nextCandidate = self.source.getNext()
-            if nextCandidate is None:
-                return None
-            else:
+
+        def iteratorFn():    
+            for nextCandidate in self.datasource:
                 resultRecord = self._attemptMapping(nextCandidate, self.outputElementType)
                 if resultRecord is not None:
-                    return resultRecord
+                    yield resultRecord
+        return iteratorFn()
+    
                 
-    def _attemptMapping(candidate, outputElementType):
+    def _attemptMapping(self, candidate: DataRecord, outputElementType):
         """Attempt to map the candidate to the outputElementType. Return None if it fails."""
-        raise NotImplementedError("I haven't done it yet!")
 
+        ##
+        # This implementation is totally fake. It's just here so I can test whether
+        # the end-to-end iterator works.
+        #
+        # In real life, this implementation comes most likely from LLM logic.
+        # Though in some cases it might come from custom parsers (like a PDF parser)
+        ##
+        if candidate.element == File:
+            dr = DataRecord(outputElementType)
+            dr.title = "Test Title"
+            dr.contents = candidate.contents
+            dr.filename = candidate.filename
+            return dr
+        else:
+            return None
 
 class FilterCandidateOp(PhysicalOp):
     def __init__(self, outputElementType, source, filters):
@@ -52,16 +75,23 @@ class FilterCandidateOp(PhysicalOp):
     def finalize(self, datasource):
         self.source.finalize(datasource)
 
-    def getNext(self):
-        while True:
-            nextCandidate = self.source.getNext()
-            if nextCandidate is None:
-                return None
-            else:
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, self.source.dumpPhysicalTree())
+
+    def __iter__(self):
+        def iteratorFn():
+            for nextCandidate in self.source: 
                 if self._passesFilters(nextCandidate):
-                    return nextCandidate
+                    yield nextCandidate
+        return iteratorFn()
 
     def _passesFilters(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
-        raise NotImplementedError("I haven't done it yet!")
-        
+        ##
+        # This implementation is totally fake. It's just here so I can test whether
+        # the end-to-end iterator works.
+        #
+        # In real life, this implementation comes most likely from LLM logic.
+        ##
+        return True        

@@ -14,6 +14,10 @@ class DataRecord:
 
         super().__setattr__(key, value)
 
+    @property
+    def element(self):
+        return self._element
+
     def __str__(self):
         keys = sorted(self.__dict__)
         items = ("{}={!r}".format(k, str(self.__dict__[k])[:15]) for k in keys)
