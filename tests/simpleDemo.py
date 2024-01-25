@@ -8,15 +8,12 @@ class ScientificPaper(pz.File):
    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
 
 def getMITBatteryPapers():
-    #
-    # A dataset-independent declarative description of authors of good papers
-    #
-    sciPapers = pz.Set(ScientificPaper) # This is a formal paper description.
+    """A dataset-independent declarative description of authors of good papers"""
+    sciPapers = pz.Set(ScientificPaper)
     mitPapers = sciPapers.addFilterStr("The paper is from MIT")
     batteryPapers = mitPapers.addFilterStr("The paper is about batteries")
     goodAuthorPapers = batteryPapers.addFilterStr("Papers where the author list contains at least one highly-respected author",
                                             targetFn=lambda x: x.authors)
-
     return goodAuthorPapers
 
 def emitDataset(rootSet, srcDataDir, title="Dataset"):
