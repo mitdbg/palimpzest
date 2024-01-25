@@ -13,8 +13,6 @@ class DataSource:
     def __eq__(self, __value: object) -> bool:
         return self.__dict__ == __value.__dict__
 
-print("DataSource is defined")
-
 class DirectorySource(DataSource):
     """DirectorySource returns multiple File objects from a real-world source (a directory on disk)"""
     def __init__(self, path):
