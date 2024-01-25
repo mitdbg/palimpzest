@@ -3,7 +3,7 @@ from palimpzest.elements import *
 class PhysicalOp:
     def __init__(self):
         pass
-
+        
 
 class PopulateOp(PhysicalOp):
     def __init__(self, element, populatedSrcElement):

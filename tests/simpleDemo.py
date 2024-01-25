@@ -52,8 +52,6 @@ def getMITBatteryPapers():
 
     print()
     print("Syntactic operator tree:")
-    #rootPhysicalOp = compileStats["rootPhysicalOp"]
-    #rootPhysicalOp.dump(verbose=False)
     syntacticElements = goodAuthorPapers.dumpSyntacticTree()
     emitNestedTuple(syntacticElements)
 
@@ -70,6 +68,19 @@ def getMITBatteryPapers():
     # Convert the dict to a string and print it
     import json
     print(json.dumps(jsonSchema, indent=2))
+
+
+    physicalTree = logicalTree.getPhysicalTree()
+
+    dataSrc = pz.DirectorySource("./testFileDirectory")
+    physicalTree.finalize(dataSrc)
+    print(physicalTree)
+
+    print()
+
+    #iterate oer directory source
+    for f in dataSrc:
+        print(f)
 
     #
     # FUTURE WORK

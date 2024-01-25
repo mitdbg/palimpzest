@@ -1,4 +1,5 @@
 from .elements import *
+from .physical import *
 
 class LogicalOperator:
     """A logical operator is an operator that operates on sets. Right now it can be a FilteredScan or a ConcreteScan."""
@@ -8,19 +9,24 @@ class LogicalOperator:
 
     def dumpLogicalTree(self):
         raise NotImplementedError("Abstract method")
+    
+    def getPhysicalTree(self):
+        raise NotImplementedError("Abstract method")
 
-
-class ConcreteScan(LogicalOperator):
+class BaseScan(LogicalOperator):
     """A ConcreteScan is a logical operator that represents a scan of a particular data source."""
     def __init__(self, outputElementType):
         super().__init__(outputElementType, None)
 
     def __str__(self):
-        return "ConcreteScan(" + str(self.outputElementType) + ")"
+        return "BaseScan(" + str(self.outputElementType) + ")"
 
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
         return (self, None)
+
+    def getPhysicalTree(self):
+        return InduceFromCandidateOp(self.outputElementType)
 
 class FilteredScan(LogicalOperator):
     """A FilteredScan is a logical operator that represents a scan of a particular data source, with filters applied."""
@@ -36,3 +42,6 @@ class FilteredScan(LogicalOperator):
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
         return (self, self.inputOp.dumpLogicalTree())
+
+    def getPhysicalTree(self):
+        return FilterCandidateOp(self.outputElementType, self.inputOp.getPhysicalTree(), self.filters)

@@ -1,5 +1,3 @@
-from typing import List, Set
-
 #####################################################
 # Basic Element types: these are the building blocks of all other Elements
 # An Element is a document or part of a document. 
@@ -50,56 +48,7 @@ class Element(metaclass=ElementMetaclass):
     def __str__(self):
         return f"{self.__class__.__name__}(desc={self._desc})"
 
-#    def populate(self, dataDict):
-#        """Populate the Element with data. This is an abstract function."""
-#        raise NotImplementedError("You must implement this function in a subclass.")
-
-#    def getLogicalTree(self):
-#        """Return the logical tree of this Element. This is an abstract function."""
-#        raise NotImplementedError("You must implement this function in a subclass.")
-
-#    @property
-#    def data(self):
-#        """The data contained in this Element. This is a DataRecord. It is populated by a Processor."""
-#        if not self._isPopulated:
-#            raise Exception("This Element has not been populated yet. You must run a Processor on it first.")
-#        return self._data
     
-#    @property
-#    def children(self):
-#        """The child Elements of this Element"""
-#        return []
-        
-#    @property
-#    def isPopulated(self):
-#        """Whether this Element has been populated by a Processor"""
-#        return self._isPopulated
-    
-#    @property
-#    def desc(self):
-#        """A description of the Element"""
-#        return self._desc
-    
-class DataRecord:
-    def __init__(self, element, **kwargs):
-        self._element = element
-
-        # Populate the DataRecord with the fields from the Element
-        for k in self._element.__dict__:
-            if k.startswith("_"):
-                continue
-            if k in kwargs:
-                setattr(self, k, kwargs[k])
-            else:
-                setattr(self, k, None)
-
-    def __str__(self):
-        keys = sorted(self.__dict__)
-        items = ("{}={!r}".format(k, self.__dict__[k]) for k in keys)
-        return "{}({})".format(type(self).__name__, ", ".join(items))
-
-    def __eq__(self, other):
-        return self.__dict__ == other.__dict__
 
 class AtomicElement(Element):
     """An Element that can only have one value. It's the Element version of a basic type"""

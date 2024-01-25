@@ -39,7 +39,7 @@ class Set:
     def getLogicalTree(self):
         """Return the logical tree of operators on Sets."""
         if self._input is None:
-            return ConcreteScan(self._basicElt)
+            return BaseScan(self._basicElt)
         else:
             return FilteredScan(self._basicElt, self._input.getLogicalTree(), self._filters)
 
