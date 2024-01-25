@@ -6,7 +6,7 @@ class DataSource():
         self.basicElement = basicElement
         self.desc = desc
 
-    def __repr__(self):
+    def __str__(self):
         return f"{self.__class__.__name__}(basicElement={self.basicElement}, desc={self.desc})"
     
     def __eq__(self, __value: object) -> bool:

@@ -33,7 +33,7 @@ class Processor():
             else:
                 raise Exception("Leaf logical nodes should have been populated by now")
 
-        rootPhysicalOp = getPhysicalOperators(self.rootElement.getLogicalTree())
+        #rootPhysicalOp = getPhysicalOperators(self.rootElement.getLogicalTree())
         #rootPhysicalOp.dump()
 
         return {"steps": countSteps(self.rootElement),

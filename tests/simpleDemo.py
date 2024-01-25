@@ -1,17 +1,15 @@
 import palimpzest as pz
 
 class ScientificPaper(pz.File):
-   """Represents a scientific research paper, usually from a PDF file"""
-   def __init__(self):
-       super().__init__(desc="A scientific research paper, usually from a PDF file")
-       self.title = pz.Field(desc="The title of the paper. This is a natural language title, not a number or letter.")
-       self.publicationYear = pz.Field(desc="The year the paper was published. This is a number.")
+   """Represents a scientific research paper, which in practice is usually from a PDF file"""
+   title = pz.Field(desc="The title of the paper. This is a natural language title, not a number or letter.", required=True)
+   publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
 
 def getMITBatteryPapers():
     #
     # A dataset-independent declarative description of authors of good papers
     #
-    sciPapers = pz.Set(ScientificPaper()) # This is a formal paper description.
+    sciPapers = pz.Set(ScientificPaper) # This is a formal paper description.
     mitPapers = sciPapers.addFilterStr("The paper is from MIT")
     batteryPapers = mitPapers.addFilterStr("The paper is about batteries")
     goodAuthorPapers = batteryPapers.addFilterStr("Papers where the author list contains at least one highly-respected author",
@@ -21,10 +19,10 @@ def getMITBatteryPapers():
     # 1) Data sources for  elements
     # 2) Labeled example repositories to check
     # 3) Runtime options
-    processor = pz.Processor(rootElement=goodAuthorPapers,
-                             populatedElements=[(sciPapers, pz.DirectorySource("./testFileDirectory"))],
-                             exampleRepos = ["http://goodexamples.com", "./localexamples.csv"],
-                             streaming=False)
+    #processor = pz.Processor(rootElement=goodAuthorPapers,
+    #                         populatedElements=[(sciPapers, pz.DirectorySource("./testFileDirectory"))],
+    #                         exampleRepos = ["http://goodexamples.com", "./localexamples.csv"],
+    #                         streaming=False)
 
     # Compiling the pipeline means that we can now execute it.
     # It entails:
@@ -34,7 +32,7 @@ def getMITBatteryPapers():
     # 4) Marshalling examples for each type conversion. These are ideally sensitive to the input data source.
     # 5) Synthesizing markup tools for each step in the plan, in case the user wants to manually annotate the data.
     # 6) Synthesizing the executable steps and compiling them into a runtime plan.
-    compileStats = processor.compile()
+    #compileStats = processor.compile()
 
     # Pretty print the compileStats dict
     #print("CompileStats:")
@@ -46,12 +44,27 @@ def getMITBatteryPapers():
     #print("Logical tree:")
     #processor.dumpLogicalTree()
 
-    print()
-    print("Physical operator tree:")
-    rootPhysicalOp = compileStats["rootPhysicalOp"]
-    rootPhysicalOp.dump(verbose=False)
+    def emitNestedTuple(node, indent=0):
+        elt, child = node
+        print(" " * indent, elt)
+        if child is not None:
+            emitNestedTuple(child, indent=indent+2)
 
-    jsonSchema = goodAuthorPapers.schema()
+    print()
+    print("Syntactic operator tree:")
+    #rootPhysicalOp = compileStats["rootPhysicalOp"]
+    #rootPhysicalOp.dump(verbose=False)
+    syntacticElements = goodAuthorPapers.dumpSyntacticTree()
+    emitNestedTuple(syntacticElements)
+
+    print()
+    print("Logical operator tree:")
+    logicalTree = goodAuthorPapers.getLogicalTree()
+    logicalElements = logicalTree.dumpLogicalTree()
+    emitNestedTuple(logicalElements)
+
+    jsonSchema = logicalTree.outputElementType.jsonSchema()
+    jsonSchema["title"]="Good MIT battery papers written by good authors"
     print()
     print("JSON SCHEMA")
     # Convert the dict to a string and print it
