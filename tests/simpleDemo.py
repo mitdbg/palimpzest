@@ -7,12 +7,14 @@ class ScientificPaper(pz.File):
    title = pz.Field(desc="The title of the paper. This is a natural language title, not a number or letter.", required=True)
    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
 
+
+
 def getMITBatteryPapers():
     """A dataset-independent declarative description of authors of good papers"""
     sciPapers = pz.Set(ScientificPaper)
     mitPapers = sciPapers.addFilterStr("The paper is from MIT")
     batteryPapers = mitPapers.addFilterStr("The paper is about batteries")
-    goodAuthorPapers = batteryPapers.addFilterStr("Papers where the author list contains at least one highly-respected author",
+    goodAuthorPapers = batteryPapers.addFilterStr("Paper where the title begins with the letter X",
                                             targetFn=lambda x: x.authors)
     return goodAuthorPapers
 
