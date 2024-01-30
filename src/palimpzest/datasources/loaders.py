@@ -1,4 +1,5 @@
-from palimpzest.elements import *
+from palimpzest.elements import DataRecord
+from palimpzest.elements import File
 
 import os
 

@@ -18,6 +18,7 @@ def getMITBatteryPapers():
                                             targetFn=lambda x: x.authors)
     return goodAuthorPapers
 
+
 def emitDataset(rootSet, srcDataDir, title="Dataset"):
     def emitNestedTuple(node, indent=0):
         elt, child = node

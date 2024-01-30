@@ -35,7 +35,7 @@ class ElementMetaclass(type):
             if v.required:
                 schema["required"].append(k)
         return schema
-
+    
 class Element(metaclass=ElementMetaclass):
     """Base class for all document elements"""
     def __init__(self, desc=None):
