@@ -4,7 +4,7 @@ class Solver:
     """This solves for needed operator implementations"""
 
     def __init__(self):
-        pass
+        self._hardcodedFns = {}
 
     def synthesize(self, taskDescriptor):
         """Return a function that maps from inputType to outputType."""
@@ -30,6 +30,14 @@ class Solver:
         #  quality-wise.
         ######################################
         if functionName == "InduceFromCandidateOp":
+
+            # Let's check if there's a prefab function for this mapping from type A to type B
+            hardcodedFn = self._hardcodedFn(inputElement, outputElement)
+            if hardcodedFn is not None:
+                return hardcodedFn
+            
+            # Let's do LLM-based induction by default
+            # REMIND: Chunwei, let's do some LLM-based induction here
             def fn(candidate: DataRecord):
                 if candidate.element == inputElement:
                     dr = DataRecord(outputElement)
@@ -40,6 +48,7 @@ class Solver:
                 else:
                     return None
             return fn
+
         elif functionName == "FilterCandidateOp":
             # Let's do LLM-based filters by default
             def createLLMFilter(filterCondition: str):

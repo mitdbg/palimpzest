@@ -2,7 +2,7 @@ import palimpzest as pz
 
 import json
 
-class ScientificPaper(pz.File):
+class ScientificPaper(pz.PDFFile):
    """Represents a scientific research paper, which in practice is usually from a PDF file"""
    title = pz.Field(desc="The title of the paper. This is a natural language title, not a number or letter.", required=True)
    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
