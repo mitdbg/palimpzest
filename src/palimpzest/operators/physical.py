@@ -45,7 +45,7 @@ class InduceFromCandidateOp(PhysicalOp):
                     
     def _attemptMapping(self, candidate: DataRecord, outputElementType):
         """Attempt to map the candidate to the outputElementType. Return None if it fails."""
-        taskDescriptor = ("InduceFromCandidateOp", outputElementType, candidate.element)
+        taskDescriptor = ("InduceFromCandidateOp", None, outputElementType, candidate.element)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
@@ -76,7 +76,7 @@ class FilterCandidateOp(PhysicalOp):
 
     def _passesFilters(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
-        taskDescriptor = ("FilterCandidateOp", candidate.element, self.outputElementType)
+        taskDescriptor = ("FilterCandidateOp", self.filters, candidate.element, self.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)

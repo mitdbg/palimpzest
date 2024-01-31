@@ -8,7 +8,7 @@ class Solver:
 
     def synthesize(self, taskDescriptor):
         """Return a function that maps from inputType to outputType."""
-        functionName, outputElement, inputElement = taskDescriptor
+        functionName, functionParams, outputElement, inputElement = taskDescriptor
 
         ######################################
         #
@@ -41,12 +41,20 @@ class Solver:
                     return None
             return fn
         elif functionName == "FilterCandidateOp":
-            def fn(candidate: DataRecord):
-                if candidate.element == inputElement:
-                    return True
-                else:
+            # Let's do LLM-based filters by default
+            def createLLMFilter(filterCondition: str):
+                def llmFilter(candidate: DataRecord):
+                    if candidate.element == inputElement:
+                        prompt = "Below is a filter condition in natural language called FILTER and a data record " +
+                                 "called RECORD. Please return just one of two values: TRUE or FALSE. Return TRUE if " + 
+                                 "FILTER accurately describes the RECORD. Return FALSE otherwise.\n\n" +
+                                 f"FILTER: {filterCondition}\n\n" +
+                                 f"RECORD: {candidate.contents}"
+                        response = openAILLMThing.prompt(prompt)
+                        if response == "TRUE":
+                            return True        
                     return False
-            return fn
+            return createLLMFilter("and ".join(functionParams[0]))
         else:
             raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))
         
