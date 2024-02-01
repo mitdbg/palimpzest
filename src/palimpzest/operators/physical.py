@@ -61,10 +61,11 @@ class InduceFromCandidateOp(PhysicalOp):
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 class FilterCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source, filters):
+    def __init__(self, outputElementType, source, filters, targetCacheId=None):
         super().__init__(outputElementType=outputElementType)
         self.source = source
         self.filters = filters
+        self.targetCacheId = targetCacheId
 
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self.filters])
@@ -75,10 +76,15 @@ class FilterCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def __iter__(self):
+        shouldCache = DataDirectory.openCache(self.targetCacheId)
         def iteratorFn():
             for nextCandidate in self.source: 
                 if self._passesFilters(nextCandidate):
+                    if shouldCache:
+                        DataDirectory.appendCache(self.targetCacheId, nextCandidate)
                     yield nextCandidate
+            DataDirectory.closeCache(self.targetCacheId)
+            
         return iteratorFn()
 
     def _passesFilters(self, candidate):

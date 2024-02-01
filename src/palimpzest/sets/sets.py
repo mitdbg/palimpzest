@@ -1,5 +1,9 @@
 from palimpzest.elements import *
 from palimpzest.operators import *
+from palimpzest.datasources import DataDirectory
+
+import json
+import hashlib
 
 #####################################################
 #
@@ -17,16 +21,22 @@ class Set:
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self._filters])
         return f"{self.__class__.__name__}(basicElt={self._basicElt}, desc={self._desc}, filters={filterStr})"
-
+    
     def serialize(self):
         if self._input is None:
             raise Exception("Cannot create JSON representation of Set because it has no input")
 
-        return {"version": SET_VERSION, 
+        return {"version": Set.SET_VERSION, 
              "desc": repr(self._desc), 
              "basicElt": repr(self._basicElt), 
              "filters": repr(self._filters), 
              "input": self._input.serialize()}
+
+    def universalIdentifier(self):
+        """Return a unique identifier for this Set."""
+        d = self.serialize()
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()
 
     def deserialize(inputObj):
         if inputObj["version"] != SET_VERSION:
@@ -64,12 +74,18 @@ class Set:
         if self._input is None:
             raise Exception("Cannot get logical tree of Set because it has no input")
 
+        # Check to see if there's a cached version of this answer
+        uid = self.universalIdentifier()
+        if DataDirectory.hasCachedAnswer(uid):
+            return CacheScan(self._basicElt, uid)
+
+        # The answer isn't cached, so we have to compute it
         if len(self._filters) >= 0 and not self._basicElt == self._input._basicElt:
-            return FilteredScan(self._basicElt, ConvertScan(self._basicElt, self._input.getLogicalTree()), self._filters)
+            return FilteredScan(self._basicElt, ConvertScan(self._basicElt, self._input.getLogicalTree()), self._filters, targetCacheId=uid)
         elif len(self._filters) == 0 and not self._basicElt == self._input._basicElt:
             return ConvertScan(self._basicElt, self._input.getLogicalTree())
         elif len(self._filters) >= 0 and self._basicElt == self._input._basicElt:
-            return FilteredScan(self._basicElt, self._input.getLogicalTree(), self._filters)
+            return FilteredScan(self._basicElt, self._input.getLogicalTree(), self._filters, targetCacheId=uid)
         else:
             return self._input.getLogicalTree()
 
@@ -90,7 +106,7 @@ class ConcreteDataset(Set):
         return BaseScan(self._basicElt, self.uniqName)
 
     def serialize(self):
-        return {"version": SET_VERSION, 
+        return {"version": Set.SET_VERSION, 
                 "desc": repr(self._desc), 
                 "basicElt": repr(self._basicElt),
                 "uniqName": self.uniqName}

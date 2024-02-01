@@ -41,11 +41,11 @@ def emitDataset(rootSet, title="Dataset"):
     emitNestedTuple(logicalElements)
 
     # Print the JSON schema that will be populated
-    jsonSchema = logicalTree.outputElementType.jsonSchema()
-    jsonSchema["title"]=title
-    print()
-    print("JSON SCHEMA")
-    print(json.dumps(jsonSchema, indent=2))
+    #jsonSchema = logicalTree.outputElementType.jsonSchema()
+    #jsonSchema["title"]=title
+    #print()
+    #print("JSON SCHEMA")
+    #print(json.dumps(jsonSchema, indent=2))
 
     # Print the physical operators that will be executed
     physicalTree = logicalTree.getPhysicalTree()
@@ -60,6 +60,28 @@ def emitDataset(rootSet, title="Dataset"):
     for r in physicalTree:
         print(r)
 
+    #####################################
+    # Now let's recompute the tree and see if caching worked
+    ####################################
+    logicalTree = rootSet.getLogicalTree()
+    logicalElements = logicalTree.dumpLogicalTree()
+    print()
+    print("Logical operator tree")
+    emitNestedTuple(logicalElements)
+
+    # Print the physical operators that will be executed
+    physicalTree = logicalTree.getPhysicalTree()
+    print()
+    print("Physical operator tree")
+    physicalOps = physicalTree.dumpPhysicalTree()
+    emitNestedTuple(physicalOps)
+
+    #iterate over data
+    print()
+    print("Concrete data results")
+    for r in physicalTree:
+        print(r)
+   
 
 #
 # Get battery papers and emit!
