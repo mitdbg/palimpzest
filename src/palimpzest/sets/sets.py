@@ -2,9 +2,12 @@ from palimpzest.elements import *
 from palimpzest.operators import *
 
 #####################################################
+#
 #####################################################
 class Set:
     """A Set is set of Elements. It can be iterated over."""
+    SET_VERSION = 0.1
+
     def __init__(self, basicElt, input=None, desc=None, filters=[]):
         self._desc = desc
         self._basicElt = basicElt
@@ -14,6 +17,25 @@ class Set:
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self._filters])
         return f"{self.__class__.__name__}(basicElt={self._basicElt}, desc={self._desc}, filters={filterStr})"
+
+    def serialize(self):
+        if self._input is None:
+            raise Exception("Cannot create JSON representation of Set because it has no input")
+
+        return {"version": SET_VERSION, 
+             "desc": repr(self._desc), 
+             "basicElt": repr(self._basicElt), 
+             "filters": repr(self._filters), 
+             "input": self._input.serialize()}
+
+    def deserialize(inputObj):
+        if inputObj["version"] != SET_VERSION:
+            raise Exception("Cannot deserialize Set because it is the wrong version")
+
+        return Set(inputObj["basicElt"], 
+                   input=Set.deserialize(inputObj["input"]), 
+                   desc=eval(inputObj["desc"]), 
+                   filters=eval(inputObj["filters"]))
 
     def schema(self):
         """The Set's basic element"""
@@ -33,38 +55,51 @@ class Set:
     
     def dumpSyntacticTree(self):
         """Return the syntactic tree of this Set."""
-        return (self, None if self._input is None else self._input.dumpSyntacticTree())
+        if self._input is None:
+            raise Exception("Cannot get syntactic tree of Set because it has no input")
+        return (self, self._input.dumpSyntacticTree())
 
     def getLogicalTree(self):
         """Return the logical tree of operators on Sets."""
         if self._input is None:
-            return BaseScan(self._basicElt)
-        else:
+            raise Exception("Cannot get logical tree of Set because it has no input")
+
+        if len(self._filters) >= 0 and not self._basicElt == self._input._basicElt:
+            return FilteredScan(self._basicElt, ConvertScan(self._basicElt, self._input.getLogicalTree()), self._filters)
+        elif len(self._filters) == 0 and not self._basicElt == self._input._basicElt:
+            return ConvertScan(self._basicElt, self._input.getLogicalTree())
+        elif len(self._filters) >= 0 and self._basicElt == self._input._basicElt:
             return FilteredScan(self._basicElt, self._input.getLogicalTree(), self._filters)
+        else:
+            return self._input.getLogicalTree()
 
     def jsonSchema(self):
         """Return the JSON schema for this Set."""
         return self._basicElt.jsonSchema()
 
-#    def populate(self, dataList):
-#        """This populates the Element Collection. Note that the PROCESSOR is responsible for implementing this Collection's filters"""
-#        self._isPopulated = True
-#        self._data = []
-#        for dataDict in dataList:
-#            self._data.append(self._basicElt.populate(dataDict))
-#        return self._data
+class ConcreteDataset(Set):
+    def __init__(self, basicElt, uniqName, desc=None):
+        super().__init__(basicElt, input=None, desc=desc, filters=[])
+        self.uniqName = uniqName
 
+    def dumpSyntacticTree(self):
+        return (self, None)
 
-#    def __iter__(self):
-#        """Abstract function that returns an iterator over all contents of the Collection that are of the specified type. Providing 'Element' means 'all contents'"""
-#        
-#        def filteredIterator():
-#            for c in self.contents:
-#                if all(f.test(c) for f in self.filters):
-#                    yield c
-#        return filteredIterator()
+    def getLogicalTree(self):
+        """Return the logical tree of operators on Sets."""
+        return BaseScan(self._basicElt, self.uniqName)
 
-#    def getAll(elt: Element):
-#        "Abstract function that returns only Elements of the specified type."
-#        pass
+    def serialize(self):
+        return {"version": SET_VERSION, 
+                "desc": repr(self._desc), 
+                "basicElt": repr(self._basicElt),
+                "uniqName": self.uniqName}
+
+    def deserialize(inputObj):
+        if inputObj["version"] != SET_VERSION:
+            raise Exception("Cannot deserialize Set because it is the wrong version")
+
+        return ConcreteDataset(inputObj["basicElt"],
+                                 uniqName=inputObj["uniqName"],
+                                 desc=eval(inputObj["desc"])) 
 

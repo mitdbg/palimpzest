@@ -11,7 +11,8 @@ class ScientificPaper(pz.PDFFile):
 
 def getMITBatteryPapers():
     """A dataset-independent declarative description of authors of good papers"""
-    sciPapers = pz.Set(ScientificPaper)
+    testRepo1 = pz.ConcreteDataset(pz.File, "concretedataset-01", desc="The dataset Mike downloaded on Jan 30")
+    sciPapers = pz.Set(ScientificPaper, input=testRepo1, desc="Scientific papers")
     mitPapers = sciPapers.addFilterStr("The paper is from MIT")
     batteryPapers = mitPapers.addFilterStr("The paper is about batteries")
     goodAuthorPapers = batteryPapers.addFilterStr("Paper where the title begins with the letter X",
@@ -19,7 +20,7 @@ def getMITBatteryPapers():
     return goodAuthorPapers
 
 
-def emitDataset(rootSet, srcDataDir, title="Dataset"):
+def emitDataset(rootSet, title="Dataset"):
     def emitNestedTuple(node, indent=0):
         elt, child = node
         print(" " * indent, elt)
@@ -47,9 +48,7 @@ def emitDataset(rootSet, srcDataDir, title="Dataset"):
     print(json.dumps(jsonSchema, indent=2))
 
     # Print the physical operators that will be executed
-    dataSrc = pz.DirectorySource(srcDataDir)
     physicalTree = logicalTree.getPhysicalTree()
-    physicalTree.finalize(dataSrc)
     print()
     print("Physical operator tree")
     physicalOps = physicalTree.dumpPhysicalTree()
@@ -65,5 +64,8 @@ def emitDataset(rootSet, srcDataDir, title="Dataset"):
 #
 # Get battery papers and emit!
 #
+srcDataDir = "./testFileDirectory"
+pz.DataDirectory.registerLocalDirectory(srcDataDir, "concretedataset-01")
+
 rootSet = getMITBatteryPapers()
-emitDataset(rootSet, "./testFileDirectory", title="Good MIT battery papers written by good authors")
+emitDataset(rootSet, title="Good MIT battery papers written by good authors")

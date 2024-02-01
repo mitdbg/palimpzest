@@ -11,9 +11,9 @@ class Filter():
 
     def __str__(self):
         return "Filter(" + self.filterCondition + ")"
-    
-    def __eq__(self, __value: object) -> bool:
-        return self.__dict__ == __value.__dict__
+
+#    def __eq__(self, __value: object) -> bool:
+#        return self.__dict__ == __value.__dict__
     
     def test(self, objToTest)->bool:
         """Test whether the object matches the filter condition"""

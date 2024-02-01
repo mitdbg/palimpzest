@@ -1,5 +1,6 @@
 from palimpzest.elements import *
 from palimpzest.solver import Solver
+from palimpzest.datasources import DataDirectory
 
 class PhysicalOp:
     synthesizedFns = {}
@@ -11,33 +12,42 @@ class PhysicalOp:
     def getNext(self):
         raise NotImplementedError("Abstract method")
     
-    def finalize(self, datasource):
-        raise NotImplementedError("Abstract method")
-    
     def dumpPhysicalTree(self):
         raise NotImplementedError("Abstract method")
 
-class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType):
+class MarshalAndScanDataOp(PhysicalOp):
+    def __init__(self, outputElementType, concreteDatasetIdentifier):
         super().__init__(outputElementType=outputElementType)
-        self.datasource = None
+        self.concreteDatasetIdentifier = concreteDatasetIdentifier
+
+    def __str__(self):
+        return "MarshalAndScanDataOp(" + str(self.outputElementType) + ", " + self.concreteDatasetIdentifier + ")"
+    
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, None)
+    
+    def __iter__(self):
+        def iteratorFn():
+            for nextCandidate in DataDirectory.getDataset(self.concreteDatasetIdentifier):
+                yield nextCandidate
+        return iteratorFn()
+    
+class InduceFromCandidateOp(PhysicalOp):
+    def __init__(self, outputElementType, source):
+        super().__init__(outputElementType=outputElementType)
+        self.source = source
 
     def __str__(self):
         return "InduceFromCandidateOp(" + str(self.outputElementType) + ")"
 
-    def finalize(self, datasource):
-        self.datasource = datasource
-
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
-        return (self, None)
+        return (self, self.source.dumpPhysicalTree())
 
     def __iter__(self):
-        if self.datasource is None:
-            raise Exception("InduceFromCandidateOp has not been finalized with a datasource")
-
         def iteratorFn():    
-            for nextCandidate in self.datasource:
+            for nextCandidate in self.source:
                 resultRecord = self._attemptMapping(nextCandidate, self.outputElementType)
                 if resultRecord is not None:
                     yield resultRecord
@@ -60,9 +70,6 @@ class FilterCandidateOp(PhysicalOp):
         filterStr = "and ".join([str(f) for f in self.filters])
         return "FilterCandidateOp(" + str(self.outputElementType) + ", " + "Filters: " + str(filterStr) + ")"
 
-    def finalize(self, datasource):
-        self.source.finalize(datasource)
-
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
@@ -76,7 +83,7 @@ class FilterCandidateOp(PhysicalOp):
 
     def _passesFilters(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
-        taskDescriptor = ("FilterCandidateOp", self.filters, candidate.element, self.outputElementType)
+        taskDescriptor = ("FilterCandidateOp", tuple(self.filters), candidate.element, self.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)

@@ -13,20 +13,37 @@ class LogicalOperator:
     def getPhysicalTree(self):
         raise NotImplementedError("Abstract method")
 
-class BaseScan(LogicalOperator):
-    """A ConcreteScan is a logical operator that represents a scan of a particular data source."""
-    def __init__(self, outputElementType):
-        super().__init__(outputElementType, None)
+class ConvertScan(LogicalOperator):
+    """A ConvertScan is a logical operator that represents a scan of a particular data source, with conversion applied."""
+    def __init__(self, outputElementType, inputOp):
+        super().__init__(outputElementType, inputOp.outputElementType)
+        self.inputOp = inputOp
 
     def __str__(self):
-        return "BaseScan(" + str(self.outputElementType) + ")"
+        return "ConvertScan(" + str(self.inputElementType) +", " + str(self.outputElementType) + ")"
+
+    def dumpLogicalTree(self):
+        """Return the logical tree of this LogicalOperator."""
+        return (self, self.inputOp.dumpLogicalTree())
+
+    def getPhysicalTree(self):
+        return InduceFromCandidateOp(self.outputElementType, self.inputOp.getPhysicalTree())
+
+class BaseScan(LogicalOperator):
+    """A ConcreteScan is a logical operator that represents a scan of a particular data source."""
+    def __init__(self, outputElementType, concreteDatasetIdentifier):
+        super().__init__(outputElementType, None)
+        self.concreteDatasetIdentifier = concreteDatasetIdentifier
+
+    def __str__(self):
+        return "BaseScan(" + str(self.outputElementType) + ", " + self.concreteDatasetIdentifier + ")"
 
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
         return (self, None)
 
     def getPhysicalTree(self):
-        return InduceFromCandidateOp(self.outputElementType)
+        return MarshalAndScanDataOp(self.outputElementType, self.concreteDatasetIdentifier)
 
 class FilteredScan(LogicalOperator):
     """A FilteredScan is a logical operator that represents a scan of a particular data source, with filters applied."""

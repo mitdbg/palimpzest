@@ -32,9 +32,9 @@ class Solver:
         if functionName == "InduceFromCandidateOp":
 
             # Let's check if there's a prefab function for this mapping from type A to type B
-            hardcodedFn = self._hardcodedFn(inputElement, outputElement)
-            if hardcodedFn is not None:
-                return hardcodedFn
+            #hardcodedFn = self._hardcodedFn(inputElement, outputElement)
+            #if hardcodedFn is not None:
+            #    return hardcodedFn
             
             # Let's do LLM-based induction by default
             # REMIND: Chunwei, let's do some LLM-based induction here
@@ -51,19 +51,25 @@ class Solver:
 
         elif functionName == "FilterCandidateOp":
             # Let's do LLM-based filters by default
-            def createLLMFilter(filterCondition: str):
-                def llmFilter(candidate: DataRecord):
-                    if candidate.element == inputElement:
-                        prompt = "Below is a filter condition in natural language called FILTER and a data record " +
-                                 "called RECORD. Please return just one of two values: TRUE or FALSE. Return TRUE if " + 
-                                 "FILTER accurately describes the RECORD. Return FALSE otherwise.\n\n" +
-                                 f"FILTER: {filterCondition}\n\n" +
-                                 f"RECORD: {candidate.contents}"
-                        response = openAILLMThing.prompt(prompt)
-                        if response == "TRUE":
-                            return True        
+            #def createLLMFilter(filterCondition: str):
+            #    def llmFilter(candidate: DataRecord):
+            #        if candidate.element == inputElement:
+            #            prompt = "Below is a filter condition in natural language called FILTER and a data record " +
+            #                     "called RECORD. Please return just one of two values: TRUE or FALSE. Return TRUE if " + 
+            #                     "FILTER accurately describes the RECORD. Return FALSE otherwise.\n\n" +
+            #                     f"FILTER: {filterCondition}\n\n" +
+            #                     f"RECORD: {candidate.contents}"
+            #            response = openAILLMThing.prompt(prompt)
+            #            if response == "TRUE":
+            #                return True        
+            #        return False
+            #return createLLMFilter("and ".join(functionParams[0]))
+            def fn(candidate: DataRecord):
+                if candidate.element == inputElement:
+                    return True
+                else:
                     return False
-            return createLLMFilter("and ".join(functionParams[0]))
+            return fn
         else:
             raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))
         
