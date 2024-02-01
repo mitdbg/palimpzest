@@ -29,10 +29,29 @@ class MarshalAndScanDataOp(PhysicalOp):
     
     def __iter__(self):
         def iteratorFn():
-            for nextCandidate in DataDirectory.getDataset(self.concreteDatasetIdentifier):
+            for nextCandidate in DataDirectory().getRegisteredDataset(self.concreteDatasetIdentifier):
                 yield nextCandidate
         return iteratorFn()
+
+class CacheScanDataOp(PhysicalOp):
+    def __init__(self, outputElementType, cacheIdentifier):
+        super().__init__(outputElementType=outputElementType)
+        self.cacheIdentifier = cacheIdentifier
+
+    def __str__(self):
+        return "CacheScanDataOp(" + str(self.outputElementType) + ", " + self.cacheIdentifier + ")"
     
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, None)
+    
+    def __iter__(self):
+        def iteratorFn():
+            for nextCandidate in DataDirectory().getCachedResult(self.cacheIdentifier):
+                yield nextCandidate
+        return iteratorFn()
+
+
 class InduceFromCandidateOp(PhysicalOp):
     def __init__(self, outputElementType, source):
         super().__init__(outputElementType=outputElementType)
@@ -76,15 +95,15 @@ class FilterCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def __iter__(self):
-        shouldCache = DataDirectory.openCache(self.targetCacheId)
+        shouldCache = DataDirectory().openCache(self.targetCacheId)
         def iteratorFn():
             for nextCandidate in self.source: 
                 if self._passesFilters(nextCandidate):
                     if shouldCache:
-                        DataDirectory.appendCache(self.targetCacheId, nextCandidate)
+                        DataDirectory().appendCache(self.targetCacheId, nextCandidate)
                     yield nextCandidate
-            DataDirectory.closeCache(self.targetCacheId)
-            
+            DataDirectory().closeCache(self.targetCacheId)
+
         return iteratorFn()
 
     def _passesFilters(self, candidate):

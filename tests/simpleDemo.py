@@ -63,45 +63,12 @@ def emitDataset(title="Dataset"):
         print(r)
 
 
-    ###########################################
-    # Let's rebuild the entire plan but make it logically identical, and make sure we can get cached results
-    ###########################################
-    print()
-    print()
-    print("Let's rebuild the entire plan but make it logically identical, and make sure we can get cached results")
-    rootSet = buildMITBatteryPaperPlan(dataset1)
-
-    syntacticElements = rootSet.dumpSyntacticTree()
-    print()
-    print("Syntactic operator tree")
-    emitNestedTuple(syntacticElements)
-
-    logicalTree = rootSet.getLogicalTree()
-    logicalElements = logicalTree.dumpLogicalTree()
-    print()
-    print("Logical operator tree")
-    emitNestedTuple(logicalElements)
-
-    # Print the physical operators that will be executed
-    physicalTree = logicalTree.getPhysicalTree()
-    print()
-    print("Physical operator tree")
-    physicalOps = physicalTree.dumpPhysicalTree()
-    emitNestedTuple(physicalOps)
-
-    #iterate over data
-    print()
-    print("Concrete data results")
-    for r in physicalTree:
-        print(r)
-
-
-
 #
 # Get battery papers and emit!
 #
+pz.initDataDirectory("./datadirectory", create=True)
 srcDataDir = "./testFileDirectory"
-pz.DataDirectory.registerLocalDirectory(srcDataDir, "concretedataset-01")
-pz.DataDirectory.registerLocalDirectory(srcDataDir, "concretedataset-02")
+pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-01")
+pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-02")
 
 emitDataset(title="Good MIT battery papers written by good authors")

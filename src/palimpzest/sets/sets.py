@@ -75,7 +75,7 @@ class Set:
 
         # Check to see if there's a cached version of this answer
         uid = self.universalIdentifier()
-        if DataDirectory.hasCachedAnswer(uid):
+        if DataDirectory().hasCachedAnswer(uid):
             return CacheScan(self._basicElt, uid)
 
         # The answer isn't cached, so we have to compute it

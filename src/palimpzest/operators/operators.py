@@ -43,7 +43,7 @@ class CacheScan(LogicalOperator):
         return (self, None)
 
     def getPhysicalTree(self):
-        return MarshalAndScanDataOp(self.outputElementType, self.cachedDataIdentifier)
+        return CacheScanDataOp(self.outputElementType, self.cachedDataIdentifier)
 
 class BaseScan(LogicalOperator):
     """A ConcreteScan is a logical operator that represents a scan of a particular data source."""
