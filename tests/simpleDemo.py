@@ -9,23 +9,32 @@ class ScientificPaper(pz.PDFFile):
 
 
 
-def getMITBatteryPapers():
+def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
-    testRepo1 = pz.ConcreteDataset(pz.File, "concretedataset-01", desc="The dataset Mike downloaded on Jan 30")
+    testRepo1 = pz.ConcreteDataset(pz.File, datasetId, desc="The dataset Mike downloaded on Jan 30")
     sciPapers = pz.Set(ScientificPaper, input=testRepo1, desc="Scientific papers")
     mitPapers = sciPapers.addFilterStr("The paper is from MIT")
     batteryPapers = mitPapers.addFilterStr("The paper is about batteries")
-    goodAuthorPapers = batteryPapers.addFilterStr("Paper where the title begins with the letter X",
-                                            targetFn=lambda x: x.authors)
+    goodAuthorPapers = batteryPapers.addFilterStr("Paper where the title begins with the letter X")
+
     return goodAuthorPapers
 
 
-def emitDataset(rootSet, title="Dataset"):
+def emitDataset(title="Dataset"):
     def emitNestedTuple(node, indent=0):
         elt, child = node
         print(" " * indent, elt)
         if child is not None:
             emitNestedTuple(child, indent=indent+2)
+
+    dataset1 = "concretedataset-01"
+    dataset2 = "concretedataset-02"
+
+    rootSet = buildMITBatteryPaperPlan(dataset1)
+
+    print()
+    print()
+    print("# Let's test the basic functionality of the system")
 
     # Print the syntactic tree
     syntacticElements = rootSet.dumpSyntacticTree()
@@ -40,13 +49,6 @@ def emitDataset(rootSet, title="Dataset"):
     print("Logical operator tree")
     emitNestedTuple(logicalElements)
 
-    # Print the JSON schema that will be populated
-    #jsonSchema = logicalTree.outputElementType.jsonSchema()
-    #jsonSchema["title"]=title
-    #print()
-    #print("JSON SCHEMA")
-    #print(json.dumps(jsonSchema, indent=2))
-
     # Print the physical operators that will be executed
     physicalTree = logicalTree.getPhysicalTree()
     print()
@@ -60,9 +62,20 @@ def emitDataset(rootSet, title="Dataset"):
     for r in physicalTree:
         print(r)
 
-    #####################################
-    # Now let's recompute the tree and see if caching worked
-    ####################################
+
+    ###########################################
+    # Let's rebuild the entire plan but make it logically identical, and make sure we can get cached results
+    ###########################################
+    print()
+    print()
+    print("Let's rebuild the entire plan but make it logically identical, and make sure we can get cached results")
+    rootSet = buildMITBatteryPaperPlan(dataset1)
+
+    syntacticElements = rootSet.dumpSyntacticTree()
+    print()
+    print("Syntactic operator tree")
+    emitNestedTuple(syntacticElements)
+
     logicalTree = rootSet.getLogicalTree()
     logicalElements = logicalTree.dumpLogicalTree()
     print()
@@ -81,13 +94,14 @@ def emitDataset(rootSet, title="Dataset"):
     print("Concrete data results")
     for r in physicalTree:
         print(r)
-   
+
+
 
 #
 # Get battery papers and emit!
 #
 srcDataDir = "./testFileDirectory"
 pz.DataDirectory.registerLocalDirectory(srcDataDir, "concretedataset-01")
+pz.DataDirectory.registerLocalDirectory(srcDataDir, "concretedataset-02")
 
-rootSet = getMITBatteryPapers()
-emitDataset(rootSet, title="Good MIT battery papers written by good authors")
+emitDataset(title="Good MIT battery papers written by good authors")

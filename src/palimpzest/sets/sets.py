@@ -20,32 +20,34 @@ class Set:
 
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self._filters])
-        return f"{self.__class__.__name__}(basicElt={self._basicElt}, desc={self._desc}, filters={filterStr})"
+        return f"{self.__class__.__name__}(basicElt={self._basicElt}, desc={self._desc}, filters={filterStr}, uid={self.universalIdentifier()})"
     
     def serialize(self):
         if self._input is None:
             raise Exception("Cannot create JSON representation of Set because it has no input")
 
-        return {"version": Set.SET_VERSION, 
-             "desc": repr(self._desc), 
-             "basicElt": repr(self._basicElt), 
-             "filters": repr(self._filters), 
+        d = {"version": Set.SET_VERSION, 
+             "desc": self._desc, 
+             "basicElt": self._basicElt.jsonSchema(), 
+             "filters": [f.serialize() for f in self._filters], 
              "input": self._input.serialize()}
-
-    def universalIdentifier(self):
-        """Return a unique identifier for this Set."""
-        d = self.serialize()
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()
+        return d
 
     def deserialize(inputObj):
         if inputObj["version"] != SET_VERSION:
             raise Exception("Cannot deserialize Set because it is the wrong version")
 
-        return Set(inputObj["basicElt"], 
+        return Set(inputObj["basicElt"].jsonSchema(), 
                    input=Set.deserialize(inputObj["input"]), 
-                   desc=eval(inputObj["desc"]), 
-                   filters=eval(inputObj["filters"]))
+                   desc=inputObj["desc"], 
+                   filters=[Filter.deserialize(f) for f in inputObj["filters"]])
+
+    def universalIdentifier(self):
+        """Return a unique identifier for this Set."""
+        d = self.serialize()
+        ordered = json.dumps(d, sort_keys=True)
+        result = hashlib.sha256(ordered.encode()).hexdigest()
+        return result
 
     def schema(self):
         """The Set's basic element"""
@@ -55,12 +57,9 @@ class Set:
         """Add a filter to the Collection. This filter will possibly restrict the items that are returned later."""
         return Set(self._basicElt, input=self, desc="Apply filter(s)", filters=[f])
 
-    def addFilterStr(self, filterCondition: str, targetFn=None):
+    def addFilterStr(self, filterCondition: str):
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
-        if targetFn is None:
-            targetFn = lambda x: x
-
-        f = Filter(filterCondition, transformingFn=targetFn)
+        f = Filter(filterCondition)
         return self.addFilter(f)
     
     def dumpSyntacticTree(self):

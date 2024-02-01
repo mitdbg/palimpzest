@@ -13,6 +13,11 @@ class _DataDirectory:
         """Register a local directory as a data source."""
         self._registry[uniqName] = DirectorySource(path)
 
+    def clearCache(self):
+        """Clear the cache."""
+        self._cache = {}
+        self._tempCache = {}
+
     def hasCachedAnswer(self, uniqName):
         """Check if a dataset is in the cache."""
         return uniqName in self._cache
