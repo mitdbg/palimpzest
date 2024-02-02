@@ -14,8 +14,8 @@ Some target use cases for Palimpzest:
 - **Data Integration**: Integrate multimodal bioinformatics data and make a nice exploration tool
 - **Document Processing**: Process all the footnotes in all the bank regulatory statements to find out which ones are in trouble
 - **Data Mining (get it???)**: Comb through historical maps to find likely deposits of critical minerals
-- **Digital Twins**: Create a dashboard to understand your software team's work. Integrate GitHub commits with bug reports and the next release's feature list
-- **Next-Gen Dashboards**: Integrate your datacenter's logs with background documentation, then ask for hypotheses about a bug you're seeing in Datadog
+- **Digital Twins**: Create a system to understand your software team's work. Integrate GitHub commits, bug reports, and the next release's feature list into a single integrated view. Then add alerting, summaries, rankers, explorers, etc.
+- **Next-Gen Dashboards**: Integrate your datacenter's logs with background documentation, then ask for hypotheses about a bug you're seeing in Datadog. Go beyond the ocean of 2d plots.
 
 # Getting started
 
