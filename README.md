@@ -9,13 +9,13 @@ Some nice things Palimpzest does for you:
 - Ancillary material comes for free: annotation tools, accuracy reports, data version updates, useful provenance records, etc
 
 Some target use cases for Palimpzest:
-- Extract a useable pandemic model from a scientific paper that is accompanied by its code and test datasets
-- Extract all the data tuples from every experiment in every battery electrolyte paper ever written, then write a simple query on them 
-- Integrate multimodal bioinformatics data and make a nice exploration tool
-- Process all the footnotes in all the bank regulatory statements to find out which ones are in trouble
-- Comb through historical maps to find likely deposits of critical minerals
-- Create a dashboard to understand your software team's work. Integrate GitHub commits with bug reports and the next release's feature list
-- Integrate your datacenter's logs with background documentation, then ask for hypotheses about a bug you're seeing in Datadog
+- **Information Extraction**: Extract a useable pandemic model from a scientific paper that is accompanied by its code and test datasets
+- **Scientific Discovery**: Extract all the data tuples from every experiment in every battery electrolyte paper ever written, then write a simple query on them 
+- **Data Integration**: Integrate multimodal bioinformatics data and make a nice exploration tool
+- **Document Processing**: Process all the footnotes in all the bank regulatory statements to find out which ones are in trouble
+- **Data Mining (get it???)**: Comb through historical maps to find likely deposits of critical minerals
+- **Digital Twins**: Create a dashboard to understand your software team's work. Integrate GitHub commits with bug reports and the next release's feature list
+- **Next-Gen Dashboards**: Integrate your datacenter's logs with background documentation, then ask for hypotheses about a bug you're seeing in Datadog
 
 # Getting started
 
