@@ -24,7 +24,8 @@ setup(
         'pandas>=2.2.0',
         'pyarrow>=13.0.0',
         'fastapi~=0.100.0',
-
+        'openai>=1.0',
+        'dspy-ai',
         # Add other dependencies as needed
     ],
 
