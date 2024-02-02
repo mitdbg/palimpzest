@@ -2,6 +2,15 @@ from palimpzest.elements import *
 from palimpzest.solver import Solver
 from palimpzest.datasources import DataDirectory
 
+# Assume 500 MB/sec for local SSD scan time
+LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
+
+# Assume 10s per record for local LLM object conversion
+LOCAL_LLM_CONVERSION_TIME_PER_RECORD = 10
+
+# Assume 5s per record for local LLM boolean filter
+LOCAL_LLM_FILTER_TIME_PER_RECORD = 5
+
 class PhysicalOp:
     synthesizedFns = {}
     solver = Solver()
@@ -13,6 +22,10 @@ class PhysicalOp:
         raise NotImplementedError("Abstract method")
     
     def dumpPhysicalTree(self):
+        raise NotImplementedError("Abstract method")
+    
+    def estimateCost(self):
+        """Returns dict of (cardinality, timePerElement, costPerElement, startupTime, startupCost)"""
         raise NotImplementedError("Abstract method")
 
 class MarshalAndScanDataOp(PhysicalOp):
@@ -26,6 +39,25 @@ class MarshalAndScanDataOp(PhysicalOp):
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, None)
+    
+    def estimateCost(self):
+        cardinality = DataDirectory().getCardinality(self.concreteDatasetIdentifier)
+        size = DataDirectory().getSize(self.concreteDatasetIdentifier)
+        perElementSizeInKb = (size / float(cardinality)) / float(1024)
+        timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
+        costPerElement = 0
+        startupTime = 0
+        startupCost = 0
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": timePerElement,
+            "costPerElement": costPerElement,
+            "startupTime": startupTime,
+            "startupCost": startupCost,
+            "bytesReadLocally": size,
+            "bytesReadRemotely": 0
+        }
     
     def __iter__(self):
         def iteratorFn():
@@ -44,7 +76,26 @@ class CacheScanDataOp(PhysicalOp):
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, None)
-    
+
+    def estimateCost(self):
+        cardinality = sum(1 for _ in DataDirectory().getCachedResult(self.cacheIdentifier))
+        size = 100 * cardinality
+        perElementSizeInKb = (size / float(cardinality)) / float(1024)
+        timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
+        costPerElement = 0
+        startupTime = 0
+        startupCost = 0
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": timePerElement,
+            "costPerElement": costPerElement,
+            "startupTime": startupTime,
+            "startupCost": startupCost,
+            "bytesReadLocally": size,
+            "bytesReadRemotely": 0
+        }
+
     def __iter__(self):
         def iteratorFn():
             for nextCandidate in DataDirectory().getCachedResult(self.cacheIdentifier):
@@ -63,6 +114,28 @@ class InduceFromCandidateOp(PhysicalOp):
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
+
+    def estimateCost(self):
+        inputCostEstimates = self.source.estimateCost()
+
+        selectivity = 1.0
+        cardinality = selectivity * inputCostEstimates["cardinality"]
+        timePerElement = LOCAL_LLM_CONVERSION_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
+        costPerElement = inputCostEstimates["costPerElement"]
+        startupTime = inputCostEstimates["startupTime"]
+        startupCost = inputCostEstimates["startupCost"]
+        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
+        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": timePerElement,
+            "costPerElement": costPerElement,
+            "startupTime": startupTime,
+            "startupCost": startupCost,
+            "bytesReadLocally": bytesReadLocally,
+            "bytesReadRemotely": bytesReadRemotely
+        }
 
     def __iter__(self):
         def iteratorFn():    
@@ -93,6 +166,28 @@ class FilterCandidateOp(PhysicalOp):
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
+
+    def estimateCost(self):
+        inputCostEstimates = self.source.estimateCost()
+
+        selectivity = 1.0
+        cardinality = selectivity * inputCostEstimates["cardinality"]
+        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
+        costPerElement = inputCostEstimates["costPerElement"]
+        startupTime = inputCostEstimates["startupTime"]
+        startupCost = inputCostEstimates["startupCost"]
+        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
+        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": timePerElement,
+            "costPerElement": costPerElement,
+            "startupTime": startupTime,
+            "startupCost": startupCost,
+            "bytesReadLocally": bytesReadLocally,
+            "bytesReadRemotely": bytesReadRemotely
+        }
 
     def __iter__(self):
         shouldCache = DataDirectory().openCache(self.targetCacheId)

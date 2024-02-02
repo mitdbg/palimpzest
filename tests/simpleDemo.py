@@ -25,7 +25,7 @@ def emitDataset(title="Dataset"):
         if child is not None:
             emitNestedTuple(child, indent=indent+2)
 
-    dataset1 = "concretedata-01"
+    dataset1 = "concretedataset-02"
     rootSet = buildMITBatteryPaperPlan(dataset1)
 
     print()
@@ -50,6 +50,8 @@ def emitDataset(title="Dataset"):
     print()
     print("Physical operator tree")
     physicalOps = physicalTree.dumpPhysicalTree()
+    print()
+    print("estimated costs:", physicalTree.estimateCost())
     emitNestedTuple(physicalOps)
 
     #iterate over data

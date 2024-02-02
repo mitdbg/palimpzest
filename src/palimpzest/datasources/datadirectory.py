@@ -58,6 +58,36 @@ class _DataDirectory:
         else:
             raise Exception("Unknown entry type")
 
+    def getSize(self, uniqName):
+        """Return the size (in bytes) of a dataset."""
+        if not uniqName in self._registry:
+            raise Exception("Cannot find dataset", uniqName, "in the registry.")
+        
+        entry, path = self._registry[uniqName]
+        if entry == "dir":
+            # Sum the length in bytes of every file in the directory
+            return sum([os.path.getsize(os.path.join(path, name)) for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
+        elif entry == "file":
+            # Get the length of the file
+            return os.path.getsize(path)
+        else:
+            raise Exception("Unknown entry type")
+
+    def getCardinality(self, uniqName):
+        """Return the number of records in a dataset."""
+        if not uniqName in self._registry:
+            raise Exception("Cannot find dataset", uniqName, "in the registry.")
+        
+        entry, path = self._registry[uniqName]
+        if entry == "dir":
+            # Return the number of files in the directory
+            return len([name for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
+        elif entry == "file":
+            # Return 1
+            return 1
+        else:
+            raise Exception("Unknown entry type")
+
     def listRegisteredDatasets(self):
         """Return a list of registered datasets."""
         return self._registry.items()
