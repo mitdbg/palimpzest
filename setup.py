@@ -26,6 +26,8 @@ setup(
         'fastapi~=0.100.0',
         'openai>=1.0',
         'dspy-ai',
+        'prettytable>=3.9.0',
+        'pyyaml>=6.0.1'
         # Add other dependencies as needed
     ],
 

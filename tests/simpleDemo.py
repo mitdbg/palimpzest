@@ -1,13 +1,11 @@
 import palimpzest as pz
 
-import json
+import os
 
 class ScientificPaper(pz.PDFFile):
    """Represents a scientific research paper, which in practice is usually from a PDF file"""
    title = pz.Field(desc="The title of the paper. This is a natural language title, not a number or letter.", required=True)
    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
-
-
 
 def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
@@ -27,9 +25,7 @@ def emitDataset(title="Dataset"):
         if child is not None:
             emitNestedTuple(child, indent=indent+2)
 
-    dataset1 = "concretedataset-01"
-    dataset2 = "concretedataset-02"
-
+    dataset1 = "concretedata-01"
     rootSet = buildMITBatteryPaperPlan(dataset1)
 
     print()
@@ -66,9 +62,9 @@ def emitDataset(title="Dataset"):
 #
 # Get battery papers and emit!
 #
-pz.initDataDirectory("./datadirectory", create=True)
-srcDataDir = "./testFileDirectory"
-pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-01")
-pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-02")
+config = pz.Config(os.getenv("PZ_DIR"))
+#srcDataDir = "./testFileDirectory"
+#pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-01")
+#pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-02")
 
 emitDataset(title="Good MIT battery papers written by good authors")
