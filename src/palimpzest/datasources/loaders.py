@@ -41,8 +41,8 @@ class FileSource(DataSource):
     def __iter__(self):
         def filteredIterator():
             dr = DataRecord(self.basicElement)
-            dr.filename = file_path
-            dr.contents = open(file_path, "rb").read()
+            dr.filename = self.path
+            dr.contents = open(self.path, "rb").read()
             yield dr
 
         return filteredIterator()

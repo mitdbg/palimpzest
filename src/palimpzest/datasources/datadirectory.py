@@ -47,16 +47,26 @@ class _DataDirectory:
     def getRegisteredDataset(self, uniqName):
         """Return a dataset from the registry."""
         if not uniqName in self._registry:
-            return None
+            raise Exception("Cannot find dataset", uniqName, "in the registry.")
         
         entry, path = self._registry[uniqName]
         if entry == "dir":
             return DirectorySource(path)
         elif entry == "file":
+            # THIS IS NOT RETURNING A GOOD ITERATOR SOMEHOW!!!!!
             return FileSource(path)
         else:
             raise Exception("Unknown entry type")
 
+    def listRegisteredDatasets(self):
+        """Return a list of registered datasets."""
+        return self._registry.items()
+    
+    def rmRegisteredDataset(self, uniqName):
+        """Remove a dataset from the registry."""
+        del self._registry[uniqName]
+        pickle.dump(self._registry, open(self._configDir + "/cache/registry.pkl", "wb"))
+    
     #
     # These methods handle cached results. They are meant to be persisted for performance reasons,
     # but can always be recomputed if necessary.
@@ -110,6 +120,7 @@ def initDataDirectory(initDir, create=False):
         raise Exception("DataDirectory already initialized")
     else:
         _DataDirectoryMember = _DataDirectory(initDir, create=create)
+        return _DataDirectoryMember
 
 def DataDirectory():
     return _DataDirectoryMember
