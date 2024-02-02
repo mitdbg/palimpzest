@@ -28,6 +28,9 @@ class Solver:
         #
         # In the future, we will be clever and choose the fastest possible LLM that can still deliver on the desired task,
         #  quality-wise.
+        # Chunwei: I will try to implement a few function templates here. Then serve them to LLM models for code generation for similar tasks.
+        # Chunwei: The generated functions will be cached in the synthesizedFns dictionary and profiled (runtime, resource usage) everytime they are called.
+        #          The profiling results will be used to rank the functions and choose the best one based on the hardware constraints.
         ######################################
         if functionName == "InduceFromCandidateOp":
 

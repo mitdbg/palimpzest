@@ -21,6 +21,10 @@ setup(
     install_requires=[
         'numpy>=1.19',
         'requests>=2.25',
+        'pandas>=2.2.0',
+        'pyarrow>=13.0.0',
+        'fastapi~=0.100.0',
+
         # Add other dependencies as needed
     ],
 
