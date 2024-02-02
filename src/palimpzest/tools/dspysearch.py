@@ -7,11 +7,12 @@ import dspy
 # Given a question, we'll feed it with the paper context for answer generation.
 ##
 class FilterOverPaper(dspy.Signature):
-    """Answer questions about a scientific paper."""
+    """Answer condition questions about a scientific paper."""
 
     context = dspy.InputField(desc="contains full text of the paper, including author, institution, title, and body")
-    question = dspy.InputField(desc="a question about the paper")
-    answer = dspy.OutputField(desc="often a true/false answer to a question about the paper")
+    question = dspy.InputField(desc="one or more conditions about the paper")
+    answer = dspy.OutputField(desc="often a TRUE/FALSE answer to the condition question(s) about the paper")
+
 class RAG(dspy.Module):
     def __init__(self):
         super().__init__()
@@ -21,6 +22,20 @@ class RAG(dspy.Module):
         context = context
         answer = self.generate_answer(context=context, question=question)
         return answer
+
+def run_rag(context, question):
+    if 'OPENAI_API_KEY' not in os.environ:
+        raise ValueError("OPENAI_API_KEY not found in environment variables")
+    # get openai key from environment
+    openai_key = os.environ['OPENAI_API_KEY']
+    turbo = dspy.OpenAI(model='gpt-4-0125-preview', api_key=openai_key, temperature=0.0)
+    dspy.settings.configure(lm=turbo)
+    rag = RAG()
+    pred = rag(question, context)
+    print(question)
+    print(indent(pred.rationale, 4 * ' '))
+    print(pred.answer)
+    return pred.answer
 
 if __name__ == "__main__":
     # get openai key from environment, throw error if not found

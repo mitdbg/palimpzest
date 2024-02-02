@@ -11,9 +11,9 @@ def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
     testRepo1 = pz.ConcreteDataset(pz.File, datasetId, desc="The dataset Mike downloaded on Jan 30")
     sciPapers = pz.Set(ScientificPaper, input=testRepo1, desc="Scientific papers")
-    mitPapers = sciPapers.addFilterStr("The paper is from MIT")
-    batteryPapers = mitPapers.addFilterStr("The paper is about batteries")
-    goodAuthorPapers = batteryPapers.addFilterStr("Paper where the title begins with the letter X")
+    batteryPapers = sciPapers.addFilterStr("The paper is about batteries")
+    mitPapers = batteryPapers.addFilterStr("The paper is from MIT")
+    goodAuthorPapers = mitPapers.addFilterStr("Paper where the title begins with the letter X")
 
     return goodAuthorPapers
 
@@ -63,8 +63,9 @@ def emitDataset(title="Dataset"):
 # Get battery papers and emit!
 #
 config = pz.Config(os.getenv("PZ_DIR"))
-#srcDataDir = "./testFileDirectory"
-#pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-01")
-#pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-02")
+# srcDataDir = "./testFileDirectory"
+# pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-01")
+# print(pz.DataDirectory().listRegisteredDatasets())
+# pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-02")
 
 emitDataset(title="Good MIT battery papers written by good authors")

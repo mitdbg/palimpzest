@@ -19,5 +19,6 @@ Some target use cases for Palimpzest:
 
 # Getting started
 
-First thing, run `tests/simpleDemo.py`
-
+First thing, please set up the system environment variables `PZ_DIR`. This is the root directory for the Palimpzest system.
+Initialize the configuration by running `pz.py --init`.
+To see a simple example of how to use Palimpzest, simply run `tests/simpleDemo.py`. 
