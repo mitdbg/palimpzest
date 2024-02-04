@@ -29,7 +29,9 @@ class PdfParser:
 
     def get_pages(self) -> List[str]:
         return self.pages
-
+##
+# Function to extract a Cosmos parquet file to Cosmos JSON
+##
 def cosmos_parquet_to_json(path):
     parquet_df = pd.read_parquet(path)
     parquet_json = parquet_df.to_json()
@@ -107,6 +109,10 @@ def cosmos_parquet_to_json(path):
                 name2results[row_data["pdf_name"]] = [row_data]
 
         return next(iter(name2results.items()))[1]
+
+##
+# Function to extract the text 'content' attribute from the Cosmos JSON data
+##
 def cosmos_json_txt(cosmos_json):
 
         # Initialize an empty list to store the content texts
@@ -118,7 +124,7 @@ def cosmos_json_txt(cosmos_json):
             content_texts.append(item.get('content', ''))
 
         return content_texts
-def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10):
+def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10 ):
     files = [
         ("pdf", (name, data, 'application/pdf')),
     ]
@@ -186,7 +192,6 @@ if __name__ == "__main__":
     file_path = "../../../tests/testFileDirectory/1 All F Guo.pdf"
     output_dir = "../../../tests/testFileDirectory/cosmos"
     with open(file_path, "rb") as file:
-        # Extract the file name from the file path
         file_name = os.path.basename(file_path)
         # Call the cosmos_client function
         cosmos_client(file_name, file, output_dir)
