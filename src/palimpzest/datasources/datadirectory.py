@@ -142,6 +142,15 @@ class _DataDirectory:
         del self._tempCache[cacheId]
         self._cache[cacheId] = filename
 
+    def exists(self, uniqName):
+        return uniqName in self._registry
+
+    def getPath(self, uniqName):
+        if not uniqName in self._registry:
+            raise Exception("Cannot find dataset", uniqName, "in the registry.")
+        entry, path = self._registry[uniqName]
+        return path
+
 _DataDirectoryMember = None
 def initDataDirectory(initDir, create=False):
     """Initialize the DataDirectory with a directory."""

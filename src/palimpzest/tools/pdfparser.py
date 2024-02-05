@@ -10,6 +10,9 @@ import pandas as pd
 import requests
 from fastapi import APIRouter, FastAPI, UploadFile, Response, status
 
+from palimpzest import DataDirectory
+import palimpzest as pz
+
 COSMOS_ADDRESS = "https://xdd.wisc.edu/cosmos_service"
 class PdfParser:
     def __init__(self, pdf_path: str):
@@ -186,12 +189,41 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10 ):
     else:
         raise RuntimeError(f"COSMOS Error - STATUS CODE: {response.status_code} - {COSMOS_ADDRESS}")
 
+##
+# Function to extract the text from a PDF file:
+# 1. Check if the text file already exists in the cache, if so, read from the cache
+# 2. If not, call the cosmos_client function to process the PDF file and cache the text file
+##
+def get_text_from_pdf(filename, pdf_bytes):
+    pdf_filename = filename
+    file_name = os.path.basename(pdf_filename)
+    text_file_name = f"{file_name.split('.')[0]}.txt"
+    if DataDirectory().exists(text_file_name):
+        print(f"Text file {text_file_name} already exists, reading from cache")
+        text_file_path = DataDirectory().getPath(text_file_name)
+        with open(text_file_path, 'r') as file:
+            text_content = file.read()
+            return text_content
+    cosmos_file_dir = file_name.split('.')[0].replace(' ', '_')
+    output_dir = os.path.dirname(pdf_filename)
+    print(f"Processing {file_name} through COSMOS")
+    # Call the cosmos_client function
+    cosmos_client(file_name, pdf_bytes, output_dir)
+    text_file_path = os.path.join(output_dir, f"{cosmos_file_dir}/{file_name.split('.')[0]}.txt")
+    DataDirectory().registerLocalFile(text_file_path, text_file_name)
+    with open(text_file_path, 'r') as file:
+        text_content = file.read()
+        return text_content
+
 
 
 if __name__ == "__main__":
+    config = pz.Config(os.getenv("PZ_DIR"))
     file_path = "../../../tests/testFileDirectory/1 All F Guo.pdf"
     output_dir = "../../../tests/testFileDirectory/cosmos"
     with open(file_path, "rb") as file:
-        file_name = os.path.basename(file_path)
-        # Call the cosmos_client function
-        cosmos_client(file_name, file, output_dir)
+        text = get_text_from_pdf(file_path, file.read())
+        print(text)
+        # file_name = os.path.basename(file_path)
+        # # Call the cosmos_client function
+        # cosmos_client(file_name, file, output_dir)

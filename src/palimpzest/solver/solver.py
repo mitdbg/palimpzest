@@ -1,8 +1,8 @@
 import os
 
 from palimpzest.elements import DataRecord
-from palimpzest.tools import cosmos_client
-from palimpzest.tools.dspysearch import run_rag
+from palimpzest.tools import cosmos_client, get_text_from_pdf
+from palimpzest.tools.dspysearch import run_rag_boolean, run_rag_qa
 
 
 class Solver:
@@ -47,11 +47,15 @@ class Solver:
             # Let's do LLM-based induction by default
             # REMIND: Chunwei, let's do some LLM-based induction here
             def fn(candidate: DataRecord):
-                print(f"file name: {candidate.filename}")
                 if candidate.element is inputElement:
-                    print(f"filtered file name: {candidate.filename}")
+                    print(f"Induce file: {candidate.filename}")
+                    pdf_bytes = candidate.contents
+                    pdf_filename = candidate.filename
+                    text_content = get_text_from_pdf(pdf_filename, pdf_bytes)
+                    title = run_rag_qa(text_content, "What is the title of the document?")
+
                     dr = DataRecord(outputElement)
-                    dr.title = "Test Title"
+                    dr.title = title
                     dr.contents = candidate.contents
                     dr.filename = candidate.filename
                     return dr
@@ -77,17 +81,8 @@ class Solver:
                     if candidate.element == inputElement:
                         pdf_bytes = candidate.contents
                         pdf_filename = candidate.filename
-                        file_name = os.path.basename(pdf_filename)
-                        cosmos_file_dir = file_name.split('.')[0].replace(' ', '_')
-                        output_dir = os.path.dirname(pdf_filename)
-                        print(f"Processing {file_name}")
-                        # Call the cosmos_client function
-                        cosmos_client(file_name, pdf_bytes, output_dir)
-                        text_path = os.path.join(output_dir, f"{cosmos_file_dir}/{file_name.split('.')[0]}.txt")
-                        print(f"Text file path: {text_path}")
-                        with open(text_path, 'r') as file:
-                            text_content = file.read()
-                        response = run_rag(text_content, filterCondition)
+                        text_content = get_text_from_pdf(pdf_filename,pdf_bytes)
+                        response = run_rag_boolean(text_content, filterCondition)
                         if response == "TRUE":
                             return True
                     return False
