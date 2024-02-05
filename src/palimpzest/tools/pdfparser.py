@@ -150,7 +150,7 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10 ):
                     if cosmos_response.status_code == status.HTTP_200_OK:
                         data = cosmos_response.content
                         with ZipFile(io.BytesIO(data)) as z:
-                            output_subdir = os.path.join(output_dir, name.split('.')[0].replace(' ', '_'))
+                            output_subdir = os.path.join(output_dir, os.path.splitext(name)[0].replace(' ', '_'))
                             os.makedirs(output_subdir, exist_ok=True)
                             z.extractall(path=output_subdir)
                             for file in os.listdir(output_subdir):
@@ -197,19 +197,22 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10 ):
 def get_text_from_pdf(filename, pdf_bytes):
     pdf_filename = filename
     file_name = os.path.basename(pdf_filename)
-    text_file_name = f"{file_name.split('.')[0]}.txt"
+    file_name_without_extension = os.path.splitext(file_name)[0]
+    text_file_name = f"{file_name_without_extension}.txt"
     if DataDirectory().exists(text_file_name):
         print(f"Text file {text_file_name} already exists, reading from cache")
         text_file_path = DataDirectory().getPath(text_file_name)
         with open(text_file_path, 'r') as file:
             text_content = file.read()
             return text_content
-    cosmos_file_dir = file_name.split('.')[0].replace(' ', '_')
+    cosmos_file_dir = file_name_without_extension.replace(' ', '_')
     output_dir = os.path.dirname(pdf_filename)
     print(f"Processing {file_name} through COSMOS")
     # Call the cosmos_client function
     cosmos_client(file_name, pdf_bytes, output_dir)
-    text_file_path = os.path.join(output_dir, f"{cosmos_file_dir}/{file_name.split('.')[0]}.txt")
+    text_file_path = os.path.join(output_dir, f"{cosmos_file_dir}/{file_name_without_extension}.txt")
+    if not os.path.exists(text_file_path):
+        raise FileNotFoundError(f"Text file {text_file_name} not found in {output_dir}/{cosmos_file_dir}")
     DataDirectory().registerLocalFile(text_file_path, text_file_name)
     with open(text_file_path, 'r') as file:
         text_content = file.read()
@@ -219,11 +222,12 @@ def get_text_from_pdf(filename, pdf_bytes):
 
 if __name__ == "__main__":
     config = pz.Config(os.getenv("PZ_DIR"))
-    file_path = "../../../tests/testFileDirectory/1 All F Guo.pdf"
-    output_dir = "../../../tests/testFileDirectory/cosmos"
+    file_path = "/Users/chunwei/Downloads/sidarthe.annotations.pdf"
+    # output_dir = "../../../tests/testFileDirectory/cosmos"
     with open(file_path, "rb") as file:
         text = get_text_from_pdf(file_path, file.read())
         print(text)
         # file_name = os.path.basename(file_path)
         # # Call the cosmos_client function
         # cosmos_client(file_name, file, output_dir)
+    pz.DataDirectory().rmRegisteredDataset("sidarthe.annotations.txt")
