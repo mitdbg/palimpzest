@@ -41,9 +41,9 @@ class MarshalAndScanDataOp(PhysicalOp):
         return (self, None)
     
     def estimateCost(self):
-        cardinality = DataDirectory().getCardinality(self.concreteDatasetIdentifier)
+        cardinality = DataDirectory().getCardinality(self.concreteDatasetIdentifier) + 1
         size = DataDirectory().getSize(self.concreteDatasetIdentifier)
-        perElementSizeInKb = (size / float(cardinality)) / float(1024)
+        perElementSizeInKb = (size / float(cardinality)) / 1024.0
         timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
         costPerElement = 0
         startupTime = 0
@@ -78,9 +78,9 @@ class CacheScanDataOp(PhysicalOp):
         return (self, None)
 
     def estimateCost(self):
-        cardinality = sum(1 for _ in DataDirectory().getCachedResult(self.cacheIdentifier))
+        cardinality = sum(1 for _ in DataDirectory().getCachedResult(self.cacheIdentifier)) + 1
         size = 100 * cardinality
-        perElementSizeInKb = (size / float(cardinality)) / float(1024)
+        perElementSizeInKb = (size / float(cardinality)) / 1024.0
         timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
         costPerElement = 0
         startupTime = 0
