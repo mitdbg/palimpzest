@@ -71,3 +71,4 @@ config = pz.Config(os.getenv("PZ_DIR"))
 # pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-02")
 
 emitDataset(title="Good MIT battery papers written by good authors")
+# pz.DataDirectory().clearCache()

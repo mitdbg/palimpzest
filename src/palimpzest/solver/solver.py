@@ -1,8 +1,10 @@
 import os
 
+from palimpzest import Field
 from palimpzest.elements import DataRecord
 from palimpzest.tools import cosmos_client, get_text_from_pdf
 from palimpzest.tools.dspysearch import run_rag_boolean, run_rag_qa
+
 
 
 class Solver:
@@ -14,7 +16,6 @@ class Solver:
     def synthesize(self, taskDescriptor):
         """Return a function that maps from inputType to outputType."""
         functionName, functionParams, outputElement, inputElement = taskDescriptor
-        # print(f"Synthesizing function for task: {functionName} with params {functionParams} from {inputElement} to {outputElement}")
         ######################################
         #
         # Here is where we would synthesize the function.
@@ -38,6 +39,8 @@ class Solver:
         #          The profiling results will be used to rank the functions and choose the best one based on the hardware constraints.
         ######################################
         if functionName == "InduceFromCandidateOp":
+            print(
+                f"Synthesizing function for task: {functionName} with params {functionParams} from {inputElement} to {outputElement}")
 
             # Let's check if there's a prefab function for this mapping from type A to type B
             # hardcodedFn = self._hardcodedFn(inputElement, outputElement)
@@ -49,15 +52,31 @@ class Solver:
             def fn(candidate: DataRecord):
                 if candidate.element is inputElement:
                     print(f"Induce file: {candidate.filename}")
-                    pdf_bytes = candidate.contents
-                    pdf_filename = candidate.filename
-                    text_content = get_text_from_pdf(pdf_filename, pdf_bytes)
-                    title = run_rag_qa(text_content, "What is the title of the document?")
+                    # now we use file suffix to detect the file type. We can use python-magic on the content to detect the file type.
+                    if candidate.filename.endswith(".pdf"):
+                        pdf_bytes = candidate.contents
+                        pdf_filename = candidate.filename
+                        text_content = get_text_from_pdf(pdf_filename, pdf_bytes)
+                    elif candidate.filename.endswith(".txt"):
+                        text_content = candidate.contents
+                    else:
+                        raise ValueError(f"Unsupported file type: {os.path.splitext(candidate.filename)}")
 
+                    # iterate through all empty fields in the outputElement and ask questions to fill them
+                    # for field in inputElement.__dict__:
+                    #     print(f"output field: {field}")
                     dr = DataRecord(outputElement)
-                    dr.title = title
+                    for field_name, field_value in vars(outputElement).items():
+                        if isinstance(field_value, Field) and not field_name.startswith('__'):
+                            field_desc = field_value.jsonSchema()['description']
+                            if hasattr(outputElement, field_name):
+                                answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({field_desc})")
+                                setattr(dr, field_name, answer)
+                            else:
+                                print(f"Warning: {outputElement} does not have a field named {field_name}")
                     dr.contents = candidate.contents
                     dr.filename = candidate.filename
+                    print(f"Converted to outputElement: {dr}")
                     return dr
                 else:
                     return None
