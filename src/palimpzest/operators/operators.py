@@ -46,7 +46,17 @@ class ConvertScan(LogicalOperator):
         return (self, self.inputOp.dumpLogicalTree())
 
     def _getPhysicalTree(self, strategy=None):
-        return InduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy))
+        # If the input is in core, and the output is NOT in core but its superclass is, then we should do a
+        # 2-stage conversion. This will maximize chances that there is a pre-existing conversion to the superclass
+        # in the known set of functions
+        intermediateOutputElement = self.outputElementType
+        while not intermediateOutputElement == Element and not PhysicalOp.solver.easyConversionAvailable(intermediateOutputElement, self.inputElementType):
+            intermediateOutputElement = intermediateOutputElement.__bases__[0]
+
+        if intermediateOutputElement == Element or intermediateOutputElement == self.outputElementType:
+            return InduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy))
+        else:
+            return InduceFromCandidateOp(self.outputElementType, InduceFromCandidateOp(intermediateOutputElement, self.inputOp._getPhysicalTree(strategy=strategy)))
 
 class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached answer."""

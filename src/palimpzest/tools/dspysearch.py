@@ -40,9 +40,9 @@ def run_rag_boolean(context, question):
     dspy.settings.configure(lm=turbo)
     rag = RAG(FilterOverPaper)
     pred = rag(question, context)
-    print(question)
-    print(indent(pred.rationale, 4 * ' '))
-    print(pred.answer)
+    #print(question)
+    #print(indent(pred.rationale, 4 * ' '))
+    #print(pred.answer)
     return pred.answer
 
 def run_rag_qa(context, question):
@@ -54,9 +54,9 @@ def run_rag_qa(context, question):
     dspy.settings.configure(lm=turbo)
     rag = RAG(QuestionOverPaper)
     pred = rag(question, context)
-    print(question)
-    print(indent(pred.rationale, 4 * ' '))
-    print(pred.answer)
+    #print(question)
+    #print(indent(pred.rationale, 4 * ' '))
+    #print(pred.answer)
     return pred.answer
 
 if __name__ == "__main__":
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     What is the first author's institution?"""
     context = open("../../../tests/testFileDirectory/cosmos/1_All_F_Guo/1 All F Guo.txt").read()
     pred = rag(question, context)
-    print(question)
-    print(indent(pred.rationale, 4 * ' '))
-    print(pred.answer)
+    #print(question)
+    #print(indent(pred.rationale, 4 * ' '))
+    #print(pred.answer)
 

@@ -199,12 +199,20 @@ def get_text_from_pdf(filename, pdf_bytes):
     file_name = os.path.basename(pdf_filename)
     file_name_without_extension = os.path.splitext(file_name)[0]
     text_file_name = f"{file_name_without_extension}.txt"
-    if DataDirectory().exists(text_file_name):
-        print(f"Text file {text_file_name} already exists, reading from cache")
-        text_file_path = DataDirectory().getPath(text_file_name)
-        with open(text_file_path, 'r') as file:
-            text_content = file.read()
-            return text_content
+
+    #
+    # CHUNWEI: This code has a bug
+    # It checks to see if the text file name is in the registry, but there are two things wrong here.
+    # 1) The registry is for 'official' datasets that have been inserted by the user, not cached objects.  
+    # 2) The filename isn't enough to check for cached results. Maybe the file moved directories, or maybe there are
+    # multiple different files with the same name. You need the checksum of the original file to ensure the cached object is valid.
+    #
+#    if DataDirectory().exists(text_file_name):
+#        print(f"Text file {text_file_name} already exists, reading from cache")
+#        text_file_path = DataDirectory().getPath(text_file_name)
+#        with open(text_file_path, 'r') as file:
+#            text_content = file.read()
+#            return text_content
     cosmos_file_dir = file_name_without_extension.replace(' ', '_')
     output_dir = os.path.dirname(pdf_filename)
     print(f"Processing {file_name} through COSMOS")

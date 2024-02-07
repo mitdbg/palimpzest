@@ -113,7 +113,6 @@ class InduceFromCandidateOp(PhysicalOp):
 
         taskDescriptor = ("InduceFromCandidateOp", None, outputElementType, source.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            print("Trying to suynthwize", taskDescriptor)
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
 
     def __str__(self):
@@ -170,6 +169,7 @@ class FilterCandidateOp(PhysicalOp):
         taskDescriptor = ("FilterCandidateOp", tuple(self.filters), source.outputElementType, self.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
+            #print("REGISTERED", taskDescriptor, "AS", PhysicalOp.synthesizedFns[taskDescriptor])
 
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self.filters])
@@ -216,6 +216,7 @@ class FilterCandidateOp(PhysicalOp):
     def _passesFilters(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
         taskDescriptor = ("FilterCandidateOp", tuple(self.filters), candidate.element, self.outputElementType)
+        #print("LOOKING FOR FUNCTION", taskDescriptor)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)

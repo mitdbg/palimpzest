@@ -20,14 +20,25 @@ def buildMITBatteryPaperPlan(datasetId):
 
     return goodAuthorPapers
 
-def emitDataset(datasetid, title="Dataset", verbose=False):
+class Email(pz.TextFile):
+    """Represents an email, which in practice is usually from a text file"""
+    sender = pz.Field(desc="The email address of the sender", required=True)
+    subject = pz.Field(desc="The subject of the email", required=True)
+
+def buildEnronPlan(datasetId):
+    testRepo1 = pz.ConcreteDataset(pz.File, datasetId, desc="A collection of files")
+    textFiles = pz.Set(pz.TextFile, input=testRepo1, desc="Text files")
+    emails = pz.Set(Email, input=textFiles, desc="Emails")
+
+    return emails
+
+def emitDataset(rootSet, title="Dataset", verbose=False):
     def emitNestedTuple(node, indent=0):
         elt, child = node
         print(" " * indent, elt)
         if child is not None:
             emitNestedTuple(child, indent=indent+2)
 
-    rootSet = buildMITBatteryPaperPlan(datasetid)
 
     print()
     print()
@@ -90,7 +101,11 @@ if __name__ == "__main__":
 
     config = pz.Config(os.getenv("PZ_DIR"))
     if task == "paper":
-        emitDataset(datasetid, title="Good MIT battery papers written by good authors", verbose=args.verbose)
+        rootSet = buildMITBatteryPaperPlan(datasetid)
+        emitDataset(rootSet, title="Good MIT battery papers written by good authors", verbose=args.verbose)
+    elif task == "enron":
+        rootSet = buildEnronPlan(datasetid)
+        emitDataset(rootSet, title="Good Enron emails", verbose=args.verbose)
     else:
         print("Unknown task")
         exit(1)

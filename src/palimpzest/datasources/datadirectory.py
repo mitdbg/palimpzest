@@ -143,6 +143,7 @@ class _DataDirectory:
         self._cache[cacheId] = filename
 
     def exists(self, uniqName):
+        print("Checking if exists", uniqName, "in", self._registry)
         return uniqName in self._registry
 
     def getPath(self, uniqName):

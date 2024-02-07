@@ -8,7 +8,6 @@ import sys
 
 if __name__ == "__main__":
     env_dir = os.getenv("PZ_DIR")
-    print("Got PZDIR", env_dir)
     parser = argparse.ArgumentParser(prog='pz', description='Palimpzest management tool')
 
     # specify config directory manually (overrides environment variable)

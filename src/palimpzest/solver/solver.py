@@ -14,6 +14,9 @@ class Solver:
         self._hardcodedFns = set()
         self._hardcodedFns.add((PDFFile, File))
 
+    def easyConversionAvailable(self, outputElement, inputElement):
+        return (outputElement, inputElement) in self._simpleTypeConversions or (outputElement, inputElement) in self._hardcodedFns
+
     def _makeSimpleTypeConversionFn(self, outputElement, inputElement):
         """This is a very simple function that converts a DataRecord from one type to another, when we know they have identical fields."""
         def _simpleTypeConversionFn(candidate: DataRecord):
@@ -37,6 +40,7 @@ class Solver:
                     return None
                 pdf_bytes = candidate.contents
                 pdf_filename = candidate.filename
+                print("About to process PDF for ", pdf_filename)
                 text_content = get_text_from_pdf(candidate.filename, candidate.contents)
                 dr = DataRecord(outputElement)
                 dr.filename = pdf_filename
@@ -64,10 +68,8 @@ class Solver:
             functionName, functionParams, outputElement, inputElement = taskDescriptor
             if len(functionParams) == 0:
                 def allPass(candidate: DataRecord):
-                    if candidate.element == inputElement:
-                        return True
-                    else:
-                        return False
+                    return True
+
                 return allPass
             
             # By default, a filter requires an LLM invocation to run
@@ -90,7 +92,6 @@ class Solver:
     def synthesize(self, taskDescriptor):
         """Return a function that maps from inputType to outputType."""
         functionName, functionParams, outputElement, inputElement = taskDescriptor
-        print(f"Synthesizing function for task: {functionName} with params {functionParams} from {inputElement} to {outputElement}")
 
         if functionName == "InduceFromCandidateOp":
             typeConversionDescriptor = (outputElement, inputElement)
@@ -101,6 +102,6 @@ class Solver:
             else:
                 return self._makeLLMTypeConversionFn(outputElement, inputElement)
         elif functionName == "FilterCandidateOp":
-            self._makeFilterFn(taskDescriptor)
+            return  self._makeFilterFn(taskDescriptor)
         else:
             raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))
