@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 import palimpzest as pz
 
 import os
 import argparse
+
 
 class ScientificPaper(pz.PDFFile):
    """Represents a scientific research paper, which in practice is usually from a PDF file"""

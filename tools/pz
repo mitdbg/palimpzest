@@ -8,7 +8,7 @@ import sys
 
 if __name__ == "__main__":
     env_dir = os.getenv("PZ_DIR")
-
+    print("Got PZDIR", env_dir)
     parser = argparse.ArgumentParser(prog='pz', description='Palimpzest management tool')
 
     # specify config directory manually (overrides environment variable)
@@ -44,6 +44,7 @@ if __name__ == "__main__":
         config = pz.Config(os.path.abspath(args.dir), create=True)
         sys.exit(0)
     
+    print("Configdir", os.path.abspath(args.dir))
     config = pz.Config(os.path.abspath(args.dir))
 
     # Process the usert command

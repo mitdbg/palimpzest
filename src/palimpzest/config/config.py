@@ -16,13 +16,12 @@ class Config:
             initDataDirectory(self.datadirectorypath, create=True)
             if not os.path.exists(self.configfilepath):
                 with open(self.configfilepath, "w") as file:
-                    self.config = {"data_directory": self.datadirectorypath}
                     self.save_config()
         else:
             if not os.path.exists(self.path):
                 raise Exception("No configuration information available at " + self.path)
             self.config = self.load_config()
-            initDataDirectory(self.config["data_directory"])
+            initDataDirectory(self.datadirectorypath)
 
     def load_config(self):
         """Load YAML configuration from the specified path."""

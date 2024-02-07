@@ -2,6 +2,7 @@ from palimpzest.elements import DataRecord
 from palimpzest.elements import File
 
 import os
+import base64
 
 class DataSource:
     """The base class for all data sources"""
@@ -27,7 +28,9 @@ class DirectorySource(DataSource):
                 if os.path.isfile(file_path):
                     dr = DataRecord(self.basicElement)
                     dr.filename = file_path
-                    dr.contents = open(file_path, "rb").read()
+                    bytes_data = open(file_path, "rb").read()
+                    dr.contents = base64.b64encode(bytes_data).decode('utf-8')
+
                     yield dr
 
         return filteredIterator()
@@ -42,7 +45,9 @@ class FileSource(DataSource):
         def filteredIterator():
             dr = DataRecord(self.basicElement)
             dr.filename = self.path
-            dr.contents = open(self.path, "rb").read()
+            bytes_data = open(file_path, "rb").read()
+            dr.contents = base64.b64encode(bytes_data).decode('utf-8')
+
             yield dr
 
         return filteredIterator()

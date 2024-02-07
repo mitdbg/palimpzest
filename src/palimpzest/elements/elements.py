@@ -40,7 +40,7 @@ class ElementMetaclass(type):
         ordered = json.dumps(d, sort_keys=True)
         return hash(ordered.encode())
 
-    def fields(cls):
+    def fieldNames(cls):
         """Return a list of the fields in this Element"""
         attributes = dir(cls)
         attributes = [attr for attr in attributes if not attr.startswith('__')]

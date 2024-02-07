@@ -167,7 +167,7 @@ class FilterCandidateOp(PhysicalOp):
         self.filters = filters
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("FilterCandidateLocalOp", tuple(self.filters), source.outputElementType, self.outputElementType)
+        taskDescriptor = ("FilterCandidateOp", tuple(self.filters), source.outputElementType, self.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
 

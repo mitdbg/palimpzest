@@ -1,7 +1,7 @@
 import os
 
 from palimpzest import Field
-from palimpzest.elements import DataRecord
+from palimpzest.elements import DataRecord, TextFile, File, PDFFile
 from palimpzest.tools import cosmos_client, get_text_from_pdf
 from palimpzest.tools.dspysearch import run_rag_boolean, run_rag_qa
 
@@ -14,14 +14,14 @@ class Solver:
         self._hardcodedFns = set()
         self._hardcodedFns.add((PDFFile, File))
 
-    def _makeSimpleTypeConversionFn(outputElement, inputElement):
+    def _makeSimpleTypeConversionFn(self, outputElement, inputElement):
         """This is a very simple function that converts a DataRecord from one type to another, when we know they have identical fields."""
         def _simpleTypeConversionFn(candidate: DataRecord):
             if not candidate.element == inputElement:
                 return None
             
             dr = DataRecord(outputElement)
-            for field in outputElement.fields():
+            for field in outputElement.fieldNames():
                 if hasattr(candidate, field):
                     setattr(dr, field, getattr(candidate, field))
                 elif field.required:
@@ -29,7 +29,7 @@ class Solver:
             return dr
         return _simpleTypeConversionFn
 
-    def _makeHardCodedTypeConversionFn(outputElement, inputElement):
+    def _makeHardCodedTypeConversionFn(self, outputElement, inputElement):
         """This converts from one type to another when we have a hard-coded method for doing so."""
         if outputElement == PDFFile and inputElement == File:
             def _fileToPDF(candidate: DataRecord):
@@ -47,7 +47,7 @@ class Solver:
         else:
             raise Exception(f"Cannot hard-code conversion from {inputElement} to {outputElement}")
 
-    def _makeLLMTypeConversionFn(outputElement, inputElement):
+    def _makeLLMTypeConversionFn(self, outputElement, inputElement):
             def fn(candidate: DataRecord):
                 # iterate through all empty fields in the outputElement and ask questions to fill them
                 # for field in inputElement.__dict__:
@@ -61,6 +61,7 @@ class Solver:
             return fn
 
     def _makeFilterFn(self, taskDescriptor):
+            functionName, functionParams, outputElement, inputElement = taskDescriptor
             if len(functionParams) == 0:
                 def allPass(candidate: DataRecord):
                     if candidate.element == inputElement:
@@ -100,6 +101,6 @@ class Solver:
             else:
                 return self._makeLLMTypeConversionFn(outputElement, inputElement)
         elif functionName == "FilterCandidateOp":
-            self._makeFilterFn(self, taskDescriptor)
+            self._makeFilterFn(taskDescriptor)
         else:
             raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))
