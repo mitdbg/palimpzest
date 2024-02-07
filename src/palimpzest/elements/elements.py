@@ -40,6 +40,13 @@ class ElementMetaclass(type):
         ordered = json.dumps(d, sort_keys=True)
         return hash(ordered.encode())
 
+    def fields(cls):
+        """Return a list of the fields in this Element"""
+        attributes = dir(cls)
+        attributes = [attr for attr in attributes if not attr.startswith('__')]
+        fields = [attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
+        return fields
+
     def jsonSchema(cls):
         """The JSON representation of the schema of this Element"""
         attributes = dir(cls)
@@ -83,6 +90,10 @@ class Field:
     
     def __eq__(self, other):
         return self._desc == other._desc and self.required == other.required and self.__class__ == other.__class__
+    
+    @property
+    def desc(self):
+        return self._desc
     
     def jsonSchema(self):
         return {"description": self._desc,

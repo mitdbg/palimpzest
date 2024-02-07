@@ -5,85 +5,62 @@ from palimpzest.elements import DataRecord
 from palimpzest.tools import cosmos_client, get_text_from_pdf
 from palimpzest.tools.dspysearch import run_rag_boolean, run_rag_qa
 
-
-
 class Solver:
     """This solves for needed operator implementations"""
-
     def __init__(self):
         self._hardcodedFns = {}
+        self._simpleTypeConversions = set()
+        self._simpleTypeConversions.add((TextFile, File))
+        self._hardcodedFns = set()
+        self._hardcodedFns.add((PDFFile, File))
 
-    def synthesize(self, taskDescriptor):
-        """Return a function that maps from inputType to outputType."""
-        functionName, functionParams, outputElement, inputElement = taskDescriptor
-        ######################################
-        #
-        # Here is where we would synthesize the function.
-        # We need to:
-        # 1) Formulate a parameterizable prompt that accomplishes the task below.
-        # 2) Then creates a function that calls OpenAI with that prompt, and parameterizes it with the given candidate object
-        # 3) And when the call to OpenAI comes back, the function returns a DataRecord with the schema of `outputElement`
-        #
-        # This style of function should be created upon the call to synthesize(), and returned.
-        # It will be registered inside the PhysicalOp.synthesizedFns dictionary.
-        # It might be called multiple times, with many different candidate objects.
-        #
-        # If this system is working well, the function will be chosen to run fast, because it will get called for each candidate.
-        # However, for now we can just call OpenAI. It's not super fast, but it's fine. Pretend we are an RDBMS in 1979. The plans
-        #  aren't always great.
-        #
-        # In the future, we will be clever and choose the fastest possible LLM that can still deliver on the desired task,
-        #  quality-wise.
-        # Chunwei: I will try to implement a few function templates here. Then serve them to LLM models for code generation for similar tasks.
-        # Chunwei: The generated functions will be cached in the synthesizedFns dictionary and profiled (runtime, resource usage) everytime they are called.
-        #          The profiling results will be used to rank the functions and choose the best one based on the hardware constraints.
-        ######################################
-        if functionName == "InduceFromCandidateOp":
-            print(
-                f"Synthesizing function for task: {functionName} with params {functionParams} from {inputElement} to {outputElement}")
-
-            # Let's check if there's a prefab function for this mapping from type A to type B
-            # hardcodedFn = self._hardcodedFn(inputElement, outputElement)
-            # if hardcodedFn is not None:
-            #    return hardcodedFn
-
-            # Let's do LLM-based induction by default
-            # REMIND: Chunwei, let's do some LLM-based induction here
-            def fn(candidate: DataRecord):
-                if candidate.element is inputElement:
-                    print(f"Induce file: {candidate.filename}")
-                    # now we use file suffix to detect the file type. We can use python-magic on the content to detect the file type.
-                    if candidate.filename.endswith(".pdf"):
-                        pdf_bytes = candidate.contents
-                        pdf_filename = candidate.filename
-                        text_content = get_text_from_pdf(pdf_filename, pdf_bytes)
-                    elif candidate.filename.endswith(".txt"):
-                        text_content = candidate.contents
-                    else:
-                        raise ValueError(f"Unsupported file type: {os.path.splitext(candidate.filename)}")
-
-                    # iterate through all empty fields in the outputElement and ask questions to fill them
-                    # for field in inputElement.__dict__:
-                    #     print(f"output field: {field}")
-                    dr = DataRecord(outputElement)
-                    for field_name, field_value in vars(outputElement).items():
-                        if isinstance(field_value, Field) and not field_name.startswith('__'):
-                            field_desc = field_value.jsonSchema()['description']
-                            if hasattr(outputElement, field_name):
-                                answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({field_desc})")
-                                setattr(dr, field_name, answer)
-                            else:
-                                print(f"Warning: {outputElement} does not have a field named {field_name}")
-                    dr.contents = candidate.contents
-                    dr.filename = candidate.filename
-                    print(f"Converted to outputElement: {dr}")
-                    return dr
-                else:
+    def _makeSimpleTypeConversionFn(outputElement, inputElement):
+        """This is a very simple function that converts a DataRecord from one type to another, when we know they have identical fields."""
+        def _simpleTypeConversionFn(candidate: DataRecord):
+            if not candidate.element == inputElement:
+                return None
+            
+            dr = DataRecord(outputElement)
+            for field in outputElement.fields():
+                if hasattr(candidate, field):
+                    setattr(dr, field, getattr(candidate, field))
+                elif field.required:
                     return None
+            return dr
+        return _simpleTypeConversionFn
 
+    def _makeHardCodedTypeConversionFn(outputElement, inputElement):
+        """This converts from one type to another when we have a hard-coded method for doing so."""
+        if outputElement == PDFFile and inputElement == File:
+            def _fileToPDF(candidate: DataRecord):
+                if not candidate.element == inputElement:
+                    return None
+                pdf_bytes = candidate.contents
+                pdf_filename = candidate.filename
+                text_content = get_text_from_pdf(candidate.filename, candidate.contents)
+                dr = DataRecord(outputElement)
+                dr.filename = pdf_filename
+                dr.contents = pdf_bytes
+                dr.text_contents = text_content
+                return dr
+            return _fileToPDF
+        else:
+            raise Exception(f"Cannot hard-code conversion from {inputElement} to {outputElement}")
+
+    def _makeLLMTypeConversionFn(outputElement, inputElement):
+            def fn(candidate: DataRecord):
+                # iterate through all empty fields in the outputElement and ask questions to fill them
+                # for field in inputElement.__dict__:
+                dr = DataRecord(outputElement)
+                text_content = candidate.asJSON()
+                for field_name in outputElement.fieldNames():
+                    f = getattr(outputElement, field_name)
+                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})")
+                    setattr(dr, field_name, answer)
+                return dr
             return fn
 
-        elif functionName == "FilterCandidateOp":
+    def _makeFilterFn(self, taskDescriptor):
             if len(functionParams) == 0:
                 def allPass(candidate: DataRecord):
                     if candidate.element == inputElement:
@@ -91,40 +68,38 @@ class Solver:
                     else:
                         return False
                 return allPass
-
-
-
-            # Let's do LLM-based filters by default
+            
+            # By default, a filter requires an LLM invocation to run
+            # Someday maybe we will offer the user the chance to run a hard-coded function.
+            # Or maybe we will ask the LLM to synthesize traditional code here.
             def createLLMFilter(filterCondition: str):
                 def llmFilter(candidate: DataRecord):
-                    if candidate.element == inputElement:
-                        pdf_bytes = candidate.contents
-                        pdf_filename = candidate.filename
-                        text_content = get_text_from_pdf(pdf_filename,pdf_bytes)
-                        response = run_rag_boolean(text_content, filterCondition)
-                        if response == "TRUE":
-                            return True
-                    return False
+                    if not candidate.element == inputElement:
+                        return False
+                    
+                    text_content = candidate.asJSON()
+                    response = run_rag_boolean(text_content, filterCondition)
+                    if response == "TRUE":
+                        return True
+                    else:
+                        return False
                 return llmFilter
             return createLLMFilter("and ".join([str(f) for f in functionParams]))
-            # def createLLMFilter(filterCondition: str):
-            #    def llmFilter(candidate: DataRecord):
-            #        if candidate.element == inputElement:
-            #            prompt = "Below is a filter condition in natural language called FILTER and a data record " +
-            #                     "called RECORD. Please return just one of two values: TRUE or FALSE. Return TRUE if " + 
-            #                     "FILTER accurately describes the RECORD. Return FALSE otherwise.\n\n" +
-            #                     f"FILTER: {filterCondition}\n\n" +
-            #                     f"RECORD: {candidate.contents}"
-            #            response = openAILLMThing.prompt(prompt)
-            #            if response == "TRUE":
-            #                return True        
-            #        return False
-            # return createLLMFilter("and ".join(functionParams[0]))
-            # def fn(candidate: DataRecord):
-            #     if candidate.element == inputElement:
-            #         return True
-            #     else:
-            #         return False
-            # return fn
+
+    def synthesize(self, taskDescriptor):
+        """Return a function that maps from inputType to outputType."""
+        functionName, functionParams, outputElement, inputElement = taskDescriptor
+        print(f"Synthesizing function for task: {functionName} with params {functionParams} from {inputElement} to {outputElement}")
+
+        if functionName == "InduceFromCandidateOp":
+            typeConversionDescriptor = (outputElement, inputElement)
+            if typeConversionDescriptor in self._simpleTypeConversions:
+                return self._makeSimpleTypeConversionFn(outputElement, inputElement)
+            elif typeConversionDescriptor in self._hardcodedFns:
+                return self._makeHardCodedTypeConversionFn(outputElement, inputElement)
+            else:
+                return self._makeLLMTypeConversionFn(outputElement, inputElement)
+        elif functionName == "FilterCandidateOp":
+            self._makeFilterFn(self, taskDescriptor)
         else:
             raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))

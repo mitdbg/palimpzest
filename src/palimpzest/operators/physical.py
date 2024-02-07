@@ -12,6 +12,9 @@ LOCAL_LLM_CONVERSION_TIME_PER_RECORD = 10
 LOCAL_LLM_FILTER_TIME_PER_RECORD = 5
 
 class PhysicalOp:
+    LOCAL_PLAN = "LOCAL"
+    REMOTE_PLAN = "REMOTE"
+
     synthesizedFns = {}
     solver = Solver()
 
@@ -108,6 +111,11 @@ class InduceFromCandidateOp(PhysicalOp):
         super().__init__(outputElementType=outputElementType)
         self.source = source
 
+        taskDescriptor = ("InduceFromCandidateOp", None, outputElementType, source.outputElementType)
+        if not taskDescriptor in PhysicalOp.synthesizedFns:
+            print("Trying to suynthwize", taskDescriptor)
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
+
     def __str__(self):
         return "InduceFromCandidateOp(" + str(self.outputElementType) + ")"
 
@@ -149,7 +157,7 @@ class InduceFromCandidateOp(PhysicalOp):
         """Attempt to map the candidate to the outputElementType. Return None if it fails."""
         taskDescriptor = ("InduceFromCandidateOp", None, outputElementType, candidate.element)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
+            raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 class FilterCandidateOp(PhysicalOp):
@@ -158,6 +166,10 @@ class FilterCandidateOp(PhysicalOp):
         self.source = source
         self.filters = filters
         self.targetCacheId = targetCacheId
+
+        taskDescriptor = ("FilterCandidateLocalOp", tuple(self.filters), source.outputElementType, self.outputElementType)
+        if not taskDescriptor in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
 
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self.filters])
@@ -205,5 +217,5 @@ class FilterCandidateOp(PhysicalOp):
         """Return True if the candidate passes all filters, False otherwise."""
         taskDescriptor = ("FilterCandidateOp", tuple(self.filters), candidate.element, self.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
+            raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)

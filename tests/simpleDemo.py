@@ -1,6 +1,7 @@
 import palimpzest as pz
 
 import os
+import argparse
 
 class ScientificPaper(pz.PDFFile):
    """Represents a scientific research paper, which in practice is usually from a PDF file"""
@@ -17,16 +18,14 @@ def buildMITBatteryPaperPlan(datasetId):
 
     return goodAuthorPapers
 
-
-def emitDataset(title="Dataset"):
+def emitDataset(datasetid, title="Dataset", verbose=False):
     def emitNestedTuple(node, indent=0):
         elt, child = node
         print(" " * indent, elt)
         if child is not None:
             emitNestedTuple(child, indent=indent+2)
 
-    dataset1 = "concretedataset-02"
-    rootSet = buildMITBatteryPaperPlan(dataset1)
+    rootSet = buildMITBatteryPaperPlan(datasetid)
 
     print()
     print()
@@ -46,7 +45,7 @@ def emitDataset(title="Dataset"):
     emitNestedTuple(logicalElements)
 
     # Print the physical operators that will be executed
-    physicalTree = logicalTree.getPhysicalTree()
+    planTime, planPrice, estimatedCardinality, physicalTree = logicalTree.createPhysicalPlan()    
     print()
     print("Physical operator tree")
     physicalOps = physicalTree.dumpPhysicalTree()
@@ -56,6 +55,9 @@ def emitDataset(title="Dataset"):
 
     #iterate over data
     print()
+    print("Estimated seconds to complete:", planTime)
+    print("Estimated USD to complete:", planPrice)
+    print("Estimated cardinality:", estimatedCardinality)
     print("Concrete data results")
     for r in physicalTree:
         print(r)
@@ -64,11 +66,29 @@ def emitDataset(title="Dataset"):
 #
 # Get battery papers and emit!
 #
-config = pz.Config(os.getenv("PZ_DIR"))
-# srcDataDir = "./testFileDirectory"
-# pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-01")
-# print(pz.DataDirectory().listRegisteredDatasets())
-# pz.DataDirectory().registerLocalDirectory(srcDataDir, "concretedataset-02")
+if __name__ == "__main__":
+    # parse arguments
+    parser = argparse.ArgumentParser(description='Run a simple demo')
+    parser.add_argument('--verbose', default=False, action='store_true', help='Print verbose output')
+    parser.add_argument('--datasetid', type=str, help='The dataset id')
+    parser.add_argument('--task' , type=str, help='The task to run')
 
-emitDataset(title="Good MIT battery papers written by good authors")
-# pz.DataDirectory().clearCache()
+    args = parser.parse_args()
+
+    # The user has to indicate the dataset id and the task
+    if args.datasetid is None:
+        print("Please provide a dataset id")
+        exit(1)
+    if args.task is None:
+        print("Please provide a task")
+        exit(1)
+
+    datasetid = args.datasetid
+    task = args.task
+
+    config = pz.Config(os.getenv("PZ_DIR"))
+    if task == "paper":
+        emitDataset(datasetid, title="Good MIT battery papers written by good authors", verbose=args.verbose)
+    else:
+        print("Unknown task")
+        exit(1)

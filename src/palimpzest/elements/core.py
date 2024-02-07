@@ -15,4 +15,5 @@ class TextFile(File):
 class PDFFile(File):
     """A PDF file is a File that is a PDF. It has specialized fields, font information, etc."""
     # This class is currently very impoverished. It needs a lot more fields before it can correctly represent a PDF.
+    text_contents = Field(desc="The text-only contents of the PDF", required=True)
 
