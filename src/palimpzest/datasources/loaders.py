@@ -30,8 +30,6 @@ class DirectorySource(DataSource):
                     dr.filename = file_path
                     bytes_data = open(file_path, "rb").read()
                     dr.contents = base64.b64encode(bytes_data).decode('utf-8')
-
-                    print("ABOUT TO YIELD DR", dr.filename, dr.contents[:10])
                     yield dr
 
         return filteredIterator()
