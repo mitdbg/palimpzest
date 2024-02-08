@@ -105,7 +105,10 @@ if __name__ == "__main__":
         emitDataset(rootSet, title="Good MIT battery papers written by good authors", verbose=args.verbose)
     elif task == "enron":
         rootSet = buildEnronPlan(datasetid)
-        emitDataset(rootSet, title="Good Enron emails", verbose=args.verbose)
+        #emitDataset(rootSet, title="Good Enron emails", verbose=args.verbose)
+        planTime, planPrice, estimatedCardinality, physicalTree = rootSet.getLogicalTree().createPhysicalPlan()
+        for email in physicalTree:
+            print(email.sender, email.subject)
     else:
         print("Unknown task")
         exit(1)
