@@ -40,12 +40,12 @@ class _DataDirectory:
     def registerLocalDirectory(self, path, uniqName):
         """Register a local directory as a data source."""
         self._registry[uniqName] = ("dir", path)
-        pickle.dump(self._registry, open(self._configDir + "/cache/registry.pkl", "wb"))
+        pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
 
     def registerLocalFile(self, path, uniqName):
         """Register a local file as a data source."""
         self._registry[uniqName] = ("file", path)
-        pickle.dump(self._registry, open(self._configDir + "/cache/registry.pkl", "wb"))
+        pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
 
     def getRegisteredDataset(self, uniqName):
         """Return a dataset from the registry."""
@@ -98,7 +98,7 @@ class _DataDirectory:
     def rmRegisteredDataset(self, uniqName):
         """Remove a dataset from the registry."""
         del self._registry[uniqName]
-        pickle.dump(self._registry, open(self._configDir + "/cache/registry.pkl", "wb"))
+        pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
     
     #
     # These methods handle cached results. They are meant to be persisted for performance reasons,
@@ -121,7 +121,7 @@ class _DataDirectory:
         self._tempCache = {}
 
         # Delete all files in the cache directory
-        for root, dirs, files in os.walk(self._configDir + "/cache"):
+        for root, dirs, files in os.walk(self._dir + "/data/cache"):
             for file in files:
                 os.remove(root + "/" + file)
 
@@ -140,7 +140,7 @@ class _DataDirectory:
 
     def closeCache(self, cacheId):
         """Close the cache."""
-        filename = self._configDir + "/cache/" + cacheId + ".cached"
+        filename = self._dir + "/data/cache/" + cacheId + ".cached"
         pickle.dump(self._tempCache[cacheId], open(filename, "wb"))
         del self._tempCache[cacheId]
         self._cache[cacheId] = filename

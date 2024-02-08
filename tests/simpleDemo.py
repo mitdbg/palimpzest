@@ -3,6 +3,7 @@ import palimpzest as pz
 
 import os
 import argparse
+import time
 
 
 class ScientificPaper(pz.PDFFile):
@@ -79,6 +80,7 @@ def emitDataset(rootSet, title="Dataset", verbose=False):
 #
 if __name__ == "__main__":
     # parse arguments
+    startTime = time.time()
     parser = argparse.ArgumentParser(description='Run a simple demo')
     parser.add_argument('--verbose', default=False, action='store_true', help='Print verbose output')
     parser.add_argument('--datasetid', type=str, help='The dataset id')
@@ -96,7 +98,7 @@ if __name__ == "__main__":
 
     datasetid = args.datasetid
     task = args.task
-    
+
     if task == "paper":
         rootSet = buildMITBatteryPaperPlan(datasetid)
         physicalTree = emitDataset(rootSet, title="Good MIT battery papers written by good authors", verbose=args.verbose)
@@ -114,3 +116,7 @@ if __name__ == "__main__":
     else:
         print("Unknown task")
         exit(1)
+
+
+    endTime = time.time()
+    print("Elapsed time:", endTime - startTime)

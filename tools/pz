@@ -42,6 +42,7 @@ if __name__ == "__main__":
     if args.init:
         pz.initDataDirectory(os.path.abspath(args.dir), create=True)
         pz.DataDirectory().config.set("llmservice", "together")
+        pz.DataDirectory().config.set("parallel", "False")
         sys.exit(0)
     
     # Process the usert command

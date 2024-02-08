@@ -111,7 +111,7 @@ class Solver:
         """Return a function that maps from inputType to outputType."""
         functionName, functionParams, outputElement, inputElement = taskDescriptor
 
-        if functionName == "InduceFromCandidateOp":
+        if functionName == "InduceFromCandidateOp" or functionName == "ParallelInduceFromCandidateOp":
             typeConversionDescriptor = (outputElement, inputElement)
             if typeConversionDescriptor in self._simpleTypeConversions:
                 return self._makeSimpleTypeConversionFn(outputElement, inputElement)

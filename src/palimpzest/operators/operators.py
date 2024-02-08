@@ -54,9 +54,15 @@ class ConvertScan(LogicalOperator):
             intermediateOutputElement = intermediateOutputElement.__bases__[0]
 
         if intermediateOutputElement == Element or intermediateOutputElement == self.outputElementType:
-            return InduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy))
+            if DataDirectory().config.get("parallel") == True:
+                return ParallelInduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy))
+            else:
+                return InduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy))
         else:
-            return InduceFromCandidateOp(self.outputElementType, InduceFromCandidateOp(intermediateOutputElement, self.inputOp._getPhysicalTree(strategy=strategy)))
+            if DataDirectory().config.get("parallel") == True:
+                return ParallelInduceFromCandidateOp(self.outputElementType, ParallelInduceFromCandidateOp(intermediateOutputElement, self.inputOp._getPhysicalTree(strategy=strategy)))
+            else:
+                return InduceFromCandidateOp(self.outputElementType, InduceFromCandidateOp(intermediateOutputElement, self.inputOp._getPhysicalTree(strategy=strategy)))
 
 class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached answer."""

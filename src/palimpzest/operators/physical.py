@@ -2,6 +2,8 @@ from palimpzest.elements import *
 from palimpzest.solver import Solver
 from palimpzest.datasources import DataDirectory
 
+import concurrent
+
 # Assume 500 MB/sec for local SSD scan time
 LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
 
@@ -158,6 +160,72 @@ class InduceFromCandidateOp(PhysicalOp):
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
+
+
+class ParallelInduceFromCandidateOp(PhysicalOp):
+    def __init__(self, outputElementType, source):
+        super().__init__(outputElementType=outputElementType)
+        self.source = source
+
+        taskDescriptor = ("ParallelInduceFromCandidateOp", None, outputElementType, source.outputElementType)
+        if not taskDescriptor in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
+
+    def __str__(self):
+        return "ParallelInduceFromCandidateOp(" + str(self.outputElementType) + ")"
+
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, self.source.dumpPhysicalTree())
+
+    def estimateCost(self):
+        inputCostEstimates = self.source.estimateCost()
+
+        selectivity = 1.0
+        cardinality = selectivity * inputCostEstimates["cardinality"]
+        timePerElement = LOCAL_LLM_CONVERSION_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
+        costPerElement = inputCostEstimates["costPerElement"]
+        startupTime = inputCostEstimates["startupTime"]
+        startupCost = inputCostEstimates["startupCost"]
+        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
+        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": timePerElement,
+            "costPerElement": costPerElement,
+            "startupTime": startupTime,
+            "startupCost": startupCost,
+            "bytesReadLocally": bytesReadLocally,
+            "bytesReadRemotely": bytesReadRemotely
+        }
+
+    def __iter__(self):
+        # This is very crudely implemented right now, since we materialize everything
+        def iteratorFn():
+            chunkSize = 50
+            inputs = []
+            results = []
+
+            for nextCandidate in self.source:
+                inputs.append(nextCandidate)
+
+            # Grab items from the list inputs in chunks of size chunkSize
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                results = list(executor.map(self._attemptMapping, inputs, chunksize=10))
+
+                for resultRecord in results:
+                    if resultRecord is not None:
+                        yield resultRecord
+        return iteratorFn()
+                    
+    def _attemptMapping(self, candidate: DataRecord):
+        """Attempt to map the candidate to the outputElementType. Return None if it fails."""
+        taskDescriptor = ("ParallelInduceFromCandidateOp", None, self.outputElementType, candidate.element)
+        if not taskDescriptor in PhysicalOp.synthesizedFns:
+            raise Exception("This function should have been synthesized during init():", taskDescriptor)
+        return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
+
 
 class FilterCandidateOp(PhysicalOp):
     def __init__(self, outputElementType, source, filters, targetCacheId=None):
