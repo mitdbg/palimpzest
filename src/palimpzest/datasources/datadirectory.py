@@ -1,4 +1,5 @@
 from palimpzest.elements import DataRecord
+from palimpzest.config import Config
 from .loaders import DirectorySource, FileSource
 
 import os
@@ -7,25 +8,27 @@ import pickle
 class _DataDirectory:
     """The DataDirectory is a registry of data sources."""
 
-    def __init__(self, configDir, create=False):
+    def __init__(self, dir, create=False):
         self._registry = {}
         self._cache = {}
         self._tempCache = {}
 
-        self._configDir = configDir
+        self._dir = dir
         if create:
-            if not os.path.exists(configDir):
-                os.makedirs(configDir)
-                os.makedirs(configDir + "/registered")
-                os.makedirs(configDir + "/cache")
-                pickle.dump(self._registry, open(configDir + "/cache/registry.pkl", "wb"))
+            if not os.path.exists(self._dir):
+                os.makedirs(self._dir)
+                os.makedirs(self._dir + "/data/registered")
+                os.makedirs(self._dir + "/data/cache")
+                pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
+
+        self.config = Config(self._dir, create=create)
 
         # Unpickle the registry of data sources
-        if os.path.exists(configDir + "/cache/registry.pkl"):
-            self._registry = pickle.load(open(configDir + "/cache/registry.pkl", "rb"))
+        if os.path.exists(self._dir + "/data/cache/registry.pkl"):
+            self._registry = pickle.load(open(self._dir + "/data/cache/registry.pkl", "rb"))
 
         # Iterate through all items in the cache directory, and rebuild the table of entries
-        for root, dirs, files in os.walk(configDir + "/cache"):
+        for root, dirs, files in os.walk(self._dir + "/data/cache"):
             for file in files:
                 if file.endswith(".cached"):
                     uniqname = file[:-7]
@@ -163,4 +166,6 @@ def initDataDirectory(initDir, create=False):
         return _DataDirectoryMember
 
 def DataDirectory():
+    if _DataDirectoryMember is None:
+        initDataDirectory(os.path.abspath(os.environ["PZ_DIR"]), create=False)
     return _DataDirectoryMember

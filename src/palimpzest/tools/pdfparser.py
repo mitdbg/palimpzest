@@ -229,7 +229,7 @@ def get_text_from_pdf(filename, pdf_bytes):
 
 
 if __name__ == "__main__":
-    config = pz.Config(os.getenv("PZ_DIR"))
+    #config = pz.Config(os.getenv("PZ_DIR"))
     file_path = "/Users/chunwei/Downloads/sidarthe.annotations.pdf"
     # output_dir = "../../../tests/testFileDirectory/cosmos"
     with open(file_path, "rb") as file:

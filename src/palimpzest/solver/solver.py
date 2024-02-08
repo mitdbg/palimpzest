@@ -4,6 +4,7 @@ from palimpzest import Field
 from palimpzest.elements import DataRecord, TextFile, File, PDFFile
 from palimpzest.tools import cosmos_client, get_text_from_pdf
 from palimpzest.tools.dspysearch import run_rag_boolean, run_rag_qa
+from palimpzest.datasources import DataDirectory
 import base64
 
 class Solver:
@@ -14,6 +15,11 @@ class Solver:
         self._hardcodedFns = set()
         self._hardcodedFns.add((PDFFile, File))
         self._hardcodedFns.add((TextFile, File))
+
+        self._llmservice = DataDirectory().config.get("llmservice")
+        if self._llmservice is None:
+            self._llmservice = "openai"
+            print("LLM service has not been configured. Defaulting to openai.")
 
     def easyConversionAvailable(self, outputElement, inputElement):
         return (outputElement, inputElement) in self._simpleTypeConversions or (outputElement, inputElement) in self._hardcodedFns
@@ -71,7 +77,7 @@ class Solver:
                 text_content = candidate.asJSON()
                 for field_name in outputElement.fieldNames():
                     f = getattr(outputElement, field_name)
-                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})", llmService="together")
+                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})", llmService=self._llmservice)
                     setattr(dr, field_name, answer)
                 return dr
             return fn
@@ -93,7 +99,7 @@ class Solver:
                         return False
                     
                     text_content = candidate.asJSON()
-                    response = run_rag_boolean(text_content, filterCondition, llmService="together")
+                    response = run_rag_boolean(text_content, filterCondition, llmService=self._llmservice)
                     if response == "TRUE":
                         return True
                     else:

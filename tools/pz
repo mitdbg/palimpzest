@@ -40,12 +40,10 @@ if __name__ == "__main__":
     # Get the working directory info
     workingdir = None
     if args.init:
-        config = pz.Config(os.path.abspath(args.dir), create=True)
+        pz.initDataDirectory(os.path.abspath(args.dir), create=True)
+        pz.DataDirectory().config.set("llmservice", "together")
         sys.exit(0)
     
-    print("Configdir", os.path.abspath(args.dir))
-    config = pz.Config(os.path.abspath(args.dir))
-
     # Process the usert command
     if args.command == 'registerdatafile':        
         pz.DataDirectory().registerLocalFile(os.path.abspath(args.filename), args.name)

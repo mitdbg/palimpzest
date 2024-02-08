@@ -96,8 +96,7 @@ if __name__ == "__main__":
 
     datasetid = args.datasetid
     task = args.task
-
-    config = pz.Config(os.getenv("PZ_DIR"))
+    
     if task == "paper":
         rootSet = buildMITBatteryPaperPlan(datasetid)
         physicalTree = emitDataset(rootSet, title="Good MIT battery papers written by good authors", verbose=args.verbose)
