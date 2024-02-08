@@ -211,8 +211,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 inputs.append(nextCandidate)
 
             # Grab items from the list inputs in chunks of size chunkSize
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                results = list(executor.map(self._attemptMapping, inputs, chunksize=10))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+                results = list(executor.map(self._attemptMapping, inputs, chunksize=12))
 
                 for resultRecord in results:
                     if resultRecord is not None:

@@ -71,6 +71,9 @@ class TogetherHFAdaptor(HFModel):
                 "stop": stop,
             }
         else:
+            #print("PROMPT", prompt)
+            #print()
+            #print()
             body = {
                 "model": self.model,
                 "prompt": prompt,
