@@ -72,9 +72,7 @@ def emitDataset(rootSet, title="Dataset", verbose=False):
     print("Estimated USD to complete:", planPrice)
     print("Estimated cardinality:", estimatedCardinality)
     print("Concrete data results")
-    for r in physicalTree:
-        print(r)
-
+    return physicalTree
 
 #
 # Get battery papers and emit!
@@ -102,13 +100,18 @@ if __name__ == "__main__":
     config = pz.Config(os.getenv("PZ_DIR"))
     if task == "paper":
         rootSet = buildMITBatteryPaperPlan(datasetid)
-        emitDataset(rootSet, title="Good MIT battery papers written by good authors", verbose=args.verbose)
+        physicalTree = emitDataset(rootSet, title="Good MIT battery papers written by good authors", verbose=args.verbose)
+        for r in physicalTree:
+            print(r)
     elif task == "enron":
         rootSet = buildEnronPlan(datasetid)
-        #emitDataset(rootSet, title="Good Enron emails", verbose=args.verbose)
-        planTime, planPrice, estimatedCardinality, physicalTree = rootSet.getLogicalTree().createPhysicalPlan()
-        for email in physicalTree:
-            print(email.sender, email.subject)
+        physicalTree = emitDataset(rootSet, title="Good Enron emails", verbose=args.verbose)
+        for r in physicalTree:
+            print(r.sender, r.subject)
+            print()
+        #planTime, planPrice, estimatedCardinality, physicalTree = rootSet.getLogicalTree().createPhysicalPlan()
+        #for email in physicalTree:
+        #    print(email.sender, email.subject)
     else:
         print("Unknown task")
         exit(1)

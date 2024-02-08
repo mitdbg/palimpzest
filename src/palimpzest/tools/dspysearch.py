@@ -1,7 +1,7 @@
 import os
 from textwrap import indent
-
 import dspy
+from .dspyadaptors import TogetherHFAdaptor
 
 ##
 # Given a question, we'll feed it with the paper context for answer generation.
@@ -31,12 +31,24 @@ class RAG(dspy.Module):
         answer = self.generate_answer(context=context, question=question)
         return answer
 
-def run_rag_boolean(context, question):
-    if 'OPENAI_API_KEY' not in os.environ:
-        raise ValueError("OPENAI_API_KEY not found in environment variables")
-    # get openai key from environment
-    openai_key = os.environ['OPENAI_API_KEY']
-    turbo = dspy.OpenAI(model='gpt-4-0125-preview', api_key=openai_key, temperature=0.0)
+def run_rag_boolean(context, question, llmService="openai"):
+    if llmService == "openai":
+        if 'OPENAI_API_KEY' not in os.environ:
+            raise ValueError("OPENAI_API_KEY not found in environment variables")
+        # get openai key from environment
+        openai_key = os.environ['OPENAI_API_KEY']
+        turbo = dspy.OpenAI(model='gpt-4-0125-preview', api_key=openai_key, temperature=0.0)
+    elif llmService == "together":
+        if 'TOGETHER_API_KEY' not in os.environ:
+            raise ValueError("TOGETHER_API_KEY not found in environment variables")
+        # get together key from environment
+        together_key = os.environ['TOGETHER_API_KEY']
+        #redpajamaModel = 'togethercomputer/RedPajama-INCITE-7B-Base'
+        mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
+        turbo = TogetherHFAdaptor(mixtralModel, together_key)
+    else:
+        raise ValueError("llmService must be either 'openai' or 'together'")
+
     dspy.settings.configure(lm=turbo)
     rag = RAG(FilterOverPaper)
     pred = rag(question, context)
@@ -45,28 +57,48 @@ def run_rag_boolean(context, question):
     #print(pred.answer)
     return pred.answer
 
-def run_rag_qa(context, question):
-    if 'OPENAI_API_KEY' not in os.environ:
-        raise ValueError("OPENAI_API_KEY not found in environment variables")
-    # get openai key from environment
-    openai_key = os.environ['OPENAI_API_KEY']
-    turbo = dspy.OpenAI(model='gpt-4-0125-preview', api_key=openai_key, temperature=0.0)
+def run_rag_qa(context, question, llmService="openai"):
+    if llmService == "openai":
+        if 'OPENAI_API_KEY' not in os.environ:
+            raise ValueError("OPENAI_API_KEY not found in environment variables")
+        # get openai key from environment
+        openai_key = os.environ['OPENAI_API_KEY']
+        turbo = dspy.OpenAI(model='gpt-4-0125-preview', api_key=openai_key, temperature=0.0)
+    elif llmService == "together":
+        if 'TOGETHER_API_KEY' not in os.environ:
+            raise ValueError("TOGETHER_API_KEY not found in environment variables")
+        # get together key from environment
+        together_key = os.environ['TOGETHER_API_KEY']
+        #redpajamaModel = 'togethercomputer/RedPajama-INCITE-7B-Base'
+        mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
+        turbo = TogetherHFAdaptor(mixtralModel, together_key)
+    else:
+        raise ValueError("llmService must be either 'openai' or 'together'")
+
     dspy.settings.configure(lm=turbo)
     rag = RAG(QuestionOverPaper)
     pred = rag(question, context)
-    #print(question)
-    #print(indent(pred.rationale, 4 * ' '))
-    #print(pred.answer)
     return pred.answer
 
 if __name__ == "__main__":
-    # get openai key from environment, throw error if not found
-    if 'OPENAI_API_KEY' not in os.environ:
-        raise ValueError("OPENAI_API_KEY not found in environment variables")
-    # get openai key from environment
-    openai_key = os.environ['OPENAI_API_KEY']
+    llmService = "openai"
+    if llmService == "openai":
+        if 'OPENAI_API_KEY' not in os.environ:
+            raise ValueError("OPENAI_API_KEY not found in environment variables")
+        # get openai key from environment
+        openai_key = os.environ['OPENAI_API_KEY']
+        turbo = dspy.OpenAI(model='gpt-4-0125-preview', api_key=openai_key, temperature=0.0)
+    elif llmService == "together":
+        if 'TOGETHER_API_KEY' not in os.environ:
+            raise ValueError("TOGETHER_API_KEY not found in environment variables")
+        # get together key from environment
+        together_key = os.environ['TOGETHER_API_KEY']
+        #redpajamaModel = 'togethercomputer/RedPajama-INCITE-7B-Base'
+        mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
+        turbo = TogetherHFAdaptor(mixtralModel, together_key)
+    else:
+        raise ValueError("llmService must be either 'openai' or 'together'")
 
-    turbo = dspy.OpenAI(model='gpt-4-0125-preview', api_key=openai_key, temperature=0.0)
     dspy.settings.configure(lm=turbo)
 
     # rag = RAG(FilterOverPaper)

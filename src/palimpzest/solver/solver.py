@@ -4,15 +4,16 @@ from palimpzest import Field
 from palimpzest.elements import DataRecord, TextFile, File, PDFFile
 from palimpzest.tools import cosmos_client, get_text_from_pdf
 from palimpzest.tools.dspysearch import run_rag_boolean, run_rag_qa
+import base64
 
 class Solver:
     """This solves for needed operator implementations"""
     def __init__(self):
         self._hardcodedFns = {}
         self._simpleTypeConversions = set()
-        self._simpleTypeConversions.add((TextFile, File))
         self._hardcodedFns = set()
         self._hardcodedFns.add((PDFFile, File))
+        self._hardcodedFns.add((TextFile, File))
 
     def easyConversionAvailable(self, outputElement, inputElement):
         return (outputElement, inputElement) in self._simpleTypeConversions or (outputElement, inputElement) in self._hardcodedFns
@@ -48,6 +49,17 @@ class Solver:
                 dr.text_contents = text_content
                 return dr
             return _fileToPDF
+        elif outputElement == TextFile and inputElement == File:
+            def _fileToText(candidate: DataRecord):
+                if not candidate.element == inputElement:
+                    return None
+                # b64 decode of candidate.contents
+                text_content = base64.b64decode(candidate.contents).decode("utf-8")
+                dr = DataRecord(outputElement)
+                dr.filename = candidate.filename
+                dr.contents = text_content
+                return dr
+            return _fileToText
         else:
             raise Exception(f"Cannot hard-code conversion from {inputElement} to {outputElement}")
 
@@ -59,7 +71,7 @@ class Solver:
                 text_content = candidate.asJSON()
                 for field_name in outputElement.fieldNames():
                     f = getattr(outputElement, field_name)
-                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})")
+                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})", llmService="together")
                     setattr(dr, field_name, answer)
                 return dr
             return fn
@@ -81,7 +93,7 @@ class Solver:
                         return False
                     
                     text_content = candidate.asJSON()
-                    response = run_rag_boolean(text_content, filterCondition)
+                    response = run_rag_boolean(text_content, filterCondition, llmService="together")
                     if response == "TRUE":
                         return True
                     else:
