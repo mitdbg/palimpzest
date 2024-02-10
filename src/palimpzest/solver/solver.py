@@ -16,13 +16,21 @@ class Solver:
         self._hardcodedFns.add((PDFFile, File))
         self._hardcodedFns.add((TextFile, File))
 
-        self._llmservice = DataDirectory().config.get("llmservice")
-        if self._llmservice is None:
-            self._llmservice = "openai"
-            print("LLM service has not been configured. Defaulting to openai.")
-
     def easyConversionAvailable(self, outputElement, inputElement):
         return (outputElement, inputElement) in self._simpleTypeConversions or (outputElement, inputElement) in self._hardcodedFns
+
+    def _llmservice(self):
+        # TODO: temporarily converting this into a function call;
+        #       if this is triggered in __init__ for new users that
+        #       have not yet set up their config(s), then this will
+        #       lead to a chain of fcn. calls that causes an exception
+        #       to be thrown on `import palimpzest`.
+        llmservice = DataDirectory().config.get("llmservice")
+        if llmservice is None:
+            llmservice = "openai"
+            print("LLM service has not been configured. Defaulting to openai.")
+        
+        return llmservice
 
     def _makeSimpleTypeConversionFn(self, outputElement, inputElement):
         """This is a very simple function that converts a DataRecord from one type to another, when we know they have identical fields."""
@@ -77,7 +85,7 @@ class Solver:
                 text_content = candidate.asJSON()
                 for field_name in outputElement.fieldNames():
                     f = getattr(outputElement, field_name)
-                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})", llmService=self._llmservice)
+                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})", llmService=self._llmservice())
                     setattr(dr, field_name, answer)
                 return dr
             return fn
@@ -99,7 +107,7 @@ class Solver:
                         return False
                     
                     text_content = candidate.asJSON()
-                    response = run_rag_boolean(text_content, filterCondition, llmService=self._llmservice)
+                    response = run_rag_boolean(text_content, filterCondition, llmService=self._llmservice())
                     if response == "TRUE":
                         return True
                     else:

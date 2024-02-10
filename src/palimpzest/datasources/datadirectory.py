@@ -5,6 +5,10 @@ from .loaders import DirectorySource, FileSource
 import os
 import pickle
 
+# DEFINITIONS
+PZ_DIR = os.getenv("PZ_DIR", os.path.join(os.path.expanduser('~'), ".pz"))
+
+
 class _DataDirectory:
     """The DataDirectory is a registry of data sources."""
 
@@ -167,5 +171,5 @@ def initDataDirectory(initDir, create=False):
 
 def DataDirectory():
     if _DataDirectoryMember is None:
-        initDataDirectory(os.path.abspath(os.environ["PZ_DIR"]), create=False)
+        initDataDirectory(os.path.abspath(PZ_DIR), create=False)
     return _DataDirectoryMember

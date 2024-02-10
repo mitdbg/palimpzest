@@ -5,6 +5,7 @@ import sys
 class Config:
     def __init__(self, path, create=False):
         self.configfilepath = os.path.join(path, "config.yaml")
+        self.config = {}
 
         if create:
             if not os.path.exists(path):
