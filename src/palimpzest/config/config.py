@@ -14,7 +14,7 @@ class Config:
                     self._save_config()
         else:
             if not os.path.exists(self.configfilepath):
-                raise Exception("No configuration information available at " + self.path)
+                raise Exception("No configuration information available at " + path)
             self.config = self._load_config()
 
     def get(self, key):
