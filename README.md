@@ -76,7 +76,7 @@ $ pz reg --path README.md --name rdme
 Registered rdme
 ```
 
-If we list Palimpzest's datasets again we will see that `README.md` has been registered under the dataset named `rmde`:
+If we list Palimpzest's datasets again we will see that `README.md` has been registered under the dataset named `rdme`:
 ```bash
 $ pz ls
 +------+------+------------------------------------------+
