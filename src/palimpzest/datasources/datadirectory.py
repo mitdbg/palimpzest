@@ -13,7 +13,7 @@ class _DataDirectory:
         self._cache = {}
         self._tempCache = {}
 
-        self._dir = dir
+        self._dir = os.path.join(dir, ".palimpzest")
         if create:
             if not os.path.exists(self._dir):
                 os.makedirs(self._dir)
@@ -21,7 +21,7 @@ class _DataDirectory:
                 os.makedirs(self._dir + "/data/cache")
                 pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
 
-        self.config = Config(self._dir, create=create)
+        self.config = Config(self._dir)
 
         # Unpickle the registry of data sources
         if os.path.exists(self._dir + "/data/cache/registry.pkl"):
@@ -160,12 +160,14 @@ def initDataDirectory(initDir, create=False):
     """Initialize the DataDirectory with a directory."""
     global _DataDirectoryMember
     if not _DataDirectoryMember is None:
-        raise Exception("DataDirectory already initialized")
+        return _DataDirectoryMember
     else:
         _DataDirectoryMember = _DataDirectory(initDir, create=create)
         return _DataDirectoryMember
 
 def DataDirectory():
     if _DataDirectoryMember is None:
-        initDataDirectory(os.path.abspath(os.environ["PZ_DIR"]), create=False)
+        if "PZ_DIR" not in os.environ:
+            raise Exception("You must set PZ_DIR environment variable to point to a dir where working data can be stored.")
+        initDataDirectory(os.path.abspath(os.environ["PZ_DIR"]), create=True)
     return _DataDirectoryMember
