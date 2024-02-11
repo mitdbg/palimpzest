@@ -1,0 +1,46 @@
+Message-ID: <14304603.1075853051229.JavaMail.evans@thyme>
+Date: Thu, 20 Sep 2001 08:08:08 -0700 (PDT)
+From: charlie.graham@enron.com
+To: debbie.moseley@enron.com, mark.walton@enron.com, linda.harris@enron.com, 
+	team.ashland@enron.com, team.mullinville-maintenance@enron.com, 
+	lisa.judy-meier@enron.com
+Subject: FW: Condensate Hauling
+Cc: randy.rice@enron.com, dan.pribble@enron.com, mike.nelson@enron.com, 
+	stephen.herber@enron.com, lynn.blair@enron.com, 
+	dan.fancler@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: randy.rice@enron.com, dan.pribble@enron.com, mike.nelson@enron.com, 
+	stephen.herber@enron.com, lynn.blair@enron.com, 
+	dan.fancler@enron.com
+X-From: Graham, Charlie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=CGRAHAM1>
+X-To: Moseley, Debbie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dmosele2>, Walton, Mark </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mwalton>, Harris, Linda </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=1fc0c134-f1c8c86b-8625675f-56facb>, Ashland, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=c6685a90-cc400683-86256735-760cc9>, Mullinville-Maintenance, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=8188a52d-d4a9df9d-8625675f-6735d3>, Judy-Meier, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=486ff473-9c250c90-86256735-75e38e>
+X-cc: Rice, Randy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rrice2>, Pribble, Dan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dpribbl>, Nelson, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mnelson>, Herber, Stephen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sherber>, Blair, Lynn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lblair>, Fancler, Dan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dfancle>
+X-bcc: 
+X-Folder: \LBLAIR (Non-Privileged)\Blair, Lynn\Customer - Oneok
+X-Origin: Blair-L
+X-FileName: LBLAIR (Non-Privileged).pst
+
+FYI.  If you hadn't already heard, sounds like ONEOK has retained a new condensate/water hauler (CP Energy?).  Just a heads up since this may impact your receipt of information (revenue statements and/or run tickets) regarding the quantities of liquid removed from our facilities.
+
+Charlie
+ -----Original Message-----
+From: 	Brickman, Ronnie  
+Sent:	Thursday, September 20, 2001 9:04 AM
+To:	Ashland, Team; Beaver-Plant, Team; Gokey, Ray; Hugoton-Plant, Team; Hugoton-SW-MTCO, Team; Hugoton-SW-TXCO, Team; Hugoton-Field, Team; Howard, Randy; Stephens, LD; Sublette, Team; Mullinville-Pipeline, Team; Mullinville-Operations, Team
+Cc:	Gary Anderson/GPGFIN/Enron@ENRON; Cessac, Kenneth; Graham, Charlie; Kile, Rick; Thompson, Charlie; Williams, Sammy
+Subject:	Condensate Hauling
+
+As most of you are now aware of, OneOk has hired a new trucking company to haul off the pipeline drips and condensate tanks at our locations where drip is contained in the southwest Kansas area.
+There has been an appointment set to meet with this new trucking company representative on Monday, Sept. 24th at the Liberal Region office complex at 1:00 p.m.
+The main focus will be for the teams involved to show the vendor where these locations are that have previously been picked up by WEGO, and to make arrangements for them to review previous schedules to haul these condensates. What they have requested from the teams are maps to each point along with driving directions that are specific to each location. It comes to my mind that maybe we could provide them with a copy of our emergency response driving directions that the teams should have on hand.
+It was also brought to my attention, from my management, that this tasks needs to be handed off to the region operations management people so that they may coordinate the activities to their needs and schedules. It was also discussed that proper safety and procedure practices need be recognized by this new company which will be entering ETS facilities to provide their services for OneOk.
+This would also be a prime opportunity to request that driver "run tickets" be left at all locations that drip is removed from. This would not only provide us with audit trail material for the future, but can give us documentation for comparisons at the places where we have load-out meters installed.
+With these suggestions considered, maybe we can go forward from here with our continued services and work ethics with OneOk to provide a more positive customer relationship.
+Thanks you in advance for your cooperation in this matter.
+
+RB
+
+
+P.S.     All teams do not need to have a rep. present at this meeting. Randy Howard, myself and a few others that I have asked to provide the maps from are all that will be needed.
