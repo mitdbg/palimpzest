@@ -9,7 +9,7 @@ import os
 import subprocess
 
 ############ DEFINITIONS ############
-PZ_DIR = os.getenv("PZ_DIR", os.path.join(os.path.expanduser('~'), ".pz"))
+PZ_DIR = os.getenv("PZ_DIR", os.path.expanduser('~'))
 
 class InvalidCommandException(Exception):
     pass
@@ -100,9 +100,7 @@ def init(pz_dir: str) -> None:
     # set directory and initialize it for PZ
     pz_dir = PZ_DIR if pz_dir is None else pz_dir
     pz.initDataDirectory(os.path.abspath(pz_dir), create=True)
-    pz.DataDirectory().config.set("llmservice", "together")
-    pz.DataDirectory().config.set("parallel", "False")
-    _print_msg(f"Palimpzest system initialized in: {pz_dir}")
+    _print_msg(f"Palimpzest system initialized in: {str(os.path.join(pz_dir, '.palimpzest'))}")
 
 
 @cli.command(aliases=["lsdata", "ls"])

@@ -3,20 +3,17 @@ import os
 import sys
 
 class Config:
-    def __init__(self, path, create=False):
+    def __init__(self, path):
         self.configfilepath = os.path.join(path, "config.yaml")
-        self.config = {}
+        if not os.path.exists(path):
+            raise Exception("Target config directory does not exist at", path, ". Something is wrong with the installation.")
 
-        if create:
-            if not os.path.exists(path):
-                os.makedirs(path)
-            if not os.path.exists(self.configfilepath):
-                with open(self.configfilepath, "w") as file:
-                    self._save_config()
-        else:
-            if not os.path.exists(self.configfilepath):
-                raise Exception("No configuration information available at " + path)
-            self.config = self._load_config()
+        if not os.path.exists(self.configfilepath):
+            with open(self.configfilepath, "w") as file:
+                self.config = {"llmservice": "openai", "parallel": "False"}
+                self._save_config()
+
+        self.config = self._load_config()
 
     def get(self, key):
         return self.config[key]

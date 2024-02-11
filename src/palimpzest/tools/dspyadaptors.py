@@ -89,6 +89,7 @@ class TogetherHFAdaptor(HFModel):
         try:
             with self.session.post(url, headers=headers, json=body) as resp:
                 resp_json = resp.json()
+                #print("RESP JSON", resp_json)
                 if use_chat_api:
                     completions = [resp_json['output'].get('choices', [])[0].get('message', {}).get('content', "")]
                 else:
@@ -96,6 +97,7 @@ class TogetherHFAdaptor(HFModel):
                 response = {"prompt": prompt, "choices": [{"text": c} for c in completions]}
                 return response
         except Exception as e:
+            #print("EXCEPTION", e)
             if resp_json:
                 print(f"resp_json:{resp_json}")
             print(f"Failed to parse JSON response: {e}")

@@ -26,7 +26,7 @@ $ pip install .
 ```
 
 ## Setting PZ_DIR
-Palimpzest uses the environment variable `PZ_DIR` to set the root of its working directory. If this environment variable is not set, Palimpzest will use `~/.pz` by default. The CLI also allows you to override `PZ_DIR` with the `--pz-dir` flag when initializing the system (e.g. `pz init --pz-dir path/to/dir`).
+Palimpzest uses the environment variable `PZ_DIR` to set the root of its working directory. If this environment variable is not set, Palimpzest will create its working directory at `~/.palimpzest` by default. The CLI also allows you to override `PZ_DIR` with the `--pz-dir` flag when initializing the system (e.g. `pz init --pz-dir path/to/dir`).
 
 ## Python Demo
 To see a simple example of how to use Palimpzest in a Python program, try running `tests/simpleDemo.py`.
@@ -53,10 +53,10 @@ Commands:
                                   PZ.
 ```
 
-Users can initialize their own system by running `pz init`. This will create Palimpzest's working directory in `~/.pz` (unless `PZ_DIR` is set, or `--pz-dir` is specified):
+Users can initialize their own system by running `pz init`. This will create Palimpzest's working directory in `~/.palimpzest` (unless `PZ_DIR` is set, or `--pz-dir` is specified):
 ```bash
 $ pz init
-Palimpzest system initialized in: /Users/matthewrusso/.pz
+Palimpzest system initialized in: /Users/matthewrusso/.palimpzest
 ```
 
 If we list the set of datasets registered with Palimpzest, we'll see there currently are none:

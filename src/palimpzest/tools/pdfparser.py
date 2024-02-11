@@ -14,7 +14,7 @@ from palimpzest import DataDirectory
 import palimpzest as pz
 
 # DEFINITIONS
-PZ_DIR = os.getenv("PZ_DIR", os.path.join(os.path.expanduser('~'), ".pz"))
+PZ_DIR = os.getenv("PZ_DIR", os.path.expanduser('~'))
 COSMOS_ADDRESS = "https://xdd.wisc.edu/cosmos_service"
 
 
