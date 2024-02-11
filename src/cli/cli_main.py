@@ -190,7 +190,7 @@ def rm_data(name: str) -> None:
 
 def main():
     """
-    Entrypoint for a2rchi cli tool implemented using Click.
+    Entrypoint for Palimpzest CLI tool implemented using Click.
     """
     cli.add_command(help)
     cli.add_command(init)
