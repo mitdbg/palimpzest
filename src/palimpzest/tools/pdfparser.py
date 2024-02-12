@@ -13,7 +13,11 @@ from fastapi import APIRouter, FastAPI, UploadFile, Response, status
 from palimpzest import DataDirectory
 import palimpzest as pz
 
+# DEFINITIONS
+PZ_DIR = os.getenv("PZ_DIR", os.path.expanduser('~'))
 COSMOS_ADDRESS = "https://xdd.wisc.edu/cosmos_service"
+
+
 class PdfParser:
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
@@ -229,7 +233,7 @@ def get_text_from_pdf(filename, pdf_bytes):
 
 
 if __name__ == "__main__":
-    #config = pz.Config(os.getenv("PZ_DIR"))
+    #config = pz.Config(PZ_DIR)
     file_path = "/Users/chunwei/Downloads/sidarthe.annotations.pdf"
     # output_dir = "../../../tests/testFileDirectory/cosmos"
     with open(file_path, "rb") as file:
