@@ -52,8 +52,6 @@ def run_rag_boolean(context, question, llmService="openai"):
     dspy.settings.configure(lm=turbo)
     rag = RAG(FilterOverPaper)
     pred = rag(question, context)
-    print("DOING IT BABY!!!")
-    pred.inspect_history(n=1)
     #print(question)
     #print(indent(pred.rationale, 4 * ' '))
     #print(pred.answer)
@@ -80,8 +78,6 @@ def run_rag_qa(context, question, llmService="openai"):
     dspy.settings.configure(lm=turbo)
     rag = RAG(QuestionOverPaper)
     pred = rag(question, context)
-    print("DOING IT BABY!!!")
-    pred.inspect_history(n=1)
     return pred.answer
 
 if __name__ == "__main__":
