@@ -19,6 +19,24 @@ Some target use cases for Palimpzest:
 
 # Getting started
 
-First thing, please set up the system environment variables `PZ_DIR`. This is the root directory for the Palimpzest system.
-Initialize the configuration by running `pz.py --init`.
-To see a simple example of how to use Palimpzest, simply run `tests/simpleDemo.py`. 
+Below are simple instructions to run pz on a test data set of enron emails that is included with the system:
+
+- Set the system environment variables `PZ_DIR`. This is the root directory for the Palimpzest system.
+
+- Add the pz tool to your path (it is in the tools directory).  
+
+`export PATH=$PATH:$PZ_DIR/tools/`
+
+- Initialize the configuration by running `pz --init`.  You can also run pz via a command like 
+`python3 tools/pz --int`.
+
+- Add a the enron data set with:
+
+`pz registerdatadir testdata/enron-tiny enron-tiny`
+
+- Run it through the test program with:
+    `tests/simpleDemo.py --task enron --datasetid enron-tiny`
+
+- Palimpzest defaults to using OpenAI. You’ll need to export an environment variable `OPENAI_API_KEY`
+
+This simple 
