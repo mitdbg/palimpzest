@@ -13,12 +13,14 @@ LOCAL_LLM_CONVERSION_TIME_PER_RECORD = 10
 # Assume 5s per record for local LLM boolean filter
 LOCAL_LLM_FILTER_TIME_PER_RECORD = 5
 
+logLLMOutput = False
+
 class PhysicalOp:
     LOCAL_PLAN = "LOCAL"
     REMOTE_PLAN = "REMOTE"
 
     synthesizedFns = {}
-    solver = Solver()
+    solver = Solver(verbose=logLLMOutput)
 
     def __init__(self, outputElementType):
         self.outputElementType = outputElementType
