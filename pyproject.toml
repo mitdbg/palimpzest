@@ -1,0 +1,56 @@
+[project]
+name = "palimpzest"
+version = "0.1.0"
+description = "Palimpzest is the next generation of extraction and document data management"
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["extraction", "llm", "tools", "document", "search", "integration"]
+authors = [
+    {name="MIT DSG Semantic Management Lab", email="michjc@csail.mit.edu"},
+]
+dependencies = [
+    "click>=8.1.7",
+    "click-aliases>=1.0.4",
+    "numpy>=1.19",
+    "requests>=2.25",
+    "pandas~=2.1.1",
+    "pyarrow>=13.0.0",
+    "fastapi~=0.100.0",
+    "openai>=1.0",
+    "dspy-ai>=2.1.9",
+    "prettytable>=3.9.0",
+    "pyyaml>=6.0.1"
+    # Add other dependencies as needed
+]
+classifiers=[
+    "Development Status :: 4 - Beta",  # Change as appropriate
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",  # Change as appropriate
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",  # Specify versions you support
+    # Add more classifiers as appropriate
+]
+
+[project.scripts]
+pz = "cli.cli_main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false
+
+[tool.setuptools.package-data]
+"*" = ["*.txt", "*.rst", "*.md"]
+
+[build-system]
+requires = ["setuptools"]
+build-backed = "setuptools.build_meta"
+
+[project.urls]
+homepage = "https://github.com/mikecafarella/Palimpzest"
+repository = "https://github.com/mikecafarella/Palimpzest"
+# documentation = "https://readthedocs.org"
+# changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"

@@ -18,7 +18,91 @@ Some target use cases for Palimpzest:
 - **Next-Gen Dashboards**: Integrate your datacenter's logs with background documentation, then ask for hypotheses about a bug you're seeing in Datadog. Go beyond the ocean of 2d plots.
 
 # Getting started
+You can install the Palimpzest package and CLI on your machine by cloning this repository and running:
+```bash
+$ git clone git@github.com:mikecafarella/palimpzest.git
+$ cd palimpzest
+$ pip install .
+```
 
-First thing, please set up the system environment variables `PZ_DIR`. This is the root directory for the Palimpzest system.
-Initialize the configuration by running `pz.py --init`.
-To see a simple example of how to use Palimpzest, simply run `tests/simpleDemo.py`. 
+## Setting PZ_DIR
+Palimpzest uses the environment variable `PZ_DIR` to set the root of its working directory. If this environment variable is not set, Palimpzest will create its working directory at `~/.palimpzest` by default. The CLI also allows you to override `PZ_DIR` with the `--pz-dir` flag when initializing the system (e.g. `pz init --pz-dir path/to/dir`).
+
+## Python Demo
+To see a simple example of how to use Palimpzest in a Python program, try running `tests/simpleDemo.py`.
+
+## Palimpzest CLI
+Installing Palimpzest also installs its CLI tool `pz` which provides users with basic utilities for creating and managing their own Palimpzest system. Running `pz --help` diplays an overview of the CLI's commands:
+```bash
+$ pz --help
+Usage: pz [OPTIONS] COMMAND [ARGS]...
+
+  The CLI tool for Palimpzest.
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  help (h)                        Print the help message for PZ.
+  init (i)                        Initialize data directory for PZ.
+  ls-data (ls,lsdata)             Print a table listing the datasets
+                                  registered with PZ.
+  register-data (r,reg,register)  Register a data file or data directory with
+                                  PZ.
+  rm-data (rm,rmdata)             Remove a dataset that was registered with
+                                  PZ.
+```
+
+Users can initialize their own system by running `pz init`. This will create Palimpzest's working directory in `~/.palimpzest` (unless `PZ_DIR` is set, or `--pz-dir` is specified):
+```bash
+$ pz init
+Palimpzest system initialized in: /Users/matthewrusso/.palimpzest
+```
+
+If we list the set of datasets registered with Palimpzest, we'll see there currently are none:
+```bash
+$ pz ls
++------+------+------+
+| Name | Type | Path |
++------+------+------+
++------+------+------+
+
+Total datasets: 0
+```
+
+To add (or "register") a dataset with Palimpzest, we can use the `pz register-data` command (also aliased as `pz reg`) to specify that a file or directory at a given `--path` should be registered as a dataset with the specified `--name`:
+```bash
+$ pz reg --path README.md --name rdme
+Registered rdme
+```
+
+If we list Palimpzest's datasets again we will see that `README.md` has been registered under the dataset named `rdme`:
+```bash
+$ pz ls
++------+------+------------------------------------------+
+| Name | Type |                   Path                   |
++------+------+------------------------------------------+
+| rdme | file | /Users/matthewrusso/palimpzest/README.md |
++------+------+------------------------------------------+
+
+Total datasets: 1
+```
+
+To remove a dataset from Palimpzest, simply use the `pz rm-data` command (also aliased as `pz rm`) and specify the `--name` of the dataset you would like to remove:
+```bash
+$ pz rm --name rdme
+Deleted rdme
+```
+
+Finally, listing our datasets once more will show that the dataset has been deleted:
+```bash
+$ pz ls
++------+------+------+
+| Name | Type | Path |
++------+------+------+
++------+------+------+
+
+Total datasets: 0
+```
+
+
