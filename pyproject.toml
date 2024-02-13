@@ -13,11 +13,11 @@ dependencies = [
     "click-aliases>=1.0.4",
     "numpy>=1.19",
     "requests>=2.25",
-    "pandas~=2.1.1",
+    "pandas", # ~=2.1.1",
     "pyarrow>=13.0.0",
     "fastapi~=0.100.0",
     "openai>=1.0",
-    "dspy-ai>=2.1.9",
+    "dspy-ai", #>=2.1.9",
     "prettytable>=3.9.0",
     "pyyaml>=6.0.1",
     "torch>=1.9.0",
@@ -34,6 +34,8 @@ dependencies = [
     "layoutparser",
     "papermage==0.15.0"
     # Add other dependencies as needed
+    # TODO: add modal==0.57.39
+    # TODO: resolve conflict between papermage (wants pandas<2) and dspy-ai (wants pandas~=2.1.1); 
 ]
 classifiers=[
     "Development Status :: 4 - Beta",  # Change as appropriate

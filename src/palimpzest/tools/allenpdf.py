@@ -27,7 +27,7 @@ pipPacks = ["papermage",
             "pysbd",
             "decontext",
             "vila"]
-pdfProcessingImage = modal.Image.debian_slim(python_version="3.11").apt_install("ffmpeg").pip_install("torch==2.1.1").pip_install("pkgconfig").pip_install(pipPacks).pip_install("python-poppler")
+pdfProcessingImage = modal.Image.debian_slim(python_version="3.11").apt_install(["ffmpeg", "pkg-config", "libpoppler-cpp-dev"]).pip_install("torch==2.1.1").pip_install("pkgconfig").pip_install(pipPacks).pip_install("python-poppler")
 #pdfProcessingImage = modal.Image.debian_slim(python_version="3.11").apt_install("ffmpeg").conda_install(["poppler"]).pip_install("torch==2.1.1").pip_install(pipPacks)
  #                                                          "pdfplumber==0.7.4", 
  #                                                          "requests", 
