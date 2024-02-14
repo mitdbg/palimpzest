@@ -1,7 +1,9 @@
 import os
-from textwrap import indent
+
 import dspy
-from .dspyadaptors import TogetherHFAdaptor
+
+from palimpzest.tools.dspyadaptors import TogetherHFAdaptor
+
 
 ##
 # Given a question, we'll feed it with the paper context for answer generation.
@@ -31,7 +33,30 @@ class RAG(dspy.Module):
         answer = self.generate_answer(context=context, question=question)
         return answer
 
-def run_rag_boolean(context, question, llmService="openai", verbose=False):
+
+def gen_signature_class(instruction, context_desc, question_desc, answer_desc):
+    class QuestionOverDoc(dspy.Signature):
+        __doc__ = instruction
+        context = dspy.InputField(desc= context_desc)
+        question = dspy.InputField(desc= question_desc)
+        answer = dspy.OutputField(desc= answer_desc)
+    return QuestionOverDoc
+
+def gen_filter_signature_class(doc_schema, doc_type):
+    instruction = f"Answer condition questions about a {doc_schema}."
+    context_desc = f"contains full text of the {doc_type}"
+    question_desc = f"one or more conditions about the {doc_type}"
+    answer_desc = f"often a TRUE/FALSE answer to the condition question(s) about the {doc_type}"
+    return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
+
+def gen_qa_signature_class(doc_schema, doc_type):
+    instruction = f"Answer question(s) about a {doc_schema}."
+    context_desc = f"contains full text of the {doc_type}"
+    question_desc = f"one or more question about the {doc_type}"
+    answer_desc = f"print the answer only, separated by a newline character"
+    return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
+
+def run_rag_boolean(context, question, llmService="openai", verbose=False, promptSignature=FilterOverPaper):
     if llmService == "openai":
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
@@ -50,7 +75,7 @@ def run_rag_boolean(context, question, llmService="openai", verbose=False):
         raise ValueError("llmService must be either 'openai' or 'together'")
 
     dspy.settings.configure(lm=turbo)
-    rag = RAG(FilterOverPaper)
+    rag = RAG(promptSignature)
     pred = rag(question, context)
     if verbose:
         print("Prompt history:")
@@ -60,7 +85,7 @@ def run_rag_boolean(context, question, llmService="openai", verbose=False):
     #print(pred.answer)
     return pred.answer
 
-def run_rag_qa(context, question, llmService="openai", verbose=False):
+def run_rag_qa(context, question, llmService="openai", verbose=False, promptSignature=QuestionOverPaper):
     if llmService == "openai":
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
@@ -79,7 +104,7 @@ def run_rag_qa(context, question, llmService="openai", verbose=False):
         raise ValueError("llmService must be either 'openai' or 'together'")
 
     dspy.settings.configure(lm=turbo)
-    rag = RAG(QuestionOverPaper)
+    rag = RAG(promptSignature)
     pred = rag(question, context)
     if verbose:
         print("Prompt history:")

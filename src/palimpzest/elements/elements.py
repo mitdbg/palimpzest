@@ -47,6 +47,10 @@ class ElementMetaclass(type):
         fields = [attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
         return fields
 
+    def className(cls):
+        """Return the name of this class"""
+        return cls.__name__
+
     def jsonSchema(cls):
         """The JSON representation of the schema of this Element"""
         attributes = dir(cls)

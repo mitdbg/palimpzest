@@ -3,7 +3,7 @@ import os
 from palimpzest import Field
 from palimpzest.elements import DataRecord, TextFile, File, PDFFile, ImageFile
 from palimpzest.tools import cosmos_client, get_text_from_pdf
-from palimpzest.tools.dspysearch import run_rag_boolean, run_rag_qa
+from palimpzest.tools.dspysearch import run_rag_boolean, run_rag_qa, gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.datasources import DataDirectory
 from palimpzest.tools.openai_image_converter import do_image_analysis
 import base64
@@ -17,6 +17,7 @@ class Solver:
         self._hardcodedFns.add((PDFFile, File))
         self._hardcodedFns.add((PDFFile, File))
         self._hardcodedFns.add((ImageFile, File))
+        self._hardcodedFns.add((TextFile, File))
         self._verbose = verbose
 
     def easyConversionAvailable(self, outputElement, inputElement):
@@ -70,8 +71,7 @@ class Solver:
             def _fileToText(candidate: DataRecord):
                 if not candidate.element == inputElement:
                     return None
-                # b64 decode of candidate.contents
-                text_content = base64.b64decode(candidate.contents).decode("utf-8")
+                text_content = str(candidate.contents, 'utf-8')
                 dr = DataRecord(outputElement)
                 dr.filename = candidate.filename
                 dr.contents = text_content
@@ -103,16 +103,21 @@ class Solver:
                 # for field in inputElement.__dict__:
                 dr = DataRecord(outputElement)
                 text_content = candidate.asTextJSON()
+                doc_schema = str(outputElement)
+                doc_type = outputElement.className()
 
                 for field_name in outputElement.fieldNames():
                     f = getattr(outputElement, field_name)
-                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})", llmService=self._llmservice(), verbose=self._verbose)
+                    answer = run_rag_qa(text_content, f"What is the {field_name} of the {doc_type}? ({f.desc})",
+                                        llmService=self._llmservice(), verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
                     setattr(dr, field_name, answer)
                 return dr
             return fn
 
     def _makeFilterFn(self, taskDescriptor):
             functionName, functionParams, outputElement, inputElement = taskDescriptor
+            doc_schema = str(inputElement)
+            doc_type = inputElement.className()
             if len(functionParams) == 0:
                 def allPass(candidate: DataRecord):
                     return True
@@ -126,9 +131,9 @@ class Solver:
                 def llmFilter(candidate: DataRecord):
                     if not candidate.element == inputElement:
                         return False
-                    
                     text_content = candidate.asJSON()
-                    response = run_rag_boolean(text_content, filterCondition, llmService=self._llmservice(), verbose=self._verbose)
+                    response = run_rag_boolean(text_content, filterCondition, llmService=self._llmservice(),
+                                               verbose=self._verbose, promptSignature=gen_filter_signature_class(doc_schema, doc_type))
                     if response == "TRUE":
                         return True
                     else:
