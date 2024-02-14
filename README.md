@@ -109,9 +109,7 @@ Total datasets: 0
 
 Below are simple instructions to run pz on a test data set of enron emails that is included with the system, assuming you have installed the pz tools via pip instal . as above:
 
-- Set the system environment variables `PZ_DIR`. This is the root directory for the Palimpzest system.
-
-- Initialize the configuration by running `pz init`
+- Initialize the configuration by running `pz init`, as described above
 
 - Add a the enron data set with:
 
