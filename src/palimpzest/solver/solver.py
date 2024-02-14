@@ -1,10 +1,11 @@
 import os
 
 from palimpzest import Field
-from palimpzest.elements import DataRecord, TextFile, File, PDFFile
+from palimpzest.elements import DataRecord, TextFile, File, PDFFile, ImageFile
 from palimpzest.tools import cosmos_client, get_text_from_pdf
 from palimpzest.tools.dspysearch import run_rag_boolean, run_rag_qa
 from palimpzest.datasources import DataDirectory
+from palimpzest.tools.openai_image_converter import do_image_analysis
 import base64
 
 class Solver:
@@ -14,9 +15,10 @@ class Solver:
         self._simpleTypeConversions = set()
         self._hardcodedFns = set()
         self._hardcodedFns.add((PDFFile, File))
-        self._hardcodedFns.add((TextFile, File))
+        self._hardcodedFns.add((PDFFile, File))
+        self._hardcodedFns.add((ImageFile, File))
         self._verbose = verbose
-        
+
     def easyConversionAvailable(self, outputElement, inputElement):
         return (outputElement, inputElement) in self._simpleTypeConversions or (outputElement, inputElement) in self._hardcodedFns
 
@@ -75,6 +77,23 @@ class Solver:
                 dr.contents = text_content
                 return dr
             return _fileToText
+        elif outputElement == ImageFile and inputElement == File:
+            def _imageToText(candidate: DataRecord):
+                if not candidate.element == inputElement:
+                    return None
+                # b64 decode of candidate.contents
+                #print(candidate.contents)
+                image_bytes = candidate.contents #base64.b64decode(candidate.contents)#.decode("utf-8")
+                dr = DataRecord(outputElement)
+                dr.filename = candidate.filename
+                if 'OPENAI_API_KEY' not in os.environ:
+                    raise ValueError("OPENAI_API_KEY not found in environment variables")
+                # get openai key from environment
+                openai_key = os.environ['OPENAI_API_KEY']
+                dr.contents = do_image_analysis(openai_key, image_bytes)
+                return dr
+            return _imageToText
+
         else:
             raise Exception(f"Cannot hard-code conversion from {inputElement} to {outputElement}")
 
