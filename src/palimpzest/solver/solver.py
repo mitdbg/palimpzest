@@ -102,10 +102,11 @@ class Solver:
                 # iterate through all empty fields in the outputElement and ask questions to fill them
                 # for field in inputElement.__dict__:
                 dr = DataRecord(outputElement)
-                text_content = candidate.asJSON()
+                text_content = candidate.asTextJSON()
+
                 for field_name in outputElement.fieldNames():
                     f = getattr(outputElement, field_name)
-                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})", llmService=self._llmservice(),verbose=self._verbose)
+                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})", llmService=self._llmservice(), verbose=self._verbose)
                     setattr(dr, field_name, answer)
                 return dr
             return fn

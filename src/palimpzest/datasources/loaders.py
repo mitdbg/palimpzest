@@ -29,7 +29,7 @@ class DirectorySource(DataSource):
                     dr = DataRecord(self.basicElement)
                     dr.filename = file_path
                     bytes_data = open(file_path, "rb").read()
-                    dr.contents = base64.b64encode(bytes_data).decode('utf-8')
+                    dr.contents = bytes_data
                     yield dr
 
         return filteredIterator()
@@ -45,7 +45,7 @@ class FileSource(DataSource):
             dr = DataRecord(self.basicElement)
             dr.filename = self.path
             bytes_data = open(self.path, "rb").read()
-            dr.contents = base64.b64encode(bytes_data).decode('utf-8')
+            dr.contents = bytes_data
 
             yield dr
 
