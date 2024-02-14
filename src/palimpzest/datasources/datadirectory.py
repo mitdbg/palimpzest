@@ -1,3 +1,5 @@
+import tempfile
+
 from palimpzest.elements import DataRecord
 from palimpzest.config import Config
 from .loaders import DirectorySource, FileSource
@@ -27,6 +29,11 @@ class _DataDirectory:
 
         self.config = Config(self._dir)
 
+        # initialize the file cache directory, defaulting to the system's temporary directory "tmp/pz"
+        pz_file_cache_dir = self.config.get("filecachedir")
+        if not os.path.exists(pz_file_cache_dir):
+            os.makedirs(pz_file_cache_dir)
+
         # Unpickle the registry of data sources
         if os.path.exists(self._dir + "/data/cache/registry.pkl"):
             self._registry = pickle.load(open(self._dir + "/data/cache/registry.pkl", "rb"))
@@ -37,7 +44,8 @@ class _DataDirectory:
                 if file.endswith(".cached"):
                     uniqname = file[:-7]
                     self._cache[uniqname] = root + "/" + file
-
+    def getFileCacheDir(self):
+        return self.config.get("filecachedir")
     #
     # These methods handle properly registered data files, meant to be kept over the long haul
     #
