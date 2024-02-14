@@ -17,3 +17,5 @@ class PDFFile(File):
     # This class is currently very impoverished. It needs a lot more fields before it can correctly represent a PDF.
     text_contents = Field(desc="The text-only contents of the PDF", required=True)
 
+class ImageFile(File):
+    """A file that contains an image."""
