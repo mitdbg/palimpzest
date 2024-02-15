@@ -58,6 +58,7 @@ class Solver:
                 remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
             else:
                 remoteFunc = None
+                
             def _fileToPDF(candidate: DataRecord):
                 pdf_bytes = base64.b64decode(candidate.contents)
                 pdf_filename = candidate.filename
