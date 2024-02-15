@@ -64,7 +64,7 @@ class Solver:
                 remoteFunc = None
                 
             def _fileToPDF(candidate: DataRecord):
-                pdf_bytes = base64.b64decode(candidate.contents)
+                pdf_bytes = candidate.contents
                 pdf_filename = candidate.filename
                 if remoteFunc is not None:
                     docJsonStr = remoteFunc.remote([pdf_bytes])
