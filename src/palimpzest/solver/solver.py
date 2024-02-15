@@ -12,13 +12,14 @@ import modal
 
 class Solver:
     """This solves for needed operator implementations"""
-    def __init__(self):
+    def __init__(self, verbose = False):
         self._hardcodedFns = {}
         self._simpleTypeConversions = set()
         self._hardcodedFns = set()
         self._hardcodedFns.add((PDFFile, File))
         self._hardcodedFns.add((TextFile, File))
-
+        self._verbose = verbose
+        
     def easyConversionAvailable(self, outputElement, inputElement):
         return (outputElement, inputElement) in self._simpleTypeConversions or (outputElement, inputElement) in self._hardcodedFns
 
@@ -99,7 +100,7 @@ class Solver:
                 text_content = candidate.asJSON()
                 for field_name in outputElement.fieldNames():
                     f = getattr(outputElement, field_name)
-                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})", llmService=self._llmservice())
+                    answer = run_rag_qa(text_content, f"What is the {field_name} of the document? ({f.desc})", llmService=self._llmservice(),verbose=self._verbose)
                     setattr(dr, field_name, answer)
                 return dr
             return fn
@@ -121,7 +122,7 @@ class Solver:
                         return False
                     
                     text_content = candidate.asJSON()
-                    response = run_rag_boolean(text_content, filterCondition, llmService=self._llmservice())
+                    response = run_rag_boolean(text_content, filterCondition, llmService=self._llmservice(), verbose=self._verbose)
                     if response == "TRUE":
                         return True
                     else:
