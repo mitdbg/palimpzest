@@ -11,6 +11,22 @@ class ScientificPaper(pz.PDFFile):
    title = pz.Field(desc="The title of the paper. This is a natural language title, not a number or letter.", required=True)
    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
 
+def testPDFProcessor(datasetId):
+    """This tests whether we can process a PDF file"""
+    print("Processing PDF inputs...")
+    testRepo1 = pz.ConcreteDataset(pz.File, datasetId, desc="A small test inputset")
+    pdfPapers = pz.Set(pz.PDFFile, input=testRepo1, desc="PDFs")
+
+    logicalTree = pdfPapers.getLogicalTree()
+    planTime, planPrice, estimatedCardinality, physicalTree = logicalTree.createPhysicalPlan()    
+
+    for paper in physicalTree:
+        print(paper.text_contents)
+
+    print()
+    print("Done processing PDF inputs")
+
+
 def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
     testRepo1 = pz.ConcreteDataset(pz.File, datasetId, desc="The dataset Mike downloaded on Jan 30")
@@ -20,6 +36,8 @@ def buildMITBatteryPaperPlan(datasetId):
     goodAuthorPapers = mitPapers.addFilterStr("Paper where the title begins with the letter X")
 
     return goodAuthorPapers
+
+
 
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
@@ -32,6 +50,9 @@ def buildEnronPlan(datasetId):
     emails = pz.Set(Email, input=textFiles, desc="Emails")
 
     return emails
+
+
+
 
 def emitDataset(rootSet, title="Dataset", verbose=False):
     def emitNestedTuple(node, indent=0):
@@ -113,6 +134,8 @@ if __name__ == "__main__":
         #planTime, planPrice, estimatedCardinality, physicalTree = rootSet.getLogicalTree().createPhysicalPlan()
         #for email in physicalTree:
         #    print(email.sender, email.subject)
+    elif task == "pdftest":
+        testPDFProcessor(datasetid)
     else:
         print("Unknown task")
         exit(1)

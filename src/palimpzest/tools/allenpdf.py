@@ -1,7 +1,7 @@
 import os
 import modal
 
-stub = modal.Stub()
+stub = modal.Stub("palimpzest.tools")
 pipPacks = ["papermage", 
             "tqdm", 
             "transformers", 
@@ -27,7 +27,7 @@ pdfProcessingImage = modal.Image.debian_slim(python_version="3.11").apt_install(
     ["torch==2.1.1", "pkgconfig", "python-poppler"] + pipPacks)
 
 @stub.function(image=pdfProcessingImage)
-def processPdf(pdfBytesDocs: list[bytes]):
+def processPapermagePdf(pdfBytesDocs: list[bytes]):
     """Process a PDF file and return the text contents."""
     import papermage
     import os
@@ -46,28 +46,6 @@ def processPdf(pdfBytesDocs: list[bytes]):
 
         os.remove("/tmp/papermage.pdf")
 
-        # print all the attrs in doc
-        abstracts = []
-        sentences = []
-        titles = []
-        for p in doc.pages:
-            for s in p.sentences:
-                sentences.append(s.text)
-
-        #doc.abstracts
-        for a in doc.abstracts:
-            for s in a.sentences:
-                abstracts.append(s.text)
-
-        #doc.titles
-        for t in doc.titles:
-            for s in t.sentences:
-                titles.append(s.text)
-        #doc.authors
-        #doc.equations
-        #doc.figures
-        #doc.tables
-        #results.append((titles, abstracts, sentences))
         results.append(json.dumps(doc.to_json()))
 
     return results
@@ -80,11 +58,13 @@ def main():
     from papermage import Document
     pdfBytes1 = open("test.pdf", "rb").read()
 
-    results = processPdf.remote([pdfBytes1])
+    results = processPapermagePdf.local([pdfBytes1])
     for idx, r in enumerate(results):
         docdict = json.loads(r)
         doc = Document.from_json(docdict)
         print(idx, doc)
+        for p in doc.pages:
+            print(p)
 
 
 
