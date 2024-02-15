@@ -2,11 +2,14 @@ import os
 
 from palimpzest import Field
 from palimpzest.elements import DataRecord, TextFile, File, PDFFile, ImageFile
-from palimpzest.tools import cosmos_client, get_text_from_pdf
+from palimpzest.tools import cosmos_client, get_text_from_pdf, processPapermagePdf
 from palimpzest.tools.dspysearch import run_rag_boolean, run_rag_qa, gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.datasources import DataDirectory
 from palimpzest.tools.openai_image_converter import do_image_analysis
+import json
+from papermage import Document
 import base64
+import modal
 
 class Solver:
     """This solves for needed operator implementations"""
@@ -54,13 +57,24 @@ class Solver:
     def _makeHardCodedTypeConversionFn(self, outputElement, inputElement):
         """This converts from one type to another when we have a hard-coded method for doing so."""
         if outputElement == PDFFile and inputElement == File:
+            if DataDirectory().config.get("pdfprocessing") == "modal":
+                print("handling PDF processing remotely")
+                remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
+            else:
+                remoteFunc = None
+                
             def _fileToPDF(candidate: DataRecord):
-                if not candidate.element == inputElement:
-                    return None
                 pdf_bytes = candidate.contents
                 pdf_filename = candidate.filename
-                print("About to process PDF for ", pdf_filename)
-                text_content = get_text_from_pdf(candidate.filename, candidate.contents)
+                if remoteFunc is not None:
+                    docJsonStr = remoteFunc.remote([pdf_bytes])
+                    docdict = json.loads(docJsonStr[0])
+                    doc = Document.from_json(docdict)
+                    text_content = ""
+                    for p in doc.pages:
+                        text_content += p.text
+                else:
+                    text_content = get_text_from_pdf(candidate.filename, candidate.contents)
                 dr = DataRecord(outputElement)
                 dr.filename = pdf_filename
                 dr.contents = pdf_bytes
