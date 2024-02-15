@@ -18,6 +18,16 @@ class DataRecord:
     def element(self):
         return self._element
 
+    def asTextJSON(self):
+        """Return a JSON representation of this DataRecord"""
+        keys = sorted(self.__dict__)
+        # Make a dictionary out of the key/value pairs
+        d = {k: self.__dict__[k] for k in keys if not k.startswith("_") and not isinstance(self.__dict__[k] , bytes)}
+        d["data type"] = str(self._element.__name__)
+        d["data type description"]  = str(self._element.__doc__)
+        j= json.dumps(d, indent=2)
+        return j
+
     def asJSON(self):
         """Return a JSON representation of this DataRecord"""
         keys = sorted(self.__dict__)

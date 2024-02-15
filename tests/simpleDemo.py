@@ -40,6 +40,17 @@ def buildEnronPlan(datasetId):
 
     return emails
 
+class DogImage(pz.ImageFile):
+    breed = pz.Field(desc="The breed of the dog", required = True)
+
+def buildImagePlan(datasetId):
+    testRepo1 = pz.ConcreteDataset(pz.File, datasetId, desc="A collection of images")
+    images = pz.Set(pz.ImageFile, input=testRepo1, desc="Cast as images")
+    filteredImages = images.addFilterStr("The image contains one or more dogs")
+    dogImages = pz.Set(DogImage, input=filteredImages, desc = "Images of dogs")
+    return dogImages
+
+
 def emitDataset(rootSet, title="Dataset", verbose=False):
     def emitNestedTuple(node, indent=0):
         elt, child = node
@@ -126,6 +137,14 @@ if __name__ == "__main__":
 
         for idx, r in enumerate(physicalTree):
             print("Extracted pdf", idx)
+    elif task == "image":
+        rootSet = buildImagePlan(datasetid)
+        physicalTree = emitDataset(rootSet, title="Dogs", verbose=args.verbose)
+        for r in physicalTree:
+            print("\n\nGOT RESULT:")
+            print(r.filename)
+            print(r.breed)
+            print()
     else:
         print("Unknown task")
         exit(1)

@@ -115,15 +115,18 @@ Below are simple instructions to run pz on a test data set of enron emails that 
 
 `export PATH=$PATH:$PZ_DIR/tools/`
 
-- Initialize the configuration by running `pz --init`.  You can also run pz via a command like 
-`python3 tools/pz --int`.
+- Initialize the configuration by running `pz --init`.
 
-- Add a the enron data set with:
+- Add the enron data set with:
+`pz reg --path testdata/enron-tiny --name enron-tiny`
+then run it through the test program with:
+      `tests/simpleDemo.py --task enron --datasetid enron-tiny`
 
-`pz registerdatadir testdata/enron-tiny enron-tiny`
+- Add the test paper set with:
+    `pz reg --path testdata/pdfs-tiny --name pdfs-tiny`
+then run it through the test program with:
+`tests/simpleDemo.py --task paper --datasetid pdfs-tiny`
 
-- Run it through the test program with:
-    `tests/simpleDemo.py --task enron --datasetid enron-tiny`
 
 - Palimpzest defaults to using OpenAI. You’ll need to export an environment variable `OPENAI_API_KEY`
 

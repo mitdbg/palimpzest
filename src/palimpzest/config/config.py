@@ -1,3 +1,5 @@
+import tempfile
+
 import yaml
 import os
 import sys
@@ -9,11 +11,20 @@ class Config:
             raise Exception("Target config directory does not exist at", path, ". Something is wrong with the installation.")
 
         if not os.path.exists(self.configfilepath):
+            # Get the system's temporary directory
+            temp_dir = tempfile.gettempdir()
+            pz_file_cache_dir = os.path.join(temp_dir, "pz")
             with open(self.configfilepath, "w") as file:
-                self.config = {"llmservice": "openai", "parallel": "False"}
+                self.config = {"llmservice": "openai", "parallel": "False", "filecachedir": pz_file_cache_dir}
                 self._save_config()
 
         self.config = self._load_config()
+        if not "filecachedir" in self.config:
+            # Get the system's temporary directory
+            temp_dir = tempfile.gettempdir()
+            pz_file_cache_dir = os.path.join(temp_dir, "pz")
+            self.config["filecachedir"] = pz_file_cache_dir
+            self._save_config()
 
     def get(self, key):
         return self.config[key]

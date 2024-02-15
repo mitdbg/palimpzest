@@ -1,5 +1,4 @@
 import os
-import argparse
 import io
 import json
 import time
@@ -12,12 +11,9 @@ from fastapi import APIRouter, FastAPI, UploadFile, Response, status
 
 from palimpzest import DataDirectory
 import palimpzest as pz
+import hashlib
 
-# DEFINITIONS
-PZ_DIR = os.getenv("PZ_DIR", os.path.expanduser('~'))
 COSMOS_ADDRESS = "https://xdd.wisc.edu/cosmos_service"
-
-
 class PdfParser:
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
@@ -36,6 +32,10 @@ class PdfParser:
 
     def get_pages(self) -> List[str]:
         return self.pages
+
+def get_md5(file_bytes: bytes) -> str:
+    return hashlib.md5(file_bytes).hexdigest()
+
 ##
 # Function to extract a Cosmos parquet file to Cosmos JSON
 ##
@@ -138,6 +138,8 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10 ):
     print(f"Sending {name} to COSMOS")
     response = requests.post(f"{COSMOS_ADDRESS}/process/", files=files)
     print(f"Received response of  {response.json()['status_endpoint']} from COSMOS: {response.status_code}")
+    # get md5 of the data
+    md5 = get_md5(data)
 
     if response.status_code == status.HTTP_202_ACCEPTED:
 
@@ -154,7 +156,7 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10 ):
                     if cosmos_response.status_code == status.HTTP_200_OK:
                         data = cosmos_response.content
                         with ZipFile(io.BytesIO(data)) as z:
-                            output_subdir = os.path.join(output_dir, os.path.splitext(name)[0].replace(' ', '_'))
+                            output_subdir = os.path.join(output_dir, f"COSMOS_{os.path.splitext(name)[0].replace(' ', '_')}_{md5}")
                             os.makedirs(output_subdir, exist_ok=True)
                             z.extractall(path=output_subdir)
                             for file in os.listdir(output_subdir):
@@ -198,11 +200,24 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10 ):
 # 1. Check if the text file already exists in the cache, if so, read from the cache
 # 2. If not, call the cosmos_client function to process the PDF file and cache the text file
 ##
-def get_text_from_pdf(filename, pdf_bytes):
+def get_text_from_pdf(filename, pdf_bytes, enable_file_cache = True):
     pdf_filename = filename
     file_name = os.path.basename(pdf_filename)
     file_name_without_extension = os.path.splitext(file_name)[0]
     text_file_name = f"{file_name_without_extension}.txt"
+
+    # Get md5 of the pdf_bytes
+    md5 = get_md5(pdf_bytes)
+    cached_extraction_folder = f"COSMOS_{os.path.splitext(file_name)[0].replace(' ', '_')}_{md5}"
+
+    pz_file_cache_dir = os.path.join(DataDirectory().getFileCacheDir(), cached_extraction_folder)
+    # Check if pz_file_cache_dir exists in the file system
+    if enable_file_cache and os.path.exists(pz_file_cache_dir):
+        print(f"Text file {text_file_name} already exists in system tmp folder {pz_file_cache_dir}, reading from cache")
+        text_file_path = os.path.join(pz_file_cache_dir, text_file_name)
+        with open(text_file_path, 'r') as file:
+            text_content = file.read()
+            return text_content
 
     #
     # CHUNWEI: This code has a bug
@@ -218,14 +233,16 @@ def get_text_from_pdf(filename, pdf_bytes):
 #            text_content = file.read()
 #            return text_content
     cosmos_file_dir = file_name_without_extension.replace(' ', '_')
-    output_dir = os.path.dirname(pdf_filename)
+    # get a tmp of the system temp directory
+
+    output_dir = DataDirectory().getFileCacheDir()
     print(f"Processing {file_name} through COSMOS")
     # Call the cosmos_client function
     cosmos_client(file_name, pdf_bytes, output_dir)
-    text_file_path = os.path.join(output_dir, f"{cosmos_file_dir}/{file_name_without_extension}.txt")
+    text_file_path = os.path.join(pz_file_cache_dir, text_file_name)
     if not os.path.exists(text_file_path):
-        raise FileNotFoundError(f"Text file {text_file_name} not found in {output_dir}/{cosmos_file_dir}")
-    DataDirectory().registerLocalFile(text_file_path, text_file_name)
+        raise FileNotFoundError(f"Text file {text_file_name} not found in {pz_file_cache_dir}/{text_file_name}")
+    # DataDirectory().registerLocalFile(text_file_path, text_file_name)
     with open(text_file_path, 'r') as file:
         text_content = file.read()
         return text_content
@@ -233,8 +250,8 @@ def get_text_from_pdf(filename, pdf_bytes):
 
 
 if __name__ == "__main__":
-    #config = pz.Config(PZ_DIR)
-    file_path = "/Users/chunwei/Downloads/sidarthe.annotations.pdf"
+    config = pz.Config(os.getenv("PZ_DIR"))
+    file_path = "/Users/chunwei/research/palimpzest/testdata/pdfs-tiny/battery.pdf"
     # output_dir = "../../../tests/testFileDirectory/cosmos"
     with open(file_path, "rb") as file:
         text = get_text_from_pdf(file_path, file.read())
@@ -242,4 +259,4 @@ if __name__ == "__main__":
         # file_name = os.path.basename(file_path)
         # # Call the cosmos_client function
         # cosmos_client(file_name, file, output_dir)
-    pz.DataDirectory().rmRegisteredDataset("sidarthe.annotations.txt")
+    # pz.DataDirectory().rmRegisteredDataset("sidarthe.annotations.txt")
