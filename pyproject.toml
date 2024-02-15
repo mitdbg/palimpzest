@@ -32,9 +32,9 @@ dependencies = [
     "grobid-client-python==0.0.5", 
     "charset-normalizer",
     "layoutparser",
-    "papermage==0.15.0"
+    "papermage==0.15.0",
+    "modal==0.57.39"
     # Add other dependencies as needed
-    # TODO: add modal==0.57.39
     # TODO: resolve conflict between papermage (wants pandas<2) and dspy-ai (wants pandas~=2.1.1); 
 ]
 classifiers=[
