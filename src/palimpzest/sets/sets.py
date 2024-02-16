@@ -53,14 +53,18 @@ class Set:
         """The Set's basic element"""
         return self._basicElt
 
-    def addFilter(self, f: Filter):
+    def filter(self, f: Filter):
         """Add a filter to the Collection. This filter will possibly restrict the items that are returned later."""
         return Set(self._basicElt, input=self, desc="Apply filter(s)", filters=[f])
 
-    def addFilterStr(self, filterCondition: str):
+    def filterByStr(self, filterCondition: str):
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
         f = Filter(filterCondition)
-        return self.addFilter(f)
+        return self.filter(f)
+    
+    def convert(self, newBasicElt, desc="Convert to new basic element"):
+        """Convert the Set to a new basic element."""
+        return Set(newBasicElt, input=self, desc=desc)
     
     def dumpSyntacticTree(self):
         """Return the syntactic tree of this Set."""
@@ -79,11 +83,9 @@ class Set:
             return CacheScan(self._basicElt, uid)
 
         # The answer isn't cached, so we have to compute it
-        if len(self._filters) >= 0 and not self._basicElt == self._input._basicElt:
-            return FilteredScan(self._basicElt, ConvertScan(self._basicElt, self._input.getLogicalTree()), self._filters, targetCacheId=uid)
-        elif len(self._filters) == 0 and not self._basicElt == self._input._basicElt:
-            return ConvertScan(self._basicElt, self._input.getLogicalTree())
-        elif len(self._filters) >= 0 and self._basicElt == self._input._basicElt:
+        if not self._basicElt == self._input._basicElt:
+            return ConvertScan(self._basicElt, self._input.getLogicalTree(), targetCacheId=uid)
+        elif len(self._filters) >= 0:
             return FilteredScan(self._basicElt, self._input.getLogicalTree(), self._filters, targetCacheId=uid)
         else:
             return self._input.getLogicalTree()

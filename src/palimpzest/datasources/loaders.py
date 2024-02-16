@@ -2,7 +2,6 @@ from palimpzest.elements import DataRecord
 from palimpzest.elements import File
 
 import os
-import base64
 
 class DataSource:
     """The base class for all data sources"""

@@ -34,9 +34,10 @@ class LogicalOperator:
 
 class ConvertScan(LogicalOperator):
     """A ConvertScan is a logical operator that represents a scan of a particular data source, with conversion applied."""
-    def __init__(self, outputElementType, inputOp):
+    def __init__(self, outputElementType, inputOp, targetCacheId=None):
         super().__init__(outputElementType, inputOp.outputElementType)
         self.inputOp = inputOp
+        self.targetCacheId = targetCacheId
 
     def __str__(self):
         return "ConvertScan(" + str(self.inputElementType) +", " + str(self.outputElementType) + ")"
@@ -55,14 +56,18 @@ class ConvertScan(LogicalOperator):
 
         if intermediateOutputElement == Element or intermediateOutputElement == self.outputElementType:
             if DataDirectory().config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy))
+                return ParallelInduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), targetCacheId=self.targetCacheId)
             else:
-                return InduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy))
+                return InduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), targetCacheId=self.targetCacheId)
         else:
             if DataDirectory().config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(self.outputElementType, ParallelInduceFromCandidateOp(intermediateOutputElement, self.inputOp._getPhysicalTree(strategy=strategy)))
+                return ParallelInduceFromCandidateOp(self.outputElementType, ParallelInduceFromCandidateOp(intermediateOutputElement, self.inputOp._getPhysicalTree(strategy=strategy)), targetCacheId=self.targetCacheId)
             else:
-                return InduceFromCandidateOp(self.outputElementType, InduceFromCandidateOp(intermediateOutputElement, self.inputOp._getPhysicalTree(strategy=strategy)))
+                return InduceFromCandidateOp(self.outputElementType, 
+                                             InduceFromCandidateOp(
+                                                 intermediateOutputElement, 
+                                                 self.inputOp._getPhysicalTree(strategy=strategy)),
+                                             targetCacheId=self.targetCacheId)
 
 class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached answer."""
