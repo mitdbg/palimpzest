@@ -20,11 +20,11 @@ def buildTestPDFPlan(datasetId):
 def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
     sciPapers = pz.getData(ScientificPaper, datasetId)
-    batteryPapers = sciPapers.filterByStr("The paper is about batteries")
-    mitPapers = batteryPapers.filterByStr("The paper is from MIT")
-    goodAuthorPapers = mitPapers.filterByStr("Paper where the title begins with the letter X")
+    #batteryPapers = sciPapers.filterByStr("The paper is about batteries")
+    #mitPapers = batteryPapers.filterByStr("The paper is from MIT")
+    #goodAuthorPapers = mitPapers.filterByStr("Paper where the title begins with the letter X")
 
-    return goodAuthorPapers
+    return sciPapers
 
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
@@ -33,7 +33,8 @@ class Email(pz.TextFile):
 
 def buildEnronPlan(datasetId):
     emails = pz.getData(Email, datasetId)
-    return emails
+    filteredEmails = emails.filterByStr("The email is about someone taking a vaction")
+    return filteredEmails
 
 class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required = True)

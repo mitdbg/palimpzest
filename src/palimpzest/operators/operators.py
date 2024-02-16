@@ -118,4 +118,7 @@ class FilteredScan(LogicalOperator):
         return (self, self.inputOp.dumpLogicalTree())
 
     def _getPhysicalTree(self, strategy=None):
-        return FilterCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.filters, targetCacheId=self.targetCacheId)
+        if DataDirectory().config.get("parallel") == True:
+            return ParallelFilterCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.filters, targetCacheId=self.targetCacheId)
+        else:
+            return FilterCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.filters, targetCacheId=self.targetCacheId)

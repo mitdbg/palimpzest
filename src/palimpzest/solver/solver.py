@@ -167,7 +167,7 @@ class Solver:
                 return self._makeHardCodedTypeConversionFn(outputElement, inputElement)
             else:
                 return self._makeLLMTypeConversionFn(outputElement, inputElement)
-        elif functionName == "FilterCandidateOp":
+        elif functionName == "FilterCandidateOp" or functionName == "ParallelFilterCandidateOp":
             return  self._makeFilterFn(taskDescriptor)
         else:
             raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))
