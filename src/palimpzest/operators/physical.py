@@ -158,7 +158,8 @@ class InduceFromCandidateOp(PhysicalOp):
                     if shouldCache:
                         DataDirectory().appendCache(self.targetCacheId, resultRecord)
                     yield resultRecord
-            DataDirectory().closeCache(self.targetCacheId)
+            if shouldCache:
+                DataDirectory().closeCache(self.targetCacheId)
 
         return iteratorFn()
                     
@@ -229,7 +230,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                         if shouldCache:
                             DataDirectory().appendCache(self.targetCacheId, resultRecord)
                         yield resultRecord
-            DataDirectory().closeCache(self.targetCacheId)
+            if shouldCache:
+                DataDirectory().closeCache(self.targetCacheId)
 
         return iteratorFn()
                     
@@ -291,7 +293,8 @@ class FilterCandidateOp(PhysicalOp):
                     if shouldCache:
                         DataDirectory().appendCache(self.targetCacheId, nextCandidate)
                     yield nextCandidate
-            DataDirectory().closeCache(self.targetCacheId)
+            if shouldCache:
+                DataDirectory().closeCache(self.targetCacheId)
 
         return iteratorFn()
 

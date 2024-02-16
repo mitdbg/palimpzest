@@ -94,6 +94,11 @@ class Set:
         """Return the JSON schema for this Set."""
         return self._basicElt.jsonSchema()
 
+
+def getData(basicElt, datasetId):
+    """Return a Set of data from the given dataset."""
+    return ConcreteDataset(basicElt, datasetId)
+
 class ConcreteDataset(Set):
     def __init__(self, basicElt, uniqName, desc=None):
         super().__init__(basicElt, input=None, desc=desc, filters=[])
@@ -104,7 +109,18 @@ class ConcreteDataset(Set):
 
     def getLogicalTree(self):
         """Return the logical tree of operators on Sets."""
-        return BaseScan(self._basicElt, self.uniqName)
+        # REMIND -- this code assumes that all concrete datastores return File objects.
+        # If that changes in the future, then this code will have to contact the datastore
+        # to figure out the basic element type returned by the datastore.
+
+        uid = self.universalIdentifier()
+        if DataDirectory().hasCachedAnswer(uid):
+            return CacheScan(self._basicElt, uid)
+
+        if self._basicElt == File:
+            return BaseScan(self._basicElt, self.uniqName)
+        else:
+            return ConvertScan(self._basicElt, BaseScan(File, self.uniqName), targetCacheId=uid)
 
     def serialize(self):
         return {"version": Set.SET_VERSION, 

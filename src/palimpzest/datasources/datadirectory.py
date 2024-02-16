@@ -142,7 +142,7 @@ class _DataDirectory:
         return uniqName in self._cache
 
     def openCache(self, cacheId):
-        if not cacheId in self._cache and not cacheId in self._tempCache:
+        if not cacheId is None and not cacheId in self._cache and not cacheId in self._tempCache:
             self._tempCache[cacheId] = []
             return True
         return False
