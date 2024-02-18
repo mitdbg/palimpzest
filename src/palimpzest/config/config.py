@@ -4,19 +4,22 @@ import yaml
 import os
 import sys
 
+# DEFINITIONS
+PZ_DIR = os.path.join(os.path.expanduser("~"), ".palimpzest")
+
+
 class Config:
-    def __init__(self, path):
-        self.configfilepath = os.path.join(path, "config.yaml")
-        if not os.path.exists(path):
-            raise Exception("Target config directory does not exist at", path, ". Something is wrong with the installation.")
+    def __init__(self, name: str = "default"):
+        self.configfilepath = os.path.join(PZ_DIR, f"config_{name}.yaml")
+        if not os.path.exists(PZ_DIR):
+            raise Exception(f"Target config directory does not exist at {PZ_DIR} :: Something is wrong with the installation.")
 
         if not os.path.exists(self.configfilepath):
             # Get the system's temporary directory
             temp_dir = tempfile.gettempdir()
             pz_file_cache_dir = os.path.join(temp_dir, "pz")
-            with open(self.configfilepath, "w") as file:
-                self.config = {"llmservice": "openai", "parallel": "False", "filecachedir": pz_file_cache_dir}
-                self._save_config()
+            self.config = {"name": name, "llmservice": "openai", "parallel": "False", "filecachedir": pz_file_cache_dir}
+            self._save_config()
 
         self.config = self._load_config()
         if not "filecachedir" in self.config:
@@ -28,7 +31,7 @@ class Config:
 
     def get(self, key):
         return self.config[key]
-    
+
     def set(self, key, value):
         self.config[key] = value
         self._save_config()

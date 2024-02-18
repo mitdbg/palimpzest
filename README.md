@@ -25,10 +25,6 @@ $ cd palimpzest
 $ pip install .
 ```
 
-## Setting PZ_DIR
-Palimpzest uses the environment variable `PZ_DIR` to set the root of its working directory. If this environment variable is not set, Palimpzest will create its working directory at `~/.palimpzest` by default. The CLI also allows you to override `PZ_DIR` with the `--pz-dir` flag when initializing the system (e.g. `pz init --pz-dir path/to/dir`).
-
-
 
 ## Palimpzest CLI
 Installing Palimpzest also installs its CLI tool `pz` which provides users with basic utilities for creating and managing their own Palimpzest system. Running `pz --help` diplays an overview of the CLI's commands:
@@ -52,7 +48,7 @@ Commands:
                                   PZ.
 ```
 
-Users can initialize their own system by running `pz init`. This will create Palimpzest's working directory in `~/.palimpzest` (unless `PZ_DIR` is set, or `--pz-dir` is specified):
+Users can initialize their own system by running `pz init`. This will create Palimpzest's working directory in `~/.palimpzest`:
 ```bash
 $ pz init
 Palimpzest system initialized in: /Users/matthewrusso/.palimpzest
@@ -108,19 +104,16 @@ Total datasets: 0
 
 There are a few things you need to do in order to use remote parallel services.
 
-If you want to use parallel LLM execution on together.ai, you have to modify the config.yaml so that `llmservice: together` and `parallel: True` are set.
+If you want to use parallel LLM execution on together.ai, you have to modify the config.yaml (by default, Palimpzest uses `~/.palimpzest/config_default.yaml`) so that `llmservice: together` and `parallel: True` are set.
 
 If you want to use parallel PDF processing at modal.com, you have to:
 1. Set `pdfprocessing: modal` in the config.yaml file.
 2. Run `modal deploy src/palimpzest/tools/allenpdf.py`.  This will remotely install the modal function so you can run it. (Actually, it's probably already installed there, but do this just in case.  Also do it if there's been a change to the server-side function inside that file.)
 
 
-
 ## Python Demo
 
 Below are simple instructions to run pz on a test data set of enron emails that is included with the system:
-
-- Set the system environment variables `PZ_DIR`. This is the root directory for the Palimpzest system.
 
 - Initialize the configuration by running `pz --init`.
 

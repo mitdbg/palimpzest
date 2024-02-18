@@ -32,7 +32,7 @@ class Solver:
         #       have not yet set up their config(s), then this will
         #       lead to a chain of fcn. calls that causes an exception
         #       to be thrown on `import palimpzest`.
-        llmservice = DataDirectory().config.get("llmservice")
+        llmservice = DataDirectory().current_config.get("llmservice")
         if llmservice is None:
             llmservice = "openai"
             print("LLM service has not been configured. Defaulting to openai.")
@@ -57,7 +57,7 @@ class Solver:
     def _makeHardCodedTypeConversionFn(self, outputElement, inputElement):
         """This converts from one type to another when we have a hard-coded method for doing so."""
         if outputElement == PDFFile and inputElement == File:
-            if DataDirectory().config.get("pdfprocessing") == "modal":
+            if DataDirectory().current_config.get("pdfprocessing") == "modal":
                 print("handling PDF processing remotely")
                 remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
             else:
@@ -92,7 +92,7 @@ class Solver:
                 return dr
             return _fileToText
         elif outputElement == ImageFile and inputElement == File:
-            def _imageToText(candidate: DataRecord):
+            def _fileToImage(candidate: DataRecord):
                 if not candidate.element == inputElement:
                     return None
                 # b64 decode of candidate.contents
@@ -106,7 +106,7 @@ class Solver:
                 openai_key = os.environ['OPENAI_API_KEY']
                 dr.contents = do_image_analysis(openai_key, image_bytes)
                 return dr
-            return _imageToText
+            return _fileToImage
 
         else:
             raise Exception(f"Cannot hard-code conversion from {inputElement} to {outputElement}")

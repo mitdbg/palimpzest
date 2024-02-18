@@ -7,9 +7,10 @@ import palimpzest as pz
 import click
 import os
 import subprocess
+import yaml
 
 ############ DEFINITIONS ############
-PZ_DIR = os.getenv("PZ_DIR", os.path.expanduser('~'))
+PZ_DIR = os.path.join(os.path.expanduser("~"), ".palimpzest")
 
 class InvalidCommandException(Exception):
     pass
@@ -87,20 +88,13 @@ def help() -> None:
 
 
 @cli.command(aliases=["i"])
-@click.option("--pz-dir", type=str, default=None, help="Path to the PZ working dir.")
-def init(pz_dir: str) -> None:
+def init() -> None:
     """
     Initialize data directory for PZ.
-
-    Parameters
-    ----------
-    pz_dir: str
-        Path to directory to be used instead of PZ_DIR.
     """
     # set directory and initialize it for PZ
-    pz_dir = PZ_DIR if pz_dir is None else pz_dir
-    pz.initDataDirectory(os.path.abspath(pz_dir), create=True)
-    _print_msg(f"Palimpzest system initialized in: {str(os.path.join(pz_dir, '.palimpzest'))}")
+    pz.DataDirectory()
+    _print_msg(f"Palimpzest system initialized in: {PZ_DIR}")
 
 
 @cli.command(aliases=["lsdata", "ls"])
@@ -188,6 +182,51 @@ def rm_data(name: str) -> None:
     _print_msg(f"Deleted {name}")
 
 
+@cli.command(aliases=["config", "pc"])
+def print_config() -> None:
+    """
+    Print the current config that Palimpzest is using.
+    """
+    # load config yaml file
+    config = pz.DataDirectory().getConfig()
+
+    # print contents of config
+    _print_msg(f"--- {config['name']} ---\n{yaml.dump(config)}")
+
+
+@cli.command(aliases=["cc"])
+def create_config() -> None:
+    """
+    Create a Palimpzest config. You must set the following fields:
+
+    TODO
+    """
+    # TODO
+    pass
+
+
+@cli.command(aliases=["rmconfig", "rmc"])
+def rm_config() -> None:
+    """
+    Remove the specified config from Palimpzest.
+
+    TODO
+    """
+    # TODO
+    pass
+
+
+@cli.command(aliases=["set", "sc"])
+def set_config() -> None:
+    """
+    Set the current config for Palimpzest to use.
+
+    TODO
+    """
+    # TODO
+    pass
+
+
 def main():
     """
     Entrypoint for Palimpzest CLI tool implemented using Click.
@@ -197,4 +236,8 @@ def main():
     cli.add_command(ls_data)
     cli.add_command(register_data)
     cli.add_command(rm_data)
+    cli.add_command(print_config)
+    cli.add_command(create_config)
+    cli.add_command(rm_config)
+    cli.add_command(set_config)
     cli()
