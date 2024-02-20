@@ -23,7 +23,8 @@ class QuestionOverPaper(dspy.Signature):
     question = dspy.InputField(desc="one or more question about the paper")
     answer = dspy.OutputField(desc="print the answer only, separated by a newline character")
 
-class RAG(dspy.Module):
+#invoke dspy in chain of thought mode
+class dspyCOT(dspy.Module):
     def __init__(self, f_signature=FilterOverPaper):
         super().__init__()
         self.generate_answer = dspy.ChainOfThought(f_signature)
@@ -56,7 +57,7 @@ def gen_qa_signature_class(doc_schema, doc_type):
     answer_desc = f"print the answer only, separated by a newline character"
     return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
-def run_rag_boolean(context, question, llmService="openai", verbose=False, promptSignature=FilterOverPaper):
+def run_cot_bool(context, question, llmService="openai", verbose=False, promptSignature=FilterOverPaper):
     if llmService == "openai":
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
@@ -75,8 +76,8 @@ def run_rag_boolean(context, question, llmService="openai", verbose=False, promp
         raise ValueError("llmService must be either 'openai' or 'together'")
 
     dspy.settings.configure(lm=turbo)
-    rag = RAG(promptSignature)
-    pred = rag(question, context)
+    cot = dspyCOT(promptSignature)
+    pred = cot(question, context)
     if verbose:
         print("Prompt history:")
         turbo.inspect_history(n=1)
@@ -85,7 +86,7 @@ def run_rag_boolean(context, question, llmService="openai", verbose=False, promp
     #print(pred.answer)
     return pred.answer
 
-def run_rag_qa(context, question, llmService="openai", verbose=False, promptSignature=QuestionOverPaper):
+def run_cot_qa(context, question, llmService="openai", verbose=False, promptSignature=QuestionOverPaper):
     if llmService == "openai":
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
@@ -104,8 +105,8 @@ def run_rag_qa(context, question, llmService="openai", verbose=False, promptSign
         raise ValueError("llmService must be either 'openai' or 'together'")
 
     dspy.settings.configure(lm=turbo)
-    rag = RAG(promptSignature)
-    pred = rag(question, context)
+    cot = dspyCOT(promptSignature)
+    pred = cot(question, context)
     if verbose:
         print("Prompt history:")
         turbo.inspect_history(n=1)
@@ -132,28 +133,9 @@ if __name__ == "__main__":
 
     dspy.settings.configure(lm=turbo)
 
-    # rag = RAG(FilterOverPaper)
-    # question = "Is the paper about batteries?"
-    # context = open("../../../tests/testFileDirectory/cosmos/1_All_F_Guo/1 All F Guo.txt").read()
-    # pred = rag(question, context)
-    # print(question)
-    # print(indent(pred.rationale, 4 * ' '))
-    # print(pred.answer)
-    # print()
-    # question = "Is the paper from MIT?"
-    # pred = rag(question, context)
-    # print(question)
-    # print(indent(pred.rationale, 4 * ' '))
-    # print(pred.answer)
-    # print()
-
-    rag = RAG(QuestionOverPaper)
+    cot = dspyCOT(QuestionOverPaper)
     question = """What is the title of the paper?
     Who is the first author?
     What is the first author's institution?"""
     context = open("../../../tests/testFileDirectory/cosmos/1_All_F_Guo/1 All F Guo.txt").read()
-    pred = rag(question, context)
-    #print(question)
-    #print(indent(pred.rationale, 4 * ' '))
-    #print(pred.answer)
-
+    pred = cot(question, context)
