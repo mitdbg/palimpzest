@@ -97,7 +97,8 @@ class Solver:
                     return None
                 # b64 decode of candidate.contents
                 #print(candidate.contents)
-                image_bytes = candidate.contents #base64.b64decode(candidate.contents)#.decode("utf-8")
+                image_bytes = base64.b64encode(candidate.contents).decode('utf-8')
+                #image_bytes = candidate.contents #base64.b64decode(candidate.contents)#.decode("utf-8")
                 dr = DataRecord(outputElement)
                 dr.filename = candidate.filename
                 if 'OPENAI_API_KEY' not in os.environ:

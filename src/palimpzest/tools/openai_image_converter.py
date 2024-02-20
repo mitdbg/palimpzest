@@ -22,7 +22,7 @@ def make_payload(base64_image):
             {
               "type": "text",
               "text": '''
-              You are a image analysis bot.  Analyze the supplied image and return an complete description of its contents including 
+              You are a image analysis bot.  Analyze the supplied image and return a complete description of its contents including 
               a description of the general scene as well as a list of all of the people, animals, and objects you see and what they are doing.
               '''
             },
@@ -53,7 +53,7 @@ def do_image_analysis(api_key, image_bytes):
 
     # Your JSON blob
     json_blob = response.json()
-    #print(json_blob)
+    print(json_blob)
     # Accessing the content
     content_str = json_blob['choices'][0]['message']['content']
 
