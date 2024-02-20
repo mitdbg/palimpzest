@@ -13,20 +13,18 @@ class ScientificPaper(pz.PDFFile):
 
 def buildTestPDFPlan(datasetId):
     """This tests whether we can process a PDF file"""
-    testRepo1 = pz.ConcreteDataset(pz.File, datasetId, desc="A small test inputset")
-    pdfPapers = pz.Set(pz.PDFFile, input=testRepo1, desc="PDFs")
+    pdfPapers = pz.getData(pz.PDFFile, datasetId)
 
     return pdfPapers
 
 def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
-    testRepo1 = pz.ConcreteDataset(pz.File, datasetId, desc="The dataset Mike downloaded on Jan 30")
-    sciPapers = pz.Set(ScientificPaper, input=testRepo1, desc="Scientific papers")
-    batteryPapers = sciPapers.addFilterStr("The paper is about batteries")
-    mitPapers = batteryPapers.addFilterStr("The paper is from MIT")
-    goodAuthorPapers = mitPapers.addFilterStr("Paper where the title begins with the letter X")
+    sciPapers = pz.getData(ScientificPaper, datasetId)
+    #batteryPapers = sciPapers.filterByStr("The paper is about batteries")
+    #mitPapers = batteryPapers.filterByStr("The paper is from MIT")
+    #goodAuthorPapers = mitPapers.filterByStr("Paper where the title begins with the letter X")
 
-    return goodAuthorPapers
+    return sciPapers
 
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
@@ -34,22 +32,18 @@ class Email(pz.TextFile):
     subject = pz.Field(desc="The subject of the email", required=True)
 
 def buildEnronPlan(datasetId):
-    testRepo1 = pz.ConcreteDataset(pz.File, datasetId, desc="A collection of files")
-    textFiles = pz.Set(pz.TextFile, input=testRepo1, desc="Text files")
-    emails = pz.Set(Email, input=textFiles, desc="Emails")
-
-    return emails
+    emails = pz.getData(Email, datasetId)
+    filteredEmails = emails.filterByStr("The email is about someone taking a vaction")
+    return filteredEmails
 
 class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required = True)
 
 def buildImagePlan(datasetId):
-    testRepo1 = pz.ConcreteDataset(pz.File, datasetId, desc="A collection of images")
-    images = pz.Set(pz.ImageFile, input=testRepo1, desc="Cast as images")
-    filteredImages = images.addFilterStr("The image contains one or more dogs")
-    dogImages = pz.Set(DogImage, input=filteredImages, desc = "Images of dogs")
+    images = pz.getData(pz.ImageFile, datasetId)
+    filteredImages = images.filterByStr("The image contains one or more dogs")
+    dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
     return dogImages
-
 
 def emitDataset(rootSet, title="Dataset", verbose=False):
     def emitNestedTuple(node, indent=0):

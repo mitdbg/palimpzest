@@ -111,9 +111,10 @@ class CacheScanDataOp(PhysicalOp):
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source):
+    def __init__(self, outputElementType, source, targetCacheId=None):
         super().__init__(outputElementType=outputElementType)
         self.source = source
+        self.targetCacheId = targetCacheId
 
         taskDescriptor = ("InduceFromCandidateOp", None, outputElementType, source.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
@@ -149,11 +150,17 @@ class InduceFromCandidateOp(PhysicalOp):
         }
 
     def __iter__(self):
+        shouldCache = DataDirectory().openCache(self.targetCacheId)
         def iteratorFn():    
             for nextCandidate in self.source:
                 resultRecord = self._attemptMapping(nextCandidate, self.outputElementType)
                 if resultRecord is not None:
+                    if shouldCache:
+                        DataDirectory().appendCache(self.targetCacheId, resultRecord)
                     yield resultRecord
+            if shouldCache:
+                DataDirectory().closeCache(self.targetCacheId)
+
         return iteratorFn()
                     
     def _attemptMapping(self, candidate: DataRecord, outputElementType):
@@ -165,9 +172,10 @@ class InduceFromCandidateOp(PhysicalOp):
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source):
+    def __init__(self, outputElementType, source, targetCacheId=None):
         super().__init__(outputElementType=outputElementType)
         self.source = source
+        self.targetCacheId = targetCacheId
 
         taskDescriptor = ("ParallelInduceFromCandidateOp", None, outputElementType, source.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
@@ -204,8 +212,9 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
     def __iter__(self):
         # This is very crudely implemented right now, since we materialize everything
+        shouldCache = DataDirectory().openCache(self.targetCacheId)
         def iteratorFn():
-            chunksize = 150
+            chunksize = 50
             inputs = []
             results = []
 
@@ -213,12 +222,17 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 inputs.append(nextCandidate)
 
             # Grab items from the list inputs in chunks of size chunkSize
-            with concurrent.futures.ThreadPoolExecutor(max_workers=11) as executor:
-                results = list(executor.map(self._attemptMapping, inputs, chunksize=10))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=chunksize+2) as executor:
+                results = list(executor.map(self._attemptMapping, inputs, chunksize=chunksize))
 
                 for resultRecord in results:
                     if resultRecord is not None:
+                        if shouldCache:
+                            DataDirectory().appendCache(self.targetCacheId, resultRecord)
                         yield resultRecord
+            if shouldCache:
+                DataDirectory().closeCache(self.targetCacheId)
+
         return iteratorFn()
                     
     def _attemptMapping(self, candidate: DataRecord):
@@ -279,7 +293,8 @@ class FilterCandidateOp(PhysicalOp):
                     if shouldCache:
                         DataDirectory().appendCache(self.targetCacheId, nextCandidate)
                     yield nextCandidate
-            DataDirectory().closeCache(self.targetCacheId)
+            if shouldCache:
+                DataDirectory().closeCache(self.targetCacheId)
 
         return iteratorFn()
 
@@ -337,7 +352,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
     def __iter__(self):
         shouldCache = DataDirectory().openCache(self.targetCacheId)
         def iteratorFn():
-            chunksize = 150
+            chunksize = 50
             inputs = []
             results = []
 
