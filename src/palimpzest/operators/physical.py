@@ -205,7 +205,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
     def __iter__(self):
         # This is very crudely implemented right now, since we materialize everything
         def iteratorFn():
-            chunkSize = 50
+            chunksize = 150
             inputs = []
             results = []
 
@@ -286,6 +286,82 @@ class FilterCandidateOp(PhysicalOp):
     def _passesFilters(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
         taskDescriptor = ("FilterCandidateOp", tuple(self.filters), candidate.element, self.outputElementType)
+        #print("LOOKING FOR FUNCTION", taskDescriptor)
+        if not taskDescriptor in PhysicalOp.synthesizedFns:
+            raise Exception("This function should have been synthesized during init():", taskDescriptor)
+        return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
+
+
+class ParallelFilterCandidateOp(PhysicalOp):
+    def __init__(self, outputElementType, source, filters, targetCacheId=None):
+        super().__init__(outputElementType=outputElementType)
+        self.source = source
+        self.filters = filters
+        self.targetCacheId = targetCacheId
+
+        taskDescriptor = ("ParallelFilterCandidateOp", tuple(self.filters), source.outputElementType, self.outputElementType)
+        if not taskDescriptor in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
+            #print("REGISTERED", taskDescriptor, "AS", PhysicalOp.synthesizedFns[taskDescriptor])
+
+    def __str__(self):
+        filterStr = "and ".join([str(f) for f in self.filters])
+        return "ParallelFilterCandidateOp(" + str(self.outputElementType) + ", " + "Filters: " + str(filterStr) + ")"
+
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, self.source.dumpPhysicalTree())
+
+    def estimateCost(self):
+        inputCostEstimates = self.source.estimateCost()
+
+        selectivity = 1.0
+        cardinality = selectivity * inputCostEstimates["cardinality"]
+        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
+        costPerElement = inputCostEstimates["costPerElement"]
+        startupTime = inputCostEstimates["startupTime"]
+        startupCost = inputCostEstimates["startupCost"]
+        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
+        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": timePerElement,
+            "costPerElement": costPerElement,
+            "startupTime": startupTime,
+            "startupCost": startupCost,
+            "bytesReadLocally": bytesReadLocally,
+            "bytesReadRemotely": bytesReadRemotely
+        }
+
+    def __iter__(self):
+        shouldCache = DataDirectory().openCache(self.targetCacheId)
+        def iteratorFn():
+            chunksize = 150
+            inputs = []
+            results = []
+
+            for nextCandidate in self.source: 
+                inputs.append(nextCandidate)
+
+            # Grab items from the list inputs in chunks of size chunkSize
+            with concurrent.futures.ThreadPoolExecutor(max_workers=chunksize+2) as executor:
+                results = list(executor.map(self._passesFilters, inputs, chunksize=chunksize))
+
+                for idx, filterResult in enumerate(results):
+                    if filterResult:
+                        resultRecord = inputs[idx]
+                        if shouldCache:
+                            DataDirectory().appendCache(self.targetCacheId, resultRecord)
+                        yield resultRecord
+            if shouldCache:
+                DataDirectory().closeCache(self.targetCacheId)
+
+        return iteratorFn()
+
+    def _passesFilters(self, candidate):
+        """Return True if the candidate passes all filters, False otherwise."""
+        taskDescriptor = ("ParallelFilterCandidateOp", tuple(self.filters), candidate.element, self.outputElementType)
         #print("LOOKING FOR FUNCTION", taskDescriptor)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)

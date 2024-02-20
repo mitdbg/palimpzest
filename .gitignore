@@ -7,3 +7,7 @@
 
 # virtual environment(s)
 venv/
+
+# tmp
+testdata/maildir/
+testdata/copy-small.sh
