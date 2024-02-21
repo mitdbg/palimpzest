@@ -1,3 +1,5 @@
+from palimpzest.config import Config
+
 from click_aliases import ClickAliasedGroup
 from prettytable import PrettyTable
 from typing import Tuple
@@ -119,8 +121,8 @@ def ls_data() -> None:
 
 
 @cli.command(aliases=["register", "reg", "r"])
-@click.option("--path", type=str, default=None, help="File or directory to register as dataset.")
-@click.option("--name", type=str, default=None, help="Registered name for the file/dir.")
+@click.option("--path", type=str, default=None, required=True, help="File or directory to register as dataset.")
+@click.option("--name", type=str, default=None, required=True, help="Registered name for the file/dir.")
 def register_data(path: str, name: str) -> None:
     """
     Register a data file or data directory with PZ.
@@ -133,14 +135,9 @@ def register_data(path: str, name: str) -> None:
     name: str
         Name to register the data file / directory with.
     """
-    # parse path and name; enforce that user provides them
-    if path is not None and name is not None:
-        path = path.strip()
-        name = name.strip()
-    else:
-        raise InvalidCommandException(
-            f"Please provide a name for the data file/dir. using --name"
-        )
+    # parse path and name
+    path = path.strip()
+    name = name.strip()
 
     # register dataset
     if os.path.isfile(path):     
@@ -158,7 +155,7 @@ def register_data(path: str, name: str) -> None:
 
 
 @cli.command(aliases=["rmdata", "rm"])
-@click.option("--name", type=str, default=None, help="Name of registered dataset to be removed.")
+@click.option("--name", type=str, default=None, required=True, help="Name of registered dataset to be removed.")
 def rm_data(name: str) -> None:
     """
     Remove a dataset that was registered with PZ.
@@ -168,13 +165,8 @@ def rm_data(name: str) -> None:
     name: str
         Name of the dataset to unregister.
     """
-    # parse name and enforce that user provides it
-    if name is not None:
-        name = name.strip()
-    else:
-        raise InvalidCommandException(
-            f"Please provide a name for the registered dataset using --name"
-        )
+    # parse name
+    name = name.strip()
 
     # remove dataset from registry
     pz.DataDirectory().rmRegisteredDataset(name)
@@ -195,36 +187,70 @@ def print_config() -> None:
 
 
 @cli.command(aliases=["cc"])
-def create_config() -> None:
+@click.option("--name", type=str, default=None, required=True, help="Name of the config to create.")
+@click.option("--llmservice", type=click.Choice(['openai', 'together'], case_sensitive=False), default="openai", help="Name of the LLM service to use.")
+@click.option("--parallel", type=bool, default=False, help="Whether to run operations in parallel or not.")
+@click.option("--set", type=bool, is_flag=True, help="Set the created config to be the current config.")
+def create_config(name: str, llmservice: str, parallel: bool, set: bool) -> None:
     """
-    Create a Palimpzest config. You must set the following fields:
+    Create a Palimpzest config. You must set the `name` field. You may optionally
+    set the `llmservice` and `parallel` fields (default to )
 
-    TODO
+    Parameters
+    ----------
+    name: str
+        Name of the config to create.
+    llmservice: str
+        Name of the LLM service to use.
+    parallel: bool
+        Whether to run operations in parallel or not.
+    set: bool
+        If this flag is present, it will set the created config to be
+        the current config.
     """
-    # TODO
-    pass
+    # create config
+    config = Config(name, llmservice, parallel)
+
+    # set newly created config to be the current config if specified
+    if set:
+        config.set_current_config()
 
 
 @cli.command(aliases=["rmconfig", "rmc"])
-def rm_config() -> None:
+@click.option("--name", type=str, default=None, required=True, help="Name of the config to remove.")
+def rm_config(name: str) -> None:
     """
-    Remove the specified config from Palimpzest.
+    Remove the specified config from Palimpzest. You cannot remove the default config.
+    If this config was the current config, the current config will be set to the default config.
 
-    TODO
+    Parameters
+    ----------
+    name: str
+        Name of the config to remove.
     """
-    # TODO
-    pass
+    # load the specified config
+    config = Config(name)
+
+    # remove the config; this will update the current config as well
+    config.remove_config()
 
 
 @cli.command(aliases=["set", "sc"])
-def set_config() -> None:
+@click.option("--name", type=str, default=None, required=True, help="Name of the config to set as the current config.")
+def set_config(name: str) -> None:
     """
     Set the current config for Palimpzest to use.
 
-    TODO
+    Parameters
+    ----------
+    name: str
+        Name of the config to set as the current config.
     """
-    # TODO
-    pass
+    # load the specified config
+    config = Config(name)
+
+    # set the config as the current config
+    config.set_current_config()
 
 
 def main():

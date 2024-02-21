@@ -150,16 +150,17 @@ class InduceFromCandidateOp(PhysicalOp):
         }
 
     def __iter__(self):
-        shouldCache = DataDirectory().openCache(self.targetCacheId)
+        datadir = DataDirectory()
+        shouldCache = datadir.openCache(self.targetCacheId)
         def iteratorFn():    
             for nextCandidate in self.source:
                 resultRecord = self._attemptMapping(nextCandidate, self.outputElementType)
                 if resultRecord is not None:
                     if shouldCache:
-                        DataDirectory().appendCache(self.targetCacheId, resultRecord)
+                        datadir.appendCache(self.targetCacheId, resultRecord)
                     yield resultRecord
             if shouldCache:
-                DataDirectory().closeCache(self.targetCacheId)
+                datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
                     
@@ -212,7 +213,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
     def __iter__(self):
         # This is very crudely implemented right now, since we materialize everything
-        shouldCache = DataDirectory().openCache(self.targetCacheId)
+        datadir = DataDirectory()
+        shouldCache = datadir.openCache(self.targetCacheId)
         def iteratorFn():
             chunksize = 50
             inputs = []
@@ -228,10 +230,10 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 for resultRecord in results:
                     if resultRecord is not None:
                         if shouldCache:
-                            DataDirectory().appendCache(self.targetCacheId, resultRecord)
+                            datadir.appendCache(self.targetCacheId, resultRecord)
                         yield resultRecord
             if shouldCache:
-                DataDirectory().closeCache(self.targetCacheId)
+                datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
                     
@@ -286,15 +288,16 @@ class FilterCandidateOp(PhysicalOp):
         }
 
     def __iter__(self):
-        shouldCache = DataDirectory().openCache(self.targetCacheId)
+        datadir = DataDirectory()
+        shouldCache = datadir.openCache(self.targetCacheId)
         def iteratorFn():
             for nextCandidate in self.source: 
                 if self._passesFilters(nextCandidate):
                     if shouldCache:
-                        DataDirectory().appendCache(self.targetCacheId, nextCandidate)
+                        datadir.appendCache(self.targetCacheId, nextCandidate)
                     yield nextCandidate
             if shouldCache:
-                DataDirectory().closeCache(self.targetCacheId)
+                datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 
@@ -350,7 +353,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
         }
 
     def __iter__(self):
-        shouldCache = DataDirectory().openCache(self.targetCacheId)
+        datadir = DataDirectory()
+        shouldCache = datadir.openCache(self.targetCacheId)
         def iteratorFn():
             chunksize = 50
             inputs = []
@@ -367,10 +371,10 @@ class ParallelFilterCandidateOp(PhysicalOp):
                     if filterResult:
                         resultRecord = inputs[idx]
                         if shouldCache:
-                            DataDirectory().appendCache(self.targetCacheId, resultRecord)
+                            datadir.appendCache(self.targetCacheId, resultRecord)
                         yield resultRecord
             if shouldCache:
-                DataDirectory().closeCache(self.targetCacheId)
+                datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 

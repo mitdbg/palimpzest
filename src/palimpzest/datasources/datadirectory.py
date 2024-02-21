@@ -27,10 +27,8 @@ class DataDirectory:
             pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
 
             # create default config
-            _ = Config("default")
-            current_config_dict = {"current_config_name": "default"}
-            with open(current_config_path, 'w') as f:
-                yaml.dump(current_config_dict, f)
+            default_config = Config("default")
+            default_config.set_current_config()
 
         # read current config (and dict. of configs) from disk
         self.current_config = None
