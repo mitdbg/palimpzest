@@ -135,10 +135,7 @@ if __name__ == "__main__":
         rootSet = buildImagePlan(datasetid)
         physicalTree = emitDataset(rootSet, title="Dogs", verbose=args.verbose)
         for r in physicalTree:
-            print("\n\nGOT RESULT:")
-            print(r.filename)
-            print(r.breed)
-            print()
+            print(r.filename, r.breed)
     else:
         print("Unknown task")
         exit(1)
