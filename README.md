@@ -25,12 +25,9 @@ $ cd palimpzest
 $ pip install .
 ```
 
-## Setting PZ_DIR
-Palimpzest uses the environment variable `PZ_DIR` to set the root of its working directory. If this environment variable is not set, Palimpzest will create its working directory at `~/.palimpzest` by default. The CLI also allows you to override `PZ_DIR` with the `--pz-dir` flag when initializing the system (e.g. `pz init --pz-dir path/to/dir`).
-
-
 
 ## Palimpzest CLI
+### Getting Started
 Installing Palimpzest also installs its CLI tool `pz` which provides users with basic utilities for creating and managing their own Palimpzest system. Running `pz --help` diplays an overview of the CLI's commands:
 ```bash
 $ pz --help
@@ -52,7 +49,7 @@ Commands:
                                   PZ.
 ```
 
-Users can initialize their own system by running `pz init`. This will create Palimpzest's working directory in `~/.palimpzest` (unless `PZ_DIR` is set, or `--pz-dir` is specified):
+Users can initialize their own system by running `pz init`. This will create Palimpzest's working directory in `~/.palimpzest`:
 ```bash
 $ pz init
 Palimpzest system initialized in: /Users/matthewrusso/.palimpzest
@@ -69,6 +66,7 @@ $ pz ls
 Total datasets: 0
 ```
 
+### Registering Datasets
 To add (or "register") a dataset with Palimpzest, we can use the `pz register-data` command (also aliased as `pz reg`) to specify that a file or directory at a given `--path` should be registered as a dataset with the specified `--name`:
 ```bash
 $ pz reg --path README.md --name rdme
@@ -104,27 +102,86 @@ $ pz ls
 Total datasets: 0
 ```
 
-## Configuring for parallel execution
+### Cache Management
+Palimpzest will cache intermediate results by default. It can be useful to remove them from the cache when trying to evaluate the performance improvement(s) of code changes. We provide a utility command `pz clear-cache` (also aliased as `pz clr`) to clear the cache:
+```bash
+$ pz clr
+Cache cleared
+```
+
+### Config Management
+You may wish to work with multiple configurations of Palimpzest in order to, e.g., evaluate the difference in performance between various LLM services for your data extraction task. To see the config Palimpzest is currently using, you can run the `pz print-config` command (also aliased as `pz config`):
+```bash
+$ pz config
+--- default ---
+filecachedir: /some/local/filepath
+llmservice: openai
+name: default
+parallel: false
+```
+By default, Palimpzest uses the configuration named `default`. As shown above, if you run a script using Palimpzest out-of-the-box, it will use OpenAI endpoints for all of its API calls.
+
+Now, let's say you wanted to try using [together.ai's](https://www.together.ai/) for your API calls, you could do this by creating a new config with the `pz create-config` command (also aliased as `pz cc`):
+```bash
+$ pz cc --name together-conf --llmservice together --parallel True --set
+Created and set config: together-conf
+```
+The `--name` parameter is required and specifies the unique name for your config. The `--llmservice` and `--parallel` options specify the service to use and whether or not to process files in parallel. Finally, if the `--set` flag is present, Palimpzest will update its current config to point to the newly created config.
+
+We can confirm that Palimpzest checked out our new config by running `pz config`:
+```bash
+$ pz config
+--- together-conf ---
+filecachedir: /some/local/filepath
+llmservice: together
+name: together-conf
+parallel: true
+```
+
+You can switch which config you are using at any time by using the `pz set-config` command (also aliased as `pz set`):
+```bash
+$ pz set --name default
+Set config: default
+
+$ pz config
+--- default ---
+filecachedir: /some/local/filepath
+llmservice: openai
+name: default
+parallel: false
+
+$ pz set --name together-conf
+Set config: together-conf
+
+$ pz config
+--- together-conf ---
+filecachedir: /some/local/filepath
+llmservice: together
+name: together-conf
+parallel: true
+```
+
+Finally, you can delete a config with the `pz rm-config` command (also aliased as `pz rmc`):
+```bash
+$ pz rmc --name together-conf
+Deleted config: together-conf
+```
+Note that you cannot delete the `default` config, and if you delete the config that you currently have set, Palimpzest will set the current config to be `default`.
+
+## Configuring for Parallel Execution
 
 There are a few things you need to do in order to use remote parallel services.
 
-If you want to use parallel LLM execution on together.ai, you have to modify the config.yaml so that `llmservice: together` and `parallel: True` are set.
+If you want to use parallel LLM execution on together.ai, you have to modify the config.yaml (by default, Palimpzest uses `~/.palimpzest/config_default.yaml`) so that `llmservice: together` and `parallel: True` are set.
 
 If you want to use parallel PDF processing at modal.com, you have to:
 1. Set `pdfprocessing: modal` in the config.yaml file.
 2. Run `modal deploy src/palimpzest/tools/allenpdf.py`.  This will remotely install the modal function so you can run it. (Actually, it's probably already installed there, but do this just in case.  Also do it if there's been a change to the server-side function inside that file.)
 
 
-
 ## Python Demo
 
 Below are simple instructions to run pz on a test data set of enron emails that is included with the system:
-
-- Set the system environment variables `PZ_DIR`. This is the root directory for the Palimpzest system.
-
-- Add the pz tool to your path (it is in the tools directory).  
-
-`export PATH=$PATH:$PZ_DIR/tools/`
 
 - Initialize the configuration by running `pz --init`.
 

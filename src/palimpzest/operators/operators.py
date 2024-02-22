@@ -55,12 +55,12 @@ class ConvertScan(LogicalOperator):
             intermediateOutputElement = intermediateOutputElement.__bases__[0]
 
         if intermediateOutputElement == Element or intermediateOutputElement == self.outputElementType:
-            if DataDirectory().config.get("parallel") == True:
+            if DataDirectory().current_config.get("parallel") == True:
                 return ParallelInduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), targetCacheId=self.targetCacheId)
             else:
                 return InduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), targetCacheId=self.targetCacheId)
         else:
-            if DataDirectory().config.get("parallel") == True:
+            if DataDirectory().current_config.get("parallel") == True:
                 return ParallelInduceFromCandidateOp(self.outputElementType, ParallelInduceFromCandidateOp(intermediateOutputElement, self.inputOp._getPhysicalTree(strategy=strategy)), targetCacheId=self.targetCacheId)
             else:
                 return InduceFromCandidateOp(self.outputElementType, 
@@ -118,7 +118,7 @@ class FilteredScan(LogicalOperator):
         return (self, self.inputOp.dumpLogicalTree())
 
     def _getPhysicalTree(self, strategy=None):
-        if DataDirectory().config.get("parallel") == True:
+        if DataDirectory().current_config.get("parallel") == True:
             return ParallelFilterCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.filters, targetCacheId=self.targetCacheId)
         else:
             return FilterCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.filters, targetCacheId=self.targetCacheId)
