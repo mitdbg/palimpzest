@@ -3,7 +3,7 @@ import os
 from palimpzest import Field
 from palimpzest.elements import DataRecord, TextFile, File, PDFFile, ImageFile
 from palimpzest.tools import cosmos_client, get_text_from_pdf, processPapermagePdf
-from palimpzest.tools.dspysearch import run_rag_boolean, run_rag_qa, gen_filter_signature_class, gen_qa_signature_class
+from palimpzest.tools.dspysearch import run_cot_bool, run_cot_qa, gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.datasources import DataDirectory
 from palimpzest.tools.openai_image_converter import do_image_analysis
 import json
@@ -84,7 +84,8 @@ class Solver:
                     return None
                 # b64 decode of candidate.contents
                 #print(candidate.contents)
-                image_bytes = candidate.contents #base64.b64decode(candidate.contents)#.decode("utf-8")
+                image_bytes = base64.b64encode(candidate.contents).decode('utf-8')
+                #image_bytes = candidate.contents #base64.b64decode(candidate.contents)#.decode("utf-8")
                 dr = DataRecord(outputElement)
                 dr.filename = candidate.filename
                 if 'OPENAI_API_KEY' not in os.environ:
@@ -110,7 +111,7 @@ class Solver:
 
                 for field_name in outputElement.fieldNames():
                     f = getattr(outputElement, field_name)
-                    answer = run_rag_qa(text_content, f"What is the {field_name} of the {doc_type}? ({f.desc})",
+                    answer = run_cot_qa(text_content, f"What is the {field_name} of the {doc_type}? ({f.desc})",
                                         llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
                     setattr(dr, field_name, answer)
                 return dr
@@ -136,7 +137,7 @@ class Solver:
                     if not candidate.element == inputElement:
                         return False
                     text_content = candidate.asJSON()
-                    response = run_rag_boolean(text_content, filterCondition, llmService=llmservice,
+                    response = run_cot_bool(text_content, filterCondition, llmService=llmservice,
                                                verbose=self._verbose, promptSignature=gen_filter_signature_class(doc_schema, doc_type))
                     if response == "TRUE":
                         return True
