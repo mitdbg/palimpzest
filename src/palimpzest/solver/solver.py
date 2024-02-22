@@ -26,19 +26,6 @@ class Solver:
     def easyConversionAvailable(self, outputElement, inputElement):
         return (outputElement, inputElement) in self._simpleTypeConversions or (outputElement, inputElement) in self._hardcodedFns
 
-    def _llmservice(self):
-        # TODO: temporarily converting this into a function call;
-        #       if this is triggered in __init__ for new users that
-        #       have not yet set up their config(s), then this will
-        #       lead to a chain of fcn. calls that causes an exception
-        #       to be thrown on `import palimpzest`.
-        llmservice = DataDirectory().current_config.get("llmservice")
-        if llmservice is None:
-            llmservice = "openai"
-            print("LLM service has not been configured. Defaulting to openai.")
-        
-        return llmservice
-
     def _makeSimpleTypeConversionFn(self, outputElement, inputElement):
         """This is a very simple function that converts a DataRecord from one type to another, when we know they have identical fields."""
         def _simpleTypeConversionFn(candidate: DataRecord):
@@ -54,10 +41,10 @@ class Solver:
             return dr
         return _simpleTypeConversionFn
 
-    def _makeHardCodedTypeConversionFn(self, outputElement, inputElement):
+    def _makeHardCodedTypeConversionFn(self, outputElement, inputElement, config):
         """This converts from one type to another when we have a hard-coded method for doing so."""
         if outputElement == PDFFile and inputElement == File:
-            if DataDirectory().current_config.get("pdfprocessing") == "modal":
+            if config.get("pdfprocessing") == "modal":
                 print("handling PDF processing remotely")
                 remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
             else:
@@ -111,7 +98,8 @@ class Solver:
         else:
             raise Exception(f"Cannot hard-code conversion from {inputElement} to {outputElement}")
 
-    def _makeLLMTypeConversionFn(self, outputElement, inputElement):
+    def _makeLLMTypeConversionFn(self, outputElement, inputElement, config):
+            llmservice = config.get("llmservice", "openai")
             def fn(candidate: DataRecord):
                 # iterate through all empty fields in the outputElement and ask questions to fill them
                 # for field in inputElement.__dict__:
@@ -123,13 +111,15 @@ class Solver:
                 for field_name in outputElement.fieldNames():
                     f = getattr(outputElement, field_name)
                     answer = run_rag_qa(text_content, f"What is the {field_name} of the {doc_type}? ({f.desc})",
-                                        llmService=self._llmservice(), verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                                        llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
                     setattr(dr, field_name, answer)
                 return dr
             return fn
 
-    def _makeFilterFn(self, taskDescriptor):
-            functionName, functionParams, outputElement, inputElement = taskDescriptor
+    def _makeFilterFn(self, taskDescriptor, config):
+            # parse inputs
+            _, functionParams, _, inputElement = taskDescriptor
+            llmservice = config.get("llmservice", "openai")
             doc_schema = str(inputElement)
             doc_type = inputElement.className()
             if len(functionParams) == 0:
@@ -146,7 +136,7 @@ class Solver:
                     if not candidate.element == inputElement:
                         return False
                     text_content = candidate.asJSON()
-                    response = run_rag_boolean(text_content, filterCondition, llmService=self._llmservice(),
+                    response = run_rag_boolean(text_content, filterCondition, llmService=llmservice,
                                                verbose=self._verbose, promptSignature=gen_filter_signature_class(doc_schema, doc_type))
                     if response == "TRUE":
                         return True
@@ -155,7 +145,7 @@ class Solver:
                 return llmFilter
             return createLLMFilter("and ".join([str(f) for f in functionParams]))
 
-    def synthesize(self, taskDescriptor):
+    def synthesize(self, taskDescriptor, config):
         """Return a function that maps from inputType to outputType."""
         functionName, functionParams, outputElement, inputElement = taskDescriptor
 
@@ -164,10 +154,10 @@ class Solver:
             if typeConversionDescriptor in self._simpleTypeConversions:
                 return self._makeSimpleTypeConversionFn(outputElement, inputElement)
             elif typeConversionDescriptor in self._hardcodedFns:
-                return self._makeHardCodedTypeConversionFn(outputElement, inputElement)
+                return self._makeHardCodedTypeConversionFn(outputElement, inputElement, config)
             else:
-                return self._makeLLMTypeConversionFn(outputElement, inputElement)
+                return self._makeLLMTypeConversionFn(outputElement, inputElement, config)
         elif functionName == "FilterCandidateOp" or functionName == "ParallelFilterCandidateOp":
-            return  self._makeFilterFn(taskDescriptor)
+            return  self._makeFilterFn(taskDescriptor, config)
         else:
             raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))

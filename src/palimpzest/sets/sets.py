@@ -21,7 +21,7 @@ class Set:
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self._filters])
         return f"{self.__class__.__name__}(basicElt={self._basicElt}, desc={self._desc}, filters={filterStr}, uid={self.universalIdentifier()})"
-    
+
     def serialize(self):
         if self._input is None:
             raise Exception("Cannot create JSON representation of Set because it has no input")
@@ -34,7 +34,7 @@ class Set:
         return d
 
     def deserialize(inputObj):
-        if inputObj["version"] != SET_VERSION:
+        if inputObj["version"] != Set.SET_VERSION:
             raise Exception("Cannot deserialize Set because it is the wrong version")
 
         return Set(inputObj["basicElt"].jsonSchema(), 
@@ -61,11 +61,11 @@ class Set:
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
         f = Filter(filterCondition)
         return self.filter(f)
-    
+
     def convert(self, newBasicElt, desc="Convert to new basic element"):
         """Convert the Set to a new basic element."""
         return Set(newBasicElt, input=self, desc=desc)
-    
+
     def dumpSyntacticTree(self):
         """Return the syntactic tree of this Set."""
         if self._input is None:
@@ -129,7 +129,7 @@ class ConcreteDataset(Set):
                 "uniqName": self.uniqName}
 
     def deserialize(inputObj):
-        if inputObj["version"] != SET_VERSION:
+        if inputObj["version"] != Set.SET_VERSION:
             raise Exception("Cannot deserialize Set because it is the wrong version")
 
         return ConcreteDataset(inputObj["basicElt"],

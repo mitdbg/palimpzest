@@ -1,21 +1,21 @@
 from dsp.modules.hf import HFModel
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 import requests
-import backoff
 
-ERRORS = (Exception)
+# retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
+RETRY_MULTIPLIER = 2
+RETRY_MAX_SECS = 10
+RETRY_MAX_ATTEMPTS = 1
 
-def backoff_hdlr(details):
-    """Handler from https://pypi.org/project/backoff/"""
-    print(
-        "Backing off {wait:0.1f} seconds after {tries} tries "
-        "calling function {target} with kwargs "
-        "{kwargs}".format(**details)
-    )
+def log_attempt_number(retry_state):
+    """return the result of the last call attempt"""
+    print(f"Retrying: {retry_state.attempt_number}...")
+
 
 class TogetherHFAdaptor(HFModel):
     def __init__(self, model, apiKey, **kwargs):
         super().__init__(model=model, is_client=True)
-        self.session = requests.Session()
         self.api_base = "https://api.together.xyz/inference"
         self.token = apiKey
         self.model = model
@@ -37,11 +37,10 @@ class TogetherHFAdaptor(HFModel):
             **kwargs
         }
 
-    @backoff.on_exception(
-        backoff.expo,
-        ERRORS,
-        max_time=1000,
-        on_backoff=backoff_hdlr,
+    @retry(
+        wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
+        stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
+        after=log_attempt_number,
     )
     def _generate(self, prompt, use_chat_api=False, **kwargs):
         url = f"{self.api_base}"
@@ -71,9 +70,6 @@ class TogetherHFAdaptor(HFModel):
                 "stop": stop,
             }
         else:
-            #print("PROMPT", prompt)
-            #print()
-            #print()
             body = {
                 "model": self.model,
                 "prompt": prompt,
@@ -87,9 +83,8 @@ class TogetherHFAdaptor(HFModel):
 
         headers = {"Authorization": f"Bearer {self.token}"}
         try:
-            with self.session.post(url, headers=headers, json=body) as resp:
+            with requests.Session().post(url, headers=headers, json=body) as resp:
                 resp_json = resp.json()
-                #print("RESP JSON", resp_json)
                 if use_chat_api:
                     completions = [resp_json['output'].get('choices', [])[0].get('message', {}).get('content', "")]
                 else:
@@ -97,9 +92,7 @@ class TogetherHFAdaptor(HFModel):
                 response = {"prompt": prompt, "choices": [{"text": c} for c in completions]}
                 return response
         except Exception as e:
-            #print("EXCEPTION", e)
             if resp_json:
                 print(f"resp_json:{resp_json}")
             print(f"Failed to parse JSON response: {e}")
             raise Exception("Received invalid JSON response from server")
-

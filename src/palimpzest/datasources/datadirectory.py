@@ -140,15 +140,16 @@ class DataDirectory:
                 yield x
         return iterateOverCachedResult()
     
-    def clearCache(self):
+    def clearCache(self, keep_registry=False):
         """Clear the cache."""
         self._cache = {}
         self._tempCache = {}
 
-        # Delete all files in the cache directory
+        # Delete all files in the cache directory (except registry.pkl if keep_registry=True)
         for root, dirs, files in os.walk(self._dir + "/data/cache"):
             for file in files:
-                os.remove(root + "/" + file)
+                if os.path.basename(file) != "registry.pkl" or keep_registry is False:
+                    os.remove(root + "/" + file)
 
     def hasCachedAnswer(self, uniqName):
         """Check if a dataset is in the cache."""

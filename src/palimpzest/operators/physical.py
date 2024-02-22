@@ -118,7 +118,8 @@ class InduceFromCandidateOp(PhysicalOp):
 
         taskDescriptor = ("InduceFromCandidateOp", None, outputElementType, source.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
+            config = DataDirectory().current_config
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
         return "InduceFromCandidateOp(" + str(self.outputElementType) + ")"
@@ -163,7 +164,7 @@ class InduceFromCandidateOp(PhysicalOp):
                 datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
-                    
+
     def _attemptMapping(self, candidate: DataRecord, outputElementType):
         """Attempt to map the candidate to the outputElementType. Return None if it fails."""
         taskDescriptor = ("InduceFromCandidateOp", None, outputElementType, candidate.element)
@@ -180,7 +181,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
         taskDescriptor = ("ParallelInduceFromCandidateOp", None, outputElementType, source.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
+            config = DataDirectory().current_config
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
         return "ParallelInduceFromCandidateOp(" + str(self.outputElementType) + ")"
@@ -216,7 +218,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
         def iteratorFn():
-            chunksize = 50
+            chunksize = 20 + 2
             inputs = []
             results = []
 
@@ -224,7 +226,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 inputs.append(nextCandidate)
 
             # Grab items from the list inputs in chunks of size chunkSize
-            with concurrent.futures.ThreadPoolExecutor(max_workers=chunksize+2) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=chunksize) as executor:
                 results = list(executor.map(self._attemptMapping, inputs, chunksize=chunksize))
 
                 for resultRecord in results:
@@ -236,7 +238,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
-                    
+
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputElementType. Return None if it fails."""
         taskDescriptor = ("ParallelInduceFromCandidateOp", None, self.outputElementType, candidate.element)
@@ -254,8 +256,8 @@ class FilterCandidateOp(PhysicalOp):
 
         taskDescriptor = ("FilterCandidateOp", tuple(self.filters), source.outputElementType, self.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
-            #print("REGISTERED", taskDescriptor, "AS", PhysicalOp.synthesizedFns[taskDescriptor])
+            config = DataDirectory().current_config
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self.filters])
@@ -319,8 +321,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
         taskDescriptor = ("ParallelFilterCandidateOp", tuple(self.filters), source.outputElementType, self.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
-            #print("REGISTERED", taskDescriptor, "AS", PhysicalOp.synthesizedFns[taskDescriptor])
+            config = DataDirectory().current_config
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self.filters])
@@ -356,7 +358,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
         def iteratorFn():
-            chunksize = 50
+            chunksize = 20 + 2
             inputs = []
             results = []
 
@@ -364,7 +366,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
                 inputs.append(nextCandidate)
 
             # Grab items from the list inputs in chunks of size chunkSize
-            with concurrent.futures.ThreadPoolExecutor(max_workers=chunksize+2) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=chunksize) as executor:
                 results = list(executor.map(self._passesFilters, inputs, chunksize=chunksize))
 
                 for idx, filterResult in enumerate(results):
@@ -381,7 +383,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
     def _passesFilters(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
         taskDescriptor = ("ParallelFilterCandidateOp", tuple(self.filters), candidate.element, self.outputElementType)
-        #print("LOOKING FOR FUNCTION", taskDescriptor)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
+
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)

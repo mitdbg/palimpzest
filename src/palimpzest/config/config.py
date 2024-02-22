@@ -31,8 +31,8 @@ class Config:
 
         self.name = self.config['name']
 
-    def get(self, key):
-        return self.config[key]
+    def get(self, key, default=None):
+        return self.config[key] if key in self.config else default
 
     def set(self, key, value):
         self.config[key] = value

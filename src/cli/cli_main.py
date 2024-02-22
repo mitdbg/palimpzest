@@ -174,6 +174,15 @@ def rm_data(name: str) -> None:
     _print_msg(f"Deleted {name}")
 
 
+@cli.command(aliases=["clear", "clr"])
+def clear_cache() -> None:
+    """
+    Clear the Palimpzest cache.
+    """
+    pz.DataDirectory().clearCache(keep_registry=True)
+    _print_msg(f"Cache cleared")
+
+
 @cli.command(aliases=["config", "pc"])
 def print_config() -> None:
     """
@@ -208,12 +217,18 @@ def create_config(name: str, llmservice: str, parallel: bool, set: bool) -> None
         If this flag is present, it will set the created config to be
         the current config.
     """
+    # check that config name is unique
+    if os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
+        raise InvalidCommandException(f"Config with name {name} already exists.")
+
     # create config
     config = Config(name, llmservice, parallel)
 
     # set newly created config to be the current config if specified
     if set:
         config.set_current_config()
+    
+    _print_msg(f"Created config: {name}" if set is False else f"Created and set config: {name}")
 
 
 @cli.command(aliases=["rmconfig", "rmc"])
@@ -228,11 +243,16 @@ def rm_config(name: str) -> None:
     name: str
         Name of the config to remove.
     """
+    # check that config exists
+    if not os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
+        raise InvalidCommandException(f"Config with name {name} does not exist.")
+
     # load the specified config
     config = Config(name)
 
     # remove the config; this will update the current config as well
     config.remove_config()
+    _print_msg(f"Deleted config: {name}")
 
 
 @cli.command(aliases=["set", "sc"])
@@ -246,11 +266,16 @@ def set_config(name: str) -> None:
     name: str
         Name of the config to set as the current config.
     """
+    # check that config exists
+    if not os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
+        raise InvalidCommandException(f"Config with name {name} does not exist.")
+
     # load the specified config
     config = Config(name)
 
     # set the config as the current config
     config.set_current_config()
+    _print_msg(f"Set config: {name}")
 
 
 def main():
@@ -262,6 +287,7 @@ def main():
     cli.add_command(ls_data)
     cli.add_command(register_data)
     cli.add_command(rm_data)
+    cli.add_command(clear_cache)
     cli.add_command(print_config)
     cli.add_command(create_config)
     cli.add_command(rm_config)

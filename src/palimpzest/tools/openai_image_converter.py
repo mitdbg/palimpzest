@@ -1,10 +1,16 @@
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 import base64
 import requests
-import json
-import shutil
-import os
-import logging
-import sys
+
+# retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
+RETRY_MULTIPLIER = 2
+RETRY_MAX_SECS = 10
+RETRY_MAX_ATTEMPTS = 1
+
+def log_attempt_number(retry_state):
+    """return the result of the last call attempt"""
+    print(f"Retrying: {retry_state.attempt_number}...")
 
 
 # Function to encode the image
@@ -39,6 +45,12 @@ def make_payload(base64_image):
     }
     return payload
 
+
+@retry(
+    wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
+    stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
+    after=log_attempt_number,
+)
 def do_image_analysis(api_key, image_bytes):
     # Getting the base64 string
     base64_image = image_bytes
