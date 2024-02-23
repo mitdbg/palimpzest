@@ -129,6 +129,32 @@ class Solver:
                     "updateAggregate": _updateAggregate,
                     "finalizeAggregate": _finalizeAggregate}
         
+        elif aggFunction.funcDesc == "AVERAGE":
+            if not inputElement == Number:
+                raise Exception("Cannot synthesize AVERAGE except on an input set of Number values")
+            
+            def _computeAggregateInit():
+                return (0, 0)
+
+            def _updateAggregate(state, candidate: DataRecord):
+                sum, count = state
+                sum += candidate.value
+                count += 1
+                return (sum, count)
+
+            def _finalizeAggregate(state):
+                sum, count = state
+                dr = DataRecord(Number)
+
+                if count > 0:
+                    dr.value = sum / float(count)
+                else:
+                    dr.value = math.nan
+                return dr
+            
+            return {"computeAggregateInit": _computeAggregateInit,
+                    "updateAggregate": _updateAggregate,
+                    "finalizeAggregate": _finalizeAggregate}
         else:
             raise Exception(f"Cannot synthesize aggregation function for {aggFunction}")
 

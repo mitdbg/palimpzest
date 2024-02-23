@@ -1,5 +1,5 @@
 from palimpzest.elements import DataRecord
-from palimpzest.elements import File
+from palimpzest.elements import File, Number
 
 import os
 
@@ -13,6 +13,22 @@ class DataSource:
     
     def __eq__(self, __value: object) -> bool:
         return self.__dict__ == __value.__dict__
+
+class MemoryDataSource(DataSource):
+    """MemoryDataSource returns multiple objects that reflect contents of an in-memory Python list"""
+    def __init__(self, vals):
+        # For the moment we assume that we are given a list of floats or ints, but someday it could be strings or something else 
+        super().__init__(Number)
+        self.vals = vals
+
+    def __iter__(self):
+        def valIterator():
+            for v in self.vals:
+                dr = DataRecord(self.basicElement)
+                dr.value = v
+                yield dr
+            
+        return valIterator()
 
 class DirectorySource(DataSource):
     """DirectorySource returns multiple File objects from a real-world source (a directory on disk)"""

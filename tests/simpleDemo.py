@@ -31,6 +31,11 @@ def getFileStats(datasetId):
     fileCount = files.aggregate("COUNT")
     return fileCount
 
+def testAverage(datasetId):
+    data = pz.getData(pz.Number, datasetId)
+    average = data.aggregate("AVERAGE")
+    return average
+
 
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
@@ -145,6 +150,11 @@ if __name__ == "__main__":
     elif task == "stats":
         rootSet = getFileStats(datasetid)
         physicalTree = emitDataset(rootSet, title="Dataset stats", verbose=args.verbose)
+        for r in physicalTree:
+            print(r)
+    elif task == "average":
+        rootSet = testAverage(datasetid)
+        physicalTree = emitDataset(rootSet, title="Average of numbers", verbose=args.verbose)
         for r in physicalTree:
             print(r)
     else:

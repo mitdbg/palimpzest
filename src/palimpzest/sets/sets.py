@@ -98,7 +98,6 @@ class Set:
 
         # The answer isn't cached, so we have to compute it
         if len(self._filters) > 0:
-            print("Creating filtered scan:", self._filters)
             return FilteredScan(self._basicElt, self._input.getLogicalTree(), self._filters, targetCacheId=uid)
         elif self._aggFunc is not None:
             return ApplyAggregateFunction(self._basicElt, self._input.getLogicalTree(), self._aggFunc, targetCacheId=uid)
@@ -134,7 +133,13 @@ class ConcreteDataset(Set):
         if DataDirectory().hasCachedAnswer(uid):
             return CacheScan(self._basicElt, uid)
 
-        if self._basicElt == File:
+        existingDataSet = DataDirectory().getRegisteredDataset(self.uniqName)
+        existingDataSetElement = None
+        for x in existingDataSet:
+            existingDataSetElement = x.element
+            break
+
+        if existingDataSetElement is None or self._basicElt == existingDataSetElement:
             return BaseScan(self._basicElt, self.uniqName)
         else:
             return ConvertScan(self._basicElt, BaseScan(File, self.uniqName), targetCacheId=uid)
