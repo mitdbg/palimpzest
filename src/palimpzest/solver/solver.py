@@ -112,7 +112,7 @@ class Solver:
         else:
             raise Exception(f"Cannot hard-code conversion from {inputElement} to {outputElement}")
 
-    def _makeLLMTypeConversionFn(self, outputElement, inputElement):
+    def _makeLLMTypeConversionFn(self, outputElement, inputElement, conversionDesc):
             def fn(candidate: DataRecord):
                 # iterate through all empty fields in the outputElement and ask questions to fill them
                 # for field in inputElement.__dict__:
@@ -123,7 +123,8 @@ class Solver:
 
                 for field_name in outputElement.fieldNames():
                     f = getattr(outputElement, field_name)
-                    answer = run_cot_qa(text_content, f"What is the {field_name} of the {doc_type}? ({f.desc})",
+                    answer = run_cot_qa(text_content, 
+                                        f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
                                         llmService=self._llmservice(), verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
                     setattr(dr, field_name, answer)
                 return dr
@@ -161,13 +162,14 @@ class Solver:
         functionName, functionParams, outputElement, inputElement = taskDescriptor
 
         if functionName == "InduceFromCandidateOp" or functionName == "ParallelInduceFromCandidateOp":
+            conversionDesc = functionParams
             typeConversionDescriptor = (outputElement, inputElement)
             if typeConversionDescriptor in self._simpleTypeConversions:
                 return self._makeSimpleTypeConversionFn(outputElement, inputElement)
             elif typeConversionDescriptor in self._hardcodedFns:
                 return self._makeHardCodedTypeConversionFn(outputElement, inputElement)
             else:
-                return self._makeLLMTypeConversionFn(outputElement, inputElement)
+                return self._makeLLMTypeConversionFn(outputElement, inputElement, conversionDesc)
         elif functionName == "FilterCandidateOp" or functionName == "ParallelFilterCandidateOp":
             return  self._makeFilterFn(taskDescriptor)
         else:

@@ -111,12 +111,13 @@ class CacheScanDataOp(PhysicalOp):
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source, targetCacheId=None):
+    def __init__(self, outputElementType, source, desc=None, targetCacheId=None):
         super().__init__(outputElementType=outputElementType)
         self.source = source
+        self.desc = desc
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("InduceFromCandidateOp", None, outputElementType, source.outputElementType)
+        taskDescriptor = ("InduceFromCandidateOp", desc, outputElementType, source.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
 
@@ -163,12 +164,13 @@ class InduceFromCandidateOp(PhysicalOp):
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source, targetCacheId=None):
+    def __init__(self, outputElementType, source, desc=None, targetCacheId=None):
         super().__init__(outputElementType=outputElementType)
         self.source = source
+        self.desc = desc
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("ParallelInduceFromCandidateOp", None, outputElementType, source.outputElementType)
+        taskDescriptor = ("ParallelInduceFromCandidateOp", desc, outputElementType, source.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
 
@@ -429,8 +431,11 @@ class ApplyAverageAggregateOp(PhysicalOp):
             sum = 0
             counter = 0
             for nextCandidate in self.source:
-                sum += nextCandidate.value
-                counter += 1
+                try:
+                    sum += int(nextCandidate.value)
+                    counter += 1
+                except:
+                    pass
 
             dr = DataRecord(Number)
             dr.value = sum / float(counter)
