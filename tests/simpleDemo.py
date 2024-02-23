@@ -47,6 +47,13 @@ def buildEnronPlan(datasetId):
     filteredEmails = emails.filterByStr("The email is about someone taking a vaction")
     return filteredEmails
 
+def computeEnronStats(datasetId):
+    emails = pz.getData(Email, datasetId)
+    filteredEmails = emails.filterByStr("The email is about someone taking a vaction")
+    subjectLineLengths = filteredEmails.convert(pz.Number, desc = "The number of words in the subject line of the email")
+    return subjectLineLengths.aggregate("AVERAGE")
+
+
 class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required = True)
 
