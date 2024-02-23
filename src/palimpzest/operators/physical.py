@@ -496,3 +496,57 @@ class ApplyAverageAggregateOp(PhysicalOp):
                 DataDirectory().closeCache(self.targetCacheId)
 
         return iteratorFn()
+
+
+class LimitScanOp(PhysicalOp):
+    def __init__(self, outputElementType, source, limit, targetCacheId=None):
+        super().__init__(outputElementType=outputElementType)
+        self.source = source
+        self.limit = limit
+        self.targetCacheId = targetCacheId
+
+    def __str__(self):
+        return "LimitScanOp(" + str(self.outputElementType) + ", " + "Limit: " + str(self.limit) + ")"
+
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, self.source.dumpPhysicalTree())
+
+    def estimateCost(self):
+        inputCostEstimates = self.source.estimateCost()
+
+        selectivity = 1.0
+        cardinality = selectivity * inputCostEstimates["cardinality"]
+        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
+        costPerElement = inputCostEstimates["costPerElement"]
+        startupTime = inputCostEstimates["startupTime"]
+        startupCost = inputCostEstimates["startupCost"]
+        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
+        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": timePerElement,
+            "costPerElement": costPerElement,
+            "startupTime": startupTime,
+            "startupCost": startupCost,
+            "bytesReadLocally": bytesReadLocally,
+            "bytesReadRemotely": bytesReadRemotely
+        }
+
+    def __iter__(self):
+        shouldCache = DataDirectory().openCache(self.targetCacheId)
+        def iteratorFn():
+            counter = 0
+            for nextCandidate in self.source: 
+                if counter >= self.limit:
+                    break
+                if shouldCache:
+                    DataDirectory().appendCache(self.targetCacheId, nextCandidate)
+                yield nextCandidate
+                counter += 1
+
+            if shouldCache:
+                DataDirectory().closeCache(self.targetCacheId)
+
+        return iteratorFn()

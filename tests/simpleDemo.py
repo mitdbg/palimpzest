@@ -36,6 +36,10 @@ def testAverage(datasetId):
     average = data.aggregate("AVERAGE")
     return average
 
+def testLimit(datasetId, n):
+    data = pz.getData(datasetId)
+    limitData = data.limit(n)
+    return limitData
 
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
@@ -162,6 +166,11 @@ if __name__ == "__main__":
     elif task == "average":
         rootSet = testAverage(datasetid)
         physicalTree = emitDataset(rootSet, title="Average of numbers", verbose=args.verbose)
+        for r in physicalTree:
+            print(r)
+    elif task == "limit":
+        rootSet = testLimit(datasetid, 5)
+        physicalTree = emitDataset(rootSet, title="Limit the set to 5 items", verbose=args.verbose)
         for r in physicalTree:
             print(r)
     else:

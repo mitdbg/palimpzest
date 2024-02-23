@@ -101,6 +101,24 @@ class BaseScan(LogicalOperator):
     def _getPhysicalTree(self, strategy=None):
         return MarshalAndScanDataOp(self.outputElementType, self.concreteDatasetIdentifier)
 
+class LimitScan(LogicalOperator):
+    def __init__(self, outputElementType, inputOp, limit, targetCacheId=None):
+        super().__init__(outputElementType, inputOp.outputElementType)
+        self.inputOp = inputOp
+        self.targetCacheId = targetCacheId
+        self.limit = limit
+
+    def __str__(self):
+        return "LimitScan(" + str(self.inputElementType) +", " + str(self.outputElementType) + ")"
+
+    def dumpLogicalTree(self):
+        """Return the logical tree of this LogicalOperator."""
+        return (self, self.inputOp.dumpLogicalTree())
+
+    def _getPhysicalTree(self, strategy=None):
+        return LimitScanOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.limit, targetCacheId=self.targetCacheId)
+
+
 class FilteredScan(LogicalOperator):
     """A FilteredScan is a logical operator that represents a scan of a particular data source, with filters applied."""
     def __init__(self, outputElementType, inputOp, filters, targetCacheId=None):

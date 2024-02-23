@@ -12,12 +12,13 @@ class Set:
     """A Set is set of Elements. It can be iterated over."""
     SET_VERSION = 0.1
 
-    def __init__(self, basicElt, input=None, desc=None, filters=[], aggFunc=None):
+    def __init__(self, basicElt, input=None, desc=None, filters=[], aggFunc=None, limit=None):
         self._desc = desc
         self._basicElt = basicElt
         self._input = input
         self._filters = filters
         self._aggFunc = aggFunc
+        self._limit = limit
 
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self._filters])
@@ -31,7 +32,8 @@ class Set:
              "desc": self._desc, 
              "basicElt": self._basicElt.jsonSchema(), 
              "filters": [f.serialize() for f in self._filters],
-             "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(), 
+             "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(),
+             "limit": self._limit, 
              "input": self._input.serialize()}
         return d
 
@@ -39,16 +41,23 @@ class Set:
         if inputObj["version"] != SET_VERSION:
             raise Exception("Cannot deserialize Set because it is the wrong version")
 
-        aggFuncStr = inputObj.get("AggFunc", None)
+        aggFuncStr = inputObj.get("aggFunc", None)
         if aggFuncStr is None:
             aggFunc = None
         else:
             aggFunc = AggregateFunction.deserialize(aggFuncStr)
 
+        limitStr = inputObj.get("limit", None)
+        if limitStr is None:
+            limit = None
+        else:
+            limit = int(limitStr)
+
         return Set(inputObj["basicElt"].jsonSchema(), 
                    input=Set.deserialize(inputObj["input"]), 
                    desc=inputObj["desc"], 
                    aggFunc=aggFunc,
+                   limit=limit,
                    filters=[Filter.deserialize(f) for f in inputObj["filters"]])
 
     def universalIdentifier(self):
@@ -76,6 +85,10 @@ class Set:
         a = AggregateFunction(aggFuncDesc)
         return Set(Number, input=self, desc="Aggregate results", aggFunc=a)
     
+    def limit(self, n):
+        """Limit the set size to no more than n rows"""
+        return Set(self._basicElt, input=self, desc="LIMIT " + str(n), limit=n)
+    
     def convert(self, newBasicElt, desc="Convert to new basic element"):
         """Convert the Set to a new basic element."""
         return Set(newBasicElt, input=self, desc=desc)
@@ -101,6 +114,8 @@ class Set:
             return FilteredScan(self._basicElt, self._input.getLogicalTree(), self._filters, targetCacheId=uid)
         elif self._aggFunc is not None:
             return ApplyAggregateFunction(self._basicElt, self._input.getLogicalTree(), self._aggFunc, targetCacheId=uid)
+        elif self._limit is not None:
+            return LimitScan(self._basicElt, self._input.getLogicalTree(), self._limit, targetCacheId=uid)
         elif not self._basicElt == self._input._basicElt:
             return ConvertScan(self._basicElt, self._input.getLogicalTree(), targetCacheId=uid)
         else:
