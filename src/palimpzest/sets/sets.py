@@ -111,14 +111,24 @@ class Set:
         return self._basicElt.jsonSchema()
 
 
-def getData(basicElt, datasetId):
+def getData(datasetId, basicElt=None):
     """Return a Set of data from the given dataset."""
-    return ConcreteDataset(basicElt, datasetId)
+    return ConcreteDataset(datasetId, targetElt=basicElt)
 
 class ConcreteDataset(Set):
-    def __init__(self, basicElt, uniqName, desc=None):
-        super().__init__(basicElt, input=None, desc=desc, filters=[])
+    def __init__(self, uniqName, targetElt=None, desc=None):
         self.uniqName = uniqName
+
+        if not targetElt is None:
+            basicElt = targetElt
+        else:
+            existingDataSet = DataDirectory().getRegisteredDataset(self.uniqName)
+            basicElt = Element
+            for x in existingDataSet:
+                basicElt = x.element
+                break
+
+        super().__init__(basicElt, input=None, desc=desc, filters=[])
 
     def dumpSyntacticTree(self):
         return (self, None)

@@ -13,26 +13,26 @@ class ScientificPaper(pz.PDFFile):
 
 def buildTestPDFPlan(datasetId):
     """This tests whether we can process a PDF file"""
-    pdfPapers = pz.getData(pz.PDFFile, datasetId)
+    pdfPapers = pz.getData(datasetId, targetElt=pz.PDFFile)
 
     return pdfPapers
 
 def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
-    sciPapers = pz.getData(ScientificPaper, datasetId)
+    sciPapers = pz.getData(datasetId, targetElt=ScientificPaper)
     batteryPapers = sciPapers.filterByStr("The paper is about batteries")
     mitPapers = batteryPapers.filterByStr("The paper is from MIT")
 
     return mitPapers
 
 
-def getFileStats(datasetId):
-    files = pz.getData(pz.File, datasetId)
+def testCount(datasetId):
+    files = pz.getData(datasetId)
     fileCount = files.aggregate("COUNT")
     return fileCount
 
 def testAverage(datasetId):
-    data = pz.getData(pz.Number, datasetId)
+    data = pz.getData(datasetId)
     average = data.aggregate("AVERAGE")
     return average
 
@@ -43,12 +43,12 @@ class Email(pz.TextFile):
     subject = pz.Field(desc="The subject of the email", required=True)
 
 def buildEnronPlan(datasetId):
-    emails = pz.getData(Email, datasetId)
+    emails = pz.getData(datasetId, targetElt=Email)
     filteredEmails = emails.filterByStr("The email is about someone taking a vaction")
     return filteredEmails
 
 def computeEnronStats(datasetId):
-    emails = pz.getData(Email, datasetId)
+    emails = pz.getData(datasetId, targetElt=Email)
     filteredEmails = emails.filterByStr("The email is about someone taking a vaction")
     subjectLineLengths = filteredEmails.convert(pz.Number, desc = "The number of words in the subject line of the email")
     return subjectLineLengths.aggregate("AVERAGE")
@@ -58,7 +58,7 @@ class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required = True)
 
 def buildImagePlan(datasetId):
-    images = pz.getData(pz.ImageFile, datasetId)
+    images = pz.getData(datasetId, targetElt=pz.ImageFile)
     filteredImages = images.filterByStr("The image contains one or more dogs")
     dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
     return dogImages
@@ -154,9 +154,9 @@ if __name__ == "__main__":
         physicalTree = emitDataset(rootSet, title="Dogs", verbose=args.verbose)
         for r in physicalTree:
             print(r.filename, r.breed)
-    elif task == "stats":
-        rootSet = getFileStats(datasetid)
-        physicalTree = emitDataset(rootSet, title="Dataset stats", verbose=args.verbose)
+    elif task == "count":
+        rootSet = testCount(datasetid)
+        physicalTree = emitDataset(rootSet, title="Count records", verbose=args.verbose)
         for r in physicalTree:
             print(r)
     elif task == "average":
