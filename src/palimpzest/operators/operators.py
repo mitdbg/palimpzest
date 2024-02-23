@@ -139,4 +139,9 @@ class ApplyAggregateFunction(LogicalOperator):
         return (self, self.inputOp.dumpLogicalTree())
     
     def _getPhysicalTree(self, strategy=None):
-        return ApplyAggFunctionOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.aggregationFunction, targetCacheId=self.targetCacheId)
+        if self.aggregationFunction.funcDesc == "COUNT":
+            return ApplyCountAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy), self.aggregationFunction, targetCacheId=self.targetCacheId)
+        elif self.aggregationFunction.funcDesc == "AVERAGE":
+            return ApplyAverageAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy), self.aggregationFunction, targetCacheId=self.targetCacheId)
+        else:
+            raise Exception(f"Cannot find implementation for {self.aggregationFunction}")

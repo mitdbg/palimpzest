@@ -383,20 +383,15 @@ class ParallelFilterCandidateOp(PhysicalOp):
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 
-class ApplyAggFunctionOp(PhysicalOp):
-    def __init__(self, outputElementType, source, aggFunction, targetCacheId=None):
-        super().__init__(outputElementType=outputElementType)
+class ApplyCountAggregateOp(PhysicalOp):
+    def __init__(self, source, aggFunction, targetCacheId=None):
+        super().__init__(outputElementType=Number)
         self.source = source
         self.aggFunction = aggFunction
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("ApplyAggFunctionOp", self.aggFunction, source.outputElementType, self.outputElementType)
-        if not taskDescriptor in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
-            #print("REGISTERED", taskDescriptor, "AS", PhysicalOp.synthesizedFns[taskDescriptor])
-
     def __str__(self):
-        return "ApplyAggFunctionOp(" + str(self.outputElementType) + ", " + "Function: " + str(self.aggFunction) + ")"
+        return "ApplyCountAggregateOp(" + str(self.outputElementType) + ", " + "Function: " + str(self.aggFunction) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -427,33 +422,75 @@ class ApplyAggFunctionOp(PhysicalOp):
     def __iter__(self):
         shouldCache = DataDirectory().openCache(self.targetCacheId)
         def iteratorFn():
-            taskDescriptor = ("ApplyAggFunctionOp", self.aggFunction, self.source.outputElementType, self.outputElementType)
-            if not taskDescriptor in PhysicalOp.synthesizedFns:
-                raise Exception("This function should have been synthesized during init():", taskDescriptor)
-
-            synFuncs = PhysicalOp.synthesizedFns[taskDescriptor]
-            
-            if not "computeAggregateInit" in synFuncs:
-                raise Exception("Aggregate function was not synthesized completely. Missing 'computeAggregateInit'")
-            
-            if not "updateAggregate" in synFuncs:
-                raise Exception("Aggregate function was not synthesized completely. Missing 'updateAggregate'")
-
-            if not "finalizeAggregate" in synFuncs:
-                raise Exception("Aggregate function was not synthesized completely. Missing 'finalizeAggregate'")
-
-            computeAggregateInit = synFuncs["computeAggregateInit"]
-            updateAggregate = synFuncs["updateAggregate"]
-            finalizeAggregate = synFuncs["finalizeAggregate"]
-
-            curState = computeAggregateInit()
+            counter = 0
             for nextCandidate in self.source:
-                curState = updateAggregate(curState, nextCandidate)
+                counter += 1
 
-            result = finalizeAggregate(curState)
+            dr = DataRecord(Number)
+            dr.value = counter
             if shouldCache:
-                DataDirectory().appendCache(self.targetCacheId, result)
-            yield result
+                DataDirectory().appendCache(self.targetCacheId, dr)
+            yield dr
+
+            if shouldCache:
+                DataDirectory().closeCache(self.targetCacheId)
+
+        return iteratorFn()
+
+
+class ApplyAverageAggregateOp(PhysicalOp):
+    def __init__(self, source, aggFunction, targetCacheId=None):
+        super().__init__(outputElementType=Number)
+        self.source = source
+        self.aggFunction = aggFunction
+        self.targetCacheId = targetCacheId
+
+        if not source.outputElementType == Number:
+            raise Exception("Aggregate function AVERAGE is only defined over Numbers")
+
+    def __str__(self):
+        return "ApplyAverageAggregateOp(" + str(self.outputElementType) + ", " + "Function: " + str(self.aggFunction) + ")"
+
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, self.source.dumpPhysicalTree())
+
+    def estimateCost(self):
+        inputCostEstimates = self.source.estimateCost()
+
+        selectivity = 1.0
+        cardinality = selectivity * inputCostEstimates["cardinality"]
+        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
+        costPerElement = inputCostEstimates["costPerElement"]
+        startupTime = inputCostEstimates["startupTime"]
+        startupCost = inputCostEstimates["startupCost"]
+        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
+        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": timePerElement,
+            "costPerElement": costPerElement,
+            "startupTime": startupTime,
+            "startupCost": startupCost,
+            "bytesReadLocally": bytesReadLocally,
+            "bytesReadRemotely": bytesReadRemotely
+        }
+
+    def __iter__(self):
+        shouldCache = DataDirectory().openCache(self.targetCacheId)
+        def iteratorFn():
+            sum = 0
+            counter = 0
+            for nextCandidate in self.source:
+                sum += nextCandidate.value
+                counter += 1
+
+            dr = DataRecord(Number)
+            dr.value = sum / float(counter)
+            if shouldCache:
+                DataDirectory().appendCache(self.targetCacheId, dr)
+            yield dr
 
             if shouldCache:
                 DataDirectory().closeCache(self.targetCacheId)
