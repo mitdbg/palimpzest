@@ -12,15 +12,16 @@ class Set:
     """A Set is set of Elements. It can be iterated over."""
     SET_VERSION = 0.1
 
-    def __init__(self, basicElt, input=None, desc=None, filters=[]):
+    def __init__(self, basicElt, input=None, desc=None, filters=[], aggFunc=None):
         self._desc = desc
         self._basicElt = basicElt
         self._input = input
         self._filters = filters
+        self._aggFunc = aggFunc
 
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self._filters])
-        return f"{self.__class__.__name__}(basicElt={self._basicElt}, desc={self._desc}, filters={filterStr}, uid={self.universalIdentifier()})"
+        return f"{self.__class__.__name__}(basicElt={self._basicElt}, desc={self._desc}, filters={filterStr}, aggFunc={str(self._aggFunc)}, uid={self.universalIdentifier()})"
     
     def serialize(self):
         if self._input is None:
@@ -29,7 +30,8 @@ class Set:
         d = {"version": Set.SET_VERSION, 
              "desc": self._desc, 
              "basicElt": self._basicElt.jsonSchema(), 
-             "filters": [f.serialize() for f in self._filters], 
+             "filters": [f.serialize() for f in self._filters],
+             "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(), 
              "input": self._input.serialize()}
         return d
 
@@ -37,9 +39,16 @@ class Set:
         if inputObj["version"] != SET_VERSION:
             raise Exception("Cannot deserialize Set because it is the wrong version")
 
+        aggFuncStr = inputObj.get("AggFunc", None)
+        if aggFuncStr is None:
+            aggFunc = None
+        else:
+            aggFunc = AggregateFunction.deserialize(aggFuncStr)
+
         return Set(inputObj["basicElt"].jsonSchema(), 
                    input=Set.deserialize(inputObj["input"]), 
                    desc=inputObj["desc"], 
+                   aggFunc=aggFunc,
                    filters=[Filter.deserialize(f) for f in inputObj["filters"]])
 
     def universalIdentifier(self):
@@ -62,6 +71,11 @@ class Set:
         f = Filter(filterCondition)
         return self.filter(f)
     
+    def aggregate(self, aggFuncDesc: str):
+        """Apply an aggregate function to this set"""
+        a = AggregateFunction(aggFuncDesc)
+        return Set(Number, input=self, desc="Aggregate results", aggFunc=a)
+    
     def convert(self, newBasicElt, desc="Convert to new basic element"):
         """Convert the Set to a new basic element."""
         return Set(newBasicElt, input=self, desc=desc)
@@ -83,10 +97,13 @@ class Set:
             return CacheScan(self._basicElt, uid)
 
         # The answer isn't cached, so we have to compute it
-        if not self._basicElt == self._input._basicElt:
-            return ConvertScan(self._basicElt, self._input.getLogicalTree(), targetCacheId=uid)
-        elif len(self._filters) >= 0:
+        if len(self._filters) > 0:
+            print("Creating filtered scan:", self._filters)
             return FilteredScan(self._basicElt, self._input.getLogicalTree(), self._filters, targetCacheId=uid)
+        elif self._aggFunc is not None:
+            return ApplyAggregateFunction(self._basicElt, self._input.getLogicalTree(), self._aggFunc, targetCacheId=uid)
+        elif not self._basicElt == self._input._basicElt:
+            return ConvertScan(self._basicElt, self._input.getLogicalTree(), targetCacheId=uid)
         else:
             return self._input.getLogicalTree()
 

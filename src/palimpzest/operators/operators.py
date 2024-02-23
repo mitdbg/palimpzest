@@ -122,3 +122,21 @@ class FilteredScan(LogicalOperator):
             return ParallelFilterCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.filters, targetCacheId=self.targetCacheId)
         else:
             return FilterCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.filters, targetCacheId=self.targetCacheId)
+
+class ApplyAggregateFunction(LogicalOperator):
+    """ApplyAggregateFunction is a logical operator that applies a function to the input set and yields a single result."""
+    def __init__(self, outputElementType, inputOp, aggregationFunction, targetCacheId=None):
+        super().__init__(outputElementType, inputOp.outputElementType)
+        self.inputOp = inputOp
+        self.aggregationFunction = aggregationFunction
+        self.targetCacheId=targetCacheId
+
+    def __str__(self):
+        return "ApplyAggregateFunction(function: " + str(self.aggregationFunction) + ")"
+
+    def dumpLogicalTree(self):
+        """Return the logical subtree rooted at this operator"""
+        return (self, self.inputOp.dumpLogicalTree())
+    
+    def _getPhysicalTree(self, strategy=None):
+        return ApplyAggFunctionOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.aggregationFunction, targetCacheId=self.targetCacheId)

@@ -27,11 +27,11 @@ class Filter():
         # __eq__ should be defined for consistency with __hash__
         return isinstance(other, Filter) and self.filterCondition == other.filterCondition
    
-    def test(self, objToTest)->bool:
-        """Test whether the object matches the filter condition"""
-        return self._compiledFilter(objToTest)
-
-    def _compiledFilter(self, target)->bool:
-        """This is the compiled version of the filter condition. It will be implemented at compile time."""
-        pass
+#    def test(self, objToTest)->bool:
+#        """Test whether the object matches the filter condition"""
+#        return self._compiledFilter(objToTest)
+#
+#    def _compiledFilter(self, target)->bool:
+#        """This is the compiled version of the filter condition. It will be implemented at compile time."""
+#        pass
 

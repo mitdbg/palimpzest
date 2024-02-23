@@ -19,3 +19,7 @@ class PDFFile(File):
 
 class ImageFile(File):
     """A file that contains an image."""
+
+class Number(Element):
+    """Just a number. Often used for aggregates"""
+    value = Field(desc="A single number", required=True)

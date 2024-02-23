@@ -1,7 +1,7 @@
 import os
 
 from palimpzest import Field
-from palimpzest.elements import DataRecord, TextFile, File, PDFFile, ImageFile
+from palimpzest.elements import DataRecord, TextFile, File, PDFFile, ImageFile, Number
 from palimpzest.tools import cosmos_client, get_text_from_pdf, processPapermagePdf
 from palimpzest.tools.dspysearch import run_cot_bool, run_cot_qa, gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.datasources import DataDirectory
@@ -112,6 +112,27 @@ class Solver:
         else:
             raise Exception(f"Cannot hard-code conversion from {inputElement} to {outputElement}")
 
+    def _makeHardCodedAggregationFn(self, aggFunction, inputElement):
+        if aggFunction.funcDesc == "COUNT":
+            def _computeAggregateInit():
+                return 0
+            
+            def _updateAggregate(state, candidate: DataRecord):
+                return state + 1
+            
+            def _finalizeAggregate(state):
+                dr = DataRecord(Number)
+                dr.value = state
+                return dr
+            
+            return {"computeAggregateInit": _computeAggregateInit,
+                    "updateAggregate": _updateAggregate,
+                    "finalizeAggregate": _finalizeAggregate}
+        
+        else:
+            raise Exception(f"Cannot synthesize aggregation function for {aggFunction}")
+
+
     def _makeLLMTypeConversionFn(self, outputElement, inputElement):
             def fn(candidate: DataRecord):
                 # iterate through all empty fields in the outputElement and ask questions to fill them
@@ -170,5 +191,8 @@ class Solver:
                 return self._makeLLMTypeConversionFn(outputElement, inputElement)
         elif functionName == "FilterCandidateOp" or functionName == "ParallelFilterCandidateOp":
             return  self._makeFilterFn(taskDescriptor)
+        elif functionName == "ApplyAggFunctionOp":
+            aggFunction = functionParams
+            return self._makeHardCodedAggregationFn(aggFunction, inputElement)
         else:
             raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))

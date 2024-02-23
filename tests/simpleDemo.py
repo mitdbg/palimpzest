@@ -20,11 +20,17 @@ def buildTestPDFPlan(datasetId):
 def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
     sciPapers = pz.getData(ScientificPaper, datasetId)
-    #batteryPapers = sciPapers.filterByStr("The paper is about batteries")
-    #mitPapers = batteryPapers.filterByStr("The paper is from MIT")
-    #goodAuthorPapers = mitPapers.filterByStr("Paper where the title begins with the letter X")
+    batteryPapers = sciPapers.filterByStr("The paper is about batteries")
+    mitPapers = batteryPapers.filterByStr("The paper is from MIT")
 
-    return sciPapers
+    return mitPapers
+
+
+def getFileStats(datasetId):
+    files = pz.getData(pz.File, datasetId)
+    fileCount = files.aggregate("COUNT")
+    return fileCount
+
 
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
@@ -136,6 +142,11 @@ if __name__ == "__main__":
         physicalTree = emitDataset(rootSet, title="Dogs", verbose=args.verbose)
         for r in physicalTree:
             print(r.filename, r.breed)
+    elif task == "stats":
+        rootSet = getFileStats(datasetid)
+        physicalTree = emitDataset(rootSet, title="Dataset stats", verbose=args.verbose)
+        for r in physicalTree:
+            print(r)
     else:
         print("Unknown task")
         exit(1)

@@ -381,3 +381,81 @@ class ParallelFilterCandidateOp(PhysicalOp):
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
+
+
+class ApplyAggFunctionOp(PhysicalOp):
+    def __init__(self, outputElementType, source, aggFunction, targetCacheId=None):
+        super().__init__(outputElementType=outputElementType)
+        self.source = source
+        self.aggFunction = aggFunction
+        self.targetCacheId = targetCacheId
+
+        taskDescriptor = ("ApplyAggFunctionOp", self.aggFunction, source.outputElementType, self.outputElementType)
+        if not taskDescriptor in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor)
+            #print("REGISTERED", taskDescriptor, "AS", PhysicalOp.synthesizedFns[taskDescriptor])
+
+    def __str__(self):
+        return "ApplyAggFunctionOp(" + str(self.outputElementType) + ", " + "Function: " + str(self.aggFunction) + ")"
+
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, self.source.dumpPhysicalTree())
+
+    def estimateCost(self):
+        inputCostEstimates = self.source.estimateCost()
+
+        selectivity = 1.0
+        cardinality = selectivity * inputCostEstimates["cardinality"]
+        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
+        costPerElement = inputCostEstimates["costPerElement"]
+        startupTime = inputCostEstimates["startupTime"]
+        startupCost = inputCostEstimates["startupCost"]
+        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
+        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": timePerElement,
+            "costPerElement": costPerElement,
+            "startupTime": startupTime,
+            "startupCost": startupCost,
+            "bytesReadLocally": bytesReadLocally,
+            "bytesReadRemotely": bytesReadRemotely
+        }
+
+    def __iter__(self):
+        shouldCache = DataDirectory().openCache(self.targetCacheId)
+        def iteratorFn():
+            taskDescriptor = ("ApplyAggFunctionOp", self.aggFunction, self.source.outputElementType, self.outputElementType)
+            if not taskDescriptor in PhysicalOp.synthesizedFns:
+                raise Exception("This function should have been synthesized during init():", taskDescriptor)
+
+            synFuncs = PhysicalOp.synthesizedFns[taskDescriptor]
+            
+            if not "computeAggregateInit" in synFuncs:
+                raise Exception("Aggregate function was not synthesized completely. Missing 'computeAggregateInit'")
+            
+            if not "updateAggregate" in synFuncs:
+                raise Exception("Aggregate function was not synthesized completely. Missing 'updateAggregate'")
+
+            if not "finalizeAggregate" in synFuncs:
+                raise Exception("Aggregate function was not synthesized completely. Missing 'finalizeAggregate'")
+
+            computeAggregateInit = synFuncs["computeAggregateInit"]
+            updateAggregate = synFuncs["updateAggregate"]
+            finalizeAggregate = synFuncs["finalizeAggregate"]
+
+            curState = computeAggregateInit()
+            for nextCandidate in self.source:
+                curState = updateAggregate(curState, nextCandidate)
+
+            result = finalizeAggregate(curState)
+            if shouldCache:
+                DataDirectory().appendCache(self.targetCacheId, result)
+            yield result
+
+            if shouldCache:
+                DataDirectory().closeCache(self.targetCacheId)
+
+        return iteratorFn()
