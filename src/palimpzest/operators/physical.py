@@ -8,10 +8,19 @@ import concurrent
 LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
 
 # Assume 10s per record for local LLM object conversion
-LOCAL_LLM_CONVERSION_TIME_PER_RECORD = 10
+STD_LLM_CONVERSION_TIME_PER_RECORD = 20
+PARALLEL_LLM_CONVERSION_TIME_OVERALL = 2.0 * STD_LLM_CONVERSION_TIME_PER_RECORD
 
-# Assume 5s per record for local LLM boolean filter
-LOCAL_LLM_FILTER_TIME_PER_RECORD = 5
+# Assume 0.06 per 1M tokens, and about 4K tokens per request (way wrong)
+STD_LLM_CONVERSION_COST_PER_RECORD = 0.06 * (4000 / 1000000)
+PARALLEL_LLM_CONVERSION_COST_PER_RECORD = STD_LLM_CONVERSION_COST_PER_RECORD
+
+# Assume filter operations are twice as fast as conversions
+STD_LLM_FILTER_TIME_PER_RECORD = STD_LLM_CONVERSION_TIME_PER_RECORD / 2
+PARALLEL_LLM_FILTER_TIME_OVERALL = PARALLEL_LLM_CONVERSION_TIME_OVERALL / 2
+
+STD_LLM_FILTER_COST_PER_RECORD = STD_LLM_CONVERSION_COST_PER_RECORD / 2
+PARALLEL_LLM_FILTER_COST_PER_RECORD = PARALLEL_LLM_CONVERSION_COST_PER_RECORD / 2
 
 logLLMOutput = False
 
@@ -49,21 +58,17 @@ class MarshalAndScanDataOp(PhysicalOp):
     
     def estimateCost(self):
         cardinality = DataDirectory().getCardinality(self.concreteDatasetIdentifier) + 1
+
         size = DataDirectory().getSize(self.concreteDatasetIdentifier)
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
+
         timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
         costPerElement = 0
-        startupTime = 0
-        startupCost = 0
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": size,
-            "bytesReadRemotely": 0
+            "costPerElement": costPerElement
         }
     
     def __iter__(self):
@@ -88,19 +93,14 @@ class CacheScanDataOp(PhysicalOp):
         cardinality = sum(1 for _ in DataDirectory().getCachedResult(self.cacheIdentifier)) + 1
         size = 100 * cardinality
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
+
         timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
         costPerElement = 0
-        startupTime = 0
-        startupCost = 0
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": size,
-            "bytesReadRemotely": 0
+            "costPerElement": costPerElement
         }
 
     def __iter__(self):
@@ -128,25 +128,16 @@ class InduceFromCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
-        inputCostEstimates = self.source.estimateCost()
+        inputEstimates = self.source.estimateCost()
 
-        selectivity = 1.0
-        cardinality = selectivity * inputCostEstimates["cardinality"]
-        timePerElement = LOCAL_LLM_CONVERSION_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
-        costPerElement = inputCostEstimates["costPerElement"]
-        startupTime = inputCostEstimates["startupTime"]
-        startupCost = inputCostEstimates["startupCost"]
-        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
-        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+        cardinality = inputEstimates["cardinality"]
+        timePerElement = STD_LLM_CONVERSION_TIME_PER_RECORD + inputEstimates["timePerElement"]
+        costPerElement = STD_LLM_CONVERSION_COST_PER_RECORD + inputEstimates["costPerElement"]
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": bytesReadLocally,
-            "bytesReadRemotely": bytesReadRemotely
+            "costPerElement": costPerElement
         }
 
     def __iter__(self):
@@ -189,25 +180,16 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
-        inputCostEstimates = self.source.estimateCost()
+        inputEstimates = self.source.estimateCost()
 
-        selectivity = 1.0
-        cardinality = selectivity * inputCostEstimates["cardinality"]
-        timePerElement = LOCAL_LLM_CONVERSION_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
-        costPerElement = inputCostEstimates["costPerElement"]
-        startupTime = inputCostEstimates["startupTime"]
-        startupCost = inputCostEstimates["startupCost"]
-        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
-        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+        cardinality = inputEstimates["cardinality"]
+        timePerElement = (PARALLEL_LLM_CONVERSION_TIME_OVERALL + (cardinality * inputEstimates["timePerElement"])) / cardinality
+        costPerElement = PARALLEL_LLM_CONVERSION_COST_PER_RECORD + inputEstimates["costPerElement"]
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": bytesReadLocally,
-            "bytesReadRemotely": bytesReadRemotely
+            "costPerElement": costPerElement
         }
 
     def __iter__(self):
@@ -264,25 +246,16 @@ class FilterCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
-        inputCostEstimates = self.source.estimateCost()
+        inputEstimates = self.source.estimateCost()
 
-        selectivity = 1.0
-        cardinality = selectivity * inputCostEstimates["cardinality"]
-        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
-        costPerElement = inputCostEstimates["costPerElement"]
-        startupTime = inputCostEstimates["startupTime"]
-        startupCost = inputCostEstimates["startupCost"]
-        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
-        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+        cardinality = inputEstimates["cardinality"]
+        timePerElement = STD_LLM_FILTER_TIME_PER_RECORD + inputEstimates["timePerElement"]
+        costPerElement = STD_LLM_FILTER_COST_PER_RECORD + inputEstimates["costPerElement"]
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": bytesReadLocally,
-            "bytesReadRemotely": bytesReadRemotely
+            "costPerElement": costPerElement
         }
 
     def __iter__(self):
@@ -328,25 +301,16 @@ class ParallelFilterCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
-        inputCostEstimates = self.source.estimateCost()
+        inputEstimates = self.source.estimateCost()
 
-        selectivity = 1.0
-        cardinality = selectivity * inputCostEstimates["cardinality"]
-        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
-        costPerElement = inputCostEstimates["costPerElement"]
-        startupTime = inputCostEstimates["startupTime"]
-        startupCost = inputCostEstimates["startupCost"]
-        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
-        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+        cardinality = inputEstimates["cardinality"]
+        timePerElement = (PARALLEL_LLM_FILTER_TIME_OVERALL + (cardinality * inputEstimates["timePerElement"])) / cardinality
+        costPerElement = PARALLEL_LLM_FILTER_COST_PER_RECORD + inputEstimates["costPerElement"]
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": bytesReadLocally,
-            "bytesReadRemotely": bytesReadRemotely
+            "costPerElement": costPerElement
         }
 
     def __iter__(self):
@@ -398,25 +362,16 @@ class ApplyCountAggregateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
-        inputCostEstimates = self.source.estimateCost()
+        inputEstimates = self.source.estimateCost()
 
-        selectivity = 1.0
-        cardinality = selectivity * inputCostEstimates["cardinality"]
-        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
-        costPerElement = inputCostEstimates["costPerElement"]
-        startupTime = inputCostEstimates["startupTime"]
-        startupCost = inputCostEstimates["startupCost"]
-        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
-        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+        cardinality = 1
+        time = inputEstimates["timePerElement"] * inputEstimates["cardinality"]
+        cost = inputEstimates["costPerElement"] * inputEstimates["cardinality"]
 
         return {
             "cardinality": cardinality,
-            "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": bytesReadLocally,
-            "bytesReadRemotely": bytesReadRemotely
+            "timePerElement": time,
+            "costPerElement": cost
         }
 
     def __iter__(self):
@@ -456,25 +411,16 @@ class ApplyAverageAggregateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
-        inputCostEstimates = self.source.estimateCost()
+        inputEstimates = self.source.estimateCost()
 
-        selectivity = 1.0
-        cardinality = selectivity * inputCostEstimates["cardinality"]
-        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
-        costPerElement = inputCostEstimates["costPerElement"]
-        startupTime = inputCostEstimates["startupTime"]
-        startupCost = inputCostEstimates["startupCost"]
-        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
-        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+        cardinality = 1
+        time = inputEstimates["timePerElement"] * inputEstimates["cardinality"]
+        cost = inputEstimates["costPerElement"] * inputEstimates["cardinality"]
 
         return {
             "cardinality": cardinality,
-            "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": bytesReadLocally,
-            "bytesReadRemotely": bytesReadRemotely
+            "timePerElement": time,
+            "costPerElement": cost
         }
 
     def __iter__(self):
@@ -513,25 +459,14 @@ class LimitScanOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
-        inputCostEstimates = self.source.estimateCost()
+        inputEstimates = self.source.estimateCost()
 
-        selectivity = 1.0
-        cardinality = selectivity * inputCostEstimates["cardinality"]
-        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
-        costPerElement = inputCostEstimates["costPerElement"]
-        startupTime = inputCostEstimates["startupTime"]
-        startupCost = inputCostEstimates["startupCost"]
-        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
-        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+        cardinality = max(self.limit, inputEstimates["cardinality"])
 
         return {
             "cardinality": cardinality,
-            "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": bytesReadLocally,
-            "bytesReadRemotely": bytesReadRemotely
+            "timePerElement": inputEstimates["timePerElement"],
+            "costPerElement": inputEstimates["costPerElement"]
         }
 
     def __iter__(self):

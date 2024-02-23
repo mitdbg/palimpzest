@@ -93,18 +93,16 @@ def emitDataset(rootSet, title="Dataset", verbose=False):
     emitNestedTuple(logicalElements)
 
     # Print the physical operators that will be executed
-    planTime, planPrice, estimatedCardinality, physicalTree = logicalTree.createPhysicalPlan()    
+    planTime, planCost, estimatedCardinality, physicalTree = logicalTree.createPhysicalPlan()    
     print()
     print("Physical operator tree")
     physicalOps = physicalTree.dumpPhysicalTree()
-    print()
-    print("estimated costs:", physicalTree.estimateCost())
     emitNestedTuple(physicalOps)
 
     #iterate over data
     print()
     print("Estimated seconds to complete:", planTime)
-    print("Estimated USD to complete:", planPrice)
+    print("Estimated USD to complete:", planCost)
     print("Estimated cardinality:", estimatedCardinality)
     print("Concrete data results")
     return physicalTree

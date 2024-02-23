@@ -16,20 +16,13 @@ class LogicalOperator:
     def createPhysicalPlan(self):
         """Create the physical tree of operators."""
         plan1 = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN)
-        plan2 = self._getPhysicalTree(strategy=PhysicalOp.REMOTE_PLAN)
 
         plan1Cost = plan1.estimateCost()
-        plan2Cost = plan2.estimateCost()
 
-        totalTime1 = plan1Cost["timePerElement"] * plan1Cost["cardinality"] + plan1Cost["startupTime"]
-        totalTime2 = plan2Cost["timePerElement"] * plan2Cost["cardinality"] + plan2Cost["startupTime"]
-        totalPrice1 = plan1Cost["costPerElement"] * plan1Cost["cardinality"] + plan1Cost["startupCost"]
-        totalPrice2 = plan2Cost["costPerElement"] * plan2Cost["cardinality"] + plan2Cost["startupCost"]
+        totalTime1 = plan1Cost["timePerElement"] * plan1Cost["cardinality"]
+        totalPrice1 = plan1Cost["costPerElement"] * plan1Cost["cardinality"]
 
-        if totalTime1 < totalTime2:
-            return totalTime1, totalPrice1, plan1Cost["cardinality"], plan1 
-        else:
-            return totalTime2, totalPrice2, plan2Cost["cardinality"], plan2
+        return totalTime1, totalPrice1, plan1Cost["cardinality"], plan1 
 
 
 class ConvertScan(LogicalOperator):
