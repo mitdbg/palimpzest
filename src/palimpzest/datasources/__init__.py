@@ -1,2 +1,2 @@
 from .loaders import *
-from .datadirectory import DataDirectory, initDataDirectory
+from .datadirectory import DataDirectory

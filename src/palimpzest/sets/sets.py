@@ -38,7 +38,7 @@ class Set:
         return d
 
     def deserialize(inputObj):
-        if inputObj["version"] != SET_VERSION:
+        if inputObj["version"] != Set.SET_VERSION:
             raise Exception("Cannot deserialize Set because it is the wrong version")
 
         aggFuncStr = inputObj.get("aggFunc", None)
@@ -92,7 +92,7 @@ class Set:
     def convert(self, newBasicElt, desc="Convert to new basic element"):
         """Convert the Set to a new basic element."""
         return Set(newBasicElt, input=self, desc=desc)
-    
+
     def dumpSyntacticTree(self):
         """Return the syntactic tree of this Set."""
         if self._input is None:
@@ -176,7 +176,7 @@ class ConcreteDataset(Set):
                 "uniqName": self.uniqName}
 
     def deserialize(inputObj):
-        if inputObj["version"] != SET_VERSION:
+        if inputObj["version"] != Set.SET_VERSION:
             raise Exception("Cannot deserialize Set because it is the wrong version")
 
         return ConcreteDataset(inputObj["basicElt"],

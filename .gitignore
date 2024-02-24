@@ -7,3 +7,6 @@
 
 # virtual environment(s)
 venv/
+
+# tmp
+testdata/maildir/
