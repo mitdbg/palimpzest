@@ -121,26 +121,21 @@ def ls_data() -> None:
 
 
 @cli.command(aliases=["synthesize", "syn"])
+@click.option("--name", type=str, default=None, required=True, help="Registered name for the set of synthetic values")
 @click.option("--count", type=int, default=100, help="How many values should be synthesized")
-@click.option("--name", type=str, default=None, help="Registered name for the set of synthetic values")
-def synthesize_data(count: int, name: str) -> None:
+def synthesize_data(name: str, count: int) -> None:
     """
     Register a synthetic set of values with PZ
     
     Parameters
     ----------
-    count: int
-        The nunber of values to synthesize
-         
     name: str
         Name to register the data set with
+
+    count: int
+        The nunber of values to synthesize
     """
-    if name is not None:
-        name = name.strip()
-    else:
-        raise InvalidCommandException(
-            f"Please provide a name for the dataset using --name"
-        )
+    name = name.strip()
     
     vals = []
     for i in range(0, count):
@@ -148,7 +143,6 @@ def synthesize_data(count: int, name: str) -> None:
     pz.DataDirectory().registerDataset(vals, name)
     
     _print_msg(f"Registered {name}")
-
 
 
 @cli.command(aliases=["register", "reg", "r"])
