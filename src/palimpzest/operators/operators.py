@@ -16,31 +16,25 @@ class LogicalOperator:
     def createPhysicalPlan(self):
         """Create the physical tree of operators."""
         plan1 = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN)
-        plan2 = self._getPhysicalTree(strategy=PhysicalOp.REMOTE_PLAN)
 
         plan1Cost = plan1.estimateCost()
-        plan2Cost = plan2.estimateCost()
 
-        totalTime1 = plan1Cost["timePerElement"] * plan1Cost["cardinality"] + plan1Cost["startupTime"]
-        totalTime2 = plan2Cost["timePerElement"] * plan2Cost["cardinality"] + plan2Cost["startupTime"]
-        totalPrice1 = plan1Cost["costPerElement"] * plan1Cost["cardinality"] + plan1Cost["startupCost"]
-        totalPrice2 = plan2Cost["costPerElement"] * plan2Cost["cardinality"] + plan2Cost["startupCost"]
+        totalTime1 = plan1Cost["timePerElement"] * plan1Cost["cardinality"]
+        totalPrice1 = plan1Cost["costPerElement"] * plan1Cost["cardinality"]
 
-        if totalTime1 < totalTime2:
-            return totalTime1, totalPrice1, plan1Cost["cardinality"], plan1 
-        else:
-            return totalTime2, totalPrice2, plan2Cost["cardinality"], plan2
+        return totalTime1, totalPrice1, plan1Cost["cardinality"], plan1 
 
 
 class ConvertScan(LogicalOperator):
     """A ConvertScan is a logical operator that represents a scan of a particular data source, with conversion applied."""
-    def __init__(self, outputElementType, inputOp, targetCacheId=None):
+    def __init__(self, outputElementType, inputOp, desc=None, targetCacheId=None):
         super().__init__(outputElementType, inputOp.outputElementType)
         self.inputOp = inputOp
+        self.desc = desc
         self.targetCacheId = targetCacheId
 
     def __str__(self):
-        return "ConvertScan(" + str(self.inputElementType) +", " + str(self.outputElementType) + ")"
+        return "ConvertScan(" + str(self.inputElementType) +", " + str(self.outputElementType) + ", " + str(self.desc) + ")"
 
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
@@ -56,17 +50,18 @@ class ConvertScan(LogicalOperator):
 
         if intermediateOutputElement == Element or intermediateOutputElement == self.outputElementType:
             if DataDirectory().current_config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), targetCacheId=self.targetCacheId)
+                return ParallelInduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), desc=self.desc, targetCacheId=self.targetCacheId)
             else:
-                return InduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), targetCacheId=self.targetCacheId)
+                return InduceFromCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), desc=self.desc, targetCacheId=self.targetCacheId)
         else:
             if DataDirectory().current_config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(self.outputElementType, ParallelInduceFromCandidateOp(intermediateOutputElement, self.inputOp._getPhysicalTree(strategy=strategy)), targetCacheId=self.targetCacheId)
+                return ParallelInduceFromCandidateOp(self.outputElementType, ParallelInduceFromCandidateOp(intermediateOutputElement, self.inputOp._getPhysicalTree(strategy=strategy)), desc=self.desc, targetCacheId=self.targetCacheId)
             else:
                 return InduceFromCandidateOp(self.outputElementType, 
                                              InduceFromCandidateOp(
                                                  intermediateOutputElement, 
                                                  self.inputOp._getPhysicalTree(strategy=strategy)),
+                                                desc=self.desc,
                                              targetCacheId=self.targetCacheId)
 
 class CacheScan(LogicalOperator):
@@ -101,6 +96,24 @@ class BaseScan(LogicalOperator):
     def _getPhysicalTree(self, strategy=None):
         return MarshalAndScanDataOp(self.outputElementType, self.concreteDatasetIdentifier)
 
+class LimitScan(LogicalOperator):
+    def __init__(self, outputElementType, inputOp, limit, targetCacheId=None):
+        super().__init__(outputElementType, inputOp.outputElementType)
+        self.inputOp = inputOp
+        self.targetCacheId = targetCacheId
+        self.limit = limit
+
+    def __str__(self):
+        return "LimitScan(" + str(self.inputElementType) +", " + str(self.outputElementType) + ")"
+
+    def dumpLogicalTree(self):
+        """Return the logical tree of this LogicalOperator."""
+        return (self, self.inputOp.dumpLogicalTree())
+
+    def _getPhysicalTree(self, strategy=None):
+        return LimitScanOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.limit, targetCacheId=self.targetCacheId)
+
+
 class FilteredScan(LogicalOperator):
     """A FilteredScan is a logical operator that represents a scan of a particular data source, with filters applied."""
     def __init__(self, outputElementType, inputOp, filters, targetCacheId=None):
@@ -122,3 +135,26 @@ class FilteredScan(LogicalOperator):
             return ParallelFilterCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.filters, targetCacheId=self.targetCacheId)
         else:
             return FilterCandidateOp(self.outputElementType, self.inputOp._getPhysicalTree(strategy=strategy), self.filters, targetCacheId=self.targetCacheId)
+
+class ApplyAggregateFunction(LogicalOperator):
+    """ApplyAggregateFunction is a logical operator that applies a function to the input set and yields a single result."""
+    def __init__(self, outputElementType, inputOp, aggregationFunction, targetCacheId=None):
+        super().__init__(outputElementType, inputOp.outputElementType)
+        self.inputOp = inputOp
+        self.aggregationFunction = aggregationFunction
+        self.targetCacheId=targetCacheId
+
+    def __str__(self):
+        return "ApplyAggregateFunction(function: " + str(self.aggregationFunction) + ")"
+
+    def dumpLogicalTree(self):
+        """Return the logical subtree rooted at this operator"""
+        return (self, self.inputOp.dumpLogicalTree())
+    
+    def _getPhysicalTree(self, strategy=None):
+        if self.aggregationFunction.funcDesc == "COUNT":
+            return ApplyCountAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy), self.aggregationFunction, targetCacheId=self.targetCacheId)
+        elif self.aggregationFunction.funcDesc == "AVERAGE":
+            return ApplyAverageAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy), self.aggregationFunction, targetCacheId=self.targetCacheId)
+        else:
+            raise Exception(f"Cannot find implementation for {self.aggregationFunction}")

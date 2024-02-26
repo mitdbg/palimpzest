@@ -120,6 +120,31 @@ def ls_data() -> None:
     _print_msg(f"Total datasets: {len(table) - 1}")
 
 
+@cli.command(aliases=["synthesize", "syn"])
+@click.option("--name", type=str, default=None, required=True, help="Registered name for the set of synthetic values")
+@click.option("--count", type=int, default=100, help="How many values should be synthesized")
+def synthesize_data(name: str, count: int) -> None:
+    """
+    Register a synthetic set of values with PZ
+    
+    Parameters
+    ----------
+    name: str
+        Name to register the data set with
+
+    count: int
+        The nunber of values to synthesize
+    """
+    name = name.strip()
+    
+    vals = []
+    for i in range(0, count):
+        vals.append(i)
+    pz.DataDirectory().registerDataset(vals, name)
+    
+    _print_msg(f"Registered {name}")
+
+
 @cli.command(aliases=["register", "reg", "r"])
 @click.option("--path", type=str, default=None, required=True, help="File or directory to register as dataset.")
 @click.option("--name", type=str, default=None, required=True, help="Registered name for the file/dir.")

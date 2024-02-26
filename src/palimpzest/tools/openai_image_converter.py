@@ -65,7 +65,7 @@ def do_image_analysis(api_key, image_bytes):
 
     # Your JSON blob
     json_blob = response.json()
-    print(json_blob)
+    #print(json_blob)
     # Accessing the content
     content_str = json_blob['choices'][0]['message']['content']
 

@@ -1,5 +1,5 @@
 from palimpzest.config import Config
-from .loaders import DirectorySource, FileSource
+from .loaders import DirectorySource, FileSource, MemoryDataSource
 
 import os
 import pickle
@@ -72,17 +72,24 @@ class DataDirectory:
         self._registry[uniqName] = ("file", path)
         pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
 
+    def registerDataset(self, vals, uniqName):
+        """Register an in-memory dataset as a data source"""
+        self._registry[uniqName] = ("memory", vals)
+        pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
+
     def getRegisteredDataset(self, uniqName):
         """Return a dataset from the registry."""
         if not uniqName in self._registry:
             raise Exception("Cannot find dataset", uniqName, "in the registry.")
         
-        entry, path = self._registry[uniqName]
+        entry, rock = self._registry[uniqName]
         if entry == "dir":
-            return DirectorySource(path)
+            return DirectorySource(rock)
         elif entry == "file":
             # THIS IS NOT RETURNING A GOOD ITERATOR SOMEHOW!!!!!
-            return FileSource(path)
+            return FileSource(rock)
+        elif entry == "memory":
+            return MemoryDataSource(rock)
         else:
             raise Exception("Unknown entry type")
 
@@ -91,13 +98,17 @@ class DataDirectory:
         if not uniqName in self._registry:
             raise Exception("Cannot find dataset", uniqName, "in the registry.")
         
-        entry, path = self._registry[uniqName]
+        entry, rock = self._registry[uniqName]
         if entry == "dir":
             # Sum the length in bytes of every file in the directory
+            path = rock
             return sum([os.path.getsize(os.path.join(path, name)) for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
         elif entry == "file":
             # Get the length of the file
+            path = rock
             return os.path.getsize(path)
+        elif entry == "memory":
+            return len(rock)
         else:
             raise Exception("Unknown entry type")
 
@@ -106,13 +117,16 @@ class DataDirectory:
         if not uniqName in self._registry:
             raise Exception("Cannot find dataset", uniqName, "in the registry.")
         
-        entry, path = self._registry[uniqName]
+        entry, rock = self._registry[uniqName]
         if entry == "dir":
             # Return the number of files in the directory
+            path = rock
             return len([name for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
         elif entry == "file":
             # Return 1
             return 1
+        elif entry == "memory":
+            return len(rock)
         else:
             raise Exception("Unknown entry type")
 
