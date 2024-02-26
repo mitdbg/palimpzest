@@ -474,7 +474,7 @@ class LimitScanOp(PhysicalOp):
     def estimateCost(self):
         inputEstimates = self.source.estimateCost()
 
-        cardinality = max(self.limit, inputEstimates["cardinality"])
+        cardinality = min(self.limit, inputEstimates["cardinality"])
 
         return {
             "cardinality": cardinality,
