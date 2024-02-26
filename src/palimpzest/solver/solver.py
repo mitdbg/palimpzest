@@ -111,10 +111,14 @@ class Solver:
 
                 for field_name in outputElement.fieldNames():
                     f = getattr(outputElement, field_name)
-                    answer = run_cot_qa(text_content, 
-                                        f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
-                                        llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
-                    setattr(dr, field_name, answer)
+                    try:
+                        answer = run_cot_qa(text_content, 
+                                            f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
+                                            llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                        setattr(dr, field_name, answer)
+                    except Exception as e:
+                        print(f"Error: {e}")
+                        setattr(dr, field_name, None)
                 return dr
             return fn
 

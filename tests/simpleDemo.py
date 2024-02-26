@@ -17,6 +17,10 @@ def buildTestPDFPlan(datasetId):
 
     return pdfPapers
 
+def buildSciPaperPlan(datasetId):
+    """A dataset-independent declarative description of authors of good papers"""
+    return pz.getData(datasetId, basicElt=ScientificPaper)
+
 def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
     sciPapers = pz.getData(datasetId, basicElt=ScientificPaper)
@@ -153,6 +157,12 @@ if __name__ == "__main__":
 
         for idx, r in enumerate(physicalTree):
             print("Extracted pdf", idx)
+    elif task == "scitest":
+        rootSet = buildSciPaperPlan(datasetid)
+        physicalTree = emitDataset(rootSet, title="Scientific files", verbose=args.verbose)
+
+        for idx, r in enumerate(physicalTree):
+            print("Extracted title", r.title)
     elif task == "image":
         rootSet = buildImagePlan(datasetid)
         physicalTree = emitDataset(rootSet, title="Dogs", verbose=args.verbose)

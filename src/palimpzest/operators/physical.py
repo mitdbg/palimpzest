@@ -383,7 +383,8 @@ class ApplyCountAggregateOp(PhysicalOp):
         }
 
     def __iter__(self):
-        shouldCache = DataDirectory().openCache(self.targetCacheId)
+        datadir = DataDirectory()
+        shouldCache = datadir.openCache(self.targetCacheId)
         def iteratorFn():
             counter = 0
             for nextCandidate in self.source:
@@ -392,11 +393,11 @@ class ApplyCountAggregateOp(PhysicalOp):
             dr = DataRecord(Number)
             dr.value = counter
             if shouldCache:
-                DataDirectory().appendCache(self.targetCacheId, dr)
+                datadir.appendCache(self.targetCacheId, dr)
             yield dr
 
             if shouldCache:
-                DataDirectory().closeCache(self.targetCacheId)
+                datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 
@@ -432,7 +433,8 @@ class ApplyAverageAggregateOp(PhysicalOp):
         }
 
     def __iter__(self):
-        shouldCache = DataDirectory().openCache(self.targetCacheId)
+        datadir = DataDirectory()
+        shouldCache = datadir.openCache(self.targetCacheId)
         def iteratorFn():
             sum = 0
             counter = 0
@@ -446,11 +448,11 @@ class ApplyAverageAggregateOp(PhysicalOp):
             dr = DataRecord(Number)
             dr.value = sum / float(counter)
             if shouldCache:
-                DataDirectory().appendCache(self.targetCacheId, dr)
+                datadir.appendCache(self.targetCacheId, dr)
             yield dr
 
             if shouldCache:
-                DataDirectory().closeCache(self.targetCacheId)
+                datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 
@@ -481,18 +483,19 @@ class LimitScanOp(PhysicalOp):
         }
 
     def __iter__(self):
-        shouldCache = DataDirectory().openCache(self.targetCacheId)
+        datadir = DataDirectory()
+        shouldCache = datadir.openCache(self.targetCacheId)
         def iteratorFn():
             counter = 0
             for nextCandidate in self.source: 
                 if counter >= self.limit:
                     break
                 if shouldCache:
-                    DataDirectory().appendCache(self.targetCacheId, nextCandidate)
+                    datadir.appendCache(self.targetCacheId, nextCandidate)
                 yield nextCandidate
                 counter += 1
 
             if shouldCache:
-                DataDirectory().closeCache(self.targetCacheId)
+                datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
