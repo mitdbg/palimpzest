@@ -1,14 +1,20 @@
 from palimpzest.config import Config
-from .loaders import DirectorySource, FileSource
+from palimpzest.constants import PZ_DIR
+from palimpzest.sets import DirectorySource, FileSource
 
 import os
 import pickle
 import yaml
 
-# DEFINITIONS
-PZ_DIR = os.path.join(os.path.expanduser("~"), ".palimpzest")
+# TODO: I have intentionally only swapped uniqName --> dataset_id in places where
+#       I am at least 50% sure that the intended use case of the function is related
+#       to working with a Dataset. I still need to think through how to properly
+#       re-use computation of Sets by writing/reading them to/from the cache.
+#       In cases where I think we may want to use a Set's uid to enable this form of
+#       computation re-use, I've left the variable name as `uniqName`
 
-
+# TODO: rename to DataManager
+# TODO: possibly rename to the PZManager, as it also manages the current config
 class DataDirectory:
     """The DataDirectory is a registry of data sources."""
 
@@ -62,26 +68,25 @@ class DataDirectory:
     #
     # These methods handle properly registered data files, meant to be kept over the long haul
     #
-    def registerLocalDirectory(self, path, uniqName):
+    def registerLocalDirectory(self, path, dataset_id):
         """Register a local directory as a data source."""
-        self._registry[uniqName] = ("dir", path)
+        self._registry[dataset_id] = ("dir", path)
         pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
 
-    def registerLocalFile(self, path, uniqName):
+    def registerLocalFile(self, path, dataset_id):
         """Register a local file as a data source."""
-        self._registry[uniqName] = ("file", path)
+        self._registry[dataset_id] = ("file", path)
         pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
 
-    def getRegisteredDataset(self, uniqName):
+    def getRegisteredDataset(self, dataset_id):
         """Return a dataset from the registry."""
-        if not uniqName in self._registry:
-            raise Exception("Cannot find dataset", uniqName, "in the registry.")
-        
-        entry, path = self._registry[uniqName]
+        if not dataset_id in self._registry:
+            raise Exception("Cannot find dataset", dataset_id, "in the registry.")
+
+        entry, path = self._registry[dataset_id]
         if entry == "dir":
             return DirectorySource(path)
         elif entry == "file":
-            # THIS IS NOT RETURNING A GOOD ITERATOR SOMEHOW!!!!!
             return FileSource(path)
         else:
             raise Exception("Unknown entry type")
@@ -90,7 +95,7 @@ class DataDirectory:
         """Return the size (in bytes) of a dataset."""
         if not uniqName in self._registry:
             raise Exception("Cannot find dataset", uniqName, "in the registry.")
-        
+
         entry, path = self._registry[uniqName]
         if entry == "dir":
             # Sum the length in bytes of every file in the directory
@@ -105,7 +110,7 @@ class DataDirectory:
         """Return the number of records in a dataset."""
         if not uniqName in self._registry:
             raise Exception("Cannot find dataset", uniqName, "in the registry.")
-        
+
         entry, path = self._registry[uniqName]
         if entry == "dir":
             # Return the number of files in the directory
@@ -119,12 +124,12 @@ class DataDirectory:
     def listRegisteredDatasets(self):
         """Return a list of registered datasets."""
         return self._registry.items()
-    
-    def rmRegisteredDataset(self, uniqName):
+
+    def rmRegisteredDataset(self, dataset_id):
         """Remove a dataset from the registry."""
-        del self._registry[uniqName]
+        del self._registry[dataset_id]
         pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
-    
+
     #
     # These methods handle cached results. They are meant to be persisted for performance reasons,
     # but can always be recomputed if necessary.
@@ -133,13 +138,13 @@ class DataDirectory:
         """Return a cached result."""
         if not uniqName in self._cache:
             return None
-        
+
         cachedResult = pickle.load(open(self._cache[uniqName], "rb"))
         def iterateOverCachedResult():
             for x in cachedResult:
                 yield x
         return iterateOverCachedResult()
-    
+
     def clearCache(self, keep_registry=False):
         """Clear the cache."""
         self._cache = {}
@@ -171,12 +176,12 @@ class DataDirectory:
         del self._tempCache[cacheId]
         self._cache[cacheId] = filename
 
-    def exists(self, uniqName):
-        print("Checking if exists", uniqName, "in", self._registry)
-        return uniqName in self._registry
+    def exists(self, dataset_id):
+        print("Checking if exists", dataset_id, "in", self._registry)
+        return dataset_id in self._registry
 
-    def getPath(self, uniqName):
-        if not uniqName in self._registry:
-            raise Exception("Cannot find dataset", uniqName, "in the registry.")
-        entry, path = self._registry[uniqName]
+    def getPath(self, dataset_id):
+        if not dataset_id in self._registry:
+            raise Exception("Cannot find dataset", dataset_id, "in the registry.")
+        entry, path = self._registry[dataset_id]
         return path

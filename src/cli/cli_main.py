@@ -1,4 +1,5 @@
 from palimpzest.config import Config
+from palimpzest.constants import PZ_DIR
 
 from click_aliases import ClickAliasedGroup
 from prettytable import PrettyTable
@@ -12,8 +13,6 @@ import subprocess
 import yaml
 
 ############ DEFINITIONS ############
-PZ_DIR = os.path.join(os.path.expanduser("~"), ".palimpzest")
-
 class InvalidCommandException(Exception):
     pass
 

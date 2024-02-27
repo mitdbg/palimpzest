@@ -1,8 +1,7 @@
-import os
+from palimpzest.tools.dspyadaptors import TogetherHFAdaptor
 
 import dspy
-
-from palimpzest.tools.dspyadaptors import TogetherHFAdaptor
+import os
 
 
 ##

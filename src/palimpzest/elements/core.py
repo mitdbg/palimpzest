@@ -1,12 +1,16 @@
-from .elements import *
+from palimpzest.elements import BytesField, Schema, StringField
 
 ###################################################################################
-# "Core" useful Element types. These are Elements that almost everyone will need.
+# "Core" useful Schemas. These are Schemas that almost everyone will need.
 # File, TextFile, Image, PDF, etc.
 ###################################################################################
-class File(MultipartElement):
-    """A File is a record that comprises a filename and the contents of the file."""
-    filename = Field(desc="The UNIX-style name of the file", required=True)
+class File(Schema):
+    """
+    A File is defined by two Fields:
+    - the filename (string)
+    - the contents of the file (bytes)
+    """
+    filename = StringField(desc="The UNIX-style name of the file", required=True)
     contents = BytesField(desc="The contents of the file", required=True)
 
 class TextFile(File):
@@ -15,7 +19,7 @@ class TextFile(File):
 class PDFFile(File):
     """A PDF file is a File that is a PDF. It has specialized fields, font information, etc."""
     # This class is currently very impoverished. It needs a lot more fields before it can correctly represent a PDF.
-    text_contents = Field(desc="The text-only contents of the PDF", required=True)
+    text_contents = StringField(desc="The text-only contents of the PDF", required=True)
 
 class ImageFile(File):
     """A file that contains an image."""

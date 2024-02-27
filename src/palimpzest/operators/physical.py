@@ -1,55 +1,47 @@
+from palimpzest.constants import *
+from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.solver import Solver
-from palimpzest.datasources import DataDirectory
+
+from __future__ import annotations
+from typing import Any, Dict, Tuple, Union
 
 import concurrent
 
-# Assume 500 MB/sec for local SSD scan time
-LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
-
-# Assume 10s per record for local LLM object conversion
-LOCAL_LLM_CONVERSION_TIME_PER_RECORD = 10
-
-# Assume 5s per record for local LLM boolean filter
-LOCAL_LLM_FILTER_TIME_PER_RECORD = 5
-
-logLLMOutput = False
 
 class PhysicalOp:
     LOCAL_PLAN = "LOCAL"
     REMOTE_PLAN = "REMOTE"
 
     synthesizedFns = {}
-    solver = Solver(verbose=logLLMOutput)
+    solver = Solver(verbose=LOG_LLM_OUTPUT)
 
-    def __init__(self, outputElementType):
-        self.outputElementType = outputElementType
+    def __init__(self, outputSchema: Schema) -> None:
+        self.outputSchema = outputSchema
+        self.datadir = DataDirectory()
 
-    def getNext(self):
+    def dumpPhysicalTree(self) -> Tuple[PhysicalOp, Union[PhysicalOp, None]]:
         raise NotImplementedError("Abstract method")
-    
-    def dumpPhysicalTree(self):
-        raise NotImplementedError("Abstract method")
-    
-    def estimateCost(self):
+
+    def estimateCost(self) -> Dict[str, Any]:
         """Returns dict of (cardinality, timePerElement, costPerElement, startupTime, startupCost)"""
         raise NotImplementedError("Abstract method")
 
 class MarshalAndScanDataOp(PhysicalOp):
-    def __init__(self, outputElementType, concreteDatasetIdentifier):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, concreteDatasetIdentifier: str):
+        super().__init__(outputSchema=outputSchema)
         self.concreteDatasetIdentifier = concreteDatasetIdentifier
 
     def __str__(self):
-        return "MarshalAndScanDataOp(" + str(self.outputElementType) + ", " + self.concreteDatasetIdentifier + ")"
+        return "MarshalAndScanDataOp(" + str(self.outputSchema) + ", " + self.concreteDatasetIdentifier + ")"
     
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, None)
     
     def estimateCost(self):
-        cardinality = DataDirectory().getCardinality(self.concreteDatasetIdentifier) + 1
-        size = DataDirectory().getSize(self.concreteDatasetIdentifier)
+        cardinality = self.datadir.getCardinality(self.concreteDatasetIdentifier) + 1
+        size = self.datadir.getSize(self.concreteDatasetIdentifier)
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
         timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
         costPerElement = 0
@@ -68,24 +60,25 @@ class MarshalAndScanDataOp(PhysicalOp):
     
     def __iter__(self):
         def iteratorFn():
-            for nextCandidate in DataDirectory().getRegisteredDataset(self.concreteDatasetIdentifier):
+            for nextCandidate in self.datadir.getRegisteredDataset(self.concreteDatasetIdentifier):
                 yield nextCandidate
         return iteratorFn()
 
 class CacheScanDataOp(PhysicalOp):
-    def __init__(self, outputElementType, cacheIdentifier):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, cacheIdentifier: str):
+        super().__init__(outputSchema=outputSchema)
         self.cacheIdentifier = cacheIdentifier
 
     def __str__(self):
-        return "CacheScanDataOp(" + str(self.outputElementType) + ", " + self.cacheIdentifier + ")"
+        return "CacheScanDataOp(" + str(self.outputSchema) + ", " + self.cacheIdentifier + ")"
     
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, None)
 
     def estimateCost(self):
-        cardinality = sum(1 for _ in DataDirectory().getCachedResult(self.cacheIdentifier)) + 1
+        cardinality = sum(1 for _ in self.datadir.getCachedResult(self.cacheIdentifier)) + 1
+        # TODO: use something similar to datadir.getSize() to compute this
         size = 100 * cardinality
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
         timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
@@ -105,24 +98,24 @@ class CacheScanDataOp(PhysicalOp):
 
     def __iter__(self):
         def iteratorFn():
-            for nextCandidate in DataDirectory().getCachedResult(self.cacheIdentifier):
+            for nextCandidate in self.datadir.getCachedResult(self.cacheIdentifier):
                 yield nextCandidate
         return iteratorFn()
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source, targetCacheId=None):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, targetCacheId: str=None):
+        super().__init__(outputSchema=outputSchema)
         self.source = source
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("InduceFromCandidateOp", None, outputElementType, source.outputElementType)
+        taskDescriptor = ("InduceFromCandidateOp", None, outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = DataDirectory().current_config
+            config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
-        return "InduceFromCandidateOp(" + str(self.outputElementType) + ")"
+        return "InduceFromCandidateOp(" + str(self.outputSchema) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -131,6 +124,9 @@ class InduceFromCandidateOp(PhysicalOp):
     def estimateCost(self):
         inputCostEstimates = self.source.estimateCost()
 
+        # TODO: convert LOCAL_LLM_CONVERSION_TIME_PER_RECORD into a model-specific time estimate
+        # TODO: can selectivity be greater than one? i.e., can the induce operation produce multiple outputs per file?
+        # TODO: costPerElement needs to be computed as a fcn. of the LLM being used, number of tokens for input, est. num tokens for output.
         selectivity = 1.0
         cardinality = selectivity * inputCostEstimates["cardinality"]
         timePerElement = LOCAL_LLM_CONVERSION_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
@@ -151,41 +147,40 @@ class InduceFromCandidateOp(PhysicalOp):
         }
 
     def __iter__(self):
-        datadir = DataDirectory()
-        shouldCache = datadir.openCache(self.targetCacheId)
+        shouldCache = self.datadir.openCache(self.targetCacheId)
         def iteratorFn():    
             for nextCandidate in self.source:
-                resultRecord = self._attemptMapping(nextCandidate, self.outputElementType)
+                resultRecord = self._attemptMapping(nextCandidate)
                 if resultRecord is not None:
                     if shouldCache:
-                        datadir.appendCache(self.targetCacheId, resultRecord)
+                        self.datadir.appendCache(self.targetCacheId, resultRecord)
                     yield resultRecord
             if shouldCache:
-                datadir.closeCache(self.targetCacheId)
+                self.datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 
-    def _attemptMapping(self, candidate: DataRecord, outputElementType):
-        """Attempt to map the candidate to the outputElementType. Return None if it fails."""
-        taskDescriptor = ("InduceFromCandidateOp", None, outputElementType, candidate.element)
+    def _attemptMapping(self, candidate: DataRecord):
+        """Attempt to map the candidate to the outputSchema. Return None if it fails."""
+        taskDescriptor = ("InduceFromCandidateOp", None, self.outputSchema, candidate.schema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source, targetCacheId=None):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, targetCacheId: str=None):
+        super().__init__(outputSchema=outputSchema)
         self.source = source
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("ParallelInduceFromCandidateOp", None, outputElementType, source.outputElementType)
+        taskDescriptor = ("ParallelInduceFromCandidateOp", None, outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = DataDirectory().current_config
+            config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
-        return "ParallelInduceFromCandidateOp(" + str(self.outputElementType) + ")"
+        return "ParallelInduceFromCandidateOp(" + str(self.outputSchema) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -194,6 +189,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
     def estimateCost(self):
         inputCostEstimates = self.source.estimateCost()
 
+        # TODO: same questions as for non-parallel induce; Also need to figure out where to compute timePerElement * numElts / parallelism for total latency est.
         selectivity = 1.0
         cardinality = selectivity * inputCostEstimates["cardinality"]
         timePerElement = LOCAL_LLM_CONVERSION_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
@@ -215,8 +211,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
     def __iter__(self):
         # This is very crudely implemented right now, since we materialize everything
-        datadir = DataDirectory()
-        shouldCache = datadir.openCache(self.targetCacheId)
+        shouldCache = self.datadir.openCache(self.targetCacheId)
         def iteratorFn():
             chunksize = 20 + 2
             inputs = []
@@ -232,36 +227,35 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 for resultRecord in results:
                     if resultRecord is not None:
                         if shouldCache:
-                            datadir.appendCache(self.targetCacheId, resultRecord)
+                            self.datadir.appendCache(self.targetCacheId, resultRecord)
                         yield resultRecord
             if shouldCache:
-                datadir.closeCache(self.targetCacheId)
+                self.datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 
     def _attemptMapping(self, candidate: DataRecord):
-        """Attempt to map the candidate to the outputElementType. Return None if it fails."""
-        taskDescriptor = ("ParallelInduceFromCandidateOp", None, self.outputElementType, candidate.element)
+        """Attempt to map the candidate to the outputSchema. Return None if it fails."""
+        taskDescriptor = ("ParallelInduceFromCandidateOp", None, self.outputSchema, candidate.schema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 
 class FilterCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source, filters, targetCacheId=None):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, targetCacheId: str=None):
+        super().__init__(outputSchema=outputSchema)
         self.source = source
-        self.filters = filters
+        self.filter = filter
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("FilterCandidateOp", tuple(self.filters), source.outputElementType, self.outputElementType)
+        taskDescriptor = ("FilterCandidateOp", (self.filter,), source.outputSchema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = DataDirectory().current_config
+            config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
-        filterStr = "and ".join([str(f) for f in self.filters])
-        return "FilterCandidateOp(" + str(self.outputElementType) + ", " + "Filters: " + str(filterStr) + ")"
+        return "FilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -270,6 +264,9 @@ class FilterCandidateOp(PhysicalOp):
     def estimateCost(self):
         inputCostEstimates = self.source.estimateCost()
 
+        # TODO: need to estimate selectivity somehow
+        # TODO: convert LOCAL_LLM_CONVERSION_TIME_PER_RECORD into a model-specific time estimate
+        # TODO: costPerElement needs to be computed as a fcn. of the LLM being used, number of tokens for input, est. num tokens for output.
         selectivity = 1.0
         cardinality = selectivity * inputCostEstimates["cardinality"]
         timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
@@ -290,43 +287,40 @@ class FilterCandidateOp(PhysicalOp):
         }
 
     def __iter__(self):
-        datadir = DataDirectory()
-        shouldCache = datadir.openCache(self.targetCacheId)
+        shouldCache = self.datadir.openCache(self.targetCacheId)
         def iteratorFn():
             for nextCandidate in self.source: 
-                if self._passesFilters(nextCandidate):
+                if self._passesFilter(nextCandidate):
                     if shouldCache:
-                        datadir.appendCache(self.targetCacheId, nextCandidate)
+                        self.datadir.appendCache(self.targetCacheId, nextCandidate)
                     yield nextCandidate
             if shouldCache:
-                datadir.closeCache(self.targetCacheId)
+                self.datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 
-    def _passesFilters(self, candidate):
+    def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
-        taskDescriptor = ("FilterCandidateOp", tuple(self.filters), candidate.element, self.outputElementType)
-        #print("LOOKING FOR FUNCTION", taskDescriptor)
+        taskDescriptor = ("FilterCandidateOp", (self.filter,), candidate.schema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 
 class ParallelFilterCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source, filters, targetCacheId=None):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, targetCacheId: str=None):
+        super().__init__(outputSchema=outputSchema)
         self.source = source
-        self.filters = filters
+        self.filter = filter
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("ParallelFilterCandidateOp", tuple(self.filters), source.outputElementType, self.outputElementType)
+        taskDescriptor = ("ParallelFilterCandidateOp", (self.filter,), source.outputSchema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = DataDirectory().current_config
+            config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
-        filterStr = "and ".join([str(f) for f in self.filters])
-        return "ParallelFilterCandidateOp(" + str(self.outputElementType) + ", " + "Filters: " + str(filterStr) + ")"
+        return "ParallelFilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -335,6 +329,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
     def estimateCost(self):
         inputCostEstimates = self.source.estimateCost()
 
+        # TODO: same questions as for non-parallel induce; Also need to figure out where to compute timePerElement * numElts / parallelism for total latency est.
         selectivity = 1.0
         cardinality = selectivity * inputCostEstimates["cardinality"]
         timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
@@ -355,8 +350,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
         }
 
     def __iter__(self):
-        datadir = DataDirectory()
-        shouldCache = datadir.openCache(self.targetCacheId)
+        shouldCache = self.datadir.openCache(self.targetCacheId)
         def iteratorFn():
             chunksize = 20 + 2
             inputs = []
@@ -367,22 +361,22 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
             # Grab items from the list inputs in chunks of size chunkSize
             with concurrent.futures.ThreadPoolExecutor(max_workers=chunksize) as executor:
-                results = list(executor.map(self._passesFilters, inputs, chunksize=chunksize))
+                results = list(executor.map(self._passesFilter, inputs, chunksize=chunksize))
 
                 for idx, filterResult in enumerate(results):
                     if filterResult:
                         resultRecord = inputs[idx]
                         if shouldCache:
-                            datadir.appendCache(self.targetCacheId, resultRecord)
+                            self.datadir.appendCache(self.targetCacheId, resultRecord)
                         yield resultRecord
             if shouldCache:
-                datadir.closeCache(self.targetCacheId)
+                self.datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 
-    def _passesFilters(self, candidate):
+    def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
-        taskDescriptor = ("ParallelFilterCandidateOp", tuple(self.filters), candidate.element, self.outputElementType)
+        taskDescriptor = ("ParallelFilterCandidateOp", (self.filter,), candidate.schema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
 
