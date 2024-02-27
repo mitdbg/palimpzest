@@ -60,13 +60,13 @@ class StringField(Field):
         return {"description": self._desc, "type": "string"}
 
 
-class IntField(Field):
-    """An IntField is a Field that is definitely an integer."""
+class NumericField(Field):
+    """A NumericField is a Field that is definitely an integer or a float."""
     def __init__(self, desc: str, required: bool=False):
         super().__init__(desc=desc, required=required)
 
     def jsonSchema(self) -> Dict[str, str]:
-        return {"description": self._desc, "type": "integer"}
+        return {"description": self._desc, "type": "numeric"}
 
 
 class BytesField(Field):

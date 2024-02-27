@@ -43,19 +43,14 @@ class MarshalAndScanDataOp(PhysicalOp):
         cardinality = self.datadir.getCardinality(self.concreteDatasetIdentifier) + 1
         size = self.datadir.getSize(self.concreteDatasetIdentifier)
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
+
         timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
         costPerElement = 0
-        startupTime = 0
-        startupCost = 0
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": size,
-            "bytesReadRemotely": 0
+            "costPerElement": costPerElement
         }
     
     def __iter__(self):
@@ -81,19 +76,14 @@ class CacheScanDataOp(PhysicalOp):
         # TODO: use something similar to datadir.getSize() to compute this
         size = 100 * cardinality
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
+
         timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
         costPerElement = 0
-        startupTime = 0
-        startupCost = 0
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": size,
-            "bytesReadRemotely": 0
+            "costPerElement": costPerElement
         }
 
     def __iter__(self):
@@ -104,12 +94,13 @@ class CacheScanDataOp(PhysicalOp):
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, desc: str=None, targetCacheId: str=None):
         super().__init__(outputSchema=outputSchema)
         self.source = source
+        self.desc = desc
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("InduceFromCandidateOp", None, outputSchema, source.outputSchema)
+        taskDescriptor = ("InduceFromCandidateOp", desc, outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
@@ -122,28 +113,19 @@ class InduceFromCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
-        inputCostEstimates = self.source.estimateCost()
+        inputEstimates = self.source.estimateCost()
 
         # TODO: convert LOCAL_LLM_CONVERSION_TIME_PER_RECORD into a model-specific time estimate
         # TODO: can selectivity be greater than one? i.e., can the induce operation produce multiple outputs per file?
         # TODO: costPerElement needs to be computed as a fcn. of the LLM being used, number of tokens for input, est. num tokens for output.
-        selectivity = 1.0
-        cardinality = selectivity * inputCostEstimates["cardinality"]
-        timePerElement = LOCAL_LLM_CONVERSION_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
-        costPerElement = inputCostEstimates["costPerElement"]
-        startupTime = inputCostEstimates["startupTime"]
-        startupCost = inputCostEstimates["startupCost"]
-        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
-        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+        cardinality = inputEstimates["cardinality"]
+        timePerElement = STD_LLM_CONVERSION_TIME_PER_RECORD + inputEstimates["timePerElement"]
+        costPerElement = STD_LLM_CONVERSION_COST_PER_RECORD + inputEstimates["costPerElement"]
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": bytesReadLocally,
-            "bytesReadRemotely": bytesReadRemotely
+            "costPerElement": costPerElement
         }
 
     def __iter__(self):
@@ -169,12 +151,13 @@ class InduceFromCandidateOp(PhysicalOp):
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, desc: str=None, targetCacheId: str=None):
         super().__init__(outputSchema=outputSchema)
         self.source = source
+        self.desc = desc
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("ParallelInduceFromCandidateOp", None, outputSchema, source.outputSchema)
+        taskDescriptor = ("ParallelInduceFromCandidateOp", desc, outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
@@ -187,26 +170,17 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
-        inputCostEstimates = self.source.estimateCost()
+        inputEstimates = self.source.estimateCost()
 
         # TODO: same questions as for non-parallel induce; Also need to figure out where to compute timePerElement * numElts / parallelism for total latency est.
-        selectivity = 1.0
-        cardinality = selectivity * inputCostEstimates["cardinality"]
-        timePerElement = LOCAL_LLM_CONVERSION_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
-        costPerElement = inputCostEstimates["costPerElement"]
-        startupTime = inputCostEstimates["startupTime"]
-        startupCost = inputCostEstimates["startupCost"]
-        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
-        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+        cardinality = inputEstimates["cardinality"]
+        timePerElement = (PARALLEL_LLM_CONVERSION_TIME_OVERALL + (cardinality * inputEstimates["timePerElement"])) / cardinality
+        costPerElement = PARALLEL_LLM_CONVERSION_COST_PER_RECORD + inputEstimates["costPerElement"]
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": bytesReadLocally,
-            "bytesReadRemotely": bytesReadRemotely
+            "costPerElement": costPerElement
         }
 
     def __iter__(self):
@@ -262,28 +236,19 @@ class FilterCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
-        inputCostEstimates = self.source.estimateCost()
+        inputEstimates = self.source.estimateCost()
 
         # TODO: need to estimate selectivity somehow
         # TODO: convert LOCAL_LLM_CONVERSION_TIME_PER_RECORD into a model-specific time estimate
         # TODO: costPerElement needs to be computed as a fcn. of the LLM being used, number of tokens for input, est. num tokens for output.
-        selectivity = 1.0
-        cardinality = selectivity * inputCostEstimates["cardinality"]
-        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
-        costPerElement = inputCostEstimates["costPerElement"]
-        startupTime = inputCostEstimates["startupTime"]
-        startupCost = inputCostEstimates["startupCost"]
-        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
-        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+        cardinality = inputEstimates["cardinality"]
+        timePerElement = STD_LLM_FILTER_TIME_PER_RECORD + inputEstimates["timePerElement"]
+        costPerElement = STD_LLM_FILTER_COST_PER_RECORD + inputEstimates["costPerElement"]
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": bytesReadLocally,
-            "bytesReadRemotely": bytesReadRemotely
+            "costPerElement": costPerElement
         }
 
     def __iter__(self):
@@ -327,26 +292,17 @@ class ParallelFilterCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
-        inputCostEstimates = self.source.estimateCost()
+        inputEstimates = self.source.estimateCost()
 
         # TODO: same questions as for non-parallel induce; Also need to figure out where to compute timePerElement * numElts / parallelism for total latency est.
-        selectivity = 1.0
-        cardinality = selectivity * inputCostEstimates["cardinality"]
-        timePerElement = LOCAL_LLM_FILTER_TIME_PER_RECORD + inputCostEstimates["timePerElement"]
-        costPerElement = inputCostEstimates["costPerElement"]
-        startupTime = inputCostEstimates["startupTime"]
-        startupCost = inputCostEstimates["startupCost"]
-        bytesReadLocally = inputCostEstimates["bytesReadLocally"]
-        bytesReadRemotely = inputCostEstimates["bytesReadRemotely"]
+        cardinality = inputEstimates["cardinality"]
+        timePerElement = (PARALLEL_LLM_FILTER_TIME_OVERALL + (cardinality * inputEstimates["timePerElement"])) / cardinality
+        costPerElement = PARALLEL_LLM_FILTER_COST_PER_RECORD + inputEstimates["costPerElement"]
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement,
-            "startupTime": startupTime,
-            "startupCost": startupCost,
-            "bytesReadLocally": bytesReadLocally,
-            "bytesReadRemotely": bytesReadRemotely
+            "costPerElement": costPerElement
         }
 
     def __iter__(self):
@@ -381,3 +337,149 @@ class ParallelFilterCandidateOp(PhysicalOp):
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
 
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
+
+
+class ApplyCountAggregateOp(PhysicalOp):
+    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, targetCacheId: str=None):
+        super().__init__(outputSchema=Number)
+        self.source = source
+        self.aggFunction = aggFunction
+        self.targetCacheId = targetCacheId
+
+    def __str__(self):
+        return "ApplyCountAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
+
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, self.source.dumpPhysicalTree())
+
+    def estimateCost(self):
+        inputEstimates = self.source.estimateCost()
+
+        cardinality = 1
+        time = inputEstimates["timePerElement"] * inputEstimates["cardinality"]
+        cost = inputEstimates["costPerElement"] * inputEstimates["cardinality"]
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": time,
+            "costPerElement": cost
+        }
+
+    def __iter__(self):
+        datadir = DataDirectory()
+        shouldCache = datadir.openCache(self.targetCacheId)
+        def iteratorFn():
+            counter = 0
+            for nextCandidate in self.source:
+                counter += 1
+
+            dr = DataRecord(Number)
+            dr.value = counter
+            if shouldCache:
+                datadir.appendCache(self.targetCacheId, dr)
+            yield dr
+
+            if shouldCache:
+                datadir.closeCache(self.targetCacheId)
+
+        return iteratorFn()
+
+
+class ApplyAverageAggregateOp(PhysicalOp):
+    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, targetCacheId: str=None):
+        super().__init__(outputSchema=Number)
+        self.source = source
+        self.aggFunction = aggFunction
+        self.targetCacheId = targetCacheId
+
+        if not source.outputSchema == Number:
+            raise Exception("Aggregate function AVERAGE is only defined over Numbers")
+
+    def __str__(self):
+        return "ApplyAverageAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
+
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, self.source.dumpPhysicalTree())
+
+    def estimateCost(self):
+        inputEstimates = self.source.estimateCost()
+
+        cardinality = 1
+        time = inputEstimates["timePerElement"] * inputEstimates["cardinality"]
+        cost = inputEstimates["costPerElement"] * inputEstimates["cardinality"]
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": time,
+            "costPerElement": cost
+        }
+
+    def __iter__(self):
+        datadir = DataDirectory()
+        shouldCache = datadir.openCache(self.targetCacheId)
+        def iteratorFn():
+            sum = 0
+            counter = 0
+            for nextCandidate in self.source:
+                try:
+                    sum += int(nextCandidate.value)
+                    counter += 1
+                except:
+                    pass
+
+            dr = DataRecord(Number)
+            dr.value = sum / float(counter)
+            if shouldCache:
+                datadir.appendCache(self.targetCacheId, dr)
+            yield dr
+
+            if shouldCache:
+                datadir.closeCache(self.targetCacheId)
+
+        return iteratorFn()
+
+
+class LimitScanOp(PhysicalOp):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, limit: int, targetCacheId: str=None):
+        super().__init__(outputSchema=outputSchema)
+        self.source = source
+        self.limit = limit
+        self.targetCacheId = targetCacheId
+
+    def __str__(self):
+        return "LimitScanOp(" + str(self.outputSchema) + ", " + "Limit: " + str(self.limit) + ")"
+
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, self.source.dumpPhysicalTree())
+
+    def estimateCost(self):
+        inputEstimates = self.source.estimateCost()
+
+        cardinality = min(self.limit, inputEstimates["cardinality"])
+
+        return {
+            "cardinality": cardinality,
+            "timePerElement": inputEstimates["timePerElement"],
+            "costPerElement": inputEstimates["costPerElement"]
+        }
+
+    def __iter__(self):
+        datadir = DataDirectory()
+        shouldCache = datadir.openCache(self.targetCacheId)
+        def iteratorFn():
+            counter = 0
+            for nextCandidate in self.source: 
+                if counter >= self.limit:
+                    break
+                if shouldCache:
+                    datadir.appendCache(self.targetCacheId, nextCandidate)
+                yield nextCandidate
+                counter += 1
+
+            if shouldCache:
+                datadir.closeCache(self.targetCacheId)
+
+        return iteratorFn()

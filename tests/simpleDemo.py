@@ -13,18 +13,37 @@ class ScientificPaper(pz.PDFFile):
 
 def buildTestPDFPlan(datasetId):
     """This tests whether we can process a PDF file"""
-    pdfPapers = pz.getData(pz.PDFFile, datasetId)
+    pdfPapers = pz.getData(datasetId, basicElt=pz.PDFFile)
 
     return pdfPapers
 
+def buildSciPaperPlan(datasetId):
+    """A dataset-independent declarative description of authors of good papers"""
+    return pz.getData(datasetId, basicElt=ScientificPaper)
+
 def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
-    sciPapers = pz.getData(ScientificPaper, datasetId)
-    #batteryPapers = sciPapers.filterByStr("The paper is about batteries")
-    #mitPapers = batteryPapers.filterByStr("The paper is from MIT")
-    #goodAuthorPapers = mitPapers.filterByStr("Paper where the title begins with the letter X")
+    sciPapers = pz.getData(datasetId, basicElt=ScientificPaper)
+    batteryPapers = sciPapers.filterByStr("The paper is about batteries")
+    mitPapers = batteryPapers.filterByStr("The paper is from MIT")
 
-    return sciPapers
+    return mitPapers
+
+
+def testCount(datasetId):
+    files = pz.getData(datasetId)
+    fileCount = files.aggregate("COUNT")
+    return fileCount
+
+def testAverage(datasetId):
+    data = pz.getData(datasetId)
+    average = data.aggregate("AVERAGE")
+    return average
+
+def testLimit(datasetId, n):
+    data = pz.getData(datasetId)
+    limitData = data.limit(n)
+    return limitData
 
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
@@ -32,15 +51,24 @@ class Email(pz.TextFile):
     subject = pz.Field(desc="The subject of the email", required=True)
 
 def buildEnronPlan(datasetId):
-    emails = pz.getData(Email, datasetId)
-    filteredEmails = emails.filterByStr("The email is about someone taking a vaction")
+    emails = pz.getData(datasetId, basicElt=Email)
+    filteredEmails = emails.filterByStr("The email was written to a woman")
     return filteredEmails
+
+def computeEnronStats(datasetId):
+    emails = pz.getData(datasetId, basicElt=Email)
+    #filteredEmails = emails.filterByStr("The email is about someone taking a vaction")
+    subjectLineLengths = emails.convert(pz.Number, desc = "The number of words in the subject field")
+    #return subjectLineLengths.aggregate("AVERAGE")
+    return subjectLineLengths
+    #return filteredEmails
+
 
 class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required = True)
 
 def buildImagePlan(datasetId):
-    images = pz.getData(pz.ImageFile, datasetId)
+    images = pz.getData(datasetId, basicElt=pz.ImageFile)
     filteredImages = images.filterByStr("The image contains one or more dogs")
     dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
     return dogImages
@@ -71,18 +99,16 @@ def emitDataset(rootSet, title="Dataset", verbose=False):
     emitNestedTuple(logicalElements)
 
     # Print the physical operators that will be executed
-    planTime, planPrice, estimatedCardinality, physicalTree = logicalTree.createPhysicalPlan()    
+    planTime, planCost, estimatedCardinality, physicalTree = logicalTree.createPhysicalPlan()    
     print()
     print("Physical operator tree")
     physicalOps = physicalTree.dumpPhysicalTree()
-    print()
-    print("estimated costs:", physicalTree.estimateCost())
     emitNestedTuple(physicalOps)
 
     #iterate over data
     print()
     print("Estimated seconds to complete:", planTime)
-    print("Estimated USD to complete:", planPrice)
+    print("Estimated USD to complete:", planCost)
     print("Estimated cardinality:", estimatedCardinality)
     print("Concrete data results")
     return physicalTree
@@ -118,10 +144,10 @@ if __name__ == "__main__":
             print(r)
     elif task == "enron":
         rootSet = buildEnronPlan(datasetid)
+        #rootSet = computeEnronStats(datasetid)
         physicalTree = emitDataset(rootSet, title="Good Enron emails", verbose=args.verbose)
         for r in physicalTree:
-            print(r.sender, r.subject)
-            print()
+            print(r)
         #planTime, planPrice, estimatedCardinality, physicalTree = rootSet.getLogicalTree().createPhysicalPlan()
         #for email in physicalTree:
         #    print(email.sender, email.subject)
@@ -131,14 +157,32 @@ if __name__ == "__main__":
 
         for idx, r in enumerate(physicalTree):
             print("Extracted pdf", idx)
+    elif task == "scitest":
+        rootSet = buildSciPaperPlan(datasetid)
+        physicalTree = emitDataset(rootSet, title="Scientific files", verbose=args.verbose)
+
+        for idx, r in enumerate(physicalTree):
+            print("Extracted title", r.title)
     elif task == "image":
         rootSet = buildImagePlan(datasetid)
         physicalTree = emitDataset(rootSet, title="Dogs", verbose=args.verbose)
         for r in physicalTree:
-            print("\n\nGOT RESULT:")
-            print(r.filename)
-            print(r.breed)
-            print()
+            print(r.filename, r.breed)
+    elif task == "count":
+        rootSet = testCount(datasetid)
+        physicalTree = emitDataset(rootSet, title="Count records", verbose=args.verbose)
+        for r in physicalTree:
+            print(r)
+    elif task == "average":
+        rootSet = testAverage(datasetid)
+        physicalTree = emitDataset(rootSet, title="Average of numbers", verbose=args.verbose)
+        for r in physicalTree:
+            print(r)
+    elif task == "limit":
+        rootSet = testLimit(datasetid, 5)
+        physicalTree = emitDataset(rootSet, title="Limit the set to 5 items", verbose=args.verbose)
+        for r in physicalTree:
+            print(r)
     else:
         print("Unknown task")
         exit(1)

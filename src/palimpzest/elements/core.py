@@ -1,4 +1,4 @@
-from palimpzest.elements import BytesField, Schema, StringField
+from palimpzest.elements import BytesField, NumericField, Schema, StringField
 
 ###################################################################################
 # "Core" useful Schemas. These are Schemas that almost everyone will need.
@@ -23,3 +23,7 @@ class PDFFile(File):
 
 class ImageFile(File):
     """A file that contains an image."""
+
+class Number(Schema):
+    """Just a number. Often used for aggregates"""
+    value = NumericField(desc="A single number", required=True)

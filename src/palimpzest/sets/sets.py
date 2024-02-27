@@ -1,7 +1,15 @@
 from palimpzest.datamanager import DataDirectory # TODO: DataManager
-from palimpzest.elements import File, Filter, Schema
-from palimpzest.operators import BaseScan, CacheScan, ConvertScan, FilteredScan, LogicalOperator
-from palimpzest.sets import DataSource, DirectorySource, FileSource
+from palimpzest.elements import AggregateFunction, File, Filter, Number, Schema
+from palimpzest.operators import (
+    ApplyAggregateFunction,
+    BaseScan,
+    CacheScan,
+    ConvertScan,
+    FilteredScan,
+    LimitScan,
+    LogicalOperator,
+)
+from palimpzest.sets import DataSource, DirectorySource, FileSource, MemorySource
 
 from __future__ import annotations
 from typing import Union
@@ -33,15 +41,17 @@ class Set:
     """
     SET_VERSION = 0.1
 
-    def __init__(self, dataset_id: str, schema: Schema, source: Union[Set, DataSource], desc: str=None, filter: Filter=None):
+    def __init__(self, dataset_id: str, schema: Schema, source: Union[Set, DataSource], desc: str=None, filter: Filter=None, aggFunc=None, limit=None):
         self._dataset_id = dataset_id
         self._schema = schema
         self._source = source
         self._desc = desc
         self._filter = filter
+        self._aggFunc = aggFunc
+        self._limit = limit
 
     def __str__(self):
-        return f"{self.__class__.__name__}(dataset_id={self._dataset_id}, schema={self._schema}, desc={self._desc}, filter={str(self._filter)}, uid={self.universalIdentifier()})"
+        return f"{self.__class__.__name__}(dataset_id={self._dataset_id}, schema={self._schema}, desc={self._desc}, filter={str(self._filter)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
 
     def serialize(self):
         d = {"version": Set.SET_VERSION, 
@@ -49,7 +59,9 @@ class Set:
              "schema": self._schema.jsonSchema(),
              "source": self._source.serialize(),
              "desc": self._desc, 
-             "filter": self._filter.serialize()}
+             "filter": self._filter.serialize(),
+             "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(),
+             "limit": self._limit}
 
         return d
 
@@ -70,11 +82,21 @@ class Set:
         elif inputObj["source_type"] == "file":
             source = FileSource(inputObj["schema"])
 
+        # deserialize agg. function
+        aggFuncStr = inputObj.get("aggFunc", None)
+        aggFunc = None if aggFuncStr is None else AggregateFunction.deserialize(aggFuncStr)
+
+        # deserialize limit
+        limitStr = inputObj.get("limit", None)
+        limit = None if limitStr is None else int(limitStr)
+
         return Set(dataset_id=inputObj["dataset_id"],
                    schema=inputObj["schema"].jsonSchema(), 
                    source=source, 
                    desc=inputObj["desc"], 
-                   filter=Filter.deserialize(inputObj["filter"]))
+                   filter=Filter.deserialize(inputObj["filter"]),
+                   aggFunc=aggFunc,
+                   limit=limit)
 
     def universalIdentifier(self):
         """Return a unique identifier for this Set."""
@@ -98,6 +120,7 @@ class Set:
 
         return (self, self._source.dumpSyntacticTree())
 
+    ### TODO --> make sure it's consistent w/new ConcreteDataset in main
     def getLogicalTree(self) -> LogicalOperator:
         """Return the logical tree of operators on Sets."""
         # first, check to see if this set has previously been cached
@@ -108,16 +131,21 @@ class Set:
         # otherwise, if this Set's source is a DataSource
         if isinstance(self._source, DataSource):
             source_id = self._source.universalIdentifier()
-            if self._schema == File:
+            sourceSchema = Number if isinstance(self._source, MemorySource) else File
+            if self._schema == sourceSchema:
                 return BaseScan(self._schema, source_id)
             else:
-                return ConvertScan(self._schema, BaseScan(File, source_id), targetCacheId=uid)
+                return ConvertScan(self._schema, BaseScan(sourceSchema, source_id), targetCacheId=uid)
 
         # if the Set's source is another Set, apply the appropriate scan to the Set
-        if not self._schema == self._source._schema:
-            return ConvertScan(self._schema, self._source.getLogicalTree(), targetCacheId=uid)
-        elif self._filter is not None:
+        if self._filter is not None:
             return FilteredScan(self._schema, self._source.getLogicalTree(), self._filter, targetCacheId=uid)
+        elif self._aggFunc is not None:
+            return ApplyAggregateFunction(self._schema, self._source.getLogicalTree(), self._aggFunc, targetCacheId=uid)
+        elif self._limit is not None:
+            return LimitScan(self._schema, self._source.getLogicalTree(), self._limit, targetCacheId=uid)
+        elif not self._schema == self._source._schema:
+            return ConvertScan(self._schema, self._source.getLogicalTree(), targetCacheId=uid)
         else:
             return self._source.getLogicalTree()
 
@@ -190,3 +218,13 @@ class Dataset(Set):
 
         # TODO: should I update self._desc to reflect the conversion operation?
         return Dataset(self.dataset_id, source=convertedSet, schema=newSchema, desc=self._desc)
+
+    ### TODO
+    def aggregate(self, aggFuncDesc: str):
+        """Apply an aggregate function to this set"""
+        a = AggregateFunction(aggFuncDesc)
+        return Set(Number, input=self, desc="Aggregate results", aggFunc=a)
+    
+    def limit(self, n):
+        """Limit the set size to no more than n rows"""
+        return Set(self._basicElt, input=self, desc="LIMIT " + str(n), limit=n)

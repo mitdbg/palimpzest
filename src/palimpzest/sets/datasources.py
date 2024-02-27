@@ -1,5 +1,5 @@
-from palimpzest.elements import DataRecord, File, Schema
-from typing import Any, Callable, Dict
+from palimpzest.elements import DataRecord, File, Number, Schema
+from typing import Any, Callable, Dict, List, Union
 
 import hashlib
 import json
@@ -35,6 +35,23 @@ class DataSource:
         ordered = json.dumps(d, sort_keys=True)
         result = hashlib.sha256(ordered.encode()).hexdigest()
         return result
+
+
+class MemorySource(DataSource):
+    """MemorySource returns multiple objects that reflect contents of an in-memory Python list"""
+    def __init__(self, vals: List[Union[int, float]]):
+        # For the moment we assume that we are given a list of floats or ints, but someday it could be strings or something else
+        super().__init__(Number)
+        self.vals = vals
+
+    def __iter__(self):
+        def valIterator():
+            for v in self.vals:
+                dr = DataRecord(self.schema)
+                dr.value = v
+                yield dr
+
+        return valIterator()
 
 
 class DirectorySource(DataSource):

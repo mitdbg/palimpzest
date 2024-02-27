@@ -103,7 +103,7 @@ class Solver:
         else:
             raise Exception(f"Cannot hard-code conversion from {inputSchema} to {outputSchema}")
 
-    def _makeLLMTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any]):
+    def _makeLLMTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], conversionDesc: str):
             llmservice = config.get("llmservice", "openai")
             def fn(candidate: DataRecord):
                 # iterate through all empty fields in the outputSchema and ask questions to fill them
@@ -115,9 +115,14 @@ class Solver:
 
                 for field_name in outputSchema.fieldNames():
                     f = getattr(outputSchema, field_name)
-                    answer = run_cot_qa(text_content, f"What is the {field_name} of the {doc_type}? ({f.desc})",
-                                        llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
-                    setattr(dr, field_name, answer)
+                    try:
+                        answer = run_cot_qa(text_content,
+                                            f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
+                                            llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                        setattr(dr, field_name, answer)
+                    except Exception as e:
+                        print(f"Error: {e}")
+                        setattr(dr, field_name, None)
                 return dr
             return fn
 
@@ -155,13 +160,14 @@ class Solver:
         functionName, functionParams, outputSchema, inputSchema = taskDescriptor
 
         if functionName == "InduceFromCandidateOp" or functionName == "ParallelInduceFromCandidateOp":
+            conversionDesc = functionParams
             typeConversionDescriptor = (outputSchema, inputSchema)
             if typeConversionDescriptor in self._simpleTypeConversions:
                 return self._makeSimpleTypeConversionFn(outputSchema, inputSchema)
             elif typeConversionDescriptor in self._hardcodedFns:
                 return self._makeHardCodedTypeConversionFn(outputSchema, inputSchema, config)
             else:
-                return self._makeLLMTypeConversionFn(outputSchema, inputSchema, config)
+                return self._makeLLMTypeConversionFn(outputSchema, inputSchema, config, conversionDesc)
         elif functionName == "FilterCandidateOp" or functionName == "ParallelFilterCandidateOp":
             return  self._makeFilterFn(taskDescriptor, config)
         else:
