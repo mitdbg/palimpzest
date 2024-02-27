@@ -19,7 +19,17 @@ class PDFFile(File):
 
 class ImageFile(File):
     """A file that contains an image."""
+    text_description = Field(desc="A text description of the image", required=False)
 
 class Number(Element):
     """Just a number. Often used for aggregates"""
     value = Field(desc="A single number", required=True)
+
+
+class EquationImage(ImageFile):
+    """An image that contains a mathematical equation."""
+    equation_text = Field(desc="The text representation of the equation in the image", required=True)
+
+class PlotImage(ImageFile):
+    """An image that contains a plot, such as a graph or chart."""
+    plot_description = Field(desc="A description of the plot", required=True)
