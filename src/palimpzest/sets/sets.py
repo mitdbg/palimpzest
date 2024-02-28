@@ -25,7 +25,7 @@ import os
 class Set:
     """
     A Set is the logical abstraction for a set of DataRecords matching some Schema. It is
-    also the building block of a Dataset.
+    also a node in the computation graph of a Dataset.
 
     Each Dataset consists of one or more Sets. The "initial" Set in a Dataset can be thought
     of as the Set that results from reading each DataRecord unaltered from the source. For each
@@ -152,8 +152,15 @@ class Set:
 
 class Dataset(Set):
     """
-    A Dataset is a uniquely named Set, and is the intended logical abstraction for programmers
-    to interact with.
+    A Dataset is the intended abstraction for programmers to interact with when manipulating Sets.
+
+    Users instantiate a Dataset by specifying a `source` that either points to a
+    DataSource or an existing cached Set. Users can then perform computations on
+    the Dataset in an imperative fashion by leveraging functions such as `filterByStr`,
+    `convert`, `aggregate`, etc. Underneath the hood, each of these operations creates
+    a new Set which is cached by the DataManager. As a result, the Sets define the
+    lineage of computation on a Dataset, and this enables programmers to re-use
+    previously cached computation by providing it as a `source` to some future Dataset.
 
     To construct a Dataset, users must provide three pieces of information. First, they must
     give the Dataset a unique name using the dataset_id. Second, they need to provide a source
@@ -201,10 +208,10 @@ class Dataset(Set):
         This function creates and returns a new Set. The newly created Set uses this Set
         as its source and applies the provided filter to it.
         """
-        filteredSet = Set(self.dataset_id, self.source.schema(), self.source, desc=desc, filter=f)
+        filteredSet = Set(self.dataset_id, self.schema(), self.source, desc=desc, filter=f)
 
         # TODO: should I update self._desc to reflect the filter operation?
-        return Dataset(self.dataset_id, source=filteredSet, schema=self.source.schema(), desc=self._desc)
+        return Dataset(self.dataset_id, source=filteredSet, schema=self.schema(), desc=self._desc)
 
     def filterByStr(self, filterCondition: str, desc: str="Apply filter(s)") -> Dataset:
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
@@ -212,19 +219,23 @@ class Dataset(Set):
 
         return self.filter(f, desc)
 
-    def convert(self, newSchema: Schema, desc: str="Convert to new schema"):
+    def convert(self, newSchema: Schema, desc: str="Convert to new schema") -> Dataset:
         """Convert the Set to a new schema."""
         convertedSet = Set(self.dataset_id, newSchema, self.source, desc=desc) # TODO: add conversion fcn. ?
 
         # TODO: should I update self._desc to reflect the conversion operation?
         return Dataset(self.dataset_id, source=convertedSet, schema=newSchema, desc=self._desc)
 
-    ### TODO
-    def aggregate(self, aggFuncDesc: str):
+    def aggregate(self, aggFuncDesc: str) -> Dataset:
         """Apply an aggregate function to this set"""
-        a = AggregateFunction(aggFuncDesc)
-        return Set(Number, input=self, desc="Aggregate results", aggFunc=a)
+        aggregatedSet = Set(self.dataset_id, Number, self.source, desc="Aggregate results", aggFunc=AggregateFunction(aggFuncDesc))
+
+        # TODO: should I update self._desc to reflect the Agg. operation?
+        return Dataset(self.dataset_id, source=aggregatedSet, schema=Number, desc=self._desc)
     
-    def limit(self, n):
+    def limit(self, n: int) -> Dataset:
         """Limit the set size to no more than n rows"""
-        return Set(self._basicElt, input=self, desc="LIMIT " + str(n), limit=n)
+        limitSet = Set(self.dataset_id, self.schema(), self.source, desc="LIMIT " + str(n), limit=n)
+
+        # TODO: should I update self._desc to reflect the limit operation?
+        return Dataset(self.dataset_id, source=limitSet, schema=self.schema(), desc=self._desc)

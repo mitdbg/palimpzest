@@ -12,7 +12,7 @@ Node = Union[LogicalOperator, PhysicalOp, Set]
 
 class Plan:
     """
-    This base class takes in the 
+    Class for building and executing data extraction / query plans.
     """
 
     def __init__(self, dataset_id: str=None, source: str=None):

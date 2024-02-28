@@ -20,8 +20,7 @@ class LarryVacationEmailsImperative(pz.Plan):
     """
     An example of how users can imperatively describe the set of emails they want
     from the `enron-tiny` dataset. In this example, the source is defined by its
-    local filepath. The PZ planner will create a logical plan and a physical plan
-    to process this dataset.
+    local filepath. The PZ planner will create a physical plan to process this dataset.
     """
     def plan(self) -> pz.Dataset:
         # NOTE: source path assumes this script is run from root of PZ repo
@@ -45,23 +44,22 @@ class LarryVacationEmailsDeclarative(pz.Plan):
     to further optimize data extraction.
     """
     def sources(self) -> List[pz.Dataset]:
-        emails = pz.Dataset(dataset_id="enron-tiny-emails", source="enron-tiny", schema=Email)
+        emails = [pz.Dataset(dataset_id="enron-tiny-emails", source="enron-tiny", schema=Email)]
 
         return emails
 
-    def filters(self):
+    def filters(self) -> List[Filter]:
         vacation_filter = Filter("The email is about someone taking a vaction", dataset_id="enron-tiny-emails")
         sender_filter = Filter("The email is sent by Larry", dataset_id="enron-tiny-emails")
+        filters = [vacation_filter, sender_filter]
 
-        return [vacation_filter, sender_filter]
+        return filters
 
 
 if __name__ == "__main__":
     """
-    This demo illustrates a few new features, including:
-    - Generating multiple plans (and optionally asking the user to select one)
-    - Basic cost-optimization which estimates the time cost, $ cost, and accuracy of various plans
-    - Proposed interface which would allow users to imperatively define a logical plan or have PZ build it for them
+    This demo illustrates how to execute an imperative and declarative
+    data extraction program using Palimpzest.
     """
     startTime = time.time()
 
