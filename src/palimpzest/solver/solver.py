@@ -1,7 +1,7 @@
 import os
 
 from palimpzest import Field
-from palimpzest.elements import DataRecord, TextFile, File, PDFFile, ImageFile, Number
+from palimpzest.elements import DataRecord, TextFile, File, PDFFile, ImageFile, EquationImage
 from palimpzest.tools import cosmos_client, get_text_from_pdf, processPapermagePdf
 from palimpzest.tools.dspysearch import run_cot_bool, run_cot_qa, gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.datasources import DataDirectory
@@ -10,6 +10,9 @@ import json
 from papermage import Document
 import base64
 import modal
+
+from palimpzest.tools.skema_tools import equations_to_latex_base64, equations_to_latex
+
 
 class Solver:
     """This solves for needed operator implementations"""
@@ -21,6 +24,7 @@ class Solver:
         self._hardcodedFns.add((PDFFile, File))
         self._hardcodedFns.add((ImageFile, File))
         self._hardcodedFns.add((TextFile, File))
+        # self._hardcodedFns.add((EquationImage, ImageFile))
         self._verbose = verbose
 
     def easyConversionAvailable(self, outputElement, inputElement):
@@ -78,6 +82,20 @@ class Solver:
                 dr.contents = text_content
                 return dr
             return _fileToText
+        elif outputElement == EquationImage and inputElement == ImageFile:
+            print("handling image to equation through skema")
+            def _imageToEquation(candidate: DataRecord):
+                if not candidate.element == inputElement:
+                    return None
+
+                dr = DataRecord(outputElement)
+                dr.filename = candidate.filename
+                dr.contents = candidate.contents
+                dr.equation_text = equations_to_latex(candidate.contents)
+                print("Running equations_to_latex_base64: ", dr.equation_text)
+                return dr
+            return _imageToEquation
+
         elif outputElement == ImageFile and inputElement == File:
             def _fileToImage(candidate: DataRecord):
                 if not candidate.element == inputElement:
@@ -92,7 +110,8 @@ class Solver:
                     raise ValueError("OPENAI_API_KEY not found in environment variables")
                 # get openai key from environment
                 openai_key = os.environ['OPENAI_API_KEY']
-                dr.contents = do_image_analysis(openai_key, image_bytes)
+                dr.contents = candidate.contents
+                dr.text_description = do_image_analysis(openai_key, image_bytes)
                 return dr
             return _fileToImage
 
@@ -141,7 +160,7 @@ class Solver:
                 def llmFilter(candidate: DataRecord):
                     if not candidate.element == inputElement:
                         return False
-                    text_content = candidate.asJSON()
+                    text_content = candidate.asTextJSON()
                     response = run_cot_bool(text_content, filterCondition, llmService=llmservice,
                                                verbose=self._verbose, promptSignature=gen_filter_signature_class(doc_schema, doc_type))
                     if response == "TRUE":

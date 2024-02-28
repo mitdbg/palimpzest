@@ -251,7 +251,7 @@ def get_text_from_pdf(filename, pdf_bytes, enable_file_cache = True):
 
 if __name__ == "__main__":
     config = pz.Config("default")
-    file_path = "/Users/chunwei/research/palimpzest/testdata/pdfs-tiny/battery.pdf"
+    file_path = "../../../testdata/pdfs-tiny/battery.pdf"
     # output_dir = "../../../tests/testFileDirectory/cosmos"
     with open(file_path, "rb") as file:
         text = get_text_from_pdf(file_path, file.read())
