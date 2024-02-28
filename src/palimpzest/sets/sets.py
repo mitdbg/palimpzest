@@ -117,7 +117,7 @@ class Set:
         elif self._limit is not None:
             return LimitScan(self._basicElt, self._input.getLogicalTree(), self._limit, targetCacheId=uid)
         elif not self._basicElt == self._input._basicElt:
-            return ConvertScan(self._basicElt, self._input.getLogicalTree(), targetCacheId=uid)
+            return ConvertScan(self._basicElt, self._input.getLogicalTree(), desc=self._desc, targetCacheId=uid)
         else:
             return self._input.getLogicalTree()
 

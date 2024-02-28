@@ -159,7 +159,7 @@ class InduceFromCandidateOp(PhysicalOp):
 
     def _attemptMapping(self, candidate: DataRecord, outputElementType):
         """Attempt to map the candidate to the outputElementType. Return None if it fails."""
-        taskDescriptor = ("InduceFromCandidateOp", None, outputElementType, candidate.element)
+        taskDescriptor = ("InduceFromCandidateOp", self.desc, outputElementType, candidate.element)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
@@ -171,8 +171,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         self.source = source
         self.desc = desc
         self.targetCacheId = targetCacheId
-
-        taskDescriptor = ("ParallelInduceFromCandidateOp", desc, outputElementType, source.outputElementType)
+        taskDescriptor = ("ParallelInduceFromCandidateOp", self.desc, outputElementType, source.outputElementType)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = DataDirectory().current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
@@ -225,7 +224,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputElementType. Return None if it fails."""
-        taskDescriptor = ("ParallelInduceFromCandidateOp", None, self.outputElementType, candidate.element)
+        taskDescriptor = ("ParallelInduceFromCandidateOp", self.desc, self.outputElementType, candidate.element)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
