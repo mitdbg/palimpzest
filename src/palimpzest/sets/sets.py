@@ -12,13 +12,14 @@ class Set:
     """A Set is set of Elements. It can be iterated over."""
     SET_VERSION = 0.1
 
-    def __init__(self, basicElt, input=None, desc=None, filters=[], aggFunc=None, limit=None):
+    def __init__(self, basicElt, input=None, desc=None, filters=[], aggFunc=None, limit=None, nocache=False):
         self._desc = desc
         self._basicElt = basicElt
         self._input = input
         self._filters = filters
         self._aggFunc = aggFunc
         self._limit = limit
+        self._nocache = nocache
 
     def __str__(self):
         filterStr = "and ".join([str(f) for f in self._filters])
@@ -106,7 +107,7 @@ class Set:
 
         # Check to see if there's a cached version of this answer
         uid = self.universalIdentifier()
-        if DataDirectory().hasCachedAnswer(uid):
+        if not self._nocache and DataDirectory().hasCachedAnswer(uid):
             return CacheScan(self._basicElt, uid)
 
         # The answer isn't cached, so we have to compute it
@@ -126,12 +127,12 @@ class Set:
         return self._basicElt.jsonSchema()
 
 
-def getData(datasetId, basicElt=None):
+def getData(datasetId, basicElt=None, nocache=False):
     """Return a Set of data from the given dataset."""
-    return ConcreteDataset(datasetId, targetElt=basicElt)
+    return ConcreteDataset(datasetId, targetElt=basicElt, nocache=nocache)
 
 class ConcreteDataset(Set):
-    def __init__(self, uniqName, targetElt=None, desc=None):
+    def __init__(self, uniqName, targetElt=None, desc=None, nocache=False):
         self.uniqName = uniqName
 
         if not targetElt is None:
@@ -143,7 +144,7 @@ class ConcreteDataset(Set):
                 basicElt = x.element
                 break
 
-        super().__init__(basicElt, input=None, desc=desc, filters=[])
+        super().__init__(basicElt, input=None, desc=desc, filters=[], nocache=nocache)
 
     def dumpSyntacticTree(self):
         return (self, None)
@@ -155,7 +156,7 @@ class ConcreteDataset(Set):
         # to figure out the basic element type returned by the datastore.
 
         uid = self.universalIdentifier()
-        if DataDirectory().hasCachedAnswer(uid):
+        if not self._nocache and DataDirectory().hasCachedAnswer(uid):
             return CacheScan(self._basicElt, uid)
 
         existingDataSet = DataDirectory().getRegisteredDataset(self.uniqName)
