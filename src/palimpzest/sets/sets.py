@@ -172,7 +172,7 @@ class ConcreteDataset(Set):
     def serialize(self):
         return {"version": Set.SET_VERSION, 
                 "desc": repr(self._desc), 
-                "basicElt": repr(self._basicElt),
+                "basicElt": self._basicElt.jsonSchema(),
                 "uniqName": self.uniqName}
 
     def deserialize(inputObj):
