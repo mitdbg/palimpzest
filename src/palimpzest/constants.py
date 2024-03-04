@@ -8,7 +8,7 @@ class Model(Enum):
     LLAMA2 = "meta-llama/Llama-2-7b-hf"
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
     GPT_3_5 = "gpt-3.5-turbo-0125"
-    GPT_4 = "gpt-4"
+    GPT_4 = "gpt-4-0125-preview"
 
 class PromptStrategy(Enum):
     ZERO_SHOT = "zero-shot"
@@ -144,12 +144,13 @@ MIXTRAL_8X_7B_MODEL_CARD = {
     ### "MATH": 28.4,
     ### "GSM8K": 74.4, # 5-shot
 }
+# NOTE: seconds_per_output_token is based on `gpt-3.5-turbo-1106`
 GPT_3_5_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.5 / 1E6,
     "usd_per_output_token": 1.5 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.021,
+    "seconds_per_output_token": 0.0065,
     ##### Agg. Benchmark #####
     "MMLU": 70.0, # 5-shot
     ##### Commonsense Reasoning #####
@@ -167,12 +168,16 @@ GPT_3_5_MODEL_CARD = {
     "math": 57.1,
     ### "GSM8K": 57.1,^     # 5-shot
 }
+# NOTE: the seconds_per_output_token was computed based on a slightly different model ('gpt-4-1106-preview')
+#       and the benchmark statistics were computed based on the GPT-4 Technical Report; these might be
+#       slightly innacurate compared to the real numbers for gpt-4-0125-preview, but we'll use them until
+#       we have something better. (The cost metrics are accurate).
 GPT_4_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 30 / 1E6,
-    "usd_per_output_token": 60 / 1E6,
+    "usd_per_input_token": 10 / 1E6,
+    "usd_per_output_token": 30 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.096,
+    "seconds_per_output_token": 0.018,
     ##### Agg. Benchmark #####
     "MMLU": 86.4, # 5-shot
     ##### Commonsense Reasoning #####

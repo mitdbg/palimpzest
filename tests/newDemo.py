@@ -14,7 +14,11 @@ def emitNestedTuple(node, indent=0):
         emitNestedTuple(child, indent=indent+2)
 
 
-class Email(Schema):
+# TODO: I want this to "just work" if it inherits from Schema instead of File;
+#       for some reason, inheriting from Schema leads to the "contents" being a bytes
+#       field but if Email inherits from File or TextFile, it becomes a string;
+#       this is important b/c dr.asTextJSON() will ignore bytes field(s).
+class Email(pz.File):
     """Represents an email, which in practice is usually from a text file"""
     sender = StringField(desc="The email address of the sender", required=True)
     subject = StringField(desc="The subject of the email", required=True)
@@ -58,9 +62,9 @@ if __name__ == "__main__":
     print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")
     emitNestedTuple(physicalTree.dumpPhysicalTree())
 
-    # # execute the plan
-    # for r in physicalTree:
-    #     print(f"(sender={r.sender}, subject={r.subject}")
+    # execute the plan
+    for r in physicalTree:
+        print(f"(sender={r.sender}, subject={r.subject}")
 
     endTime = time.time()
     print("Elapsed time:", endTime - startTime)

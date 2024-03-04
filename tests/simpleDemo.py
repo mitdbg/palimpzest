@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import palimpzest as pz
 
-import os
 import argparse
 import time
 
@@ -16,17 +15,17 @@ class ScientificPaper(pz.PDFFile):
 
 def buildSciPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
-    return pz.getData(datasetId, basicElt=ScientificPaper)
+    return pz.Dataset(datasetId, schema=ScientificPaper)
 
 def buildTestPDFPlan(datasetId):
     """This tests whether we can process a PDF file"""
-    pdfPapers = pz.getData(datasetId, basicElt=pz.PDFFile)
+    pdfPapers = pz.Dataset(datasetId, schema=pz.PDFFile)
 
     return pdfPapers
 
 def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
-    sciPapers = pz.getData(datasetId, basicElt=ScientificPaper)
+    sciPapers = pz.Dataset(datasetId, schema=ScientificPaper)
     batteryPapers = sciPapers.filterByStr("The paper is about batteries")
     mitPapers = batteryPapers.filterByStr("The paper is from MIT")
 
@@ -34,17 +33,17 @@ def buildMITBatteryPaperPlan(datasetId):
 
 
 def testCount(datasetId):
-    files = pz.getData(datasetId)
+    files = pz.Dataset(datasetId)
     fileCount = files.aggregate("COUNT")
     return fileCount
 
 def testAverage(datasetId):
-    data = pz.getData(datasetId)
+    data = pz.Dataset(datasetId)
     average = data.aggregate("AVERAGE")
     return average
 
 def testLimit(datasetId, n):
-    data = pz.getData(datasetId)
+    data = pz.Dataset(datasetId)
     limitData = data.limit(n)
     return limitData
 
@@ -54,11 +53,11 @@ class Email(pz.TextFile):
     subject = pz.Field(desc="The subject of the email", required=True)
 
 def buildEnronPlan(datasetId):
-    emails = pz.getData(datasetId, basicElt=Email)
+    emails = pz.Dataset(datasetId, schema=Email)
     return emails
 
 def computeEnronStats(datasetId):
-    emails = pz.getData(datasetId, basicElt=Email)
+    emails = pz.Dataset(datasetId, schema=Email)
     subjectLineLengths = emails.convert(pz.Number, desc = "The number of words in the subject field")
     return subjectLineLengths
 
@@ -66,7 +65,7 @@ class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required = True)
 
 def buildImagePlan(datasetId):
-    images = pz.getData(datasetId, basicElt=pz.ImageFile)
+    images = pz.Dataset(datasetId, schema=pz.ImageFile)
     filteredImages = images.filterByStr("The image contains one or more dogs")
     dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
     return dogImages
@@ -96,18 +95,32 @@ def emitDataset(rootSet, title="Dataset", verbose=False):
     print("Logical operator tree")
     emitNestedTuple(logicalElements)
 
-    # Print the physical operators that will be executed
-    planTime, planCost, estimatedCardinality, physicalTree = logicalTree.createPhysicalPlan()    
-    print()
-    print("Physical operator tree")
-    physicalOps = physicalTree.dumpPhysicalTree()
-    emitNestedTuple(physicalOps)
+    # Generate candidate physical plans
+    candidatePlans = logicalTree.createPhysicalPlanCandidates()    
+
+    # print out plans to the user
+    print("----------")
+    for idx, cp in enumerate(candidatePlans):
+        print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
+        print("Physical operator tree")
+        physicalOps = cp[3].dumpPhysicalTree()
+        emitNestedTuple(physicalOps)
+        print("----------")
+
+    # have policy select the candidate plan to execute
+    # myPolicy = pz.UserChoice()
+    myPolicy = pz.MinCost()
+    planTime, planCost, quality, physicalTree = myPolicy.choose(candidatePlans)
+    print("----------")
+    print(f"Policy is: {str(myPolicy)}")
+    print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")
+    emitNestedTuple(physicalTree.dumpPhysicalTree())
+
 
     #iterate over data
     print()
     print("Estimated seconds to complete:", planTime)
     print("Estimated USD to complete:", planCost)
-    print("Estimated cardinality:", estimatedCardinality)
     print("Concrete data results")
     return physicalTree
 

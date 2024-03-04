@@ -167,7 +167,7 @@ class Dataset(Set):
     provide a Schema for the Dataset. This Schema will be enforced when the Dataset iterates
     over the source in its __iter__ method and constructs DataRecords.
     """
-    def __init__(self, source: Union[str, Set], schema: Schema, desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None, nocache: bool=False):
+    def __init__(self, source: Union[str, Set], schema: Schema=File, desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None, nocache: bool=False):
         # convert source (str) -> source (DataSource) if need be
         self.source = (
             DataDirectory().getRegisteredDataset(source)
