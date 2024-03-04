@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from palimpzest.datamanager import DataDirectory # TODO: DataManager
+from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import AggregateFunction, File, Filter, Number, Schema
 from palimpzest.operators import (
     ApplyAggregateFunction,
@@ -17,7 +17,6 @@ from typing import Union
 
 import hashlib
 import json
-import os
 
 
 #####################################################
@@ -168,10 +167,7 @@ class Dataset(Set):
     over the source in its __iter__ method and constructs DataRecords.
     """
     def __init__(self, source: Union[str, Set], schema: Schema, desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None):
-        # convert source (str) -> source (Union[Set, DataSource])
-        # TODO: this will fetch the appropriate source assuming it's a Dataset;
-        #       can we make it possible for source to refer to the intermediate
-        #       computation of a previous Dataset (i.e. a Set)?
+        # convert source (str) -> source (DataSource) if need be
         self.source = (
             DataDirectory().getRegisteredDataset(source)
             if isinstance(source, str)

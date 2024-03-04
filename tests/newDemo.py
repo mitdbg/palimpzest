@@ -20,7 +20,6 @@ class Email(Schema):
     subject = StringField(desc="The subject of the email", required=True)
 
 
-# TODO: get demo working before 1pm
 if __name__ == "__main__":
     """
     This demo illustrates how the cost optimizer can produce and evaluate multiple plans.

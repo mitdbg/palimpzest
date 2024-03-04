@@ -26,7 +26,7 @@ class PhysicalOp:
         raise NotImplementedError("Abstract method")
 
     def estimateCost(self) -> Dict[str, Any]:
-        """Returns dict of (TODO)"""
+        """Returns dict of time, cost, and quality metrics."""
         raise NotImplementedError("Abstract method")
 
 class MarshalAndScanDataOp(PhysicalOp):

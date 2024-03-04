@@ -7,14 +7,7 @@ import pickle
 import sys
 import yaml
 
-# TODO: I have intentionally only swapped uniqName --> dataset_id in places where
-#       I am at least 50% sure that the intended use case of the function is related
-#       to working with a Dataset. I still need to think through how to properly
-#       re-use computation of Sets by writing/reading them to/from the cache.
-#       In cases where I think we may want to use a Set's uid to enable this form of
-#       computation re-use, I've left the variable name as `uniqName`
 
-# TODO: rename to DataManager
 # TODO: possibly rename to the PZManager, as it also manages the current config
 class DataDirectory:
     """The DataDirectory is a registry of data sources."""
@@ -57,8 +50,8 @@ class DataDirectory:
         for root, _, files in os.walk(self._dir + "/data/cache"):
             for file in files:
                 if file.endswith(".cached"):
-                    uniqname = file[:-7]
-                    self._cache[uniqname] = root + "/" + file
+                    cacheId = file[:-7]
+                    self._cache[cacheId] = root + "/" + file
 
     def getConfig(self):
         return self.current_config._load_config()
@@ -108,12 +101,12 @@ class DataDirectory:
 
         return entry
 
-    def getSize(self, uniqName):
+    def getSize(self, dataset_id):
         """Return the size (in bytes) of a dataset."""
-        if not uniqName in self._registry:
-            raise Exception("Cannot find dataset", uniqName, "in the registry.")
+        if not dataset_id in self._registry:
+            raise Exception("Cannot find dataset", dataset_id, "in the registry.")
         
-        entry, rock = self._registry[uniqName]
+        entry, rock = self._registry[dataset_id]
         if entry == "dir":
             # Sum the size in bytes of every file in the directory
             path = rock
@@ -128,12 +121,12 @@ class DataDirectory:
         else:
             raise Exception("Unknown entry type")
 
-    def getCardinality(self, uniqName):
+    def getCardinality(self, dataset_id):
         """Return the number of records in a dataset."""
-        if not uniqName in self._registry:
-            raise Exception("Cannot find dataset", uniqName, "in the registry.")
+        if not dataset_id in self._registry:
+            raise Exception("Cannot find dataset", dataset_id, "in the registry.")
         
-        entry, rock = self._registry[uniqName]
+        entry, rock = self._registry[dataset_id]
         if entry == "dir":
             # Return the number of files in the directory
             path = rock
@@ -160,12 +153,12 @@ class DataDirectory:
     # These methods handle cached results. They are meant to be persisted for performance reasons,
     # but can always be recomputed if necessary.
     #
-    def getCachedResult(self, uniqName):
+    def getCachedResult(self, cacheId):
         """Return a cached result."""
-        if not uniqName in self._cache:
+        if not cacheId in self._cache:
             return None
 
-        cachedResult = pickle.load(open(self._cache[uniqName], "rb"))
+        cachedResult = pickle.load(open(self._cache[cacheId], "rb"))
         def iterateOverCachedResult():
             for x in cachedResult:
                 yield x
@@ -182,9 +175,9 @@ class DataDirectory:
                 if os.path.basename(file) != "registry.pkl" or keep_registry is False:
                     os.remove(root + "/" + file)
 
-    def hasCachedAnswer(self, uniqName):
+    def hasCachedAnswer(self, cacheId):
         """Check if a dataset is in the cache."""
-        return uniqName in self._cache
+        return cacheId in self._cache
 
     def openCache(self, cacheId):
         if not cacheId is None and not cacheId in self._cache and not cacheId in self._tempCache:
