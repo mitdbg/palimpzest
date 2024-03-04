@@ -122,6 +122,15 @@ class SchemaMetaclass(type):
         """Return a description of the schema"""
         fields = SchemaMetaclass.fieldNames(cls)
         d = {k: hash(getattr(cls, k)) for k in fields}
+
+        # TODO: this causes an exception why trying to use Schema in a type definition
+        # e.g. TaskDescriptor = Tuple[str, Union[tuple, None], Schema, Schema]
+        # will throw the following exception:
+        #
+        # File "/Users/matthewrusso/palimpzest/src/palimpzest/elements/elements.py", line 168, in getDesc
+        #     d["__class__"] = o.__name__
+        # AttributeError: '_SpecialForm' object has no attribute '__name__'
+        #
         d["__class__"] = cls.__name__
 
         return json.dumps(d, sort_keys=True)
@@ -147,6 +156,7 @@ class SchemaMetaclass(type):
             if v.required:
                 schema["required"].append(k)
         return schema
+
 
 # TODO: how does deserialize actually work with Schema (formerly Element)
 # TODO: should we put the SchemaMetaclass functionality into Schema and make it a @dataclass?

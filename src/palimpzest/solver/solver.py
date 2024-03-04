@@ -1,4 +1,5 @@
-from palimpzest.elements import DataRecord, File, ImageFile, PDFFile, Schema, TextFile
+from palimpzest.constants import Model, PromptStrategy
+from palimpzest.elements import DataRecord, File, Filter, ImageFile, PDFFile, Schema, TextFile
 from palimpzest.tools import get_text_from_pdf
 from palimpzest.tools.dspysearch import run_cot_bool, run_cot_qa, gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.tools.openai_image_converter import do_image_analysis
@@ -12,7 +13,7 @@ import modal
 import os
 
 # DEFINITIONS
-TaskDescriptor = Tuple[str, Union[tuple, None], Schema, Schema]
+# TaskDescriptor = Tuple[str, Union[tuple, None], Schema, Schema]
 
 
 class Solver:
@@ -96,6 +97,7 @@ class Solver:
                     raise ValueError("OPENAI_API_KEY not found in environment variables")
                 # get openai key from environment
                 openai_key = os.environ['OPENAI_API_KEY']
+                # TODO: consider multiple image models
                 dr.contents = do_image_analysis(openai_key, image_bytes)
                 return dr
             return _fileToImage
@@ -103,7 +105,7 @@ class Solver:
         else:
             raise Exception(f"Cannot hard-code conversion from {inputSchema} to {outputSchema}")
 
-    def _makeLLMTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], conversionDesc: str):
+    def _makeLLMTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, conversionDesc: str):
             llmservice = config.get("llmservice", "openai")
             def fn(candidate: DataRecord):
                 # iterate through all empty fields in the outputSchema and ask questions to fill them
@@ -116,9 +118,19 @@ class Solver:
                 for field_name in outputSchema.fieldNames():
                     f = getattr(outputSchema, field_name)
                     try:
-                        answer = run_cot_qa(text_content,
-                                            f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
-                                            llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                        # TODO: allow for mult. fcns
+                        if prompt_strategy == PromptStrategy.DSPY_COT:
+                            answer = run_cot_qa(text_content,
+                                                f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
+                                                model.value,
+                                                llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                        # TODO
+                        elif prompt_strategy == PromptStrategy.ZERO_SHOT:
+                            raise Exception("not implemented yet")
+                        # TODO
+                        elif prompt_strategy == PromptStrategy.FEW_SHOT:
+                            raise Exception("not implemented yet")
+
                         setattr(dr, field_name, answer)
                     except Exception as e:
                         print(f"Error: {e}")
@@ -126,18 +138,12 @@ class Solver:
                 return dr
             return fn
 
-    def _makeFilterFn(self, taskDescriptor: TaskDescriptor, config: Dict[str, Any]):
+    def _makeFilterFn(self, inputSchema: Schema, filter: Filter, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy):
             # parse inputs
-            _, functionParams, _, inputSchema = taskDescriptor
             llmservice = config.get("llmservice", "openai")
             doc_schema = str(inputSchema)
             doc_type = inputSchema.className()
-            if len(functionParams) == 0:
-                def allPass(candidate: DataRecord):
-                    return True
 
-                return allPass
-            
             # By default, a filter requires an LLM invocation to run
             # Someday maybe we will offer the user the chance to run a hard-coded function.
             # Or maybe we will ask the LLM to synthesize traditional code here.
@@ -146,29 +152,40 @@ class Solver:
                     if not candidate.schema == inputSchema:
                         return False
                     text_content = candidate.asJSON()
-                    response = run_cot_bool(text_content, filterCondition, llmService=llmservice,
-                                               verbose=self._verbose, promptSignature=gen_filter_signature_class(doc_schema, doc_type))
+                    # TODO: allow for mult. fcns
+                    response = None
+                    if prompt_strategy == PromptStrategy.DSPY_BOOL:
+                        response = run_cot_bool(text_content, filterCondition, model=model.value, llmService=llmservice,
+                                                verbose=self._verbose, promptSignature=gen_filter_signature_class(doc_schema, doc_type))
+                    # TODO
+                    elif prompt_strategy == PromptStrategy.ZERO_SHOT:
+                        raise Exception("not implemented yet")
+                    # TODO
+                    elif prompt_strategy == PromptStrategy.FEW_SHOT:
+                        raise Exception("not implemented yet")
+                    
                     if response == "TRUE":
                         return True
                     else:
                         return False
                 return llmFilter
-            return createLLMFilter("and ".join([str(f) for f in functionParams]))
+            return createLLMFilter(str(filter))
 
-    def synthesize(self, taskDescriptor: TaskDescriptor, config: Dict[str, Any]):
+    def synthesize(self, taskDescriptor: Any, config: Dict[str, Any]):
         """Return a function that maps from inputType to outputType."""
         functionName, functionParams, outputSchema, inputSchema = taskDescriptor
 
         if functionName == "InduceFromCandidateOp" or functionName == "ParallelInduceFromCandidateOp":
-            conversionDesc = functionParams
+            model, prompt_strategy, conversionDesc = functionParams
             typeConversionDescriptor = (outputSchema, inputSchema)
             if typeConversionDescriptor in self._simpleTypeConversions:
                 return self._makeSimpleTypeConversionFn(outputSchema, inputSchema)
             elif typeConversionDescriptor in self._hardcodedFns:
-                return self._makeHardCodedTypeConversionFn(outputSchema, inputSchema, config)
+                return self._makeHardCodedTypeConversionFn(outputSchema, inputSchema, config) # TODO: add option for model for image?
             else:
-                return self._makeLLMTypeConversionFn(outputSchema, inputSchema, config, conversionDesc)
+                return self._makeLLMTypeConversionFn(outputSchema, inputSchema, config, model, prompt_strategy, conversionDesc)
         elif functionName == "FilterCandidateOp" or functionName == "ParallelFilterCandidateOp":
-            return  self._makeFilterFn(taskDescriptor, config)
+            filter, model, prompt_strategy = functionParams
+            return  self._makeFilterFn(inputSchema, filter, config, model, prompt_strategy)
         else:
             raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))

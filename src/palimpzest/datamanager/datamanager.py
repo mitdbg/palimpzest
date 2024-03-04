@@ -1,9 +1,10 @@
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
-from palimpzest.sets import DirectorySource, FileSource, MemorySource
+from palimpzest.datasources import DirectorySource, FileSource, MemorySource
 
 import os
 import pickle
+import sys
 import yaml
 
 # TODO: I have intentionally only swapped uniqName --> dataset_id in places where
@@ -90,13 +91,22 @@ class DataDirectory:
         
         entry, rock = self._registry[dataset_id]
         if entry == "dir":
-            return DirectorySource(rock)
+            return DirectorySource(rock, dataset_id)
         elif entry == "file":
-            return FileSource(rock)
+            return FileSource(rock, dataset_id)
         elif entry == "memory":
-            return MemorySource(rock)
+            return MemorySource(rock, dataset_id)
         else:
             raise Exception("Unknown entry type")
+
+    def getRegisteredDatasetType(self, dataset_id):
+        """Return the type of the given dataset in the registry."""
+        if not dataset_id in self._registry:
+            raise Exception("Cannot find dataset", dataset_id, "in the registry.")
+
+        entry, _ = self._registry[dataset_id]
+
+        return entry
 
     def getSize(self, uniqName):
         """Return the size (in bytes) of a dataset."""
@@ -105,15 +115,16 @@ class DataDirectory:
         
         entry, rock = self._registry[uniqName]
         if entry == "dir":
-            # Sum the length in bytes of every file in the directory
+            # Sum the size in bytes of every file in the directory
             path = rock
             return sum([os.path.getsize(os.path.join(path, name)) for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
         elif entry == "file":
-            # Get the length of the file
+            # Get the size of the file in bytes
             path = rock
             return os.path.getsize(path)
         elif entry == "memory":
-            return len(rock)
+            # get the size of the values in bytes
+            return sys.getsizeof(rock)
         else:
             raise Exception("Unknown entry type")
 
@@ -131,6 +142,7 @@ class DataDirectory:
             # Return 1
             return 1
         elif entry == "memory":
+            # Return the number of elements in the values list
             return len(rock)
         else:
             raise Exception("Unknown entry type")

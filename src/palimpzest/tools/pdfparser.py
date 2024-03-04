@@ -1,5 +1,5 @@
 from palimpzest.config import Config
-from palimpzest.datasources import DataDirectory
+from palimpzest.datamanager import DataDirectory
 
 from fastapi import status
 from typing import List, BinaryIO

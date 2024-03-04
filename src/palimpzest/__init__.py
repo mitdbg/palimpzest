@@ -1,5 +1,6 @@
 from .elements import *
 from .datamanager import *
+from .datasources import *
 from .operators import *
 from .sets import *
 from .solver import *
