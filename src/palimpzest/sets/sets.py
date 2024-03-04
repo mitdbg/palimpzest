@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from palimpzest.datamanager import DataDirectory # TODO: DataManager
 from palimpzest.elements import AggregateFunction, File, Filter, Number, Schema
 from palimpzest.operators import (
@@ -9,9 +11,8 @@ from palimpzest.operators import (
     LimitScan,
     LogicalOperator,
 )
-from palimpzest.sets import DataSource, DirectorySource, FileSource, MemorySource
+from palimpzest.datasources import DataSource, DirectorySource, FileSource, MemorySource
 
-from __future__ import annotations
 from typing import Union
 
 import hashlib
@@ -41,8 +42,7 @@ class Set:
     """
     SET_VERSION = 0.1
 
-    def __init__(self, dataset_id: str, schema: Schema, source: Union[Set, DataSource], desc: str=None, filter: Filter=None, aggFunc=None, limit=None):
-        self._dataset_id = dataset_id
+    def __init__(self, schema: Schema, source: Union[Set, DataSource], desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None):
         self._schema = schema
         self._source = source
         self._desc = desc
@@ -51,15 +51,14 @@ class Set:
         self._limit = limit
 
     def __str__(self):
-        return f"{self.__class__.__name__}(dataset_id={self._dataset_id}, schema={self._schema}, desc={self._desc}, filter={str(self._filter)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
+        return f"{self.__class__.__name__}(schema={self._schema}, desc={self._desc}, filter={str(self._filter)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
 
     def serialize(self):
         d = {"version": Set.SET_VERSION, 
-             "dataset_id": self._dataset_id,
              "schema": self._schema.jsonSchema(),
              "source": self._source.serialize(),
              "desc": self._desc, 
-             "filter": self._filter.serialize(),
+             "filter": None if self._filter is None else self._filter.serialize(),
              "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(),
              "limit": self._limit}
 
@@ -70,7 +69,8 @@ class Set:
             raise Exception("Cannot deserialize Set because it is the wrong version")
 
         # TODO: I don't believe this would actually work for the DataSources,
-        #       as inputObj["schema"] is a dict. not a Schema
+        #       as inputObj["schema"] is a dict. not a Schema; also need to add
+        #       dataset_id to constructor here somehow
         # deserialize source depending on whether it's a Set or DataSource
         source = None
         if "version" in inputObj["source"]:
@@ -90,8 +90,7 @@ class Set:
         limitStr = inputObj.get("limit", None)
         limit = None if limitStr is None else int(limitStr)
 
-        return Set(dataset_id=inputObj["dataset_id"],
-                   schema=inputObj["schema"].jsonSchema(), 
+        return Set(schema=inputObj["schema"].jsonSchema(), 
                    source=source, 
                    desc=inputObj["desc"], 
                    filter=Filter.deserialize(inputObj["filter"]),
@@ -120,7 +119,6 @@ class Set:
 
         return (self, self._source.dumpSyntacticTree())
 
-    ### TODO --> make sure it's consistent w/new ConcreteDataset in main
     def getLogicalTree(self) -> LogicalOperator:
         """Return the logical tree of operators on Sets."""
         # first, check to see if this set has previously been cached
@@ -130,12 +128,12 @@ class Set:
 
         # otherwise, if this Set's source is a DataSource
         if isinstance(self._source, DataSource):
-            source_id = self._source.universalIdentifier()
+            dataset_id = self._source.universalIdentifier()
             sourceSchema = Number if isinstance(self._source, MemorySource) else File
             if self._schema == sourceSchema:
-                return BaseScan(self._schema, source_id)
+                return BaseScan(self._schema, dataset_id)
             else:
-                return ConvertScan(self._schema, BaseScan(sourceSchema, source_id), targetCacheId=uid)
+                return ConvertScan(self._schema, BaseScan(sourceSchema, dataset_id), targetCacheId=uid)
 
         # if the Set's source is another Set, apply the appropriate scan to the Set
         if self._filter is not None:
@@ -169,21 +167,18 @@ class Dataset(Set):
     provide a Schema for the Dataset. This Schema will be enforced when the Dataset iterates
     over the source in its __iter__ method and constructs DataRecords.
     """
-    def __init__(self, dataset_id: str, source: str, schema: Schema, desc: str=None):
+    def __init__(self, source: Union[str, Set], schema: Schema, desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None):
         # convert source (str) -> source (Union[Set, DataSource])
-        sourceSet = None
-        if os.path.exists(source) and os.path.isdir(source):
-            sourceSet = DirectorySource(source)
-        elif os.path.exists(source) and os.path.isfile(source):
-            sourceSet = FileSource(source)
-        else:
-            # TODO: this will fetch the appropriate source assuming it's a Dataset;
-            #       can we make it possible for source to refer to the intermediate
-            #       computation of a previous Dataset (i.e. a Set)?
-            sourceSet = DataDirectory().getRegisteredDataset(source)
+        # TODO: this will fetch the appropriate source assuming it's a Dataset;
+        #       can we make it possible for source to refer to the intermediate
+        #       computation of a previous Dataset (i.e. a Set)?
+        self.source = (
+            DataDirectory().getRegisteredDataset(source)
+            if isinstance(source, str)
+            else source
+        )
 
-        super().__init__(schema, sourceSet, desc=desc, filter=None)
-        self.dataset_id = dataset_id
+        super().__init__(schema, self.source, desc=desc, filter=filter, aggFunc=aggFunc, limit=limit)
 
     def deserialize(inputObj):
         # TODO: this deserialize operation will not work; I need to finish the deserialize impl. for Schema
@@ -201,17 +196,14 @@ class Dataset(Set):
         elif inputObj["source_type"] == "file":
             source = FileSource(inputObj["schema"])
 
-        return Dataset(inputObj["dataset_id"], source, inputObj["schema"], desc=inputObj["desc"]) 
+        return Dataset(source, inputObj["schema"], desc=inputObj["desc"]) 
 
     def filter(self, f: Filter, desc: str="Apply filter(s)") -> Dataset:
         """
         This function creates and returns a new Set. The newly created Set uses this Set
         as its source and applies the provided filter to it.
         """
-        filteredSet = Set(self.dataset_id, self.schema(), self.source, desc=desc, filter=f)
-
-        # TODO: should I update self._desc to reflect the filter operation?
-        return Dataset(self.dataset_id, source=filteredSet, schema=self.schema(), desc=self._desc)
+        return Dataset(source=self, schema=self.schema(), desc=desc, filter=f)
 
     def filterByStr(self, filterCondition: str, desc: str="Apply filter(s)") -> Dataset:
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
@@ -221,21 +213,12 @@ class Dataset(Set):
 
     def convert(self, newSchema: Schema, desc: str="Convert to new schema") -> Dataset:
         """Convert the Set to a new schema."""
-        convertedSet = Set(self.dataset_id, newSchema, self.source, desc=desc) # TODO: add conversion fcn. ?
-
-        # TODO: should I update self._desc to reflect the conversion operation?
-        return Dataset(self.dataset_id, source=convertedSet, schema=newSchema, desc=self._desc)
+        return Dataset(source=self, schema=newSchema, desc=desc)
 
     def aggregate(self, aggFuncDesc: str) -> Dataset:
         """Apply an aggregate function to this set"""
-        aggregatedSet = Set(self.dataset_id, Number, self.source, desc="Aggregate results", aggFunc=AggregateFunction(aggFuncDesc))
-
-        # TODO: should I update self._desc to reflect the Agg. operation?
-        return Dataset(self.dataset_id, source=aggregatedSet, schema=Number, desc=self._desc)
+        return Dataset(source=self, schema=Number, desc="Aggregate results", aggFunc=AggregateFunction(aggFuncDesc))
     
     def limit(self, n: int) -> Dataset:
         """Limit the set size to no more than n rows"""
-        limitSet = Set(self.dataset_id, self.schema(), self.source, desc="LIMIT " + str(n), limit=n)
-
-        # TODO: should I update self._desc to reflect the limit operation?
-        return Dataset(self.dataset_id, source=limitSet, schema=self.schema(), desc=self._desc)
+        return Dataset(source=self, schema=self.schema(), desc="LIMIT " + str(n), limit=n)

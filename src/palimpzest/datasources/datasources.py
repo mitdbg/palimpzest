@@ -17,8 +17,9 @@ class DataSource:
     Many (if not all) DataSources should use Schemas from `palimpzest.elements.core`.
     In the future, programmers can implement their own DataSources using custom Schemas.
     """
-    def __init__(self, schema: Schema) -> None:
+    def __init__(self, schema: Schema, dataset_id: str) -> None:
         self.schema = schema
+        self.dataset_id = dataset_id
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(schema={self.schema})"
@@ -31,17 +32,14 @@ class DataSource:
     
     def universalIdentifier(self):
         """Return a unique identifier for this Set."""
-        d = self.serialize()
-        ordered = json.dumps(d, sort_keys=True)
-        result = hashlib.sha256(ordered.encode()).hexdigest()
-        return result
+        return self.dataset_id
 
 
 class MemorySource(DataSource):
     """MemorySource returns multiple objects that reflect contents of an in-memory Python list"""
-    def __init__(self, vals: List[Union[int, float]]):
+    def __init__(self, vals: List[Union[int, float]], dataset_id: str):
         # For the moment we assume that we are given a list of floats or ints, but someday it could be strings or something else
-        super().__init__(Number)
+        super().__init__(Number, dataset_id)
         self.vals = vals
 
     def __iter__(self):
@@ -56,8 +54,8 @@ class MemorySource(DataSource):
 
 class DirectorySource(DataSource):
     """DirectorySource returns multiple File objects from a real-world source (a directory on disk)"""
-    def __init__(self, path: str) -> None:
-        super().__init__(File)
+    def __init__(self, path: str, dataset_id: str) -> None:
+        super().__init__(File, dataset_id)
         self.path = path
 
     def __iter__(self) -> Callable[[], DataRecord]:
@@ -83,8 +81,8 @@ class DirectorySource(DataSource):
 
 class FileSource(DataSource):
     """FileSource returns a single File object from a single real-world local file"""
-    def __init__(self, path: str) -> None:
-        super().__init__(File)
+    def __init__(self, path: str, dataset_id: str) -> None:
+        super().__init__(File, dataset_id)
         self.path = path
 
     def __iter__(self) -> Callable[[], DataRecord]:

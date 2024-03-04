@@ -22,7 +22,10 @@ class DataRecord:
         """Return a JSON representation of this DataRecord"""
         keys = sorted(self.__dict__)
         # Make a dictionary out of the key/value pairs
-        d = {k: self.__dict__[k] for k in keys if not k.startswith("_") and not isinstance(self.__dict__[k] , bytes)}
+
+        # TODO: figure out why self.__dict__['contents'] suddenly became a bytes object instead of a string
+        # d = {k: self.__dict__[k] for k in keys if not k.startswith("_") and not isinstance(self.__dict__[k] , bytes)}
+        d = {k: str(self.__dict__[k]) for k in keys if not k.startswith("_")}
         d["data type"] = str(self._schema.__name__)
         d["data type description"]  = str(self._schema.__doc__)
         return json.dumps(d, indent=2)
