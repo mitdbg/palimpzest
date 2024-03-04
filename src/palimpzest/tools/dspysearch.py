@@ -57,8 +57,6 @@ def gen_qa_signature_class(doc_schema, doc_type):
     return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
 def run_cot_bool(context, question, model, llmService="openai", verbose=False, promptSignature=FilterOverPaper):
-    # TODO: do we need llmservice if planner is looking for best model(s)?
-    # TODO: default model was: 'gpt-4-0125-preview'; it has slightly diff. metrics than 'gpt-4' model
     if llmService == "openai":
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
@@ -89,8 +87,6 @@ def run_cot_bool(context, question, model, llmService="openai", verbose=False, p
     return pred.answer
 
 def run_cot_qa(context, question, model, llmService="openai", verbose=False, promptSignature=QuestionOverPaper):
-    # TODO: do we need llmservice if planner is looking for best model(s)?
-    # TODO: default model was: 'gpt-4-0125-preview'; it has slightly diff. metrics than 'gpt-4' model
     if llmService == "openai":
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")

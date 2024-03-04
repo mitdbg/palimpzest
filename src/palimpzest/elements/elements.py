@@ -83,8 +83,7 @@ class BytesField(Field):
 
 class SchemaMetaclass(type):
     """
-    This is a metaclass for our Schema class. I need to ask Mike about metaclasses in general
-    and the motivation(s) behind using one here.
+    This is a metaclass for our Schema class.
     """
     def __str__(cls) -> str:
         """

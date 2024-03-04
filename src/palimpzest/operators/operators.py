@@ -144,6 +144,13 @@ class LogicalOperator:
         #    a. Zero-Shot vs. Few-Shot vs. COT vs. DSPy
         # 3. input sub-selection
         #    a. vector DB, LLM attention, ask-the-LLM
+
+        # choose set of acceptable models based on llmservice for now
+        models = (
+            [Model.GPT_3_5, Model.GPT_4]
+            if DataDirectory().current_config.get("llmservice") == "openai"
+            else [Model.MIXTRAL]
+        )
         physicalPlans = []
         for model in [Model.GPT_3_5, Model.GPT_4]: # in Model:
             physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, model=model)
