@@ -1,5 +1,5 @@
 from palimpzest.constants import Model, PromptStrategy
-from palimpzest.elements import DataRecord, File, Filter, ImageFile, PDFFile, Schema, TextFile
+from palimpzest.elements import DataRecord, EquationImage, File, Filter, ImageFile, PDFFile, Schema, TextFile
 from palimpzest.tools import get_text_from_pdf
 from palimpzest.tools.dspysearch import run_cot_bool, run_cot_qa, gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.tools.openai_image_converter import do_image_analysis
@@ -16,6 +16,9 @@ import os
 # TaskDescriptor = Tuple[str, Union[tuple, None], Schema, Schema]
 
 
+from palimpzest.tools.skema_tools import equations_to_latex_base64, equations_to_latex
+
+
 class Solver:
     """This solves for needed operator implementations"""
     def __init__(self, verbose: bool=False):
@@ -26,6 +29,7 @@ class Solver:
         self._hardcodedFns.add((PDFFile, File))
         self._hardcodedFns.add((ImageFile, File))
         self._hardcodedFns.add((TextFile, File))
+        # self._hardcodedFns.add((EquationImage, ImageFile))
         self._verbose = verbose
 
     def easyConversionAvailable(self, outputSchema: Schema, inputSchema: Schema):
@@ -83,6 +87,20 @@ class Solver:
                 dr.contents = text_content
                 return dr
             return _fileToText
+        elif outputSchema == EquationImage and inputSchema == ImageFile:
+            print("handling image to equation through skema")
+            def _imageToEquation(candidate: DataRecord):
+                if not candidate.element == inputSchema:
+                    return None
+
+                dr = DataRecord(outputSchema)
+                dr.filename = candidate.filename
+                dr.contents = candidate.contents
+                dr.equation_text = equations_to_latex(candidate.contents)
+                print("Running equations_to_latex_base64: ", dr.equation_text)
+                return dr
+            return _imageToEquation
+
         elif outputSchema == ImageFile and inputSchema == File:
             def _fileToImage(candidate: DataRecord):
                 if not candidate.schema == inputSchema:
@@ -98,7 +116,8 @@ class Solver:
                 # get openai key from environment
                 openai_key = os.environ['OPENAI_API_KEY']
                 # TODO: consider multiple image models
-                dr.contents = do_image_analysis(openai_key, image_bytes)
+                dr.contents = candidate.contents
+                dr.text_description = do_image_analysis(openai_key, image_bytes)
                 return dr
             return _fileToImage
 
@@ -151,7 +170,7 @@ class Solver:
                 def llmFilter(candidate: DataRecord):
                     if not candidate.schema == inputSchema:
                         return False
-                    text_content = candidate.asJSON()
+                    text_content = candidate.asTextJSON()
                     # TODO: allow for mult. fcns
                     response = None
                     if prompt_strategy == PromptStrategy.DSPY_BOOL:
@@ -163,7 +182,6 @@ class Solver:
                     # TODO
                     elif prompt_strategy == PromptStrategy.FEW_SHOT:
                         raise Exception("not implemented yet")
-                    
                     if response == "TRUE":
                         return True
                     else:

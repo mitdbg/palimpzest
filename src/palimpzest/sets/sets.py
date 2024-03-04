@@ -41,22 +41,23 @@ class Set:
     """
     SET_VERSION = 0.1
 
-    def __init__(self, schema: Schema, source: Union[Set, DataSource], desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None):
+    def __init__(self, schema: Schema, source: Union[Set, DataSource], desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None, nocache: bool=False):
         self._schema = schema
         self._source = source
         self._desc = desc
         self._filter = filter
         self._aggFunc = aggFunc
         self._limit = limit
+        self._nocache = nocache
 
     def __str__(self):
         return f"{self.__class__.__name__}(schema={self._schema}, desc={self._desc}, filter={str(self._filter)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
 
     def serialize(self):
-        d = {"version": Set.SET_VERSION, 
+        d = {"version": Set.SET_VERSION,
              "schema": self._schema.jsonSchema(),
              "source": self._source.serialize(),
-             "desc": self._desc, 
+             "desc": repr(self._desc),
              "filter": None if self._filter is None else self._filter.serialize(),
              "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(),
              "limit": self._limit}
@@ -122,7 +123,7 @@ class Set:
         """Return the logical tree of operators on Sets."""
         # first, check to see if this set has previously been cached
         uid = self.universalIdentifier()
-        if DataDirectory().hasCachedAnswer(uid):
+        if not self._nocache and DataDirectory().hasCachedAnswer(uid):
             return CacheScan(self._schema, uid)
 
         # otherwise, if this Set's source is a DataSource
@@ -166,7 +167,7 @@ class Dataset(Set):
     provide a Schema for the Dataset. This Schema will be enforced when the Dataset iterates
     over the source in its __iter__ method and constructs DataRecords.
     """
-    def __init__(self, source: Union[str, Set], schema: Schema, desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None):
+    def __init__(self, source: Union[str, Set], schema: Schema, desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None, nocache: bool=False):
         # convert source (str) -> source (DataSource) if need be
         self.source = (
             DataDirectory().getRegisteredDataset(source)
@@ -174,7 +175,7 @@ class Dataset(Set):
             else source
         )
 
-        super().__init__(schema, self.source, desc=desc, filter=filter, aggFunc=aggFunc, limit=limit)
+        super().__init__(schema, self.source, desc=desc, filter=filter, aggFunc=aggFunc, limit=limit, nocache=nocache)
 
     def deserialize(inputObj):
         # TODO: this deserialize operation will not work; I need to finish the deserialize impl. for Schema

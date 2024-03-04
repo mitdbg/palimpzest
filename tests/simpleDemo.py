@@ -5,21 +5,24 @@ import os
 import argparse
 import time
 
-
 class ScientificPaper(pz.PDFFile):
    """Represents a scientific research paper, which in practice is usually from a PDF file"""
    title = pz.Field(desc="The title of the paper. This is a natural language title, not a number or letter.", required=True)
    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
+   author = pz.Field(desc="The name of the first author of the paper", required=True)
+   institution = pz.Field(desc="The institution of the first author of the paper", required=True)
+   journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
+   fundingAgency = pz.Field(desc="The name of the funding agency that supported the research", required=False)
+
+def buildSciPaperPlan(datasetId):
+    """A dataset-independent declarative description of authors of good papers"""
+    return pz.getData(datasetId, basicElt=ScientificPaper)
 
 def buildTestPDFPlan(datasetId):
     """This tests whether we can process a PDF file"""
     pdfPapers = pz.getData(datasetId, basicElt=pz.PDFFile)
 
     return pdfPapers
-
-def buildSciPaperPlan(datasetId):
-    """A dataset-independent declarative description of authors of good papers"""
-    return pz.getData(datasetId, basicElt=ScientificPaper)
 
 def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
@@ -52,17 +55,12 @@ class Email(pz.TextFile):
 
 def buildEnronPlan(datasetId):
     emails = pz.getData(datasetId, basicElt=Email)
-    filteredEmails = emails.filterByStr("The email was written to a woman")
-    return filteredEmails
+    return emails
 
 def computeEnronStats(datasetId):
     emails = pz.getData(datasetId, basicElt=Email)
-    #filteredEmails = emails.filterByStr("The email is about someone taking a vaction")
     subjectLineLengths = emails.convert(pz.Number, desc = "The number of words in the subject field")
-    #return subjectLineLengths.aggregate("AVERAGE")
     return subjectLineLengths
-    #return filteredEmails
-
 
 class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required = True)
@@ -144,13 +142,18 @@ if __name__ == "__main__":
             print(r)
     elif task == "enron":
         rootSet = buildEnronPlan(datasetid)
-        #rootSet = computeEnronStats(datasetid)
-        physicalTree = emitDataset(rootSet, title="Good Enron emails", verbose=args.verbose)
-        for r in physicalTree:
+        physicalTree = emitDataset(rootSet, title="Enron emails", verbose=args.verbose)
+        for idx, r in enumerate(physicalTree):
+            print(idx)
+            print(r.subject)
+            print()
+    elif task == "enronmap":
+        rootSet = computeEnronStats(datasetid)
+        physicalTree = emitDataset(rootSet, title="Enron subject counts", verbose=args.verbose)
+        for idx, r in enumerate(physicalTree):
+            print(idx)
             print(r)
-        #planTime, planPrice, estimatedCardinality, physicalTree = rootSet.getLogicalTree().createPhysicalPlan()
-        #for email in physicalTree:
-        #    print(email.sender, email.subject)
+            print()
     elif task == "pdftest":
         rootSet = buildTestPDFPlan(datasetid)
         physicalTree = emitDataset(rootSet, title="PDF files", verbose=args.verbose)
@@ -162,7 +165,13 @@ if __name__ == "__main__":
         physicalTree = emitDataset(rootSet, title="Scientific files", verbose=args.verbose)
 
         for idx, r in enumerate(physicalTree):
-            print("Extracted title", r.title)
+            print("Title", r.title)
+            print("Author", r.author)
+            print("Institution", r.institution)
+            print("Journal", r.journal)
+            print("Funding agency", r.fundingAgency)
+
+            print()
     elif task == "image":
         rootSet = buildImagePlan(datasetid)
         physicalTree = emitDataset(rootSet, title="Dogs", verbose=args.verbose)
