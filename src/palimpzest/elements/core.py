@@ -23,7 +23,7 @@ class PDFFile(File):
 
 class ImageFile(File):
     """A file that contains an image."""
-    text_description = Field(desc="A text description of the image", required=False)
+    text_description = StringField(desc="A text description of the image", required=False)
 
 class Number(Schema):
     """Just a number. Often used for aggregates"""
