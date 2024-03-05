@@ -1,4 +1,3 @@
-import os
 import modal
 
 stub = modal.Stub("palimpzest.tools")

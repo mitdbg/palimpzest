@@ -1,29 +1,28 @@
-from .elements import *
+from __future__ import annotations
+from typing import Any, Dict
 
 #############################
-# An AggregateFunction that can be applied to a Set of elements
+# An AggregateFunction that can be applied to a Set of DataRecords
 #############################
 class AggregateFunction():
-    """A function that can be applied to a Set of Elements"""
-
-    def serialize(a):
-        return {"aggFuncDesc": a.funcDesc}
-    
-    def deserialize(d):
-        return AggregateFunction(d["aggFuncDesc"])
-
-    def __init__(self, funcDesc: str):
+    """A function that can be applied to a Set of DataRecords"""
+    def __init__(self, funcDesc: str) -> None:
         self.funcDesc = funcDesc
 
-    def __str__(self):
+    def serialize(a) -> Dict[str, Any]:
+        return {"aggFuncDesc": a.funcDesc}
+    
+    def deserialize(d) -> AggregateFunction:
+        return AggregateFunction(d["aggFuncDesc"])
+
+    def __str__(self) -> str:
         return "AggregateFunction(" + self.funcDesc + ")"
 
-    def __hash__(self):
-            # Custom hash function
-        # For example, hash based on the value attribute
+    def __hash__(self) -> int:
+        # custom hash function
         return hash(self.funcDesc)
 
-    def __eq__(self, other):
+    def __eq__(self, other: AggregateFunction) -> bool:
         # __eq__ should be defined for consistency with __hash__
         return isinstance(other, AggregateFunction) and self.funcDesc == other.funcDesc
 

@@ -1,11 +1,9 @@
-import tempfile
+from palimpzest.constants import PZ_DIR
 
-import yaml
 import os
 import sys
-
-# DEFINITIONS
-PZ_DIR = os.path.join(os.path.expanduser("~"), ".palimpzest")
+import tempfile
+import yaml
 
 
 class Config:

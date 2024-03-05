@@ -27,7 +27,6 @@ $ pip install .
 
 
 ## Palimpzest CLI
-### Getting Started
 Installing Palimpzest also installs its CLI tool `pz` which provides users with basic utilities for creating and managing their own Palimpzest system. Running `pz --help` diplays an overview of the CLI's commands:
 ```bash
 $ pz --help

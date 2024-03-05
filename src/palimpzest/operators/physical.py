@@ -1,129 +1,171 @@
+from __future__ import annotations
+
+from palimpzest.constants import *
+from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.solver import Solver
-from palimpzest.datasources import DataDirectory
+
+from typing import Any, Dict, Tuple, Union
 
 import concurrent
+import sys
 
-# Assume 500 MB/sec for local SSD scan time
-LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
-
-# Assume 10s per record for local LLM object conversion
-STD_LLM_CONVERSION_TIME_PER_RECORD = 20
-PARALLEL_LLM_CONVERSION_TIME_OVERALL = 2.0 * STD_LLM_CONVERSION_TIME_PER_RECORD
-
-# Assume 0.06 per 1M tokens, and about 4K tokens per request (way wrong)
-STD_LLM_CONVERSION_COST_PER_RECORD = 0.06 * (4000 / 1000000)
-PARALLEL_LLM_CONVERSION_COST_PER_RECORD = STD_LLM_CONVERSION_COST_PER_RECORD
-
-# Assume filter operations are twice as fast as conversions
-STD_LLM_FILTER_TIME_PER_RECORD = STD_LLM_CONVERSION_TIME_PER_RECORD / 2
-PARALLEL_LLM_FILTER_TIME_OVERALL = PARALLEL_LLM_CONVERSION_TIME_OVERALL / 2
-
-STD_LLM_FILTER_COST_PER_RECORD = STD_LLM_CONVERSION_COST_PER_RECORD / 2
-PARALLEL_LLM_FILTER_COST_PER_RECORD = PARALLEL_LLM_CONVERSION_COST_PER_RECORD / 2
-
-logLLMOutput = False
 
 class PhysicalOp:
     LOCAL_PLAN = "LOCAL"
     REMOTE_PLAN = "REMOTE"
 
     synthesizedFns = {}
-    solver = Solver(verbose=logLLMOutput)
+    solver = Solver(verbose=LOG_LLM_OUTPUT)
 
-    def __init__(self, outputElementType):
-        self.outputElementType = outputElementType
+    def __init__(self, outputSchema: Schema) -> None:
+        self.outputSchema = outputSchema
+        self.datadir = DataDirectory()
 
-    def getNext(self):
+    def dumpPhysicalTree(self) -> Tuple[PhysicalOp, Union[PhysicalOp, None]]:
         raise NotImplementedError("Abstract method")
-    
-    def dumpPhysicalTree(self):
-        raise NotImplementedError("Abstract method")
-    
-    def estimateCost(self):
-        """Returns dict of (cardinality, timePerElement, costPerElement, startupTime, startupCost)"""
+
+    def estimateCost(self) -> Dict[str, Any]:
+        """Returns dict of time, cost, and quality metrics."""
         raise NotImplementedError("Abstract method")
 
 class MarshalAndScanDataOp(PhysicalOp):
-    def __init__(self, outputElementType, concreteDatasetIdentifier):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, concreteDatasetIdentifier: str):
+        super().__init__(outputSchema=outputSchema)
         self.concreteDatasetIdentifier = concreteDatasetIdentifier
 
     def __str__(self):
-        return "MarshalAndScanDataOp(" + str(self.outputElementType) + ", " + self.concreteDatasetIdentifier + ")"
+        return "MarshalAndScanDataOp(" + str(self.outputSchema) + ", " + self.concreteDatasetIdentifier + ")"
     
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, None)
     
     def estimateCost(self):
-        cardinality = DataDirectory().getCardinality(self.concreteDatasetIdentifier) + 1
-
-        size = DataDirectory().getSize(self.concreteDatasetIdentifier)
+        cardinality = self.datadir.getCardinality(self.concreteDatasetIdentifier) + 1
+        size = self.datadir.getSize(self.concreteDatasetIdentifier)
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
 
-        timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
-        costPerElement = 0
+        datasetType = self.datadir.getRegisteredDatasetType(self.concreteDatasetIdentifier)
+        timePerElement = (
+            LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
+            if datasetType in ["dir", "file"]
+            else MEMORY_SCAN_TIME_PER_KB * perElementSizeInKb
+        )
+        usdPerElement = 0
+
+        # TODO: similar to notes in other physical operators' estimateCost() function
+        #       we will likely want to augment PZ to use sampling and/or real-time updates
+        #       to estimates like these, rather then employing constants.
+        #
+        # estimate per-element number of tokens output by this operator
+        estOutputTokensPerElement = (
+            (size / float(cardinality)) # per-element size in bytes
+            * ELEMENT_FRAC_IN_CONTEXT   # fraction of the element which is provided in context
+            * BYTES_TO_TOKENS           # convert bytes to tokens
+        )
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement
+            "usdPerElement": usdPerElement,
+            "cumulativeTimePerElement": timePerElement,
+            "cumulativeUSDPerElement": usdPerElement,
+            "totalTime": timePerElement * cardinality,
+            "totalUSD": usdPerElement * cardinality,
+            "estOutputTokensPerElement": estOutputTokensPerElement,
+            "quality": 1.0,
         }
     
     def __iter__(self):
         def iteratorFn():
-            for nextCandidate in DataDirectory().getRegisteredDataset(self.concreteDatasetIdentifier):
+            for nextCandidate in self.datadir.getRegisteredDataset(self.concreteDatasetIdentifier):
                 yield nextCandidate
+
         return iteratorFn()
 
 class CacheScanDataOp(PhysicalOp):
-    def __init__(self, outputElementType, cacheIdentifier):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, cacheIdentifier: str):
+        super().__init__(outputSchema=outputSchema)
         self.cacheIdentifier = cacheIdentifier
 
     def __str__(self):
-        return "CacheScanDataOp(" + str(self.outputElementType) + ", " + self.cacheIdentifier + ")"
+        return "CacheScanDataOp(" + str(self.outputSchema) + ", " + self.cacheIdentifier + ")"
     
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, None)
 
     def estimateCost(self):
-        cardinality = sum(1 for _ in DataDirectory().getCachedResult(self.cacheIdentifier)) + 1
-        size = 100 * cardinality
+        # TODO: at the moment, getCachedResult() looks up a pickled file that stores
+        #       the cached data specified by self.cacheIdentifier, opens the file,
+        #       and then returns an iterator over records in the pickled file.
+        #
+        #       I'm guessing that in the future we may want to load the cached data into
+        #       the DataDirectory._cache object on __init__ (or in the background) so
+        #       that this operation doesn't require a read from disk. If that happens, be
+        #       sure to switch LOCAL_SCAN_TIME_PER_KB --> MEMORY_SCAN_TIME_PER_KB; and store
+        #       metadata about the cardinality and size of cached data upfront so that we
+        #       can access it in constant time.
+        #
+        #       At a minimum, we could use this function call to load the data into DataManager._cache
+        #       since we have to iterate over it anyways; which would cache the data before the __iter__
+        #       method below gets called.
+        cached_data_info = [(1, sys.getsizeof(data)) for data in self.datadir.getCachedResult(self.cacheIdentifier)]
+        cardinality = sum(list(map(lambda tup: tup[0], cached_data_info))) + 1
+        size = sum(list(map(lambda tup: tup[1], cached_data_info)))
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
 
         timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
-        costPerElement = 0
+        usdPerElement = 0
+
+        # TODO: similar to notes in other physical operators' estimateCost() function
+        #       we will likely want to augment PZ to use sampling and/or real-time updates
+        #       to estimates like these, rather then employing constants.
+        #
+        # estimate per-element number of tokens output by this operator
+        estOutputTokensPerElement = (
+            (size / float(cardinality)) # per-element size in bytes
+            * ELEMENT_FRAC_IN_CONTEXT   # fraction of the element which is provided in context
+            * BYTES_TO_TOKENS           # convert bytes to tokens
+        )
 
         return {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
-            "costPerElement": costPerElement
+            "usdPerElement": usdPerElement,
+            "cumulativeTimePerElement": timePerElement,
+            "cumulativeUSDPerElement": usdPerElement,
+            "totalTime": timePerElement * cardinality,
+            "totalUSD": usdPerElement * cardinality,
+            "estOutputTokensPerElement": estOutputTokensPerElement,
+            "quality": 1.0,
         }
 
     def __iter__(self):
         def iteratorFn():
-            for nextCandidate in DataDirectory().getCachedResult(self.cacheIdentifier):
+            # NOTE: see comment in `estimateCost()` 
+            for nextCandidate in self.datadir.getCachedResult(self.cacheIdentifier):
                 yield nextCandidate
         return iteratorFn()
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source, desc=None, targetCacheId=None):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None):
+        super().__init__(outputSchema=outputSchema)
         self.source = source
+        self.model = model
+        self.prompt_strategy = prompt_strategy
         self.desc = desc
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("InduceFromCandidateOp", desc, outputElementType, source.outputElementType)
+        taskDescriptor = ("InduceFromCandidateOp", (model, prompt_strategy, desc), outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = DataDirectory().current_config
+            config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
-        return "InduceFromCandidateOp(" + str(self.outputElementType) + ")"
+        return "InduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -132,175 +174,348 @@ class InduceFromCandidateOp(PhysicalOp):
     def estimateCost(self):
         inputEstimates = self.source.estimateCost()
 
-        cardinality = inputEstimates["cardinality"]
-        timePerElement = STD_LLM_CONVERSION_TIME_PER_RECORD + inputEstimates["timePerElement"]
-        costPerElement = STD_LLM_CONVERSION_COST_PER_RECORD + inputEstimates["costPerElement"]
+        # estimate number of input tokens from source
+        est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
+
+        # estimate number of output tokens as constant multiple of input tokens (for now)
+        # 
+        # TODO: we could get better est. if we could update plans in real-time (or use sampling)
+        est_num_output_tokens = OUTPUT_TOKENS_MULTIPLE * est_num_input_tokens
+
+        # if we're using a few-shot prompt strategy, the est_num_input_tokens will increase
+        # by a small factor due to the added examples; we multiply after computing the
+        # est_num_output_tokens b/c the few-shot examples likely won't affect the output length
+        # 
+        # TODO: once again, real-time updates and/or sampling could improve est.
+        if self.prompt_strategy == PromptStrategy.FEW_SHOT:
+            est_num_input_tokens *= FEW_SHOT_PROMPT_INFLATION
+
+        # get est. of conversion time per record from model card;
+        # TODO: the time is a linear function of the number of output tokens,
+        #       if we look at the distribution of output tokens as we generate
+        #       responses we can get better estimates in real-time. This of
+        #       course would require modifying our design of PZ to enable it
+        #       to be more of a bandit which can switch query plans as it observes
+        #       query results.
+        model_conversion_time_per_record = MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+
+        # get est. of conversion cost (in USD) per record from model card
+        model_conversion_usd_per_record = (
+            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
+            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+        )
+
+        # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
+        #
+        # TODO: once again, real-time updates and/or sampling could improve this est.
+        if self.prompt_strategy == PromptStrategy.DSPY_COT:
+            model_conversion_time_per_record *= DSPY_TIME_INFLATION
+            model_conversion_usd_per_record *= DSPY_COST_INFLATION
+
+        # TODO: can selectivity be >1.0? Imagine an induce operation which extracts the authors from a research paper.
+        selectivity = 1.0
+        cardinality = selectivity * inputEstimates["cardinality"]
+        cumulativeTimePerElement = model_conversion_time_per_record + inputEstimates["cumulativeTimePerElement"]
+        cumulativeUSDPerElement = model_conversion_usd_per_record + inputEstimates["cumulativeUSDPerElement"]
+
+        # NOTE: the following estimate assumes that the entire generator of the previous
+        #       operator is materialized before this operator begins processing records
+        #       (i.e., it assumes that operators execute in sequence). I ran a small test
+        #       to see if this was the case:
+        #
+        #       >>> def f():
+        #       ...   for idx in range(3):
+        #       ...     time.sleep(2)
+        #       ...     yield idx
+        #
+        #       >>> def g():
+        #       ... for idx in f():
+        #       ...     time.sleep(3)
+        #       ...     yield idx
+        #
+        #       >>> def test():
+        #       ...   start_time = time.time()
+        #       ...   lst = [elt for elt in g()]
+        #       ...   end_time = time.time()
+        #       ...   print(f"duration: {end_time - start_time}")
+        #
+        #       >>> test()
+        #       duration: 15.014
+        #
+        # compute total time and cost for preceding operations + this operation;
+        # make sure to use input cardinality (not output cardinality)
+        totalTime = model_conversion_time_per_record * inputEstimates["cardinality"] + inputEstimates["totalTime"]
+        totalUSD = model_conversion_usd_per_record * inputEstimates["cardinality"] + inputEstimates["totalUSD"]
+
+        # TODO: simple first hack -- use model's MMLU score / 100.0 to get a rough
+        #       estimate of the quality in the range [0, 1]
+        # 
+        # estimate quality of output based on the strength of the model being used
+        quality = (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * inputEstimates["quality"]
 
         return {
             "cardinality": cardinality,
-            "timePerElement": timePerElement,
-            "costPerElement": costPerElement
+            "timePerElement": model_conversion_time_per_record,
+            "usdPerElement": model_conversion_usd_per_record,
+            "cumulativeTimePerElement": cumulativeTimePerElement,
+            "cumulativeUSDPerElement": cumulativeUSDPerElement,
+            "totalTime": totalTime,
+            "totalUSD": totalUSD,
+            "estOutputTokensPerElement": est_num_output_tokens,
+            "quality": quality,
         }
 
     def __iter__(self):
-        datadir = DataDirectory()
-        shouldCache = datadir.openCache(self.targetCacheId)
+        shouldCache = self.datadir.openCache(self.targetCacheId)
         def iteratorFn():    
             for nextCandidate in self.source:
-                resultRecord = self._attemptMapping(nextCandidate, self.outputElementType)
+                resultRecord = self._attemptMapping(nextCandidate)
                 if resultRecord is not None:
                     if shouldCache:
-                        datadir.appendCache(self.targetCacheId, resultRecord)
+                        self.datadir.appendCache(self.targetCacheId, resultRecord)
                     yield resultRecord
             if shouldCache:
-                datadir.closeCache(self.targetCacheId)
+                self.datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 
-    def _attemptMapping(self, candidate: DataRecord, outputElementType):
-        """Attempt to map the candidate to the outputElementType. Return None if it fails."""
-        taskDescriptor = ("InduceFromCandidateOp", self.desc, outputElementType, candidate.element)
+    def _attemptMapping(self, candidate: DataRecord):
+        """Attempt to map the candidate to the outputSchema. Return None if it fails."""
+        taskDescriptor = ("InduceFromCandidateOp", (self.model, self.prompt_strategy, self.desc), self.outputSchema, candidate.schema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source, desc=None, targetCacheId=None):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None):
+        super().__init__(outputSchema=outputSchema)
         self.source = source
+        self.model = model
+        self.prompt_strategy = prompt_strategy
         self.desc = desc
         self.targetCacheId = targetCacheId
-        taskDescriptor = ("ParallelInduceFromCandidateOp", self.desc, outputElementType, source.outputElementType)
+        self.max_workers = 20
+
+        taskDescriptor = ("ParallelInduceFromCandidateOp", (model, prompt_strategy, desc), outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = DataDirectory().current_config
+            config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
-        return "ParallelInduceFromCandidateOp(" + str(self.outputElementType) + ")"
+        return "ParallelInduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
+        """
+        See InduceFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
+        """
         inputEstimates = self.source.estimateCost()
 
-        cardinality = inputEstimates["cardinality"]
-        timePerElement = (PARALLEL_LLM_CONVERSION_TIME_OVERALL + (cardinality * inputEstimates["timePerElement"])) / cardinality
-        costPerElement = PARALLEL_LLM_CONVERSION_COST_PER_RECORD + inputEstimates["costPerElement"]
+        # estimate number of input tokens from source
+        est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
+
+        # estimate number of output tokens as constant multiple of input tokens (for now)
+        est_num_output_tokens = OUTPUT_TOKENS_MULTIPLE * est_num_input_tokens
+
+        # if we're using a few-shot prompt strategy, the est_num_input_tokens will increase
+        # by a small factor due to the added examples; we multiply after computing the
+        # est_num_output_tokens b/c the few-shot examples likely won't affect the output length
+        if self.prompt_strategy == PromptStrategy.FEW_SHOT:
+            est_num_input_tokens *= FEW_SHOT_PROMPT_INFLATION
+
+        # get est. of conversion time per record from model card;
+        model_conversion_time_per_record = MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+
+        # get est. of conversion cost (in USD) per record from model card
+        model_conversion_usd_per_record = (
+            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
+            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+        )
+
+        # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
+        if self.prompt_strategy == PromptStrategy.DSPY_COT:
+            model_conversion_time_per_record *= DSPY_TIME_INFLATION
+            model_conversion_usd_per_record *= DSPY_COST_INFLATION
+
+        selectivity = 1.0
+        cardinality = selectivity * inputEstimates["cardinality"]
+        cumulativeTimePerElement = model_conversion_time_per_record + inputEstimates["cumulativeTimePerElement"]
+        cumulativeUSDPerElement = model_conversion_usd_per_record + inputEstimates["cumulativeUSDPerElement"]
+
+        # compute total time and cost for preceding operations + this operation;
+        # make sure to use input cardinality (not output cardinality)
+        totalTime = model_conversion_time_per_record * (inputEstimates["cardinality"] / self.max_workers) + inputEstimates["totalTime"]
+        totalUSD = model_conversion_usd_per_record * inputEstimates["cardinality"] + inputEstimates["totalUSD"]
+
+        # estimate quality of output based on the strength of the model being used
+        quality = (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * inputEstimates["quality"]
 
         return {
             "cardinality": cardinality,
-            "timePerElement": timePerElement,
-            "costPerElement": costPerElement
+            "timePerElement": model_conversion_time_per_record,
+            "usdPerElement": model_conversion_usd_per_record,
+            "cumulativeTimePerElement": cumulativeTimePerElement,
+            "cumulativeUSDPerElement": cumulativeUSDPerElement,
+            "totalTime": totalTime,
+            "totalUSD": totalUSD,
+            "estOutputTokensPerElement": est_num_output_tokens,
+            "quality": quality,
         }
 
     def __iter__(self):
         # This is very crudely implemented right now, since we materialize everything
-        datadir = DataDirectory()
-        shouldCache = datadir.openCache(self.targetCacheId)
+        shouldCache = self.datadir.openCache(self.targetCacheId)
         def iteratorFn():
-            chunksize = 20 + 2
             inputs = []
             results = []
 
             for nextCandidate in self.source:
                 inputs.append(nextCandidate)
 
-            # Grab items from the list inputs in chunks of size chunkSize
-            with concurrent.futures.ThreadPoolExecutor(max_workers=chunksize) as executor:
-                results = list(executor.map(self._attemptMapping, inputs, chunksize=chunksize))
+            # Grab items from the list inputs in chunks using self.max_workers
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                results = list(executor.map(self._attemptMapping, inputs))
 
                 for resultRecord in results:
                     if resultRecord is not None:
                         if shouldCache:
-                            datadir.appendCache(self.targetCacheId, resultRecord)
+                            self.datadir.appendCache(self.targetCacheId, resultRecord)
                         yield resultRecord
             if shouldCache:
-                datadir.closeCache(self.targetCacheId)
+                self.datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 
     def _attemptMapping(self, candidate: DataRecord):
-        """Attempt to map the candidate to the outputElementType. Return None if it fails."""
-        taskDescriptor = ("ParallelInduceFromCandidateOp", self.desc, self.outputElementType, candidate.element)
+        """Attempt to map the candidate to the outputSchema. Return None if it fails."""
+        taskDescriptor = ("ParallelInduceFromCandidateOp", (self.model, self.prompt_strategy, self.desc), self.outputSchema, candidate.schema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 
 class FilterCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source, filters, targetCacheId=None):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None):
+        super().__init__(outputSchema=outputSchema)
         self.source = source
-        self.filters = filters
+        self.filter = filter
+        self.model = model
+        self.prompt_strategy = prompt_strategy
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("FilterCandidateOp", tuple(self.filters), source.outputElementType, self.outputElementType)
+        taskDescriptor = ("FilterCandidateOp", (filter, model, prompt_strategy), source.outputSchema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = DataDirectory().current_config
+            config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
-        filterStr = "and ".join([str(f) for f in self.filters])
-        return "FilterCandidateOp(" + str(self.outputElementType) + ", " + "Filters: " + str(filterStr) + ")"
+        return "FilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
 
     def estimateCost(self):
+        """
+        See InduceFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
+        """
         inputEstimates = self.source.estimateCost()
 
-        cardinality = inputEstimates["cardinality"]
-        timePerElement = STD_LLM_FILTER_TIME_PER_RECORD + inputEstimates["timePerElement"]
-        costPerElement = STD_LLM_FILTER_COST_PER_RECORD + inputEstimates["costPerElement"]
+        # estimate number of input tokens from source
+        est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
+
+        # the filter operation's LLM call should only output TRUE or FALSE, thus we expect its
+        # number of output tokens to be ~1.25
+        est_num_output_tokens = 1.25
+
+        # if we're using a few-shot prompt strategy, the est_num_input_tokens will increase
+        # by a small factor due to the added examples; we multiply after computing the
+        # est_num_output_tokens b/c the few-shot examples likely won't affect the output length
+        if self.prompt_strategy == PromptStrategy.FEW_SHOT:
+            est_num_input_tokens *= FEW_SHOT_PROMPT_INFLATION
+
+        # get est. of conversion time per record from model card;
+        model_conversion_time_per_record = MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+
+        # get est. of conversion cost (in USD) per record from model card
+        model_conversion_usd_per_record = (
+            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
+            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+        )
+
+        # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
+        if self.prompt_strategy == PromptStrategy.DSPY_COT:
+            model_conversion_time_per_record *= DSPY_TIME_INFLATION
+            model_conversion_usd_per_record *= DSPY_COST_INFLATION
+
+        # TODO: use sampling / real-time feedback to better estimate selectivity
+        selectivity = EST_FILTER_SELECTIVITY
+        cardinality = selectivity * inputEstimates["cardinality"]
+        cumulativeTimePerElement = model_conversion_time_per_record + inputEstimates["cumulativeTimePerElement"]
+        cumulativeUSDPerElement = model_conversion_usd_per_record + inputEstimates["cumulativeUSDPerElement"]
+
+        # compute total time and cost for preceding operations + this operation;
+        # make sure to use input cardinality (not output cardinality)
+        totalTime = model_conversion_time_per_record * inputEstimates["cardinality"] + inputEstimates["totalTime"]
+        totalUSD = model_conversion_usd_per_record * inputEstimates["cardinality"] + inputEstimates["totalUSD"]
+
+        # estimate quality of output based on the strength of the model being used
+        quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
 
         return {
             "cardinality": cardinality,
-            "timePerElement": timePerElement,
-            "costPerElement": costPerElement
+            "timePerElement": model_conversion_time_per_record,
+            "usdPerElement": model_conversion_usd_per_record,
+            "cumulativeTimePerElement": cumulativeTimePerElement,
+            "cumulativeUSDPerElement": cumulativeUSDPerElement,
+            "totalTime": totalTime,
+            "totalUSD": totalUSD,
+            "estOutputTokensPerElement": est_num_output_tokens,
+            "quality": quality,
         }
 
     def __iter__(self):
-        datadir = DataDirectory()
-        shouldCache = datadir.openCache(self.targetCacheId)
+        shouldCache = self.datadir.openCache(self.targetCacheId)
         def iteratorFn():
             for nextCandidate in self.source: 
-                if self._passesFilters(nextCandidate):
+                if self._passesFilter(nextCandidate):
                     if shouldCache:
-                        datadir.appendCache(self.targetCacheId, nextCandidate)
+                        self.datadir.appendCache(self.targetCacheId, nextCandidate)
                     yield nextCandidate
             if shouldCache:
-                datadir.closeCache(self.targetCacheId)
+                self.datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 
-    def _passesFilters(self, candidate):
+    def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
-        taskDescriptor = ("FilterCandidateOp", tuple(self.filters), candidate.element, self.outputElementType)
-        #print("LOOKING FOR FUNCTION", taskDescriptor)
+        taskDescriptor = ("FilterCandidateOp", (self.filter, self.model, self.prompt_strategy), candidate.schema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 
 class ParallelFilterCandidateOp(PhysicalOp):
-    def __init__(self, outputElementType, source, filters, targetCacheId=None):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None):
+        super().__init__(outputSchema=outputSchema)
         self.source = source
-        self.filters = filters
+        self.filter = filter
+        self.model = model
+        self.prompt_strategy = prompt_strategy
         self.targetCacheId = targetCacheId
+        self.max_workers = 20
 
-        taskDescriptor = ("ParallelFilterCandidateOp", tuple(self.filters), source.outputElementType, self.outputElementType)
+        taskDescriptor = ("ParallelFilterCandidateOp", (filter, model, prompt_strategy), source.outputSchema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = DataDirectory().current_config
+            config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
-        filterStr = "and ".join([str(f) for f in self.filters])
-        return "ParallelFilterCandidateOp(" + str(self.outputElementType) + ", " + "Filters: " + str(filterStr) + ")"
+        return "ParallelFilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -309,45 +524,86 @@ class ParallelFilterCandidateOp(PhysicalOp):
     def estimateCost(self):
         inputEstimates = self.source.estimateCost()
 
-        cardinality = inputEstimates["cardinality"]
-        timePerElement = (PARALLEL_LLM_FILTER_TIME_OVERALL + (cardinality * inputEstimates["timePerElement"])) / cardinality
-        costPerElement = PARALLEL_LLM_FILTER_COST_PER_RECORD + inputEstimates["costPerElement"]
+        # estimate number of input tokens from source
+        est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
+
+        # the filter operation's LLM call should only output TRUE or FALSE, thus we expect its
+        # number of output tokens to be ~1.25
+        est_num_output_tokens = 1.25
+
+        # if we're using a few-shot prompt strategy, the est_num_input_tokens will increase
+        # by a small factor due to the added examples; we multiply after computing the
+        # est_num_output_tokens b/c the few-shot examples likely won't affect the output length
+        if self.prompt_strategy == PromptStrategy.FEW_SHOT:
+            est_num_input_tokens *= FEW_SHOT_PROMPT_INFLATION
+
+        # get est. of conversion time per record from model card;
+        model_conversion_time_per_record = MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+
+        # get est. of conversion cost (in USD) per record from model card
+        model_conversion_usd_per_record = (
+            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
+            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+        )
+
+        # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
+        if self.prompt_strategy == PromptStrategy.DSPY_COT:
+            model_conversion_time_per_record *= DSPY_TIME_INFLATION
+            model_conversion_usd_per_record *= DSPY_COST_INFLATION
+
+        # TODO: use sampling / real-time feedback to better estimate selectivity
+        selectivity = EST_FILTER_SELECTIVITY
+        cardinality = selectivity * inputEstimates["cardinality"]
+        cumulativeTimePerElement = model_conversion_time_per_record + inputEstimates["cumulativeTimePerElement"]
+        cumulativeUSDPerElement = model_conversion_usd_per_record + inputEstimates["cumulativeUSDPerElement"]
+
+        # compute total time and cost for preceding operations + this operation;
+        # make sure to use input cardinality (not output cardinality)
+        totalTime = model_conversion_time_per_record * (inputEstimates["cardinality"] / self.max_workers) + inputEstimates["totalTime"]
+        totalUSD = model_conversion_usd_per_record * inputEstimates["cardinality"] + inputEstimates["totalUSD"]
+
+        # estimate quality of output based on the strength of the model being used
+        quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
 
         return {
             "cardinality": cardinality,
-            "timePerElement": timePerElement,
-            "costPerElement": costPerElement
+            "timePerElement": model_conversion_time_per_record,
+            "usdPerElement": model_conversion_usd_per_record,
+            "cumulativeTimePerElement": cumulativeTimePerElement,
+            "cumulativeUSDPerElement": cumulativeUSDPerElement,
+            "totalTime": totalTime,
+            "totalUSD": totalUSD,
+            "estOutputTokensPerElement": est_num_output_tokens,
+            "quality": quality,
         }
 
     def __iter__(self):
-        datadir = DataDirectory()
-        shouldCache = datadir.openCache(self.targetCacheId)
+        shouldCache = self.datadir.openCache(self.targetCacheId)
         def iteratorFn():
-            chunksize = 20 + 2
             inputs = []
             results = []
 
             for nextCandidate in self.source: 
                 inputs.append(nextCandidate)
 
-            # Grab items from the list inputs in chunks of size chunkSize
-            with concurrent.futures.ThreadPoolExecutor(max_workers=chunksize) as executor:
-                results = list(executor.map(self._passesFilters, inputs, chunksize=chunksize))
+            # Grab items from the list of inputs in chunks using self.max_workers
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                results = list(executor.map(self._passesFilter, inputs))
 
                 for idx, filterResult in enumerate(results):
                     if filterResult:
                         resultRecord = inputs[idx]
                         if shouldCache:
-                            datadir.appendCache(self.targetCacheId, resultRecord)
+                            self.datadir.appendCache(self.targetCacheId, resultRecord)
                         yield resultRecord
             if shouldCache:
-                datadir.closeCache(self.targetCacheId)
+                self.datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
 
-    def _passesFilters(self, candidate):
+    def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
-        taskDescriptor = ("ParallelFilterCandidateOp", tuple(self.filters), candidate.element, self.outputElementType)
+        taskDescriptor = ("ParallelFilterCandidateOp", (self.filter, self.model, self.prompt_strategy), candidate.schema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
 
@@ -355,14 +611,14 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
 
 class ApplyCountAggregateOp(PhysicalOp):
-    def __init__(self, source, aggFunction, targetCacheId=None):
-        super().__init__(outputElementType=Number)
+    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, targetCacheId: str=None):
+        super().__init__(outputSchema=Number)
         self.source = source
         self.aggFunction = aggFunction
         self.targetCacheId = targetCacheId
 
     def __str__(self):
-        return "ApplyCountAggregateOp(" + str(self.outputElementType) + ", " + "Function: " + str(self.aggFunction) + ")"
+        return "ApplyCountAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -371,15 +627,15 @@ class ApplyCountAggregateOp(PhysicalOp):
     def estimateCost(self):
         inputEstimates = self.source.estimateCost()
 
-        cardinality = 1
-        time = inputEstimates["timePerElement"] * inputEstimates["cardinality"]
-        cost = inputEstimates["costPerElement"] * inputEstimates["cardinality"]
+        outputEstimates = {**inputEstimates}
+        outputEstimates['cardinality'] = 1
 
-        return {
-            "cardinality": cardinality,
-            "timePerElement": time,
-            "costPerElement": cost
-        }
+        # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
+        outputEstimates['timePerElement'] = 0
+        outputEstimates['usdPerElement'] = 0
+        outputEstimates['estOutputTokensPerElement'] = 0
+
+        return outputEstimates
 
     def __iter__(self):
         datadir = DataDirectory()
@@ -402,17 +658,17 @@ class ApplyCountAggregateOp(PhysicalOp):
 
 
 class ApplyAverageAggregateOp(PhysicalOp):
-    def __init__(self, source, aggFunction, targetCacheId=None):
-        super().__init__(outputElementType=Number)
+    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, targetCacheId: str=None):
+        super().__init__(outputSchema=Number)
         self.source = source
         self.aggFunction = aggFunction
         self.targetCacheId = targetCacheId
 
-        if not source.outputElementType == Number:
+        if not source.outputSchema == Number:
             raise Exception("Aggregate function AVERAGE is only defined over Numbers")
 
     def __str__(self):
-        return "ApplyAverageAggregateOp(" + str(self.outputElementType) + ", " + "Function: " + str(self.aggFunction) + ")"
+        return "ApplyAverageAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -421,15 +677,15 @@ class ApplyAverageAggregateOp(PhysicalOp):
     def estimateCost(self):
         inputEstimates = self.source.estimateCost()
 
-        cardinality = 1
-        time = inputEstimates["timePerElement"] * inputEstimates["cardinality"]
-        cost = inputEstimates["costPerElement"] * inputEstimates["cardinality"]
+        outputEstimates = {**inputEstimates}
+        outputEstimates["cardinality"] = 1
 
-        return {
-            "cardinality": cardinality,
-            "timePerElement": time,
-            "costPerElement": cost
-        }
+        # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
+        outputEstimates["timePerElement"] = 0
+        outputEstimates["usdPerElement"] = 0
+        outputEstimates["estOutputTokensPerElement"] = 0
+
+        return outputEstimates
 
     def __iter__(self):
         datadir = DataDirectory()
@@ -457,14 +713,14 @@ class ApplyAverageAggregateOp(PhysicalOp):
 
 
 class LimitScanOp(PhysicalOp):
-    def __init__(self, outputElementType, source, limit, targetCacheId=None):
-        super().__init__(outputElementType=outputElementType)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, limit: int, targetCacheId: str=None):
+        super().__init__(outputSchema=outputSchema)
         self.source = source
         self.limit = limit
         self.targetCacheId = targetCacheId
 
     def __str__(self):
-        return "LimitScanOp(" + str(self.outputElementType) + ", " + "Limit: " + str(self.limit) + ")"
+        return "LimitScanOp(" + str(self.outputSchema) + ", " + "Limit: " + str(self.limit) + ")"
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -473,13 +729,10 @@ class LimitScanOp(PhysicalOp):
     def estimateCost(self):
         inputEstimates = self.source.estimateCost()
 
-        cardinality = min(self.limit, inputEstimates["cardinality"])
+        outputEstimates = {**inputEstimates}
+        outputEstimates["cardinality"] = min(self.limit, inputEstimates["cardinality"])
 
-        return {
-            "cardinality": cardinality,
-            "timePerElement": inputEstimates["timePerElement"],
-            "costPerElement": inputEstimates["costPerElement"]
-        }
+        return outputEstimates
 
     def __iter__(self):
         datadir = DataDirectory()

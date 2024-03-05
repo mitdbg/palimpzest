@@ -6,7 +6,7 @@ from palimpzest.elements.pzlist import ListField
 from tests.simpleDemo import emitDataset
 
 
-# class DocumentElement(Element):
+# class DocumentSchema(Schema):
 #     """A document element that can contain a list of either Equation Images or Plot Images."""
 #     images = pz.List(Any([EquationImage, PlotImage]), desc="Images in the document that are either equations or plots", cardinality="0..*")
 
@@ -26,7 +26,7 @@ class PandemicPaper(ScientificPaper):
     equationImage = ListField(pz.EquationImage, desc="Equation images in the paper", cardinality="0..*")
 
 
-class Equation(pz.Element):
+class Equation(pz.Schema):
     """A mathematical equation"""
     text = pz.Field(desc="The text of the equation", required=True)
     image_content = pz.BytesField(desc="An image of the equation", required=True)
@@ -34,7 +34,7 @@ class Equation(pz.Element):
 
 def buildPandemicPaperPlan(datasetId):
     """Fetches pandemic papers from a dataset"""
-    pandemicPapers = pz.getData(datasetId, basicElt=PandemicPaper)
+    pandemicPapers = pz.Dataset(datasetId, schema=PandemicPaper)
     return pandemicPapers
 
 def buildEquationPlan(datasetId):
@@ -58,7 +58,7 @@ def testEmit(datasetId = "askem-testset-02072024"):
     #     print(dataRecord.text, dataRecord.variables, dataRecord.parent.title, dataRecord.parent.publicationYear)
 
 def buildEquationImagePlan(datasetId):
-    images = pz.getData(datasetId, basicElt=pz.ImageFile)
+    images = pz.Dataset(datasetId, schema=pz.ImageFile)
     filteredImages = images.filterByStr("The image contains an equation")
     equationImages = filteredImages.convert(pz.EquationImage, desc = "Image that contains an equation")
     return equationImages

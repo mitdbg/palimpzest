@@ -1,17 +1,19 @@
-import os
-import io
-import json
-import time
-from typing import List, Union, BinaryIO, Callable
+from palimpzest.config import Config
+from palimpzest.datamanager import DataDirectory
+
+from fastapi import status
+from typing import List, BinaryIO
 from zipfile import ZipFile
 
 import pandas as pd
-import requests
-from fastapi import APIRouter, FastAPI, UploadFile, Response, status
 
-from palimpzest import DataDirectory
-import palimpzest as pz
 import hashlib
+import io
+import json
+import os
+import requests
+import time
+
 
 COSMOS_ADDRESS = "https://xdd.wisc.edu/cosmos_service"
 class PdfParser:
@@ -250,7 +252,7 @@ def get_text_from_pdf(filename, pdf_bytes, enable_file_cache = True):
 
 
 if __name__ == "__main__":
-    config = pz.Config("default")
+    config = Config("default")
     file_path = "../../../testdata/pdfs-tiny/battery.pdf"
     # output_dir = "../../../tests/testFileDirectory/cosmos"
     with open(file_path, "rb") as file:
@@ -259,4 +261,4 @@ if __name__ == "__main__":
         # file_name = os.path.basename(file_path)
         # # Call the cosmos_client function
         # cosmos_client(file_name, file, output_dir)
-    # pz.DataDirectory().rmRegisteredDataset("sidarthe.annotations.txt")
+    # DataDirectory().rmRegisteredDataset("sidarthe.annotations.txt")
