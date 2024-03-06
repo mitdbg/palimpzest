@@ -4,6 +4,7 @@ from palimpzest.policy import *
 
 import palimpzest as pz
 
+import json
 import time
 
 
@@ -36,10 +37,16 @@ if __name__ == "__main__":
     emails = emails.filterByStr("The email is sent by Larry")
 
     # get logical tree
+    t1 = time.time()
     logicalTree = emails.getLogicalTree()
+    t2 = time.time()
 
     # get candidate physical plans
     candidatePlans = logicalTree.createPhysicalPlanCandidates()
+    t3 = time.time()
+    print(f"Create Plan: {t1 - startTime:.3f}")
+    print(f"Get Logical Tree: {t2 - t1:.3f}")
+    print(f"Create Cand. Plans: {t3 - t2:.3f}")
 
     # use sampling to get better information about plans
     # sampler = SimpleSampler(min=10)
@@ -61,10 +68,18 @@ if __name__ == "__main__":
     print(f"Policy is: {str(myPolicy)}")
     print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")
     emitNestedTuple(physicalTree.dumpPhysicalTree())
+    t4 = time.time()
 
     # execute the plan
-    for r in physicalTree:
+    all_timing_info = []
+    for timing_info, r in physicalTree:
         print(f"(sender={r.sender}, subject={r.subject}")
+        all_timing_info.append(timing_info)
+
+    with open('timing_info.json', 'w') as f:
+        json.dump(all_timing_info, f)
 
     endTime = time.time()
-    print("Elapsed time:", endTime - startTime)
+    print(f"Plan Selection Time: {t4 - t3}")
+    print(f"Execution Time: {endTime - t4}")
+    print(f"Total Elapsed Time: {endTime - startTime}")

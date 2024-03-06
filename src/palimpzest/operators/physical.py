@@ -80,7 +80,7 @@ class MarshalAndScanDataOp(PhysicalOp):
     def __iter__(self):
         def iteratorFn():
             for nextCandidate in self.datadir.getRegisteredDataset(self.concreteDatasetIdentifier):
-                yield nextCandidate
+                yield {}, nextCandidate
 
         return iteratorFn()
 
@@ -146,7 +146,7 @@ class CacheScanDataOp(PhysicalOp):
         def iteratorFn():
             # NOTE: see comment in `estimateCost()` 
             for nextCandidate in self.datadir.getCachedResult(self.cacheIdentifier):
-                yield nextCandidate
+                yield {}, nextCandidate
         return iteratorFn()
 
 
@@ -273,7 +273,7 @@ class InduceFromCandidateOp(PhysicalOp):
                 if resultRecord is not None:
                     if shouldCache:
                         self.datadir.appendCache(self.targetCacheId, resultRecord)
-                    yield resultRecord
+                    yield {}, resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -384,7 +384,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                     if resultRecord is not None:
                         if shouldCache:
                             self.datadir.appendCache(self.targetCacheId, resultRecord)
-                        yield resultRecord
+                        yield {}, resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -485,7 +485,7 @@ class FilterCandidateOp(PhysicalOp):
                 if self._passesFilter(nextCandidate):
                     if shouldCache:
                         self.datadir.appendCache(self.targetCacheId, nextCandidate)
-                    yield nextCandidate
+                    yield {}, nextCandidate
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -595,7 +595,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
                         resultRecord = inputs[idx]
                         if shouldCache:
                             self.datadir.appendCache(self.targetCacheId, resultRecord)
-                        yield resultRecord
+                        yield {}, resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -649,7 +649,7 @@ class ApplyCountAggregateOp(PhysicalOp):
             dr.value = counter
             if shouldCache:
                 datadir.appendCache(self.targetCacheId, dr)
-            yield dr
+            yield {}, dr
 
             if shouldCache:
                 datadir.closeCache(self.targetCacheId)
@@ -704,7 +704,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
             dr.value = sum / float(counter)
             if shouldCache:
                 datadir.appendCache(self.targetCacheId, dr)
-            yield dr
+            yield {}, dr
 
             if shouldCache:
                 datadir.closeCache(self.targetCacheId)
@@ -744,7 +744,7 @@ class LimitScanOp(PhysicalOp):
                     break
                 if shouldCache:
                     datadir.appendCache(self.targetCacheId, nextCandidate)
-                yield nextCandidate
+                yield {}, nextCandidate
                 counter += 1
 
             if shouldCache:

@@ -1,9 +1,8 @@
 from palimpzest.elements import DataRecord, File, Number, Schema
 from typing import Any, Callable, Dict, List, Union
 
-import hashlib
-import json
 import os
+import time
 
 
 class DataSource:
@@ -60,6 +59,7 @@ class DirectorySource(DataSource):
 
     def __iter__(self) -> Callable[[], DataRecord]:
         def filteredIterator():
+            t_start = time.time()
             for filename in os.listdir(self.path):
                 file_path = os.path.join(self.path, filename)
                 if os.path.isfile(file_path):
@@ -67,7 +67,11 @@ class DirectorySource(DataSource):
                     dr.filename = file_path
                     bytes_data = open(file_path, "rb").read()
                     dr.contents = bytes_data
-                    yield dr
+                    t_end = time.time()
+                    timing_info = {"iter_time": t_end - t_start}
+                    yield timing_info, dr
+
+                    t_start = time.time()
 
         return filteredIterator()
 
