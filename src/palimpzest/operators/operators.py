@@ -152,7 +152,7 @@ class LogicalOperator:
             else [Model.MIXTRAL]
         )
         physicalPlans = []
-        for model in [Model.GPT_3_5, Model.GPT_4]: # in Model:
+        for model in models: # in Model:
             physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, model=model)
             physicalPlans.append(physicalPlan)
 
