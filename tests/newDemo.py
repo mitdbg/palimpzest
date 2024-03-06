@@ -14,11 +14,11 @@ def emitNestedTuple(node, indent=0):
         emitNestedTuple(child, indent=indent+2)
 
 
-# TODO: I want this to "just work" if it inherits from Schema instead of File;
+# TODO: I want this to "just work" if it inherits from Schema instead of TextFile;
 #       for some reason, inheriting from Schema leads to the "contents" being a bytes
 #       field but if Email inherits from File or TextFile, it becomes a string;
 #       this is important b/c dr.asTextJSON() will ignore bytes field(s).
-class Email(pz.File):
+class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
     sender = StringField(desc="The email address of the sender", required=True)
     subject = StringField(desc="The subject of the email", required=True)
@@ -28,8 +28,6 @@ if __name__ == "__main__":
     """
     This demo illustrates how the cost optimizer can produce and evaluate multiple plans.
     """
-    startTime = time.time()
-
     # user implemented plan
     emails = pz.Dataset(source="enron-tiny", schema=Email)
     emails = emails.filterByStr("The email is about someone taking a vacation")
@@ -63,8 +61,9 @@ if __name__ == "__main__":
     emitNestedTuple(physicalTree.dumpPhysicalTree())
 
     # execute the plan
+    startTime = time.time()
     for r in physicalTree:
-        print(f"(sender={r.sender}, subject={r.subject}")
+        print(f"(sender={r.sender}, subject={r.subject})")
 
     endTime = time.time()
     print("Elapsed time:", endTime - startTime)
