@@ -78,6 +78,8 @@ if __name__ == "__main__":
         records.append(r)
 
     # pretty print a table of the output records
+    print("----------")
+    print()
     printTable(records, cols=["subject", "sender"])
 
     endTime = time.time()
