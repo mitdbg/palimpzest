@@ -2,7 +2,10 @@
 from palimpzest.elements import Schema, StringField
 from palimpzest.policy import *
 
+from tabulate import tabulate
+
 import palimpzest as pz
+import pandas as pd
 
 import time
 
@@ -13,6 +16,14 @@ def emitNestedTuple(node, indent=0):
     if child is not None:
         emitNestedTuple(child, indent=indent+2)
 
+def printTable(records, cols=None):
+    records = [
+        {key: record.__dict__[key] for key in record.__dict__ if not key.startswith('_')}
+        for record in records
+    ]
+    records_df = pd.DataFrame(records)
+    print_cols = records_df.columns if cols is None else cols
+    print(tabulate(records_df[print_cols], headers="keys", tablefmt='psql'))
 
 # TODO: I want this to "just work" if it inherits from Schema instead of TextFile;
 #       for some reason, inheriting from Schema leads to the "contents" being a bytes
@@ -43,17 +54,17 @@ if __name__ == "__main__":
     # sampler = SimpleSampler(min=10)
     # candidatePlans = logicalTree.createPhysicalPlanCandidates(sampler=sampler)
 
-    # print out plans to the user
-    print("----------")
-    for idx, cp in enumerate(candidatePlans):
-        print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
-        print("Physical operator tree")
-        physicalOps = cp[3].dumpPhysicalTree()
-        emitNestedTuple(physicalOps)
-        print("----------")
+    # # print out plans to the user
+    # print("----------")
+    # for idx, cp in enumerate(candidatePlans):
+    #     print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
+    #     print("Physical operator tree")
+    #     physicalOps = cp[3].dumpPhysicalTree()
+    #     emitNestedTuple(physicalOps)
+    #     print("----------")
 
     # have policy select the candidate plan to execute
-    myPolicy = UserChoice()
+    myPolicy = MinCost()
     planTime, planCost, quality, physicalTree = myPolicy.choose(candidatePlans)
     print("----------")
     print(f"Policy is: {str(myPolicy)}")
@@ -62,8 +73,12 @@ if __name__ == "__main__":
 
     # execute the plan
     startTime = time.time()
+    records = []
     for r in physicalTree:
-        print(f"(sender={r.sender}, subject={r.subject})")
+        records.append(r)
+
+    # pretty print a table of the output records
+    printTable(records, cols=["subject", "sender"])
 
     endTime = time.time()
     print("Elapsed time:", endTime - startTime)

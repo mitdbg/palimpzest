@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 import palimpzest as pz
 
+from tabulate import tabulate
+
+import pandas as pd
+
 import argparse
 import time
 
@@ -70,6 +74,15 @@ def buildImagePlan(datasetId):
     dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
     return dogImages
 
+def printTable(records, cols=None):
+    records = [
+        {key: record.__dict__[key] for key in record.__dict__ if not key.startswith('_')}
+        for record in records
+    ]
+    records_df = pd.DataFrame(records)
+    print_cols = records_df.columns if cols is None else cols
+    print(tabulate(records_df[print_cols], headers="keys", tablefmt='psql'))
+
 def emitDataset(rootSet, title="Dataset", verbose=False):
     def emitNestedTuple(node, indent=0):
         elt, child = node
@@ -77,35 +90,34 @@ def emitDataset(rootSet, title="Dataset", verbose=False):
         if child is not None:
             emitNestedTuple(child, indent=indent+2)
 
-
-    print()
-    print()
-    print("# Let's test the basic functionality of the system")
+    # print()
+    # print()
+    # print("# Let's test the basic functionality of the system")
 
     # Print the syntactic tree
     syntacticElements = rootSet.dumpSyntacticTree()
-    print()
-    print("Syntactic operator tree")
-    emitNestedTuple(syntacticElements)
+    # print()
+    # print("Syntactic operator tree")
+    # emitNestedTuple(syntacticElements)
 
     # Print the (possibly optimized) logical tree
     logicalTree = rootSet.getLogicalTree()
     logicalElements = logicalTree.dumpLogicalTree()
-    print()
-    print("Logical operator tree")
-    emitNestedTuple(logicalElements)
+    # print()
+    # print("Logical operator tree")
+    # emitNestedTuple(logicalElements)
 
     # Generate candidate physical plans
     candidatePlans = logicalTree.createPhysicalPlanCandidates()    
 
-    # print out plans to the user
-    print("----------")
-    for idx, cp in enumerate(candidatePlans):
-        print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
-        print("Physical operator tree")
-        physicalOps = cp[3].dumpPhysicalTree()
-        emitNestedTuple(physicalOps)
-        print("----------")
+    # # print out plans to the user
+    # print("----------")
+    # for idx, cp in enumerate(candidatePlans):
+    #     print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
+    #     print("Physical operator tree")
+    #     physicalOps = cp[3].dumpPhysicalTree()
+    #     emitNestedTuple(physicalOps)
+    #     print("----------")
 
     # have policy select the candidate plan to execute
     # myPolicy = pz.UserChoice()
@@ -118,10 +130,10 @@ def emitDataset(rootSet, title="Dataset", verbose=False):
 
 
     #iterate over data
-    print()
-    print("Estimated seconds to complete:", planTime)
-    print("Estimated USD to complete:", planCost)
-    print("Concrete data results")
+    # print()
+    # print("Estimated seconds to complete:", planTime)
+    # print("Estimated USD to complete:", planCost)
+    # print("Concrete data results")
     return physicalTree
 
 #
@@ -151,60 +163,76 @@ if __name__ == "__main__":
     if task == "paper":
         rootSet = buildMITBatteryPaperPlan(datasetid)
         physicalTree = emitDataset(rootSet, title="Good MIT battery papers written by good authors", verbose=args.verbose)
-        for r in physicalTree:
-            print(r)
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records, cols=["title", "publicationYear", "author", "institution", "journal", "fundingAgency"])
+
     elif task == "enron":
         rootSet = buildEnronPlan(datasetid)
         physicalTree = emitDataset(rootSet, title="Enron emails", verbose=args.verbose)
-        for idx, r in enumerate(physicalTree):
-            print(idx)
-            print(r.subject)
-            print()
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records, cols=["sender", "subject"])
+
     elif task == "enronmap":
         rootSet = computeEnronStats(datasetid)
         physicalTree = emitDataset(rootSet, title="Enron subject counts", verbose=args.verbose)
-        for idx, r in enumerate(physicalTree):
-            print(idx)
-            print(r)
-            print()
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records)
+
     elif task == "pdftest":
         rootSet = buildTestPDFPlan(datasetid)
         physicalTree = emitDataset(rootSet, title="PDF files", verbose=args.verbose)
+        records = [pz.Number() for r in enumerate(physicalTree)]
+        records = [setattr(number, 'value', idx) for idx, number in enumerate(records)]
+        print("----------")
+        print()
+        printTable(records)
 
-        for idx, r in enumerate(physicalTree):
-            print("Extracted pdf", idx)
     elif task == "scitest":
         rootSet = buildSciPaperPlan(datasetid)
         physicalTree = emitDataset(rootSet, title="Scientific files", verbose=args.verbose)
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records, cols=["title", "author", "institution", "journal", "fundingAgency"])
 
-        for idx, r in enumerate(physicalTree):
-            print("Title", r.title)
-            print("Author", r.author)
-            print("Institution", r.institution)
-            print("Journal", r.journal)
-            print("Funding agency", r.fundingAgency)
-
-            print()
     elif task == "image":
         rootSet = buildImagePlan(datasetid)
         physicalTree = emitDataset(rootSet, title="Dogs", verbose=args.verbose)
-        for r in physicalTree:
-            print(r.filename, r.breed)
+        records = [r for r in physicalTree]
+        # TODO: create visual / HTML output
+        # for r in physicalTree:
+        #     print(r.filename, r.breed)
+
     elif task == "count":
         rootSet = testCount(datasetid)
         physicalTree = emitDataset(rootSet, title="Count records", verbose=args.verbose)
-        for r in physicalTree:
-            print(r)
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records)
+
     elif task == "average":
         rootSet = testAverage(datasetid)
         physicalTree = emitDataset(rootSet, title="Average of numbers", verbose=args.verbose)
-        for r in physicalTree:
-            print(r)
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records)
+
     elif task == "limit":
         rootSet = testLimit(datasetid, 5)
         physicalTree = emitDataset(rootSet, title="Limit the set to 5 items", verbose=args.verbose)
-        for r in physicalTree:
-            print(r)
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records)
+
     else:
         print("Unknown task")
         exit(1)
