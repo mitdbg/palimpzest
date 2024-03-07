@@ -5,11 +5,70 @@ from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.solver import Solver
 
-from typing import Any, Dict, Tuple, Union
+from functools import wraps
+from typing import Any, Callable, Dict, Tuple, Union
 
 import concurrent
+import os
 import sys
+import time
 
+# DEFINITIONS
+IteratorFn = Callable[[], DataRecord]
+
+
+def profiler(name: str):
+    """
+    profiler is a decorator factory. This function takes in a `name` argument
+    and returns a decorator which will decorate an iterator. In practice, this
+    looks almost identical to how you would normally use a decorator. The only
+    difference is that now we can use the `name` inside of our decorated function
+    to identify the profiling information on a per-iterator basis.
+
+    To use the profiler, simply apply it to an iterator as follows:
+
+    @profiler(name="foo")
+    def someIterator():
+        # do normal iterator things
+        yield dr
+    """
+    def profile_decorator(iterator: IteratorFn) -> IteratorFn:
+        # return iterator if profiling is not set to True
+        profile_pz = os.getenv(PZ_PROFILING_ENV_VAR)
+        if profile_pz is None or profile_pz.lower() != "true":
+            return iterator
+
+        # TODO: need to handle parallel iterators differently b/c all of
+        #       the time will be spent waiting for the first tuple and then
+        #       subsequent tuples will come immediately afterwards.
+        #
+        #       the history dict. is actually good;
+        #
+        #       most of the info we want to capture is in the _attemptMapping()
+        #       and/or _passesFilter() fcn. call(s); we need to have logic in those
+        #       functions that adds info to `record` directly in order to preserve
+        #       property that we don't need to change iterator function bodies/signatures
+        #       in order to handle profiling.
+        @wraps(iterator)
+        def timed_iterator():
+            t_start = time.time()
+            for idx, record in enumerate(iterator()):
+                t_end = time.time()
+
+                # capture time spent in iteration for operator
+                record._stats[f"{name}_iter_time"] = t_end - t_start
+
+                # add transformation to history of computation if this is an induce
+                if "induce" in name:
+                    record._history[f"{name}"] = record.asJSON()
+
+                yield record
+
+                # start timer for next iteration
+                t_start = time.time()
+
+        return timed_iterator
+    return profile_decorator
 
 class PhysicalOp:
     LOCAL_PLAN = "LOCAL"
@@ -21,6 +80,11 @@ class PhysicalOp:
     def __init__(self, outputSchema: Schema) -> None:
         self.outputSchema = outputSchema
         self.datadir = DataDirectory()
+
+        # if profiling is set to True, collect execution statistics and history of transformations
+        profile_pz = os.getenv(PZ_PROFILING_ENV_VAR)
+        if profile_pz is not None and profile_pz.lower() == "true":
+            self._stats = {}
 
     def dumpPhysicalTree(self) -> Tuple[PhysicalOp, Union[PhysicalOp, None]]:
         raise NotImplementedError("Abstract method")
@@ -76,11 +140,12 @@ class MarshalAndScanDataOp(PhysicalOp):
             "estOutputTokensPerElement": estOutputTokensPerElement,
             "quality": 1.0,
         }
-    
-    def __iter__(self):
+
+    def __iter__(self) -> IteratorFn:
+        @profiler(name="base_scan")
         def iteratorFn():
             for nextCandidate in self.datadir.getRegisteredDataset(self.concreteDatasetIdentifier):
-                yield {}, nextCandidate
+                yield nextCandidate
 
         return iteratorFn()
 
@@ -142,11 +207,12 @@ class CacheScanDataOp(PhysicalOp):
             "quality": 1.0,
         }
 
-    def __iter__(self):
+    def __iter__(self) -> IteratorFn:
+        @profiler(name="cache_scan")
         def iteratorFn():
             # NOTE: see comment in `estimateCost()` 
             for nextCandidate in self.datadir.getCachedResult(self.cacheIdentifier):
-                yield {}, nextCandidate
+                yield nextCandidate
         return iteratorFn()
 
 
@@ -265,15 +331,17 @@ class InduceFromCandidateOp(PhysicalOp):
             "quality": quality,
         }
 
-    def __iter__(self):
+    def __iter__(self) -> IteratorFn:
         shouldCache = self.datadir.openCache(self.targetCacheId)
+
+        @profiler(name="induce")
         def iteratorFn():    
             for nextCandidate in self.source:
                 resultRecord = self._attemptMapping(nextCandidate)
                 if resultRecord is not None:
                     if shouldCache:
                         self.datadir.appendCache(self.targetCacheId, resultRecord)
-                    yield {}, resultRecord
+                    yield resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -369,6 +437,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
     def __iter__(self):
         # This is very crudely implemented right now, since we materialize everything
         shouldCache = self.datadir.openCache(self.targetCacheId)
+        
+        @profiler(name="p_induce")
         def iteratorFn():
             inputs = []
             results = []
@@ -384,7 +454,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                     if resultRecord is not None:
                         if shouldCache:
                             self.datadir.appendCache(self.targetCacheId, resultRecord)
-                        yield {}, resultRecord
+                        yield resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -480,12 +550,14 @@ class FilterCandidateOp(PhysicalOp):
 
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
+        
+        @profiler(name="filter")
         def iteratorFn():
-            for nextCandidate in self.source: 
+            for nextCandidate in self.source:
                 if self._passesFilter(nextCandidate):
                     if shouldCache:
                         self.datadir.appendCache(self.targetCacheId, nextCandidate)
-                    yield {}, nextCandidate
+                    yield nextCandidate
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -579,6 +651,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
+        
+        @profiler(name="p_filter")
         def iteratorFn():
             inputs = []
             results = []
@@ -595,7 +669,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
                         resultRecord = inputs[idx]
                         if shouldCache:
                             self.datadir.appendCache(self.targetCacheId, resultRecord)
-                        yield {}, resultRecord
+                        yield resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -640,16 +714,18 @@ class ApplyCountAggregateOp(PhysicalOp):
     def __iter__(self):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
+        
+        @profiler(name="count")
         def iteratorFn():
             counter = 0
-            for nextCandidate in self.source:
+            for _ in self.source:
                 counter += 1
 
             dr = DataRecord(Number)
             dr.value = counter
             if shouldCache:
                 datadir.appendCache(self.targetCacheId, dr)
-            yield {}, dr
+            yield dr
 
             if shouldCache:
                 datadir.closeCache(self.targetCacheId)
@@ -690,6 +766,8 @@ class ApplyAverageAggregateOp(PhysicalOp):
     def __iter__(self):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
+        
+        @profiler(name="average")
         def iteratorFn():
             sum = 0
             counter = 0
@@ -704,7 +782,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
             dr.value = sum / float(counter)
             if shouldCache:
                 datadir.appendCache(self.targetCacheId, dr)
-            yield {}, dr
+            yield dr
 
             if shouldCache:
                 datadir.closeCache(self.targetCacheId)
@@ -737,6 +815,8 @@ class LimitScanOp(PhysicalOp):
     def __iter__(self):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
+        
+        @profiler(name="limit")
         def iteratorFn():
             counter = 0
             for nextCandidate in self.source: 
@@ -744,7 +824,7 @@ class LimitScanOp(PhysicalOp):
                     break
                 if shouldCache:
                     datadir.appendCache(self.targetCacheId, nextCandidate)
-                yield {}, nextCandidate
+                yield nextCandidate
                 counter += 1
 
             if shouldCache:

@@ -1,7 +1,9 @@
 from palimpzest.tools.dspyadaptors import TogetherHFAdaptor
+from palimpzest.tools.profilers import profiler
 
 import dspy
 import os
+import time
 
 
 ##
@@ -21,6 +23,7 @@ class QuestionOverPaper(dspy.Signature):
     context = dspy.InputField(desc="contains full text of the paper, including author, institution, title, and body")
     question = dspy.InputField(desc="one or more question about the paper")
     answer = dspy.OutputField(desc="print the answer only, separated by a newline character")
+
 
 #invoke dspy in chain of thought mode
 class dspyCOT(dspy.Module):
@@ -107,11 +110,31 @@ def run_cot_qa(context, question, model, llmService="openai", verbose=False, pro
 
     dspy.settings.configure(lm=turbo)
     cot = dspyCOT(promptSignature)
+    
+    start_time = time.time()
     pred = cot(question, context)
+    end_time = time.time()
+
+    # TODO: add this to run_cot_bool (and do_image_analysis) as well;
+    #       need to create some class structure / abstraction around everything
+    #       from physical operators -> solvers -> dspysearch, dspyadaptors, openai_image_converter, etc.
+    # collect statistics on prompt, usage, and timing if profiling is on
+    stats = {}
+    if profiler.is_profiling:
+        stats['api_call_duration'] = end_time - start_time
+        stats['prompt'] = turbo.history[-1]['prompt']
+        stats['usage'] = turbo.history[-1]['response']['usage']
+        stats['finish_reason'] = (
+            turbo.history[-1]['response']['finish_reason']
+            if isinstance(turbo, TogetherHFAdaptor)
+            else turbo.history[-1]['response']['choices'][-1]['finish_reason']
+        )
+
     if verbose:
         print("Prompt history:")
         turbo.inspect_history(n=1)
-    return pred.answer
+
+    return pred.answer, stats
 
 if __name__ == "__main__":
     llmService = "openai"

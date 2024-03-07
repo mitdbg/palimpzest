@@ -3,6 +3,7 @@ from palimpzest.elements import DataRecord, EquationImage, File, Filter, ImageFi
 from palimpzest.tools import get_text_from_pdf
 from palimpzest.tools.dspysearch import run_cot_bool, run_cot_qa, gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.tools.openai_image_converter import do_image_analysis
+from palimpzest.tools.profilers import profiler
 
 from papermage import Document
 from typing import Any, Dict, Tuple, Union
@@ -133,16 +134,17 @@ class Solver:
                 text_content = candidate.asTextJSON()
                 doc_schema = str(outputSchema)
                 doc_type = outputSchema.className()
-
+                qa_stats = {}
                 for field_name in outputSchema.fieldNames():
                     f = getattr(outputSchema, field_name)
                     try:
                         # TODO: allow for mult. fcns
+                        stats = None
                         if prompt_strategy == PromptStrategy.DSPY_COT:
-                            answer = run_cot_qa(text_content,
-                                                f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
-                                                model.value,
-                                                llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                            answer, stats = run_cot_qa(text_content,
+                                                       f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
+                                                       model.value,
+                                                       llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
                         # TODO
                         elif prompt_strategy == PromptStrategy.ZERO_SHOT:
                             raise Exception("not implemented yet")
@@ -151,9 +153,13 @@ class Solver:
                             raise Exception("not implemented yet")
 
                         setattr(dr, field_name, answer)
+                        if profiler.is_profiling:
+                            qa_stats[f"{field_name}_{}"] = stats # TODO
+
                     except Exception as e:
                         print(f"Error: {e}")
                         setattr(dr, field_name, None)
+                    
                 return dr
             return fn
 

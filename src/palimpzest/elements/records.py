@@ -1,4 +1,5 @@
 from palimpzest.elements import Schema
+from palimpzest.tools.profilers import profiler
 
 import json
 
@@ -7,6 +8,11 @@ class DataRecord:
     """A DataRecord is a single record of data matching some Schema."""
     def __init__(self, schema: Schema):
         self._schema = schema
+
+        # if profiling is set to True, collect execution statistics and history of transformations
+        if profiler.is_profiling:
+            self._stats = {}
+            self._history = {}
 
     def __setattr__(self, key, value):
         if not key.startswith("_") and not hasattr(self._schema, key):
