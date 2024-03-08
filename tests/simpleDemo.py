@@ -77,7 +77,17 @@ def buildImagePlan(datasetId):
     dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
     return dogImages
 
-def printTable(records, cols=None, gradio=False):
+
+def buildNestedStr(node, indent=0, buildStr=""):
+        elt, child = node
+        indentation = " " * indent
+        buildStr =  f"{indentation}{elt}" if indent == 0 else buildStr + f"\n{indentation}{elt}"
+        if child is not None:
+            return buildNestedStr(child, indent=indent+2, buildStr=buildStr)
+        else:
+            return buildStr
+
+def printTable(records, cols=None, gradio=False, query=None, plan=None):
     records = [
         {
             key: record.__dict__[key]
@@ -95,6 +105,10 @@ def printTable(records, cols=None, gradio=False):
     else:
         with gr.Blocks() as demo:
             gr.Dataframe(records_df[print_cols])
+
+            if plan is not None:
+                plan_str = buildNestedStr(plan.dumpPhysicalTree())
+                gr.Textbox(value=plan_str, info="Query Plan")
 
         demo.launch()
 
@@ -197,6 +211,7 @@ if __name__ == "__main__":
             records,
             cols=["title", "publicationYear", "author", "institution", "journal", "fundingAgency"],
             gradio=True,
+            plan=physicalTree,
         )
 
     elif task == "enron":
@@ -205,7 +220,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records, cols=["sender", "subject"], gradio=True)
+        printTable(records, cols=["sender", "subject"], gradio=True, plan=physicalTree)
 
     elif task == "enronmap":
         rootSet = computeEnronStats(datasetid)
@@ -213,7 +228,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records, gradio=True)
+        printTable(records, gradio=True, plan=physicalTree)
 
     elif task == "pdftest":
         rootSet = buildTestPDFPlan(datasetid)
@@ -222,7 +237,7 @@ if __name__ == "__main__":
         records = [setattr(number, 'value', idx) for idx, number in enumerate(records)]
         print("----------")
         print()
-        printTable(records, gradio=True)
+        printTable(records, gradio=True, plan=physicalTree)
 
     elif task == "scitest":
         rootSet = buildSciPaperPlan(datasetid)
@@ -230,7 +245,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records, cols=["title", "author", "institution", "journal", "fundingAgency"], gradio=True)
+        printTable(records, cols=["title", "author", "institution", "journal", "fundingAgency"], gradio=True, plan=physicalTree)
 
     elif task == "image":
         print("Starting image task")
@@ -256,6 +271,9 @@ if __name__ == "__main__":
                     with gr.Column():
                         breed_blocks.append(gr.Textbox(value=breed))
 
+            plan_str = buildNestedStr(physicalTree.dumpPhysicalTree())
+            gr.Textbox(value=plan_str, info="Query Plan")
+
         demo.launch()
 
     elif task == "count":
@@ -264,7 +282,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records, gradio=True)
+        printTable(records, gradio=True, plan=physicalTree)
 
     elif task == "average":
         rootSet = testAverage(datasetid)
@@ -272,7 +290,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records, gradio=True)
+        printTable(records, gradio=True, plan=physicalTree)
 
     elif task == "limit":
         rootSet = testLimit(datasetid, 5)
@@ -280,7 +298,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records, gradio=True)
+        printTable(records, gradio=True, plan=physicalTree)
 
     else:
         print("Unknown task")
