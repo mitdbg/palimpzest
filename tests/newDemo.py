@@ -4,6 +4,7 @@ from palimpzest.policy import *
 
 from tabulate import tabulate
 
+import gradio as gr
 import palimpzest as pz
 import pandas as pd
 
@@ -16,14 +17,26 @@ def emitNestedTuple(node, indent=0):
     if child is not None:
         emitNestedTuple(child, indent=indent+2)
 
-def printTable(records, cols=None):
+def printTable(records, cols=None, gradio=False):
     records = [
-        {key: record.__dict__[key] for key in record.__dict__ if not key.startswith('_')}
+        {
+            key: record.__dict__[key]
+            for key in record.__dict__
+            if not key.startswith('_')
+        }
         for record in records
     ]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
-    print(tabulate(records_df[print_cols], headers="keys", tablefmt='psql'))
+
+    if not gradio:
+        print(tabulate(records_df[print_cols], headers="keys", tablefmt='psql'))
+
+    else:
+        with gr.Blocks() as demo:
+            gr.Dataframe(records_df[print_cols])
+
+        demo.launch()
 
 # TODO: I want this to "just work" if it inherits from Schema instead of TextFile;
 #       for some reason, inheriting from Schema leads to the "contents" being a bytes
@@ -80,7 +93,7 @@ if __name__ == "__main__":
     # pretty print a table of the output records
     print("----------")
     print()
-    printTable(records, cols=["subject", "sender"])
+    printTable(records, cols=["sender", "subject"], gradio=True)
 
     endTime = time.time()
     print("Elapsed time:", endTime - startTime)

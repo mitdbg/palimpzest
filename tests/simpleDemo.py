@@ -77,14 +77,26 @@ def buildImagePlan(datasetId):
     dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
     return dogImages
 
-def printTable(records, cols=None):
+def printTable(records, cols=None, gradio=False):
     records = [
-        {key: record.__dict__[key] for key in record.__dict__ if not key.startswith('_')}
+        {
+            key: record.__dict__[key]
+            for key in record.__dict__
+            if not key.startswith('_')
+        }
         for record in records
     ]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
-    print(tabulate(records_df[print_cols], headers="keys", tablefmt='psql'))
+
+    if not gradio:
+        print(tabulate(records_df[print_cols], headers="keys", tablefmt='psql'))
+
+    else:
+        with gr.Blocks() as demo:
+            gr.Dataframe(records_df[print_cols])
+
+        demo.launch()
 
 def emitDataset(rootSet, title="Dataset", verbose=False):
     def emitNestedTuple(node, indent=0):
@@ -169,7 +181,11 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records, cols=["title", "publicationYear", "author", "institution", "journal", "fundingAgency"])
+        printTable(
+            records,
+            cols=["title", "publicationYear", "author", "institution", "journal", "fundingAgency"],
+            gradio=True,
+        )
 
     elif task == "enron":
         rootSet = buildEnronPlan(datasetid)
@@ -177,7 +193,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records, cols=["sender", "subject"])
+        printTable(records, cols=["sender", "subject"], gradio=True)
 
     elif task == "enronmap":
         rootSet = computeEnronStats(datasetid)
@@ -185,7 +201,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records)
+        printTable(records, gradio=True)
 
     elif task == "pdftest":
         rootSet = buildTestPDFPlan(datasetid)
@@ -194,7 +210,7 @@ if __name__ == "__main__":
         records = [setattr(number, 'value', idx) for idx, number in enumerate(records)]
         print("----------")
         print()
-        printTable(records)
+        printTable(records, gradio=True)
 
     elif task == "scitest":
         rootSet = buildSciPaperPlan(datasetid)
@@ -202,7 +218,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records, cols=["title", "author", "institution", "journal", "fundingAgency"])
+        printTable(records, cols=["title", "author", "institution", "journal", "fundingAgency"], gradio=True)
 
     elif task == "image":
         rootSet = buildImagePlan(datasetid)
@@ -233,7 +249,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records)
+        printTable(records, gradio=True)
 
     elif task == "average":
         rootSet = testAverage(datasetid)
@@ -241,7 +257,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records)
+        printTable(records, gradio=True)
 
     elif task == "limit":
         rootSet = testLimit(datasetid, 5)
@@ -249,7 +265,7 @@ if __name__ == "__main__":
         records = [r for r in physicalTree]
         print("----------")
         print()
-        printTable(records)
+        printTable(records, gradio=True)
 
     else:
         print("Unknown task")
