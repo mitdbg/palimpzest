@@ -190,9 +190,6 @@ class LogicalOperator:
 
             plans.append((totalTime, totalCost, quality, physicalPlan))
 
-        for plan in plans:
-            print(plan)
-
         t_cost = time.time()
         # print(f"Time to est. plan cost(s): {t_cost - t_physical:.2f}")
 
