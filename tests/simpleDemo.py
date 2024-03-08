@@ -241,7 +241,7 @@ if __name__ == "__main__":
         print("Obtained records", records)
         imgs, breeds = [], []
         for record in records:
-            print("Truing to open ", record.filename)
+            print("Trying to open ", record.filename)
             img = Image.open(record.filename).resize((128,128))
             img_arr = np.asarray(img)
             imgs.append(img_arr)
