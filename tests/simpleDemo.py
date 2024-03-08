@@ -2,7 +2,10 @@
 import palimpzest as pz
 
 from tabulate import tabulate
+from PIL import Image
 
+import gradio as gr
+import numpy as np
 import pandas as pd
 
 import argparse
@@ -205,9 +208,24 @@ if __name__ == "__main__":
         rootSet = buildImagePlan(datasetid)
         physicalTree = emitDataset(rootSet, title="Dogs", verbose=args.verbose)
         records = [r for r in physicalTree]
-        # TODO: create visual / HTML output
-        # for r in physicalTree:
-        #     print(r.filename, r.breed)
+
+        imgs, breeds = [], []
+        for record in records:
+            img = Image.open(record.filename).resize((128,128))
+            img_arr = np.asarray(img)
+            imgs.append(img_arr)
+            breeds.append(record.breed)
+
+        with gr.Blocks() as demo:
+            img_blocks, breed_blocks = [], []
+            for img, breed in zip(imgs, breeds):
+                with gr.Row():
+                    with gr.Column():
+                        img_blocks.append(gr.Image(value=img))
+                    with gr.Column():
+                        breed_blocks.append(gr.Textbox(value=breed))
+
+        demo.launch()
 
     elif task == "count":
         rootSet = testCount(datasetid)
