@@ -21,6 +21,7 @@ from copy import deepcopy
 from itertools import permutations
 from typing import List, Tuple
 
+import os
 import random
 import time
 
@@ -145,14 +146,16 @@ class LogicalOperator:
         # 3. input sub-selection
         #    a. vector DB, LLM attention, ask-the-LLM
 
-        # choose set of acceptable models based on llmservice for now
-        models = (
-            [Model.GPT_3_5, Model.GPT_4]
-            if DataDirectory().current_config.get("llmservice") == "openai"
-            else [Model.MIXTRAL]
-        )
+        # choose set of acceptable models based on possible llmservices
+        models = []
+        if os.getenv('OPENAI_API_KEY') is not None:
+            models.extend([Model.GPT_3_5, Model.GPT_4])
+
+        if os.getenv('TOGETHER_API_KEY') is not None:
+            models.extend([Model.MIXTRAL])
+
         physicalPlans = []
-        for model in models: # in Model:
+        for model in models:
             physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, model=model)
             physicalPlans.append(physicalPlan)
 
@@ -186,6 +189,9 @@ class LogicalOperator:
             quality = planCost["quality"]
 
             plans.append((totalTime, totalCost, quality, physicalPlan))
+
+        for plan in plans:
+            print(plan)
 
         t_cost = time.time()
         # print(f"Time to est. plan cost(s): {t_cost - t_physical:.2f}")

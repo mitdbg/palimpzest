@@ -125,14 +125,15 @@ def emitDataset(rootSet, policy, title="Dataset", verbose=False):
     # Generate candidate physical plans
     candidatePlans = logicalTree.createPhysicalPlanCandidates()    
 
-    # # print out plans to the user
-    # print("----------")
-    # for idx, cp in enumerate(candidatePlans):
-    #     print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
-    #     print("Physical operator tree")
-    #     physicalOps = cp[3].dumpPhysicalTree()
-    #     emitNestedTuple(physicalOps)
-    #     print("----------")
+    # print out plans to the user if it is their choice
+    if args.policy == "user":
+        print("----------")
+        for idx, cp in enumerate(candidatePlans):
+            print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
+            print("Physical operator tree")
+            physicalOps = cp[3].dumpPhysicalTree()
+            emitNestedTuple(physicalOps)
+            print("----------")
 
     # have policy select the candidate plan to execute
     planTime, planCost, quality, physicalTree = policy.choose(candidatePlans)
