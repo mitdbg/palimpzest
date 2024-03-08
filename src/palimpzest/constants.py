@@ -9,6 +9,7 @@ class Model(Enum):
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
     GPT_3_5 = "gpt-3.5-turbo-0125"
     GPT_4 = "gpt-4-0125-preview"
+    GPT_4V = "gpt-4-vision-preview"
 
 class PromptStrategy(Enum):
     ZERO_SHOT = "zero-shot"
@@ -196,9 +197,21 @@ GPT_4_MODEL_CARD = {
     ### "GSM8K": 92.0,^     # 5-shot
 }
 
+# TODO: rename MMLU to "overall" for all cards
+GPT_4V_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 10 / 1E6,
+    "usd_per_output_token": 30 / 1E6,
+    ##### Time #####
+    "seconds_per_output_token": 0.042 / 10.0, # TODO: / 10.0 is a hack; need to figure out why time estimates are so off
+    ##### Agg. Benchmark #####
+    "MMLU": 86.4,
+}
+
 MODEL_CARDS = {
     Model.LLAMA2.value: LLAMA2_7B_MODEL_CARD,
     Model.MIXTRAL.value: MIXTRAL_8X_7B_MODEL_CARD,
     Model.GPT_3_5.value: GPT_3_5_MODEL_CARD,
     Model.GPT_4.value: GPT_4_MODEL_CARD,
+    Model.GPT_4V.value: GPT_4V_MODEL_CARD,
 }
