@@ -98,7 +98,7 @@ def printTable(records, cols=None, gradio=False):
 
         demo.launch()
 
-def emitDataset(rootSet, title="Dataset", verbose=False):
+def emitDataset(rootSet, policy, title="Dataset", verbose=False):
     def emitNestedTuple(node, indent=0):
         elt, child = node
         print(" " * indent, elt)
@@ -135,11 +135,9 @@ def emitDataset(rootSet, title="Dataset", verbose=False):
     #     print("----------")
 
     # have policy select the candidate plan to execute
-    # myPolicy = pz.UserChoice()
-    myPolicy = pz.MinCost()
-    planTime, planCost, quality, physicalTree = myPolicy.choose(candidatePlans)
+    planTime, planCost, quality, physicalTree = policy.choose(candidatePlans)
     print("----------")
-    print(f"Policy is: {str(myPolicy)}")
+    print(f"Policy is: {str(policy)}")
     print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")
     emitNestedTuple(physicalTree.dumpPhysicalTree())
 
@@ -161,6 +159,7 @@ if __name__ == "__main__":
     parser.add_argument('--verbose', default=False, action='store_true', help='Print verbose output')
     parser.add_argument('--datasetid', type=str, help='The dataset id')
     parser.add_argument('--task' , type=str, help='The task to run')
+    parser.add_argument('--policy', type=str, help="One of 'user', 'mincost', 'mintime', 'maxquality', 'harmonicmean'")
 
     args = parser.parse_args()
 
@@ -174,10 +173,22 @@ if __name__ == "__main__":
 
     datasetid = args.datasetid
     task = args.task
+    policy = pz.MaxHarmonicMean()
+    if args.policy is not None:
+        if args.policy == "user":
+            policy = pz.UserChoice()
+        elif args.policy == "mincost":
+            policy = pz.MinCost()
+        elif args.policy == "mintime":
+            policy = pz.MinTime()
+        elif args.policy == "maxquality":
+            policy = pz.MaxQuality()
+        elif args.policy == "harmonicmean":
+            policy = pz.MaxHarmonicMean()
 
     if task == "paper":
         rootSet = buildMITBatteryPaperPlan(datasetid)
-        physicalTree = emitDataset(rootSet, title="Good MIT battery papers written by good authors", verbose=args.verbose)
+        physicalTree = emitDataset(rootSet, policy, title="Good MIT battery papers written by good authors", verbose=args.verbose)
         records = [r for r in physicalTree]
         print("----------")
         print()
@@ -189,7 +200,7 @@ if __name__ == "__main__":
 
     elif task == "enron":
         rootSet = buildEnronPlan(datasetid)
-        physicalTree = emitDataset(rootSet, title="Enron emails", verbose=args.verbose)
+        physicalTree = emitDataset(rootSet, policy, title="Enron emails", verbose=args.verbose)
         records = [r for r in physicalTree]
         print("----------")
         print()
@@ -197,7 +208,7 @@ if __name__ == "__main__":
 
     elif task == "enronmap":
         rootSet = computeEnronStats(datasetid)
-        physicalTree = emitDataset(rootSet, title="Enron subject counts", verbose=args.verbose)
+        physicalTree = emitDataset(rootSet, policy, title="Enron subject counts", verbose=args.verbose)
         records = [r for r in physicalTree]
         print("----------")
         print()
@@ -205,7 +216,7 @@ if __name__ == "__main__":
 
     elif task == "pdftest":
         rootSet = buildTestPDFPlan(datasetid)
-        physicalTree = emitDataset(rootSet, title="PDF files", verbose=args.verbose)
+        physicalTree = emitDataset(rootSet, policy, title="PDF files", verbose=args.verbose)
         records = [pz.Number() for r in enumerate(physicalTree)]
         records = [setattr(number, 'value', idx) for idx, number in enumerate(records)]
         print("----------")
@@ -214,19 +225,22 @@ if __name__ == "__main__":
 
     elif task == "scitest":
         rootSet = buildSciPaperPlan(datasetid)
-        physicalTree = emitDataset(rootSet, title="Scientific files", verbose=args.verbose)
+        physicalTree = emitDataset(rootSet, policy, title="Scientific files", verbose=args.verbose)
         records = [r for r in physicalTree]
         print("----------")
         print()
         printTable(records, cols=["title", "author", "institution", "journal", "fundingAgency"], gradio=True)
 
     elif task == "image":
+        print("Starting image task")
         rootSet = buildImagePlan(datasetid)
-        physicalTree = emitDataset(rootSet, title="Dogs", verbose=args.verbose)
+        physicalTree = emitDataset(rootSet, policy, title="Dogs", verbose=args.verbose)
         records = [r for r in physicalTree]
 
+        print("Obtained records", records)
         imgs, breeds = [], []
         for record in records:
+            print("Truing to open ", record.filename)
             img = Image.open(record.filename).resize((128,128))
             img_arr = np.asarray(img)
             imgs.append(img_arr)
@@ -245,7 +259,7 @@ if __name__ == "__main__":
 
     elif task == "count":
         rootSet = testCount(datasetid)
-        physicalTree = emitDataset(rootSet, title="Count records", verbose=args.verbose)
+        physicalTree = emitDataset(rootSet, policy, title="Count records", verbose=args.verbose)
         records = [r for r in physicalTree]
         print("----------")
         print()
@@ -253,7 +267,7 @@ if __name__ == "__main__":
 
     elif task == "average":
         rootSet = testAverage(datasetid)
-        physicalTree = emitDataset(rootSet, title="Average of numbers", verbose=args.verbose)
+        physicalTree = emitDataset(rootSet, policy, title="Average of numbers", verbose=args.verbose)
         records = [r for r in physicalTree]
         print("----------")
         print()
@@ -261,7 +275,7 @@ if __name__ == "__main__":
 
     elif task == "limit":
         rootSet = testLimit(datasetid, 5)
-        physicalTree = emitDataset(rootSet, title="Limit the set to 5 items", verbose=args.verbose)
+        physicalTree = emitDataset(rootSet, policy, title="Limit the set to 5 items", verbose=args.verbose)
         records = [r for r in physicalTree]
         print("----------")
         print()
