@@ -304,6 +304,5 @@ if __name__ == "__main__":
         print("Unknown task")
         exit(1)
 
-
     endTime = time.time()
     print("Elapsed time:", endTime - startTime)
