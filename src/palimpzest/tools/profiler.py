@@ -69,7 +69,7 @@ class Profiler:
             self.agg_operator_stats["prompts"][prompt] += 1
         else:
             self.agg_operator_stats["prompts"][prompt] = 1
-        
+
         if field_name is not None:
             # initialize aggregate field stats sub-dictionary if not already present
             if field_name not in self.agg_operator_stats:
@@ -80,7 +80,7 @@ class Profiler:
                     "finish_reasons": {},
                     "prompts": {},
                 }
-            
+
             # update field aggregate statistics
             self.agg_operator_stats[field_name]["total_input_tokens"] += stats["usage"]["prompt_tokens"]
             finish_reason = stats["finish_reason"]
