@@ -1,7 +1,10 @@
+from palimpzest.tools.profiler import Profiler
+
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 import base64
 import requests
+import time
 
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
 RETRY_MULTIPLIER = 2
@@ -61,16 +64,22 @@ def do_image_analysis(api_key, image_bytes):
         "Authorization": f"Bearer {api_key}"
     }
 
+    start_time = time.time()
     response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+    end_time = time.time()
 
     # Your JSON blob
     json_blob = response.json()
-    #print(json_blob)
+
     # Accessing the content
-    content_str = json_blob['choices'][0]['message']['content']
+    content_str = json_blob['choices'][-1]['message']['content']
 
-    # Converting the string back to a JSON object
-    #content_json = json.loads(content_str)
+    # get usage data if profiling is on
+    stats = {}
+    if Profiler.profiling_on():
+        stats['api_call_duration'] = end_time - start_time
+        stats['prompt'] = None
+        stats['usage'] = json_blob['usage']
+        stats['finish_reason'] = json_blob['response']['choices'][-1]['finish_reason']
 
-    #print(content_json)
-    return content_str
+    return content_str, stats

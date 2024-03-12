@@ -1,5 +1,5 @@
 from palimpzest.elements import Schema
-from palimpzest.tools.profilers import profiler
+from palimpzest.tools.profiler import Profiler
 
 import json
 
@@ -10,7 +10,7 @@ class DataRecord:
         self._schema = schema
 
         # if profiling is set to True, collect execution statistics and history of transformations
-        if profiler.is_profiling:
+        if Profiler.profiling_on():
             self._stats = {}
             self._history = {}
 
@@ -24,13 +24,18 @@ class DataRecord:
     def schema(self):
         return self._schema
 
-    def asTextJSON(self):
+    def asTextJSON(self, serialize: bool=False):
         """Return a JSON representation of this DataRecord"""
         keys = sorted(self.__dict__)
         # Make a dictionary out of the key/value pairs
         d = {k: str(self.__dict__[k]) for k in keys if not k.startswith("_") and not isinstance(self.__dict__[k] , bytes)}
         d["data type"] = str(self._schema.__name__)
         d["data type description"]  = str(self._schema.__doc__)
+        if serialize and Profiler.profiling_on():
+            d = {k: v for k, v in d.items() if k not in ["contents"]}
+            d["_stats"] = self._stats
+            return d
+
         return json.dumps(d, indent=2)
 
     def asJSON(self):

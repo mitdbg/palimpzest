@@ -19,9 +19,6 @@ class PromptStrategy(Enum):
 # Palimpzest root directory
 PZ_DIR = os.path.join(os.path.expanduser("~"), ".palimpzest")
 
-# Palimpzest env. variable which must be set to turn on profiling
-PZ_PROFILING_ENV_VAR = "PZ_PROFILE"
-
 # Assume 500 MB/sec for local SSD scan time
 LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
 

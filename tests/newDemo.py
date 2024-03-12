@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from palimpzest.elements import Schema, StringField
 from palimpzest.policy import *
+from palimpzest.tools.profiler import Profiler
 
 import palimpzest as pz
 
@@ -71,13 +72,15 @@ if __name__ == "__main__":
     t4 = time.time()
 
     # execute the plan
-    all_timing_info = []
-    for timing_info, r in physicalTree:
+    for r in physicalTree:
         print(f"(sender={r.sender}, subject={r.subject})")
-        all_timing_info.append(timing_info)
 
-    with open('timing_info.json', 'w') as f:
-        json.dump(all_timing_info, f)
+    # if profiling was turned on; capture statistics
+    if Profiler.profiling_on():
+        profiling_data = physicalTree.getProfilingData()
+
+        with open('profiling.json', 'w') as f:
+            json.dump(profiling_data, f)
 
     endTime = time.time()
     print(f"Plan Selection Time: {t4 - t3}")

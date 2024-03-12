@@ -1,5 +1,5 @@
 from palimpzest.tools.dspyadaptors import TogetherHFAdaptor
-from palimpzest.tools.profilers import profiler
+from palimpzest.tools.profiler import Profiler
 
 import dspy
 import os
@@ -59,13 +59,13 @@ def gen_qa_signature_class(doc_schema, doc_type):
     answer_desc = f"print the answer only, separated by a newline character"
     return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
-def run_cot_bool(context, question, model, llmService="openai", verbose=False, promptSignature=FilterOverPaper):
+def run_cot_bool(context, question, model_name, llmService="openai", verbose=False, promptSignature=FilterOverPaper):
     if llmService == "openai":
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         # get openai key from environment
         openai_key = os.environ['OPENAI_API_KEY']
-        turbo = dspy.OpenAI(model=model, api_key=openai_key, temperature=0.0)
+        turbo = dspy.OpenAI(model=model_name, api_key=openai_key, temperature=0.0)
     elif llmService == "together":
         if 'TOGETHER_API_KEY' not in os.environ:
             raise ValueError("TOGETHER_API_KEY not found in environment variables")
@@ -73,54 +73,23 @@ def run_cot_bool(context, question, model, llmService="openai", verbose=False, p
         together_key = os.environ['TOGETHER_API_KEY']
         #redpajamaModel = 'togethercomputer/RedPajama-INCITE-7B-Base'
         # mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
-        mixtralModel = model
+        mixtralModel = model_name
         turbo = TogetherHFAdaptor(mixtralModel, together_key)
     else:
         raise ValueError("llmService must be either 'openai' or 'together'")
 
     dspy.settings.configure(lm=turbo)
     cot = dspyCOT(promptSignature)
-    pred = cot(question, context)
-    if verbose:
-        print("Prompt history:")
-        turbo.inspect_history(n=1)
-    #print(question)
-    #print(indent(pred.rationale, 4 * ' '))
-    #print(pred.answer)
-    return pred.answer
 
-def run_cot_qa(context, question, model, llmService="openai", verbose=False, promptSignature=QuestionOverPaper):
-    if llmService == "openai":
-        if 'OPENAI_API_KEY' not in os.environ:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
-        # get openai key from environment
-        openai_key = os.environ['OPENAI_API_KEY']
-        turbo = dspy.OpenAI(model=model, api_key=openai_key, temperature=0.0)
-    elif llmService == "together":
-        if 'TOGETHER_API_KEY' not in os.environ:
-            raise ValueError("TOGETHER_API_KEY not found in environment variables")
-        # get together key from environment
-        together_key = os.environ['TOGETHER_API_KEY']
-        #redpajamaModel = 'togethercomputer/RedPajama-INCITE-7B-Base'
-        # mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
-        mixtralModel = model
-        turbo = TogetherHFAdaptor(mixtralModel, together_key)
-    else:
-        raise ValueError("llmService must be either 'openai' or 'together'")
-
-    dspy.settings.configure(lm=turbo)
-    cot = dspyCOT(promptSignature)
-    
     start_time = time.time()
     pred = cot(question, context)
     end_time = time.time()
 
-    # TODO: add this to run_cot_bool (and do_image_analysis) as well;
-    #       need to create some class structure / abstraction around everything
-    #       from physical operators -> solvers -> dspysearch, dspyadaptors, openai_image_converter, etc.
+    # TODO: need to create some class structure / abstraction around everything from
+    #       physical operators -> solvers -> dspysearch, dspyadaptors, openai_image_converter, etc.
     # collect statistics on prompt, usage, and timing if profiling is on
     stats = {}
-    if profiler.is_profiling:
+    if Profiler.profiling_on():
         stats['api_call_duration'] = end_time - start_time
         stats['prompt'] = turbo.history[-1]['prompt']
         stats['usage'] = turbo.history[-1]['response']['usage']
@@ -135,6 +104,54 @@ def run_cot_qa(context, question, model, llmService="openai", verbose=False, pro
         turbo.inspect_history(n=1)
 
     return pred.answer, stats
+
+
+def run_cot_qa(context, question, model_name, llmService="openai", verbose=False, promptSignature=QuestionOverPaper):
+    if llmService == "openai":
+        if 'OPENAI_API_KEY' not in os.environ:
+            raise ValueError("OPENAI_API_KEY not found in environment variables")
+        # get openai key from environment
+        openai_key = os.environ['OPENAI_API_KEY']
+        turbo = dspy.OpenAI(model=model_name, api_key=openai_key, temperature=0.0)
+    elif llmService == "together":
+        if 'TOGETHER_API_KEY' not in os.environ:
+            raise ValueError("TOGETHER_API_KEY not found in environment variables")
+        # get together key from environment
+        together_key = os.environ['TOGETHER_API_KEY']
+        #redpajamaModel = 'togethercomputer/RedPajama-INCITE-7B-Base'
+        # mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
+        mixtralModel = model_name
+        turbo = TogetherHFAdaptor(mixtralModel, together_key)
+    else:
+        raise ValueError("llmService must be either 'openai' or 'together'")
+
+    dspy.settings.configure(lm=turbo)
+    cot = dspyCOT(promptSignature)
+
+    start_time = time.time()
+    pred = cot(question, context)
+    end_time = time.time()
+
+    # TODO: need to create some class structure / abstraction around everything from
+    #       physical operators -> solvers -> dspysearch, dspyadaptors, openai_image_converter, etc.
+    # collect statistics on prompt, usage, and timing if profiling is on
+    stats = {}
+    if Profiler.profiling_on():
+        stats['api_call_duration'] = end_time - start_time
+        stats['prompt'] = turbo.history[-1]['prompt']
+        stats['usage'] = turbo.history[-1]['response']['usage']
+        stats['finish_reason'] = (
+            turbo.history[-1]['response']['finish_reason']
+            if isinstance(turbo, TogetherHFAdaptor)
+            else turbo.history[-1]['response']['choices'][-1]['finish_reason']
+        )
+
+    if verbose:
+        print("Prompt history:")
+        turbo.inspect_history(n=1)
+
+    return pred.answer, stats
+
 
 if __name__ == "__main__":
     llmService = "openai"

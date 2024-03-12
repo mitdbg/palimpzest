@@ -1,9 +1,8 @@
-from palimpzest.tools.profilers import profiler
+from palimpzest.tools.profiler import Profiler
 
 from dsp.modules.hf import HFModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-import os
 import requests
 
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
@@ -98,7 +97,7 @@ class TogetherHFAdaptor(HFModel):
                 }
 
                 # add key(s) for usage, finish_reason if profiling the system
-                if profiler.is_profiling:
+                if Profiler.profiling_on():
                     response['usage'] = resp_json['output']['usage']
                     response['finish_reason'] = resp_json['output']['finish_reason']
 

@@ -1,9 +1,10 @@
 from palimpzest.constants import Model, PromptStrategy
 from palimpzest.elements import DataRecord, EquationImage, File, Filter, ImageFile, PDFFile, Schema, TextFile
-from palimpzest.tools import get_text_from_pdf
 from palimpzest.tools.dspysearch import run_cot_bool, run_cot_qa, gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.tools.openai_image_converter import do_image_analysis
-from palimpzest.tools.profilers import profiler
+from palimpzest.tools.pdfparser import get_text_from_pdf
+from palimpzest.tools.profiler import Profiler
+from palimpzest.tools.skema_tools import equations_to_latex_base64, equations_to_latex
 
 from papermage import Document
 from typing import Any, Dict, Tuple, Union
@@ -15,9 +16,6 @@ import os
 
 # DEFINITIONS
 # TaskDescriptor = Tuple[str, Union[tuple, None], Schema, Schema]
-
-
-from palimpzest.tools.skema_tools import equations_to_latex_base64, equations_to_latex
 
 
 class Solver:
@@ -51,12 +49,12 @@ class Solver:
             return dr
         return _simpleTypeConversionFn
 
-    def _makeHardCodedTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any]):
+    def _makeHardCodedTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], op_id: str):
         """This converts from one type to another when we have a hard-coded method for doing so."""
         if outputSchema == PDFFile and inputSchema == File:
             if config.get("pdfprocessing") == "modal":
                 print("handling PDF processing remotely")
-                remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
+                remoteFunc = modal.Function.lookup("palimpzest.tools.allenpdf", "processPapermagePdf")
             else:
                 remoteFunc = None
                 
@@ -102,14 +100,13 @@ class Solver:
                 return dr
             return _imageToEquation
 
+        # TODO: maybe move this to _makeLLMTypeConversionFn?
         elif outputSchema == ImageFile and inputSchema == File:
             def _fileToImage(candidate: DataRecord):
                 if not candidate.schema == inputSchema:
                     return None
                 # b64 decode of candidate.contents
-                #print(candidate.contents)
                 image_bytes = base64.b64encode(candidate.contents).decode('utf-8')
-                #image_bytes = candidate.contents #base64.b64decode(candidate.contents)#.decode("utf-8")
                 dr = DataRecord(outputSchema)
                 dr.filename = candidate.filename
                 if 'OPENAI_API_KEY' not in os.environ:
@@ -118,14 +115,19 @@ class Solver:
                 openai_key = os.environ['OPENAI_API_KEY']
                 # TODO: consider multiple image models
                 dr.contents = candidate.contents
-                dr.text_description = do_image_analysis(openai_key, image_bytes)
+                dr.text_description, stats = do_image_analysis(openai_key, image_bytes)
+
+                # if profiling, set record's stats for the given op_id
+                if Profiler.profiling_on():
+                    dr._stats[op_id] = stats
+
                 return dr
             return _fileToImage
 
         else:
             raise Exception(f"Cannot hard-code conversion from {inputSchema} to {outputSchema}")
 
-    def _makeLLMTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, conversionDesc: str):
+    def _makeLLMTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str, conversionDesc: str):
             llmservice = config.get("llmservice", "openai")
             def fn(candidate: DataRecord):
                 # iterate through all empty fields in the outputSchema and ask questions to fill them
@@ -134,17 +136,16 @@ class Solver:
                 text_content = candidate.asTextJSON()
                 doc_schema = str(outputSchema)
                 doc_type = outputSchema.className()
-                qa_stats = {}
+                stats = {}
                 for field_name in outputSchema.fieldNames():
                     f = getattr(outputSchema, field_name)
                     try:
                         # TODO: allow for mult. fcns
-                        stats = None
+                        field_stats = None
                         if prompt_strategy == PromptStrategy.DSPY_COT:
-                            answer, stats = run_cot_qa(text_content,
-                                                       f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
-                                                       model.value,
-                                                       llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                            answer, field_stats = run_cot_qa(text_content,
+                                                             f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
+                                                             model_name=model.value, llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
                         # TODO
                         elif prompt_strategy == PromptStrategy.ZERO_SHOT:
                             raise Exception("not implemented yet")
@@ -153,17 +154,20 @@ class Solver:
                             raise Exception("not implemented yet")
 
                         setattr(dr, field_name, answer)
-                        if profiler.is_profiling:
-                            qa_stats[f"{field_name}_{}"] = stats # TODO
+                        stats[f"{field_name}"] = field_stats
 
                     except Exception as e:
                         print(f"Error: {e}")
                         setattr(dr, field_name, None)
-                    
+                
+                # if profiling, set record's stats for the given op_id
+                if Profiler.profiling_on():
+                    dr._stats[op_id] = stats
+
                 return dr
             return fn
 
-    def _makeFilterFn(self, inputSchema: Schema, filter: Filter, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy):
+    def _makeFilterFn(self, inputSchema: Schema, filter: Filter, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str):
             # parse inputs
             llmservice = config.get("llmservice", "openai")
             doc_schema = str(inputSchema)
@@ -178,20 +182,24 @@ class Solver:
                         return False
                     text_content = candidate.asTextJSON()
                     # TODO: allow for mult. fcns
-                    response = None
+                    response, stats = None, {}
                     if prompt_strategy == PromptStrategy.DSPY_BOOL:
-                        response = run_cot_bool(text_content, filterCondition, model=model.value, llmService=llmservice,
-                                                verbose=self._verbose, promptSignature=gen_filter_signature_class(doc_schema, doc_type))
+                        response, stats = run_cot_bool(text_content, filterCondition, model_name=model.value, llmService=llmservice,
+                                                       verbose=self._verbose, promptSignature=gen_filter_signature_class(doc_schema, doc_type))
                     # TODO
                     elif prompt_strategy == PromptStrategy.ZERO_SHOT:
                         raise Exception("not implemented yet")
                     # TODO
                     elif prompt_strategy == PromptStrategy.FEW_SHOT:
                         raise Exception("not implemented yet")
-                    if response == "TRUE":
-                        return True
-                    else:
-                        return False
+
+                    # if profiling, set record's stats for the given op_id and set _passed_filter
+                    if Profiler.profiling_on():
+                        candidate._stats[op_id] = stats
+                        setattr(candidate, "_passed_filter", response.lower() == "true")
+
+                    return response.lower() == "true"
+
                 return llmFilter
             return createLLMFilter(str(filter))
 
@@ -200,16 +208,16 @@ class Solver:
         functionName, functionParams, outputSchema, inputSchema = taskDescriptor
 
         if functionName == "InduceFromCandidateOp" or functionName == "ParallelInduceFromCandidateOp":
-            model, prompt_strategy, conversionDesc = functionParams
+            model, prompt_strategy, op_id, conversionDesc = functionParams
             typeConversionDescriptor = (outputSchema, inputSchema)
             if typeConversionDescriptor in self._simpleTypeConversions:
                 return self._makeSimpleTypeConversionFn(outputSchema, inputSchema)
             elif typeConversionDescriptor in self._hardcodedFns:
-                return self._makeHardCodedTypeConversionFn(outputSchema, inputSchema, config) # TODO: add option for model for image?
+                return self._makeHardCodedTypeConversionFn(outputSchema, inputSchema, config, op_id) # TODO: add another model for image processing (e.g., Claude)?
             else:
-                return self._makeLLMTypeConversionFn(outputSchema, inputSchema, config, model, prompt_strategy, conversionDesc)
+                return self._makeLLMTypeConversionFn(outputSchema, inputSchema, config, model, prompt_strategy, op_id, conversionDesc)
         elif functionName == "FilterCandidateOp" or functionName == "ParallelFilterCandidateOp":
-            filter, model, prompt_strategy = functionParams
-            return  self._makeFilterFn(inputSchema, filter, config, model, prompt_strategy)
+            filter, model, prompt_strategy, op_id = functionParams
+            return self._makeFilterFn(inputSchema, filter, config, model, prompt_strategy, op_id)
         else:
             raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))
