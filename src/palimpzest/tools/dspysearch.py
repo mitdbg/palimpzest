@@ -1,3 +1,4 @@
+from palimpzest.constants import Model
 from palimpzest.tools.dspyadaptors import TogetherHFAdaptor
 from palimpzest.tools.profiler import Profiler
 
@@ -59,14 +60,14 @@ def gen_qa_signature_class(doc_schema, doc_type):
     answer_desc = f"print the answer only, separated by a newline character"
     return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
-def run_cot_bool(context, question, model_name, llmService="openai", verbose=False, promptSignature=FilterOverPaper):
-    if llmService == "openai":
+def run_cot_bool(context, question, model_name, verbose=False, promptSignature=FilterOverPaper):
+    if model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         # get openai key from environment
         openai_key = os.environ['OPENAI_API_KEY']
         turbo = dspy.OpenAI(model=model_name, api_key=openai_key, temperature=0.0)
-    elif llmService == "together":
+    elif model_name in [Model.MIXTRAL.value]:
         if 'TOGETHER_API_KEY' not in os.environ:
             raise ValueError("TOGETHER_API_KEY not found in environment variables")
         # get together key from environment
@@ -76,7 +77,7 @@ def run_cot_bool(context, question, model_name, llmService="openai", verbose=Fal
         mixtralModel = model_name
         turbo = TogetherHFAdaptor(mixtralModel, together_key)
     else:
-        raise ValueError("llmService must be either 'openai' or 'together'")
+        raise ValueError("model must be one of those specified in palimpzest.constants.Model")
 
     dspy.settings.configure(lm=turbo)
     cot = dspyCOT(promptSignature)
@@ -106,14 +107,14 @@ def run_cot_bool(context, question, model_name, llmService="openai", verbose=Fal
     return pred.answer, stats
 
 
-def run_cot_qa(context, question, model_name, llmService="openai", verbose=False, promptSignature=QuestionOverPaper):
-    if llmService == "openai":
+def run_cot_qa(context, question, model_name, verbose=False, promptSignature=QuestionOverPaper):
+    if model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         # get openai key from environment
         openai_key = os.environ['OPENAI_API_KEY']
         turbo = dspy.OpenAI(model=model_name, api_key=openai_key, temperature=0.0)
-    elif llmService == "together":
+    elif model_name in [Model.MIXTRAL.value]:
         if 'TOGETHER_API_KEY' not in os.environ:
             raise ValueError("TOGETHER_API_KEY not found in environment variables")
         # get together key from environment
@@ -123,7 +124,7 @@ def run_cot_qa(context, question, model_name, llmService="openai", verbose=False
         mixtralModel = model_name
         turbo = TogetherHFAdaptor(mixtralModel, together_key)
     else:
-        raise ValueError("llmService must be either 'openai' or 'together'")
+        raise ValueError("model must be one of those specified in palimpzest.constants.Model")
 
     dspy.settings.configure(lm=turbo)
     cot = dspyCOT(promptSignature)
@@ -153,30 +154,3 @@ def run_cot_qa(context, question, model_name, llmService="openai", verbose=False
     return pred.answer, stats
 
 
-if __name__ == "__main__":
-    llmService = "openai"
-    if llmService == "openai":
-        if 'OPENAI_API_KEY' not in os.environ:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
-        # get openai key from environment
-        openai_key = os.environ['OPENAI_API_KEY']
-        turbo = dspy.OpenAI(model='gpt-4-0125-preview', api_key=openai_key, temperature=0.0)
-    elif llmService == "together":
-        if 'TOGETHER_API_KEY' not in os.environ:
-            raise ValueError("TOGETHER_API_KEY not found in environment variables")
-        # get together key from environment
-        together_key = os.environ['TOGETHER_API_KEY']
-        #redpajamaModel = 'togethercomputer/RedPajama-INCITE-7B-Base'
-        mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
-        turbo = TogetherHFAdaptor(mixtralModel, together_key)
-    else:
-        raise ValueError("llmService must be either 'openai' or 'together'")
-
-    dspy.settings.configure(lm=turbo)
-
-    cot = dspyCOT(QuestionOverPaper)
-    question = """What is the title of the paper?
-    Who is the first author?
-    What is the first author's institution?"""
-    context = open("../../../tests/testFileDirectory/cosmos/1_All_F_Guo/1 All F Guo.txt").read()
-    pred = cot(question, context)

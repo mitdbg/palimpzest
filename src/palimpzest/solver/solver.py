@@ -128,7 +128,6 @@ class Solver:
             raise Exception(f"Cannot hard-code conversion from {inputSchema} to {outputSchema}")
 
     def _makeLLMTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str, conversionDesc: str):
-            llmservice = config.get("llmservice", "openai")
             def fn(candidate: DataRecord):
                 # iterate through all empty fields in the outputSchema and ask questions to fill them
                 # for field in inputSchema.__dict__:
@@ -145,7 +144,7 @@ class Solver:
                         if prompt_strategy == PromptStrategy.DSPY_COT:
                             answer, field_stats = run_cot_qa(text_content,
                                                              f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
-                                                             model_name=model.value, llmService=llmservice, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                                                             model_name=model.value, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
                         # TODO
                         elif prompt_strategy == PromptStrategy.ZERO_SHOT:
                             raise Exception("not implemented yet")
@@ -169,7 +168,6 @@ class Solver:
 
     def _makeFilterFn(self, inputSchema: Schema, filter: Filter, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str):
             # parse inputs
-            llmservice = config.get("llmservice", "openai")
             doc_schema = str(inputSchema)
             doc_type = inputSchema.className()
 
@@ -184,7 +182,7 @@ class Solver:
                     # TODO: allow for mult. fcns
                     response, stats = None, {}
                     if prompt_strategy == PromptStrategy.DSPY_BOOL:
-                        response, stats = run_cot_bool(text_content, filterCondition, model_name=model.value, llmService=llmservice,
+                        response, stats = run_cot_bool(text_content, filterCondition, model_name=model.value,
                                                        verbose=self._verbose, promptSignature=gen_filter_signature_class(doc_schema, doc_type))
                     # TODO
                     elif prompt_strategy == PromptStrategy.ZERO_SHOT:

@@ -65,6 +65,7 @@ class MaxHarmonicMean(Policy):
         return "Maximum Harmonic Mean"
 
     def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
+        epsilon = 1e-9
         bestPlan, bestHarmonicMean = None, 0.0
         for plan in candidatePlans:
             # scale time and cost into [0, 1]
@@ -73,7 +74,7 @@ class MaxHarmonicMean(Policy):
             scaled_time = min(max(scaled_time, 0.0), 1.0)
             scaled_cost = min(max(scaled_cost, 0.0), 1.0)
 
-            harmonicMean = 3.0 / ((1.0 / scaled_time) + (1.0 / scaled_cost) + (1.0 / plan[2]))
+            harmonicMean = 3.0 / ((1.0 / (scaled_time + epsilon)) + (1.0 / (scaled_cost + epsilon)) + (1.0 / plan[2]))
 
             if harmonicMean > bestHarmonicMean:
                 bestHarmonicMean = harmonicMean

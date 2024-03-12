@@ -189,7 +189,10 @@ class InduceFromCandidateOp(PhysicalOp):
         self.desc = desc
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("InduceFromCandidateOp", (model, prompt_strategy, op_id, desc), outputSchema, source.outputSchema)
+        if outputSchema == ImageFile and source.outputSchema == File:
+            self.model = Model.GPT_4V
+
+        taskDescriptor = ("InduceFromCandidateOp", (self.model, prompt_strategy, op_id, desc), outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
