@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from palimpzest.tools.profiler import Profiler
 import palimpzest as pz
 
 from tabulate import tabulate
@@ -9,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 import argparse
+import json
 import time
 
 class ScientificPaper(pz.PDFFile):
@@ -275,6 +277,13 @@ if __name__ == "__main__":
             gr.Textbox(value=plan_str, info="Query Plan")
 
         demo.launch()
+
+        # if profiling was turned on; capture statistics
+        if Profiler.profiling_on():
+            profiling_data = physicalTree.getProfilingData()
+
+            with open('profiling.json', 'w') as f:
+                json.dump(profiling_data, f)
 
     elif task == "count":
         rootSet = testCount(datasetid)

@@ -78,8 +78,8 @@ def do_image_analysis(api_key, image_bytes):
     stats = {}
     if Profiler.profiling_on():
         stats['api_call_duration'] = end_time - start_time
-        stats['prompt'] = None
+        stats['prompt'] = payload['messages'][0]["content"][0]["text"]
         stats['usage'] = json_blob['usage']
-        stats['finish_reason'] = json_blob['response']['choices'][-1]['finish_reason']
+        stats['finish_reason'] = json_blob['choices'][-1]['finish_reason']
 
     return content_str, stats
