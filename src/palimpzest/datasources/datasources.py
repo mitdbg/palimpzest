@@ -1,8 +1,6 @@
 from palimpzest.elements import DataRecord, File, Number, Schema
 from typing import Any, Callable, Dict, List, Union
 
-import hashlib
-import json
 import os
 
 
@@ -23,13 +21,13 @@ class DataSource:
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(schema={self.schema})"
-    
+
     def __eq__(self, __value: object) -> bool:
         return self.__dict__ == __value.__dict__
 
     def serialize(self) -> Dict[str, Any]:
         return {"schema": self.schema.jsonSchema()}
-    
+
     def universalIdentifier(self):
         """Return a unique identifier for this Set."""
         return self.dataset_id
@@ -42,7 +40,8 @@ class MemorySource(DataSource):
         super().__init__(Number, dataset_id)
         self.vals = vals
 
-    def __iter__(self):
+    def __iter__(self) -> Callable[[], DataRecord]:
+
         def valIterator():
             for v in self.vals:
                 dr = DataRecord(self.schema)

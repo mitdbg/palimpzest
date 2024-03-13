@@ -301,20 +301,20 @@ class CacheScan(LogicalOperator):
 
 
 class BaseScan(LogicalOperator):
-    """A ConcreteScan is a logical operator that represents a scan of a particular data source."""
-    def __init__(self, outputSchema: Schema, concreteDatasetIdentifier: str):
+    """A BaseScan is a logical operator that represents a scan of a particular data source."""
+    def __init__(self, outputSchema: Schema, datasetIdentifier: str):
         super().__init__(outputSchema, None)
-        self.concreteDatasetIdentifier = concreteDatasetIdentifier
+        self.datasetIdentifier = datasetIdentifier
 
     def __str__(self):
-        return "BaseScan(" + str(self.outputSchema) + ", " + self.concreteDatasetIdentifier + ")"
+        return "BaseScan(" + str(self.outputSchema) + ", " + self.datasetIdentifier + ")"
 
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
         return (self, None)
 
     def _getPhysicalTree(self, strategy: str=None, model: Model=None):
-        return MarshalAndScanDataOp(self.outputSchema, self.concreteDatasetIdentifier)
+        return MarshalAndScanDataOp(self.outputSchema, self.datasetIdentifier)
 
 
 class LimitScan(LogicalOperator):
@@ -371,7 +371,7 @@ class ApplyAggregateFunction(LogicalOperator):
     def dumpLogicalTree(self):
         """Return the logical subtree rooted at this operator"""
         return (self, self.inputOp.dumpLogicalTree())
-    
+
     def _getPhysicalTree(self, strategy: str=None, model: Model=None):
         if self.aggregationFunction.funcDesc == "COUNT":
             return ApplyCountAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.aggregationFunction, targetCacheId=self.targetCacheId)

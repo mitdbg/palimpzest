@@ -1,1 +1,1 @@
-from .datamanager import *
+from .datamanager import DataDirectory

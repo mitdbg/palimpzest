@@ -1,3 +1,5 @@
+from palimpzest.tools.profiler import Profiler
+
 from dsp.modules.hf import HFModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -89,7 +91,16 @@ class TogetherHFAdaptor(HFModel):
                     completions = [resp_json['output'].get('choices', [])[0].get('message', {}).get('content', "")]
                 else:
                     completions = [resp_json['output'].get('choices', [])[0].get('text', "")]
-                response = {"prompt": prompt, "choices": [{"text": c} for c in completions]}
+                response = {
+                    "prompt": resp_json['prompt'][-1],
+                    "choices": [{"text": c} for c in completions],
+                }
+
+                # add key(s) for usage, finish_reason if profiling the system
+                if Profiler.profiling_on():
+                    response['usage'] = resp_json['output']['usage']
+                    response['finish_reason'] = resp_json['output']['finish_reason']
+
                 return response
         except Exception as e:
             if resp_json:

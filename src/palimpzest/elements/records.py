@@ -1,4 +1,5 @@
 from palimpzest.elements import Schema
+from palimpzest.tools.profiler import Profiler
 
 import json
 
@@ -7,6 +8,25 @@ class DataRecord:
     """A DataRecord is a single record of data matching some Schema."""
     def __init__(self, schema: Schema):
         self._schema = schema
+
+        # if profiling is set to True, collect execution statistics and history of transformations
+        if Profiler.profiling_on():
+            # self._stats is a dictionary mapping a physical opId --> a stats dictionary
+            # for the LLM operation(s) performed during that physical operation (if applicable);
+            # the self._stats dictionary is updated in solver.py as the physical operation is performed;
+            # some timing statistics will also be computed inside of profiler.py when the DataRecord
+            # is intercepted before being passed on to the next operation.
+            self._stats = {}
+
+            # TODO: if we want to preserve entire lineage / history **within** each record, we'll
+            #       need to modify solver.py (and datasources.py?) to set self._state; I don't love
+            #       this approach b/c it requires updating code in many disparate places to properly
+            #       manage the _state updates. The nice thing about the current way we handle the
+            #       lineage / history computation is that it is entirely confined to profiler.py.
+            #
+            # self._state is a dictionary mapping a physical opId --> its serialized state
+            # at the end of each physical operation; this dict is updated in profiler.py
+            self._state = {}
 
     def __setattr__(self, key, value):
         if not key.startswith("_") and not hasattr(self._schema, key):
@@ -18,13 +38,16 @@ class DataRecord:
     def schema(self):
         return self._schema
 
-    def asTextJSON(self):
+    def asTextJSON(self, serialize: bool=False):
         """Return a JSON representation of this DataRecord"""
         keys = sorted(self.__dict__)
         # Make a dictionary out of the key/value pairs
         d = {k: str(self.__dict__[k]) for k in keys if not k.startswith("_") and not isinstance(self.__dict__[k] , bytes)}
         d["data type"] = str(self._schema.__name__)
         d["data type description"]  = str(self._schema.__doc__)
+        if serialize and Profiler.profiling_on():
+            return d
+
         return json.dumps(d, indent=2)
 
     def asJSON(self):

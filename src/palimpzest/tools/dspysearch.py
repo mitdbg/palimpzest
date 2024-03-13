@@ -1,8 +1,10 @@
 from palimpzest.constants import Model
 from palimpzest.tools.dspyadaptors import TogetherHFAdaptor
+from palimpzest.tools.profiler import Profiler
 
 import dspy
 import os
+import time
 
 
 ##
@@ -22,6 +24,7 @@ class QuestionOverPaper(dspy.Signature):
     context = dspy.InputField(desc="contains full text of the paper, including author, institution, title, and body")
     question = dspy.InputField(desc="one or more question about the paper")
     answer = dspy.OutputField(desc="print the answer only, separated by a newline character")
+
 
 #invoke dspy in chain of thought mode
 class dspyCOT(dspy.Module):
@@ -57,60 +60,97 @@ def gen_qa_signature_class(doc_schema, doc_type):
     answer_desc = f"print the answer only, separated by a newline character"
     return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
-def run_cot_bool(context, question, model, verbose=False, promptSignature=FilterOverPaper):
-    if model in [Model.GPT_3_5.value, Model.GPT_4.value]:
+def run_cot_bool(context, question, model_name, verbose=False, promptSignature=FilterOverPaper):
+    if model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         # get openai key from environment
         openai_key = os.environ['OPENAI_API_KEY']
-        turbo = dspy.OpenAI(model=model, api_key=openai_key, temperature=0.0)
-    elif model in [Model.MIXTRAL.value]:
+        turbo = dspy.OpenAI(model=model_name, api_key=openai_key, temperature=0.0)
+    elif model_name in [Model.MIXTRAL.value]:
         if 'TOGETHER_API_KEY' not in os.environ:
             raise ValueError("TOGETHER_API_KEY not found in environment variables")
         # get together key from environment
         together_key = os.environ['TOGETHER_API_KEY']
         #redpajamaModel = 'togethercomputer/RedPajama-INCITE-7B-Base'
         # mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
-        mixtralModel = model
+        mixtralModel = model_name
         turbo = TogetherHFAdaptor(mixtralModel, together_key)
     else:
         raise ValueError("model must be one of those specified in palimpzest.constants.Model")
 
     dspy.settings.configure(lm=turbo)
     cot = dspyCOT(promptSignature)
+
+    start_time = time.time()
     pred = cot(question, context)
+    end_time = time.time()
+
+    # TODO: need to create some class structure / abstraction around everything from
+    #       physical operators -> solvers -> dspysearch, dspyadaptors, openai_image_converter, etc.
+    # collect statistics on prompt, usage, and timing if profiling is on
+    stats = {}
+    if Profiler.profiling_on():
+        stats['api_call_duration'] = end_time - start_time
+        stats['prompt'] = turbo.history[-1]['prompt']
+        stats['usage'] = turbo.history[-1]['response']['usage']
+        stats['finish_reason'] = (
+            turbo.history[-1]['response']['finish_reason']
+            if isinstance(turbo, TogetherHFAdaptor)
+            else turbo.history[-1]['response']['choices'][-1]['finish_reason']
+        )
+
     if verbose:
         print("Prompt history:")
         turbo.inspect_history(n=1)
-    #print(question)
-    #print(indent(pred.rationale, 4 * ' '))
-    #print(pred.answer)
-    return pred.answer
 
-def run_cot_qa(context, question, model, verbose=False, promptSignature=QuestionOverPaper):
-    if model in [Model.GPT_3_5.value, Model.GPT_4.value]:
+    return pred.answer, stats
+
+
+def run_cot_qa(context, question, model_name, verbose=False, promptSignature=QuestionOverPaper):
+    if model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         # get openai key from environment
         openai_key = os.environ['OPENAI_API_KEY']
-        turbo = dspy.OpenAI(model=model, api_key=openai_key, temperature=0.0)
-    elif model in [Model.MIXTRAL.value]:
+        turbo = dspy.OpenAI(model=model_name, api_key=openai_key, temperature=0.0)
+    elif model_name in [Model.MIXTRAL.value]:
         if 'TOGETHER_API_KEY' not in os.environ:
             raise ValueError("TOGETHER_API_KEY not found in environment variables")
         # get together key from environment
         together_key = os.environ['TOGETHER_API_KEY']
         #redpajamaModel = 'togethercomputer/RedPajama-INCITE-7B-Base'
         # mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
-        mixtralModel = model
+        mixtralModel = model_name
         turbo = TogetherHFAdaptor(mixtralModel, together_key)
     else:
         raise ValueError("model must be one of those specified in palimpzest.constants.Model")
 
     dspy.settings.configure(lm=turbo)
     cot = dspyCOT(promptSignature)
+
+    start_time = time.time()
     pred = cot(question, context)
+    end_time = time.time()
+
+    # TODO: need to create some class structure / abstraction around everything from
+    #       physical operators -> solvers -> dspysearch, dspyadaptors, openai_image_converter, etc.
+    # collect statistics on prompt, usage, and timing if profiling is on
+    stats = {}
+    if Profiler.profiling_on():
+        stats['api_call_duration'] = end_time - start_time
+        stats['prompt'] = turbo.history[-1]['prompt']
+        stats['usage'] = turbo.history[-1]['response']['usage']
+        stats['finish_reason'] = (
+            turbo.history[-1]['response']['finish_reason']
+            if isinstance(turbo, TogetherHFAdaptor)
+            else turbo.history[-1]['response']['choices'][-1]['finish_reason']
+        )
+
     if verbose:
         print("Prompt history:")
         turbo.inspect_history(n=1)
-    return pred.answer
+
+    return pred.answer, stats
+
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from palimpzest.elements import Schema, StringField
 from palimpzest.policy import *
+from palimpzest.tools.profiler import Profiler
 
 from tabulate import tabulate
 
@@ -8,6 +9,7 @@ import gradio as gr
 import palimpzest as pz
 import pandas as pd
 
+import json
 import time
 
 
@@ -52,16 +54,24 @@ if __name__ == "__main__":
     """
     This demo illustrates how the cost optimizer can produce and evaluate multiple plans.
     """
+    startTime = time.time()
+
     # user implemented plan
     emails = pz.Dataset(source="enron-tiny", schema=Email)
     emails = emails.filterByStr("The email is about someone taking a vacation")
     emails = emails.filterByStr("The email is sent by Larry")
 
     # get logical tree
+    t1 = time.time()
     logicalTree = emails.getLogicalTree()
+    t2 = time.time()
 
     # get candidate physical plans
     candidatePlans = logicalTree.createPhysicalPlanCandidates()
+    t3 = time.time()
+    print(f"Create Plan: {t1 - startTime:.3f}")
+    print(f"Get Logical Tree: {t2 - t1:.3f}")
+    print(f"Create Cand. Plans: {t3 - t2:.3f}")
 
     # use sampling to get better information about plans
     # sampler = SimpleSampler(min=10)
@@ -83,6 +93,7 @@ if __name__ == "__main__":
     print(f"Policy is: {str(myPolicy)}")
     print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")
     emitNestedTuple(physicalTree.dumpPhysicalTree())
+    t4 = time.time()
 
     # execute the plan
     startTime = time.time()
@@ -95,5 +106,14 @@ if __name__ == "__main__":
     print()
     printTable(records, cols=["sender", "subject"], gradio=True)
 
+    # if profiling was turned on; capture statistics
+    if Profiler.profiling_on():
+        profiling_data = physicalTree.getProfilingData()
+
+        with open('profiling.json', 'w') as f:
+            json.dump(profiling_data, f)
+
     endTime = time.time()
-    print("Elapsed time:", endTime - startTime)
+    print(f"Plan Selection Time: {t4 - t3}")
+    print(f"Execution Time: {endTime - t4}")
+    print(f"Total Elapsed Time: {endTime - startTime}")

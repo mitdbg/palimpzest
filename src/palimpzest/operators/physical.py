@@ -3,12 +3,19 @@ from __future__ import annotations
 from palimpzest.constants import *
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
+from palimpzest.elements import Any
 from palimpzest.solver import Solver
+from palimpzest.tools.profiler import Profiler
 
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Callable, Dict, Tuple, Union
 
 import concurrent
+import hashlib
 import sys
+
+# DEFINITIONS
+MAX_ID_CHARS = 10
+IteratorFn = Callable[[], DataRecord]
 
 
 class PhysicalOp:
@@ -22,7 +29,27 @@ class PhysicalOp:
         self.outputSchema = outputSchema
         self.datadir = DataDirectory()
 
+        # if profiling is set to True, collect execution statistics and history of transformations
+        if Profiler.profiling_on():
+            self.profiler = Profiler()
+            self.profile = self.profiler.iter_profiler
+
+        # otherwise, make self.profile a no-op
+        else:
+            self.profile = self.no_op_wrapper
+
+    def no_op_wrapper(self, *args, **kwargs):
+        def no_op_decorator(fn):
+            return fn
+        return no_op_decorator
+
+    def opId(self) -> str:
+        raise NotImplementedError("Abstract method")
+
     def dumpPhysicalTree(self) -> Tuple[PhysicalOp, Union[PhysicalOp, None]]:
+        raise NotImplementedError("Abstract method")
+
+    def getProfilingData(self) -> Dict[str, Any]:
         raise NotImplementedError("Abstract method")
 
     def estimateCost(self) -> Dict[str, Any]:
@@ -30,23 +57,38 @@ class PhysicalOp:
         raise NotImplementedError("Abstract method")
 
 class MarshalAndScanDataOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, concreteDatasetIdentifier: str):
+    def __init__(self, outputSchema: Schema, datasetIdentifier: str):
         super().__init__(outputSchema=outputSchema)
-        self.concreteDatasetIdentifier = concreteDatasetIdentifier
+        self.datasetIdentifier = datasetIdentifier
 
     def __str__(self):
-        return "MarshalAndScanDataOp(" + str(self.outputSchema) + ", " + self.concreteDatasetIdentifier + ")"
-    
+        return "MarshalAndScanDataOp(" + str(self.outputSchema) + ", " + self.datasetIdentifier + ")"
+
+    def opId(self):
+        d = {
+            "operator": "MarshalAndScanDataOp",
+            "outputSchema": str(self.outputSchema),
+            "datasetIdentifier": self.datasetIdentifier,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, None)
-    
+
+    def getProfilingData(self):
+        if Profiler.profiling_on():
+            return self.profiler.get_data()
+        else:
+            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
+
     def estimateCost(self):
-        cardinality = self.datadir.getCardinality(self.concreteDatasetIdentifier) + 1
-        size = self.datadir.getSize(self.concreteDatasetIdentifier)
+        cardinality = self.datadir.getCardinality(self.datasetIdentifier) + 1
+        size = self.datadir.getSize(self.datasetIdentifier)
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
 
-        datasetType = self.datadir.getRegisteredDatasetType(self.concreteDatasetIdentifier)
+        datasetType = self.datadir.getRegisteredDatasetType(self.datasetIdentifier)
         timePerElement = (
             LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
             if datasetType in ["dir", "file"]
@@ -76,10 +118,11 @@ class MarshalAndScanDataOp(PhysicalOp):
             "estOutputTokensPerElement": estOutputTokensPerElement,
             "quality": 1.0,
         }
-    
-    def __iter__(self):
+
+    def __iter__(self) -> IteratorFn:
+        @self.profile(name="base_scan", op_id=self.opId())
         def iteratorFn():
-            for nextCandidate in self.datadir.getRegisteredDataset(self.concreteDatasetIdentifier):
+            for nextCandidate in self.datadir.getRegisteredDataset(self.datasetIdentifier):
                 yield nextCandidate
 
         return iteratorFn()
@@ -91,10 +134,25 @@ class CacheScanDataOp(PhysicalOp):
 
     def __str__(self):
         return "CacheScanDataOp(" + str(self.outputSchema) + ", " + self.cacheIdentifier + ")"
-    
+
+    def opId(self):
+        d = {
+            "operator": "CacheScanDataOp",
+            "outputSchema": str(self.outputSchema),
+            "cacheIdentifier": self.cacheIdentifier,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, None)
+
+    def getProfilingData(self):
+        if Profiler.profiling_on():
+            return self.profiler.get_data()
+        else:
+            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
     def estimateCost(self):
         # TODO: at the moment, getCachedResult() looks up a pickled file that stores
@@ -142,7 +200,8 @@ class CacheScanDataOp(PhysicalOp):
             "quality": 1.0,
         }
 
-    def __iter__(self):
+    def __iter__(self) -> IteratorFn:
+        @self.profile(name="cache_scan", op_id=self.opId())
         def iteratorFn():
             # NOTE: see comment in `estimateCost()` 
             for nextCandidate in self.datadir.getCachedResult(self.cacheIdentifier):
@@ -159,11 +218,10 @@ class InduceFromCandidateOp(PhysicalOp):
         self.desc = desc
         self.targetCacheId = targetCacheId
 
-
         if outputSchema == ImageFile and source.outputSchema == File:
             self.model = Model.GPT_4V
 
-        taskDescriptor = ("InduceFromCandidateOp", (self.model, prompt_strategy, desc), outputSchema, source.outputSchema)
+        taskDescriptor = ("InduceFromCandidateOp", (self.model, prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
@@ -171,9 +229,31 @@ class InduceFromCandidateOp(PhysicalOp):
     def __str__(self):
         return "InduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
 
+    def opId(self):
+        d = {
+            "operator": "InduceFromCandidateOp",
+            "outputSchema": str(self.outputSchema),
+            "source": self.source.opId(),
+            "model": self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
+            "desc": self.desc,
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
+
+    def getProfilingData(self):
+        if Profiler.profiling_on():
+            source_data = self.source.getProfilingData()
+            operator_data = self.profiler.get_data(model_name=self.model.value)
+            operator_data["source"] = source_data
+            return operator_data
+        else:
+            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
     def estimateCost(self):
         inputEstimates = self.source.estimateCost()
@@ -222,10 +302,11 @@ class InduceFromCandidateOp(PhysicalOp):
         cumulativeTimePerElement = model_conversion_time_per_record + inputEstimates["cumulativeTimePerElement"]
         cumulativeUSDPerElement = model_conversion_usd_per_record + inputEstimates["cumulativeUSDPerElement"]
 
-        # NOTE: the following estimate assumes that the entire generator of the previous
-        #       operator is materialized before this operator begins processing records
-        #       (i.e., it assumes that operators execute in sequence). I ran a small test
-        #       to see if this was the case:
+        # NOTE: the following estimate assumes that nested generators effectively execute
+        #       a single record at a time in sequence. I.e., there is no waterfall / time
+        #       overlap for execution in two different stages of the chain of generators.
+        #       The example below illustrates how this leads the total execution time to
+        #       be equal to the 
         #
         #       >>> def f():
         #       ...   for idx in range(3):
@@ -269,8 +350,10 @@ class InduceFromCandidateOp(PhysicalOp):
             "quality": quality,
         }
 
-    def __iter__(self):
+    def __iter__(self) -> IteratorFn:
         shouldCache = self.datadir.openCache(self.targetCacheId)
+
+        @self.profile(name="induce", op_id=self.opId())
         def iteratorFn():    
             for nextCandidate in self.source:
                 resultRecord = self._attemptMapping(nextCandidate)
@@ -285,7 +368,7 @@ class InduceFromCandidateOp(PhysicalOp):
 
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputSchema. Return None if it fails."""
-        taskDescriptor = ("InduceFromCandidateOp", (self.model, self.prompt_strategy, self.desc), self.outputSchema, candidate.schema)
+        taskDescriptor = ("InduceFromCandidateOp", (self.model, self.prompt_strategy, self.opId(), self.desc), self.outputSchema, candidate.schema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
@@ -301,7 +384,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         self.targetCacheId = targetCacheId
         self.max_workers = 20
 
-        taskDescriptor = ("ParallelInduceFromCandidateOp", (model, prompt_strategy, desc), outputSchema, source.outputSchema)
+        taskDescriptor = ("ParallelInduceFromCandidateOp", (model, prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
@@ -309,9 +392,31 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
     def __str__(self):
         return "ParallelInduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
 
+    def opId(self):
+        d = {
+            "operator": "ParallelInduceFromCandidateOp",
+            "outputSchema": str(self.outputSchema),
+            "source": self.source.opId(),
+            "model": self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
+            "desc": self.desc,
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
+
+    def getProfilingData(self):
+        if Profiler.profiling_on():
+            source_data = self.source.getProfilingData()
+            operator_data = self.profiler.get_data(model_name=self.model.value)
+            operator_data["source"] = source_data
+            return operator_data
+        else:
+            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
     def estimateCost(self):
         """
@@ -373,6 +478,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
     def __iter__(self):
         # This is very crudely implemented right now, since we materialize everything
         shouldCache = self.datadir.openCache(self.targetCacheId)
+
+        @self.profile(name="p_induce", op_id=self.opId())
         def iteratorFn():
             inputs = []
             results = []
@@ -396,7 +503,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputSchema. Return None if it fails."""
-        taskDescriptor = ("ParallelInduceFromCandidateOp", (self.model, self.prompt_strategy, self.desc), self.outputSchema, candidate.schema)
+        taskDescriptor = ("ParallelInduceFromCandidateOp", (self.model, self.prompt_strategy, self.opId(), self.desc), self.outputSchema, candidate.schema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
@@ -411,7 +518,7 @@ class FilterCandidateOp(PhysicalOp):
         self.prompt_strategy = prompt_strategy
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("FilterCandidateOp", (filter, model, prompt_strategy), source.outputSchema, self.outputSchema)
+        taskDescriptor = ("FilterCandidateOp", (filter, model, prompt_strategy, self.opId()), source.outputSchema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
@@ -419,9 +526,31 @@ class FilterCandidateOp(PhysicalOp):
     def __str__(self):
         return "FilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
 
+    def opId(self):
+        d = {
+            "operator": "FilterCandidateOp",
+            "outputSchema": str(self.outputSchema),
+            "source": self.source.opId(),
+            "filter": str(self.filter),
+            "model": self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
+
+    def getProfilingData(self):
+        if Profiler.profiling_on():
+            source_data = self.source.getProfilingData()
+            operator_data = self.profiler.get_data(model_name=self.model.value)
+            operator_data["source"] = source_data
+            return operator_data
+        else:
+            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
     def estimateCost(self):
         """
@@ -484,12 +613,21 @@ class FilterCandidateOp(PhysicalOp):
 
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
+
+        @self.profile(name="filter", op_id=self.opId())
         def iteratorFn():
-            for nextCandidate in self.source: 
-                if self._passesFilter(nextCandidate):
+            for nextCandidate in self.source:
+                resultRecord = self._passesFilter(nextCandidate)
+                if resultRecord._passed_filter:
                     if shouldCache:
-                        self.datadir.appendCache(self.targetCacheId, nextCandidate)
-                    yield nextCandidate
+                        self.datadir.appendCache(self.targetCacheId, resultRecord)
+                    yield resultRecord
+
+                # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
+                # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
+                elif Profiler.profiling_on():
+                    yield resultRecord
+
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -497,7 +635,7 @@ class FilterCandidateOp(PhysicalOp):
 
     def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
-        taskDescriptor = ("FilterCandidateOp", (self.filter, self.model, self.prompt_strategy), candidate.schema, self.outputSchema)
+        taskDescriptor = ("FilterCandidateOp", (self.filter, self.model, self.prompt_strategy, self.opId()), candidate.schema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
@@ -513,7 +651,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
         self.targetCacheId = targetCacheId
         self.max_workers = 20
 
-        taskDescriptor = ("ParallelFilterCandidateOp", (filter, model, prompt_strategy), source.outputSchema, self.outputSchema)
+        taskDescriptor = ("ParallelFilterCandidateOp", (filter, model, prompt_strategy, self.opId()), source.outputSchema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
@@ -521,9 +659,31 @@ class ParallelFilterCandidateOp(PhysicalOp):
     def __str__(self):
         return "ParallelFilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
 
+    def opId(self):
+        d = {
+            "operator": "ParallelFilterCandidateOp",
+            "outputSchema": str(self.outputSchema),
+            "source": self.source.opId(),
+            "filter": str(self.filter),
+            "model": self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
+
+    def getProfilingData(self):
+        if Profiler.profiling_on():
+            source_data = self.source.getProfilingData()
+            operator_data = self.profiler.get_data(model_name=self.model.value)
+            operator_data["source"] = source_data
+            return operator_data
+        else:
+            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
     def estimateCost(self):
         inputEstimates = self.source.estimateCost()
@@ -583,6 +743,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
+
+        @self.profile(name="p_filter", op_id=self.opId())
         def iteratorFn():
             inputs = []
             results = []
@@ -594,12 +756,17 @@ class ParallelFilterCandidateOp(PhysicalOp):
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 results = list(executor.map(self._passesFilter, inputs))
 
-                for idx, filterResult in enumerate(results):
-                    if filterResult:
-                        resultRecord = inputs[idx]
+                for resultRecord in results:
+                    if resultRecord._passed_filter:
                         if shouldCache:
                             self.datadir.appendCache(self.targetCacheId, resultRecord)
                         yield resultRecord
+
+                    # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
+                    # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
+                    elif Profiler.profiling_on():
+                        yield resultRecord
+
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -607,7 +774,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
     def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
-        taskDescriptor = ("ParallelFilterCandidateOp", (self.filter, self.model, self.prompt_strategy), candidate.schema, self.outputSchema)
+        taskDescriptor = ("ParallelFilterCandidateOp", (self.filter, self.model, self.prompt_strategy, self.opId()), candidate.schema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
 
@@ -624,9 +791,28 @@ class ApplyCountAggregateOp(PhysicalOp):
     def __str__(self):
         return "ApplyCountAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
 
+    def opId(self):
+        d = {
+            "operator": "ApplyCountAggregateOp",
+            "source": self.source.opId(),
+            "aggFunction": str(self.aggFunction),
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
+
+    def getProfilingData(self):
+        if Profiler.profiling_on():
+            source_data = self.source.getProfilingData()
+            operator_data = self.profiler.get_data()
+            operator_data["source"] = source_data
+            return operator_data
+        else:
+            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
     def estimateCost(self):
         inputEstimates = self.source.estimateCost()
@@ -644,9 +830,11 @@ class ApplyCountAggregateOp(PhysicalOp):
     def __iter__(self):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
+
+        @self.profile(name="count", op_id=self.opId())
         def iteratorFn():
             counter = 0
-            for nextCandidate in self.source:
+            for _ in self.source:
                 counter += 1
 
             dr = DataRecord(Number)
@@ -674,9 +862,28 @@ class ApplyAverageAggregateOp(PhysicalOp):
     def __str__(self):
         return "ApplyAverageAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
 
+    def opId(self):
+        d = {
+            "operator": "ApplyAverageAggregateOp",
+            "source": self.source.opId(),
+            "aggFunction": str(self.aggFunction),
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
+
+    def getProfilingData(self):
+        if Profiler.profiling_on():
+            source_data = self.source.getProfilingData()
+            operator_data = self.profiler.get_data()
+            operator_data["source"] = source_data
+            return operator_data
+        else:
+            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
     def estimateCost(self):
         inputEstimates = self.source.estimateCost()
@@ -694,6 +901,8 @@ class ApplyAverageAggregateOp(PhysicalOp):
     def __iter__(self):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
+
+        @self.profile(name="average", op_id=self.opId())
         def iteratorFn():
             sum = 0
             counter = 0
@@ -726,9 +935,29 @@ class LimitScanOp(PhysicalOp):
     def __str__(self):
         return "LimitScanOp(" + str(self.outputSchema) + ", " + "Limit: " + str(self.limit) + ")"
 
+    def opId(self):
+        d = {
+            "operator": "LimitScanOp",
+            "outputSchema": str(self.outputSchema),
+            "source": self.source.opId(),
+            "limit": self.limit,
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, self.source.dumpPhysicalTree())
+
+    def getProfilingData(self):
+        if Profiler.profiling_on():
+            source_data = self.source.getProfilingData()
+            operator_data = self.profiler.get_data()
+            operator_data["source"] = source_data
+            return operator_data
+        else:
+            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
     def estimateCost(self):
         inputEstimates = self.source.estimateCost()
@@ -741,6 +970,8 @@ class LimitScanOp(PhysicalOp):
     def __iter__(self):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
+
+        @self.profile(name="limit", op_id=self.opId())
         def iteratorFn():
             counter = 0
             for nextCandidate in self.source: 
