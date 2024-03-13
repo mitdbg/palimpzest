@@ -34,16 +34,16 @@ class Profiler:
             # time spent waiting for API calls to return
             "total_api_call_duration": 0.0,
 
-            # keep track of finish reasons and prompts used
+            # keep track of finish reasons
             "finish_reasons": {},
-            "prompts": {},
 
             # keep track of the total time spent inside of the profiler
             "total_time_in_profiler": 0.0,
         }
 
         # list of records computed by this operator; each record will have
-        # its individual stats and computation history stored
+        # its individual stats and state stored; we can then get the lineage / history
+        # of computation by looking at records' _state across computations
         self.records = []
 
     def _update_agg_stats(self, stats: Dict[str, Any], field_name: str=None) -> None:
@@ -64,12 +64,6 @@ class Profiler:
         else:
             self.agg_operator_stats["finish_reasons"][finish_reason] = 1
 
-        prompt = stats["prompt"]
-        if prompt in self.agg_operator_stats["prompts"]:
-            self.agg_operator_stats["prompts"][prompt] += 1
-        else:
-            self.agg_operator_stats["prompts"][prompt] = 1
-
         if field_name is not None:
             # initialize aggregate field stats sub-dictionary if not already present
             if field_name not in self.agg_operator_stats:
@@ -78,22 +72,17 @@ class Profiler:
                     "total_output_tokens": 0,
                     "total_api_call_duration": 0.0,
                     "finish_reasons": {},
-                    "prompts": {},
                 }
 
             # update field aggregate statistics
             self.agg_operator_stats[field_name]["total_input_tokens"] += stats["usage"]["prompt_tokens"]
+            self.agg_operator_stats[field_name]["total_output_tokens"] += stats["usage"]["completion_tokens"]
+            self.agg_operator_stats[field_name]["total_api_call_duration"] += stats["api_call_duration"]
             finish_reason = stats["finish_reason"]
             if finish_reason in self.agg_operator_stats[field_name]["finish_reasons"]:
                 self.agg_operator_stats[field_name]["finish_reasons"][finish_reason] += 1
             else:
                 self.agg_operator_stats[field_name]["finish_reasons"][finish_reason] = 1
-
-            prompt = stats["prompt"]
-            if prompt in self.agg_operator_stats[field_name]["prompts"]:
-                self.agg_operator_stats[field_name]["prompts"][prompt] += 1
-            else:
-                self.agg_operator_stats[field_name]["prompts"][prompt] = 1
 
     @staticmethod
     def profiling_on() -> bool:
@@ -122,7 +111,7 @@ class Profiler:
         # prepare final dictionary and return
         full_stats_dict = {
             "agg_operator_stats": self.agg_operator_stats,
-            "per_record_stats": self.records,
+            "records": self.records,
         }
 
         return full_stats_dict
@@ -149,56 +138,62 @@ class Profiler:
 
             @wraps(iterator)
             def timed_iterator():
-                t_start = time.time()
+                t_op_start = time.time()
+                t_record_start = time.time()
                 for record in iterator():
-                    t_end = time.time()
+                    t_record_end = time.time()
                     self.agg_operator_stats["total_records"] += 1
 
                     # for non-LLM workload operators, we need to add the op_id
                     if op_id not in record._stats:
                         record._stats[op_id] = {}
 
-                    # add name and time spent in iteration for operator
-                    record._stats[op_id]["name"] = name
-                    record._stats[op_id]["iter_time"] = t_end - t_start
+                    # add time spent in iteration for operator
+                    record._stats[op_id]["iter_time"] = t_record_end - t_record_start
 
-                    # add transformation to history of computation if this is an induce
-                    if "induce" in name:
-                        record._history[op_id] = {
-                            "name": name,
-                            "record_state": record.asTextJSON(serialize=True),
-                        }
+                    # update state of record for complete history of computation
+                    record._state[op_id] = {
+                        "name": name,
+                        "stats": record._stats[op_id],
+                        "record_state": record.asTextJSON(serialize=True),
+                    }
 
                     # add record to set of records computed by this operator
-                    self.records.append(record._history)
+                    self.records.append(record._state)
 
-                    # TODO: make this if-condition less hacky
+                    # TODO: make this if-condition less hacky; length of _stats[op_id] should be
+                    #       greater than 1 if there's more than just the iter_time computed;
+                    #       filter operation currently puts stats like api_call_duration, usage, etc.
+                    #       at same level in JSON as iter_time, while induce has a key called fields
+                    #       (which then points to per-field stats) at the same level as iter_time
+                    #
                     # update aggregate stats for operators with LLM workloads
-                    if "filter" in name and "usage" in record._stats[op_id]:
+                    if "filter" in name and len(record._stats[op_id]) > 1:
                         stats = dict(record._stats[op_id])
                         self._update_agg_stats(stats)
 
-                    elif "induce" in name and "usage" in record._stats[op_id]:
+                    elif "induce" in name and len(record._stats[op_id]) > 1:
                         stats = dict(record._stats[op_id])
-                        for field_name, field_stats in stats.items():
+                        for field_name, field_stats in stats['fields'].items():
                             self._update_agg_stats(field_stats, field_name=field_name)
+
+                    # track time spent in profiler
+                    self.agg_operator_stats["total_time_in_profiler"] += time.time() - t_record_end
 
                     # if this is a filter operation and the record did not pass the filter,
                     # then this record is meant to be filtered out, so do not yield it
                     if "filter" in name and record._passed_filter is False:
-                        t_start = time.time()
-                        self.agg_operator_stats["total_time_in_profiler"] += t_start - t_end
+                        t_record_start = time.time()
                         continue
 
                     yield record
 
                     # start timer for next iteration
-                    t_start = time.time()
-                    self.agg_operator_stats["total_time_in_profiler"] += t_start - t_end
+                    t_record_start = time.time()
 
                 # compute total time for iterator to finish
                 t_final = time.time()
-                self.agg_operator_stats["total_iter_time"] = t_final - t_start
+                self.agg_operator_stats["total_iter_time"] = t_final - t_op_start
 
             return timed_iterator
         return profile_decorator

@@ -21,13 +21,11 @@ from copy import deepcopy
 from itertools import permutations
 from typing import List, Tuple
 
-import hashlib
 import os
 import random
 import time
 
 # DEFINITIONS
-MAX_ID_CHARS = 10
 PhysicalPlan = Tuple[float, float, float, PhysicalOp]
 
 
@@ -45,9 +43,6 @@ class LogicalOperator:
         self.outputSchema = outputSchema
         self.inputSchema = inputSchema
         self.inputOp = inputOp
-
-    def opId(self) -> str:
-        raise NotImplementedError("Abstract method")
 
     def dumpLogicalTree(self) -> Tuple[LogicalOperator, LogicalOperator]:
         raise NotImplementedError("Abstract method")
@@ -250,18 +245,6 @@ class ConvertScan(LogicalOperator):
     def __str__(self):
         return "ConvertScan(" + str(self.inputSchema) + ", " + str(self.outputSchema) + ", " + str(self.desc) + ")"
 
-    def opId(self):
-        d = {
-            "operator": "ConvertScan",
-            "inputSchema": str(self.inputSchema),
-            "outputSchema": str(self.outputSchema),
-            "desc": str(self.desc),
-            "targetCacheId": str(self.targetCacheId),
-            "inputOpId": self.inputOp.opId(),
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
         return (self, self.inputOp.dumpLogicalTree())
@@ -276,31 +259,27 @@ class ConvertScan(LogicalOperator):
 
         if intermediateSchema == Schema or intermediateSchema == self.outputSchema:
             if DataDirectory().current_config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), model=model, desc=self.desc, op_id=self.opId(), targetCacheId=self.targetCacheId)
+                return ParallelInduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), model=model, desc=self.desc, targetCacheId=self.targetCacheId)
             else:
-                return InduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), model=model, desc=self.desc, op_id=self.opId(), targetCacheId=self.targetCacheId)
+                return InduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), model=model, desc=self.desc, targetCacheId=self.targetCacheId)
         else:
             if DataDirectory().current_config.get("parallel") == True:
                 return ParallelInduceFromCandidateOp(self.outputSchema,
                                                      ParallelInduceFromCandidateOp(
                                                          intermediateSchema,
                                                          self.inputOp._getPhysicalTree(strategy=strategy, model=model),
-                                                         model=model,
-                                                         op_id=self.opId()),
+                                                         model=model),
                                                      model=model,
                                                      desc=self.desc,
-                                                     op_id=self.opId(),
                                                      targetCacheId=self.targetCacheId)
             else:
                 return InduceFromCandidateOp(self.outputSchema,
                                              InduceFromCandidateOp(
                                                  intermediateSchema,
                                                  self.inputOp._getPhysicalTree(strategy=strategy, model=model),
-                                                 model=model,
-                                                 op_id=self.opId()),
+                                                 model=model),
                                              model=model,
                                              desc=self.desc,
-                                             op_id=self.opId(),
                                              targetCacheId=self.targetCacheId)
 
 
@@ -313,22 +292,12 @@ class CacheScan(LogicalOperator):
     def __str__(self):
         return "CacheScan(" + str(self.outputSchema) + ", " + str(self.cachedDataIdentifier) + ")"
 
-    def opId(self):
-        d = {
-            "operator": "CacheScan",
-            "inputSchema": str(self.inputSchema),
-            "outputSchema": str(self.outputSchema),
-            "cachedDataIdentifier": str(self.cachedDataIdentifier),
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
         return (self, None)
 
     def _getPhysicalTree(self, strategy: str=None, model: Model=None):
-        return CacheScanDataOp(self.outputSchema, self.cachedDataIdentifier, op_id=self.opId())
+        return CacheScanDataOp(self.outputSchema, self.cachedDataIdentifier)
 
 
 class BaseScan(LogicalOperator):
@@ -340,22 +309,12 @@ class BaseScan(LogicalOperator):
     def __str__(self):
         return "BaseScan(" + str(self.outputSchema) + ", " + self.datasetIdentifier + ")"
 
-    def opId(self):
-        d = {
-            "operator": "BaseScan",
-            "inputSchema": str(self.inputSchema),
-            "outputSchema": str(self.outputSchema),
-            "datasetIdentifier": str(self.datasetIdentifier),
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
         return (self, None)
 
     def _getPhysicalTree(self, strategy: str=None, model: Model=None):
-        return MarshalAndScanDataOp(self.outputSchema, self.datasetIdentifier, op_id=self.opId())
+        return MarshalAndScanDataOp(self.outputSchema, self.datasetIdentifier)
 
 
 class LimitScan(LogicalOperator):
@@ -368,24 +327,12 @@ class LimitScan(LogicalOperator):
     def __str__(self):
         return "LimitScan(" + str(self.inputSchema) + ", " + str(self.outputSchema) + ")"
 
-    def opId(self):
-        d = {
-            "operator": "LimitScan",
-            "inputSchema": str(self.inputSchema),
-            "outputSchema": str(self.outputSchema),
-            "limit": self.limit,
-            "targetCacheId": str(self.targetCacheId),
-            "inputOpId": self.inputOp.opId(),
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
         return (self, self.inputOp.dumpLogicalTree())
 
     def _getPhysicalTree(self, strategy: str=None, model: Model=None):
-        return LimitScanOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.limit, op_id=self.opId(), targetCacheId=self.targetCacheId)
+        return LimitScanOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.limit, targetCacheId=self.targetCacheId)
 
 
 class FilteredScan(LogicalOperator):
@@ -399,27 +346,15 @@ class FilteredScan(LogicalOperator):
     def __str__(self):
         return "FilteredScan(" + str(self.outputSchema) + ", " + "Filters: " + str(self.filter) + ")"
 
-    def opId(self):
-        d = {
-            "operator": "FilteredScan",
-            "inputSchema": str(self.inputSchema),
-            "outputSchema": str(self.outputSchema),
-            "filter": self.filter.serialize(),
-            "targetCacheId": str(self.targetCacheId),
-            "inputOpId": self.inputOp.opId(),
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
         return (self, self.inputOp.dumpLogicalTree())
 
     def _getPhysicalTree(self, strategy: str=None, model: Model=None):
         if DataDirectory().current_config.get("parallel") == True:
-            return ParallelFilterCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.filter, model=model, op_id=self.opId(), targetCacheId=self.targetCacheId)
+            return ParallelFilterCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.filter, model=model, targetCacheId=self.targetCacheId)
         else:
-            return FilterCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.filter, model=model, op_id=self.opId(), targetCacheId=self.targetCacheId)
+            return FilterCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.filter, model=model, targetCacheId=self.targetCacheId)
 
 
 class ApplyAggregateFunction(LogicalOperator):
@@ -433,26 +368,14 @@ class ApplyAggregateFunction(LogicalOperator):
     def __str__(self):
         return "ApplyAggregateFunction(function: " + str(self.aggregationFunction) + ")"
 
-    def opId(self):
-        d = {
-            "operator": "ApplyAggregateFunction",
-            "inputSchema": str(self.inputSchema),
-            "outputSchema": str(self.outputSchema),
-            "aggregationFunction": self.aggregationFunction.serialize(),
-            "targetCacheId": str(self.targetCacheId),
-            "inputOpId": self.inputOp.opId(),
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
     def dumpLogicalTree(self):
         """Return the logical subtree rooted at this operator"""
         return (self, self.inputOp.dumpLogicalTree())
 
     def _getPhysicalTree(self, strategy: str=None, model: Model=None):
         if self.aggregationFunction.funcDesc == "COUNT":
-            return ApplyCountAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.aggregationFunction, op_id=self.opId(), targetCacheId=self.targetCacheId)
+            return ApplyCountAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.aggregationFunction, targetCacheId=self.targetCacheId)
         elif self.aggregationFunction.funcDesc == "AVERAGE":
-            return ApplyAverageAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.aggregationFunction, op_id=self.opId(), targetCacheId=self.targetCacheId)
+            return ApplyAverageAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.aggregationFunction, targetCacheId=self.targetCacheId)
         else:
             raise Exception(f"Cannot find implementation for {self.aggregationFunction}")

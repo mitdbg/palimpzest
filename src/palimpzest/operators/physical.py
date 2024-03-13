@@ -10,10 +10,12 @@ from palimpzest.tools.profiler import Profiler
 from typing import Any, Callable, Dict, Tuple, Union
 
 import concurrent
+import hashlib
 import os
 import sys
 
 # DEFINITIONS
+MAX_ID_CHARS = 10
 IteratorFn = Callable[[], DataRecord]
 
 
@@ -31,6 +33,19 @@ class PhysicalOp:
         # if profiling is set to True, collect execution statistics and history of transformations
         if Profiler.profiling_on():
             self.profiler = Profiler()
+            self.profile = self.profiler.iter_profiler
+
+        # otherwise, make self.profile a no-op
+        else:
+            self.profile = self.no_op_wrapper
+
+    def no_op_wrapper(self, *args, **kwargs):
+        def no_op_decorator(fn):
+            return fn
+        return no_op_decorator
+
+    def opId(self) -> str:
+        raise NotImplementedError("Abstract method")
 
     def dumpPhysicalTree(self) -> Tuple[PhysicalOp, Union[PhysicalOp, None]]:
         raise NotImplementedError("Abstract method")
@@ -43,13 +58,21 @@ class PhysicalOp:
         raise NotImplementedError("Abstract method")
 
 class MarshalAndScanDataOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, datasetIdentifier: str, op_id: str=None):
+    def __init__(self, outputSchema: Schema, datasetIdentifier: str):
         super().__init__(outputSchema=outputSchema)
         self.datasetIdentifier = datasetIdentifier
-        self.op_id = op_id
 
     def __str__(self):
         return "MarshalAndScanDataOp(" + str(self.outputSchema) + ", " + self.datasetIdentifier + ")"
+
+    def opId(self):
+        d = {
+            "operator": "MarshalAndScanDataOp",
+            "outputSchema": str(self.outputSchema),
+            "datasetIdentifier": self.datasetIdentifier,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -98,7 +121,7 @@ class MarshalAndScanDataOp(PhysicalOp):
         }
 
     def __iter__(self) -> IteratorFn:
-        @self.profiler.iter_profiler(name="base_scan", op_id=self.op_id)
+        @self.profile(name="base_scan", op_id=self.opId())
         def iteratorFn():
             for nextCandidate in self.datadir.getRegisteredDataset(self.datasetIdentifier):
                 yield nextCandidate
@@ -106,14 +129,22 @@ class MarshalAndScanDataOp(PhysicalOp):
         return iteratorFn()
 
 class CacheScanDataOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, cacheIdentifier: str, op_id: str=None):
+    def __init__(self, outputSchema: Schema, cacheIdentifier: str):
         super().__init__(outputSchema=outputSchema)
         self.cacheIdentifier = cacheIdentifier
-        self.op_id = op_id
 
     def __str__(self):
         return "CacheScanDataOp(" + str(self.outputSchema) + ", " + self.cacheIdentifier + ")"
-    
+
+    def opId(self):
+        d = {
+            "operator": "CacheScanDataOp",
+            "outputSchema": str(self.outputSchema),
+            "cacheIdentifier": self.cacheIdentifier,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
         return (self, None)
@@ -171,7 +202,7 @@ class CacheScanDataOp(PhysicalOp):
         }
 
     def __iter__(self) -> IteratorFn:
-        @self.profiler.iter_profiler(name="cache_scan", op_id=self.op_id)
+        @self.profile(name="cache_scan", op_id=self.opId())
         def iteratorFn():
             # NOTE: see comment in `estimateCost()` 
             for nextCandidate in self.datadir.getCachedResult(self.cacheIdentifier):
@@ -180,25 +211,37 @@ class CacheScanDataOp(PhysicalOp):
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, op_id: str=None, desc: str=None, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None):
         super().__init__(outputSchema=outputSchema)
         self.source = source
         self.model = model
         self.prompt_strategy = prompt_strategy
-        self.op_id = op_id
         self.desc = desc
         self.targetCacheId = targetCacheId
 
         if outputSchema == ImageFile and source.outputSchema == File:
             self.model = Model.GPT_4V
 
-        taskDescriptor = ("InduceFromCandidateOp", (self.model, prompt_strategy, op_id, desc), outputSchema, source.outputSchema)
+        taskDescriptor = ("InduceFromCandidateOp", (self.model, prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
         return "InduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
+
+    def opId(self):
+        d = {
+            "operator": "InduceFromCandidateOp",
+            "outputSchema": str(self.outputSchema),
+            "source": self.source.opId(),
+            "model": self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
+            "desc": self.desc,
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -311,7 +354,7 @@ class InduceFromCandidateOp(PhysicalOp):
     def __iter__(self) -> IteratorFn:
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profiler.iter_profiler(name="induce", op_id=self.op_id)
+        @self.profile(name="induce", op_id=self.opId())
         def iteratorFn():    
             for nextCandidate in self.source:
                 resultRecord = self._attemptMapping(nextCandidate)
@@ -326,30 +369,42 @@ class InduceFromCandidateOp(PhysicalOp):
 
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputSchema. Return None if it fails."""
-        taskDescriptor = ("InduceFromCandidateOp", (self.model, self.prompt_strategy, self.op_id, self.desc), self.outputSchema, candidate.schema)
+        taskDescriptor = ("InduceFromCandidateOp", (self.model, self.prompt_strategy, self.opId(), self.desc), self.outputSchema, candidate.schema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, op_id: str=None, desc: str=None, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None):
         super().__init__(outputSchema=outputSchema)
         self.source = source
         self.model = model
         self.prompt_strategy = prompt_strategy
-        self.op_id = op_id
         self.desc = desc
         self.targetCacheId = targetCacheId
         self.max_workers = 20
 
-        taskDescriptor = ("ParallelInduceFromCandidateOp", (model, prompt_strategy, op_id, desc), outputSchema, source.outputSchema)
+        taskDescriptor = ("ParallelInduceFromCandidateOp", (model, prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
         return "ParallelInduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
+
+    def opId(self):
+        d = {
+            "operator": "ParallelInduceFromCandidateOp",
+            "outputSchema": str(self.outputSchema),
+            "source": self.source.opId(),
+            "model": self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
+            "desc": self.desc,
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -425,7 +480,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         # This is very crudely implemented right now, since we materialize everything
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profiler.iter_profiler(name="p_induce", op_id=self.op_id)
+        @self.profile(name="p_induce", op_id=self.opId())
         def iteratorFn():
             inputs = []
             results = []
@@ -449,29 +504,41 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputSchema. Return None if it fails."""
-        taskDescriptor = ("ParallelInduceFromCandidateOp", (self.model, self.prompt_strategy, self.op_id, self.desc), self.outputSchema, candidate.schema)
+        taskDescriptor = ("ParallelInduceFromCandidateOp", (self.model, self.prompt_strategy, self.opId(), self.desc), self.outputSchema, candidate.schema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 
 class FilterCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, op_id: str=None, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None):
         super().__init__(outputSchema=outputSchema)
         self.source = source
         self.filter = filter
         self.model = model
         self.prompt_strategy = prompt_strategy
-        self.op_id = op_id
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("FilterCandidateOp", (filter, model, prompt_strategy, op_id), source.outputSchema, self.outputSchema)
+        taskDescriptor = ("FilterCandidateOp", (filter, model, prompt_strategy, self.opId()), source.outputSchema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
         return "FilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
+
+    def opId(self):
+        d = {
+            "operator": "FilterCandidateOp",
+            "outputSchema": str(self.outputSchema),
+            "source": self.source.opId(),
+            "filter": str(self.filter),
+            "model": self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -548,7 +615,7 @@ class FilterCandidateOp(PhysicalOp):
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profiler.iter_profiler(name="filter", op_id=self.op_id)
+        @self.profile(name="filter", op_id=self.opId())
         def iteratorFn():
             for nextCandidate in self.source:
                 if self._passesFilter(nextCandidate):
@@ -558,7 +625,7 @@ class FilterCandidateOp(PhysicalOp):
 
                 # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
                 # the profiler will check the nextCandidate._passed_filter field to see if it needs to be dropped
-                elif self.profiler.profiling_on():
+                elif Profiler.profiling_on():
                     yield nextCandidate
 
             if shouldCache:
@@ -568,30 +635,42 @@ class FilterCandidateOp(PhysicalOp):
 
     def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
-        taskDescriptor = ("FilterCandidateOp", (self.filter, self.model, self.prompt_strategy, self.op_id), candidate.schema, self.outputSchema)
+        taskDescriptor = ("FilterCandidateOp", (self.filter, self.model, self.prompt_strategy, self.opId()), candidate.schema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 
 class ParallelFilterCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, op_id: str=None, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None):
         super().__init__(outputSchema=outputSchema)
         self.source = source
         self.filter = filter
         self.model = model
         self.prompt_strategy = prompt_strategy
-        self.op_id = op_id
         self.targetCacheId = targetCacheId
         self.max_workers = 20
 
-        taskDescriptor = ("ParallelFilterCandidateOp", (filter, model, prompt_strategy, op_id), source.outputSchema, self.outputSchema)
+        taskDescriptor = ("ParallelFilterCandidateOp", (filter, model, prompt_strategy, self.opId()), source.outputSchema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
 
     def __str__(self):
         return "ParallelFilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
+
+    def opId(self):
+        d = {
+            "operator": "ParallelFilterCandidateOp",
+            "outputSchema": str(self.outputSchema),
+            "source": self.source.opId(),
+            "filter": str(self.filter),
+            "model": self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -665,7 +744,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profiler.iter_profiler(name="p_filter", op_id=self.op_id)
+        @self.profile(name="p_filter", op_id=self.opId())
         def iteratorFn():
             inputs = []
             results = []
@@ -686,7 +765,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
                     # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
                     # the profiler will check the nextCandidate._passed_filter field to see if it needs to be dropped
-                    elif self.profiler.profiling_on():
+                    elif Profiler.profiling_on():
                         yield nextCandidate
 
             if shouldCache:
@@ -696,7 +775,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
     def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
-        taskDescriptor = ("ParallelFilterCandidateOp", (self.filter, self.model, self.prompt_strategy, self.op_id), candidate.schema, self.outputSchema)
+        taskDescriptor = ("ParallelFilterCandidateOp", (self.filter, self.model, self.prompt_strategy, self.opId()), candidate.schema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
 
@@ -704,15 +783,24 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
 
 class ApplyCountAggregateOp(PhysicalOp):
-    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, op_id: str=None, targetCacheId: str=None):
+    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, targetCacheId: str=None):
         super().__init__(outputSchema=Number)
         self.source = source
         self.aggFunction = aggFunction
-        self.op_id = op_id
         self.targetCacheId = targetCacheId
 
     def __str__(self):
         return "ApplyCountAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
+
+    def opId(self):
+        d = {
+            "operator": "ApplyCountAggregateOp",
+            "source": self.source.opId(),
+            "aggFunction": str(self.aggFunction),
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -744,7 +832,7 @@ class ApplyCountAggregateOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profiler.iter_profiler(name="count", op_id=self.op_id)
+        @self.profile(name="count", op_id=self.opId())
         def iteratorFn():
             counter = 0
             for _ in self.source:
@@ -763,11 +851,10 @@ class ApplyCountAggregateOp(PhysicalOp):
 
 
 class ApplyAverageAggregateOp(PhysicalOp):
-    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, op_id: str=None, targetCacheId: str=None):
+    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, targetCacheId: str=None):
         super().__init__(outputSchema=Number)
         self.source = source
         self.aggFunction = aggFunction
-        self.op_id = op_id
         self.targetCacheId = targetCacheId
 
         if not source.outputSchema == Number:
@@ -775,6 +862,16 @@ class ApplyAverageAggregateOp(PhysicalOp):
 
     def __str__(self):
         return "ApplyAverageAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
+
+    def opId(self):
+        d = {
+            "operator": "ApplyAverageAggregateOp",
+            "source": self.source.opId(),
+            "aggFunction": str(self.aggFunction),
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -806,7 +903,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profiler.iter_profiler(name="average", op_id=self.op_id)
+        @self.profile(name="average", op_id=self.opId())
         def iteratorFn():
             sum = 0
             counter = 0
@@ -830,15 +927,25 @@ class ApplyAverageAggregateOp(PhysicalOp):
 
 
 class LimitScanOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, limit: int, op_id: str=None, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, limit: int, targetCacheId: str=None):
         super().__init__(outputSchema=outputSchema)
         self.source = source
         self.limit = limit
-        self.op_id = op_id
         self.targetCacheId = targetCacheId
 
     def __str__(self):
         return "LimitScanOp(" + str(self.outputSchema) + ", " + "Limit: " + str(self.limit) + ")"
+
+    def opId(self):
+        d = {
+            "operator": "LimitScanOp",
+            "outputSchema": str(self.outputSchema),
+            "source": self.source.opId(),
+            "limit": self.limit,
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
     def dumpPhysicalTree(self):
         """Return the physical tree of operators."""
@@ -865,7 +972,7 @@ class LimitScanOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profiler.iter_profiler(name="limit", op_id=self.op_id)
+        @self.profile(name="limit", op_id=self.opId())
         def iteratorFn():
             counter = 0
             for nextCandidate in self.source: 

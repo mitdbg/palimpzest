@@ -161,7 +161,7 @@ class Solver:
                 
                 # if profiling, set record's stats for the given op_id
                 if Profiler.profiling_on():
-                    dr._stats[op_id] = stats
+                    dr._stats[op_id] = {"fields": stats}
 
                 return dr
             return fn

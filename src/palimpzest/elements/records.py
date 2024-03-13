@@ -11,8 +11,22 @@ class DataRecord:
 
         # if profiling is set to True, collect execution statistics and history of transformations
         if Profiler.profiling_on():
+            # self._stats is a dictionary mapping a physical opId --> a stats dictionary
+            # for the LLM operation(s) performed during that physical operation (if applicable);
+            # the self._stats dictionary is updated in solver.py as the physical operation is performed;
+            # some timing statistics will also be computed inside of profiler.py when the DataRecord
+            # is intercepted before being passed on to the next operation.
             self._stats = {}
-            self._history = {}
+
+            # TODO: if we want to preserve entire lineage / history **within** each record, we'll
+            #       need to modify solver.py (and datasources.py?) to set self._state; I don't love
+            #       this approach b/c it requires updating code in many disparate places to properly
+            #       manage the _state updates. The nice thing about the current way we handle the
+            #       lineage / history computation is that it is entirely confined to profiler.py.
+            #
+            # self._state is a dictionary mapping a physical opId --> its serialized state
+            # at the end of each physical operation; this dict is updated in profiler.py
+            self._state = {}
 
     def __setattr__(self, key, value):
         if not key.startswith("_") and not hasattr(self._schema, key):
@@ -32,8 +46,6 @@ class DataRecord:
         d["data type"] = str(self._schema.__name__)
         d["data type description"]  = str(self._schema.__doc__)
         if serialize and Profiler.profiling_on():
-            d = {k: v for k, v in d.items() if k not in ["contents"]}
-            d["_stats"] = self._stats
             return d
 
         return json.dumps(d, indent=2)
