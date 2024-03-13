@@ -6,6 +6,7 @@ from palimpzest.tools.pdfparser import get_text_from_pdf
 from palimpzest.tools.profiler import Profiler
 from palimpzest.tools.skema_tools import equations_to_latex_base64, equations_to_latex
 
+from copy import deepcopy
 from papermage import Document
 from typing import Any, Dict, Tuple, Union
 
@@ -191,12 +192,16 @@ class Solver:
                     elif prompt_strategy == PromptStrategy.FEW_SHOT:
                         raise Exception("not implemented yet")
 
-                    # if profiling, set record's stats for the given op_id and set _passed_filter
+                    # if profiling, set record's stats for the given op_id and clear any state from the previous operation
                     if Profiler.profiling_on():
+                        candidate = deepcopy(candidate)
+                        candidate._state = {}
                         candidate._stats[op_id] = stats
-                        setattr(candidate, "_passed_filter", response.lower() == "true")
 
-                    return response.lower() == "true"
+                    # set _passed_filter attribute and return record
+                    setattr(candidate, "_passed_filter", response.lower() == "true")
+
+                    return candidate
 
                 return llmFilter
             return createLLMFilter(str(filter))

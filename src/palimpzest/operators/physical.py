@@ -11,7 +11,6 @@ from typing import Any, Callable, Dict, Tuple, Union
 
 import concurrent
 import hashlib
-import os
 import sys
 
 # DEFINITIONS
@@ -618,15 +617,16 @@ class FilterCandidateOp(PhysicalOp):
         @self.profile(name="filter", op_id=self.opId())
         def iteratorFn():
             for nextCandidate in self.source:
-                if self._passesFilter(nextCandidate):
+                resultRecord = self._passesFilter(nextCandidate)
+                if resultRecord._passed_filter:
                     if shouldCache:
-                        self.datadir.appendCache(self.targetCacheId, nextCandidate)
-                    yield nextCandidate
+                        self.datadir.appendCache(self.targetCacheId, resultRecord)
+                    yield resultRecord
 
                 # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
-                # the profiler will check the nextCandidate._passed_filter field to see if it needs to be dropped
+                # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
                 elif Profiler.profiling_on():
-                    yield nextCandidate
+                    yield resultRecord
 
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
@@ -756,17 +756,16 @@ class ParallelFilterCandidateOp(PhysicalOp):
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 results = list(executor.map(self._passesFilter, inputs))
 
-                for idx, filterResult in enumerate(results):
-                    if filterResult:
-                        resultRecord = inputs[idx]
+                for resultRecord in results:
+                    if resultRecord._passed_filter:
                         if shouldCache:
                             self.datadir.appendCache(self.targetCacheId, resultRecord)
                         yield resultRecord
 
                     # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
-                    # the profiler will check the nextCandidate._passed_filter field to see if it needs to be dropped
+                    # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
                     elif Profiler.profiling_on():
-                        yield nextCandidate
+                        yield resultRecord
 
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
