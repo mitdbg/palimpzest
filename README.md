@@ -1,4 +1,4 @@
-# Palimpzest
+# Palimpzest (PZ)
 Palimpzest is a framework for writing document-centric programs. It will help you marshal, clean, extract, transform, and integrate documents and data. The LLM compute platform is going to read and write a lot of documents; Palimpzest is how programmers can control it.
 
 Some nice things Palimpzest does for you:
