@@ -28,14 +28,15 @@ class TogetherHFAdaptor(HFModel):
 
         stop_default = "\n\n---"
 
+#        print("Stop procedure", stop_default)
         self.kwargs = {
             "temperature": 0.0,
-            "max_tokens": 512,
+            "max_tokens": 4096,
             "top_p": 1,
             "top_k": 20,
             "repetition_penalty": 1,
             "n": 1,
-            "stop": stop_default if "stop" not in kwargs else kwargs["stop"],
+#            "stop": stop_default if "stop" not in kwargs else kwargs["stop"],
             **kwargs
         }
 
@@ -97,6 +98,9 @@ class TogetherHFAdaptor(HFModel):
                 }
 
                 # add key(s) for usage, finish_reason if profiling the system
+#                print("COMPLETIONS:", completions)
+#               print("STOP REASON", resp_json['output']['finish_reason'])
+
                 if Profiler.profiling_on():
                     response['usage'] = resp_json['output']['usage']
                     response['finish_reason'] = resp_json['output']['finish_reason']

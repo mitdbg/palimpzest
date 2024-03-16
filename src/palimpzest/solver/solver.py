@@ -137,6 +137,72 @@ class Solver:
                 doc_schema = str(outputSchema)
                 doc_type = outputSchema.className()
                 stats = {}
+
+                field_stats = None
+
+                fieldDescriptions = ""
+                for field_name in outputSchema.fieldNames():
+                    f = getattr(outputSchema, field_name)
+                    fieldDescriptions += f"{field_name}: {f.desc}\n"
+
+                promptQuestion = f"""I am trying to create an output object of type {doc_type}. I have an input object of type {str(inputSchema)}.
+                I must somehow use the information in the input object to create the correct fields in the output object. 
+                The input object is described as follows: {inputSchema.__doc__}.
+                The output object is described as follows: {outputSchema.__doc__}.
+                The output object should have a set of fields that are described in the following JSON schema: {doc_schema}.
+                Here are detailed descriptions of each of the fields in the desired output object: \n{fieldDescriptions}.
+                "Please return a correct parsable JSON object as an answer. Return ONLY the JSON object.""" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}."                
+
+                try:
+                    if prompt_strategy == PromptStrategy.DSPY_COT:
+                        answer, field_stats = run_cot_qa(text_content, promptQuestion,
+                                                                 model_name=model.value, 
+                                                                 verbose=self._verbose, 
+                                                                 promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                    try:
+                        if not answer.strip().startswith('{'):
+                            # Find the start index of the actual JSON string
+                            # assuming the prefix is followed by the JSON object/array
+                            start_index = answer.find('{') if '{' in answer else answer.find('[')
+                            if start_index != -1:
+                                # Remove the prefix and any leading characters before the JSON starts
+                                answer = answer[start_index:]
+                        if not answer.strip().endswith('}'):
+                            # Find the end index of the actual JSON string
+                            # assuming the suffix is preceded by the JSON object/array
+                            end_index = answer.rfind('}') if '}' in answer else answer.rfind(']')
+                            if end_index != -1:
+                                # Remove the suffix and any trailing characters after the JSON ends
+                                answer = answer[:end_index + 1]
+
+                        jsonObj = json.loads(answer)
+                        for field_name in outputSchema.fieldNames():
+                            # parse the json object and set the fields of the record
+                            setattr(dr, field_name, jsonObj[field_name])
+                            stats[f"{field_name}"] = field_stats
+                    except Exception as e:
+                        print(f"Error: {e}")
+                        for field_name in outputSchema.fieldNames():
+                            setattr(dr, field_name, None)
+                except Exception as e:
+                    print(f"Error: {e}")
+                    for field_name in outputSchema.fieldNames():
+                        setattr(dr, field_name, None)
+
+                # if profiling, set record's stats for the given op_id
+                if Profiler.profiling_on():
+                    dr._stats[op_id] = {"fields": stats}
+
+                return dr
+
+            def fnOrig(candidate: DataRecord):
+                # iterate through all empty fields in the outputSchema and ask questions to fill them
+                # for field in inputSchema.__dict__:
+                dr = DataRecord(outputSchema)
+                text_content = candidate.asTextJSON()
+                doc_schema = str(outputSchema)
+                doc_type = outputSchema.className()
+                stats = {}
                 for field_name in outputSchema.fieldNames():
                     f = getattr(outputSchema, field_name)
                     try:
@@ -165,7 +231,8 @@ class Solver:
                     dr._stats[op_id] = {"fields": stats}
 
                 return dr
-            return fn
+
+            return fnOrig
 
     def _makeFilterFn(self, inputSchema: Schema, filter: Filter, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str):
             # parse inputs
