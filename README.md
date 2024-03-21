@@ -185,6 +185,16 @@ Furthermore, you can modify the following parameters to influence the code gener
 - `codegen_num_ensemble`: how many parallel code snippets to generate. Default to `4`.
 - `codegen_logging`: whether to print codegen information. This also changes the code output: for logging purpose, if enabled, all codegen returned terms are labelled as `(code extracted)`. Default to `false`.
 
+### // Development Note
+
+The current code generation implements a hybrid conversion solution (in `solver/solver.py` as `_makeHybridTypeConversionFn`), which first uses `_makeCodeGenTypeConversionFn` and then falls back to the usual `_makeLLMTypeConversionFn`.
+
+The `_makeCodeGenTypeConversionFn` invokes the LLM to generate an ensemble of code snippets at once upon receiving the first query. Then the generated code snippets will be used for all future query. A majority voting is used to decide the ensemble output.
+
+TODO:
+- [ ] parallelism consistency
+- [ ] extra validation data as an optional user config
+
 ## Python Demo
 
 Below are simple instructions to run pz on a test data set of enron emails that is included with the system:

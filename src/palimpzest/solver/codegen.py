@@ -41,6 +41,16 @@ Example:
 {example_output}
 Please provide me with {n} different ideas to complete this task. Return the ideas only, following the format above.
 """
+
+ADVICED_CODEGEN_PROMPT = """You are a helpful programming assistant and an expert Python programmer. Implement the Python function `{api}` that extracts `{output}` ({output_desc}) from given inputs:
+{inputs_desc}
+Example:
+{example_inputs}
+{example_output}
+Hint: {advice}
+Notice that the evaluation will severely punish incorrect outputs. Thus, when the function is uncertain, it should return `None` to abstain instead of returning an incorrect guess.
+Return the implementation only."""
+
 def parse_multiple_outputs(text, outputs=['Thought', 'Action']):
     data = {}
     for key in reversed(outputs):
@@ -61,15 +71,6 @@ def llmAdviceGen(prompt, model, default=list()):
         advices = list(parse_ideas(response).values()); return advices
     except Exception as e:
         return default
-
-ADVICED_CODEGEN_PROMPT = """You are a helpful programming assistant and an expert Python programmer. Implement the Python function `{api}` that extracts `{output}` ({output_desc}) from given inputs:
-{inputs_desc}
-Example:
-{example_inputs}
-{example_output}
-Hint: {advice}
-Notice that the evaluation will severely punish incorrect outputs. Thus, when the function is uncertain, it should return `None` to abstain instead of returning an incorrect guess.
-Return the implementation only."""
 
 
 
