@@ -179,15 +179,10 @@ If you want to use parallel PDF processing at modal.com, you have to:
 
 ## Configuring for Code Generation Solution
 
-**Currently code generation is inconsistent with parallel execution.** The code snippets are generated once receiving the first input data, and LLM-annotated validation examples are accumulated during execution. Thus parallelism in code generation does not work.
-
 If you want to enable LLM generating code to perform batch operations, you have to modify the config.yaml (by default, Palimpzest uses `~/.palimpzest/config_default.yaml`) so that `codegen: true` and `parallel: false` are set.
 
 Furthermore, you can modify the following parameters to influence the code generation process:
 - `codegen_num_ensemble`: how many parallel code snippets to generate. Default to `4`.
-- `codegen_validation`: whether to fix code based on error feedback. Default to `false`. (TODO, no actual influence now)
-- `codegen_num_iterations`: number of max iterations for code fixing. Must have `codegen_validation: true` to have any effect. Default to `5`.
-- `codegen_num_max_examples`: number of max validation examples for code fixing. Must have `codegen_validation: true` to have any effect. Default to `20`.
 - `codegen_logging`: whether to print codegen information. This also changes the code output: for logging purpose, if enabled, all codegen returned terms are labelled as `(code extracted)`. Default to `false`.
 
 ## Python Demo
