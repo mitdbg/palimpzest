@@ -12,6 +12,7 @@ import pandas as pd
 import argparse
 import json
 import time
+import os
 
 class ScientificPaper(pz.PDFFile):
    """Represents a scientific research paper, which in practice is usually from a PDF file"""
@@ -134,9 +135,10 @@ def emitDataset(rootSet, policy, title="Dataset", verbose=False):
     # Print the (possibly optimized) logical tree
     logicalTree = rootSet.getLogicalTree()
     logicalElements = logicalTree.dumpLogicalTree()
+
     # print()
-    # print("Logical operator tree")
-    # emitNestedTuple(logicalElements)
+    #print("Logical operator tree")
+    #emitNestedTuple(logicalElements)
 
     # Generate candidate physical plans
     candidatePlans = logicalTree.createPhysicalPlanCandidates()    
@@ -202,6 +204,10 @@ if __name__ == "__main__":
             policy = pz.MaxQuality()
         elif args.policy == "harmonicmean":
             policy = pz.MaxHarmonicMean()
+
+    if os.getenv('OPENAI_API_KEY') is None and os.getenv('TOGETHER_API_KEY') is None:
+        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+
 
     if task == "paper":
         rootSet = buildMITBatteryPaperPlan(datasetid)
