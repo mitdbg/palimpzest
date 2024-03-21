@@ -8,7 +8,7 @@ import yaml
 
 class Config:
     def __init__(self, name: str="default", llmservice: str="openai", parallel: bool=False,
-                       codegen: bool=False, codegen_num_ensemble: int=4, codegen_validation: bool=False, codegen_num_iterations: int=5, codegen_num_max_examples: int=20
+                       codegen: bool=False, codegen_num_ensemble: int=4, codegen_validation: bool=False, codegen_num_iterations: int=5, codegen_num_max_examples: int=20, codegen_logging: bool=False
     ):
         self.configfilepath = os.path.join(PZ_DIR, f"config_{name}.yaml")
         if not os.path.exists(PZ_DIR):
@@ -19,7 +19,7 @@ class Config:
             temp_dir = tempfile.gettempdir()
             pz_file_cache_dir = os.path.join(temp_dir, "pz")
             self.config = {"name": name, "llmservice": llmservice, "parallel": parallel, "filecachedir": pz_file_cache_dir,
-                           "codegen": codegen, "codegen_num_ensemble": codegen_num_ensemble, "codegen_validation": codegen_validation, "codegen_num_iterations": codegen_num_iterations, "codegen_num_max_examples": codegen_num_max_examples,
+                           "codegen": codegen, "codegen_num_ensemble": codegen_num_ensemble, "codegen_validation": codegen_validation, "codegen_num_iterations": codegen_num_iterations, "codegen_num_max_examples": codegen_num_max_examples, "codegen_logging": codegen_logging
             }
             self._save_config()
 

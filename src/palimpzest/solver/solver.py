@@ -310,12 +310,14 @@ class Solver:
                         answer, code_stats = exec_codegen(api, code, inputs)
                         answers.append(answer)
                         for k,v in code_stats.items(): field_stats[k] += v
-                        print(code); print(answer)
+                        if config.get('codegen_logging', default=False):
+                            print(f"Code:\n====================\n{code}\n====================\nInputs:\n{DumpsJson(inputs,indent=4)}\nOutput:\n{answer}\n\n")
                     majority_answer = max(set(answers), key = answers.count)
                     
                     # For logging purpose only, set the field to the answer + " (code extracted)"
-                    # setattr(dr, field_name, answer)
-                    setattr(dr, field_name, majority_answer + " (code extracted)")
+                    if config.get('codegen_logging', default=False):
+                        majority_answer += " (code extracted)"
+                    setattr(dr, field_name, majority_answer)
                     stats[f"{field_name}"] = field_stats
 
                 # if profiling, set record's stats for the given op_id
