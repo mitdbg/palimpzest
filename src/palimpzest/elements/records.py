@@ -37,6 +37,12 @@ class DataRecord:
     @property
     def schema(self):
         return self._schema
+    
+    def asDict(self):
+        """Return a dictionary representation of this DataRecord"""
+        keys = sorted(self.__dict__)
+        # Make a dictionary out of the key/value pairs
+        return {k: str(self.__dict__[k]) for k in keys if not k.startswith("_") and not isinstance(self.__dict__[k] , bytes)}
 
     def asTextJSON(self, serialize: bool=False):
         """Return a JSON representation of this DataRecord"""

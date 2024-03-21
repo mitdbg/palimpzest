@@ -177,6 +177,17 @@ If you want to use parallel PDF processing at modal.com, you have to:
 1. Set `pdfprocessing: modal` in the config.yaml file.
 2. Run `modal deploy src/palimpzest/tools/allenpdf.py`.  This will remotely install the modal function so you can run it. (Actually, it's probably already installed there, but do this just in case.  Also do it if there's been a change to the server-side function inside that file.)
 
+## Configuring for Code Generation Solution
+
+**Currently code generation is inconsistent with parallel execution.**
+
+If you want to enable LLM generating code to perform batch operations, you have to modify the config.yaml (by default, Palimpzest uses `~/.palimpzest/config_default.yaml`) so that `codegen: true` is set.
+
+Furthermore, you can modify the following parameters to influence the code generation process:
+- `codegen_num_ensemble`: how many parallel code snippets to generate. Default to `4`.
+- `codegen_validation`: whether to fix code based on error feedback. Default to `False`. (TODO, no actual influence now)
+- `codegen_num_iterations`: number of max iterations for code fixing. Must have `codegen_validation=True` to have any effect. Default to `5`.
+- `codegen_num_max_examples`: number of max validation examples for code fixing.  Must have `codegen_validation=True` to have any effect. Default to `20`.
 
 ## Python Demo
 

@@ -37,6 +37,7 @@ dependencies = [
     "torch>=1.9.0",
     "tqdm>=4.66.2",
     "transformers>=4.11.3",
+    "pyheaven",
     # Add other dependencies as needed
 ]
 classifiers=[
