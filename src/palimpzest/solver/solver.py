@@ -140,25 +140,41 @@ class Solver:
 
                 field_stats = None
 
-                fieldDescriptions = ""
+                fieldDescriptions = {}
                 for field_name in outputSchema.fieldNames():
                     f = getattr(outputSchema, field_name)
-                    fieldDescriptions += f"{field_name}: {f.desc}\n"
+                    fieldDescriptions[field_name] = f.desc
 
-                promptQuestion = f"""I am trying to create an output object of type {doc_type}. I have an input object of type {str(inputSchema)}.
-                I must somehow use the information in the input object to create the correct fields in the output object. 
-                The input object is described as follows: {inputSchema.__doc__}.
-                The output object is described as follows: {outputSchema.__doc__}.
-                The output object should have a set of fields that are described in the following JSON schema: {doc_schema}.
-                Here are detailed descriptions of each of the fields in the desired output object: \n{fieldDescriptions}.
-                "Please return a correct parsable JSON object as an answer. Return ONLY the JSON object.""" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}."                
+                multilineInputFieldDescription = ""
+                for field_name in inputSchema.fieldNames():
+                    f = getattr(inputSchema, field_name)
+                    multilineInputFieldDescription += f"INPUT FIELD {field_name}: {f.desc}\n"
+
+                multilineOutputFieldDescription = ""
+                for field_name in outputSchema.fieldNames():
+                    f = getattr(outputSchema, field_name)
+                    multilineOutputFieldDescription += f"OUTPUT FIELD {field_name}: {f.desc}\n"
+
+                promptQuestion = f"""I would like you to create a output JSON object that describes an object of type {doc_type}. 
+                You will use the information in an input JSON object that I will provide. The input object has type {inputSchema.className()}.
+                All of the fields in the output object can be derived using information from the input object.
+                Here is a description of the input object: {inputSchema.__doc__}.
+                Here is a description of the output object: {outputSchema.__doc__}.
+                Here is every input field name and a description: 
+                {multilineInputFieldDescription}
+                Here is every output field name and a description:
+                {multilineOutputFieldDescription}.
+                Be sure to emit a JSON object only.
+                """ + "" if conversionDesc is None else f" Keep in mind that this process is described by this text: {conversionDesc}."                
 
                 try:
+                    answer = None
                     if prompt_strategy == PromptStrategy.DSPY_COT:
                         answer, field_stats = run_cot_qa(text_content, promptQuestion,
                                                                  model_name=model.value, 
                                                                  verbose=self._verbose, 
                                                                  promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                        
                     try:
                         if not answer.strip().startswith('{'):
                             # Find the start index of the actual JSON string
@@ -175,17 +191,21 @@ class Solver:
                                 # Remove the suffix and any trailing characters after the JSON ends
                                 answer = answer[:end_index + 1]
 
+                        # Handle weird escaped values. I am not sure why the model
+                        # is returning these, but the JSON parser can't take them
+                        answer = answer.replace("\_", "_")
                         jsonObj = json.loads(answer)
                         for field_name in outputSchema.fieldNames():
                             # parse the json object and set the fields of the record
                             setattr(dr, field_name, jsonObj[field_name])
                             stats[f"{field_name}"] = field_stats
                     except Exception as e:
-                        print(f"Error: {e}")
+                        print(f"Error level 0: {e}")
+                        print("ANSWER:", answer)
                         for field_name in outputSchema.fieldNames():
                             setattr(dr, field_name, None)
                 except Exception as e:
-                    print(f"Error: {e}")
+                    print(f"Error level 1: {type(e)}")
                     for field_name in outputSchema.fieldNames():
                         setattr(dr, field_name, None)
 
