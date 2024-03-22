@@ -7,6 +7,14 @@ from palimpzest.tools.dspysearch import run_codegen, run_basic_request, exec_cod
 from typing import Any, Dict, Tuple, Union
 
 # TODO: support parallel (edit cache)
+def Lock():
+    lock_dir = pjoin(DataDirectory()._dir, "data", "cache", ".codegen_lock"); CreateFile(lock_dir)
+
+def Unlock():
+    lock_dir = pjoin(DataDirectory()._dir, "data", "cache", ".codegen_lock"); Delete(lock_dir)
+
+def IsLocked():
+    lock_dir = pjoin(DataDirectory()._dir, "data", "cache", ".codegen_lock"); return ExistFile(lock_dir)
 
 CODEGEN_PROMPT = """You are a helpful programming assistant and an expert Python programmer. Implement the Python function `{api}` that extracts `{output}` ({output_desc}) from given inputs:
 {inputs_desc}
@@ -72,42 +80,16 @@ def llmAdviceGen(prompt, model, default=list()):
     except Exception as e:
         return default
 
-
-
-def getConversionCodeExamples(inputSchema: Schema, outputFieldDict: Dict[str, Field], conversionDesc: str, config: Dict[str, Any]):
-    examplesdir = pjoin(DataDirectory()._dir, "data", "cache", "codegen_cache_examples.json")
-    if not ExistFile(examplesdir): SaveJson(dict(), examplesdir)
-    EXAMPLES_CACHE = LoadJson(examplesdir)
-    outputName, outputField = list(outputFieldDict.items())[0]
-    hash_key = str((conversionDesc, inputSchema, outputName, outputField).__hash__())
-    if hash_key in EXAMPLES_CACHE:
-        return EXAMPLES_CACHE[hash_key]
-    return list()
-
-def registerConversionCodeGenExample(inputSchema: Schema, outputFieldDict: Dict[str, Field], conversionDesc: str, inputs: Dict[str, Any], outputs: Dict[str, Any]=None):
-    examplesdir = pjoin(DataDirectory()._dir, "data", "cache", "codegen_cache_examples.json")
-    if not ExistFile(examplesdir): SaveJson(dict(), examplesdir)
-    EXAMPLES_CACHE = LoadJson(examplesdir)
-    outputName, outputField = list(outputFieldDict.items())[0]
-    hash_key = str((conversionDesc, inputSchema, outputName, outputField).__hash__())
-    if hash_key not in EXAMPLES_CACHE:
-        EXAMPLES_CACHE[hash_key] = list()
-    EXAMPLES_CACHE[hash_key].append((inputs, outputs))
-    SaveJson(EXAMPLES_CACHE, examplesdir)
-
-def codeGen(inputSchema: Schema, outputFieldDict: Dict[str, Field], conversionDesc: str, config: Dict[str, Any], model: Model, api: API):
+def codeGen(inputSchema: Schema, outputFieldDict: Dict[str, Field], conversionDesc: str, config: Dict[str, Any], model: Model, api: API, example_inputs: Dict[str, Any]=None):    
     outputName, outputField = list(outputFieldDict.items())[0]
     # LLM code generation
-    examples = getConversionCodeExamples(inputSchema, outputFieldDict, conversionDesc, config)
-    assert (len(examples) > 0), "No examples found for code generation"
-    example_inputs, example_output = examples[0] # TODO: use more examples
     codeGenPrompt = CODEGEN_PROMPT.format(
         api = api.args_call(),
         output = outputName,
         output_desc = f"{outputField.desc}. {conversionDesc}" if conversionDesc else outputField.desc,
         inputs_desc = "\n".join([f"- {k}: {getattr(inputSchema,k).desc}." for k in inputSchema.fieldNames()]),
-        example_inputs = "\n".join([f"- {k} = {repr(example_inputs[k])}" for k in inputSchema.fieldNames()]),
-        example_output = f"- {outputName} = {repr(example_output[outputName])}" if example_output else ""
+        example_inputs = "\n".join([f"- {k} = {repr(example_inputs[k])}" for k in inputSchema.fieldNames()]) if example_inputs else "",
+        example_output = ""
     )
     code = llmCodeGen(codeGenPrompt, model, default=NONE_CODE.format(api=api.name))
     
@@ -125,8 +107,8 @@ def codeGen(inputSchema: Schema, outputFieldDict: Dict[str, Field], conversionDe
             output = outputName,
             output_desc = f"{outputField.desc}. {conversionDesc}" if conversionDesc else outputField.desc,
             inputs_desc = "\n".join([f"- {k}: {getattr(inputSchema,k).desc}." for k in inputSchema.fieldNames()]),
-            example_inputs = "\n".join([f"- {k} = {repr(example_inputs[k])}" for k in inputSchema.fieldNames()]),
-            example_output = f"- {outputName} = {repr(example_output[outputName])}" if example_output else "",
+            example_inputs = "\n".join([f"- {k} = {repr(example_inputs[k])}" for k in inputSchema.fieldNames()]) if example_inputs else "",
+            example_output = "",
             n = num_advices,
         )
         advices = llmAdviceGen(adviceGenPrompt, model)
@@ -136,33 +118,30 @@ def codeGen(inputSchema: Schema, outputFieldDict: Dict[str, Field], conversionDe
                 output = outputName,
                 output_desc = f"{outputField.desc}. {conversionDesc}" if conversionDesc else outputField.desc,
                 inputs_desc = "\n".join([f"- {k}: {getattr(inputSchema,k).desc}." for k in inputSchema.fieldNames()]),
-                example_inputs = "\n".join([f"- {k} = {repr(example_inputs[k])}" for k in inputSchema.fieldNames()]),
-                example_output = f"- {outputName} = {repr(example_output[outputName])}" if example_output else "",
+                example_inputs = "\n".join([f"- {k} = {repr(example_inputs[k])}" for k in inputSchema.fieldNames()]) if example_inputs else "",
+                example_output = "",
                 advice = advice,
             )
             advised_code = llmCodeGen(advisedCodeGenPrompt, model, default=NONE_CODE.format(api=api.name))
             codes.append(advised_code)
     
         # Validation & Iteration (there is currently not a lot of validation examples, and the reGenerate is always False, so this may never be used)
-        if validation and num_iterations > 0:
-            validation_examples = [(example_inputs, example_output) for example_inputs, example_output in validation_examples if example_output is not None]
-            validation_examples = validation_examples[:num_max_examples]
-            profiles = [[(exec_codegen(api, code, example_inputs), example_output) for exp in validation_examples] for code in codes]
-            for i in range(num_iterations):
-                # TODO: need validation examples, probably from a forced fallback ratio to LLM (e.g., 1% ?)
-                pass
+        # if validation and num_iterations > 0:
+        #     validation_examples = [(example_inputs, example_output) for example_inputs, example_output in validation_examples if example_output is not None]
+        #     validation_examples = validation_examples[:num_max_examples]
+        #     profiles = [[(exec_codegen(api, code, example_inputs), example_output) for exp in validation_examples] for code in codes]
+        #     for i in range(num_iterations):
+        #         # TODO: need validation examples, probably from a forced fallback ratio to LLM (e.g., 1% ?)
+        #         pass
 
     return codes
 
-def getConversionCodes(inputSchema: Schema, outputFieldDict: Dict[str, Field], conversionDesc: str, config: Dict[str, Any], model: Model, api: API, reGenerate: bool=False):
-    cachedir = pjoin(DataDirectory()._dir, "data", "cache", "codegen_cache_code.json")
-    if not ExistFile(cachedir): SaveJson(dict(), cachedir)
-    CODEGEN_CACHE = LoadJson(cachedir)
+def getConversionCodes(inputSchema: Schema, outputFieldDict: Dict[str, Field], conversionDesc: str, config: Dict[str, Any], model: Model, api: API, example_inputs: Dict[str, Any]=None):
     outputName, outputField = list(outputFieldDict.items())[0]
-    hash_key = str((conversionDesc, inputSchema, outputName, outputField).__hash__())
-    if (hash_key in CODEGEN_CACHE) and (not reGenerate):
-        return CODEGEN_CACHE[hash_key]
-    codes = codeGen(inputSchema, outputFieldDict, conversionDesc, config, model, api)
-    CODEGEN_CACHE[hash_key] = codes
-    SaveJson(CODEGEN_CACHE, cachedir)
+    hash_key = str((conversionDesc, inputSchema, outputName, outputField).__hash__()).replace('-','_')
+    codedir = pjoin(DataDirectory()._dir, "data", "cache", "codegen", f"{hash_key}.json")
+    if ExistFile(codedir):
+        return LoadJson(codedir)
+    codes = codeGen(inputSchema, outputFieldDict, conversionDesc, config, model, api, example_inputs=example_inputs)
+    SaveJson(codes, codedir)
     return codes

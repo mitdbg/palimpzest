@@ -6,7 +6,7 @@ from palimpzest.tools.pdfparser import get_text_from_pdf
 from palimpzest.tools.profiler import Profiler
 from palimpzest.tools.skema_tools import equations_to_latex_base64, equations_to_latex
 from palimpzest.solver.sandbox import *
-from palimpzest.solver.codegen import getConversionCodes, registerConversionCodeGenExample
+from palimpzest.solver.codegen import getConversionCodes
 
 from collections import defaultdict
 from copy import deepcopy
@@ -267,9 +267,6 @@ class Solver:
                         setattr(dr, field_name, answer)
                         stats[f"{field_name}"] = field_stats
                         
-                        registerConversionCodeGenExample(inputSchema, {field_name: f}, conversionDesc, inputs, outputs=answer)
-                        setattr(dr, field_name, answer)
-                        
                     except Exception as e:
                         print(f"Error: {e}")
                         setattr(dr, field_name, None)
@@ -298,13 +295,12 @@ class Solver:
                     if field_name in inputSchema.fieldNames():
                         setattr(dr, field_name, inputs[field_name])
                         continue
-                    registerConversionCodeGenExample(inputSchema, {field_name: f}, conversionDesc, inputs, outputs=None)
                     api = API(name = "extract", inputs = [
                         {'name': input_field_name, 'type': 'str', 'desc': getattr(inputSchema,input_field_name).desc} for input_field_name in inputSchema.fieldNames()
                     ], outputs=[
                         {'name': field_name, 'type': 'str', 'desc': f.desc}
                     ])
-                    codes = getConversionCodes(inputSchema, {field_name: f}, conversionDesc, config, model, api, reGenerate=False)
+                    codes = getConversionCodes(inputSchema, {field_name: f}, conversionDesc, config, model, api, example_inputs=inputs)
                     answers, field_stats = list(), defaultdict(float)
                     for code in codes:
                         answer, code_stats = exec_codegen(api, code, inputs)
