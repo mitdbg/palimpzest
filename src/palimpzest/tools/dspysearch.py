@@ -119,7 +119,7 @@ def run_cot_qa(context, question, model_name, verbose=False, promptSignature=Que
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         # get openai key from environment
         openai_key = os.environ['OPENAI_API_KEY']
-        turbo = dspy.OpenAI(model=model_name, api_key=openai_key, temperature=0.0, max_tokens=8192)
+        turbo = dspy.OpenAI(model=model_name, api_key=openai_key, temperature=0.0, max_tokens=4096)
     elif model_name in [Model.MIXTRAL.value]:
         if 'TOGETHER_API_KEY' not in os.environ:
             raise ValueError("TOGETHER_API_KEY not found in environment variables")
