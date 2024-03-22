@@ -55,7 +55,7 @@ class Solver:
         if outputSchema == PDFFile and inputSchema == File:
             if config.get("pdfprocessing") == "modal":
                 print("handling PDF processing remotely")
-                remoteFunc = modal.Function.lookup("palimpzest.tools.allenpdf", "processPapermagePdf")
+                remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
             else:
                 remoteFunc = None
                 
@@ -155,11 +155,13 @@ class Solver:
                     f = getattr(outputSchema, field_name)
                     multilineOutputFieldDescription += f"OUTPUT FIELD {field_name}: {f.desc}\n"
 
+                optionalInputDesc = "" if inputSchema.__doc__ is None else f"Here is a description of the input object: {inputSchema.__doc__}."
+                optionalOutputDesc = "" if outputSchema.__doc__ is None else f"Here is a description of the output object: {outputSchema.__doc__}."
                 promptQuestion = f"""I would like you to create a output JSON object that describes an object of type {doc_type}. 
                 You will use the information in an input JSON object that I will provide. The input object has type {inputSchema.className()}.
                 All of the fields in the output object can be derived using information from the input object.
-                Here is a description of the input object: {inputSchema.__doc__}.
-                Here is a description of the output object: {outputSchema.__doc__}.
+                {optionalInputDesc}
+                {optionalOutputDesc}
                 Here is every input field name and a description: 
                 {multilineInputFieldDescription}
                 Here is every output field name and a description:
@@ -169,12 +171,16 @@ class Solver:
 
                 try:
                     answer = None
+                    #print("ABOUT TO RUN prompt strat", prompt_strategy)
+                    #print("ABOUT TO RUN txt_content", text_content)
+                    #print("ABOUT TO RUN promptQuestion", promptQuestion)
+                    #print("ABOUT TO RUN MODEL", model.value)
                     if prompt_strategy == PromptStrategy.DSPY_COT:
                         answer, field_stats = run_cot_qa(text_content, promptQuestion,
                                                                  model_name=model.value, 
                                                                  verbose=self._verbose, 
                                                                  promptSignature=gen_qa_signature_class(doc_schema, doc_type))
-                        
+                        #print("Got it back!!!!!", answer)
                     try:
                         if not answer.strip().startswith('{'):
                             # Find the start index of the actual JSON string
@@ -228,7 +234,9 @@ class Solver:
                     try:
                         # TODO: allow for mult. fcns
                         field_stats = None
-                        if prompt_strategy == PromptStrategy.DSPY_COT:
+                        if prompt_strategy == PromptStrategy.DSPY_COT:                            
+                            #print("ABOUT TO RUN", text_content, f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.")
+                            #print("About to run model", model.value)
                             answer, field_stats = run_cot_qa(text_content,
                                                              f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
                                                              model_name=model.value, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
@@ -253,6 +261,7 @@ class Solver:
                 return dr
 
             return fnOrig
+#            return fn
 
     def _makeFilterFn(self, inputSchema: Schema, filter: Filter, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str):
             # parse inputs
