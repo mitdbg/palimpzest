@@ -132,136 +132,127 @@ class Solver:
             def fn(candidate: DataRecord):
                 # iterate through all empty fields in the outputSchema and ask questions to fill them
                 # for field in inputSchema.__dict__:
-                dr = DataRecord(outputSchema)
                 text_content = candidate.asTextJSON()
                 doc_schema = str(outputSchema)
                 doc_type = outputSchema.className()
                 stats = {}
 
-                field_stats = None
+                def runBondedQuery():
+                    dr = DataRecord(outputSchema)
+                    field_stats = None
 
-                fieldDescriptions = {}
-                for field_name in outputSchema.fieldNames():
-                    f = getattr(outputSchema, field_name)
-                    fieldDescriptions[field_name] = f.desc
+                    fieldDescriptions = {}
+                    for field_name in outputSchema.fieldNames():
+                        f = getattr(outputSchema, field_name)
+                        fieldDescriptions[field_name] = f.desc
 
-                multilineInputFieldDescription = ""
-                for field_name in inputSchema.fieldNames():
-                    f = getattr(inputSchema, field_name)
-                    multilineInputFieldDescription += f"INPUT FIELD {field_name}: {f.desc}\n"
+                    multilineInputFieldDescription = ""
+                    for field_name in inputSchema.fieldNames():
+                        f = getattr(inputSchema, field_name)
+                        multilineInputFieldDescription += f"INPUT FIELD {field_name}: {f.desc}\n"
 
-                multilineOutputFieldDescription = ""
-                for field_name in outputSchema.fieldNames():
-                    f = getattr(outputSchema, field_name)
-                    multilineOutputFieldDescription += f"OUTPUT FIELD {field_name}: {f.desc}\n"
+                    multilineOutputFieldDescription = ""
+                    for field_name in outputSchema.fieldNames():
+                        f = getattr(outputSchema, field_name)
+                        multilineOutputFieldDescription += f"OUTPUT FIELD {field_name}: {f.desc}\n"
 
-                optionalInputDesc = "" if inputSchema.__doc__ is None else f"Here is a description of the input object: {inputSchema.__doc__}."
-                optionalOutputDesc = "" if outputSchema.__doc__ is None else f"Here is a description of the output object: {outputSchema.__doc__}."
-                promptQuestion = f"""I would like you to create a output JSON object that describes an object of type {doc_type}. 
-                You will use the information in an input JSON object that I will provide. The input object has type {inputSchema.className()}.
-                All of the fields in the output object can be derived using information from the input object.
-                {optionalInputDesc}
-                {optionalOutputDesc}
-                Here is every input field name and a description: 
-                {multilineInputFieldDescription}
-                Here is every output field name and a description:
-                {multilineOutputFieldDescription}.
-                Be sure to emit a JSON object only.
-                """ + "" if conversionDesc is None else f" Keep in mind that this process is described by this text: {conversionDesc}."                
+                    optionalInputDesc = "" if inputSchema.__doc__ is None else f"Here is a description of the input object: {inputSchema.__doc__}."
+                    optionalOutputDesc = "" if outputSchema.__doc__ is None else f"Here is a description of the output object: {outputSchema.__doc__}."
+                    promptQuestion = f"""I would like you to create a output JSON object that describes an object of type {doc_type}. 
+                    You will use the information in an input JSON object that I will provide. The input object has type {inputSchema.className()}.
+                    All of the fields in the output object can be derived using information from the input object.
+                    {optionalInputDesc}
+                    {optionalOutputDesc}
+                    Here is every input field name and a description: 
+                    {multilineInputFieldDescription}
+                    Here is every output field name and a description:
+                    {multilineOutputFieldDescription}.
+                    Be sure to emit a JSON object only.
+                    """ + "" if conversionDesc is None else f" Keep in mind that this process is described by this text: {conversionDesc}."                
 
-                try:
                     answer = None
-                    #print("ABOUT TO RUN prompt strat", prompt_strategy)
-                    #print("ABOUT TO RUN txt_content", text_content)
-                    #print("ABOUT TO RUN promptQuestion", promptQuestion)
-                    #print("ABOUT TO RUN MODEL", model.value)
                     if prompt_strategy == PromptStrategy.DSPY_COT:
                         answer, field_stats = run_cot_qa(text_content, promptQuestion,
-                                                                 model_name=model.value, 
-                                                                 verbose=self._verbose, 
-                                                                 promptSignature=gen_qa_signature_class(doc_schema, doc_type))
-                        #print("Got it back!!!!!", answer)
-                    try:
-                        if not answer.strip().startswith('{'):
-                            # Find the start index of the actual JSON string
-                            # assuming the prefix is followed by the JSON object/array
-                            start_index = answer.find('{') if '{' in answer else answer.find('[')
-                            if start_index != -1:
-                                # Remove the prefix and any leading characters before the JSON starts
-                                answer = answer[start_index:]
-                        if not answer.strip().endswith('}'):
-                            # Find the end index of the actual JSON string
-                            # assuming the suffix is preceded by the JSON object/array
-                            end_index = answer.rfind('}') if '}' in answer else answer.rfind(']')
-                            if end_index != -1:
-                                # Remove the suffix and any trailing characters after the JSON ends
-                                answer = answer[:end_index + 1]
+                                                                model_name=model.value, 
+                                                                verbose=self._verbose, 
+                                                                promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                    if not answer.strip().startswith('{'):
+                        # Find the start index of the actual JSON string
+                        # assuming the prefix is followed by the JSON object/array
+                        start_index = answer.find('{') if '{' in answer else answer.find('[')
+                        if start_index != -1:
+                            # Remove the prefix and any leading characters before the JSON starts
+                            answer = answer[start_index:]
+                    if not answer.strip().endswith('}'):
+                        # Find the end index of the actual JSON string
+                        # assuming the suffix is preceded by the JSON object/array
+                        end_index = answer.rfind('}') if '}' in answer else answer.rfind(']')
+                        if end_index != -1:
+                            # Remove the suffix and any trailing characters after the JSON ends
+                            answer = answer[:end_index + 1]
 
-                        # Handle weird escaped values. I am not sure why the model
-                        # is returning these, but the JSON parser can't take them
-                        answer = answer.replace("\_", "_")
-                        jsonObj = json.loads(answer)
-                        for field_name in outputSchema.fieldNames():
-                            # parse the json object and set the fields of the record
-                            setattr(dr, field_name, jsonObj[field_name])
-                            stats[f"{field_name}"] = field_stats
-                    except Exception as e:
-                        print(f"Error level 0: {e}")
-                        print("ANSWER:", answer)
-                        for field_name in outputSchema.fieldNames():
-                            setattr(dr, field_name, None)
-                except Exception as e:
-                    print(f"Error level 1: {type(e)}")
+                    # Handle weird escaped values. I am not sure why the model
+                    # is returning these, but the JSON parser can't take them
+                    answer = answer.replace("\_", "_")
+                    jsonObj = json.loads(answer)
                     for field_name in outputSchema.fieldNames():
-                        setattr(dr, field_name, None)
-
-                # if profiling, set record's stats for the given op_id
-                if Profiler.profiling_on():
-                    dr._stats[op_id] = {"fields": stats}
-
-                return dr
-
-            def fnOrig(candidate: DataRecord):
-                # iterate through all empty fields in the outputSchema and ask questions to fill them
-                # for field in inputSchema.__dict__:
-                dr = DataRecord(outputSchema)
-                text_content = candidate.asTextJSON()
-                doc_schema = str(outputSchema)
-                doc_type = outputSchema.className()
-                stats = {}
-                for field_name in outputSchema.fieldNames():
-                    f = getattr(outputSchema, field_name)
-                    try:
-                        # TODO: allow for mult. fcns
-                        field_stats = None
-                        if prompt_strategy == PromptStrategy.DSPY_COT:                            
-                            #print("ABOUT TO RUN", text_content, f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.")
-                            #print("About to run model", model.value)
-                            answer, field_stats = run_cot_qa(text_content,
-                                                             f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
-                                                             model_name=model.value, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
-                        # TODO
-                        elif prompt_strategy == PromptStrategy.ZERO_SHOT:
-                            raise Exception("not implemented yet")
-                        # TODO
-                        elif prompt_strategy == PromptStrategy.FEW_SHOT:
-                            raise Exception("not implemented yet")
-
-                        setattr(dr, field_name, answer)
+                        # parse the json object and set the fields of the record
+                        setattr(dr, field_name, jsonObj[field_name])
                         stats[f"{field_name}"] = field_stats
 
+                    # if profiling, set record's stats for the given op_id
+                    if Profiler.profiling_on():
+                        dr._stats[op_id] = {"fields": stats}
+
+                    return dr
+
+                def runConventionalQuery():
+                    dr = DataRecord(outputSchema)
+
+                    for field_name in outputSchema.fieldNames():
+                        f = getattr(outputSchema, field_name)
+                        try:
+                            # TODO: allow for mult. fcns
+                            field_stats = None
+                            if prompt_strategy == PromptStrategy.DSPY_COT:                            
+                                #print("ABOUT TO RUN", text_content, f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.")
+                                #print("About to run model", model.value)
+                                answer, field_stats = run_cot_qa(text_content,
+                                                                f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
+                                                                model_name=model.value, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                            # TODO
+                            elif prompt_strategy == PromptStrategy.ZERO_SHOT:
+                                raise Exception("not implemented yet")
+                            # TODO
+                            elif prompt_strategy == PromptStrategy.FEW_SHOT:
+                                raise Exception("not implemented yet")
+
+                            setattr(dr, field_name, answer)
+                            stats[f"{field_name}"] = field_stats
+                        except Exception as e:
+                            print(f"Traditional field processing error: {e}")
+                            setattr(dr, field_name, None)
+                
+                    # if profiling, set record's stats for the given op_id
+                    if Profiler.profiling_on():
+                        dr._stats[op_id] = {"fields": stats}
+
+                    return dr
+
+                try:
+                    return runBondedQuery()
+                except Exception as e:
+                    try:
+                        return runConventionalQuery()
                     except Exception as e:
                         print(f"Error: {e}")
-                        setattr(dr, field_name, None)
-                
-                # if profiling, set record's stats for the given op_id
-                if Profiler.profiling_on():
-                    dr._stats[op_id] = {"fields": stats}
+                        dr = DataRecord(outputSchema)
+                        for field_name in outputSchema.fieldNames():
+                            setattr(dr, field_name, None)
+                        return dr
 
-                return dr
 
-            return fnOrig
-#            return fn
+            return fn
 
     def _makeFilterFn(self, inputSchema: Schema, filter: Filter, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str):
             # parse inputs
