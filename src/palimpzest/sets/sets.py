@@ -82,6 +82,10 @@ class Set:
         elif inputObj["source_type"] == "file":
             source = FileSource(inputObj["schema"])
 
+        elif inputObj["source_type"] == "jsonstream":
+            raise Exception("This can't possibly work, can it?")
+            #source = JSONStreamSource(inputObj["schema"])
+
         # deserialize agg. function
         aggFuncStr = inputObj.get("aggFunc", None)
         aggFunc = None if aggFuncStr is None else AggregateFunction.deserialize(aggFuncStr)
@@ -129,7 +133,8 @@ class Set:
         # otherwise, if this Set's source is a DataSource
         if isinstance(self._source, DataSource):
             dataset_id = self._source.universalIdentifier()
-            sourceSchema = Number if isinstance(self._source, MemorySource) else File
+            sourceSchema = self._source.schema
+
             if self._schema == sourceSchema:
                 return BaseScan(self._schema, dataset_id)
             else:

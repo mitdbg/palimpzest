@@ -375,7 +375,7 @@ class InduceFromCandidateOp(PhysicalOp):
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None, streaming=False):
         super().__init__(outputSchema=outputSchema)
         self.source = source
         self.model = model
@@ -383,6 +383,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         self.desc = desc
         self.targetCacheId = targetCacheId
         self.max_workers = 20
+        self.streaming = streaming
 
         taskDescriptor = ("ParallelInduceFromCandidateOp", (model, prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
@@ -488,14 +489,20 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 inputs.append(nextCandidate)
 
             # Grab items from the list inputs in chunks using self.max_workers
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                results = list(executor.map(self._attemptMapping, inputs))
+            if self.streaming:                
+                chunksize =self.max_workers
+            else:
+                chunksize = len(inputs)
 
-                for resultRecord in results:
-                    if resultRecord is not None:
-                        if shouldCache:
-                            self.datadir.appendCache(self.targetCacheId, resultRecord)
-                        yield resultRecord
+            for i in range(0, len(inputs), chunksize):
+                with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                    results = list(executor.map(self._attemptMapping, inputs[i:i+chunksize]))
+
+                    for resultRecord in results:
+                        if resultRecord is not None:
+                            if shouldCache:
+                                self.datadir.appendCache(self.targetCacheId, resultRecord)
+                            yield resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -642,7 +649,7 @@ class FilterCandidateOp(PhysicalOp):
 
 
 class ParallelFilterCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None, streaming=False):
         super().__init__(outputSchema=outputSchema)
         self.source = source
         self.filter = filter
@@ -650,6 +657,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
         self.prompt_strategy = prompt_strategy
         self.targetCacheId = targetCacheId
         self.max_workers = 20
+        self.streaming = streaming
 
         taskDescriptor = ("ParallelFilterCandidateOp", (filter, model, prompt_strategy, self.opId()), source.outputSchema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
@@ -752,21 +760,26 @@ class ParallelFilterCandidateOp(PhysicalOp):
             for nextCandidate in self.source: 
                 inputs.append(nextCandidate)
 
+            if self.streaming:                
+                chunksize =self.max_workers
+            else:
+                chunksize = len(inputs)
+
             # Grab items from the list of inputs in chunks using self.max_workers
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                results = list(executor.map(self._passesFilter, inputs))
+            for i in range(0, len(inputs), chunksize):                
+                with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                    results = list(executor.map(self._passesFilter, inputs[i:i+chunksize]))
 
-                for resultRecord in results:
-                    if resultRecord._passed_filter:
-                        if shouldCache:
-                            self.datadir.appendCache(self.targetCacheId, resultRecord)
-                        yield resultRecord
+                    for resultRecord in results:
+                        if resultRecord._passed_filter:
+                            if shouldCache:
+                                self.datadir.appendCache(self.targetCacheId, resultRecord)
+                            yield resultRecord
 
-                    # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
-                    # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
-                    elif Profiler.profiling_on():
-                        yield resultRecord
-
+                        # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
+                        # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
+                        elif Profiler.profiling_on():
+                            yield resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 

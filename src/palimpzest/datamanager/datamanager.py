@@ -1,15 +1,26 @@
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
-from palimpzest.datasources import DirectorySource, FileSource, MemorySource
+from palimpzest.datasources import DirectorySource, FileSource, MemorySource, StreamingJSONSource
 
 import os
 import pickle
 import sys
 import yaml
+from threading import Lock
 
+class DataDirectorySingletonMeta(type):
+    _instances = {}
+    _lock: Lock = Lock()
+
+    def __call__(cls, *args, **kwargs):
+        with cls._lock:
+            if cls not in cls._instances:
+                instance = super(DataDirectorySingletonMeta, cls).__call__(*args, **kwargs)
+                cls._instances[cls] = instance
+        return cls._instances[cls]    
 
 # TODO: possibly rename to the PZManager, as it also manages the current config
-class DataDirectory:
+class DataDirectory(metaclass=DataDirectorySingletonMeta):
     """The DataDirectory is a registry of data sources."""
 
     def __init__(self):
@@ -72,6 +83,12 @@ class DataDirectory:
         self._registry[dataset_id] = ("file", path)
         pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
 
+    def registerJsonStream(self, url:str, blockTime:int, dataset_id:str):
+        """Register a json stream as a data source."""
+        self._registry[dataset_id] = ("jsonstream", (url, blockTime))
+        if not dataset_id.startswith("ephemeral"):
+            pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
+
     def registerDataset(self, vals, dataset_id):
         """Register an in-memory dataset as a data source"""
         self._registry[dataset_id] = ("memory", vals)
@@ -89,6 +106,9 @@ class DataDirectory:
             return FileSource(rock, dataset_id)
         elif entry == "memory":
             return MemorySource(rock, dataset_id)
+        elif entry == "jsonstream":
+            url, blockTime = rock
+            return StreamingJSONSource(url, blockTime, dataset_id)
         else:
             raise Exception("Unknown entry type")
 
@@ -118,6 +138,8 @@ class DataDirectory:
         elif entry == "memory":
             # get the size of the values in bytes
             return sys.getsizeof(rock)
+        elif entry == "jsonstream":
+            return 100 # WAG
         else:
             raise Exception("Unknown entry type")
 
@@ -137,6 +159,8 @@ class DataDirectory:
         elif entry == "memory":
             # Return the number of elements in the values list
             return len(rock)
+        elif entry == "jsonstream":
+            return 100 # WAG
         else:
             raise Exception("Unknown entry type")
 

@@ -36,3 +36,7 @@ class EquationImage(ImageFile):
 class PlotImage(ImageFile):
     """An image that contains a plot, such as a graph or chart."""
     plot_description = StringField(desc="A description of the plot", required=True)
+
+class RawJSONObject(Schema):
+    """A JSON object, which is a dictionary of key-value pairs."""
+    json = StringField(desc="String representation of a JSON object", required=True)

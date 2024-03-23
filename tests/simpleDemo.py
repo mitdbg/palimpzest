@@ -42,6 +42,16 @@ def buildMITBatteryPaperPlan(datasetId):
     return mitPapers
 
 
+class GitHubUpdate(pz.Schema):
+    """GitHubUpdate represents a single commit message from a GitHub repo"""
+    commit_message = pz.Field(desc="The message associated with the commit", required=True)
+    commit_date = pz.Field(desc="The date the commit was made", required=True)
+    committer_name = pz.Field(desc="The name of the person who made the commit", required=True)
+    file_names = pz.Field(desc="The list of files changed in the commit", required=False)
+
+def testStreaming(datasetId: str):
+    return pz.Dataset(datasetId, schema=GitHubUpdate)
+
 def testCount(datasetId):
     files = pz.Dataset(datasetId)
     fileCount = files.aggregate("COUNT")
@@ -254,6 +264,23 @@ if __name__ == "__main__":
         print("----------")
         print()
         printTable(records, cols=["title", "author", "institution", "journal", "fundingAgency"], gradio=True, plan=physicalTree)
+
+    elif task == "streaming":
+        # register the ephemeral dataset
+        datasetid = "ephemeral:jsontest"
+        owner = "mikecafarella"
+        repo = "palimpzest"
+        url = f"https://api.github.com/repos/{owner}/{repo}/commits"
+        blockTime = 5
+        pz.DataDirectory().registerJsonStream(url, blockTime, datasetid)
+
+        rootSet = testStreaming(datasetid)
+        physicalTree = emitDataset(rootSet, policy, title="Streaming items", verbose=args.verbose)
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records, gradio=True, plan=physicalTree)
+
 
     elif task == "image":
         print("Starting image task")
