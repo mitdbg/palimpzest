@@ -1,1 +1,2 @@
-from .datasources import DataSource, DirectorySource, FileSource, MemorySource
+from .datasources import DataSource, DirectorySource, FileSource, MemorySource, StreamingJSONSource
+

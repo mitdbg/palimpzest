@@ -1,12 +1,15 @@
-from palimpzest.elements import DataRecord, File, Number, Schema
+from palimpzest.elements import DataRecord, File, Number, Schema, RawJSONObject
 from typing import Any, Callable, Dict, List, Union
 
 import os
+import time
+import requests
+import json
 
 
-class DataSource:
+class AbstractDataSource:
     """
-    A DataSource is an Iterable which yields DataRecords adhering to a given schema.
+    An AbstractDataSource is an Iterable which yields DataRecords adhering to a given schema.
     
     This base class must have its `__iter__` method implemented by a subclass, with each
     subclass reading data files from some real-world source (i.e. a directory, an S3 prefix,
@@ -15,9 +18,8 @@ class DataSource:
     Many (if not all) DataSources should use Schemas from `palimpzest.elements.core`.
     In the future, programmers can implement their own DataSources using custom Schemas.
     """
-    def __init__(self, schema: Schema, dataset_id: str) -> None:
+    def __init__(self, schema: Schema) -> None:
         self.schema = schema
-        self.dataset_id = dataset_id
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(schema={self.schema})"
@@ -28,9 +30,17 @@ class DataSource:
     def serialize(self) -> Dict[str, Any]:
         return {"schema": self.schema.jsonSchema()}
 
+class DataSource(AbstractDataSource):
+    def __init__(self, schema: Schema, dataset_id: str) -> None:
+        super().__init__(schema)
+        self.dataset_id = dataset_id
+
     def universalIdentifier(self):
         """Return a unique identifier for this Set."""
         return self.dataset_id
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}(schema={self.schema}, dataset_id={self.dataset_id})"
 
 
 class MemorySource(DataSource):
@@ -41,7 +51,6 @@ class MemorySource(DataSource):
         self.vals = vals
 
     def __iter__(self) -> Callable[[], DataRecord]:
-
         def valIterator():
             for v in self.vals:
                 dr = DataRecord(self.schema)
@@ -101,4 +110,49 @@ class FileSource(DataSource):
             "schema": self.schema.jsonSchema(),
             "path": self.path,
             "source_type": "file",
+        }
+
+class StreamingJSONSource(DataSource):
+    """StreamingSource returns multiple objects from a stream of data"""
+    def __init__(self, url:str, blockTime: int, dataset_id: str):
+        super().__init__(RawJSONObject, dataset_id)
+        self.url = url
+        self.blockTime = blockTime
+
+    def __iter__(self) -> Callable[[], DataRecord]:
+        def streamIterator():
+            seenItems = set()
+            timeLastNewItemSeen = time.time()
+            lastTry = -1
+
+            while True:
+                if self.blockTime >= 0 and time.time() - timeLastNewItemSeen > self.blockTime:
+                    break
+
+                if lastTry > 0 and time.time() - lastTry < 5:
+                    time.sleep(5)
+                response = requests.get(self.url, timeout=5)
+                lastTry = time.time()
+                if response.status_code == 200:
+                    results = response.json()
+                    for result in results:
+                        # convert json object to string
+                        resultStr = json.dumps(result)
+                        if resultStr in seenItems:
+                            continue
+
+                        dr = DataRecord(self.schema)
+                        dr.json = resultStr
+                        seenItems.add(resultStr)
+                        yield dr
+                        timeLastNewItemSeen = time.time()
+
+        return streamIterator()
+
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            "schema": self.schema.jsonSchema(),
+            "url": self.url,
+            "blockTime": self.blockTime,
+            "source_type": "jsonstream",
         }
