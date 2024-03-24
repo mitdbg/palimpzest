@@ -1,6 +1,6 @@
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
-from palimpzest.datasources import DirectorySource, FileSource, MemorySource, StreamingJSONSource
+from palimpzest.datasources import DirectorySource, FileSource, MemorySource, UserSource
 
 import os
 import pickle
@@ -76,23 +76,25 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
     def registerLocalDirectory(self, path, dataset_id):
         """Register a local directory as a data source."""
         self._registry[dataset_id] = ("dir", path)
-        pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
+        if not dataset_id.startswith("ephemeral"):
+            pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
 
     def registerLocalFile(self, path, dataset_id):
         """Register a local file as a data source."""
         self._registry[dataset_id] = ("file", path)
-        pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
-
-    def registerJsonStream(self, url:str, blockTime:int, dataset_id:str):
-        """Register a json stream as a data source."""
-        self._registry[dataset_id] = ("jsonstream", (url, blockTime))
         if not dataset_id.startswith("ephemeral"):
             pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
 
     def registerDataset(self, vals, dataset_id):
         """Register an in-memory dataset as a data source"""
         self._registry[dataset_id] = ("memory", vals)
-        pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
+        if not dataset_id.startswith("ephemeral"):
+            pickle.dump(self._registry, open(self._dir + "/data/cache/registry.pkl", "wb"))
+
+    def registerUserSource(self, src:UserSource, dataset_id:str):
+        """Register a user source as a data source."""
+        self._registry[dataset_id] = ("user", src)
+#        # user sources are always ephemeral
 
     def getRegisteredDataset(self, dataset_id):
         """Return a dataset from the registry."""
@@ -106,9 +108,9 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             return FileSource(rock, dataset_id)
         elif entry == "memory":
             return MemorySource(rock, dataset_id)
-        elif entry == "jsonstream":
-            url, blockTime = rock
-            return StreamingJSONSource(url, blockTime, dataset_id)
+        elif entry == "user":
+            src = rock
+            return src
         else:
             raise Exception("Unknown entry type")
 
@@ -138,8 +140,8 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         elif entry == "memory":
             # get the size of the values in bytes
             return sys.getsizeof(rock)
-        elif entry == "jsonstream":
-            return 100 # WAG
+        elif entry == "user":
+            return rock.getSize()
         else:
             raise Exception("Unknown entry type")
 
@@ -159,8 +161,8 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         elif entry == "memory":
             # Return the number of elements in the values list
             return len(rock)
-        elif entry == "jsonstream":
-            return 100 # WAG
+        elif entry == "user":
+            return rock.getCardinality()
         else:
             raise Exception("Unknown entry type")
 

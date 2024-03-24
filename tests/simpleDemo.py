@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 import argparse
+import requests
 import json
 import time
 import os
@@ -44,6 +45,8 @@ def buildMITBatteryPaperPlan(datasetId):
 
 class GitHubUpdate(pz.Schema):
     """GitHubUpdate represents a single commit message from a GitHub repo"""
+    commitId = pz.Field(desc="The unique identifier for the commit", required=True)
+    reponame = pz.Field(desc="The name of the repository", required=True)
     commit_message = pz.Field(desc="The message associated with the commit", required=True)
     commit_date = pz.Field(desc="The date the commit was made", required=True)
     committer_name = pz.Field(desc="The name of the person who made the commit", required=True)
@@ -267,12 +270,43 @@ if __name__ == "__main__":
 
     elif task == "streaming":
         # register the ephemeral dataset
-        datasetid = "ephemeral:jsontest"
+        datasetid = "ephemeral:githubtest"
         owner = "mikecafarella"
         repo = "palimpzest"
         url = f"https://api.github.com/repos/{owner}/{repo}/commits"
         blockTime = 5
-        pz.DataDirectory().registerJsonStream(url, blockTime, datasetid)
+
+        class GitHubCommitSource(pz.UserSource):
+            def __init__(self, datasetId):
+                super().__init__(pz.RawJSONObject, datasetId)
+
+            def userImplementedIterator(self):
+                per_page = 100
+                params = {
+                    'per_page': per_page,
+                    'page': 1
+                }
+                while True:
+                    response = requests.get(url, params=params)
+                    commits = response.json()
+
+                    if not commits or response.status_code != 200:
+                        break
+
+                    for commit in commits:
+                        # Process each commit here
+                        commitStr = json.dumps(commit)
+                        dr = pz.DataRecord(self.schema)
+                        dr.json = commitStr
+                        yield dr
+
+                    if len(commits) < per_page:
+                        break
+
+                    params['page'] += 1
+                    time.sleep(1)
+
+        pz.DataDirectory().registerUserSource(GitHubCommitSource(datasetid), datasetid)
 
         rootSet = testStreaming(datasetid)
         physicalTree = emitDataset(rootSet, policy, title="Streaming items", verbose=args.verbose)
