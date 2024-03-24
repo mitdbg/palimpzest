@@ -112,47 +112,30 @@ class FileSource(DataSource):
             "source_type": "file",
         }
 
-class StreamingJSONSource(DataSource):
-    """StreamingSource returns multiple objects from a stream of data"""
-    def __init__(self, url:str, blockTime: int, dataset_id: str):
-        super().__init__(RawJSONObject, dataset_id)
-        self.url = url
-        self.blockTime = blockTime
+class UserSource(DataSource):
+    """UserSource is a DataSource that is created by the user and not loaded from a file"""
+    def __init__(self, schema: Schema, dataset_id: str) -> None:
+        super().__init__(schema, dataset_id)
 
     def __iter__(self) -> Callable[[], DataRecord]:
-        def streamIterator():
-            seenItems = set()
-            timeLastNewItemSeen = time.time()
-            lastTry = -1
+        def userIterator():
+            return self.userImplementedIterator()
 
-            while True:
-                if self.blockTime >= 0 and time.time() - timeLastNewItemSeen > self.blockTime:
-                    break
-
-                if lastTry > 0 and time.time() - lastTry < 5:
-                    time.sleep(5)
-                response = requests.get(self.url, timeout=5)
-                lastTry = time.time()
-                if response.status_code == 200:
-                    results = response.json()
-                    for result in results:
-                        # convert json object to string
-                        resultStr = json.dumps(result)
-                        if resultStr in seenItems:
-                            continue
-
-                        dr = DataRecord(self.schema)
-                        dr.json = resultStr
-                        seenItems.add(resultStr)
-                        yield dr
-                        timeLastNewItemSeen = time.time()
-
-        return streamIterator()
-
+        return userIterator()
+    
+    def userImplementedIterator(self) -> Callable[[], DataRecord]:
+        raise Exception("User sources must implement their own iterator.")
+    
     def serialize(self) -> Dict[str, Any]:
         return {
             "schema": self.schema.jsonSchema(),
-            "url": self.url,
-            "blockTime": self.blockTime,
-            "source_type": "jsonstream",
+            "source_type": "user-defined:" + self.__class__.__name__,
         }
+    
+    def getSize(self):
+        return 100 # this should be overridden
+    
+    def getCardinality(self):
+        return 100 # this should be overridden
+
+
