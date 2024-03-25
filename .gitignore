@@ -1,3 +1,6 @@
+.env
+build/*
+
 # python artifacts
 *.egg-info
 **/__pycache__/

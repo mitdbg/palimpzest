@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import context # needed to load api keys from .env
 from palimpzest.elements import Schema, StringField
 from palimpzest.policy import *
 from palimpzest.tools.profiler import Profiler
