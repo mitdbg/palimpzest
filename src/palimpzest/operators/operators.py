@@ -153,7 +153,12 @@ class LogicalOperator:
 
         if os.getenv('TOGETHER_API_KEY') is not None:
             models.extend([Model.MIXTRAL])
+        
+        if os.getenv('GOOGLE_API_KEY') is not None:
+            models.extend([Model.GEMINI_1, Model.GEMINI_1V])
 
+        assert len(models) > 0,"No models available to create physical plans! Have you provided any API keys?"
+        
         physicalPlans = []
         for model in models:
             physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, model=model)

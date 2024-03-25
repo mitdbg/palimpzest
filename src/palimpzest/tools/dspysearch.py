@@ -76,6 +76,12 @@ def run_cot_bool(context, question, model_name, verbose=False, promptSignature=F
         # mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
         mixtralModel = model_name
         turbo = TogetherHFAdaptor(mixtralModel, together_key)
+    elif model_name in [Model.GEMINI_1.value, Model.GEMINI_1V.value]:
+        if 'GOOGLE_API_KEY' not in os.environ:
+            raise ValueError("GOOGLE_API_KEY not found in environment variables")
+        # get google key from environment
+        google_key = os.environ['GOOGLE_API_KEY']
+        turbo = dspy.Google(model=model_name, api_key=google_key)
     else:
         raise ValueError("model must be one of those specified in palimpzest.constants.Model")
 
@@ -123,6 +129,12 @@ def run_cot_qa(context, question, model_name, verbose=False, promptSignature=Que
         # mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
         mixtralModel = model_name
         turbo = TogetherHFAdaptor(mixtralModel, together_key)
+    elif model_name in [Model.GEMINI_1.value, Model.GEMINI_1V.value]:
+        if 'GOOGLE_API_KEY' not in os.environ:
+            raise ValueError("GOOGLE_API_KEY not found in environment variables")
+        # get google key from environment
+        google_key = os.environ['GOOGLE_API_KEY']
+        turbo = dspy.Google(model=model_name, api_key=google_key)
     else:
         raise ValueError("model must be one of those specified in palimpzest.constants.Model")
 
