@@ -1,5 +1,6 @@
 .env
 build/*
+.vscode/*
 
 # python artifacts
 *.egg-info
