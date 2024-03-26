@@ -116,7 +116,7 @@ class Profiler:
 
         return full_stats_dict
 
-    def iter_profiler(self, name: str, op_id: str):
+    def iter_profiler(self, name: str, op_id: str, shouldProfile: bool = False):
         """
         iter_profiler is a decorator factory. This function takes in a `name` argument
         and returns a decorator which will decorate an iterator. In practice, this
@@ -133,7 +133,7 @@ class Profiler:
         """
         def profile_decorator(iterator):
             # return iterator if profiling is not set to True
-            if not Profiler.profiling_on():
+            if not shouldProfile:
                 return iterator
 
             @wraps(iterator)

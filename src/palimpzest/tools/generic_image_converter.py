@@ -1,6 +1,4 @@
 from palimpzest.constants import Model
-from palimpzest.tools.profiler import Profiler
-from pathlib import Path
 from openai import OpenAI
 import google.generativeai as genai
 
@@ -8,7 +6,6 @@ from typing import Union
 from tenacity import retry, stop_after_attempt, wait_exponential
 import os
 import base64
-import requests
 import time
 import io
 from PIL import Image
@@ -65,7 +62,7 @@ def make_payload(base64_image):
     stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
     after=log_attempt_number,
 )
-def describe_image(model_name:str, image_b64: str) -> Union[str,str]:
+def describe_image(model_name:str, image_b64: str, shouldProfile: bool=False) -> Union[str,str]:
     """Method essentially based on do_image_analysis from the original codebase.
     Key differences:
     1. API key is not passed, rather it is fetched from the environment variables based on the llm service chosen
@@ -82,6 +79,7 @@ def describe_image(model_name:str, image_b64: str) -> Union[str,str]:
       content_str = candidate.message.content
       finish_reason = candidate.finish_reason
       usage = completion.usage
+
     elif model_name == Model.GEMINI_1V.value:
       api_key = os.environ["GOOGLE_API_KEY"]
       genai.configure(api_key=api_key)
@@ -94,11 +92,12 @@ def describe_image(model_name:str, image_b64: str) -> Union[str,str]:
       content_str = candidate.content.parts[0].text
       finish_reason = candidate.finish_reason
       usage = 0
+
     else:
       raise ValueError(f"Unknown model name: {model_name}")
 
     stats = {}
-    if Profiler.profiling_on():
+    if shouldProfile:
       stats['api_call_duration'] = end_time - start_time
       stats['prompt'] = PROMPT
       stats['usage'] = usage

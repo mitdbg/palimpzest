@@ -60,7 +60,7 @@ def gen_qa_signature_class(doc_schema, doc_type):
     answer_desc = f"print the answer only, separated by a newline character"
     return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
-def run_cot_bool(context, question, model_name, verbose=False, promptSignature=FilterOverPaper):
+def run_cot_bool(context, question, model_name, verbose=False, promptSignature=FilterOverPaper, shouldProfile=False):
     if model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
@@ -75,8 +75,8 @@ def run_cot_bool(context, question, model_name, verbose=False, promptSignature=F
         #redpajamaModel = 'togethercomputer/RedPajama-INCITE-7B-Base'
         # mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
         mixtralModel = model_name
-        turbo = TogetherHFAdaptor(mixtralModel, together_key)
-    elif model_name in [Model.GEMINI_1.value, Model.GEMINI_1V.value]:
+        turbo = TogetherHFAdaptor(mixtralModel, together_key, shouldProfile)
+    elif model_name in [Model.GEMINI_1.value]:
         if 'GOOGLE_API_KEY' not in os.environ:
             raise ValueError("GOOGLE_API_KEY not found in environment variables")
         # get google key from environment
@@ -96,7 +96,7 @@ def run_cot_bool(context, question, model_name, verbose=False, promptSignature=F
     #       physical operators -> solvers -> dspysearch, dspyadaptors, openai_image_converter, etc.
     # collect statistics on prompt, usage, and timing if profiling is on
     stats = {}
-    if Profiler.profiling_on():
+    if shouldProfile:
         stats['api_call_duration'] = end_time - start_time
         stats['prompt'] = turbo.history[-1]['prompt']
         stats['usage'] = turbo.history[-1]['response']['usage']
@@ -113,7 +113,7 @@ def run_cot_bool(context, question, model_name, verbose=False, promptSignature=F
     return pred.answer, stats
 
 
-def run_cot_qa(context, question, model_name, verbose=False, promptSignature=QuestionOverPaper):
+def run_cot_qa(context, question, model_name, verbose=False, promptSignature=QuestionOverPaper, shouldProfile=False):
     if model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
         if 'OPENAI_API_KEY' not in os.environ:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
@@ -128,8 +128,8 @@ def run_cot_qa(context, question, model_name, verbose=False, promptSignature=Que
         #redpajamaModel = 'togethercomputer/RedPajama-INCITE-7B-Base'
         # mixtralModel = 'mistralai/Mixtral-8x7B-Instruct-v0.1'
         mixtralModel = model_name
-        turbo = TogetherHFAdaptor(mixtralModel, together_key)
-    elif model_name in [Model.GEMINI_1.value, Model.GEMINI_1V.value]:
+        turbo = TogetherHFAdaptor(mixtralModel, together_key, shouldProfile)
+    elif model_name in [Model.GEMINI_1.value]:
         if 'GOOGLE_API_KEY' not in os.environ:
             raise ValueError("GOOGLE_API_KEY not found in environment variables")
         # get google key from environment
@@ -149,7 +149,7 @@ def run_cot_qa(context, question, model_name, verbose=False, promptSignature=Que
     #       physical operators -> solvers -> dspysearch, dspyadaptors, openai_image_converter, etc.
     # collect statistics on prompt, usage, and timing if profiling is on
     stats = {}
-    if Profiler.profiling_on():
+    if shouldProfile:
         stats['api_call_duration'] = end_time - start_time
         stats['prompt'] = turbo.history[-1]['prompt']
         stats['usage'] = turbo.history[-1]['response']['usage']

@@ -25,17 +25,16 @@ class PhysicalOp:
     synthesizedFns = {}
     solver = Solver(verbose=LOG_LLM_OUTPUT)
 
-    def __init__(self, outputSchema: Schema) -> None:
+    def __init__(self, outputSchema: Schema, shouldProfile = False) -> None:
         self.outputSchema = outputSchema
         self.datadir = DataDirectory()
 
-        # if profiling is set to True, collect execution statistics and history of transformations
-        if Profiler.profiling_on():
+        self.shouldProfile = shouldProfile
+        if self.shouldProfile:
             self.profiler = Profiler()
             self.profile = self.profiler.iter_profiler
-
-        # otherwise, make self.profile a no-op
-        else:
+        else:            
+            # otherwise, make self.profile a no-op
             self.profile = self.no_op_wrapper
 
     def no_op_wrapper(self, *args, **kwargs):
@@ -57,8 +56,8 @@ class PhysicalOp:
         raise NotImplementedError("Abstract method")
 
 class MarshalAndScanDataOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, datasetIdentifier: str):
-        super().__init__(outputSchema=outputSchema)
+    def __init__(self, outputSchema: Schema, datasetIdentifier: str, shouldProfile=False):
+        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.datasetIdentifier = datasetIdentifier
 
     def __str__(self):
@@ -78,11 +77,11 @@ class MarshalAndScanDataOp(PhysicalOp):
         return (self, None)
 
     def getProfilingData(self):
-        if Profiler.profiling_on():
+        if self.shouldProfile:
             return self.profiler.get_data()
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
-
+                
     def estimateCost(self):
         cardinality = self.datadir.getCardinality(self.datasetIdentifier) + 1
         size = self.datadir.getSize(self.datasetIdentifier)
@@ -120,7 +119,7 @@ class MarshalAndScanDataOp(PhysicalOp):
         }
 
     def __iter__(self) -> IteratorFn:
-        @self.profile(name="base_scan", op_id=self.opId())
+        @self.profile(name="base_scan", op_id=self.opId(), shouldProfile=self.shouldProfile)
         def iteratorFn():
             for nextCandidate in self.datadir.getRegisteredDataset(self.datasetIdentifier):
                 yield nextCandidate
@@ -128,8 +127,8 @@ class MarshalAndScanDataOp(PhysicalOp):
         return iteratorFn()
 
 class CacheScanDataOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, cacheIdentifier: str):
-        super().__init__(outputSchema=outputSchema)
+    def __init__(self, outputSchema: Schema, cacheIdentifier: str, shouldProfile=False):
+        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.cacheIdentifier = cacheIdentifier
 
     def __str__(self):
@@ -149,7 +148,7 @@ class CacheScanDataOp(PhysicalOp):
         return (self, None)
 
     def getProfilingData(self):
-        if Profiler.profiling_on():
+        if self.shouldProfile:
             return self.profiler.get_data()
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
@@ -201,7 +200,7 @@ class CacheScanDataOp(PhysicalOp):
         }
 
     def __iter__(self) -> IteratorFn:
-        @self.profile(name="cache_scan", op_id=self.opId())
+        @self.profile(name="cache_scan", op_id=self.opId(), shouldProfile=self.shouldProfile)
         def iteratorFn():
             # NOTE: see comment in `estimateCost()` 
             for nextCandidate in self.datadir.getCachedResult(self.cacheIdentifier):
@@ -210,8 +209,8 @@ class CacheScanDataOp(PhysicalOp):
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None):
-        super().__init__(outputSchema=outputSchema)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None, shouldProfile=False):
+        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.model = model
         self.prompt_strategy = prompt_strategy
@@ -230,7 +229,7 @@ class InduceFromCandidateOp(PhysicalOp):
         taskDescriptor = ("InduceFromCandidateOp", (self.model, self.prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "InduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -253,7 +252,7 @@ class InduceFromCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def getProfilingData(self):
-        if Profiler.profiling_on():
+        if self.shouldProfile:
             source_data = self.source.getProfilingData()
             operator_data = self.profiler.get_data(model_name=self.model.value)
             operator_data["source"] = source_data
@@ -359,7 +358,7 @@ class InduceFromCandidateOp(PhysicalOp):
     def __iter__(self) -> IteratorFn:
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="induce", op_id=self.opId())
+        @self.profile(name="induce", op_id=self.opId(), shouldProfile=self.shouldProfile)
         def iteratorFn():    
             for nextCandidate in self.source:
                 resultRecord = self._attemptMapping(nextCandidate)
@@ -381,8 +380,8 @@ class InduceFromCandidateOp(PhysicalOp):
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None, streaming=False):
-        super().__init__(outputSchema=outputSchema)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
+        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.model = model
         self.prompt_strategy = prompt_strategy
@@ -391,10 +390,19 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         self.max_workers = 20
         self.streaming = streaming
 
+        if outputSchema == ImageFile and source.outputSchema == File:
+            # TODO : find a more general way by llm provider 
+            # TODO : which module is responsible of setting PromptStrategy.IMAGE_TO_TEXT? 
+            if self.model in [Model.GPT_3_5, Model.GPT_4]:
+                self.model = Model.GPT_4V
+            if self.model == Model.GEMINI_1:
+                self.model = Model.GEMINI_1V               
+            self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
+
         taskDescriptor = ("ParallelInduceFromCandidateOp", (model, prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "ParallelInduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -417,7 +425,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def getProfilingData(self):
-        if Profiler.profiling_on():
+        if self.shouldProfile:
             source_data = self.source.getProfilingData()
             operator_data = self.profiler.get_data(model_name=self.model.value)
             operator_data["source"] = source_data
@@ -486,7 +494,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         # This is very crudely implemented right now, since we materialize everything
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="p_induce", op_id=self.opId())
+        @self.profile(name="p_induce", op_id=self.opId(), shouldProfile=self.shouldProfile)
         def iteratorFn():
             inputs = []
             results = []
@@ -523,8 +531,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
 
 class FilterCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None):
-        super().__init__(outputSchema=outputSchema)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None, shouldProfile=False):
+        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.filter = filter
         self.model = model
@@ -534,7 +542,7 @@ class FilterCandidateOp(PhysicalOp):
         taskDescriptor = ("FilterCandidateOp", (filter, model, prompt_strategy, self.opId()), source.outputSchema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "FilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -557,7 +565,7 @@ class FilterCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def getProfilingData(self):
-        if Profiler.profiling_on():
+        if self.shouldProfile:
             source_data = self.source.getProfilingData()
             operator_data = self.profiler.get_data(model_name=self.model.value)
             operator_data["source"] = source_data
@@ -627,7 +635,7 @@ class FilterCandidateOp(PhysicalOp):
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="filter", op_id=self.opId())
+        @self.profile(name="filter", op_id=self.opId(), shouldProfile=self.shouldProfile)
         def iteratorFn():
             for nextCandidate in self.source:
                 resultRecord = self._passesFilter(nextCandidate)
@@ -638,7 +646,7 @@ class FilterCandidateOp(PhysicalOp):
 
                 # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
                 # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
-                elif Profiler.profiling_on():
+                elif self.shouldProfile:
                     yield resultRecord
 
             if shouldCache:
@@ -655,8 +663,8 @@ class FilterCandidateOp(PhysicalOp):
 
 
 class ParallelFilterCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None, streaming=False):
-        super().__init__(outputSchema=outputSchema)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None, streaming=False, shouldProfile=False):
+        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.filter = filter
         self.model = model
@@ -668,7 +676,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
         taskDescriptor = ("ParallelFilterCandidateOp", (filter, model, prompt_strategy, self.opId()), source.outputSchema, self.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)
+            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "ParallelFilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -691,7 +699,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def getProfilingData(self):
-        if Profiler.profiling_on():
+        if self.shouldProfile:
             source_data = self.source.getProfilingData()
             operator_data = self.profiler.get_data(model_name=self.model.value)
             operator_data["source"] = source_data
@@ -758,7 +766,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="p_filter", op_id=self.opId())
+        @self.profile(name="p_filter", op_id=self.opId(), shouldProfile=self.shouldProfile)
         def iteratorFn():
             inputs = []
             results = []
@@ -784,7 +792,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
                         # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
                         # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
-                        elif Profiler.profiling_on():
+                        elif self.shouldProfile:
                             yield resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
@@ -801,8 +809,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
 
 class ApplyCountAggregateOp(PhysicalOp):
-    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, targetCacheId: str=None):
-        super().__init__(outputSchema=Number)
+    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, targetCacheId: str=None, shouldProfile=False):
+        super().__init__(outputSchema=Number, shouldProfile=shouldProfile)
         self.source = source
         self.aggFunction = aggFunction
         self.targetCacheId = targetCacheId
@@ -825,7 +833,7 @@ class ApplyCountAggregateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def getProfilingData(self):
-        if Profiler.profiling_on():
+        if self.shouldProfile:
             source_data = self.source.getProfilingData()
             operator_data = self.profiler.get_data()
             operator_data["source"] = source_data
@@ -850,7 +858,7 @@ class ApplyCountAggregateOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="count", op_id=self.opId())
+        @self.profile(name="count", op_id=self.opId(), shouldProfile=self.shouldProfile)
         def iteratorFn():
             counter = 0
             for _ in self.source:
@@ -869,8 +877,8 @@ class ApplyCountAggregateOp(PhysicalOp):
 
 
 class ApplyAverageAggregateOp(PhysicalOp):
-    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, targetCacheId: str=None):
-        super().__init__(outputSchema=Number)
+    def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, targetCacheId: str=None, shouldProfile=False):
+        super().__init__(outputSchema=Number, shouldProfile=shouldProfile)
         self.source = source
         self.aggFunction = aggFunction
         self.targetCacheId = targetCacheId
@@ -896,7 +904,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def getProfilingData(self):
-        if Profiler.profiling_on():
+        if self.shouldProfile:
             source_data = self.source.getProfilingData()
             operator_data = self.profiler.get_data()
             operator_data["source"] = source_data
@@ -921,7 +929,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="average", op_id=self.opId())
+        @self.profile(name="average", op_id=self.opId(), shouldProfile=shouldProfile)
         def iteratorFn():
             sum = 0
             counter = 0
@@ -945,8 +953,8 @@ class ApplyAverageAggregateOp(PhysicalOp):
 
 
 class LimitScanOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, limit: int, targetCacheId: str=None):
-        super().__init__(outputSchema=outputSchema)
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, limit: int, targetCacheId: str=None, shouldProfile=False):
+        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.limit = limit
         self.targetCacheId = targetCacheId
@@ -970,7 +978,7 @@ class LimitScanOp(PhysicalOp):
         return (self, self.source.dumpPhysicalTree())
 
     def getProfilingData(self):
-        if Profiler.profiling_on():
+        if self.shouldProfile:
             source_data = self.source.getProfilingData()
             operator_data = self.profiler.get_data()
             operator_data["source"] = source_data
@@ -990,7 +998,7 @@ class LimitScanOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="limit", op_id=self.opId())
+        @self.profile(name="limit", op_id=self.opId(), shouldProfile=self.shouldProfile)
         def iteratorFn():
             counter = 0
             for nextCandidate in self.source: 

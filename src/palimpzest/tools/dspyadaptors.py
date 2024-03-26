@@ -16,11 +16,12 @@ def log_attempt_number(retry_state):
 
 
 class TogetherHFAdaptor(HFModel):
-    def __init__(self, model, apiKey, **kwargs):
+    def __init__(self, model, apiKey, shouldProfile, **kwargs):
         super().__init__(model=model, is_client=True)
         self.api_base = "https://api.together.xyz/inference"
         self.token = apiKey
         self.model = model
+        self.shouldProfile = shouldProfile
 
         self.use_inst_template = False
         if any(keyword in self.model.lower() for keyword in ["inst", "instruct"]):
@@ -101,7 +102,7 @@ class TogetherHFAdaptor(HFModel):
 #                print("COMPLETIONS:", completions)
 #               print("STOP REASON", resp_json['output']['finish_reason'])
 
-                if Profiler.profiling_on():
+                if self.shouldProfile:
                     response['usage'] = resp_json['output']['usage']
                     response['finish_reason'] = resp_json['output']['finish_reason']
 

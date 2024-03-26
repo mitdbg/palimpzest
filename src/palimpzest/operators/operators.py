@@ -126,7 +126,7 @@ class LogicalOperator:
 
         return logicalPlans
 
-    def _createPhysicalPlans(self, max: int=10) -> PhysicalOp:
+    def _createPhysicalPlans(self, max: int=10, shouldProfile: bool=False) -> PhysicalOp:
         """
         Given the logical plan implied by this LogicalOperator, enumerate up to `max`
         possible physical plans and return them as a list.
@@ -153,20 +153,20 @@ class LogicalOperator:
 
         if os.getenv('TOGETHER_API_KEY') is not None:
             models.extend([Model.MIXTRAL])
-        
-        if os.getenv('GOOGLE_API_KEY') is not None:
-            models.extend([Model.GEMINI_1, Model.GEMINI_1V])
 
-        assert len(models) > 0,"No models available to create physical plans! Have you provided any API keys?"
-        
+        if os.getenv('GOOGLE_API_KEY') is not None:
+            models.extend([Model.GEMINI_1])
+
+        assert len(models) > 0, "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
+
         physicalPlans = []
         for model in models:
-            physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, model=model)
+            physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, model=model, shouldProfile=shouldProfile)
             physicalPlans.append(physicalPlan)
 
         return physicalPlans
 
-    def createPhysicalPlanCandidates(self, sampler: Sampler=None) -> List[PhysicalPlan]:
+    def createPhysicalPlanCandidates(self, sampler: Sampler=None, shouldProfile: bool=False) -> List[PhysicalPlan]:
         """Return a set of physical trees of operators."""
         start_time = time.time()
 
@@ -179,7 +179,7 @@ class LogicalOperator:
         physicalPlans = [
             physicalPlan
             for logicalPlan in logicalPlans
-            for physicalPlan in logicalPlan._createPhysicalPlans()
+            for physicalPlan in logicalPlan._createPhysicalPlans(shouldProfile=shouldProfile)
         ]
         t_physical = time.time()
         # print(f"Time to create physical plans: {t_physical - t_logical:.2f}")
@@ -254,7 +254,7 @@ class ConvertScan(LogicalOperator):
         """Return the logical tree of this LogicalOperator."""
         return (self, self.inputOp.dumpLogicalTree())
 
-    def _getPhysicalTree(self, strategy: str=None, model: Model=None):
+    def _getPhysicalTree(self, strategy: str=None, model: Model=None, shouldProfile: bool=False):
         # If the input is in core, and the output is NOT in core but its superclass is, then we should do a
         # 2-stage conversion. This will maximize chances that there is a pre-existing conversion to the superclass
         # in the known set of functions
@@ -264,28 +264,32 @@ class ConvertScan(LogicalOperator):
 
         if intermediateSchema == Schema or intermediateSchema == self.outputSchema:
             if DataDirectory().current_config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), model=model, desc=self.desc, targetCacheId=self.targetCacheId)
+                return ParallelInduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), model=model, desc=self.desc, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
             else:
-                return InduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), model=model, desc=self.desc, targetCacheId=self.targetCacheId)
+                return InduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), model=model, desc=self.desc, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
         else:
             if DataDirectory().current_config.get("parallel") == True:
                 return ParallelInduceFromCandidateOp(self.outputSchema,
                                                      ParallelInduceFromCandidateOp(
                                                          intermediateSchema,
-                                                         self.inputOp._getPhysicalTree(strategy=strategy, model=model),
-                                                         model=model),
+                                                         self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile),
+                                                         model=model,
+                                                         shouldProfile=shouldProfile),
                                                      model=model,
                                                      desc=self.desc,
-                                                     targetCacheId=self.targetCacheId)
+                                                     targetCacheId=self.targetCacheId, 
+                                                     shouldProfile=shouldProfile)
             else:
                 return InduceFromCandidateOp(self.outputSchema,
                                              InduceFromCandidateOp(
                                                  intermediateSchema,
-                                                 self.inputOp._getPhysicalTree(strategy=strategy, model=model),
-                                                 model=model),
+                                                 self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile),
+                                                 model=model,
+                                                 shouldProfile=shouldProfile),
                                              model=model,
                                              desc=self.desc,
-                                             targetCacheId=self.targetCacheId)
+                                             targetCacheId=self.targetCacheId, 
+                                             shouldProfile=shouldProfile)
 
 
 class CacheScan(LogicalOperator):
@@ -301,8 +305,8 @@ class CacheScan(LogicalOperator):
         """Return the logical tree of this LogicalOperator."""
         return (self, None)
 
-    def _getPhysicalTree(self, strategy: str=None, model: Model=None):
-        return CacheScanDataOp(self.outputSchema, self.cachedDataIdentifier)
+    def _getPhysicalTree(self, strategy: str=None, model: Model=None, shouldProfile: bool=False):
+        return CacheScanDataOp(self.outputSchema, self.cachedDataIdentifier, shouldProfile=shouldProfile)
 
 
 class BaseScan(LogicalOperator):
@@ -318,8 +322,8 @@ class BaseScan(LogicalOperator):
         """Return the logical tree of this LogicalOperator."""
         return (self, None)
 
-    def _getPhysicalTree(self, strategy: str=None, model: Model=None):
-        return MarshalAndScanDataOp(self.outputSchema, self.datasetIdentifier)
+    def _getPhysicalTree(self, strategy: str=None, model: Model=None, shouldProfile: bool=False):
+        return MarshalAndScanDataOp(self.outputSchema, self.datasetIdentifier, shouldProfile=shouldProfile)
 
 
 class LimitScan(LogicalOperator):
@@ -336,8 +340,8 @@ class LimitScan(LogicalOperator):
         """Return the logical tree of this LogicalOperator."""
         return (self, self.inputOp.dumpLogicalTree())
 
-    def _getPhysicalTree(self, strategy: str=None, model: Model=None):
-        return LimitScanOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.limit, targetCacheId=self.targetCacheId)
+    def _getPhysicalTree(self, strategy: str=None, model: Model=None, shouldProfile: bool=False):
+        return LimitScanOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.limit, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
 
 
 class FilteredScan(LogicalOperator):
@@ -355,11 +359,11 @@ class FilteredScan(LogicalOperator):
         """Return the logical tree of this LogicalOperator."""
         return (self, self.inputOp.dumpLogicalTree())
 
-    def _getPhysicalTree(self, strategy: str=None, model: Model=None):
+    def _getPhysicalTree(self, strategy: str=None, model: Model=None, shouldProfile: bool=False):
         if DataDirectory().current_config.get("parallel") == True:
-            return ParallelFilterCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.filter, model=model, targetCacheId=self.targetCacheId)
+            return ParallelFilterCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.filter, model=model, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
         else:
-            return FilterCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.filter, model=model, targetCacheId=self.targetCacheId)
+            return FilterCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.filter, model=model, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
 
 
 class ApplyAggregateFunction(LogicalOperator):
@@ -377,10 +381,10 @@ class ApplyAggregateFunction(LogicalOperator):
         """Return the logical subtree rooted at this operator"""
         return (self, self.inputOp.dumpLogicalTree())
 
-    def _getPhysicalTree(self, strategy: str=None, model: Model=None):
+    def _getPhysicalTree(self, strategy: str=None, model: Model=None, shouldProfile: bool=False):
         if self.aggregationFunction.funcDesc == "COUNT":
-            return ApplyCountAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.aggregationFunction, targetCacheId=self.targetCacheId)
+            return ApplyCountAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.aggregationFunction, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
         elif self.aggregationFunction.funcDesc == "AVERAGE":
-            return ApplyAverageAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model), self.aggregationFunction, targetCacheId=self.targetCacheId)
+            return ApplyAverageAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.aggregationFunction, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
         else:
             raise Exception(f"Cannot find implementation for {self.aggregationFunction}")
