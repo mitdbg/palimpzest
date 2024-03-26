@@ -219,9 +219,15 @@ class InduceFromCandidateOp(PhysicalOp):
         self.targetCacheId = targetCacheId
 
         if outputSchema == ImageFile and source.outputSchema == File:
-            self.model = Model.GPT_4V
+            # TODO : find a more general way by llm provider 
+            # TODO : which module is responsible of setting PromptStrategy.IMAGE_TO_TEXT? 
+            if self.model in [Model.GPT_3_5, Model.GPT_4]:
+                self.model = Model.GPT_4V
+            if self.model == Model.GEMINI_1:
+                self.model = Model.GEMINI_1V               
+            self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
-        taskDescriptor = ("InduceFromCandidateOp", (self.model, prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
+        taskDescriptor = ("InduceFromCandidateOp", (self.model, self.prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config)

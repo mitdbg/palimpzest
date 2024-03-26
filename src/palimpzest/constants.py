@@ -16,6 +16,7 @@ class Model(Enum):
 class PromptStrategy(Enum):
     ZERO_SHOT = "zero-shot"
     FEW_SHOT = "few-shot"
+    IMAGE_TO_TEXT = "image-to-text"
     DSPY_COT = "dspy-chain-of-thought"
     DSPY_BOOL = "dspy-bool"
 

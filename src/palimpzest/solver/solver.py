@@ -1,7 +1,7 @@
 from palimpzest.constants import Model, PromptStrategy
 from palimpzest.elements import DataRecord, EquationImage, File, Filter, ImageFile, PDFFile, Schema, TextFile
 from palimpzest.tools.dspysearch import run_cot_bool, run_cot_qa, gen_filter_signature_class, gen_qa_signature_class
-from palimpzest.tools.openai_image_converter import do_image_analysis
+from palimpzest.tools.generic_image_converter import describe_image
 from palimpzest.tools.pdfparser import get_text_from_pdf
 from palimpzest.tools.profiler import Profiler
 from palimpzest.tools.skema_tools import equations_to_latex_base64, equations_to_latex
@@ -27,8 +27,8 @@ class Solver:
         self._hardcodedFns = set()
         self._hardcodedFns.add((PDFFile, File))
         self._hardcodedFns.add((PDFFile, File))
-        self._hardcodedFns.add((ImageFile, File))
         self._hardcodedFns.add((TextFile, File))
+        # self._hardcodedFns.add((ImageFile, File))
         # self._hardcodedFns.add((EquationImage, ImageFile))
         self._verbose = verbose
 
@@ -100,31 +100,6 @@ class Solver:
                 print("Running equations_to_latex_base64: ", dr.equation_text)
                 return dr
             return _imageToEquation
-
-        # TODO: maybe move this to _makeLLMTypeConversionFn?
-        elif outputSchema == ImageFile and inputSchema == File:
-            def _fileToImage(candidate: DataRecord):
-                if not candidate.schema == inputSchema:
-                    return None
-                # b64 decode of candidate.contents
-                image_bytes = base64.b64encode(candidate.contents).decode('utf-8')
-                dr = DataRecord(outputSchema)
-                dr.filename = candidate.filename
-                if 'OPENAI_API_KEY' not in os.environ:
-                    raise ValueError("OPENAI_API_KEY not found in environment variables")
-                # get openai key from environment
-                openai_key = os.environ['OPENAI_API_KEY']
-                # TODO: consider multiple image models
-                dr.contents = candidate.contents
-                dr.text_description, stats = do_image_analysis(openai_key, image_bytes)
-
-                # if profiling, set record's stats for the given op_id
-                if Profiler.profiling_on():
-                    dr._stats[op_id] = {"fields": {"text_description": stats}}
-
-                return dr
-            return _fileToImage
-
         else:
             raise Exception(f"Cannot hard-code conversion from {inputSchema} to {outputSchema}")
 
@@ -208,7 +183,6 @@ class Solver:
 
                 def runConventionalQuery():
                     dr = DataRecord(outputSchema)
-
                     for field_name in outputSchema.fieldNames():
                         f = getattr(outputSchema, field_name)
                         try:
@@ -220,7 +194,21 @@ class Solver:
                                 answer, field_stats = run_cot_qa(text_content,
                                                                 f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
                                                                 model_name=model.value, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
-                            # TODO
+                            elif prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:                               
+                                    if not candidate.schema == inputSchema:
+                                        return None
+                                    # b64 decode of candidate.contents
+                                    image_b64 = base64.b64encode(candidate.contents).decode('utf-8')
+                                    dr = DataRecord(outputSchema)
+                                    dr.filename = candidate.filename
+                                    dr.contents = candidate.contents
+                                    answer, field_stats = describe_image(model_name=model.value, image_b64=image_b64)
+
+
+                                    # if profiling, set record's stats for the given op_id
+                                    if Profiler.profiling_on():
+                                        field_stats[op_id] = {"fields": {"text_description": stats}}
+
                             elif prompt_strategy == PromptStrategy.ZERO_SHOT:
                                 raise Exception("not implemented yet")
                             # TODO
