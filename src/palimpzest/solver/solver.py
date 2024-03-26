@@ -149,8 +149,8 @@ class Solver:
                     answer = None
                     if prompt_strategy == PromptStrategy.DSPY_COT:
                         answer, field_stats = run_cot_qa(text_content, promptQuestion,
-                                                                model_name=model.value, 
-                                                                verbose=self._verbose, 
+                                                                model_name=model.value,
+                                                                verbose=self._verbose,
                                                                 promptSignature=gen_qa_signature_class(doc_schema, doc_type),
                                                                 shouldProfile=shouldProfile)
                     if not answer.strip().startswith('{'):
