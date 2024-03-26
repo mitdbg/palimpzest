@@ -133,8 +133,8 @@ class Profiler:
         """
         def profile_decorator(iterator):
             # return iterator if profiling is not set to True
-            if not Profiler.profiling_on():
-                return iterator
+            #if not Profiler.profiling_on():
+            #    return iterator
 
             @wraps(iterator)
             def timed_iterator():

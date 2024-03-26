@@ -50,7 +50,7 @@ class Solver:
             return dr
         return _simpleTypeConversionFn
 
-    def _makeHardCodedTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], op_id: str):
+    def _makeHardCodedTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], op_id: str, shouldProfile=False):
         """This converts from one type to another when we have a hard-coded method for doing so."""
         if outputSchema == PDFFile and inputSchema == File:
             if config.get("pdfprocessing") == "modal":
@@ -119,7 +119,7 @@ class Solver:
                 dr.text_description, stats = do_image_analysis(openai_key, image_bytes)
 
                 # if profiling, set record's stats for the given op_id
-                if Profiler.profiling_on():
+                if shouldProfile:
                     dr._stats[op_id] = {"fields": {"text_description": stats}}
 
                 return dr
@@ -128,7 +128,7 @@ class Solver:
         else:
             raise Exception(f"Cannot hard-code conversion from {inputSchema} to {outputSchema}")
 
-    def _makeLLMTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str, conversionDesc: str):
+    def _makeLLMTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str, conversionDesc: str, shouldProfile=False):
             def fn(candidate: DataRecord):
                 # iterate through all empty fields in the outputSchema and ask questions to fill them
                 # for field in inputSchema.__dict__:
@@ -175,7 +175,8 @@ class Solver:
                         answer, field_stats = run_cot_qa(text_content, promptQuestion,
                                                                 model_name=model.value, 
                                                                 verbose=self._verbose, 
-                                                                promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                                                                promptSignature=gen_qa_signature_class(doc_schema, doc_type),
+                                                                shouldProfile=shouldProfile)
                     if not answer.strip().startswith('{'):
                         # Find the start index of the actual JSON string
                         # assuming the prefix is followed by the JSON object/array
@@ -201,7 +202,7 @@ class Solver:
                         stats[f"{field_name}"] = field_stats
 
                     # if profiling, set record's stats for the given op_id
-                    if Profiler.profiling_on():
+                    if shouldProfile:
                         dr._stats[op_id] = {"fields": stats}
 
                     return dr
@@ -219,7 +220,10 @@ class Solver:
                                 #print("About to run model", model.value)
                                 answer, field_stats = run_cot_qa(text_content,
                                                                 f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
-                                                                model_name=model.value, verbose=self._verbose, promptSignature=gen_qa_signature_class(doc_schema, doc_type))
+                                                                model_name=model.value, 
+                                                                verbose=self._verbose, 
+                                                                promptSignature=gen_qa_signature_class(doc_schema, doc_type),
+                                                                shouldProfile=shouldProfile)
                             # TODO
                             elif prompt_strategy == PromptStrategy.ZERO_SHOT:
                                 raise Exception("not implemented yet")
@@ -234,7 +238,7 @@ class Solver:
                             setattr(dr, field_name, None)
                 
                     # if profiling, set record's stats for the given op_id
-                    if Profiler.profiling_on():
+                    if shouldProfile:
                         dr._stats[op_id] = {"fields": stats}
 
                     return dr
@@ -254,7 +258,7 @@ class Solver:
 
             return fn
 
-    def _makeFilterFn(self, inputSchema: Schema, filter: Filter, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str):
+    def _makeFilterFn(self, inputSchema: Schema, filter: Filter, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str, shouldProfile=False):
             # parse inputs
             doc_schema = str(inputSchema)
             doc_type = inputSchema.className()
@@ -270,8 +274,12 @@ class Solver:
                     # TODO: allow for mult. fcns
                     response, stats = None, {}
                     if prompt_strategy == PromptStrategy.DSPY_BOOL:
-                        response, stats = run_cot_bool(text_content, filterCondition, model_name=model.value,
-                                                       verbose=self._verbose, promptSignature=gen_filter_signature_class(doc_schema, doc_type))
+                        response, stats = run_cot_bool(text_content, 
+                                                       filterCondition, 
+                                                       model_name=model.value,
+                                                       verbose=self._verbose, 
+                                                       promptSignature=gen_filter_signature_class(doc_schema, doc_type),
+                                                       shouldProfile=shouldProfile)
                     # TODO
                     elif prompt_strategy == PromptStrategy.ZERO_SHOT:
                         raise Exception("not implemented yet")
@@ -280,7 +288,7 @@ class Solver:
                         raise Exception("not implemented yet")
 
                     # if profiling, set record's stats for the given op_id and clear any state from the previous operation
-                    if Profiler.profiling_on():
+                    if shouldProfile:
                         candidate = deepcopy(candidate)
                         candidate._state = {}
                         candidate._stats[op_id] = stats
@@ -293,7 +301,7 @@ class Solver:
                 return llmFilter
             return createLLMFilter(str(filter))
 
-    def synthesize(self, taskDescriptor: Any, config: Dict[str, Any]):
+    def synthesize(self, taskDescriptor: Any, config: Dict[str, Any], shouldProfile=False):
         """Return a function that maps from inputType to outputType."""
         functionName, functionParams, outputSchema, inputSchema = taskDescriptor
 
@@ -303,11 +311,11 @@ class Solver:
             if typeConversionDescriptor in self._simpleTypeConversions:
                 return self._makeSimpleTypeConversionFn(outputSchema, inputSchema)
             elif typeConversionDescriptor in self._hardcodedFns:
-                return self._makeHardCodedTypeConversionFn(outputSchema, inputSchema, config, op_id) # TODO: add another model for image processing (e.g., Claude)?
+                return self._makeHardCodedTypeConversionFn(outputSchema, inputSchema, config, op_id, shouldProfile=shouldProfile) # TODO: add another model for image processing (e.g., Claude)?
             else:
-                return self._makeLLMTypeConversionFn(outputSchema, inputSchema, config, model, prompt_strategy, op_id, conversionDesc)
+                return self._makeLLMTypeConversionFn(outputSchema, inputSchema, config, model, prompt_strategy, op_id, conversionDesc, shouldProfile=shouldProfile)
         elif functionName == "FilterCandidateOp" or functionName == "ParallelFilterCandidateOp":
             filter, model, prompt_strategy, op_id = functionParams
-            return self._makeFilterFn(inputSchema, filter, config, model, prompt_strategy, op_id)
+            return self._makeFilterFn(inputSchema, filter, config, model, prompt_strategy, op_id, shouldProfile=shouldProfile)
         else:
             raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))

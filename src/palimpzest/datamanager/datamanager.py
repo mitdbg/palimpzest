@@ -19,6 +19,19 @@ class DataDirectorySingletonMeta(type):
                 cls._instances[cls] = instance
         return cls._instances[cls]    
 
+
+class CacheService:
+    """This class manages the cache for the DataDirectory and other misc PZ components.
+       Eventually modify this to be durable and to have expiration policies."""
+    def __init__(self):
+        self.allCaches = {}
+
+    def getCachedData(self, cacheName, cacheKey):
+        return self.allCaches.setdefault(cacheName, {}).get(cacheKey, None)
+
+    def putCachedData(self, cacheName, cacheKey, cacheVal):
+        self.allCaches.setdefault(cacheName, {})[cacheKey] = cacheVal
+
 # TODO: possibly rename to the PZManager, as it also manages the current config
 class DataDirectory(metaclass=DataDirectorySingletonMeta):
     """The DataDirectory is a registry of data sources."""
@@ -27,6 +40,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         self._registry = {}
         self._cache = {}
         self._tempCache = {}
+        self.cacheService = CacheService()
 
         # set up data directory
         self._dir = PZ_DIR
@@ -63,6 +77,9 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
                 if file.endswith(".cached"):
                     cacheId = file[:-7]
                     self._cache[cacheId] = root + "/" + file
+
+    def getCacheService(self):
+        return self.cacheService
 
     def getConfig(self):
         return self.current_config._load_config()
