@@ -259,9 +259,9 @@ class ConvertScan(LogicalOperator):
 
         if intermediateSchema == Schema or intermediateSchema == self.outputSchema:
             if DataDirectory().current_config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), model=model, desc=self.desc, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
+                return ParallelInduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), model=model, desc=self.desc, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
             else:
-                return InduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model), model=model, desc=self.desc, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
+                return InduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), model=model, desc=self.desc, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
         else:
             if DataDirectory().current_config.get("parallel") == True:
                 return ParallelInduceFromCandidateOp(self.outputSchema,
