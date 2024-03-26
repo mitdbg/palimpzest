@@ -39,7 +39,7 @@ class Execution:
             # REMIND michjc: now we must transform the profileData object into something that optimizers can use
 
             # We put this into an ephemeral cache 
-            cache.putCachedData("logicalTreeSamples", self.rootset.universalIdentifier(), (sampleOutputs, profileData))
+            cache.putCachedData("querySamples", self.rootset.universalIdentifier(), (sampleOutputs, profileData))
                                 
         # Ok now reoptimize the logical plan, this time with the sample data.
         # (The data is not currently being used; let's see if this method can work first)
