@@ -5,6 +5,9 @@ import palimpzest as pz
 from tabulate import tabulate
 from PIL import Image
 
+
+from palimpzest.execution import Execution
+
 import gradio as gr
 import numpy as np
 import pandas as pd
@@ -238,6 +241,15 @@ if __name__ == "__main__":
     elif task == "enron":
         rootSet = buildEnronPlan(datasetid)
         physicalTree = emitDataset(rootSet, policy, title="Enron emails", verbose=args.verbose)
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records, cols=["sender", "subject"], gradio=True, plan=physicalTree)
+
+    elif task == "enronoptimize":
+        rootSet = buildEnronPlan(datasetid)
+        execution = pz.Execution(rootSet, policy)
+        physicalTree = execution.executeAndOptimize()
         records = [r for r in physicalTree]
         print("----------")
         print()
