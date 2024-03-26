@@ -631,8 +631,7 @@ class FilterCandidateOp(PhysicalOp):
 
                 # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
                 # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
-                #elif Profiler.profiling_on():
-                else:
+                elif self.shouldProfile:
                     yield resultRecord
 
             if shouldCache:
@@ -649,7 +648,7 @@ class FilterCandidateOp(PhysicalOp):
 
 
 class ParallelFilterCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None, streaming=False, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.filter = filter
@@ -778,8 +777,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
                         # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
                         # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
-                        #elif Profiler.profiling_on():
-                        else:
+                        elif self.shouldProfile:
                             yield resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
