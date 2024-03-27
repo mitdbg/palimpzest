@@ -929,7 +929,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="average", op_id=self.opId(), shouldProfile=shouldProfile)
+        @self.profile(name="average", op_id=self.opId(), shouldProfile=self.shouldProfile)
         def iteratorFn():
             sum = 0
             counter = 0
