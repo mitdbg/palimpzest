@@ -47,7 +47,7 @@ class Solver:
                     setattr(dr, field, getattr(candidate, field))
                 elif field.required:
                     return None
-            return dr
+            return [dr]
         return _simpleTypeConversionFn
 
     def _makeHardCodedTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], op_id: str, shouldProfile=False):
@@ -75,7 +75,7 @@ class Solver:
                 dr.filename = pdf_filename
                 dr.contents = pdf_bytes
                 dr.text_contents = text_content
-                return dr
+                return [dr]
             return _fileToPDF
         elif outputSchema == TextFile and inputSchema == File:
             def _fileToText(candidate: DataRecord):
@@ -85,7 +85,7 @@ class Solver:
                 dr = DataRecord(outputSchema)
                 dr.filename = candidate.filename
                 dr.contents = text_content
-                return dr
+                return [dr]
             return _fileToText
         elif outputSchema == EquationImage and inputSchema == ImageFile:
             print("handling image to equation through skema")
@@ -98,7 +98,7 @@ class Solver:
                 dr.contents = candidate.contents
                 dr.equation_text = equations_to_latex(candidate.contents)
                 print("Running equations_to_latex_base64: ", dr.equation_text)
-                return dr
+                return [dr]
             return _imageToEquation
 
         # TODO: maybe move this to _makeLLMTypeConversionFn?
@@ -122,13 +122,22 @@ class Solver:
                 if shouldProfile:
                     dr._stats[op_id] = {"fields": {"text_description": stats}}
 
-                return dr
+                return [dr]
             return _fileToImage
 
         else:
             raise Exception(f"Cannot hard-code conversion from {inputSchema} to {outputSchema}")
 
-    def _makeLLMTypeConversionFn(self, outputSchema: Schema, inputSchema: Schema, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str, conversionDesc: str, shouldProfile=False):
+    def _makeLLMTypeConversionFn(self, 
+                                 outputSchema: Schema, 
+                                 inputSchema: Schema, 
+                                 config: Dict[str, Any], 
+                                 model: Model, 
+                                 cardinality: str,
+                                 prompt_strategy: PromptStrategy, 
+                                 op_id: str, 
+                                 conversionDesc: str, 
+                                 shouldProfile=False):
             def fn(candidate: DataRecord):
                 # iterate through all empty fields in the outputSchema and ask questions to fill them
                 # for field in inputSchema.__dict__:
@@ -138,7 +147,6 @@ class Solver:
                 stats = {}
 
                 def runBondedQuery():
-                    dr = DataRecord(outputSchema)
                     field_stats = None
 
                     fieldDescriptions = {}
@@ -158,20 +166,30 @@ class Solver:
 
                     optionalInputDesc = "" if inputSchema.__doc__ is None else f"Here is a description of the input object: {inputSchema.__doc__}."
                     optionalOutputDesc = "" if outputSchema.__doc__ is None else f"Here is a description of the output object: {outputSchema.__doc__}."
-                    promptQuestion = f"""I would like you to create a output JSON object that describes an object of type {doc_type}. 
+
+                    targetOutputDescriptor = "an output JSON object that describes an object of type"
+                    outputSingleOrPlural = "the output object"
+                    appendixInstruction = "Be sure to emit a JSON object only"
+                    if cardinality == "oneToMany":
+                        targetOutputDescriptor = "output an array of zero or more JSON objects that describe objects of type"
+                        outputSingleOrPlural = "the output objects"
+                        appendixInstruction = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields described above. You must decide the correct number of output objects. It is at least two."
+
+                    promptQuestion = f"""I would like you to create {targetOutputDescriptor} {doc_type}. 
                     You will use the information in an input JSON object that I will provide. The input object has type {inputSchema.className()}.
-                    All of the fields in the output object can be derived using information from the input object.
+                    All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
                     {optionalInputDesc}
                     {optionalOutputDesc}
                     Here is every input field name and a description: 
                     {multilineInputFieldDescription}
                     Here is every output field name and a description:
                     {multilineOutputFieldDescription}.
-                    Be sure to emit a JSON object only.
+                    {appendixInstruction}
                     """ + "" if conversionDesc is None else f" Keep in mind that this process is described by this text: {conversionDesc}."                
 
                     answer = None
                     if prompt_strategy == PromptStrategy.DSPY_COT:
+                        #print("Processing", text_content, promptQuestion)
                         answer, field_stats = run_cot_qa(text_content, promptQuestion,
                                                                 model_name=model.value, 
                                                                 verbose=self._verbose, 
@@ -195,17 +213,34 @@ class Solver:
                     # Handle weird escaped values. I am not sure why the model
                     # is returning these, but the JSON parser can't take them
                     answer = answer.replace("\_", "_")
-                    jsonObj = json.loads(answer)
-                    for field_name in outputSchema.fieldNames():
-                        # parse the json object and set the fields of the record
-                        setattr(dr, field_name, jsonObj[field_name])
-                        stats[f"{field_name}"] = field_stats
+                    if cardinality == "oneToMany":
+                        drs = []
+                        jsonObj = json.loads(answer)
+                        for elt in jsonObj["items"]:
+                            dr = DataRecord(outputSchema)
+                            for field_name in outputSchema.fieldNames():
+                                # parse the json object and set the fields of the record
+                                setattr(dr, field_name, elt[field_name])
+                                stats[f"{field_name}"] = field_stats
 
-                    # if profiling, set record's stats for the given op_id
-                    if shouldProfile:
-                        dr._stats[op_id] = {"fields": stats}
+                            # if profiling, set record's stats for the given op_id
+                            if shouldProfile:
+                                dr._stats[op_id] = {"fields": stats}
+                            drs.append(dr)
+                        return drs
+                    else:
+                        jsonObj = json.loads(answer)
+                        dr = DataRecord(outputSchema)
+                        for field_name in outputSchema.fieldNames():
+                            # parse the json object and set the fields of the record
+                            setattr(dr, field_name, jsonObj[field_name])
+                            stats[f"{field_name}"] = field_stats
 
-                    return dr
+                        # if profiling, set record's stats for the given op_id
+                        if shouldProfile:
+                            dr._stats[op_id] = {"fields": stats}
+
+                        return [dr]
 
                 def runConventionalQuery():
                     dr = DataRecord(outputSchema)
@@ -216,8 +251,6 @@ class Solver:
                             # TODO: allow for mult. fcns
                             field_stats = None
                             if prompt_strategy == PromptStrategy.DSPY_COT:                            
-                                #print("ABOUT TO RUN", text_content, f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.")
-                                #print("About to run model", model.value)
                                 answer, field_stats = run_cot_qa(text_content,
                                                                 f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
                                                                 model_name=model.value, 
@@ -306,14 +339,14 @@ class Solver:
         functionName, functionParams, outputSchema, inputSchema = taskDescriptor
 
         if functionName == "InduceFromCandidateOp" or functionName == "ParallelInduceFromCandidateOp":
-            model, prompt_strategy, op_id, conversionDesc = functionParams
+            model, cardinality, prompt_strategy, op_id, conversionDesc = functionParams
             typeConversionDescriptor = (outputSchema, inputSchema)
             if typeConversionDescriptor in self._simpleTypeConversions:
                 return self._makeSimpleTypeConversionFn(outputSchema, inputSchema)
             elif typeConversionDescriptor in self._hardcodedFns:
                 return self._makeHardCodedTypeConversionFn(outputSchema, inputSchema, config, op_id, shouldProfile=shouldProfile) # TODO: add another model for image processing (e.g., Claude)?
             else:
-                return self._makeLLMTypeConversionFn(outputSchema, inputSchema, config, model, prompt_strategy, op_id, conversionDesc, shouldProfile=shouldProfile)
+                return self._makeLLMTypeConversionFn(outputSchema, inputSchema, config, model, cardinality, prompt_strategy, op_id, conversionDesc, shouldProfile=shouldProfile)
         elif functionName == "FilterCandidateOp" or functionName == "ParallelFilterCandidateOp":
             filter, model, prompt_strategy, op_id = functionParams
             return self._makeFilterFn(inputSchema, filter, config, model, prompt_strategy, op_id, shouldProfile=shouldProfile)

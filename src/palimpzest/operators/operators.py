@@ -237,9 +237,10 @@ class LogicalOperator:
 
 class ConvertScan(LogicalOperator):
     """A ConvertScan is a logical operator that represents a scan of a particular data source, with conversion applied."""
-    def __init__(self, outputSchema: Schema, inputOp: LogicalOperator, desc: str=None, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, inputOp: LogicalOperator, cardinality: str=None, desc: str=None, targetCacheId: str=None):
         super().__init__(outputSchema, inputOp.outputSchema)
         self.inputOp = inputOp
+        self.cardinality = cardinality
         self.desc = desc
         self.targetCacheId = targetCacheId
 
@@ -260,18 +261,38 @@ class ConvertScan(LogicalOperator):
 
         if intermediateSchema == Schema or intermediateSchema == self.outputSchema:
             if DataDirectory().current_config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), model=model, desc=self.desc, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
+                return ParallelInduceFromCandidateOp(self.outputSchema,
+                                                     self.inputOp._getPhysicalTree(strategy=strategy, 
+                                                                                   model=model, 
+                                                                                   shouldProfile=shouldProfile), 
+                                                    model, 
+                                                    self.cardinality,
+                                                    desc=self.desc, 
+                                                    targetCacheId=self.targetCacheId, 
+                                                    shouldProfile=shouldProfile)
             else:
-                return InduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), model=model, desc=self.desc, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
+                return InduceFromCandidateOp(self.outputSchema, 
+                                             self.inputOp._getPhysicalTree(strategy=strategy, 
+                                                                           model=model, 
+                                                                           shouldProfile=shouldProfile), 
+                                            model, 
+                                            self.cardinality,
+                                            desc=self.desc, 
+                                            targetCacheId=self.targetCacheId, 
+                                            shouldProfile=shouldProfile)
         else:
             if DataDirectory().current_config.get("parallel") == True:
                 return ParallelInduceFromCandidateOp(self.outputSchema,
                                                      ParallelInduceFromCandidateOp(
                                                          intermediateSchema,
-                                                         self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile),
-                                                         model=model,
+                                                         self.inputOp._getPhysicalTree(strategy=strategy, 
+                                                                                       model=model, 
+                                                                                       shouldProfile=shouldProfile),       
+                                                         model,
+                                                         self.cardinality,
                                                          shouldProfile=shouldProfile),
-                                                     model=model,
+                                                     model,
+                                                     "oneToOne",
                                                      desc=self.desc,
                                                      targetCacheId=self.targetCacheId, 
                                                      shouldProfile=shouldProfile)
@@ -279,10 +300,14 @@ class ConvertScan(LogicalOperator):
                 return InduceFromCandidateOp(self.outputSchema,
                                              InduceFromCandidateOp(
                                                  intermediateSchema,
-                                                 self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile),
-                                                 model=model,
+                                                 self.inputOp._getPhysicalTree(strategy=strategy, 
+                                                                               model=model, 
+                                                                               shouldProfile=shouldProfile),
+                                                 model,
+                                                 self.cardinality,                              
                                                  shouldProfile=shouldProfile),
-                                             model=model,
+                                             model,
+                                             "oneToOne",    
                                              desc=self.desc,
                                              targetCacheId=self.targetCacheId, 
                                              shouldProfile=shouldProfile)

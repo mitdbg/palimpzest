@@ -209,10 +209,11 @@ class CacheScanDataOp(PhysicalOp):
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.model = model
+        self.cardinality = cardinality
         self.prompt_strategy = prompt_strategy
         self.desc = desc
         self.targetCacheId = targetCacheId
@@ -220,13 +221,16 @@ class InduceFromCandidateOp(PhysicalOp):
         if outputSchema == ImageFile and source.outputSchema == File:
             self.model = Model.GPT_4V
 
-        taskDescriptor = ("InduceFromCandidateOp", (self.model, prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
+        taskDescriptor = self._makeTaskDescriptor()
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "InduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
+
+    def _makeTaskDescriptor(self):
+        return ("InduceFromCandidateOp", (self.model, self.cardinality, self.prompt_strategy, self.opId(), self.desc), self.outputSchema, self.source.outputSchema)
 
     def opId(self):
         d = {
@@ -355,11 +359,13 @@ class InduceFromCandidateOp(PhysicalOp):
         @self.profile(name="induce", op_id=self.opId(), shouldProfile=self.shouldProfile)
         def iteratorFn():    
             for nextCandidate in self.source:
-                resultRecord = self._attemptMapping(nextCandidate)
-                if resultRecord is not None:
-                    if shouldCache:
-                        self.datadir.appendCache(self.targetCacheId, resultRecord)
-                    yield resultRecord
+                resultRecordList = self._attemptMapping(nextCandidate)
+                if resultRecordList is not None:
+                    for resultRecord in resultRecordList:
+                        if resultRecord is not None:
+                            if shouldCache:
+                                self.datadir.appendCache(self.targetCacheId, resultRecord)
+                            yield resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -367,30 +373,34 @@ class InduceFromCandidateOp(PhysicalOp):
 
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputSchema. Return None if it fails."""
-        taskDescriptor = ("InduceFromCandidateOp", (self.model, self.prompt_strategy, self.opId(), self.desc), self.outputSchema, candidate.schema)
+        taskDescriptor = self._makeTaskDescriptor()
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.model = model
+        self.cardinality = cardinality
         self.prompt_strategy = prompt_strategy
         self.desc = desc
         self.targetCacheId = targetCacheId
         self.max_workers = 20
         self.streaming = streaming
 
-        taskDescriptor = ("ParallelInduceFromCandidateOp", (model, prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
+        taskDescriptor = self._makeTaskDescriptor()
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "ParallelInduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
+
+    def _makeTaskDescriptor(self):
+        return ("ParallelInduceFromCandidateOp", (self.model, self.cardinality, self.prompt_strategy, self.opId(), self.desc), self.outputSchema, self.source.outputSchema)
 
     def opId(self):
         d = {
@@ -500,11 +510,13 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                     results = list(executor.map(self._attemptMapping, inputs[i:i+chunksize]))
 
-                    for resultRecord in results:
-                        if resultRecord is not None:
-                            if shouldCache:
-                                self.datadir.appendCache(self.targetCacheId, resultRecord)
-                            yield resultRecord
+                    for resultRecordList in results:
+                        if resultRecordList is not None:
+                            for resultRecord in resultRecordList:
+                                if resultRecord is not None:
+                                    if shouldCache:
+                                        self.datadir.appendCache(self.targetCacheId, resultRecord)
+                                    yield resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -512,7 +524,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputSchema. Return None if it fails."""
-        taskDescriptor = ("ParallelInduceFromCandidateOp", (self.model, self.prompt_strategy, self.opId(), self.desc), self.outputSchema, candidate.schema)
+        #taskDescriptor = ("ParallelInduceFromCandidateOp", (self.model, self.cardinality, self.prompt_strategy, self.opId(), self.desc), self.outputSchema, candidate.schema)
+        taskDescriptor = self._makeTaskDescriptor()
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", taskDescriptor)
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)

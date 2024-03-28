@@ -34,5 +34,6 @@ class Download(Schema):
 class WebPage(Schema):
     """A web page is a URL and the contents of the page."""
     url = StringField(desc="The URL of the web page", required=True)
-    html = StringField(desc="The contents of the web page", required=True)
+    text = StringField(desc="The text contents of the web page", required=True)
+    html = StringField(desc="The html contents of the web page", required=True)
     timestamp = StringField(desc="The timestamp of the download", required=True)
