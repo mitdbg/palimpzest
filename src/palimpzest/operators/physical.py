@@ -3,9 +3,9 @@ from __future__ import annotations
 from palimpzest.constants import *
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
-from palimpzest.elements import Any
-from palimpzest.solver import Solver
-from palimpzest.tools.profiler import Profiler
+from palimpzest.elements import Any # TODO: can we delete?
+from palimpzest.solver import Solver, TaskDescriptor
+from palimpzest.profiler import Profiler
 
 from typing import Any, Callable, Dict, Tuple, Union
 
@@ -30,17 +30,8 @@ class PhysicalOp:
         self.datadir = DataDirectory()
 
         self.shouldProfile = shouldProfile
-        if self.shouldProfile:
-            self.profiler = Profiler()
-            self.profile = self.profiler.iter_profiler
-        else:            
-            # otherwise, make self.profile a no-op
-            self.profile = self.no_op_wrapper
-
-    def no_op_wrapper(self, *args, **kwargs):
-        def no_op_decorator(fn):
-            return fn
-        return no_op_decorator
+        self.profiler = Profiler()
+        self.profile = self.profiler.iter_profiler
 
     def opId(self) -> str:
         raise NotImplementedError("Abstract method")
@@ -209,7 +200,7 @@ class CacheScanDataOp(PhysicalOp):
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.model = model
@@ -226,10 +217,22 @@ class InduceFromCandidateOp(PhysicalOp):
                 self.model = Model.GEMINI_1V               
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
-        taskDescriptor = ("InduceFromCandidateOp", (self.model, self.prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
-        if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = self.datadir.current_config
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config, shouldProfile=self.shouldProfile)
+        # construct TaskDescriptor
+        taskDescriptor = TaskDescriptor(
+            physical_op="InduceFromCandidateOp",
+            inputSchema=source.outputSchema,
+            outputSchema=outputSchema,
+            op_id=self.opId(),
+            model=model,
+            prompt_strategy=prompt_strategy,
+            query_strategy=query_strategy,
+            conversionDesc=desc,
+            pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
+        )
+
+        # synthesize task function
+        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[str(taskDescriptor)] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "InduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -297,7 +300,7 @@ class InduceFromCandidateOp(PhysicalOp):
         # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
         #
         # TODO: once again, real-time updates and/or sampling could improve this est.
-        if self.prompt_strategy == PromptStrategy.DSPY_COT:
+        if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             model_conversion_time_per_record *= DSPY_TIME_INFLATION
             model_conversion_usd_per_record *= DSPY_COST_INFLATION
 
@@ -380,7 +383,7 @@ class InduceFromCandidateOp(PhysicalOp):
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.model = model
@@ -399,10 +402,22 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 self.model = Model.GEMINI_1V               
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
-        taskDescriptor = ("ParallelInduceFromCandidateOp", (model, prompt_strategy, self.opId(), desc), outputSchema, source.outputSchema)
-        if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = self.datadir.current_config
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config, shouldProfile=self.shouldProfile)
+        # construct TaskDescriptor
+        taskDescriptor = TaskDescriptor(
+            physical_op="ParallelInduceFromCandidateOp",
+            inputSchema=source.outputSchema,
+            outputSchema=outputSchema,
+            op_id=self.opId(),
+            model=model,
+            prompt_strategy=prompt_strategy,
+            query_strategy=query_strategy,
+            conversionDesc=desc,
+            pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
+        )
+
+        # synthesize task function
+        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[str(taskDescriptor)] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "ParallelInduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -461,7 +476,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         )
 
         # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
-        if self.prompt_strategy == PromptStrategy.DSPY_COT:
+        if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             model_conversion_time_per_record *= DSPY_TIME_INFLATION
             model_conversion_usd_per_record *= DSPY_COST_INFLATION
 
@@ -531,7 +546,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
 
 class FilterCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_BOOL, targetCacheId: str=None, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.filter = filter
@@ -539,10 +554,19 @@ class FilterCandidateOp(PhysicalOp):
         self.prompt_strategy = prompt_strategy
         self.targetCacheId = targetCacheId
 
-        taskDescriptor = ("FilterCandidateOp", (filter, model, prompt_strategy, self.opId()), source.outputSchema, self.outputSchema)
-        if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = self.datadir.current_config
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config, shouldProfile=self.shouldProfile)
+        # construct TaskDescriptor
+        taskDescriptor = TaskDescriptor(
+            physical_op="FilterCandidateOp",
+            inputSchema=source.outputSchema,
+            op_id=self.opId(),
+            filter=filter,
+            model=model,
+            prompt_strategy=prompt_strategy,
+        )
+
+        # synthesize task function
+        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[str(taskDescriptor)] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "FilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -602,7 +626,7 @@ class FilterCandidateOp(PhysicalOp):
         )
 
         # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
-        if self.prompt_strategy == PromptStrategy.DSPY_COT:
+        if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
             model_conversion_time_per_record *= DSPY_TIME_INFLATION
             model_conversion_usd_per_record *= DSPY_COST_INFLATION
 
@@ -663,7 +687,7 @@ class FilterCandidateOp(PhysicalOp):
 
 
 class ParallelFilterCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None, streaming=False, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_BOOL, targetCacheId: str=None, streaming=False, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.filter = filter
@@ -673,10 +697,19 @@ class ParallelFilterCandidateOp(PhysicalOp):
         self.max_workers = 20
         self.streaming = streaming
 
-        taskDescriptor = ("ParallelFilterCandidateOp", (filter, model, prompt_strategy, self.opId()), source.outputSchema, self.outputSchema)
-        if not taskDescriptor in PhysicalOp.synthesizedFns:
-            config = self.datadir.current_config
-            PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config, shouldProfile=self.shouldProfile)
+        # construct TaskDescriptor
+        taskDescriptor = TaskDescriptor(
+            physical_op="ParallelFilterCandidateOp",
+            inputSchema=source.outputSchema,
+            op_id=self.opId(),
+            filter=filter,
+            model=model,
+            prompt_strategy=prompt_strategy,
+        )
+
+        # synthesize task function
+        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[str(taskDescriptor)] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "ParallelFilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -733,7 +766,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
         )
 
         # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
-        if self.prompt_strategy == PromptStrategy.DSPY_COT:
+        if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
             model_conversion_time_per_record *= DSPY_TIME_INFLATION
             model_conversion_usd_per_record *= DSPY_COST_INFLATION
 

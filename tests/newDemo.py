@@ -2,7 +2,7 @@
 import context # needed to load api keys from .env
 from palimpzest.elements import Schema, StringField
 from palimpzest.policy import *
-from palimpzest.tools.profiler import Profiler
+from palimpzest.profiler import Profiler
 
 from tabulate import tabulate
 
