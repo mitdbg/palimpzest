@@ -6,6 +6,7 @@ from palimpzest.elements import *
 from palimpzest.operators import (
     ApplyCountAggregateOp,
     ApplyAverageAggregateOp,
+    ApplyUserFunctionOp,
     CacheScanDataOp,
     FilterCandidateOp,
     InduceFromCandidateOp,
@@ -383,3 +384,23 @@ class ApplyAggregateFunction(LogicalOperator):
             return ApplyAverageAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.aggregationFunction, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
         else:
             raise Exception(f"Cannot find implementation for {self.aggregationFunction}")
+
+
+class ApplyUserFunction(LogicalOperator):
+    """ApplyUserFunction is a logical operator that applies a user-provided function to the input set and yields a result."""
+    def __init__(self, outputSchema: Schema, inputOp: LogicalOperator, fnid:str, targetCacheId: str=None):
+        super().__init__(outputSchema, inputOp.outputSchema)
+        self.inputOp = inputOp
+        self.fnid = fnid
+        self.fn = DataDirectory().getUserFunction(fnid)
+        self.targetCacheId=targetCacheId
+
+    def __str__(self):
+        return "ApplyUserFunction(function: " + str(self.fnid) + ")"
+
+    def dumpLogicalTree(self):
+        """Return the logical subtree rooted at this operator"""
+        return (self, self.inputOp.dumpLogicalTree())
+
+    def _getPhysicalTree(self, strategy: str=None, model: Model=None, shouldProfile: bool=False):
+        return ApplyUserFunctionOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.fn, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)

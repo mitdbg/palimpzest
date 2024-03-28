@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from palimpzest.datamanager import DataDirectory
-from palimpzest.elements import AggregateFunction, File, Filter, Number, Schema
+from palimpzest.elements import AggregateFunction, File, Filter, Number, Schema, UserFunction
 from palimpzest.operators import (
     ApplyAggregateFunction,
+    ApplyUserFunction,
     BaseScan,
     CacheScan,
     ConvertScan,
@@ -41,13 +42,14 @@ class Set:
     """
     SET_VERSION = 0.1
 
-    def __init__(self, schema: Schema, source: Union[Set, DataSource], desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None, nocache: bool=False):
+    def __init__(self, schema: Schema, source: Union[Set, DataSource], desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None, fnid:str = None, nocache: bool=False):
         self._schema = schema
         self._source = source
         self._desc = desc
         self._filter = filter
         self._aggFunc = aggFunc
         self._limit = limit
+        self._fnid = fnid
         self._nocache = nocache
 
     def __str__(self):
@@ -60,6 +62,7 @@ class Set:
              "desc": repr(self._desc),
              "filter": None if self._filter is None else self._filter.serialize(),
              "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(),
+             "fnid": None if self._fnid is None else self._fnid,
              "limit": self._limit}
 
         return d
@@ -94,11 +97,14 @@ class Set:
         limitStr = inputObj.get("limit", None)
         limit = None if limitStr is None else int(limitStr)
 
+        fnid = inputObj.get("fnid", None)
+
         return Set(schema=inputObj["schema"].jsonSchema(), 
                    source=source, 
                    desc=inputObj["desc"], 
                    filter=Filter.deserialize(inputObj["filter"]),
                    aggFunc=aggFunc,
+                   fnid=fnid,
                    limit=limit)
 
     def universalIdentifier(self):
@@ -147,6 +153,8 @@ class Set:
             return ApplyAggregateFunction(self._schema, self._source.getLogicalTree(), self._aggFunc, targetCacheId=uid)
         elif self._limit is not None:
             return LimitScan(self._schema, self._source.getLogicalTree(), self._limit, targetCacheId=uid)
+        elif self._fnid is not None:
+            return ApplyUserFunction(self._schema, self._source.getLogicalTree(), self._fnid, targetCacheId=uid)
         elif not self._schema == self._source._schema:
             return ConvertScan(self._schema, self._source.getLogicalTree(), targetCacheId=uid)
         else:
@@ -172,7 +180,7 @@ class Dataset(Set):
     provide a Schema for the Dataset. This Schema will be enforced when the Dataset iterates
     over the source in its __iter__ method and constructs DataRecords.
     """
-    def __init__(self, source: Union[str, Set], schema: Schema=File, desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None, nocache: bool=False):
+    def __init__(self, source: Union[str, Set], schema: Schema=File, desc: str=None, filter: Filter=None, aggFunc: AggregateFunction=None, limit: int=None, fnid: str=None, nocache: bool=False):
         # convert source (str) -> source (DataSource) if need be
         self.source = (
             DataDirectory().getRegisteredDataset(source)
@@ -180,7 +188,7 @@ class Dataset(Set):
             else source
         )
 
-        super().__init__(schema, self.source, desc=desc, filter=filter, aggFunc=aggFunc, limit=limit, nocache=nocache)
+        super().__init__(schema, self.source, desc=desc, filter=filter, aggFunc=aggFunc, limit=limit, fnid=fnid, nocache=nocache)
 
     def deserialize(inputObj):
         # TODO: this deserialize operation will not work; I need to finish the deserialize impl. for Schema
@@ -216,6 +224,12 @@ class Dataset(Set):
     def convert(self, newSchema: Schema, desc: str="Convert to new schema") -> Dataset:
         """Convert the Set to a new schema."""
         return Dataset(source=self, schema=newSchema, desc=desc)
+
+    def map(self, fn: UserFunction) -> Dataset:
+        """Convert the Set to a new schema."""
+        if not fn.inputSchema == self.schema():
+            raise Exception("Input schema of function (" + str(fn.inputSchema.getDesc()) + ") does not match schema of input Set (" + str(self.schema().getDesc()) + ")" )        
+        return Dataset(source=self, schema=fn.outputSchema, fnid=fn.udfid)
 
     def aggregate(self, aggFuncDesc: str) -> Dataset:
         """Apply an aggregate function to this set"""

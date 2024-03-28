@@ -1,14 +1,14 @@
 from palimpzest.constants import Model, PromptStrategy
-from palimpzest.elements import DataRecord, EquationImage, File, Filter, ImageFile, PDFFile, Schema, TextFile
+from palimpzest.elements import DataRecord, Filter, File, TextFile, Schema
+from palimpzest.corelib import EquationImage, ImageFile, PDFFile
 from palimpzest.tools.dspysearch import run_cot_bool, run_cot_qa, gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.tools.openai_image_converter import do_image_analysis
 from palimpzest.tools.pdfparser import get_text_from_pdf
-from palimpzest.tools.profiler import Profiler
-from palimpzest.tools.skema_tools import equations_to_latex_base64, equations_to_latex
+from palimpzest.tools.skema_tools import equations_to_latex
 
 from copy import deepcopy
 from papermage import Document
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict
 
 import json
 import base64

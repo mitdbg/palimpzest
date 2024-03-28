@@ -493,6 +493,9 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             else:
                 chunksize = len(inputs)
 
+            if chunksize == 0:
+                return
+            
             for i in range(0, len(inputs), chunksize):
                 with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                     results = list(executor.map(self._attemptMapping, inputs[i:i+chunksize]))
@@ -856,6 +859,79 @@ class ApplyCountAggregateOp(PhysicalOp):
             if shouldCache:
                 datadir.appendCache(self.targetCacheId, dr)
             yield dr
+
+            if shouldCache:
+                datadir.closeCache(self.targetCacheId)
+
+        return iteratorFn()
+
+
+#        return ApplyUserFunctionOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.fn, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
+
+
+class ApplyUserFunctionOp(PhysicalOp):
+    def __init__(self, source: PhysicalOp, fn:UserFunction, targetCacheId: str=None, shouldProfile=False):
+        super().__init__(outputSchema=fn.outputSchema, shouldProfile=shouldProfile)
+        self.source = source
+        self.fn = fn
+        self.targetCacheId = targetCacheId
+        if not source.outputSchema == fn.inputSchema:
+            raise Exception("Supplied UserFunction input schema does not match output schema of input source")
+
+    def __str__(self):
+        return "ApplyUserFunctionOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.fn.udfid) + ")"
+
+    def opId(self):
+        d = {
+            "operator": "ApplyUserFunctionOp",
+            "source": self.source.opId(),
+            "fn": str(self.fn.udfid),
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, self.source.dumpPhysicalTree())
+
+    def getProfilingData(self):
+        if self.shouldProfile:
+            source_data = self.source.getProfilingData()
+            operator_data = self.profiler.get_data()
+            operator_data["source"] = source_data
+            return operator_data
+        else:
+            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
+
+    def estimateCost(self):
+        inputEstimates = self.source.estimateCost()
+
+        outputEstimates = {**inputEstimates}
+        outputEstimates["cardinality"] = 1
+
+        # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
+        outputEstimates["timePerElement"] = 0
+        outputEstimates["usdPerElement"] = 0
+        outputEstimates["estOutputTokensPerElement"] = 0
+
+        return outputEstimates
+
+    def __iter__(self):
+        datadir = DataDirectory()
+        shouldCache = datadir.openCache(self.targetCacheId)
+
+        @self.profile(name="applyfn", op_id=self.opId(), shouldProfile=self.shouldProfile)
+        def iteratorFn():
+            for nextCandidate in self.source:
+                try:
+                    dr = self.fn.map(nextCandidate)
+                    if shouldCache:
+                        datadir.appendCache(self.targetCacheId, dr)
+                    yield dr
+                except Exception as e:
+                    print("Error in applying function", e)
+                    pass
 
             if shouldCache:
                 datadir.closeCache(self.targetCacheId)

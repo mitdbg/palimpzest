@@ -1,6 +1,7 @@
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
 from palimpzest.datasources import DirectorySource, FileSource, MemorySource, UserSource
+from palimpzest.elements import UserFunction
 
 import os
 import pickle
@@ -112,6 +113,22 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         """Register a user source as a data source."""
         self._registry[dataset_id] = ("user", src)
 #        # user sources are always ephemeral
+        
+    def registerUserFunction(self, udf:UserFunction):
+        """Register a user function as a data source."""
+        self._registry[udf.udfid] = ("udf", udf)
+        # user functions are always ephemeral
+
+    def getUserFunction(self, udfid):
+        """Return a user function from the registry."""
+        if not udfid in self._registry:
+            raise Exception("Cannot find user function", udfid, "in the registry.")
+        
+        entry, rock = self._registry[udfid]
+        if entry == "udf":
+            return rock
+        else:
+            raise Exception("Unknown entry type")
 
     def getRegisteredDataset(self, dataset_id):
         """Return a dataset from the registry."""
