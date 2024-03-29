@@ -921,9 +921,8 @@ class ApplyUserFunctionOp(PhysicalOp):
         inputEstimates = self.source.estimateCost()
 
         outputEstimates = {**inputEstimates}
-        outputEstimates["cardinality"] = 1
 
-        # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
+        # for now, assume applying the user function takes negligible additional time (and no cost in USD)
         outputEstimates["timePerElement"] = 0
         outputEstimates["usdPerElement"] = 0
         outputEstimates["estOutputTokensPerElement"] = 0
