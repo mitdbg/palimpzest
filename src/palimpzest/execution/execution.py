@@ -44,7 +44,7 @@ class Execution:
         # Ok now reoptimize the logical plan, this time with the sample data.
         # (The data is not currently being used; let's see if this method can work first)
         logicalTree = self.rootset.getLogicalTree()
-        candidatePlans = logicalTree.createPhysicalPlanCandidates()
+        candidatePlans = logicalTree.createPhysicalPlanCandidates() # TODO: pass in (profiling) data from querySamples here
         if type(self.policy) == UserChoice:
             def emitNestedTuple(node, indent=0):
                 elt, child = node

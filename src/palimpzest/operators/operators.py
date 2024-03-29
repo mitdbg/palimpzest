@@ -166,6 +166,7 @@ class LogicalOperator:
 
         return physicalPlans
 
+    # TODO: possibly get data from profiling here
     def createPhysicalPlanCandidates(self, sampler: Sampler=None, shouldProfile: bool=False) -> List[PhysicalPlan]:
         """Return a set of physical trees of operators."""
         start_time = time.time()
@@ -179,7 +180,7 @@ class LogicalOperator:
         physicalPlans = [
             physicalPlan
             for logicalPlan in logicalPlans
-            for physicalPlan in logicalPlan._createPhysicalPlans(shouldProfile=shouldProfile)
+            for physicalPlan in logicalPlan._createPhysicalPlans(shouldProfile=shouldProfile) # TODO: pass profiling data through here
         ]
         t_physical = time.time()
         # print(f"Time to create physical plans: {t_physical - t_logical:.2f}")
