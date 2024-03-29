@@ -147,14 +147,11 @@ class Profiler:
 
                     # for non-induce/filter operators, we need to create an empty Stats object for the op_id
                     if op_id not in record._stats:
-                        record._stats[op_id] = Stats()
+                        record._stats[op_id] = {}
 
                     # add time spent in iteration for operator
                     record._stats[op_id]["iter_time"] = t_record_end - t_record_start
 
-                    # TODO: since we were trying to have records be re-created by each operator,
-                    #       this _state dict should only have one (key, value) for a given record
-                    #       which means we can just replace this with a {} and put op_id in as a key
                     # update state of record for complete history of computation
                     record._state[op_id] = {
                         "name": name,
