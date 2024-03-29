@@ -41,6 +41,15 @@ class QueryStrategy(Enum):
     CODE_GEN = "code-gen"
     CODE_GEN_WITH_FALLBACK = "codegen-with-fallback"
 
+# retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
+RETRY_MULTIPLIER = 2
+RETRY_MAX_SECS = 10
+RETRY_MAX_ATTEMPTS = 1
+
+def log_attempt_number(retry_state):
+    """return the result of the last call attempt"""
+    print(f"Retrying: {retry_state.attempt_number}...")
+
 # Palimpzest root directory
 PZ_DIR = os.path.join(os.path.expanduser("~"), ".palimpzest")
 

@@ -1,10 +1,9 @@
-from palimpzest.generators import log_attempt_number, RETRY_MAX_ATTEMPTS, RETRY_MAX_SECS, RETRY_MULTIPLIER
+from palimpzest.constants import log_attempt_number, RETRY_MAX_ATTEMPTS, RETRY_MAX_SECS, RETRY_MULTIPLIER
 from dsp.modules.hf import HFModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 import dspy
 import requests
-
 
 ### DSPy Signatures ###
 # Given a questionn, we'll feed it with the paper context for answer generation.
