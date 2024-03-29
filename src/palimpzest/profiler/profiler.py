@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from palimpzest.constants import MODEL_CARDS
+from palimpzest.profiler import Stats, AggOperatorStats, FilterLLMStats, InduceLLMStats
 
 from functools import wraps
 from typing import Any, Dict
@@ -17,43 +18,23 @@ class Profiler:
     This class maintains a set of utility tools and functions to help with profiling PZ programs.
     """
 
-    def __init__(self):
+    def __init__(self, op_id: str):
+        # store op_id for the operation associated with this profiler
+        self.op_id = op_id
+
         # dictionary with aggregate statistics for this operator
-        self.agg_operator_stats = {
-            # total number of records returned by the iterator for this operator
-            "total_records": 0,
+        self.agg_operator_stats = AggOperatorStats(op_id=self.op_id)
 
-            # TODO: compute this as sum of individual record times
-            # TODO: for each individual record, subtract the (cumulative_)iter_time of its source/parent to get
-            #       the actual time spent in this operator
-            # total time spent in this iterator; this will include time spent in input operators
-            "total_iter_time": 0.0,
-
-            # usage statistics computed for induce and filter operations
-            "total_input_tokens": 0,
-            "total_output_tokens": 0,
-
-            # time spent waiting for API calls to return
-            "total_api_call_duration": 0.0,
-
-            # keep track of finish reasons
-            "finish_reasons": {},
-
-            # keep track of the total time spent inside of the profiler
-            "total_time_in_profiler": 0.0,
-        }
-
-        # list of records computed by this operator; each record will have
-        # its individual stats and state stored; we can then get the lineage / history
-        # of computation by looking at records' _state across computations
+        # list of records' states after being operated on by the operator associated with
+        # this profiler; each record will have its individual stats and state stored;
+        # we can then get the lineage / history of computation by looking at records'
+        # _state across computations
         self.records = []
 
-    def _update_agg_stats(self, stats: Dict[str, Any], field_name: str=None) -> None:
+    def _update_agg_stats(self, stats: Stats) -> None:
         """
-        Given the stats dictionary from either (1) a `run_cot_bool` function call or
-        (2) a single field in a `run_cot_qa` function all -- update the aggregate stats
-        in place. When a `field_name` is provided, we update the total aggregate stats
-        as well as the per-field aggregate stats.
+        Given the stats object for a single record which was operated on by this operator,
+        update the aggregate stats for this operator in place.
         """
         # update aggregate statistics
         self.agg_operator_stats["total_input_tokens"] += stats["usage"]["prompt_tokens"]
@@ -118,7 +99,7 @@ class Profiler:
 
         return full_stats_dict
 
-    def iter_profiler(self, name: str, op_id: str, shouldProfile: bool = False):
+    def iter_profiler(self, name: str, shouldProfile: bool = False):
         """
         iter_profiler is a decorator factory. This function takes in a `name` argument
         and returns a decorator which will decorate an iterator. In practice, this
@@ -128,7 +109,7 @@ class Profiler:
 
         To use the profiler, simply apply it to an iterator as follows:
 
-        @profiler(name="foo", op_id="some-logical-op", shouldProfile=True)
+        @profiler(name="foo", shouldProfile=True)
         def someIterator():
             # do normal iterator things
             yield dr
@@ -140,46 +121,37 @@ class Profiler:
 
             @wraps(iterator)
             def timed_iterator():
+                self.agg_operator_stats.op_name = name
                 t_record_start = time.time()
                 for record in iterator():
                     t_record_end = time.time()
-                    self.agg_operator_stats["total_records"] += 1
+                    self.agg_operator_stats.total_records += 1
 
                     # for non-induce/filter operators, we need to create an empty Stats object for the op_id
-                    if op_id not in record._stats:
-                        record._stats[op_id] = {}
+                    if self.op_id not in record._stats:
+                        record._stats[self.op_id] = Stats()
 
-                    # add time spent in iteration for operator
-                    record._stats[op_id]["iter_time"] = t_record_end - t_record_start
+                    # add time spent waiting for iterator to yield record; this measures the
+                    # time spent by the record in this operator and all source operators
+                    record._stats[self.op_id].cumulative_iter_time = t_record_end - t_record_start
 
                     # update state of record for complete history of computation
-                    record._state[op_id] = {
+                    record._state[self.op_id] = {
                         "name": name,
-                        "stats": record._stats[op_id],
-                        "record_state": record.asTextJSON(serialize=True),
+                        "uuid": record.uuid,
+                        "parent_uuid": record.parent_uuid,
+                        "stats": record._stats[self.op_id],
+                        "record_state": record.asDict(include_bytes=False),
                     }
 
-                    # add record to set of records computed by this operator
-                    self.records.append(record._state)
+                    # add record state to set of records computed by this operator
+                    self.records.append(record._state[self.op_id])
 
-                    # TODO: make this if-condition less hacky; length of _stats[op_id] should be
-                    #       greater than 1 if there's more than just the iter_time computed;
-                    #       filter operation currently puts stats like api_call_duration, usage, etc.
-                    #       at same level in JSON as iter_time, while induce has a key called fields
-                    #       (which then points to per-field stats) at the same level as iter_time
-                    #
                     # update aggregate stats for operators with LLM workloads
-                    if "filter" in name and len(record._stats[op_id]) > 1:
-                        stats = dict(record._stats[op_id])
-                        self._update_agg_stats(stats)
-
-                    elif "induce" in name and len(record._stats[op_id]) > 1:
-                        stats = dict(record._stats[op_id])
-                        for field_name, field_stats in stats['fields'].items():
-                            self._update_agg_stats(field_stats, field_name=field_name)
+                    self._update_agg_stats(stats, record._stats[self.op_id])
 
                     # track time spent in profiler
-                    self.agg_operator_stats["total_time_in_profiler"] += time.time() - t_record_end
+                    self.agg_operator_stats.total_time_in_profiler += time.time() - t_record_end
 
                     # if this is a filter operation and the record did not pass the filter,
                     # then this record is meant to be filtered out, so do not yield it
@@ -194,6 +166,3 @@ class Profiler:
 
             return timed_iterator
         return profile_decorator
-
-    
-    # TODO: define generator_profiler?

@@ -32,23 +32,25 @@ class DataRecord:
     def schema(self):
         return self._schema
 
-    def asTextJSON(self, return_dict: bool=False):
+    def asTextJSON(self):
         """Return a JSON representation of this DataRecord"""
         keys = sorted(self.__dict__)
         # Make a dictionary out of the key/value pairs
         d = {k: str(self.__dict__[k]) for k in keys if not k.startswith("_") and not isinstance(self.__dict__[k] , bytes)}
         d["data type"] = str(self._schema.__name__)
         d["data type description"]  = str(self._schema.__doc__)
-        if return_dict:
-            return d
 
         return json.dumps(d, indent=2)
     
-    def asDict(self):
+    def asDict(self, include_bytes: bool=True):
         """Return a dictionary representation of this DataRecord"""
         keys = sorted(self.__dict__)
         # Make a dictionary out of the key/value pairs
-        d = {k: self.__dict__[k] for k in keys if not k.startswith("_")}
+        d = (
+            {k: self.__dict__[k] for k in keys if not k.startswith("_")}
+            if include_bytes
+            else {k: self.__dict__[k] if not isinstance(self.__dict__[k] , bytes) else "<bytes>" for k in keys if not k.startswith("_")}
+        )
         return d
 
     def asJSON(self):

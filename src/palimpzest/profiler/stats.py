@@ -3,8 +3,55 @@ from typing import Dict, List
 
 
 @dataclass
+class AggOperatorStats:
+    """
+    Dataclass for storing aggregate statistics related to an operator.
+
+    All other Stats classes are concerned with the statistics computed for a single
+    induce / filter operation executed on a single input record. This dataclass
+    aggregates across all of those statistics (e.g. by capturing the total number
+    of output tokens generated across all generations, the total number of records
+    processed, etc.)
+    """
+    # the ID of the operation in which these stats were collected
+    op_id: str
+    # the name of the operation in which these stats were collected
+    op_name: str=None
+    # total number of records returned by the iterator for this operator
+    total_records: int=0
+    # total time spent in this iterator; this will include time spent in input operators
+    total_iter_time: float=0.0
+    # usage statistics computed for induce and filter operations
+    total_input_tokens: int=0
+    total_output_tokens: int=0
+    # time spent waiting for API calls to return
+    total_api_call_duration: float=0.0
+    # keep track of finish reasons
+    finish_reasons: dict={}
+    # keep track of the total time spent inside of the profiler
+    total_time_in_profiler: float=0.0
+
+    def to_dict(self):
+        return asdict(self)
+
+
+@dataclass
 class Stats:
-    """Base dataclass for storing statistics captured during the execution of a physical plan."""
+    """
+    Base dataclass for storing statistics captured during the execution of an induce / filter
+    operation on a single input record.
+    """
+    # (set in profiler.py) this is the total time spent waiting for the iterator
+    # to yield the data record associated with this Stats object; note that this
+    # will capture the total time spent in this operation and all source operations
+    # due to the way in which we set timers in profiler.py rather than in the
+    # physical operator code
+    cumulative_iter_time: float=0.0
+    # the time spent by the data record just in this operation; this is computed
+    # in the StatsProcessor as (the cumulative_iter_time of this data record in
+    # this operation) minus (the cumulative_iter_time of this data record in the
+    # source operation)
+    op_time: float=0.0
 
     def to_dict(self):
         return asdict(self)
@@ -18,6 +65,8 @@ class ApiStats(Stats):
 
 class GenerationStats(Stats):
     """Statistics captured from LLM calls (i.e. the Generator's .generate() functions)."""
+    # name of the LLM used to generate the output; should be a key in the MODEL_CARDS
+    model_name: str
     # total time spent from sending input to LLM to receiving output string
     llm_call_duration_secs: float
     # the prompt used to generate the output
@@ -136,7 +185,7 @@ class InduceNonLLMStats(Stats):
     api_stats: ApiStats
 
 
-class FilterStats(Stats):
+class FilterLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from a filter operation."""
     # the generation statistics from the call to the filter LLM
     gen_stats: GenerationStats

@@ -32,7 +32,7 @@ class PhysicalOp:
         self.datadir = DataDirectory()
 
         self.shouldProfile = shouldProfile
-        self.profiler = Profiler()
+        self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
 
     def opId(self) -> str:
@@ -112,7 +112,7 @@ class MarshalAndScanDataOp(PhysicalOp):
         }
 
     def __iter__(self) -> IteratorFn:
-        @self.profile(name="base_scan", op_id=self.opId(), shouldProfile=self.shouldProfile)
+        @self.profile(name="base_scan", shouldProfile=self.shouldProfile)
         def iteratorFn():
             for nextCandidate in self.datadir.getRegisteredDataset(self.datasetIdentifier):
                 yield nextCandidate
@@ -193,7 +193,7 @@ class CacheScanDataOp(PhysicalOp):
         }
 
     def __iter__(self) -> IteratorFn:
-        @self.profile(name="cache_scan", op_id=self.opId(), shouldProfile=self.shouldProfile)
+        @self.profile(name="cache_scan", shouldProfile=self.shouldProfile)
         def iteratorFn():
             # NOTE: see comment in `estimateCost()` 
             for nextCandidate in self.datadir.getCachedResult(self.cacheIdentifier):
@@ -369,7 +369,7 @@ class InduceFromCandidateOp(PhysicalOp):
     def __iter__(self) -> IteratorFn:
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="induce", op_id=self.opId(), shouldProfile=self.shouldProfile)
+        @self.profile(name="induce", shouldProfile=self.shouldProfile)
         def iteratorFn():    
             for nextCandidate in self.source:
                 resultRecordList = self._attemptMapping(nextCandidate)
@@ -525,7 +525,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         # This is very crudely implemented right now, since we materialize everything
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="p_induce", op_id=self.opId(), shouldProfile=self.shouldProfile)
+        @self.profile(name="p_induce", shouldProfile=self.shouldProfile)
         def iteratorFn():
             inputs = []
             results = []
@@ -683,7 +683,7 @@ class FilterCandidateOp(PhysicalOp):
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="filter", op_id=self.opId(), shouldProfile=self.shouldProfile)
+        @self.profile(name="filter", shouldProfile=self.shouldProfile)
         def iteratorFn():
             for nextCandidate in self.source:
                 resultRecord = self._passesFilter(nextCandidate)
@@ -826,7 +826,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="p_filter", op_id=self.opId(), shouldProfile=self.shouldProfile)
+        @self.profile(name="p_filter", shouldProfile=self.shouldProfile)
         def iteratorFn():
             inputs = []
             results = []
@@ -918,7 +918,7 @@ class ApplyCountAggregateOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="count", op_id=self.opId(), shouldProfile=self.shouldProfile)
+        @self.profile(name="count", shouldProfile=self.shouldProfile)
         def iteratorFn():
             counter = 0
             for _ in self.source:
@@ -990,7 +990,7 @@ class ApplyUserFunctionOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="applyfn", op_id=self.opId(), shouldProfile=self.shouldProfile)
+        @self.profile(name="applyfn", shouldProfile=self.shouldProfile)
         def iteratorFn():
             for nextCandidate in self.source:
                 try:
@@ -1061,7 +1061,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="average", op_id=self.opId(), shouldProfile=self.shouldProfile)
+        @self.profile(name="average", shouldProfile=self.shouldProfile)
         def iteratorFn():
             sum = 0
             counter = 0
@@ -1130,7 +1130,7 @@ class LimitScanOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="limit", op_id=self.opId(), shouldProfile=self.shouldProfile)
+        @self.profile(name="limit", shouldProfile=self.shouldProfile)
         def iteratorFn():
             counter = 0
             for nextCandidate in self.source: 

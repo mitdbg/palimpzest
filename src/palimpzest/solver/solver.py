@@ -2,7 +2,7 @@ from palimpzest.constants import PromptStrategy, QueryStrategy
 from palimpzest.elements import DataRecord, File, TextFile, Schema
 from palimpzest.corelib import EquationImage, ImageFile, PDFFile
 from palimpzest.generators import DSPyGenerator
-from palimpzest.profiler import ApiStats, FilterStats, InduceLLMStats, InduceNonLLMStats
+from palimpzest.profiler import ApiStats, FilterLLMStats, InduceLLMStats, InduceNonLLMStats
 from palimpzest.solver.query_strategies import runBondedQuery, runConventionalQuery, runCodeGenQuery
 from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.tools.pdfparser import get_text_from_pdf
@@ -50,6 +50,7 @@ class Solver:
                 return None
 
             dr = DataRecord(td.outputSchema)
+            dr.parent_uuid = candidate.uuid
             for field in td.outputSchema.fieldNames():
                 if hasattr(candidate, field):
                     setattr(dr, field, getattr(candidate, field))
@@ -95,6 +96,7 @@ class Solver:
 
                 # construct data record
                 dr = DataRecord(td.outputSchema)
+                dr.parent_uuid = candidate.uuid
                 dr.filename = pdf_filename
                 dr.contents = pdf_bytes
                 dr.text_contents = text_content
@@ -110,6 +112,7 @@ class Solver:
                     return None
                 text_content = str(candidate.contents, 'utf-8')
                 dr = DataRecord(td.outputSchema)
+                dr.parent_uuid = candidate.uuid
                 dr.filename = candidate.filename
                 dr.contents = text_content
                 # if profiling, set record's stats for the given op_id to be an empty Stats object
@@ -125,6 +128,7 @@ class Solver:
                     return None
 
                 dr = DataRecord(td.outputSchema)
+                dr.parent_uuid = candidate.uuid
                 dr.filename = candidate.filename
                 dr.contents = candidate.contents
                 dr.equation_text, api_stats = equations_to_latex(candidate.contents)
@@ -161,6 +165,7 @@ class Solver:
                 if err_msg is not None:
                     print(f"BondedQuery Error: {err_msg}")
                     dr = DataRecord(td.outputSchema)
+                    dr.parent_uuid = candidate.uuid
                     for field_name in td.outputSchema.fieldNames():
                         setattr(dr, field_name, None)
                     drs = [dr]
@@ -217,6 +222,7 @@ class Solver:
                 # if err_msg is not None:
                 #     print(f"CodeGenQuery Error: {err_msg}")
                 #     dr = DataRecord(td.outputSchema)
+                #     dr.parent_uuid = candidate.uuid
                 #     for field_name in td.outputSchema.fieldNames():
                 #         setattr(dr, field_name, None)
                 #     drs = [dr]
@@ -275,7 +281,7 @@ class Solver:
 
                     # if profiling, set record's stats for the given op_id
                     if shouldProfile:
-                        candidate._stats[td.op_id] = FilterStats(gen_stats=gen_stats)
+                        candidate._stats[td.op_id] = FilterLLMStats(gen_stats=gen_stats)
 
                     # set _passed_filter attribute and return record
                     setattr(candidate, "_passed_filter", response.lower() == "true")

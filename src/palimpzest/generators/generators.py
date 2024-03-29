@@ -97,6 +97,7 @@ class DSPyGenerator(BaseGenerator):
 
         # collect statistics on prompt, usage, and timing
         stats = GenerationStats(
+            model_name=self.model_name,
             llm_call_duration_secs=end_time - start_time,
             prompt=dspy_lm.history[-1]['prompt'],
             usage=dspy_lm.history[-1]['response']['usage'],
@@ -215,6 +216,7 @@ class ImageTextGenerator(BaseGenerator):
 
         # collect statistics on prompt, usage, and timing
         stats = GenerationStats(
+            model_name=self.model_name,
             llm_call_duration_secs=end_time - start_time,
             prompt=prompt,
             usage=usage,
