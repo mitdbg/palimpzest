@@ -14,8 +14,7 @@ PZ_PROFILING_ENV_VAR = "PZ_PROFILING"
 
 class Profiler:
     """
-    This class maintains a set of utility tools and functions to help
-    with profiling PZ programs.
+    This class maintains a set of utility tools and functions to help with profiling PZ programs.
     """
 
     def __init__(self):
@@ -146,9 +145,9 @@ class Profiler:
                     t_record_end = time.time()
                     self.agg_operator_stats["total_records"] += 1
 
-                    # for non-LLM workload operators, we need to add the op_id
+                    # for non-induce/filter operators, we need to create an empty Stats object for the op_id
                     if op_id not in record._stats:
-                        record._stats[op_id] = {}
+                        record._stats[op_id] = Stats()
 
                     # add time spent in iteration for operator
                     record._stats[op_id]["iter_time"] = t_record_end - t_record_start

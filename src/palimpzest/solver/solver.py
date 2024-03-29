@@ -2,7 +2,7 @@ from palimpzest.constants import PromptStrategy, QueryStrategy
 from palimpzest.elements import DataRecord, File, TextFile, Schema
 from palimpzest.corelib import EquationImage, ImageFile, PDFFile
 from palimpzest.generators import DSPyGenerator
-from palimpzest.profiler import FilterStats, InduceLLMStats
+from palimpzest.profiler import ApiStats, FilterStats, InduceLLMStats, InduceNonLLMStats
 from palimpzest.solver.query_strategies import runBondedQuery, runConventionalQuery, runCodeGenQuery
 from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.tools.pdfparser import get_text_from_pdf
@@ -12,6 +12,7 @@ from papermage import Document
 
 import json
 import modal
+import time
 
 
 class Solver:
@@ -41,10 +42,11 @@ class Solver:
     def easyConversionAvailable(self, outputSchema: Schema, inputSchema: Schema):
         return (outputSchema, inputSchema) in self._simpleTypeConversions or (outputSchema, inputSchema) in self._hardcodedFns
 
-    def _makeSimpleTypeConversionFn(self, td: TaskDescriptor):
+
+    def _makeSimpleTypeConversionFn(self, td: TaskDescriptor, shouldProfile: bool=False):
         """This is a very simple function that converts a DataRecord from one Schema to another, when we know they have identical fields."""
         def _simpleTypeConversionFn(candidate: DataRecord):
-            if not candidate.schema == td.inputSchema: # TODO: stats?
+            if not candidate.schema == td.inputSchema:
                 return None
 
             dr = DataRecord(td.outputSchema)
@@ -53,8 +55,14 @@ class Solver:
                     setattr(dr, field, getattr(candidate, field))
                 elif field.required:
                     return None
+            
+            # if profiling, set record's stats for the given op_id to be an empty Stats object
+            if shouldProfile:
+                candidate._stats[td.op_id] = InduceNonLLMStats()
+
             return [dr]
         return _simpleTypeConversionFn
+
 
     def _makeHardCodedTypeConversionFn(self, td: TaskDescriptor, shouldProfile: bool=False):
         """This converts from one type to another when we have a hard-coded method for doing so."""
@@ -66,8 +74,12 @@ class Solver:
                 remoteFunc = None
                 
             def _fileToPDF(candidate: DataRecord):
+                # parse PDF variables
                 pdf_bytes = candidate.contents
                 pdf_filename = candidate.filename
+
+                # generate text_content from PDF
+                start_time = time.time()
                 if remoteFunc is not None:
                     docJsonStr = remoteFunc.remote([pdf_bytes])
                     docdict = json.loads(docJsonStr[0])
@@ -77,13 +89,22 @@ class Solver:
                         text_content += p.text
                 else:
                     text_content = get_text_from_pdf(candidate.filename, candidate.contents)
+
+                # construct an ApiStats object to reflect time spent waiting
+                api_stats = ApiStats(api_call_duration_secs=time.time() - start_time)
+
+                # construct data record
                 dr = DataRecord(td.outputSchema)
                 dr.filename = pdf_filename
                 dr.contents = pdf_bytes
                 dr.text_contents = text_content
+                # if profiling, set record's stats for the given op_id
+                if shouldProfile:
+                    dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
                 return [dr]
             return _fileToPDF
-        elif td.outputSchema == TextFile and td.inputSchema == File: # TODO: stats?
+
+        elif td.outputSchema == TextFile and td.inputSchema == File:
             def _fileToText(candidate: DataRecord):
                 if not candidate.schema == td.inputSchema:
                     return None
@@ -91,8 +112,12 @@ class Solver:
                 dr = DataRecord(td.outputSchema)
                 dr.filename = candidate.filename
                 dr.contents = text_content
+                # if profiling, set record's stats for the given op_id to be an empty Stats object
+                if shouldProfile:
+                    candidate._stats[td.op_id] = InduceNonLLMStats()
                 return [dr]
             return _fileToText
+
         elif td.outputSchema == EquationImage and td.inputSchema == ImageFile:
             print("handling image to equation through skema")
             def _imageToEquation(candidate: DataRecord):
@@ -102,15 +127,17 @@ class Solver:
                 dr = DataRecord(td.outputSchema)
                 dr.filename = candidate.filename
                 dr.contents = candidate.contents
-                dr.equation_text, stats = equations_to_latex(candidate.contents)
+                dr.equation_text, api_stats = equations_to_latex(candidate.contents)
                 print("Running equations_to_latex_base64: ", dr.equation_text)
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
-                    dr._stats[td.op_id] = stats
+                    dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
                 return [dr]
             return _imageToEquation
+
         else:
             raise Exception(f"Cannot hard-code conversion from {td.inputSchema} to {td.outputSchema}")
+
 
     def _makeLLMTypeConversionFn(self, td: TaskDescriptor, shouldProfile: bool=False):
         def fn(candidate: DataRecord):
@@ -170,6 +197,7 @@ class Solver:
 
         return fn
 
+
     # TODO: @Zui
     def _makeCodeGenTypeConversionFn(self, td: TaskDescriptor, shouldProfile: bool=False):
         """
@@ -211,6 +239,7 @@ class Solver:
                 raise ValueError(f"Unrecognized QueryStrategy: {td.query_strategy.value}")
 
         return fn
+
 
     def _makeFilterFn(self, td: TaskDescriptor, shouldProfile: bool=False):
             # compute record schema and type
@@ -256,6 +285,7 @@ class Solver:
                 return llmFilter
             return createLLMFilter(str(td.filter))
 
+
     def synthesize(self, td: TaskDescriptor, shouldProfile: bool=False):
         """
         Return a function that implements the desired task as specified by some PhysicalOp.
@@ -271,7 +301,7 @@ class Solver:
         if "InduceFromCandidateOp" in td.physical_op:
             typeConversionDescriptor = (td.outputSchema, td.inputSchema)
             if typeConversionDescriptor in self._simpleTypeConversions:
-                return self._makeSimpleTypeConversionFn(td)
+                return self._makeSimpleTypeConversionFn(td, shouldProfile)
             elif typeConversionDescriptor in self._hardcodedFns:
                 return self._makeHardCodedTypeConversionFn(td, shouldProfile)
             else:

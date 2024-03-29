@@ -13,7 +13,7 @@ class Stats:
 class ApiStats(Stats):
     """Staistics captured from a (non-LLM) API call."""
     # total time spent waiting for the API to return a response
-    api_call_duration_secs: float
+    api_call_duration_secs: float=None
 
 
 class GenerationStats(Stats):
@@ -54,6 +54,7 @@ class ConventionalQueryStats(Stats):
     input_fields: List[str]
     # the set of fields the conventional query was supposed to generate values for
     generated_fields: List[str]
+
 
 class CodeGenStepStats(Stats):
     """
@@ -131,7 +132,8 @@ class InduceLLMStats(Stats):
 
 class InduceNonLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from a hard-coded induce operation."""
-    # time spent calling some external endpoint
+    # stats containing time spent calling some external API
+    api_stats: ApiStats
 
 
 class FilterStats(Stats):
@@ -145,6 +147,5 @@ class StatsProcessor:
     This class implements a set of standardized functions for processing profiling statistics
     collected by PZ.
     """
-
     def __init__(self, stats: Stats) -> None:
         self.stats = stats

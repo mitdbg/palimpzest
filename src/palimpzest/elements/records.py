@@ -17,7 +17,10 @@ class DataRecord:
         self.parent_uuid = parent_uuid
 
         # attribute which may collect profiling stats pertaining to a record
-        self._stats = None
+        self._stats = {}
+
+        # attribute which may collect snapshots of the record state
+        self._state = {}
 
     def __setattr__(self, key, value):
         if not key.startswith("_") and not hasattr(self._schema, key):
