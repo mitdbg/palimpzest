@@ -2,7 +2,8 @@ from palimpzest.constants import PromptStrategy, QueryStrategy
 from palimpzest.elements import DataRecord, File, TextFile, Schema
 from palimpzest.corelib import EquationImage, ImageFile, PDFFile
 from palimpzest.generators import DSPyGenerator
-from palimpzest.solver.query_strategies import runBondedQuery, runConventionalQuery
+from palimpzest.profiler import FilterStats, InduceLLMStats
+from palimpzest.solver.query_strategies import runBondedQuery, runConventionalQuery, runCodeGenQuery
 from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.tools.pdfparser import get_text_from_pdf
 from palimpzest.tools.skema_tools import equations_to_latex
@@ -25,16 +26,6 @@ class Solver:
     
     These functions are NOT responsible for managing the details of LLM output generation.
     That responsibility lies in the Generator class(es).
-
-    TODO: I think the abstraction between Solver and Generator is improved, but I'm still
-          not sure if it makes sense for the Solver to handle the construction of the context
-          and question which are ultimately passed into the Generator?
-    
-    TODO: the solver should not do things which the physical operator cannot estimate the cost of,
-          e.g., in the world in which we have bonded queries, llm generated code, and conventional queries,
-          these behaviors all need to be dictated by the TaskDescriptor (which should become a dataclass);
-          the physical operator is in charge of sending the TaskDescriptor to the Solver, which then
-          formulaically creates the task function in accordance w/the given TaskDescriptor
     """
     def __init__(self, verbose: bool=False):
         self._hardcodedFns = {}
@@ -123,9 +114,8 @@ class Solver:
 
     def _makeLLMTypeConversionFn(self, td: TaskDescriptor, shouldProfile: bool=False):
         def fn(candidate: DataRecord):
-            # ask LLM to generate all empty fields in the outputSchema; if a field in the
-            # outputSchema already exists in the inputSchema, we copy the value
-            stats = {"bondedQuery": None, "conventionalQuery": None}
+            # initialize stats objects
+            bonded_query_stats, conventional_query_stats = None, None
 
             if td.query_strategy == QueryStrategy.CONVENTIONAL:
                 # NOTE: runConventionalQuery does exception handling internally
@@ -133,8 +123,7 @@ class Solver:
 
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
-                    stats["conventionalQuery"] = conventional_query_stats
-                    dr._stats[td.op_id] = stats
+                    dr._stats[td.op_id] = InduceLLMStats(conventional_query_stats=conventional_query_stats)
 
                 return [dr]
 
@@ -151,9 +140,8 @@ class Solver:
 
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
-                    stats["bondedQuery"] = bonded_query_stats
                     for dr in drs:
-                        dr._stats[td.op_id] = stats
+                        dr._stats[td.op_id] = InduceLLMStats(bonded_query_stats=bonded_query_stats)
 
                 return drs
 
@@ -167,24 +155,56 @@ class Solver:
                     dr, conventional_query_stats = runConventionalQuery(candidate, td, self._verbose)
                     drs = [dr]
 
-                    # if profiling, set conventional query stats
-                    if shouldProfile:
-                        stats["conventionalQuery"] = conventional_query_stats
-
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
-                    stats["bondedQuery"] = bonded_query_stats
                     for dr in drs:
-                        dr._stats[td.op_id] = stats
+                        dr._stats[td.op_id] = InduceLLMStats(
+                            bonded_query_stats=bonded_query_stats,
+                            conventional_query_stats=conventional_query_stats,
+                        )
 
                 return drs
 
+            else:
+                raise ValueError(f"Unrecognized QueryStrategy: {td.query_strategy.value}")
+
+        return fn
+
+    # TODO: @Zui
+    def _makeCodeGenTypeConversionFn(self, td: TaskDescriptor, shouldProfile: bool=False):
+        """
+        If you look at my implementation of _makeLLMTypeConversionFn above, you'll see that
+        I've moved a lot of the core logic around generating outputs and collecting statistics
+        into a set of functions which are defined in palimpzest.solver.query_strategies.
+        """
+        def fn(candidate: DataRecord):
+            # initialize stats objects
+            full_code_gen_stats = None
+
             # TODO
-            elif td.query_strategy == QueryStrategy.CODE_GEN:
+            if td.query_strategy == QueryStrategy.CODE_GEN:
+                # drs, full_code_gen_stats, err_msg = runCodeGenQuery(candidate, td, self._verbose)
+
+                # # if code gen query failed, manually set fields to None
+                # if err_msg is not None:
+                #     print(f"CodeGenQuery Error: {err_msg}")
+                #     dr = DataRecord(td.outputSchema)
+                #     for field_name in td.outputSchema.fieldNames():
+                #         setattr(dr, field_name, None)
+                #     drs = [dr]
+
+                # # if profiling, set record's stats for the given op_id
+                # if shouldProfile:
+                #     for dr in drs:
+                #         dr._stats[td.op_id] = InduceLLMStats(full_code_gen_stats=full_code_gen_stats)
+
+                # return drs
                 raise Exception("not implemented yet")
 
             # TODO
             elif td.query_strategy == QueryStrategy.CODE_GEN_WITH_FALLBACK:
+                # similar to in _makeLLMTypeConversionFn; maybe we can have one strategy in which we try
+                # to use code generation, but if it fails then we fall back to a conventional query strategy?
                 raise Exception("not implemented yet")
 
             else:
@@ -222,11 +242,11 @@ class Solver:
 
                     # invoke LLM to generate filter decision (True or False)
                     text_content = candidate.asTextJSON()
-                    response, stats = generator.generate(context=text_content, question=filterCondition)
+                    response, gen_stats = generator.generate(context=text_content, question=filterCondition)
 
                     # if profiling, set record's stats for the given op_id
                     if shouldProfile:
-                        candidate._stats[td.op_id] = stats
+                        candidate._stats[td.op_id] = FilterStats(gen_stats=gen_stats)
 
                     # set _passed_filter attribute and return record
                     setattr(candidate, "_passed_filter", response.lower() == "true")

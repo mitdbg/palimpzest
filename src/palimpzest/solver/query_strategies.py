@@ -1,7 +1,7 @@
 from palimpzest.constants import PromptStrategy
 from palimpzest.elements import DataRecord
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-from palimpzest.profiler import Stats
+from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats
 from palimpzest.solver.task_descriptors import TaskDescriptor
 
 from typing import Any, Dict, List, Tuple
@@ -143,16 +143,19 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
     promptQuestion = _construct_query_prompt(td, doc_type, generate_field_names)
 
     # generate LLM response and capture statistics
-    answer, query_stats = None, None
+    answer, bonded_query_stats = None, None
     try:
         if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # invoke LLM to generate output JSON
             generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-            answer, query_stats = generator.generate(text_content, promptQuestion)
+            answer, gen_stats = generator.generate(text_content, promptQuestion)
 
-            # add input and *computed* output fields to query_stats object
-            query_stats["in_fields"] = td.inputSchema.fieldNames()
-            query_stats["out_fields"] = generate_field_names
+            # construct BondedQueryStats object
+            bonded_query_stats = BondedQueryStats(
+                gen_stats=gen_stats,
+                input_fields=td.inputSchema.fieldNames(),
+                generated_fields=generate_field_names,
+            )
 
         elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
             # b64 decode of candidate.contents
@@ -160,11 +163,14 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
 
             # invoke LLM to generate output JSON
             generator = ImageTextGenerator(td.model.value)
-            answer, query_stats = generator.generate(image_b64, promptQuestion)
+            answer, gen_stats = generator.generate(image_b64, promptQuestion)
 
-            # add input and *computed* output fields to query_stats object
-            query_stats["in_fields"] = td.inputSchema.fieldNames()
-            query_stats["out_fields"] = generate_field_names
+            # construct BondedQueryStats object
+            bonded_query_stats = BondedQueryStats(
+                gen_stats=gen_stats,
+                input_fields=td.inputSchema.fieldNames(),
+                generated_fields=generate_field_names,
+            )
 
         # TODO
         elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:
@@ -187,9 +193,9 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
             drs = [dr]
 
     except Exception as e:
-        return None, query_stats, str(e)
+        return None, bonded_query_stats, str(e)
 
-    return drs, query_stats, None
+    return drs, bonded_query_stats, None
 
 
 def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[DataRecord, Stats]:
@@ -255,4 +261,25 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
             setattr(dr, field_name, None)
             query_stats[f"{field_name}"] = None
 
-    return dr, query_stats
+    # construct ConventionalQueryStats object
+    field_query_stats_lst = [FieldQueryStats(gen_stats, field_name) for field_name, gen_stats in query_stats.items()]
+    conventional_query_stats = ConventionalQueryStats(
+        field_query_stats_lst=field_query_stats_lst,
+        input_fields=td.inputSchema.fieldNames(),
+        generated_fields=generate_field_names,
+    )
+
+    return dr, conventional_query_stats
+
+
+# TODO: @Zui
+def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[DataRecord, Stats]:
+    """
+    I think this would roughly map to the internals of _makeCodeGenTypeConversionFn() in your branch.
+    Similar to the functions above, I moved most of the details of generating responses
+    """
+    # dr = None
+    # full_code_gen_stats = None
+    
+    # return dr, full_code_gen_stats
+    raise Exception("not implemented yet")

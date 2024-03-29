@@ -1,11 +1,11 @@
 from palimpzest.constants import *
 from palimpzest.generators import dspyCOT, gen_filter_signature_class, gen_qa_signature_class, TogetherHFAdaptor
-from palimpzest.profiler import Stats
+from palimpzest.profiler import GenerationStats
 
 from openai import OpenAI
 from PIL import Image
 from tenacity import retry, stop_after_attempt, wait_exponential
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Tuple, Union
 
 import google.generativeai as genai
 
@@ -16,18 +16,9 @@ import io
 import os
 import time
 
-# retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
-RETRY_MULTIPLIER = 2
-RETRY_MAX_SECS = 10
-RETRY_MAX_ATTEMPTS = 1
-
-def log_attempt_number(retry_state):
-    """return the result of the last call attempt"""
-    print(f"Retrying: {retry_state.attempt_number}...")
-
 
 # DEFINITIONS
-GenerationOutput = Tuple[str, Stats]
+GenerationOutput = Tuple[str, GenerationStats]
 
 def get_api_key(key: str) -> str:
     # get API key from environment or throw an exception if it's not set
@@ -105,16 +96,16 @@ class DSPyGenerator(BaseGenerator):
         end_time = time.time()
 
         # collect statistics on prompt, usage, and timing
-        stats = {
-            'api_call_duration': end_time - start_time,
-            'prompt': dspy_lm.history[-1]['prompt'],
-            'usage': dspy_lm.history[-1]['response']['usage'],
-            'finish_reason': (
+        stats = GenerationStats(
+            llm_call_duration_secs=end_time - start_time,
+            prompt=dspy_lm.history[-1]['prompt'],
+            usage=dspy_lm.history[-1]['response']['usage'],
+            finish_reason=(
                 dspy_lm.history[-1]['response']['finish_reason']
                 if isinstance(dspy_lm, TogetherHFAdaptor)
                 else dspy_lm.history[-1]['response']['choices'][-1]['finish_reason']
             ),
-        }
+        )
 
         if self.verbose:
             print("Prompt history:")
@@ -210,7 +201,7 @@ class ImageTextGenerator(BaseGenerator):
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
         after=log_attempt_number,
     )
-    def generate(self, image_b64: str, prompt: str) -> Union[str,str]:
+    def generate(self, image_b64: str, prompt: str) -> GenerationOutput:
         # fetch model client
         client = self._get_model_client()
 
@@ -223,11 +214,11 @@ class ImageTextGenerator(BaseGenerator):
         end_time = time.time()
 
         # collect statistics on prompt, usage, and timing
-        stats = {
-            'api_call_duration': end_time - start_time,
-            'prompt': prompt,
-            'usage': usage,
-            'finish_reason': finish_reason,
-        }
+        stats = GenerationStats(
+            llm_call_duration_secs=end_time - start_time,
+            prompt=prompt,
+            usage=usage,
+            finish_reason=finish_reason,
+        )
 
         return answer, stats

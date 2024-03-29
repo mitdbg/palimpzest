@@ -1,2 +1,2 @@
 from .profiler import *
-# from .stats import *
+from .stats import *
