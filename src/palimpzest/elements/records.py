@@ -50,6 +50,13 @@ class DataRecord:
             return d
 
         return json.dumps(d, indent=2)
+    
+    def asDict(self):
+        """Return a dictionary representation of this DataRecord"""
+        keys = sorted(self.__dict__)
+        # Make a dictionary out of the key/value pairs
+        d = {k: self.__dict__[k] for k in keys if not k.startswith("_")}
+        return d
 
     def asJSON(self):
         """Return a JSON representation of this DataRecord"""
