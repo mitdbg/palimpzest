@@ -5,7 +5,8 @@ from palimpzest.corelib.schemas import ImageFile
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.elements import Any # TODO: can we delete?
-from palimpzest.solver import Solver, TaskDescriptor
+from palimpzest.solver.solver import Solver
+from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.profiler import Profiler
 
 from typing import Any, Callable, Dict, Tuple, Union
@@ -201,7 +202,7 @@ class CacheScanDataOp(PhysicalOp):
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.model = model
@@ -392,7 +393,7 @@ class InduceFromCandidateOp(PhysicalOp):
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.model = model
