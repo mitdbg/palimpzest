@@ -1,5 +1,6 @@
 from palimpzest.constants import Model, PromptStrategy, QueryStrategy
-from palimpzest.elements import DataRecord, EquationImage, File, Filter, ImageFile, PDFFile, Schema, TextFile
+from palimpzest.elements import DataRecord, Filter, File, TextFile, Schema
+from palimpzest.corelib import EquationImage, ImageFile, PDFFile
 from palimpzest.generators import DSPyGenerator, describe_image, run_cot_bool, run_cot_qa, gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.solver import runBondedQuery, runConventionalQuery
 from palimpzest.tools.pdfparser import get_text_from_pdf
@@ -25,6 +26,8 @@ class TaskDescriptor:
     op_id: str = None
     # the model to use in the task
     model: Model = None
+    # the cardinality ("oneToOne" or "oneToMany") of the operation
+    cardinality: str = None
     # the prompt strategy
     prompt_strategy: PromptStrategy = None
     # the query strategy
@@ -90,7 +93,7 @@ class Solver:
                     setattr(dr, field, getattr(candidate, field))
                 elif field.required:
                     return None
-            return dr
+            return [dr]
         return _simpleTypeConversionFn
 
     def _makeHardCodedTypeConversionFn(self, td: TaskDescriptor, shouldProfile: bool=False):
@@ -118,7 +121,7 @@ class Solver:
                 dr.filename = pdf_filename
                 dr.contents = pdf_bytes
                 dr.text_contents = text_content
-                return dr
+                return [dr]
             return _fileToPDF
         elif td.outputSchema == TextFile and td.inputSchema == File: # TODO: stats?
             def _fileToText(candidate: DataRecord):
@@ -128,7 +131,7 @@ class Solver:
                 dr = DataRecord(td.outputSchema)
                 dr.filename = candidate.filename
                 dr.contents = text_content
-                return dr
+                return [dr]
             return _fileToText
         elif td.outputSchema == EquationImage and td.inputSchema == ImageFile:
             print("handling image to equation through skema")
@@ -144,7 +147,7 @@ class Solver:
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     dr._stats[td.op_id] = stats
-                return dr
+                return [dr]
             return _imageToEquation
         else:
             raise Exception(f"Cannot hard-code conversion from {td.inputSchema} to {td.outputSchema}")
@@ -164,10 +167,10 @@ class Solver:
                     stats["conventionalQuery"] = conventional_query_stats
                     dr._stats[td.op_id] = stats
 
-                return dr
+                return [dr]
 
             elif td.query_strategy == QueryStrategy.BONDED:
-                dr, bonded_query_stats, err_msg = runBondedQuery(candidate, td, self._verbose)
+                drs, bonded_query_stats, err_msg = runBondedQuery(candidate, td, self._verbose)
 
                 # if bonded query failed, manually set fields to None
                 if err_msg is not None:
@@ -175,22 +178,25 @@ class Solver:
                     dr = DataRecord(td.outputSchema)
                     for field_name in td.outputSchema.fieldNames():
                         setattr(dr, field_name, None)
+                    drs = [dr]
 
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     stats["bondedQuery"] = bonded_query_stats
-                    dr._stats[td.op_id] = stats
+                    for dr in drs:
+                        dr._stats[td.op_id] = stats
 
-                return dr
-                
+                return drs
+
             elif td.query_strategy == QueryStrategy.BONDED_WITH_FALLBACK:
-                dr, bonded_query_stats, err_msg = runBondedQuery(candidate, td, self._verbose)
+                drs, bonded_query_stats, err_msg = runBondedQuery(candidate, td, self._verbose)
 
                 # if bonded query failed, run conventional query
                 if err_msg is not None:
                     print(f"BondedQuery Error: {err_msg}")
                     print("Falling back to conventional query")
                     dr, conventional_query_stats = runConventionalQuery(candidate, td, self._verbose)
+                    drs = [dr]
 
                     # if profiling, set conventional query stats
                     if shouldProfile:
@@ -199,9 +205,10 @@ class Solver:
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     stats["bondedQuery"] = bonded_query_stats
-                    dr._stats[td.op_id] = stats
+                    for dr in drs:
+                        dr._stats[td.op_id] = stats
 
-                return dr
+                return drs
 
             # TODO
             elif td.query_strategy == QueryStrategy.CODE_GEN:
@@ -260,7 +267,7 @@ class Solver:
                 return llmFilter
             return createLLMFilter(str(td.filter))
 
-    def synthesize(self, taskDescriptor: TaskDescriptor, shouldProfile: bool=False):
+    def synthesize(self, td: TaskDescriptor, shouldProfile: bool=False):
         """
         Return a function that implements the desired task as specified by some PhysicalOp.
         Right now, the two primary tasks that the Solver provides solutions for are:
@@ -272,18 +279,18 @@ class Solver:
         profiling statistics for LLM invocations and attach them to each record.
         """
         # synthesize a function to induce from inputType to outputType
-        if "InduceFromCandidateOp" in taskDescriptor.physical_op:
-            typeConversionDescriptor = (taskDescriptor.outputSchema, taskDescriptor.inputSchema)
+        if "InduceFromCandidateOp" in td.physical_op:
+            typeConversionDescriptor = (td.outputSchema, td.inputSchema)
             if typeConversionDescriptor in self._simpleTypeConversions:
-                return self._makeSimpleTypeConversionFn(taskDescriptor)
+                return self._makeSimpleTypeConversionFn(td)
             elif typeConversionDescriptor in self._hardcodedFns:
-                return self._makeHardCodedTypeConversionFn(taskDescriptor, shouldProfile)
+                return self._makeHardCodedTypeConversionFn(td, shouldProfile)
             else:
-                return self._makeLLMTypeConversionFn(taskDescriptor, shouldProfile)
+                return self._makeLLMTypeConversionFn(td, shouldProfile)
 
         # synthesize a function to filter records
-        elif "FilterCandidateOp" in taskDescriptor.physical_op:
-            return self._makeFilterFn(taskDescriptor, shouldProfile)
+        elif "FilterCandidateOp" in td.physical_op:
+            return self._makeFilterFn(td, shouldProfile)
 
         else:
-            raise Exception("Cannot synthesize function for task descriptor: " + str(taskDescriptor))
+            raise Exception("Cannot synthesize function for task descriptor: " + str(td))
