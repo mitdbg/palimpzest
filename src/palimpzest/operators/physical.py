@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from palimpzest.constants import *
+from palimpzest.corelib.schemas import ImageFile
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.elements import Any
@@ -219,7 +220,13 @@ class InduceFromCandidateOp(PhysicalOp):
         self.targetCacheId = targetCacheId
 
         if outputSchema == ImageFile and source.outputSchema == File:
-            self.model = Model.GPT_4V
+            # TODO : find a more general way by llm provider 
+            # TODO : which module is responsible of setting PromptStrategy.IMAGE_TO_TEXT? 
+            if self.model in [Model.GPT_3_5, Model.GPT_4]:
+                self.model = Model.GPT_4V
+            if self.model == Model.GEMINI_1:
+                self.model = Model.GEMINI_1V               
+            self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
         taskDescriptor = self._makeTaskDescriptor()
         if not taskDescriptor in PhysicalOp.synthesizedFns:
@@ -391,7 +398,17 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         self.max_workers = 20
         self.streaming = streaming
 
+        if outputSchema == ImageFile and source.outputSchema == File:
+            # TODO : find a more general way by llm provider 
+            # TODO : which module is responsible of setting PromptStrategy.IMAGE_TO_TEXT? 
+            if self.model in [Model.GPT_3_5, Model.GPT_4]:
+                self.model = Model.GPT_4V
+            if self.model == Model.GEMINI_1:
+                self.model = Model.GEMINI_1V               
+            self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
+
         taskDescriptor = self._makeTaskDescriptor()
+
         if not taskDescriptor in PhysicalOp.synthesizedFns:
             config = self.datadir.current_config
             PhysicalOp.synthesizedFns[taskDescriptor] = PhysicalOp.solver.synthesize(taskDescriptor, config, shouldProfile=self.shouldProfile)
@@ -647,8 +664,7 @@ class FilterCandidateOp(PhysicalOp):
 
                 # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
                 # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
-                #elif Profiler.profiling_on():
-                else:
+                elif self.shouldProfile:
                     yield resultRecord
 
             if shouldCache:
@@ -665,7 +681,7 @@ class FilterCandidateOp(PhysicalOp):
 
 
 class ParallelFilterCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_BOOL, targetCacheId: str=None, streaming=False, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.filter = filter
@@ -794,8 +810,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
                         # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
                         # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
-                        #elif Profiler.profiling_on():
-                        else:
+                        elif self.shouldProfile:
                             yield resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
@@ -1004,7 +1019,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="average", op_id=self.opId(), shouldProfile=shouldProfile)
+        @self.profile(name="average", op_id=self.opId(), shouldProfile=self.shouldProfile)
         def iteratorFn():
             sum = 0
             counter = 0

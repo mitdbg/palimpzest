@@ -2,7 +2,7 @@ from palimpzest.constants import Model, PromptStrategy
 from palimpzest.elements import DataRecord, Filter, File, TextFile, Schema
 from palimpzest.corelib import EquationImage, ImageFile, PDFFile
 from palimpzest.tools.dspysearch import run_cot_bool, run_cot_qa, gen_filter_signature_class, gen_qa_signature_class
-from palimpzest.tools.openai_image_converter import do_image_analysis
+from palimpzest.tools.generic_image_converter import describe_image
 from palimpzest.tools.pdfparser import get_text_from_pdf
 from palimpzest.tools.skema_tools import equations_to_latex
 
@@ -27,8 +27,8 @@ class Solver:
         self._hardcodedFns = set()
         self._hardcodedFns.add((PDFFile, File))
         self._hardcodedFns.add((PDFFile, File))
-        self._hardcodedFns.add((ImageFile, File))
         self._hardcodedFns.add((TextFile, File))
+        # self._hardcodedFns.add((ImageFile, File))
         # self._hardcodedFns.add((EquationImage, ImageFile))
         self._verbose = verbose
 
@@ -89,6 +89,7 @@ class Solver:
             return _fileToText
         elif outputSchema == EquationImage and inputSchema == ImageFile:
             print("handling image to equation through skema")
+            # TODO: use op_id and shouldProfile to measure time spent waiting on API response
             def _imageToEquation(candidate: DataRecord):
                 if not candidate.element == inputSchema:
                     return None
@@ -100,31 +101,6 @@ class Solver:
                 print("Running equations_to_latex_base64: ", dr.equation_text)
                 return [dr]
             return _imageToEquation
-
-        # TODO: maybe move this to _makeLLMTypeConversionFn?
-        elif outputSchema == ImageFile and inputSchema == File:
-            def _fileToImage(candidate: DataRecord):
-                if not candidate.schema == inputSchema:
-                    return None
-                # b64 decode of candidate.contents
-                image_bytes = base64.b64encode(candidate.contents).decode('utf-8')
-                dr = DataRecord(outputSchema)
-                dr.filename = candidate.filename
-                if 'OPENAI_API_KEY' not in os.environ:
-                    raise ValueError("OPENAI_API_KEY not found in environment variables")
-                # get openai key from environment
-                openai_key = os.environ['OPENAI_API_KEY']
-                # TODO: consider multiple image models
-                dr.contents = candidate.contents
-                dr.text_description, stats = do_image_analysis(openai_key, image_bytes)
-
-                # if profiling, set record's stats for the given op_id
-                if shouldProfile:
-                    dr._stats[op_id] = {"fields": {"text_description": stats}}
-
-                return [dr]
-            return _fileToImage
-
         else:
             raise Exception(f"Cannot hard-code conversion from {inputSchema} to {outputSchema}")
 
@@ -191,8 +167,8 @@ class Solver:
                     if prompt_strategy == PromptStrategy.DSPY_COT:
                         #print("Processing", text_content, promptQuestion)
                         answer, field_stats = run_cot_qa(text_content, promptQuestion,
-                                                                model_name=model.value, 
-                                                                verbose=self._verbose, 
+                                                                model_name=model.value,
+                                                                verbose=self._verbose,
                                                                 promptSignature=gen_qa_signature_class(doc_schema, doc_type),
                                                                 shouldProfile=shouldProfile)
                     if not answer.strip().startswith('{'):
@@ -244,7 +220,6 @@ class Solver:
 
                 def runConventionalQuery():
                     dr = DataRecord(outputSchema)
-
                     for field_name in outputSchema.fieldNames():
                         f = getattr(outputSchema, field_name)
                         try:
@@ -253,10 +228,26 @@ class Solver:
                             if prompt_strategy == PromptStrategy.DSPY_COT:                            
                                 answer, field_stats = run_cot_qa(text_content,
                                                                 f"What is the {field_name} of the {doc_type}? ({f.desc})" + "" if conversionDesc is None else f" Keep in mind that this output is described by this text: {conversionDesc}.",
-                                                                model_name=model.value, 
-                                                                verbose=self._verbose, 
+                                                                model_name=model.value,
+                                                                verbose=self._verbose,
                                                                 promptSignature=gen_qa_signature_class(doc_schema, doc_type),
                                                                 shouldProfile=shouldProfile)
+
+                            elif prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:                               
+                                    if not candidate.schema == inputSchema:
+                                        return None
+
+                                    # b64 decode of candidate.contents
+                                    image_b64 = base64.b64encode(candidate.contents).decode('utf-8')
+                                    dr = DataRecord(outputSchema)
+                                    dr.filename = candidate.filename
+                                    dr.contents = candidate.contents
+                                    answer, field_stats = describe_image(model_name=model.value, image_b64=image_b64, shouldProfile=shouldProfile)
+
+                                    # if profiling, set record's stats for the given op_id
+                                    if shouldProfile:
+                                        field_stats[op_id] = {"fields": {"text_description": stats}}
+
                             # TODO
                             elif prompt_strategy == PromptStrategy.ZERO_SHOT:
                                 raise Exception("not implemented yet")
@@ -274,7 +265,7 @@ class Solver:
                     if shouldProfile:
                         dr._stats[op_id] = {"fields": stats}
 
-                    return dr
+                    return [dr]
 
                 try:
                     return runBondedQuery()
@@ -286,9 +277,7 @@ class Solver:
                         dr = DataRecord(outputSchema)
                         for field_name in outputSchema.fieldNames():
                             setattr(dr, field_name, None)
-                        return dr
-
-
+                        return [dr]
             return fn
 
     def _makeFilterFn(self, inputSchema: Schema, filter: Filter, config: Dict[str, Any], model: Model, prompt_strategy: PromptStrategy, op_id: str, shouldProfile=False):
@@ -344,7 +333,7 @@ class Solver:
             if typeConversionDescriptor in self._simpleTypeConversions:
                 return self._makeSimpleTypeConversionFn(outputSchema, inputSchema)
             elif typeConversionDescriptor in self._hardcodedFns:
-                return self._makeHardCodedTypeConversionFn(outputSchema, inputSchema, config, op_id, shouldProfile=shouldProfile) # TODO: add another model for image processing (e.g., Claude)?
+                return self._makeHardCodedTypeConversionFn(outputSchema, inputSchema, config, op_id, shouldProfile=shouldProfile)
             else:
                 return self._makeLLMTypeConversionFn(outputSchema, inputSchema, config, model, cardinality, prompt_strategy, op_id, conversionDesc, shouldProfile=shouldProfile)
         elif functionName == "FilterCandidateOp" or functionName == "ParallelFilterCandidateOp":

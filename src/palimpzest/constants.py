@@ -10,10 +10,13 @@ class Model(Enum):
     GPT_3_5 = "gpt-3.5-turbo-0125"
     GPT_4 = "gpt-4-0125-preview"
     GPT_4V = "gpt-4-vision-preview"
+    GEMINI_1 = "gemini-1.0-pro-001"
+    GEMINI_1V = "gemini-1.0-pro-vision-latest"
 
 class PromptStrategy(Enum):
     ZERO_SHOT = "zero-shot"
     FEW_SHOT = "few-shot"
+    IMAGE_TO_TEXT = "image-to-text"
     DSPY_COT = "dspy-chain-of-thought"
     DSPY_BOOL = "dspy-bool"
 
@@ -83,6 +86,7 @@ LOG_LLM_OUTPUT = False
 # - Llama2 7B: https://blog.truefoundry.com/llama-2-benchmarks/
 # - Mixtral 7B: https://artificialanalysis.ai/models/mixtral-8x7b-instruct/hosts
 # - GPT 3.5/4: https://community.openai.com/t/gpt-3-5-and-gpt-4-api-response-time-measurements-fyi/237394/16 
+# - Gemini 1: https://blog.google/technology/ai/google-gemini-ai/
 LLAMA2_7B_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 1 / 1E10,  # for now, let's have a de minimis cost for Llama2
@@ -208,10 +212,61 @@ GPT_4V_MODEL_CARD = {
     "MMLU": 86.4,
 }
 
+GEMINI_1_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 125 / 1E8, # Gemini is free but rate limited for now. Pricing will be updated 
+    "usd_per_output_token": 375 / 1E9,
+    ##### Time #####
+    "seconds_per_output_token": 0.042 / 10.0, # TODO: 
+    ##### Agg. Benchmark #####
+    "MMLU": 90.0,
+    ##### Commonsense Reasoning #####
+    "reasoning": 87.8,
+    # "HellaSwag": 87.8,  # 10-shot
+    ##### World Knowledge #####
+    ##### Reading Comprehension #####
+    # "DROP": 82.4, # Variable shots ?
+    ##### Code #####
+    "code": 74.4,
+    # "HumanEval": 74.4, # 0-shot (IT)*
+    # "Natural2Code": 74.9, # 0-shot 
+    ##### Math #####
+    "math": 94.4,
+    # "GSM8K": 94.4,     # maj1@32
+    # "MATH": 53.2,      # 4-shot
+}
+
+GEMINI_1V_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 25 / 1E6,  # Gemini is free but rate limited for now. Pricing will be updated 
+    "usd_per_output_token": 375 / 1E9,
+    ##### Time #####
+    "seconds_per_output_token": 0.042 / 10.0, # TODO: 
+    ##### Agg. Benchmark #####
+    "MMLU": 90.0,
+    ##### Commonsense Reasoning #####
+    "reasoning": 87.8,
+    # "HellaSwag": 87.8,  # 10-shot
+    ##### World Knowledge #####
+    ##### Reading Comprehension #####
+    # "DROP": 82.4, # Variable shots ?
+    ##### Code #####
+    "code": 74.4,
+    # "HumanEval": 74.4, # 0-shot (IT)*
+    # "Natural2Code": 74.9, # 0-shot 
+    ##### Math #####
+    "math": 94.4,
+    # "GSM8K": 94.4,     # maj1@32
+    # "MATH": 53.2,      # 4-shot
+}
+
+
 MODEL_CARDS = {
     Model.LLAMA2.value: LLAMA2_7B_MODEL_CARD,
     Model.MIXTRAL.value: MIXTRAL_8X_7B_MODEL_CARD,
     Model.GPT_3_5.value: GPT_3_5_MODEL_CARD,
     Model.GPT_4.value: GPT_4_MODEL_CARD,
     Model.GPT_4V.value: GPT_4V_MODEL_CARD,
+    Model.GEMINI_1.value: GEMINI_1_MODEL_CARD,
+    Model.GEMINI_1V.value: GEMINI_1V_MODEL_CARD,
 }
