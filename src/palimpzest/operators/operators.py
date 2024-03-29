@@ -6,6 +6,7 @@ from palimpzest.elements import *
 from palimpzest.operators import (
     ApplyCountAggregateOp,
     ApplyAverageAggregateOp,
+    ApplyUserFunctionOp,
     CacheScanDataOp,
     FilterCandidateOp,
     InduceFromCandidateOp,
@@ -242,9 +243,10 @@ class LogicalOperator:
 
 class ConvertScan(LogicalOperator):
     """A ConvertScan is a logical operator that represents a scan of a particular data source, with conversion applied."""
-    def __init__(self, outputSchema: Schema, inputOp: LogicalOperator, desc: str=None, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, inputOp: LogicalOperator, cardinality: str=None, desc: str=None, targetCacheId: str=None):
         super().__init__(outputSchema, inputOp.outputSchema)
         self.inputOp = inputOp
+        self.cardinality = cardinality
         self.desc = desc
         self.targetCacheId = targetCacheId
 
@@ -265,18 +267,38 @@ class ConvertScan(LogicalOperator):
 
         if intermediateSchema == Schema or intermediateSchema == self.outputSchema:
             if DataDirectory().current_config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), model=model, desc=self.desc, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
+                return ParallelInduceFromCandidateOp(self.outputSchema,
+                                                     self.inputOp._getPhysicalTree(strategy=strategy, 
+                                                                                   model=model, 
+                                                                                   shouldProfile=shouldProfile), 
+                                                    model, 
+                                                    self.cardinality,
+                                                    desc=self.desc, 
+                                                    targetCacheId=self.targetCacheId, 
+                                                    shouldProfile=shouldProfile)
             else:
-                return InduceFromCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), model=model, desc=self.desc, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
+                return InduceFromCandidateOp(self.outputSchema, 
+                                             self.inputOp._getPhysicalTree(strategy=strategy, 
+                                                                           model=model, 
+                                                                           shouldProfile=shouldProfile), 
+                                            model, 
+                                            self.cardinality,
+                                            desc=self.desc, 
+                                            targetCacheId=self.targetCacheId, 
+                                            shouldProfile=shouldProfile)
         else:
             if DataDirectory().current_config.get("parallel") == True:
                 return ParallelInduceFromCandidateOp(self.outputSchema,
                                                      ParallelInduceFromCandidateOp(
                                                          intermediateSchema,
-                                                         self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile),
-                                                         model=model,
+                                                         self.inputOp._getPhysicalTree(strategy=strategy, 
+                                                                                       model=model, 
+                                                                                       shouldProfile=shouldProfile),       
+                                                         model,
+                                                         self.cardinality,
                                                          shouldProfile=shouldProfile),
-                                                     model=model,
+                                                     model,
+                                                     "oneToOne",
                                                      desc=self.desc,
                                                      targetCacheId=self.targetCacheId, 
                                                      shouldProfile=shouldProfile)
@@ -284,10 +306,14 @@ class ConvertScan(LogicalOperator):
                 return InduceFromCandidateOp(self.outputSchema,
                                              InduceFromCandidateOp(
                                                  intermediateSchema,
-                                                 self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile),
-                                                 model=model,
+                                                 self.inputOp._getPhysicalTree(strategy=strategy, 
+                                                                               model=model, 
+                                                                               shouldProfile=shouldProfile),
+                                                 model,
+                                                 self.cardinality,                              
                                                  shouldProfile=shouldProfile),
-                                             model=model,
+                                             model,
+                                             "oneToOne",    
                                              desc=self.desc,
                                              targetCacheId=self.targetCacheId, 
                                              shouldProfile=shouldProfile)
@@ -389,3 +415,23 @@ class ApplyAggregateFunction(LogicalOperator):
             return ApplyAverageAggregateOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.aggregationFunction, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
         else:
             raise Exception(f"Cannot find implementation for {self.aggregationFunction}")
+
+
+class ApplyUserFunction(LogicalOperator):
+    """ApplyUserFunction is a logical operator that applies a user-provided function to the input set and yields a result."""
+    def __init__(self, outputSchema: Schema, inputOp: LogicalOperator, fnid:str, targetCacheId: str=None):
+        super().__init__(outputSchema, inputOp.outputSchema)
+        self.inputOp = inputOp
+        self.fnid = fnid
+        self.fn = DataDirectory().getUserFunction(fnid)
+        self.targetCacheId=targetCacheId
+
+    def __str__(self):
+        return "ApplyUserFunction(function: " + str(self.fnid) + ")"
+
+    def dumpLogicalTree(self):
+        """Return the logical subtree rooted at this operator"""
+        return (self, self.inputOp.dumpLogicalTree())
+
+    def _getPhysicalTree(self, strategy: str=None, model: Model=None, shouldProfile: bool=False):
+        return ApplyUserFunctionOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.fn, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)

@@ -7,6 +7,7 @@ from PIL import Image
 
 
 from palimpzest.execution import Execution
+from palimpzest.elements import DataRecord
 
 import gradio as gr
 import numpy as np
@@ -17,6 +18,7 @@ import requests
 import json
 import time
 import os
+import csv
 
 class ScientificPaper(pz.PDFFile):
    """Represents a scientific research paper, which in practice is usually from a PDF file"""
@@ -44,6 +46,49 @@ def buildMITBatteryPaperPlan(datasetId):
     mitPapers = batteryPapers.filterByStr("The paper is from MIT")
 
     return mitPapers
+
+class VLDBPaperListing(pz.Schema):
+    """VLDBPaperListing represents a single paper from the VLDB conference"""
+    title = pz.Field(desc="The title of the paper", required=True)
+    authors = pz.Field(desc="The authors of the paper", required=True)
+    pdfLink = pz.Field(desc="The link to the PDF of the paper", required=True)
+
+def downloadVLDBPapers(vldbListingPageURLsId, outputDir):
+    """ This function downloads a bunch of VLDB papers from an online listing and saves them to disk.  It also saves a CSV file of the paper listings."""
+    policy = pz.MaxQuality()
+
+    # 1. Grab the input VLDB listing page(s) and scrape them for paper metadata
+    tfs = pz.Dataset(vldbListingPageURLsId, schema=pz.TextFile, desc="A file full of URLs of VLDB journal pages")
+    urls = tfs.convert(pz.URL, desc="The actual URLs of the VLDB pages", cardinality="oneToMany")  # oneToMany=True would be nice here.   
+    htmlContent = urls.map(pz.DownloadHTMLFunction())
+    vldbPaperListings = htmlContent.convert(VLDBPaperListing, desc="The actual listings for each VLDB paper", cardinality="oneToMany")
+
+    # 2. Get the PDF URL for each paper that's listed and download it
+    vldbPaperURLs = vldbPaperListings.convert(pz.URL, desc="The URLs of the PDFs of the VLDB papers")
+    pdfContent = vldbPaperURLs.map(pz.DownloadBinaryFunction())
+
+    # 3. Save the paper listings to a CSV file and the PDFs to disk
+    if not os.path.exists(outputDir):
+        os.makedirs(outputDir)
+    outputPath = os.path.join(outputDir, "vldbPaperListings.csv")
+
+    physicalTree1 = emitDataset(vldbPaperListings, policy, title="VLDB paper dump", verbose=True)
+    listingRecords = [r for r in physicalTree1]
+    with open(outputPath, 'w', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=listingRecords[0].__dict__.keys())
+        writer.writeheader()
+        for record in listingRecords:
+            writer.writerow(record.asDict())
+
+    physicalTree2 = emitDataset(pdfContent, policy, title="VLDB paper dump", verbose=True)
+    for idx, r in enumerate(physicalTree2):
+        with open(os.path.join(outputDir, str(idx) + ".pdf"), "wb") as f:
+            f.write(r.content)
+
+#    For debugging
+#    physicalTree = emitDataset(vldbPaperListings, policy, title="VLDB papers", verbose=True)
+#    listingRecords = [r for r in physicalTree]
+#    printTable(listingRecords, gradio=True, plan=physicalTree)
 
 
 class GitHubUpdate(pz.Schema):
@@ -363,6 +408,9 @@ if __name__ == "__main__":
 
             with open('profiling.json', 'w') as f:
                 json.dump(profiling_data, f)
+
+    elif task == "vldb":
+        downloadVLDBPapers(datasetid, "vldbPapers")
 
     elif task == "count":
         rootSet = testCount(datasetid)
