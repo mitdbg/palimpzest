@@ -265,7 +265,7 @@ class InduceFromCandidateOp(PhysicalOp):
     def getProfilingData(self):
         if self.shouldProfile:
             source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data(model_name=self.model.value)
+            operator_data = self.profiler.get_data()
             operator_data["source"] = source_data
             return operator_data
         else:
@@ -458,7 +458,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
     def getProfilingData(self):
         if self.shouldProfile:
             source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data(model_name=self.model.value)
+            operator_data = self.profiler.get_data()
             operator_data["source"] = source_data
             return operator_data
         else:
@@ -615,7 +615,7 @@ class FilterCandidateOp(PhysicalOp):
     def getProfilingData(self):
         if self.shouldProfile:
             source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data(model_name=self.model.value)
+            operator_data = self.profiler.get_data()
             operator_data["source"] = source_data
             return operator_data
         else:
@@ -761,7 +761,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
     def getProfilingData(self):
         if self.shouldProfile:
             source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data(model_name=self.model.value)
+            operator_data = self.profiler.get_data()
             operator_data["source"] = source_data
             return operator_data
         else:
