@@ -1,6 +1,6 @@
 from palimpzest.constants import *
 from palimpzest.generators import dspyCOT, gen_filter_signature_class, gen_qa_signature_class, TogetherHFAdaptor
-# from palimpzest.profiler import Stats
+from palimpzest.profiler import Stats
 
 from openai import OpenAI
 from PIL import Image
@@ -27,8 +27,7 @@ def log_attempt_number(retry_state):
 
 
 # DEFINITIONS
-StatsDict = Dict[str, Any]
-GenerationOutput = Tuple[str, StatsDict]  # TODO: replace w/Stats
+GenerationOutput = Tuple[str, Stats]
 
 def get_api_key(key: str) -> str:
     # get API key from environment or throw an exception if it's not set

@@ -1,7 +1,7 @@
 from palimpzest.constants import PromptStrategy
 from palimpzest.elements import DataRecord
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-# from palimpzest.profiler import Stats
+from palimpzest.profiler import Stats
 from palimpzest.solver.task_descriptors import TaskDescriptor
 
 from typing import Any, Dict, List, Tuple
@@ -112,8 +112,8 @@ def _create_data_record_from_json(jsonObj: Any, td: TaskDescriptor, candidate: D
 
     return dr
 
-# TODO: Stats
-def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[List[DataRecord], dict, str]:
+
+def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[List[DataRecord], Stats, str]:
     """
     Run a bonded query, in which all new fields in the outputSchema are generated simultaneously
     in a single LLM call. This is in contrast to a conventional query, in which each output field
@@ -191,8 +191,8 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
 
     return drs, query_stats, None
 
-# TODO: Stats
-def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[DataRecord, dict]:
+
+def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[DataRecord, Stats]:
     """
     Run a conventional query, in which each output field is generated using its own LLM call.
 
