@@ -68,7 +68,7 @@ if __name__ == "__main__":
     t2 = time.time()
 
     # get candidate physical plans
-    candidatePlans = logicalTree.createPhysicalPlanCandidates()
+    candidatePlans = logicalTree.createPhysicalPlanCandidates(shouldProfile=True)
     t3 = time.time()
     print(f"Create Plan: {t1 - startTime:.3f}")
     print(f"Get Logical Tree: {t2 - t1:.3f}")

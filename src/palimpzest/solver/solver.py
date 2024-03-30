@@ -49,8 +49,7 @@ class Solver:
             if not candidate.schema == td.inputSchema:
                 return None
 
-            dr = DataRecord(td.outputSchema)
-            dr.parent_uuid = candidate.uuid
+            dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
             for field in td.outputSchema.fieldNames():
                 if hasattr(candidate, field):
                     setattr(dr, field, getattr(candidate, field))
@@ -95,8 +94,7 @@ class Solver:
                 api_stats = ApiStats(api_call_duration_secs=time.time() - start_time)
 
                 # construct data record
-                dr = DataRecord(td.outputSchema)
-                dr.parent_uuid = candidate.uuid
+                dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
                 dr.filename = pdf_filename
                 dr.contents = pdf_bytes
                 dr.text_contents = text_content
@@ -111,8 +109,7 @@ class Solver:
                 if not candidate.schema == td.inputSchema:
                     return None
                 text_content = str(candidate.contents, 'utf-8')
-                dr = DataRecord(td.outputSchema)
-                dr.parent_uuid = candidate.uuid
+                dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
                 dr.filename = candidate.filename
                 dr.contents = text_content
                 # if profiling, set record's stats for the given op_id to be an empty Stats object
@@ -127,8 +124,7 @@ class Solver:
                 if not candidate.element == td.inputSchema:
                     return None
 
-                dr = DataRecord(td.outputSchema)
-                dr.parent_uuid = candidate.uuid
+                dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
                 dr.filename = candidate.filename
                 dr.contents = candidate.contents
                 dr.equation_text, api_stats = equations_to_latex(candidate.contents)
@@ -164,8 +160,7 @@ class Solver:
                 # if bonded query failed, manually set fields to None
                 if err_msg is not None:
                     print(f"BondedQuery Error: {err_msg}")
-                    dr = DataRecord(td.outputSchema)
-                    dr.parent_uuid = candidate.uuid
+                    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
                     for field_name in td.outputSchema.fieldNames():
                         setattr(dr, field_name, None)
                     drs = [dr]
@@ -221,8 +216,7 @@ class Solver:
                 # # if code gen query failed, manually set fields to None
                 # if err_msg is not None:
                 #     print(f"CodeGenQuery Error: {err_msg}")
-                #     dr = DataRecord(td.outputSchema)
-                #     dr.parent_uuid = candidate.uuid
+                #     dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
                 #     for field_name in td.outputSchema.fieldNames():
                 #         setattr(dr, field_name, None)
                 #     drs = [dr]

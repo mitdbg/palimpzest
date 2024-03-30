@@ -13,8 +13,8 @@ class DataRecord:
         self._schema = schema
 
         # unique identifier for the record
-        self.uuid = uuid.uuid4()[:MAX_UUID_CHARS]
-        self.parent_uuid = parent_uuid
+        self._uuid = str(uuid.uuid4())[:MAX_UUID_CHARS]
+        self._parent_uuid = parent_uuid
 
         # attribute which may collect profiling stats pertaining to a record
         self._stats = {}

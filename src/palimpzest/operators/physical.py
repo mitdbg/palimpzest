@@ -30,10 +30,7 @@ class PhysicalOp:
     def __init__(self, outputSchema: Schema, shouldProfile = False) -> None:
         self.outputSchema = outputSchema
         self.datadir = DataDirectory()
-
         self.shouldProfile = shouldProfile
-        self.profiler = Profiler(op_id=self.opId())
-        self.profile = self.profiler.iter_profiler
 
     def opId(self) -> str:
         raise NotImplementedError("Abstract method")
@@ -52,6 +49,10 @@ class MarshalAndScanDataOp(PhysicalOp):
     def __init__(self, outputSchema: Schema, datasetIdentifier: str, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.datasetIdentifier = datasetIdentifier
+
+        # NOTE: need to construct profiler after all fields used by self.opId() are set
+        self.profiler = Profiler(op_id=self.opId())
+        self.profile = self.profiler.iter_profiler
 
     def __str__(self):
         return "MarshalAndScanDataOp(" + str(self.outputSchema) + ", " + self.datasetIdentifier + ")"
@@ -123,6 +124,10 @@ class CacheScanDataOp(PhysicalOp):
     def __init__(self, outputSchema: Schema, cacheIdentifier: str, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.cacheIdentifier = cacheIdentifier
+
+        # NOTE: need to construct profiler after all fields used by self.opId() are set
+        self.profiler = Profiler(op_id=self.opId())
+        self.profile = self.profiler.iter_profiler
 
     def __str__(self):
         return "CacheScanDataOp(" + str(self.outputSchema) + ", " + self.cacheIdentifier + ")"
@@ -220,6 +225,10 @@ class InduceFromCandidateOp(PhysicalOp):
             if self.model == Model.GEMINI_1:
                 self.model = Model.GEMINI_1V               
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
+
+        # NOTE: need to construct profiler after all fields used by self.opId() are set
+        self.profiler = Profiler(op_id=self.opId())
+        self.profile = self.profiler.iter_profiler
 
         # construct TaskDescriptor
         taskDescriptor = self._makeTaskDescriptor()
@@ -414,6 +423,10 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 self.model = Model.GEMINI_1V               
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
+        # NOTE: need to construct profiler after all fields used by self.opId() are set
+        self.profiler = Profiler(op_id=self.opId())
+        self.profile = self.profiler.iter_profiler
+
         # construct TaskDescriptor
         taskDescriptor = self._makeTaskDescriptor()
 
@@ -575,6 +588,10 @@ class FilterCandidateOp(PhysicalOp):
         self.prompt_strategy = prompt_strategy
         self.targetCacheId = targetCacheId
 
+        # NOTE: need to construct profiler after all fields used by self.opId() are set
+        self.profiler = Profiler(op_id=self.opId())
+        self.profile = self.profiler.iter_profiler
+
         # construct TaskDescriptor
         taskDescriptor = self._makeTaskDescriptor()
 
@@ -720,6 +737,10 @@ class ParallelFilterCandidateOp(PhysicalOp):
         self.targetCacheId = targetCacheId
         self.max_workers = 20
         self.streaming = streaming
+
+        # NOTE: need to construct profiler after all fields used by self.opId() are set
+        self.profiler = Profiler(op_id=self.opId())
+        self.profile = self.profiler.iter_profiler
 
         # construct TaskDescriptor
         taskDescriptor = self._makeTaskDescriptor()
@@ -875,6 +896,10 @@ class ApplyCountAggregateOp(PhysicalOp):
         self.aggFunction = aggFunction
         self.targetCacheId = targetCacheId
 
+        # NOTE: need to construct profiler after all fields used by self.opId() are set
+        self.profiler = Profiler(op_id=self.opId())
+        self.profile = self.profiler.iter_profiler
+
     def __str__(self):
         return "ApplyCountAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
 
@@ -948,6 +973,10 @@ class ApplyUserFunctionOp(PhysicalOp):
         if not source.outputSchema == fn.inputSchema:
             raise Exception("Supplied UserFunction input schema does not match output schema of input source")
 
+        # NOTE: need to construct profiler after all fields used by self.opId() are set
+        self.profiler = Profiler(op_id=self.opId())
+        self.profile = self.profiler.iter_profiler
+
     def __str__(self):
         return "ApplyUserFunctionOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.fn.udfid) + ")"
 
@@ -1017,6 +1046,10 @@ class ApplyAverageAggregateOp(PhysicalOp):
 
         if not source.outputSchema == Number:
             raise Exception("Aggregate function AVERAGE is only defined over Numbers")
+
+        # NOTE: need to construct profiler after all fields used by self.opId() are set
+        self.profiler = Profiler(op_id=self.opId())
+        self.profile = self.profiler.iter_profiler
 
     def __str__(self):
         return "ApplyAverageAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
@@ -1090,6 +1123,10 @@ class LimitScanOp(PhysicalOp):
         self.source = source
         self.limit = limit
         self.targetCacheId = targetCacheId
+
+        # NOTE: need to construct profiler after all fields used by self.opId() are set
+        self.profiler = Profiler(op_id=self.opId())
+        self.profile = self.profiler.iter_profiler
 
     def __str__(self):
         return "LimitScanOp(" + str(self.outputSchema) + ", " + "Limit: " + str(self.limit) + ")"

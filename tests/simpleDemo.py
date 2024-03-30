@@ -176,7 +176,7 @@ def printTable(records, cols=None, gradio=False, query=None, plan=None):
 
         demo.launch()
 
-def emitDataset(rootSet, policy, title="Dataset", verbose=False):
+def emitDataset(rootSet, policy, title="Dataset", verbose=False, shouldProfile=False):
     def emitNestedTuple(node, indent=0):
         elt, child = node
         print(" " * indent, elt)
@@ -202,7 +202,7 @@ def emitDataset(rootSet, policy, title="Dataset", verbose=False):
     #emitNestedTuple(logicalElements)
 
     # Generate candidate physical plans
-    candidatePlans = logicalTree.createPhysicalPlanCandidates()    
+    candidatePlans = logicalTree.createPhysicalPlanCandidates(shouldProfile=shouldProfile)
 
     # print out plans to the user if it is their choice
     if args.policy == "user":
@@ -237,6 +237,7 @@ if __name__ == "__main__":
     startTime = time.time()
     parser = argparse.ArgumentParser(description='Run a simple demo')
     parser.add_argument('--verbose', default=False, action='store_true', help='Print verbose output')
+    parser.add_argument('--profile', default=False, action='store_true', help='Profile execution')
     parser.add_argument('--datasetid', type=str, help='The dataset id')
     parser.add_argument('--task' , type=str, help='The task to run')
     parser.add_argument('--policy', type=str, help="One of 'user', 'mincost', 'mintime', 'maxquality', 'harmonicmean'")
@@ -285,11 +286,18 @@ if __name__ == "__main__":
 
     elif task == "enron":
         rootSet = buildEnronPlan(datasetid)
-        physicalTree = emitDataset(rootSet, policy, title="Enron emails", verbose=args.verbose)
+        physicalTree = emitDataset(rootSet, policy, title="Enron emails", verbose=args.verbose, shouldProfile=args.profile)
         records = [r for r in physicalTree]
         print("----------")
         print()
         printTable(records, cols=["sender", "subject"], gradio=True, plan=physicalTree)
+
+        # if profiling was turned on; capture statistics
+        if Profiler.profiling_on():
+            profiling_data = physicalTree.getProfilingData()
+
+            with open('profiling.json', 'w') as f:
+                json.dump(profiling_data, f)
 
     elif task == "enronoptimize":
         rootSet = buildEnronPlan(datasetid)

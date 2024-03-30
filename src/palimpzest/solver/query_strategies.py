@@ -98,8 +98,7 @@ def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
 
 def _create_data_record_from_json(jsonObj: Any, td: TaskDescriptor, candidate: DataRecord) -> DataRecord:
     # initialize data record
-    dr = DataRecord(td.outputSchema)
-    dr.parent_uuid = candidate.uuid
+    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
 
     # copy fields from the candidate (input) record if they already exist,
     # otherwise parse them from the generated jsonObj
@@ -189,7 +188,7 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
                 dr = _create_data_record_from_json(elt, td, candidate)
                 drs.append(dr)
         else:
-            dr = _create_data_record_from_json(elt, td, candidate)
+            dr = _create_data_record_from_json(jsonObj, td, candidate)
             drs = [dr]
 
     except Exception as e:
@@ -205,8 +204,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
     At the moment, conventional queries cannot execute tasks with cardinality == "oneToMany".
     """
     # initialize output data record
-    dr = DataRecord(td.outputSchema)
-    dr.parent_uuid = candidate.uuid
+    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
 
     # copy fields from the candidate (input) record if they already exist
     # and construct list of fields in outputSchema which will need to be generated

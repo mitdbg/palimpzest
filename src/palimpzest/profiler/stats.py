@@ -57,14 +57,14 @@ class AggOperatorStats:
     ##### Field for Induce w/Conventional Query #####
     #################################################
     # [computed in _update_agg_stats] record aggregated stats on a per-field basis for conventional induce queries
-    per_field_agg_op_stats: defaultdict[AggOperatorStats]=field(default_factory=lambda: defaultdict(AggOperatorStats))
+    per_field_agg_op_stats: defaultdict[AggOperatorStats]=field(default_factory=lambda: defaultdict(lambda: AggOperatorStats()))
 
     #######################################
     ##### Fields for Induce w/CodeGen #####
     #######################################
     # [computed in _update_agg_stats] record aggregated stats on a per-step basis for codegen queries
     # (here the steps are: initial code generation, advice generation, advised code generation)
-    code_gen_agg_op_stats: defaultdict[AggOperatorStats]=field(default_factory=lambda: defaultdict(AggOperatorStats))
+    code_gen_agg_op_stats: defaultdict[AggOperatorStats]=field(default_factory=lambda: defaultdict(lambda: AggOperatorStats()))
 
     ##########################################
     ##### Optional Non-LLM Induce Fields #####
@@ -73,6 +73,11 @@ class AggOperatorStats:
     total_api_call_duration: float=0.0
 
     def to_dict(self):
+        # convert defaultdict -> dict before calling asdict()
+        self.finish_reasons = dict(self.finish_reasons)
+        self.per_field_agg_op_stats = dict(self.per_field_agg_op_stats)
+        self.code_gen_agg_op_stats = dict(self.code_gen_agg_op_stats)
+
         return asdict(self)
 
 

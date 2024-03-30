@@ -273,8 +273,8 @@ class Profiler:
                     # update state of record for complete history of computation
                     record._state[self.op_id] = {
                         "name": name,
-                        "uuid": record.uuid,
-                        "parent_uuid": record.parent_uuid,
+                        "uuid": record._uuid,
+                        "parent_uuid": record._parent_uuid,
                         "stats": record._stats[self.op_id].to_dict(), # TODO: filter out prompts?
                         "record_state": record.asDict(include_bytes=False),
                     }
