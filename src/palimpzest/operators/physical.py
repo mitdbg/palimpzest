@@ -41,7 +41,7 @@ class PhysicalOp:
     def getProfilingData(self) -> Dict[str, Any]:
         raise NotImplementedError("Abstract method")
 
-    def estimateCost(self, cost_estimates: dict=None) -> Dict[str, Any]:
+    def estimateCost(self, cost_estimates: dict={}) -> Dict[str, Any]:
         """Returns dict of time, cost, and quality metrics."""
         raise NotImplementedError("Abstract method")
 
@@ -76,7 +76,7 @@ class MarshalAndScanDataOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
                 
-    def estimateCost(self, cost_estimates: dict=None):
+    def estimateCost(self, cost_estimates: dict={}):
         cardinality = self.datadir.getCardinality(self.datasetIdentifier) + 1
         size = self.datadir.getSize(self.datasetIdentifier)
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
@@ -157,7 +157,7 @@ class CacheScanDataOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self, cost_estimates: dict=None):
+    def estimateCost(self, cost_estimates: dict={}):
         # TODO: at the moment, getCachedResult() looks up a pickled file that stores
         #       the cached data specified by self.cacheIdentifier, opens the file,
         #       and then returns an iterator over records in the pickled file.
@@ -298,7 +298,7 @@ class InduceFromCandidateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self, cost_estimates: dict=None):
+    def estimateCost(self, cost_estimates: dict={}):
         # fetch cost estimates from source operation
         inputEstimates = self.source.estimateCost(cost_estimates)
 
@@ -495,7 +495,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self, cost_estimates: dict=None):
+    def estimateCost(self, cost_estimates: dict={}):
         """
         See InduceFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
         """
@@ -687,7 +687,7 @@ class FilterCandidateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self, cost_estimates: dict=None):
+    def estimateCost(self, cost_estimates: dict={}):
         """
         See InduceFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
         """
@@ -860,7 +860,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self, cost_estimates: dict=None):
+    def estimateCost(self, cost_estimates: dict={}):
         # fetch cost estimates from source operation
         inputEstimates = self.source.estimateCost(cost_estimates)
 
@@ -1022,7 +1022,7 @@ class ApplyCountAggregateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self, cost_estimates: dict=None):
+    def estimateCost(self, cost_estimates: dict={}):
         # get input estimates and pass through to output
         inputEstimates = self.source.estimateCost(cost_estimates)
         outputEstimates = {**inputEstimates}
@@ -1114,7 +1114,7 @@ class ApplyUserFunctionOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self, cost_estimates: dict=None):
+    def estimateCost(self, cost_estimates: dict={}):
         # get input estimates and pass through to output
         inputEstimates = self.source.estimateCost(cost_estimates)
         outputEstimates = {**inputEstimates}
@@ -1204,7 +1204,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self, cost_estimates: dict=None):
+    def estimateCost(self, cost_estimates: dict={}):
         # get input estimates and pass through to output
         inputEstimates = self.source.estimateCost(cost_estimates)
         outputEstimates = {**inputEstimates}
@@ -1300,7 +1300,7 @@ class LimitScanOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self, cost_estimates: dict=None):
+    def estimateCost(self, cost_estimates: dict={}):
         # get input estimates and pass through to output
         inputEstimates = self.source.estimateCost(cost_estimates)
         outputEstimates = {**inputEstimates}

@@ -303,11 +303,19 @@ if __name__ == "__main__":
     elif task == "enronoptimize":
         rootSet = buildEnronPlan(datasetid)
         execution = pz.Execution(rootSet, policy)
-        physicalTree = execution.executeAndOptimize()
+        physicalTree = execution.executeAndOptimize(verbose=args.verbose, shouldProfile=args.profile)
         records = [r for r in physicalTree]
         print("----------")
         print()
         printTable(records, cols=["sender", "subject"], gradio=True, plan=physicalTree)
+
+        # if profiling was turned on; capture statistics
+        if Profiler.profiling_on():
+            profiling_data = physicalTree.getProfilingData()
+            sp = StatsProcessor(profiling_data)
+
+            with open('profiling.json', 'w') as f:
+                json.dump(sp.profiling_data, f)
 
     elif task == "enronmap":
         rootSet = computeEnronStats(datasetid)

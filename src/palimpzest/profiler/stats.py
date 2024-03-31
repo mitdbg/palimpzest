@@ -365,9 +365,15 @@ class StatsProcessor:
         # TODO: this is N^2 in # of records; we may want to use a dictionary to speed this up
         # for each record we need to identify its parent to compute the op_time
         for record in profiling_data['records']:
+            uuid = record['uuid']
             parent_uuid = record['parent_uuid']
             for source_record in profiling_data['source']['records']:
-                if source_record['uuid'] == parent_uuid:
+                # NOTE: right now, because some operations create new DataRecord objects (e.g. induce, agg.)
+                #       while other operations pass through the same record (e.g. filter, limit), there are
+                #       two possible scenarios:
+                #         1. the record's parent_uuid will equal the source_record's uuid (in the induce/agg case)
+                #         2. the record's uuid will equal the source_record's uuid (in the filter/limit case)
+                if parent_uuid == source_record['uuid'] or uuid == source_record['uuid']:
                     record['stats']['op_time'] = record['stats']['cumulative_iter_time'] - source_record['stats']['cumulative_iter_time']
 
         # compute total_op_time
@@ -378,37 +384,36 @@ class StatsProcessor:
 
         return profiling_data
 
-    def _est_time_per_record(self, op_data: Dict[str, Any]) -> float:
+    def _est_time_per_record(self, op_agg_stats: Dict[str, Any]) -> float:
         """
-        Given an operator's profiling data dictionary, estimate the time_per_record
+        Given an operator's aggregate stats, estimate the time_per_record
         to be the per-record average op_time.
         """
-        return op_data['total_op_time'] / op_data['total_records']
+        return op_agg_stats['total_op_time'] / op_agg_stats['total_records']
 
-    def _est_num_input_output_tokens(self, op_data: Dict[str, Any]) -> Tuple[float, float]:
+    def _est_num_input_output_tokens(self, op_agg_stats: Dict[str, Any]) -> Tuple[float, float]:
         """
-        Given an operator's profiling data dictionary, estimate the number of input and
+        Given an operator's aggregate stats, estimate the number of input and
         output tokens to be their per-record averages.
         """
-        avg_num_input_tokens = op_data['total_input_tokens'] / op_data['total_records']
-        avg_num_output_tokens = op_data['total_output_tokens'] / op_data['total_records']
+        avg_num_input_tokens = op_agg_stats['total_input_tokens'] / op_agg_stats['total_records']
+        avg_num_output_tokens = op_agg_stats['total_output_tokens'] / op_agg_stats['total_records']
 
         return avg_num_input_tokens, avg_num_output_tokens
 
-    def _est_usd_per_record(self, op_data: Dict[str, Any]) -> float:
+    def _est_usd_per_record(self, op_agg_stats: Dict[str, Any]) -> float:
         """
-        Given an operator's profiling data dictionary, estimate the usd_per_record
+        Given an operator's aggregate stats, estimate the usd_per_record
         to be the per-record average usd spent.
         """
-        return op_data['total_usd'] / op_data['total_records']
+        return op_agg_stats['total_usd'] / op_agg_stats['total_records']
 
-    def _est_selectivity(self, op_data: Dict[str, Any], source_op_data: Dict[str, Any]) -> float:
+    def _est_selectivity(self, op_agg_stats: Dict[str, Any], source_op_agg_stats: Dict[str, Any]) -> float:
         """
-        Given an operator's profiling data dictionary and the profiling data dictionary
-        of its source operator, estimate the selectivity to be the ratio of records
-        output by each operation. 
+        Given an operator's aggregate stats and the aggregate stats of its source operator,
+        estimate the selectivity to be the ratio of records output by each operation. 
         """
-        return op_data['total_records'] / source_op_data['total_records']
+        return op_agg_stats['total_records'] / source_op_agg_stats['total_records']
 
     def compute_cost_estimates(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -416,30 +421,34 @@ class StatsProcessor:
         containing the sample estimate(s) of key statistics for that operation.
         """
         op_cost_estimates = {}
-        op_data = self.profiling_data['agg_operator_stats']
+        op_data = self.profiling_data
         source_op_data = (
-            self.profiling_data['source']['agg_operator_stats']
+            self.profiling_data['source']
             if 'source' in self.profiling_data
             else None
         )
-        op_id = op_data['op_id']
+        op_id = op_data['agg_operator_stats']['op_id']
         while op_id is not None:
             op_cost_estimates[op_id] = {}
 
+            # get the aggregate stats for this op and its source (if applicable)
+            op_agg_stats = op_data['agg_operator_stats']
+            source_op_agg_stats = source_op_data['agg_operator_stats'] if source_op_data is not None else None
+
             # compute per-record average time spent in operator
-            avg_op_time = self._est_time_per_record(op_data)
+            avg_op_time = self._est_time_per_record(op_agg_stats)
             op_cost_estimates[op_id]['time_per_record'] = avg_op_time
 
             # compute est_num_input_tokens and est_num_output_tokens to be the
             # per-record average number of input and output tokens, respectively;
-            avg_num_input_tokens, avg_num_output_tokens = self._est_num_input_output_tokens(op_data)
-            op_cost_estimates['est_num_input_tokens'] = avg_num_input_tokens
-            op_cost_estimates['est_num_output_tokens'] = avg_num_output_tokens
+            avg_num_input_tokens, avg_num_output_tokens = self._est_num_input_output_tokens(op_agg_stats)
+            op_cost_estimates[op_id]['est_num_input_tokens'] = avg_num_input_tokens
+            op_cost_estimates[op_id]['est_num_output_tokens'] = avg_num_output_tokens
 
             # compute _usd_per_record (even though this is just a derivative of
             # avg_num_input/output_tokens) as the per-record average spend
-            avg_usd = self._est_usd_per_record(op_data)
-            op_cost_estimates['usd_per_record'] = avg_usd
+            avg_usd = self._est_usd_per_record(op_agg_stats)
+            op_cost_estimates[op_id]['usd_per_record'] = avg_usd
 
             # NOTE: we estimate selectivity instead of cardinality because, given PZ's current
             #       design, we will run the StatsProcessor on a sample of records to get data
@@ -454,28 +463,28 @@ class StatsProcessor:
             # compute selectivity as (# of records in this op) / (# records in parent op);
             # if this is the source operation then selectivity = 1.0
             selectivity = (
-                self._est_selectivity(op_data, source_op_data)
-                if source_op_data is not None
+                self._est_selectivity(op_agg_stats, source_op_agg_stats)
+                if source_op_agg_stats is not None
                 else 1.0
             )
-            op_cost_estimates['selectivity'] = selectivity
+            op_cost_estimates[op_id]['selectivity'] = selectivity
 
             # For now, for the reasons outlined in the NOTE above, we do not directly estimate cardinality
-            op_cost_estimates['cardinality'] = None
+            op_cost_estimates[op_id]['cardinality'] = None
 
             # TODO: try estimating quality using mean or p90 log probability
             # - first approach: mean output log prob. from generations? (no labels necessary)
             # - if we have labels we can estimate directly (use semantic answer similarity to determine if output is correct)
-            op_cost_estimates['quality'] = None
+            op_cost_estimates[op_id]['quality'] = None
 
-            # 
+            # update op_data, source_op_data, and op_id
             op_data = source_op_data
             source_op_data = (
-                op_data['source']['agg_operator_stats']
-                if 'source' in op_data
+                source_op_data['source']
+                if source_op_data is not None and 'source' in source_op_data
                 else None
             )
-            op_id = op_data['op_id'] if op_data is not None else None
+            op_id = op_data['agg_operator_stats']['op_id'] if op_data is not None else None
 
         return op_cost_estimates
 

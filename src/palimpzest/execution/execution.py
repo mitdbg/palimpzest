@@ -3,6 +3,13 @@ from palimpzest.policy import Policy, MaxQuality, UserChoice
 from palimpzest.profiler import StatsProcessor
 from palimpzest.datamanager import DataDirectory
 
+def emitNestedTuple(node, indent=0):
+    elt, child = node
+    print(" " * indent, elt)
+    if child is not None:
+        emitNestedTuple(child, indent=indent+2)
+
+
 class Execution:
     """An Execution is responsible for completing a query on a given Set.
     Right now we assume the query is always SELECT * FROM set."""
@@ -10,7 +17,7 @@ class Execution:
         self.rootset = rootset
         self.policy = policy
 
-    def executeAndOptimize(self):
+    def executeAndOptimize(self, verbose: bool=False, shouldProfile: bool=False):
         """An execution of the rootset, subject to user-given policy."""
         logicalTree = self.rootset.getLogicalTree()
 
@@ -31,7 +38,22 @@ class Execution:
             limitSet = self.rootset.limit(sampleSize)
             logicalTree = limitSet.getLogicalTree()
             candidatePlans = logicalTree.createPhysicalPlanCandidates(shouldProfile=True)
+            if verbose:
+                print("----- PRE-SAMPLE PLANS -----")
+                for idx, cp in enumerate(candidatePlans):
+                    print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
+                    print("Physical operator tree")
+                    physicalOps = cp[3].dumpPhysicalTree()
+                    emitNestedTuple(physicalOps)
+                    print("----------")
+
             planTime, planCost, quality, physicalTree = MaxQuality().choose(candidatePlans)
+
+            if verbose:
+                print("----------")
+                print(f"Policy is: Maximum Quality")
+                print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")
+                emitNestedTuple(physicalTree.dumpPhysicalTree())
 
             # Execute the physical plan and cache the results
             sampleOutputs = [r for r in physicalTree]
@@ -40,6 +62,12 @@ class Execution:
             # We put this into an ephemeral cache
             cache.putCachedData("querySamples", self.rootset.universalIdentifier(), (sampleOutputs, profileData))
 
+        # TODO: remove
+        if verbose:
+            import json
+            with open('sample_profiling.json', 'w') as f:
+                json.dump(profileData, f)
+
         # process profileData with StatsProcessor
         sp = StatsProcessor(profileData)
         cost_estimates = sp.compute_cost_estimates()
@@ -47,21 +75,23 @@ class Execution:
         # Ok now reoptimize the logical plan, this time with the sample data.
         # (The data is not currently being used; let's see if this method can work first)
         logicalTree = self.rootset.getLogicalTree()
-        candidatePlans = logicalTree.createPhysicalPlanCandidates(cost_estimates=cost_estimates)
-        if type(self.policy) == UserChoice:
-            def emitNestedTuple(node, indent=0):
-                elt, child = node
-                print(" " * indent, elt)
-                if child is not None:
-                    emitNestedTuple(child, indent=indent+2)
-
-            print("----------")
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(cost_estimates=cost_estimates, shouldProfile=shouldProfile)
+        if type(self.policy) == UserChoice or verbose:
+            print("----- POST-SAMPLE PLANS -----")
             for idx, cp in enumerate(candidatePlans):
                 print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
                 print("Physical operator tree")
                 physicalOps = cp[3].dumpPhysicalTree()
                 emitNestedTuple(physicalOps)
                 print("----------")
+
         planTime, planCost, quality, physicalTree = self.policy.choose(candidatePlans)
+
+        if verbose:
+            print("----------")
+            print(f"Policy is: {self.policy}")
+            print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")
+            emitNestedTuple(physicalTree.dumpPhysicalTree())
+
         return physicalTree
 
