@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from palimpzest.profiler import Profiler
+from palimpzest.profiler import Profiler, StatsProcessor
 import palimpzest as pz
 
 from tabulate import tabulate
@@ -295,9 +295,10 @@ if __name__ == "__main__":
         # if profiling was turned on; capture statistics
         if Profiler.profiling_on():
             profiling_data = physicalTree.getProfilingData()
+            sp = StatsProcessor(profiling_data)
 
             with open('profiling.json', 'w') as f:
-                json.dump(profiling_data, f)
+                json.dump(sp.profiling_data, f)
 
     elif task == "enronoptimize":
         rootSet = buildEnronPlan(datasetid)

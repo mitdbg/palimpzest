@@ -16,7 +16,6 @@ from palimpzest.operators import (
     ParallelInduceFromCandidateOp,
     PhysicalOp,
 )
-from palimpzest.sampler import Sampler
 
 from copy import deepcopy
 from itertools import permutations
@@ -24,7 +23,6 @@ from typing import List, Tuple
 
 import os
 import random
-import time
 
 # DEFINITIONS
 PhysicalPlan = Tuple[float, float, float, PhysicalOp]
@@ -167,38 +165,28 @@ class LogicalOperator:
 
         return physicalPlans
 
-    # TODO: possibly get data from profiling here
-    def createPhysicalPlanCandidates(self, sampler: Sampler=None, shouldProfile: bool=False) -> List[PhysicalPlan]:
+    def createPhysicalPlanCandidates(self, cost_estimates: dict=None, shouldProfile: bool=False) -> List[PhysicalPlan]:
         """Return a set of physical trees of operators."""
-        start_time = time.time()
-
         # create set of logical plans (e.g. consider different filter/join orderings)
         logicalPlans = self._createLogicalPlans()
-        t_logical = time.time()
-        # print(f"Time to create logical plans: {t_logical - start_time:.2f}")
 
         # iterate through logical plans and evaluate multiple physical plans
         physicalPlans = [
             physicalPlan
             for logicalPlan in logicalPlans
-            for physicalPlan in logicalPlan._createPhysicalPlans(shouldProfile=shouldProfile) # TODO: pass profiling data through here
+            for physicalPlan in logicalPlan._createPhysicalPlans(shouldProfile=shouldProfile)
         ]
-        t_physical = time.time()
-        # print(f"Time to create physical plans: {t_physical - t_logical:.2f}")
 
         # estimate the cost (in terms of USD, latency, throughput, etc.) for each plan
         plans = []
         for physicalPlan in physicalPlans:
-            planCost = physicalPlan.estimateCost()
+            planCost = physicalPlan.estimateCost(cost_estimates=cost_estimates)
 
             totalTime = planCost["totalTime"]
             totalCost = planCost["totalUSD"]  # for now, cost == USD
             quality = planCost["quality"]
 
             plans.append((totalTime, totalCost, quality, physicalPlan))
-
-        t_cost = time.time()
-        # print(f"Time to est. plan cost(s): {t_cost - t_physical:.2f}")
 
         # drop duplicate plans in terms of time, cost, and quality, as these can cause
         # plans on the pareto frontier to be dropped if they are "dominated" by a duplicate
@@ -234,9 +222,6 @@ class LogicalOperator:
             # add plan i to pareto frontier if it's not dominated
             if paretoFrontier:
                 paretoFrontierPlans.append((totalTime_i, totalCost_i, quality_i, plan))
-
-        t_pareto = time.time()
-        # print(f"Time to compute pareto frontier: {t_pareto - t_cost:.2f}")
 
         return paretoFrontierPlans
 

@@ -41,7 +41,7 @@ class PhysicalOp:
     def getProfilingData(self) -> Dict[str, Any]:
         raise NotImplementedError("Abstract method")
 
-    def estimateCost(self) -> Dict[str, Any]:
+    def estimateCost(self, cost_estimates: dict=None) -> Dict[str, Any]:
         """Returns dict of time, cost, and quality metrics."""
         raise NotImplementedError("Abstract method")
 
@@ -76,29 +76,35 @@ class MarshalAndScanDataOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
                 
-    def estimateCost(self):
+    def estimateCost(self, cost_estimates: dict=None):
         cardinality = self.datadir.getCardinality(self.datasetIdentifier) + 1
         size = self.datadir.getSize(self.datasetIdentifier)
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
 
-        datasetType = self.datadir.getRegisteredDatasetType(self.datasetIdentifier)
-        timePerElement = (
-            LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
-            if datasetType in ["dir", "file"]
-            else MEMORY_SCAN_TIME_PER_KB * perElementSizeInKb
-        )
-        usdPerElement = 0
+        # if we have sample data, use it to get a better estimate of the timePerElement
+        # and the output tokens per element
+        timePerElement = None
+        if self.opId() in cost_estimates:
+            timePerElement = cost_estimates[self.opId()]['time_per_record']
+        else:
+            # estimate time spent reading each record
+            datasetType = self.datadir.getRegisteredDatasetType(self.datasetIdentifier)
+            timePerElement = (
+                LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
+                if datasetType in ["dir", "file"]
+                else MEMORY_SCAN_TIME_PER_KB * perElementSizeInKb
+            )
 
-        # TODO: similar to notes in other physical operators' estimateCost() function
-        #       we will likely want to augment PZ to use sampling and/or real-time updates
-        #       to estimates like these, rather then employing constants.
-        #
+        # NOTE: downstream operators will ignore this estimate if they have a cost_estimate dict.
         # estimate per-element number of tokens output by this operator
         estOutputTokensPerElement = (
             (size / float(cardinality)) # per-element size in bytes
             * ELEMENT_FRAC_IN_CONTEXT   # fraction of the element which is provided in context
             * BYTES_TO_TOKENS           # convert bytes to tokens
         )
+
+        # assume no cost for reading data
+        usdPerElement = 0
 
         return {
             "cardinality": cardinality,
@@ -151,7 +157,7 @@ class CacheScanDataOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self):
+    def estimateCost(self, cost_estimates: dict=None):
         # TODO: at the moment, getCachedResult() looks up a pickled file that stores
         #       the cached data specified by self.cacheIdentifier, opens the file,
         #       and then returns an iterator over records in the pickled file.
@@ -171,13 +177,19 @@ class CacheScanDataOp(PhysicalOp):
         size = sum(list(map(lambda tup: tup[1], cached_data_info)))
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
 
-        timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
+        # if we have sample data, use it to get a better estimate of the timePerElement
+        # and the output tokens per element
+        timePerElement = None
+        if self.opId() in cost_estimates:
+            timePerElement = cost_estimates[self.opId()]['time_per_record']
+        else:
+            # estimate time spent reading each record
+            timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
+
+        # assume no cost for reading data
         usdPerElement = 0
 
-        # TODO: similar to notes in other physical operators' estimateCost() function
-        #       we will likely want to augment PZ to use sampling and/or real-time updates
-        #       to estimates like these, rather then employing constants.
-        #
+        # NOTE: downstream operators will ignore this estimate if they have a cost_estimate dict.
         # estimate per-element number of tokens output by this operator
         estOutputTokensPerElement = (
             (size / float(cardinality)) # per-element size in bytes
@@ -254,6 +266,12 @@ class InduceFromCandidateOp(PhysicalOp):
             pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
         )
 
+    def _is_quick_conversion(self):
+        td = self._makeTaskDescriptor()
+        is_file_to_text_file = (td.outputSchema == TextFile and td.inputSchema == File)
+
+        return PhysicalOp.solver.isSimpleConversion(td) or is_file_to_text_file
+
     def opId(self):
         d = {
             "operator": "InduceFromCandidateOp",
@@ -280,32 +298,50 @@ class InduceFromCandidateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self):
-        inputEstimates = self.source.estimateCost()
+    def estimateCost(self, cost_estimates: dict=None):
+        # fetch cost estimates from source operation
+        inputEstimates = self.source.estimateCost(cost_estimates)
+
+        # if induce has a quick conversion; set "no-op" cost estimates
+        if self._is_quick_conversion():
+            # we assume time cost of these conversions is negligible
+            return inputEstimates
+
+        # if we have sample estimates, let's use those instead of our prescriptive estimates
+        if self.opId() in cost_estimates:
+            op_cost_estimates = cost_estimates[self.opId()]
+
+            # estimate cardinality using sample selectivity and input cardinality est.
+            cardinality = inputEstimates['cardinality'] * op_cost_estimates['selectivity']
+
+            # for now, quality is still estimated from model card
+            quality = (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * inputEstimates["quality"]
+
+            return {
+                "cardinality": cardinality,
+                "timePerElement": op_cost_estimates['time_per_record'],
+                "usdPerElement": op_cost_estimates['usd_per_record'],
+                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record'],
+                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + op_cost_estimates['usd_per_record'],
+                "totalTime": cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime'],
+                "totalUSD": cardinality * op_cost_estimates['usd_per_record'] + inputEstimates['totalUSD'],
+                "estOutputTokensPerElement": op_cost_estimates['est_num_output_tokens'],
+                "quality": quality,
+            }
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
 
         # estimate number of output tokens as constant multiple of input tokens (for now)
-        # 
-        # TODO: we could get better est. if we could update plans in real-time (or use sampling)
         est_num_output_tokens = OUTPUT_TOKENS_MULTIPLE * est_num_input_tokens
 
         # if we're using a few-shot prompt strategy, the est_num_input_tokens will increase
         # by a small factor due to the added examples; we multiply after computing the
         # est_num_output_tokens b/c the few-shot examples likely won't affect the output length
-        # 
-        # TODO: once again, real-time updates and/or sampling could improve est.
         if self.prompt_strategy == PromptStrategy.FEW_SHOT:
             est_num_input_tokens *= FEW_SHOT_PROMPT_INFLATION
 
         # get est. of conversion time per record from model card;
-        # TODO: the time is a linear function of the number of output tokens,
-        #       if we look at the distribution of output tokens as we generate
-        #       responses we can get better estimates in real-time. This of
-        #       course would require modifying our design of PZ to enable it
-        #       to be more of a bandit which can switch query plans as it observes
-        #       query results.
         model_conversion_time_per_record = MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card
@@ -315,51 +351,27 @@ class InduceFromCandidateOp(PhysicalOp):
         )
 
         # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
-        #
-        # TODO: once again, real-time updates and/or sampling could improve this est.
         if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             model_conversion_time_per_record *= DSPY_TIME_INFLATION
             model_conversion_usd_per_record *= DSPY_COST_INFLATION
 
-        # TODO: can selectivity be >1.0? Imagine an induce operation which extracts the authors from a research paper.
-        selectivity = 1.0
+        # estimate cardinality and selectivity given the "cardinality" set by the user
+        selectivity = 1.0 if self.cardinality != "oneToMany" else 2.0
         cardinality = selectivity * inputEstimates["cardinality"]
+
+        # estimate cumulative time per element
         cumulativeTimePerElement = model_conversion_time_per_record + inputEstimates["cumulativeTimePerElement"]
         cumulativeUSDPerElement = model_conversion_usd_per_record + inputEstimates["cumulativeUSDPerElement"]
 
-        # NOTE: the following estimate assumes that nested generators effectively execute
-        #       a single record at a time in sequence. I.e., there is no waterfall / time
+        # NOTE: the following estimate assumes that nested Python generators effectively
+        #       execute a single record at a time in sequence. I.e., there is no time
         #       overlap for execution in two different stages of the chain of generators.
-        #       The example below illustrates how this leads the total execution time to
-        #       be equal to the 
-        #
-        #       >>> def f():
-        #       ...   for idx in range(3):
-        #       ...     time.sleep(2)
-        #       ...     yield idx
-        #
-        #       >>> def g():
-        #       ... for idx in f():
-        #       ...     time.sleep(3)
-        #       ...     yield idx
-        #
-        #       >>> def test():
-        #       ...   start_time = time.time()
-        #       ...   lst = [elt for elt in g()]
-        #       ...   end_time = time.time()
-        #       ...   print(f"duration: {end_time - start_time}")
-        #
-        #       >>> test()
-        #       duration: 15.014
         #
         # compute total time and cost for preceding operations + this operation;
         # make sure to use input cardinality (not output cardinality)
         totalTime = model_conversion_time_per_record * inputEstimates["cardinality"] + inputEstimates["totalTime"]
         totalUSD = model_conversion_usd_per_record * inputEstimates["cardinality"] + inputEstimates["totalUSD"]
 
-        # TODO: simple first hack -- use model's MMLU score / 100.0 to get a rough
-        #       estimate of the quality in the range [0, 1]
-        # 
         # estimate quality of output based on the strength of the model being used
         quality = (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * inputEstimates["quality"]
 
@@ -451,6 +463,12 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
         )
 
+    def _is_quick_conversion(self):
+        td = self._makeTaskDescriptor()
+        is_file_to_text_file = td.outputSchema == TextFile and td.inputSchema == File
+
+        return PhysicalOp.solver.isSimpleConversion(td) or is_file_to_text_file
+
     def opId(self):
         d = {
             "operator": "ParallelInduceFromCandidateOp",
@@ -477,11 +495,39 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self):
+    def estimateCost(self, cost_estimates: dict=None):
         """
         See InduceFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
         """
-        inputEstimates = self.source.estimateCost()
+        # fetch cost estimates from source operation
+        inputEstimates = self.source.estimateCost(cost_estimates)
+
+        # if induce has a quick conversion; set "no-op" cost estimates
+        if self._is_quick_conversion():
+            # we assume time cost of these conversions is negligible
+            return inputEstimates
+
+        # if we have sample estimates, let's use those instead of our prescriptive estimates
+        if self.opId() in cost_estimates:
+            op_cost_estimates = cost_estimates[self.opId()]
+
+            # estimate cardinality using sample selectivity and input cardinality est.
+            cardinality = inputEstimates['cardinality'] * op_cost_estimates['selectivity']
+
+            # for now, quality is still estimated from model card
+            quality = (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * inputEstimates["quality"]
+
+            return {
+                "cardinality": cardinality,
+                "timePerElement": op_cost_estimates['time_per_record'],
+                "usdPerElement": op_cost_estimates['usd_per_record'],
+                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record'],
+                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + op_cost_estimates['usd_per_record'],
+                "totalTime": cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime'],
+                "totalUSD": cardinality * op_cost_estimates['usd_per_record'] + inputEstimates['totalUSD'],
+                "estOutputTokensPerElement": op_cost_estimates['est_num_output_tokens'],
+                "quality": quality,
+            }
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
@@ -509,8 +555,11 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             model_conversion_time_per_record *= DSPY_TIME_INFLATION
             model_conversion_usd_per_record *= DSPY_COST_INFLATION
 
-        selectivity = 1.0
+        # estimate cardinality and selectivity given the "cardinality" set by the user
+        selectivity = 1.0 if self.cardinality != "oneToMany" else 2.0
         cardinality = selectivity * inputEstimates["cardinality"]
+
+        # estimate cumulative time per element
         cumulativeTimePerElement = model_conversion_time_per_record + inputEstimates["cumulativeTimePerElement"]
         cumulativeUSDPerElement = model_conversion_usd_per_record + inputEstimates["cumulativeUSDPerElement"]
 
@@ -638,11 +687,34 @@ class FilterCandidateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self):
+    def estimateCost(self, cost_estimates: dict=None):
         """
         See InduceFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
         """
-        inputEstimates = self.source.estimateCost()
+        # fetch cost estimates from source operation
+        inputEstimates = self.source.estimateCost(cost_estimates)
+
+        # if we have sample estimates, let's use those instead of our prescriptive estimates
+        if self.opId() in cost_estimates:
+            op_cost_estimates = cost_estimates[self.opId()]
+
+            # estimate cardinality using sample selectivity and input cardinality est.
+            cardinality = inputEstimates['cardinality'] * op_cost_estimates['selectivity']
+
+            # for now, quality is still estimated from model card
+            quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
+
+            return {
+                "cardinality": cardinality,
+                "timePerElement": op_cost_estimates['time_per_record'],
+                "usdPerElement": op_cost_estimates['usd_per_record'],
+                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record'],
+                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + op_cost_estimates['usd_per_record'],
+                "totalTime": cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime'],
+                "totalUSD": cardinality * op_cost_estimates['usd_per_record'] + inputEstimates['totalUSD'],
+                "estOutputTokensPerElement": op_cost_estimates['est_num_output_tokens'],
+                "quality": quality,
+            }
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
@@ -671,7 +743,7 @@ class FilterCandidateOp(PhysicalOp):
             model_conversion_time_per_record *= DSPY_TIME_INFLATION
             model_conversion_usd_per_record *= DSPY_COST_INFLATION
 
-        # TODO: use sampling / real-time feedback to better estimate selectivity
+        # estimate output cardinality using a constant assumption of the filter selectivity
         selectivity = EST_FILTER_SELECTIVITY
         cardinality = selectivity * inputEstimates["cardinality"]
         cumulativeTimePerElement = model_conversion_time_per_record + inputEstimates["cumulativeTimePerElement"]
@@ -788,8 +860,32 @@ class ParallelFilterCandidateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self):
-        inputEstimates = self.source.estimateCost()
+    def estimateCost(self, cost_estimates: dict=None):
+        # fetch cost estimates from source operation
+        inputEstimates = self.source.estimateCost(cost_estimates)
+
+        # if we have sample estimates, let's use those instead of our prescriptive estimates
+        if self.opId() in cost_estimates:
+            op_cost_estimates = cost_estimates[self.opId()]
+
+            # estimate cardinality using sample selectivity and input cardinality est.
+            cardinality = inputEstimates['cardinality'] * op_cost_estimates['selectivity']
+
+            # for now, quality is still estimated from model card
+            quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
+
+            return {
+                "cardinality": cardinality,
+                "timePerElement": op_cost_estimates['time_per_record'],
+                "usdPerElement": op_cost_estimates['usd_per_record'],
+                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record'],
+                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + op_cost_estimates['usd_per_record'],
+                "totalTime": cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime'],
+                "totalUSD": cardinality * op_cost_estimates['usd_per_record'] + inputEstimates['totalUSD'],
+                "estOutputTokensPerElement": op_cost_estimates['est_num_output_tokens'],
+                "quality": quality,
+            }
+
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
@@ -818,7 +914,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
             model_conversion_time_per_record *= DSPY_TIME_INFLATION
             model_conversion_usd_per_record *= DSPY_COST_INFLATION
 
-        # TODO: use sampling / real-time feedback to better estimate selectivity
+        # estimate output cardinality using a constant assumption of the filter selectivity
         selectivity = EST_FILTER_SELECTIVITY
         cardinality = selectivity * inputEstimates["cardinality"]
         cumulativeTimePerElement = model_conversion_time_per_record + inputEstimates["cumulativeTimePerElement"]
@@ -926,10 +1022,28 @@ class ApplyCountAggregateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self):
-        inputEstimates = self.source.estimateCost()
-
+    def estimateCost(self, cost_estimates: dict=None):
+        # get input estimates and pass through to output
+        inputEstimates = self.source.estimateCost(cost_estimates)
         outputEstimates = {**inputEstimates}
+
+        # the profiler will record timing info for this operator, which can be used
+        # to improve timing related estimates
+        if self.opId() in cost_estimates:
+            op_cost_estimates = cost_estimates[self.opId()]
+
+            # output cardinality for an aggregate will be 1
+            cardinality = 1
+
+            # update cardinality, timePerElement and related stats
+            outputEstimates['cardinality'] = cardinality
+            outputEstimates['timePerElement'] = op_cost_estimates['time_per_record']
+            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record']
+            outputEstimates['totalTime'] = cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime']
+
+            return outputEstimates
+
+        # output cardinality for an aggregate will be 1
         outputEstimates['cardinality'] = 1
 
         # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
@@ -959,9 +1073,6 @@ class ApplyCountAggregateOp(PhysicalOp):
                 datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
-
-
-#        return ApplyUserFunctionOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.fn, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
 
 
 class ApplyUserFunctionOp(PhysicalOp):
@@ -1003,10 +1114,26 @@ class ApplyUserFunctionOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self):
-        inputEstimates = self.source.estimateCost()
-
+    def estimateCost(self, cost_estimates: dict=None):
+        # get input estimates and pass through to output
+        inputEstimates = self.source.estimateCost(cost_estimates)
         outputEstimates = {**inputEstimates}
+
+        # the profiler will record selectivity and timing info for this operator,
+        # which can be used to improve timing related estimates
+        if self.opId() in cost_estimates:
+            op_cost_estimates = cost_estimates[self.opId()]
+
+            # estimate cardinality using sample selectivity and input cardinality est.
+            cardinality = inputEstimates['cardinality'] * op_cost_estimates['selectivity']
+
+            # update cardinality, timePerElement and related stats
+            outputEstimates['cardinality'] = cardinality
+            outputEstimates['timePerElement'] = op_cost_estimates['time_per_record']
+            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record']
+            outputEstimates['totalTime'] = cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime']
+
+            return outputEstimates
 
         # for now, assume applying the user function takes negligible additional time (and no cost in USD)
         outputEstimates["timePerElement"] = 0
@@ -1077,10 +1204,28 @@ class ApplyAverageAggregateOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self):
-        inputEstimates = self.source.estimateCost()
-
+    def estimateCost(self, cost_estimates: dict=None):
+        # get input estimates and pass through to output
+        inputEstimates = self.source.estimateCost(cost_estimates)
         outputEstimates = {**inputEstimates}
+
+        # the profiler will record timing info for this operator, which can be used
+        # to improve timing related estimates
+        if self.opId() in cost_estimates:
+            op_cost_estimates = cost_estimates[self.opId()]
+
+            # output cardinality for an aggregate will be 1
+            cardinality = 1
+
+            # update cardinality, timePerElement and related stats
+            outputEstimates['cardinality'] = cardinality
+            outputEstimates['timePerElement'] = op_cost_estimates['time_per_record']
+            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record']
+            outputEstimates['totalTime'] = cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime']
+
+            return outputEstimates
+
+        # output cardinality for an aggregate will be 1
         outputEstimates["cardinality"] = 1
 
         # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
@@ -1155,10 +1300,28 @@ class LimitScanOp(PhysicalOp):
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self):
-        inputEstimates = self.source.estimateCost()
-
+    def estimateCost(self, cost_estimates: dict=None):
+        # get input estimates and pass through to output
+        inputEstimates = self.source.estimateCost(cost_estimates)
         outputEstimates = {**inputEstimates}
+
+        # the profiler will record timing info for this operator, which can be used
+        # to improve timing related estimates
+        if self.opId() in cost_estimates:
+            op_cost_estimates = cost_estimates[self.opId()]
+
+            # output cardinality for limit can be at most self.limit
+            cardinality = min(self.limit, inputEstimates["cardinality"])
+
+            # update cardinality, timePerElement and related stats
+            outputEstimates['cardinality'] = cardinality
+            outputEstimates['timePerElement'] = op_cost_estimates['time_per_record']
+            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record']
+            outputEstimates['totalTime'] = cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime']
+
+            return outputEstimates
+
+        # output cardinality for limit can be at most self.limit
         outputEstimates["cardinality"] = min(self.limit, inputEstimates["cardinality"])
 
         return outputEstimates

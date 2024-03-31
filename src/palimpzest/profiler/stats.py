@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, asdict, field
-from typing import Dict, List
+from typing import Any, Dict, List, Tuple
 
 
 @dataclass
@@ -92,12 +92,12 @@ class Stats:
     # will capture the total time spent in this operation and all source operations
     # due to the way in which we set timers in profiler.py rather than in the
     # physical operator code
-    cumulative_iter_time: float=0.0
+    cumulative_iter_time: float=None
     # the time spent by the data record just in this operation; this is computed
     # in the StatsProcessor as (the cumulative_iter_time of this data record in
     # this operation) minus (the cumulative_iter_time of this data record in the
     # source operation)
-    op_time: float=0.0
+    op_time: float=None
 
     def to_dict(self):
         return asdict(self)
@@ -241,6 +241,275 @@ class StatsProcessor:
     """
     This class implements a set of standardized functions for processing profiling statistics
     collected by PZ.
+
+    TODO
+    ----
+    8. augment Execution to be able to iteratively draw sample data (instead of just once up front)
+    9. implement other methods here to help with understanding profile data
     """
-    def __init__(self, stats: Stats) -> None:
-        self.stats = stats
+    def __init__(self, profiling_data: Dict[str, Any]) -> None:
+        """
+        The profiling data dictionary has the following structure:
+        
+        {
+            "agg_operator_stats": {
+                #### unique identifier for this instance of this operator
+                "op_id": str,
+                #### name of this operator
+                "op_name": str,
+                #### total records processed by op
+                "total_records": int,
+                #### sum of cumulative_iter_time for records in op (in seconds)
+                "total_cumulative_iter_time": float,
+                #### Sum of op_time for records in op (in seconds) -- this is computed in StatsProcessor.__init__()
+                "total_op_time": float,
+                #### total time spent inside of profiler code (in seconds)
+                "total_time_in_profiler": float,
+                #### total input and output tokens processed in op
+                "total_input_tokens": int,
+                "total_output_tokens": int,
+                #### total dollars spent in op
+                "total_input_usd": float,
+                "total_output_usd": float,
+                "total_usd": float,
+                #### total time spent executing LLM calls in this op (in seconds)
+                "total_llm_call_duration": float,
+                #### distribution of finish reasons for LLM calls in this op
+                "finish_reasons": Dict[str, int],
+                #### total time spent waiting on non-LLM API calls (in seconds)
+                "total_api_call_duration": float,
+                #### the input fields for records coming into this op, and the fields this op generated
+                "input_fields": List[str],
+                "generated_fields": List[str],
+                #### ONLY for induce ops with conventional queries -- per-field breakdown of these agg_operator_stats
+                "per_field_agg_op_stats": Dict[str, Dict[str, Any]],
+                #### ONLY for induce ops with code gen -- per-state breakdown of these agg_operator_stats
+                "code_gen_agg_op_stats": Dict[str, Dict[str, Any]],
+            },
+            "records": [
+                {
+                    #### name of this operator
+                    "name": str,
+                    #### unique identifier for this record
+                    "uuid": str,
+                    #### unique identifier for the parent/source of this record
+                    "parent_uuid": str,
+                    #### 
+                    "stats": {
+                        #### Total time in seconds spent waiting for operator to yield this record; includes time spent in source operators
+                        "cumulative_iter_time": float,
+                        #### Total time in seconds spent by record in this operator -- this is computed in StatsProcessor.__init__()
+                        "op_time": 0.0,
+                        #### per-record stats; can include zero-or-more of the following fields:
+                        ## for induce operations with an LLM
+                        "bonded_query_stats": Dict[str, Any],
+                        "conventional_query_stats": Dict[str, Any],
+                        "full_code_gen_stats": Dict[str, Any],
+                        ## for induce operations w/out an LLM
+                        "api_stats": Dict[str, Any],
+                        ## for filter operations
+                        "gen_stats: Dict[str, Any],
+                    },
+                    #### dictionary representation of the record after being processed by this operator
+                    "record_state": {
+                        "<field-name-1>": value1,
+                        "<field-name-2>": value2,
+                        ...
+                    }
+                },
+                ...
+            ],
+            #### the data structure recurses until the original source operation (e.g. a scan) is reached
+            "source": {
+                "agg_operator_stats": {...},
+                "records": [...],
+                "source": {
+                    ...
+                }
+            },
+        }
+        """
+        # compute op_time for each record and the total_op_time for each operator
+        self.profiling_data = self._compute_op_time(profiling_data)
+
+
+    def _compute_op_time(self, profiling_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        This helper function computes the time spent by each record in each operation
+        (i.e. the record's op_time). It then aggregates the op_times for every record
+        in each operation to get a total_op_time.
+
+        Inside the profiler we are only able to track the time it takes for a record
+        to be yielded by the operator's iterator method. This time (stored in
+        "cumulative_iter_time") is cumulative in the sense that it also captures time
+        spent waiting for source/parent operators to yield this record.
+
+        In this function, for each record we effectively compute:
+
+        op_time = (cumulative_iter_time) - (the cumulative_iter_time of this record's parent)
+
+        Once we've computed each record's op_time we finally compute the total_op_time
+        for each operator.
+        """
+        # base case: this is the source operation
+        if "source" not in profiling_data:
+            # in this case: op_time == cumulative_iter_time
+            for record in profiling_data['records']:
+                record['stats']['op_time'] = record['stats']['cumulative_iter_time']
+
+            # compute total_op_time
+            profiling_data['agg_operator_stats']['total_op_time'] = sum(list(map(lambda record: record['stats']['op_time'], profiling_data['records'])))
+
+            return profiling_data
+
+        # TODO: this is N^2 in # of records; we may want to use a dictionary to speed this up
+        # for each record we need to identify its parent to compute the op_time
+        for record in profiling_data['records']:
+            parent_uuid = record['parent_uuid']
+            for source_record in profiling_data['source']['records']:
+                if source_record['uuid'] == parent_uuid:
+                    record['stats']['op_time'] = record['stats']['cumulative_iter_time'] - source_record['stats']['cumulative_iter_time']
+
+        # compute total_op_time
+        profiling_data['agg_operator_stats']['total_op_time'] = sum(list(map(lambda record: record['stats']['op_time'], profiling_data['records'])))
+
+        # recurse
+        profiling_data["source"] = self._compute_op_time(profiling_data["source"])
+
+        return profiling_data
+
+    def _est_time_per_record(self, op_data: Dict[str, Any]) -> float:
+        """
+        Given an operator's profiling data dictionary, estimate the time_per_record
+        to be the per-record average op_time.
+        """
+        return op_data['total_op_time'] / op_data['total_records']
+
+    def _est_num_input_output_tokens(self, op_data: Dict[str, Any]) -> Tuple[float, float]:
+        """
+        Given an operator's profiling data dictionary, estimate the number of input and
+        output tokens to be their per-record averages.
+        """
+        avg_num_input_tokens = op_data['total_input_tokens'] / op_data['total_records']
+        avg_num_output_tokens = op_data['total_output_tokens'] / op_data['total_records']
+
+        return avg_num_input_tokens, avg_num_output_tokens
+
+    def _est_usd_per_record(self, op_data: Dict[str, Any]) -> float:
+        """
+        Given an operator's profiling data dictionary, estimate the usd_per_record
+        to be the per-record average usd spent.
+        """
+        return op_data['total_usd'] / op_data['total_records']
+
+    def _est_selectivity(self, op_data: Dict[str, Any], source_op_data: Dict[str, Any]) -> float:
+        """
+        Given an operator's profiling data dictionary and the profiling data dictionary
+        of its source operator, estimate the selectivity to be the ratio of records
+        output by each operation. 
+        """
+        return op_data['total_records'] / source_op_data['total_records']
+
+    def compute_cost_estimates(self) -> Dict[str, Dict[str, Any]]:
+        """
+        This function computes a mapping from each induce op_id to a dictionary
+        containing the sample estimate(s) of key statistics for that operation.
+        """
+        op_cost_estimates = {}
+        op_data = self.profiling_data['agg_operator_stats']
+        source_op_data = (
+            self.profiling_data['source']['agg_operator_stats']
+            if 'source' in self.profiling_data
+            else None
+        )
+        op_id = op_data['op_id']
+        while op_id is not None:
+            op_cost_estimates[op_id] = {}
+
+            # compute per-record average time spent in operator
+            avg_op_time = self._est_time_per_record(op_data)
+            op_cost_estimates[op_id]['time_per_record'] = avg_op_time
+
+            # compute est_num_input_tokens and est_num_output_tokens to be the
+            # per-record average number of input and output tokens, respectively;
+            avg_num_input_tokens, avg_num_output_tokens = self._est_num_input_output_tokens(op_data)
+            op_cost_estimates['est_num_input_tokens'] = avg_num_input_tokens
+            op_cost_estimates['est_num_output_tokens'] = avg_num_output_tokens
+
+            # compute _usd_per_record (even though this is just a derivative of
+            # avg_num_input/output_tokens) as the per-record average spend
+            avg_usd = self._est_usd_per_record(op_data)
+            op_cost_estimates['usd_per_record'] = avg_usd
+
+            # NOTE: we estimate selectivity instead of cardinality because, given PZ's current
+            #       design, we will run the StatsProcessor on a sample of records to get data
+            #       for better cost estimates. Thus, using the `total_records` field as an estimate
+            #       for the cardinality of the operation would be really, really bad since it
+            #       would just be equal to the sample size. Instead, we estimate the selectivity
+            #       and then estimate new cardinalities inside each physical operator by multiplying
+            #       its source's cardinality by the selectivity estimate. The ultimate sources
+            #       (e.g. the CacheScan / MarshalAndScanDataOp) will give real cardinalities based
+            #       on the size of the datasource they are reading from.
+            #
+            # compute selectivity as (# of records in this op) / (# records in parent op);
+            # if this is the source operation then selectivity = 1.0
+            selectivity = (
+                self._est_selectivity(op_data, source_op_data)
+                if source_op_data is not None
+                else 1.0
+            )
+            op_cost_estimates['selectivity'] = selectivity
+
+            # For now, for the reasons outlined in the NOTE above, we do not directly estimate cardinality
+            op_cost_estimates['cardinality'] = None
+
+            # TODO: try estimating quality using mean or p90 log probability
+            # - first approach: mean output log prob. from generations? (no labels necessary)
+            # - if we have labels we can estimate directly (use semantic answer similarity to determine if output is correct)
+            op_cost_estimates['quality'] = None
+
+            # 
+            op_data = source_op_data
+            source_op_data = (
+                op_data['source']['agg_operator_stats']
+                if 'source' in op_data
+                else None
+            )
+            op_id = op_data['op_id'] if op_data is not None else None
+
+        return op_cost_estimates
+
+    def get_avg_record_stats(self):
+        """
+        Return a representation of an average trace for a record. E.g., it
+        starts in such and such operation and takes blah seconds to load
+        on avg., on median, p95, p99, max, etc. Then it goes to induce...
+        """
+        pass
+
+    def get_operator_aggregate_stats(self):
+        """
+        Return mapping op_id -> agg. stats. Also include computation tree.
+        Also compute mean, median, p95, p99, max stats.
+        """
+        pass
+
+    def get_output_record_lineages(self):
+        """
+        Get the lineage of transformations for each record in the final output
+        result set. The output is a list of lists, where each element in the outer
+        list represents a lineage of computation, and each element in the inner list
+        (i.e. the lineage of computation) is the state of each record after each
+        physical operation.
+        """
+        pass
+
+    def get_input_record_lineages(self):
+        """
+        Get the lineage of transformations for each record in the input set.
+        The output is a list of lists, where each element in the outer list
+        represents a lineage of computation, and each element in the inner list
+        (i.e. the lineage of computation) is the state of each record after each
+        physical operation.
+        """
+        pass

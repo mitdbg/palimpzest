@@ -1,5 +1,6 @@
 from palimpzest.sets import Set
 from palimpzest.policy import Policy, MaxQuality, UserChoice
+from palimpzest.profiler import StatsProcessor
 from palimpzest.datamanager import DataDirectory
 
 class Execution:
@@ -36,15 +37,17 @@ class Execution:
             sampleOutputs = [r for r in physicalTree]
             profileData = physicalTree.getProfilingData()
 
-            # REMIND michjc: now we must transform the profileData object into something that optimizers can use
-
             # We put this into an ephemeral cache
             cache.putCachedData("querySamples", self.rootset.universalIdentifier(), (sampleOutputs, profileData))
+
+        # process profileData with StatsProcessor
+        sp = StatsProcessor(profileData)
+        cost_estimates = sp.compute_cost_estimates()
 
         # Ok now reoptimize the logical plan, this time with the sample data.
         # (The data is not currently being used; let's see if this method can work first)
         logicalTree = self.rootset.getLogicalTree()
-        candidatePlans = logicalTree.createPhysicalPlanCandidates() # TODO: pass in (profiling) data from querySamples here
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(cost_estimates=cost_estimates)
         if type(self.policy) == UserChoice:
             def emitNestedTuple(node, indent=0):
                 elt, child = node

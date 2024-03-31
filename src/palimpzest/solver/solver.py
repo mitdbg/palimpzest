@@ -39,6 +39,14 @@ class Solver:
         # self._hardcodedFns.add((EquationImage, ImageFile))
         self._verbose = verbose
 
+    def isSimpleConversion(self, td: TaskDescriptor) -> bool:
+        """
+        Returns true if the given task descriptor has a simple type conversion.
+        """
+        typeConversionDescriptor = (td.outputSchema, td.inputSchema)
+        return typeConversionDescriptor in self._simpleTypeConversions
+
+
     def easyConversionAvailable(self, outputSchema: Schema, inputSchema: Schema):
         return (outputSchema, inputSchema) in self._simpleTypeConversions or (outputSchema, inputSchema) in self._hardcodedFns
 
@@ -66,7 +74,7 @@ class Solver:
 
     def _makeHardCodedTypeConversionFn(self, td: TaskDescriptor, shouldProfile: bool=False):
         """This converts from one type to another when we have a hard-coded method for doing so."""
-        if td.outputSchema == PDFFile and td.inputSchema == File: # TODO: stats?
+        if td.outputSchema == PDFFile and td.inputSchema == File:
             if td.pdfprocessor == "modal":
                 print("handling PDF processing remotely")
                 remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
