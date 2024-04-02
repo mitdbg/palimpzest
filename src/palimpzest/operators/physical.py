@@ -901,6 +901,8 @@ class ApplyGroupByOp(PhysicalOp):
                     #build group array
                     group = ()
                     for f in self.gbySig.gbyFields:
+                        if (not hasattr(r, f)):
+                            raise TypeError(f"ApplyGroupOp record missing expected field {f}")
                         group = group + (getattr(r,f),)
                     if group in aggState:
                         state = aggState[group]
@@ -910,6 +912,8 @@ class ApplyGroupByOp(PhysicalOp):
                             state.append(agg_init(fun))
                     for i in range(0,len(self.gbySig.aggFuncs)):
                         fun = self.gbySig.aggFuncs[i]
+                        if (not hasattr(r, self.gbySig.aggFields[i])):
+                            raise TypeError(f"ApplyGroupOp record missing expected field {self.gbySig.aggFields[i]}")
                         field = getattr(r, self.gbySig.aggFields[i])
                         state[i] = agg_merge(fun, state[i], field)
                     aggState[group] = state

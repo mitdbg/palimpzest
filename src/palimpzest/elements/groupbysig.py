@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Any, Dict
-from palimpzest.elements import Field, OperatorDerivedSchema
+from palimpzest.elements import Field, OperatorDerivedSchema, Schema
 
 #signature for a group by aggregate that applies
 # group and aggregation to an input tuple
@@ -10,6 +10,15 @@ class GroupBySig:
         self.aggFields = aggFields
         self.aggFuncs = aggFuncs
 
+    def validateSchema(self, inputSchema: Schema) -> tuple[bool, str]:
+        for f in self.gbyFields:
+            if not hasattr(inputSchema, f):
+                return (False, "Supplied schema has no field " + f)
+        for f in self.aggFields:
+            if not hasattr(inputSchema, f):
+                return (False, "Supplied schema has no field " + f)
+        return (True, None)
+    
     def serialize(a) -> Dict[str, Any]:
         out = {"groupByFields":a.gbyFields, "aggFuncs":a.aggFuncs, "aggFields": a.aggFields}
         return out

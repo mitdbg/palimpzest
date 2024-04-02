@@ -396,6 +396,9 @@ class FilteredScan(LogicalOperator):
 class GroupByAggregate(LogicalOperator):
     def __init__(self, outputSchema: Schema, inputOp: LogicalOperator, gbySig: elements.GroupBySig, targetCacheId: str=None):
         super().__init__(outputSchema, inputOp.outputSchema)
+        (valid, error) = gbySig.validateSchema(inputOp.outputSchema)
+        if (not valid):
+            raise TypeError(error)
         self.inputOp = inputOp 
         self.gbySig = gbySig
         self.targetCacheId = targetCacheId

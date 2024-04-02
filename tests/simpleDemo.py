@@ -137,7 +137,7 @@ def enronGbyPlan(datasetId):
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
-    gbyDesc = GroupBySig(groupbyfields, ops, fields)
+    gbyDesc = GroupBySig(emails.schema(), groupbyfields, ops, fields)
     groupedEmails = emails.groupby(gbyDesc)
     return groupedEmails
 
@@ -182,7 +182,7 @@ def buildImageAggPlan(datasetId):
     ops = ["count"]
     fields = ["breed"]
     groupbyfields = ["breed"]
-    gbyDesc = GroupBySig(groupbyfields, ops, fields)
+    gbyDesc = GroupBySig(dogImages, groupbyfields, ops, fields)
     groupedDogImages = dogImages.groupby(gbyDesc)
     return groupedDogImages
 
