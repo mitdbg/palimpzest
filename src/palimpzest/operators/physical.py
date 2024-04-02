@@ -825,6 +825,116 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
         return PhysicalOp.synthesizedFns[taskDescriptor](candidate)
 
+def agg_init(func):
+    if (func.lower() == 'count'):
+        return 0
+    elif (func.lower() == 'average'):
+        return (0,0)
+    else:
+        raise Exception("Unknown agg function " + func)
+
+def agg_merge(func, state, val):
+    if (func.lower() == 'count'):
+        return state + 1
+    elif (func.lower() == 'average'):
+        sum, cnt = state
+        return (sum + val, cnt + 1)
+    else:
+        raise Exception("Unknown agg function " + func)
+
+def agg_final(func, state):
+    if (func.lower() == 'count'):
+        return state
+    elif (func.lower() == 'average'):
+        sum, cnt = state
+        return float(sum)/cnt
+    else:
+        raise Exception("Unknown agg function " + func)
+
+
+class ApplyGroupByOp(PhysicalOp):
+        def __init__(self, source: PhysicalOp, gbySig: GroupBySig,  targetCacheId: str=None, shouldProfile=False):
+            super().__init__(outputSchema=gbySig.outputSchema(), shouldProfile=shouldProfile)
+            self.source = source
+            self.gbySig = gbySig
+            self.targetCacheId=targetCacheId
+            self.shouldProfile=shouldProfile
+
+        def __str__(self):
+            return str(self.gbySig)
+        def opId(self):
+            d = {
+                "operator": "ApplyGroupByOp",
+                "source": self.source.opId(),
+                "gbySig": str(GroupBySig.serialize(self.gbySig)),
+                "targetCacheId": self.targetCacheId,
+            }
+            ordered = json.dumps(d, sort_keys=True)
+            return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+        def dumpPhysicalTree(self):
+            """Return the physical tree of operators."""
+            return (self, self.source.dumpPhysicalTree())
+        
+        def estimateCost(self):
+            inputEstimates = self.source.estimateCost()
+
+            outputEstimates = {**inputEstimates}
+            outputEstimates['cardinality'] = 1
+
+            # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
+            outputEstimates['timePerElement'] = 0
+            outputEstimates['usdPerElement'] = 0
+            outputEstimates['estOutputTokensPerElement'] = 0
+
+            return outputEstimates
+
+
+
+        def __iter__(self):
+            datadir = DataDirectory()
+            shouldCache = datadir.openCache(self.targetCacheId)
+            aggState = {}
+
+            @self.profile(name="gby", op_id=self.opId(), shouldProfile=self.shouldProfile)
+            def iteratorFn():
+                for r in self.source:
+                    #build group array
+                    group = ()
+                    for f in self.gbySig.gbyFields:
+                        group = group + (getattr(r,f),)
+                    if group in aggState:
+                        state = aggState[group]
+                    else:
+                        state = []
+                        for fun in self.gbySig.aggFuncs:
+                            state.append(agg_init(fun))
+                    for i in range(0,len(self.gbySig.aggFuncs)):
+                        fun = self.gbySig.aggFuncs[i]
+                        field = getattr(r, self.gbySig.aggFields[i])
+                        state[i] = agg_merge(fun, state[i], field)
+                    aggState[group] = state
+
+                gbyFields = self.gbySig.gbyFields
+                aggFields = self.gbySig.getAggFieldNames()
+                for g in aggState.keys():
+                    dr = DataRecord(self.gbySig.outputSchema())
+                    for i in range(0, len(g)):
+                        k = g[i]
+                        setattr(dr, gbyFields[i], k)
+                    vals = aggState[g]
+                    for i in range(0, len(vals)):
+                        v = agg_final(self.gbySig.aggFuncs[i], vals[i])
+                        setattr(dr, aggFields[i], v)
+                    if shouldCache:
+                        datadir.appendCache(self.targetCacheId, dr)
+                    yield dr
+
+                if shouldCache:
+                    datadir.closeCache(self.targetCacheId)
+
+            return iteratorFn()
+
+
 
 class ApplyCountAggregateOp(PhysicalOp):
     def __init__(self, source: PhysicalOp, aggFunction: AggregateFunction, targetCacheId: str=None, shouldProfile=False):
