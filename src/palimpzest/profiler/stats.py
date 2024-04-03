@@ -784,57 +784,6 @@ class StatsProcessor:
 
         return cost_est_sample_data
 
-            # compute per-record average time spent in operator
-            avg_op_time = self._est_time_per_record(op_agg_stats) # TODO: op_data
-            op_cost_estimates[op_id]['time_per_record'] = avg_op_time
-
-            # compute est_num_input_tokens and est_num_output_tokens to be the
-            # per-record average number of input and output tokens, respectively;
-            avg_num_input_tokens, avg_num_output_tokens = self._est_num_input_output_tokens(op_agg_stats)
-            op_cost_estimates[op_id]['est_num_input_tokens'] = avg_num_input_tokens
-            op_cost_estimates[op_id]['est_num_output_tokens'] = avg_num_output_tokens
-
-            # compute _usd_per_record (even though this is just a derivative of
-            # avg_num_input/output_tokens) as the per-record average spend
-            avg_usd = self._est_usd_per_record(op_agg_stats)
-            op_cost_estimates[op_id]['usd_per_record'] = avg_usd
-
-            # NOTE: we estimate selectivity instead of cardinality because, given PZ's current
-            #       design, we will run the StatsProcessor on a sample of records to get data
-            #       for better cost estimates. Thus, using the `total_records` field as an estimate
-            #       for the cardinality of the operation would be really, really bad since it
-            #       would just be equal to the sample size. Instead, we estimate the selectivity
-            #       and then estimate new cardinalities inside each physical operator by multiplying
-            #       its source's cardinality by the selectivity estimate. The ultimate sources
-            #       (e.g. the CacheScan / MarshalAndScanDataOp) will give real cardinalities based
-            #       on the size of the datasource they are reading from.
-            #
-            # compute selectivity as (# of records in this op) / (# records in parent op);
-            # if this is the source operation then selectivity = 1.0
-            selectivity = (
-                self._est_selectivity(op_agg_stats, source_op_agg_stats)
-                if source_op_agg_stats is not None
-                else 1.0
-            )
-            op_cost_estimates[op_id]['selectivity'] = selectivity
-
-            # For now, for the reasons outlined in the NOTE above, we do not directly estimate cardinality
-            op_cost_estimates[op_id]['cardinality'] = None
-
-            # estimate quality using average of mean output token log probability and model's MMLU score
-            # - NOTE: if we have labels we can estimate directly (use semantic answer similarity to determine if output is correct)
-            op_cost_estimates[op_id]['quality'] = self._est_quality(op_agg_stats)
-
-            # update op_data, source_op_data, and op_id
-            op_data = source_op_data
-            source_op_data = (
-                source_op_data['source']
-                if source_op_data is not None and 'source' in source_op_data
-                else None
-            )
-            op_id = op_data['agg_operator_stats']['op_id'] if op_data is not None else None
-
-        return op_cost_estimates
 
     def get_avg_record_stats(self):
         """
