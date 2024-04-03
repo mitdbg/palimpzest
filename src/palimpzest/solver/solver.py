@@ -63,7 +63,7 @@ class Solver:
                     setattr(dr, field, getattr(candidate, field))
                 elif field.required:
                     return None
-            
+
             # if profiling, set record's stats for the given op_id to be an empty Stats object
             if shouldProfile:
                 candidate._stats[td.op_id] = InduceNonLLMStats()
@@ -283,7 +283,7 @@ class Solver:
 
                     # if profiling, set record's stats for the given op_id
                     if shouldProfile:
-                        candidate._stats[td.op_id] = FilterLLMStats(gen_stats=gen_stats)
+                        candidate._stats[td.op_id] = FilterLLMStats(gen_stats=gen_stats, filter=filterCondition)
 
                     # set _passed_filter attribute and return record
                     setattr(candidate, "_passed_filter", response.lower() == "true")

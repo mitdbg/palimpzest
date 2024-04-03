@@ -66,16 +66,16 @@ class Execution:
         if verbose:
             import json
             with open('sample_profiling.json', 'w') as f:
-                json.dump(profileData, f)
+                json.dump(profileData.to_dict(), f)
 
         # process profileData with StatsProcessor
         sp = StatsProcessor(profileData)
-        cost_estimates = sp.compute_cost_estimates()
+        cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
 
         # Ok now reoptimize the logical plan, this time with the sample data.
         # (The data is not currently being used; let's see if this method can work first)
         logicalTree = self.rootset.getLogicalTree()
-        candidatePlans = logicalTree.createPhysicalPlanCandidates(cost_estimates=cost_estimates, shouldProfile=shouldProfile)
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(cost_estimates=cost_estimate_sample_data, shouldProfile=shouldProfile)
         if type(self.policy) == UserChoice or verbose:
             print("----- POST-SAMPLE PLANS -----")
             for idx, cp in enumerate(candidatePlans):
@@ -94,4 +94,22 @@ class Execution:
             emitNestedTuple(physicalTree.dumpPhysicalTree())
 
         return physicalTree
+
+
+class SamplePlansExecution(Execution):
+
+    def __init__(self, rootset: Set, policy: Policy, n_plans: int) -> None:
+        self.rootset = rootset
+        self.policy = policy
+        self.n_plans = n_plans
+
+    def executeAndOptimize(self, verbose: bool=False, shouldProfile: bool=False):
+        """An execution of the rootset, subject to user-given policy."""
+        logicalTree = self.rootset.getLogicalTree()
+
+        # TODO:
+        # 1. enumerate plans
+        # 2. select N to run for k samples
+        # 3. gather execution data
+        # 4. provide all cost estimates to physical operators
 

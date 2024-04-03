@@ -232,6 +232,7 @@ GPT_4_MODEL_CARD = {
 }
 
 # TODO: rename MMLU to "overall" for all cards
+# TODO: use cost info in here: https://platform.openai.com/docs/guides/vision/calculating-costs
 GPT_4V_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 10 / 1E6,

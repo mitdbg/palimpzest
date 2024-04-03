@@ -4,10 +4,9 @@ from palimpzest.constants import *
 from palimpzest.corelib.schemas import ImageFile
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
-from palimpzest.elements import Any # TODO: can we delete?
 from palimpzest.solver.solver import Solver
 from palimpzest.solver.task_descriptors import TaskDescriptor
-from palimpzest.profiler import Profiler
+from palimpzest.profiler import OperatorStats, Profiler, StatsProcessor
 
 from typing import Any, Callable, Dict, Tuple, Union
 
@@ -27,19 +26,44 @@ class PhysicalOp:
     synthesizedFns = {}
     solver = Solver(verbose=LOG_LLM_OUTPUT)
 
-    def __init__(self, outputSchema: Schema, shouldProfile = False) -> None:
+    def __init__(self, outputSchema: Schema, source: PhysicalOp=None, shouldProfile=False) -> None:
         self.outputSchema = outputSchema
+        self.source = source
         self.datadir = DataDirectory()
         self.shouldProfile = shouldProfile
+
+        # NOTE: this must be overridden in each physical operator's __init__ method;
+        #       we have to do it their b/c the opId() (which is an argument to the
+        #       profiler's constructor) may not be valid until the physical operator
+        #       has initialized all of its member fields
+        self.profiler = None
 
     def opId(self) -> str:
         raise NotImplementedError("Abstract method")
 
     def dumpPhysicalTree(self) -> Tuple[PhysicalOp, Union[PhysicalOp, None]]:
-        raise NotImplementedError("Abstract method")
+        """Return the physical tree of operators."""
+        if self.source is None:
+            return (self, None)
 
-    def getProfilingData(self) -> Dict[str, Any]:
-        raise NotImplementedError("Abstract method")
+        return (self, self.source.dumpPhysicalTree())
+
+    def getProfilingData(self) -> OperatorStats:
+        # simply return stats for this operator if there is no source
+        if self.shouldProfile and self.source is None:
+            return self.profiler.get_data()
+
+        # otherwise, fetch the source operator's stats first, and then return
+        # the current operator's stats w/a copy of its sources' stats
+        elif self.shouldProfile:
+            source_operator_stats = self.source.getProfilingData()
+            operator_stats = self.profiler.get_data()
+            operator_stats.source_op_stats = source_operator_stats
+            return operator_stats
+
+        # raise an exception if this method is called w/out profiling turned on
+        else:
+            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
     def estimateCost(self, cost_estimates: dict={}) -> Dict[str, Any]:
         """Returns dict of time, cost, and quality metrics."""
@@ -66,17 +90,7 @@ class MarshalAndScanDataOp(PhysicalOp):
         ordered = json.dumps(d, sort_keys=True)
         return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def dumpPhysicalTree(self):
-        """Return the physical tree of operators."""
-        return (self, None)
-
-    def getProfilingData(self):
-        if self.shouldProfile:
-            return self.profiler.get_data()
-        else:
-            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
-                
-    def estimateCost(self, cost_estimates: dict={}):
+    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         cardinality = self.datadir.getCardinality(self.datasetIdentifier) + 1
         size = self.datadir.getSize(self.datasetIdentifier)
         perElementSizeInKb = (size / float(cardinality)) / 1024.0
@@ -84,8 +98,8 @@ class MarshalAndScanDataOp(PhysicalOp):
         # if we have sample data, use it to get a better estimate of the timePerElement
         # and the output tokens per element
         timePerElement = None
-        if self.opId() in cost_estimates:
-            timePerElement = cost_estimates[self.opId()]['time_per_record']
+        if cost_estimate_sample_data is not None:
+            timePerElement = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter="op_name == 'base_scan'")
         else:
             # estimate time spent reading each record
             datasetType = self.datadir.getRegisteredDatasetType(self.datasetIdentifier)
@@ -147,17 +161,7 @@ class CacheScanDataOp(PhysicalOp):
         ordered = json.dumps(d, sort_keys=True)
         return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def dumpPhysicalTree(self):
-        """Return the physical tree of operators."""
-        return (self, None)
-
-    def getProfilingData(self):
-        if self.shouldProfile:
-            return self.profiler.get_data()
-        else:
-            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
-
-    def estimateCost(self, cost_estimates: dict={}):
+    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # TODO: at the moment, getCachedResult() looks up a pickled file that stores
         #       the cached data specified by self.cacheIdentifier, opens the file,
         #       and then returns an iterator over records in the pickled file.
@@ -180,8 +184,8 @@ class CacheScanDataOp(PhysicalOp):
         # if we have sample data, use it to get a better estimate of the timePerElement
         # and the output tokens per element
         timePerElement = None
-        if self.opId() in cost_estimates:
-            timePerElement = cost_estimates[self.opId()]['time_per_record']
+        if cost_estimate_sample_data is not None:
+            timePerElement = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter="op_name == 'cache_scan'")
         else:
             # estimate time spent reading each record
             timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
@@ -220,8 +224,7 @@ class CacheScanDataOp(PhysicalOp):
 
 class InduceFromCandidateOp(PhysicalOp):
     def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, shouldProfile=False):
-        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
-        self.source = source
+        super().__init__(outputSchema=outputSchema, source=source, shouldProfile=shouldProfile)
         self.model = model
         self.cardinality = cardinality
         self.prompt_strategy = prompt_strategy
@@ -285,22 +288,9 @@ class InduceFromCandidateOp(PhysicalOp):
         ordered = json.dumps(d, sort_keys=True)
         return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def dumpPhysicalTree(self):
-        """Return the physical tree of operators."""
-        return (self, self.source.dumpPhysicalTree())
-
-    def getProfilingData(self):
-        if self.shouldProfile:
-            source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data()
-            operator_data["source"] = source_data
-            return operator_data
-        else:
-            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
-
-    def estimateCost(self, cost_estimates: dict={}):
+    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # fetch cost estimates from source operation
-        inputEstimates = self.source.estimateCost(cost_estimates)
+        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
 
         # if induce has a quick conversion; set "no-op" cost estimates
         if self._is_quick_conversion():
@@ -308,24 +298,31 @@ class InduceFromCandidateOp(PhysicalOp):
             return inputEstimates
 
         # if we have sample estimates, let's use those instead of our prescriptive estimates
-        if self.opId() in cost_estimates:
-            op_cost_estimates = cost_estimates[self.opId()]
+        if cost_estimate_sample_data is not None:
+            # get state variables
+            input_fields = json.dumps(sorted(self.source.outputSchema.fieldNames()))
+            generated_fields = json.dumps(sorted([field for field in self.outputSchema.fieldNames() if field not in input_fields]))
+
+            # compute estimates
+            filter = f"(input_fields == '{input_fields}') & (generated_fields == '{generated_fields}') & (op_name == 'induce'))"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
+            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, filter=filter)
+            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, filter=filter)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, filter=filter)
+            quality = StatsProcessor._est_quality(cost_estimate_sample_data, filter=filter)
 
             # estimate cardinality using sample selectivity and input cardinality est.
-            cardinality = inputEstimates['cardinality'] * op_cost_estimates['selectivity']
-
-            # for now, quality is still estimated from model card
-            quality = (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * inputEstimates["quality"]
+            cardinality = inputEstimates['cardinality'] * selectivity
 
             return {
                 "cardinality": cardinality,
-                "timePerElement": op_cost_estimates['time_per_record'],
-                "usdPerElement": op_cost_estimates['usd_per_record'],
-                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record'],
-                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + op_cost_estimates['usd_per_record'],
-                "totalTime": cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime'],
-                "totalUSD": cardinality * op_cost_estimates['usd_per_record'] + inputEstimates['totalUSD'],
-                "estOutputTokensPerElement": op_cost_estimates['est_num_output_tokens'],
+                "timePerElement": time_per_record,
+                "usdPerElement": usd_per_record,
+                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
+                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
+                "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
+                "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
+                "estOutputTokensPerElement": est_num_output_tokens,
                 "quality": quality,
             }
 
@@ -482,25 +479,12 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         ordered = json.dumps(d, sort_keys=True)
         return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def dumpPhysicalTree(self):
-        """Return the physical tree of operators."""
-        return (self, self.source.dumpPhysicalTree())
-
-    def getProfilingData(self):
-        if self.shouldProfile:
-            source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data()
-            operator_data["source"] = source_data
-            return operator_data
-        else:
-            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
-
-    def estimateCost(self, cost_estimates: dict={}):
+    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         """
         See InduceFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
         """
         # fetch cost estimates from source operation
-        inputEstimates = self.source.estimateCost(cost_estimates)
+        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
 
         # if induce has a quick conversion; set "no-op" cost estimates
         if self._is_quick_conversion():
@@ -508,24 +492,31 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             return inputEstimates
 
         # if we have sample estimates, let's use those instead of our prescriptive estimates
-        if self.opId() in cost_estimates:
-            op_cost_estimates = cost_estimates[self.opId()]
+        if cost_estimate_sample_data is not None:
+            # get state variables
+            input_fields = json.dumps(sorted(self.source.outputSchema.fieldNames()))
+            generated_fields = json.dumps(sorted([field for field in self.outputSchema.fieldNames() if field not in input_fields]))
+
+            # compute estimates
+            filter = f"(input_fields == '{input_fields}') & (generated_fields == '{generated_fields}') & (op_name == 'p_induce')"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
+            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, filter=filter)
+            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, filter=filter)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, filter=filter)
+            quality = StatsProcessor._est_quality(cost_estimate_sample_data, filter=filter)
 
             # estimate cardinality using sample selectivity and input cardinality est.
-            cardinality = inputEstimates['cardinality'] * op_cost_estimates['selectivity']
-
-            # for now, quality is still estimated from model card
-            quality = (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * inputEstimates["quality"]
+            cardinality = inputEstimates['cardinality'] * selectivity
 
             return {
                 "cardinality": cardinality,
-                "timePerElement": op_cost_estimates['time_per_record'],
-                "usdPerElement": op_cost_estimates['usd_per_record'],
-                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record'],
-                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + op_cost_estimates['usd_per_record'],
-                "totalTime": cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime'],
-                "totalUSD": cardinality * op_cost_estimates['usd_per_record'] + inputEstimates['totalUSD'],
-                "estOutputTokensPerElement": op_cost_estimates['est_num_output_tokens'],
+                "timePerElement": time_per_record,
+                "usdPerElement": usd_per_record,
+                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
+                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
+                "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
+                "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
+                "estOutputTokensPerElement": est_num_output_tokens,
                 "quality": quality,
             }
 
@@ -674,45 +665,34 @@ class FilterCandidateOp(PhysicalOp):
         ordered = json.dumps(d, sort_keys=True)
         return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def dumpPhysicalTree(self):
-        """Return the physical tree of operators."""
-        return (self, self.source.dumpPhysicalTree())
-
-    def getProfilingData(self):
-        if self.shouldProfile:
-            source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data()
-            operator_data["source"] = source_data
-            return operator_data
-        else:
-            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
-
-    def estimateCost(self, cost_estimates: dict={}):
+    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         """
         See InduceFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
         """
         # fetch cost estimates from source operation
-        inputEstimates = self.source.estimateCost(cost_estimates)
+        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
 
-        # if we have sample estimates, let's use those instead of our prescriptive estimates
-        if self.opId() in cost_estimates:
-            op_cost_estimates = cost_estimates[self.opId()]
+        if cost_estimate_sample_data is not None:
+            # compute estimates
+            filter = f"(filter == '{str(self.filter)}') & (op_name == 'filter')"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
+            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, filter=filter)
+            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, filter=filter)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, filter=filter)
+            quality = StatsProcessor._est_quality(cost_estimate_sample_data, filter=filter)
 
             # estimate cardinality using sample selectivity and input cardinality est.
-            cardinality = inputEstimates['cardinality'] * op_cost_estimates['selectivity']
-
-            # for now, quality is still estimated from model card
-            quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
+            cardinality = inputEstimates['cardinality'] * selectivity
 
             return {
                 "cardinality": cardinality,
-                "timePerElement": op_cost_estimates['time_per_record'],
-                "usdPerElement": op_cost_estimates['usd_per_record'],
-                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record'],
-                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + op_cost_estimates['usd_per_record'],
-                "totalTime": cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime'],
-                "totalUSD": cardinality * op_cost_estimates['usd_per_record'] + inputEstimates['totalUSD'],
-                "estOutputTokensPerElement": op_cost_estimates['est_num_output_tokens'],
+                "timePerElement": time_per_record,
+                "usdPerElement": usd_per_record,
+                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
+                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
+                "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
+                "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
+                "estOutputTokensPerElement": est_num_output_tokens,
                 "quality": quality,
             }
 
@@ -847,45 +827,33 @@ class ParallelFilterCandidateOp(PhysicalOp):
         ordered = json.dumps(d, sort_keys=True)
         return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def dumpPhysicalTree(self):
-        """Return the physical tree of operators."""
-        return (self, self.source.dumpPhysicalTree())
-
-    def getProfilingData(self):
-        if self.shouldProfile:
-            source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data()
-            operator_data["source"] = source_data
-            return operator_data
-        else:
-            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
-
-    def estimateCost(self, cost_estimates: dict={}):
+    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # fetch cost estimates from source operation
-        inputEstimates = self.source.estimateCost(cost_estimates)
+        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
 
-        # if we have sample estimates, let's use those instead of our prescriptive estimates
-        if self.opId() in cost_estimates:
-            op_cost_estimates = cost_estimates[self.opId()]
+        if cost_estimate_sample_data is not None:
+            # compute estimates
+            filter = f"(filter == '{str(self.filter)}') & (op_name == 'p_filter')"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
+            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, filter=filter)
+            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, filter=filter)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, filter=filter)
+            quality = StatsProcessor._est_quality(cost_estimate_sample_data, filter=filter)
 
             # estimate cardinality using sample selectivity and input cardinality est.
-            cardinality = inputEstimates['cardinality'] * op_cost_estimates['selectivity']
-
-            # for now, quality is still estimated from model card
-            quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
+            cardinality = inputEstimates['cardinality'] * selectivity
 
             return {
                 "cardinality": cardinality,
-                "timePerElement": op_cost_estimates['time_per_record'],
-                "usdPerElement": op_cost_estimates['usd_per_record'],
-                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record'],
-                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + op_cost_estimates['usd_per_record'],
-                "totalTime": cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime'],
-                "totalUSD": cardinality * op_cost_estimates['usd_per_record'] + inputEstimates['totalUSD'],
-                "estOutputTokensPerElement": op_cost_estimates['est_num_output_tokens'],
+                "timePerElement": time_per_record,
+                "usdPerElement": usd_per_record,
+                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
+                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
+                "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
+                "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
+                "estOutputTokensPerElement": est_num_output_tokens,
                 "quality": quality,
             }
-
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
@@ -1009,37 +977,26 @@ class ApplyCountAggregateOp(PhysicalOp):
         ordered = json.dumps(d, sort_keys=True)
         return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def dumpPhysicalTree(self):
-        """Return the physical tree of operators."""
-        return (self, self.source.dumpPhysicalTree())
-
-    def getProfilingData(self):
-        if self.shouldProfile:
-            source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data()
-            operator_data["source"] = source_data
-            return operator_data
-        else:
-            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
-
-    def estimateCost(self, cost_estimates: dict={}):
+    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # get input estimates and pass through to output
-        inputEstimates = self.source.estimateCost(cost_estimates)
+        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
         outputEstimates = {**inputEstimates}
 
         # the profiler will record timing info for this operator, which can be used
         # to improve timing related estimates
-        if self.opId() in cost_estimates:
-            op_cost_estimates = cost_estimates[self.opId()]
+        if cost_estimate_sample_data is not None:
+            # compute estimates
+            filter = f"(op_name == 'count')"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
 
             # output cardinality for an aggregate will be 1
             cardinality = 1
 
             # update cardinality, timePerElement and related stats
             outputEstimates['cardinality'] = cardinality
-            outputEstimates['timePerElement'] = op_cost_estimates['time_per_record']
-            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record']
-            outputEstimates['totalTime'] = cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime']
+            outputEstimates['timePerElement'] = time_per_record
+            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + time_per_record
+            outputEstimates['totalTime'] = cardinality * time_per_record + inputEstimates['totalTime']
 
             return outputEstimates
 
@@ -1101,37 +1058,27 @@ class ApplyUserFunctionOp(PhysicalOp):
         ordered = json.dumps(d, sort_keys=True)
         return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def dumpPhysicalTree(self):
-        """Return the physical tree of operators."""
-        return (self, self.source.dumpPhysicalTree())
-
-    def getProfilingData(self):
-        if self.shouldProfile:
-            source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data()
-            operator_data["source"] = source_data
-            return operator_data
-        else:
-            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
-
-    def estimateCost(self, cost_estimates: dict={}):
+    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # get input estimates and pass through to output
-        inputEstimates = self.source.estimateCost(cost_estimates)
+        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
         outputEstimates = {**inputEstimates}
 
         # the profiler will record selectivity and timing info for this operator,
         # which can be used to improve timing related estimates
-        if self.opId() in cost_estimates:
-            op_cost_estimates = cost_estimates[self.opId()]
+        if cost_estimate_sample_data is not None:
+            # compute estimates
+            filter = f"(filter == '{str(self.filter)}') & (op_name == 'p_filter')"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, filter=filter)
 
             # estimate cardinality using sample selectivity and input cardinality est.
-            cardinality = inputEstimates['cardinality'] * op_cost_estimates['selectivity']
+            cardinality = inputEstimates['cardinality'] * selectivity
 
             # update cardinality, timePerElement and related stats
             outputEstimates['cardinality'] = cardinality
-            outputEstimates['timePerElement'] = op_cost_estimates['time_per_record']
-            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record']
-            outputEstimates['totalTime'] = cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime']
+            outputEstimates['timePerElement'] = time_per_record
+            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + time_per_record
+            outputEstimates['totalTime'] = cardinality * time_per_record + inputEstimates['totalTime']
 
             return outputEstimates
 
@@ -1191,37 +1138,26 @@ class ApplyAverageAggregateOp(PhysicalOp):
         ordered = json.dumps(d, sort_keys=True)
         return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def dumpPhysicalTree(self):
-        """Return the physical tree of operators."""
-        return (self, self.source.dumpPhysicalTree())
-
-    def getProfilingData(self):
-        if self.shouldProfile:
-            source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data()
-            operator_data["source"] = source_data
-            return operator_data
-        else:
-            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
-
-    def estimateCost(self, cost_estimates: dict={}):
+    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # get input estimates and pass through to output
-        inputEstimates = self.source.estimateCost(cost_estimates)
+        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
         outputEstimates = {**inputEstimates}
 
         # the profiler will record timing info for this operator, which can be used
         # to improve timing related estimates
-        if self.opId() in cost_estimates:
-            op_cost_estimates = cost_estimates[self.opId()]
+        if cost_estimate_sample_data is not None:
+            # compute estimates
+            filter = f"(op_name == 'average')"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
 
             # output cardinality for an aggregate will be 1
             cardinality = 1
 
             # update cardinality, timePerElement and related stats
             outputEstimates['cardinality'] = cardinality
-            outputEstimates['timePerElement'] = op_cost_estimates['time_per_record']
-            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record']
-            outputEstimates['totalTime'] = cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime']
+            outputEstimates['timePerElement'] = time_per_record
+            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + time_per_record
+            outputEstimates['totalTime'] = cardinality * time_per_record + inputEstimates['totalTime']
 
             return outputEstimates
 
@@ -1287,37 +1223,26 @@ class LimitScanOp(PhysicalOp):
         ordered = json.dumps(d, sort_keys=True)
         return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def dumpPhysicalTree(self):
-        """Return the physical tree of operators."""
-        return (self, self.source.dumpPhysicalTree())
-
-    def getProfilingData(self):
-        if self.shouldProfile:
-            source_data = self.source.getProfilingData()
-            operator_data = self.profiler.get_data()
-            operator_data["source"] = source_data
-            return operator_data
-        else:
-            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
-
-    def estimateCost(self, cost_estimates: dict={}):
+    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # get input estimates and pass through to output
-        inputEstimates = self.source.estimateCost(cost_estimates)
+        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
         outputEstimates = {**inputEstimates}
-
-        # the profiler will record timing info for this operator, which can be used
-        # to improve timing related estimates
-        if self.opId() in cost_estimates:
-            op_cost_estimates = cost_estimates[self.opId()]
+        
+        # the profiler will record selectivity and timing info for this operator,
+        # which can be used to improve timing related estimates
+        if cost_estimate_sample_data is not None:
+            # compute estimates
+            filter = f"(filter == '{str(self.filter)}') & (op_name == 'p_filter')"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
 
             # output cardinality for limit can be at most self.limit
             cardinality = min(self.limit, inputEstimates["cardinality"])
 
             # update cardinality, timePerElement and related stats
             outputEstimates['cardinality'] = cardinality
-            outputEstimates['timePerElement'] = op_cost_estimates['time_per_record']
-            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + op_cost_estimates['time_per_record']
-            outputEstimates['totalTime'] = cardinality * op_cost_estimates['time_per_record'] + inputEstimates['totalTime']
+            outputEstimates['timePerElement'] = time_per_record
+            outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + time_per_record
+            outputEstimates['totalTime'] = cardinality * time_per_record + inputEstimates['totalTime']
 
             return outputEstimates
 

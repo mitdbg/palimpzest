@@ -101,6 +101,7 @@ class TogetherHFAdaptor(HFModel):
         top_p = kwargs.get("top_p", 0.7)
         top_k = kwargs.get("top_k", 50)
         repetition_penalty = kwargs.get("repetition_penalty", 1)
+        logprobs = kwargs.get("logprobs", 0)
         prompt = f"[INST]{prompt}[/INST]" if self.use_inst_template else prompt
 
         if use_chat_api:
@@ -117,6 +118,7 @@ class TogetherHFAdaptor(HFModel):
                 "top_k": top_k,
                 "repetition_penalty": repetition_penalty,
                 "stop": stop,
+                "logprobs": logprobs,
             }
         else:
             body = {
@@ -128,6 +130,7 @@ class TogetherHFAdaptor(HFModel):
                 "top_k": top_k,
                 "repetition_penalty": repetition_penalty,
                 "stop": stop,
+                "logprobs": logprobs,
             }
 
         headers = {"Authorization": f"Bearer {self.token}"}
@@ -144,6 +147,9 @@ class TogetherHFAdaptor(HFModel):
                 }
                 response['usage'] = resp_json['output']['usage']
                 response['finish_reason'] = resp_json['output']['finish_reason']
+                if logprobs > 0:
+                    response['tokens'] = resp_json['output']['choices'][0]['tokens']
+                    response['token_logprobs'] = resp_json['output']['choices'][0]['token_logprobs']
 
                 return response
         except Exception as e:
