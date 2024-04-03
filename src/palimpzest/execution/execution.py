@@ -62,15 +62,15 @@ class Execution:
             # We put this into an ephemeral cache
             cache.putCachedData("querySamples", self.rootset.universalIdentifier(), (sampleOutputs, profileData))
 
+        # process profileData with StatsProcessor
+        sp = StatsProcessor(profileData)
+        cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
+
         # TODO: remove
         if verbose:
             import json
             with open('sample_profiling.json', 'w') as f:
-                json.dump(profileData.to_dict(), f)
-
-        # process profileData with StatsProcessor
-        sp = StatsProcessor(profileData)
-        cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
+                json.dump(sp.profiling_data.to_dict(), f)
 
         # Ok now reoptimize the logical plan, this time with the sample data.
         # (The data is not currently being used; let's see if this method can work first)

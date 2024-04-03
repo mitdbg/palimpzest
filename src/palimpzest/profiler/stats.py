@@ -3,14 +3,14 @@ from __future__ import annotations
 from palimpzest.constants import MODEL_CARDS
 
 from collections import defaultdict
+from copy import deepcopy
 from dataclasses import dataclass, asdict, field
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
 import json
-
 
 @dataclass
 class OperatorStats:
@@ -103,16 +103,19 @@ class OperatorStats:
     total_api_call_duration: float=0.0
 
     def to_dict(self):
+        # create copy of self
+        self_copy = deepcopy(self)
+
         # convert defaultdict -> dict before calling asdict()
-        self.finish_reasons = dict(self.finish_reasons)
-        self.per_field_op_stats = dict(self.per_field_op_stats)
-        self.code_gen_op_stats = dict(self.code_gen_op_stats)
+        self_copy.finish_reasons = dict(self_copy.finish_reasons)
+        self_copy.per_field_op_stats = dict(self_copy.per_field_op_stats)
+        self_copy.code_gen_op_stats = dict(self_copy.code_gen_op_stats)
 
         # call to_dict() on source_op_stats
-        if self.source_op_stats is not None:
-            self.source_op_stats = self.source_op_stats.to_dict()
+        if self_copy.source_op_stats is not None:
+            self_copy.source_op_stats = self_copy.source_op_stats.to_dict()
 
-        return asdict(self)
+        return asdict(self_copy)
 
 
 @dataclass
@@ -601,15 +604,16 @@ class StatsProcessor:
         if profiling_data.source_op_stats is None:
             # in this case: op_time == cumulative_iter_time
             for record_dict in profiling_data.records:
-                record_dict['stats']['op_time'] = record_dict['stats']['cumulative_iter_time']
+                record_dict['stats'].op_time = record_dict['stats'].cumulative_iter_time
 
             # compute total_op_time
-            profiling_data.total_op_time = sum(list(map(lambda record_dict: record_dict['stats']['op_time'], profiling_data.records)))
+            profiling_data.total_op_time = sum(list(map(lambda record_dict: record_dict['stats'].op_time, profiling_data.records)))
 
             return profiling_data
 
         # TODO: this is N^2 in # of records; we may want to use a dictionary to speed this up
         # for each record we need to identify its parent to compute the op_time
+        # NOTE: source_op_stats will be a dictionary b/c profiling_data
         for record_dict in profiling_data.records:
             uuid = record_dict['uuid']
             parent_uuid = record_dict['parent_uuid']
@@ -620,10 +624,10 @@ class StatsProcessor:
                 #         1. the record's parent_uuid will equal the source_record's uuid (in the induce/agg case)
                 #         2. the record's uuid will equal the source_record's uuid (in the filter/limit case)
                 if parent_uuid == source_record_dict['uuid'] or uuid == source_record_dict['uuid']:
-                    record_dict['stats']['op_time'] = record_dict['stats']['cumulative_iter_time'] - source_record_dict['stats']['cumulative_iter_time']
+                    record_dict['stats'].op_time = record_dict['stats'].cumulative_iter_time - source_record_dict['stats'].cumulative_iter_time
 
         # compute total_op_time
-        profiling_data.total_op_time = sum(list(map(lambda record_dict: record_dict['stats']['op_time'], profiling_data.records)))
+        profiling_data.total_op_time = sum(list(map(lambda record_dict: record_dict['stats'].op_time, profiling_data.records)))
 
         # recurse
         profiling_data.source_op_stats = self._compute_op_time(profiling_data.source_op_stats)
@@ -696,7 +700,7 @@ class StatsProcessor:
 
         # get subset of records that were the source to this operator
         source_op_id = op_df.source_op_id.iloc[0]
-        source_op_df = df.query(op_id=source_op_id)
+        source_op_df = df.query(f"op_id=='{source_op_id}'")
 
         return len(op_df) / len(source_op_df)
 
@@ -726,7 +730,11 @@ class StatsProcessor:
             df = df.query(filter)
 
         # get all answer token log probabilities and compute the mean
-        all_answer_log_probs = np.array(df.answer_log_probs.tolist())
+        all_answer_log_probs = np.array([
+            log_prob
+            for log_probs in df.answer_log_probs.tolist()
+            for log_prob in log_probs
+        ])
         avg_token_log_probability = np.mean(all_answer_log_probs)
 
         # get prior believe of model quality
@@ -737,6 +745,33 @@ class StatsProcessor:
         est_quality = np.mean([model_quality, avg_token_log_probability]) 
 
         return est_quality
+
+    def _parse_record_llm_stats(self, record_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Extract gen_stats fields for get_cost_estimate_sample_data.
+        """
+        # create OperatorStats object with a single record
+        op_stats = OperatorStats()
+        op_stats.records = [record_dict]
+
+        # re-use _compute_agg_op_stats to compute statistics across all possible stats objects
+        op_stats = self._compute_agg_op_stats(op_stats)
+
+        # get values needed to compute observation metrics
+        additional_fields_dict = {
+            "model_name": op_stats.model_name,
+            "input_fields": "-".join(sorted(op_stats.input_fields)),
+            "generated_fields": "-".join(sorted(op_stats.generated_fields)),
+            "num_input_tokens": op_stats.total_input_tokens,
+            "num_output_tokens": op_stats.total_output_tokens,
+            "input_usd": op_stats.total_input_usd,
+            "output_usd": op_stats.total_output_usd,
+            "answer": op_stats.answers[0] if len(op_stats.answers) > 0 else None,
+            "answer_log_probs": op_stats.answer_log_probs[0] if len(op_stats.answer_log_probs) > 0 else None,
+        }
+
+        return additional_fields_dict
+
 
     def get_cost_estimate_sample_data(self) -> List[Dict[str, Any]]:
         """
@@ -751,32 +786,21 @@ class StatsProcessor:
         while op_data is not None:
             # append observation data for each record
             for record_dict in op_data.records:
-                # get values needed to compute observation metrics
-                model_name = record_dict["stats"]["model_name"]
-                num_input_tokens = record_dict["stats"]["usage"]["prompt_tokens"]
-                num_output_tokens = record_dict["stats"]["usage"]["completion_tokens"]
-
-                # look up cost per input/output token for given model
-                usd_per_input_token = MODEL_CARDS[model_name]["usd_per_input_token"]
-                usd_per_output_token = MODEL_CARDS[model_name]["usd_per_output_token"]
-
-                # create observation dictionary
+                # compute minimal observation which is supported by all operators
+                # TODO: one issue with this setup is that cache_scans of previously computed queries
+                #       may not match w/these observations due to the diff. op_name
                 observation = {
                     "op_id": op_data.op_id,
                     "op_name": op_data.op_name,
                     "source_op_id": op_data.source_op_stats.op_id if op_data.source_op_stats is not None else None,
-                    "input_fields": json.dumps(sorted(op_data.input_fields)),
-                    "generated_fields": json.dumps(sorted(op_data.generated_fields)),
-                    "op_time": record_dict["stats"]["op_time"],
-                    "num_input_tokens": num_input_tokens,
-                    "num_output_tokens": num_output_tokens,
-                    "model_name": model_name,
-                    "input_usd": num_input_tokens * usd_per_input_token,
-                    "output_usd": num_output_tokens * usd_per_output_token,
-                    "answer": record_dict["stats"]["answer"],
-                    "answer_log_probs": record_dict["stats"]["answer_log_probs"],
-                    "filter": record_dict["stats"]["filter"] if "filter" in record_dict["stats"] else None,
+                    "op_time": record_dict["stats"].op_time,
                 }
+
+                # add additional fields for induce or filter w/LLM
+                additional_fields_dict = self._parse_record_llm_stats(record_dict)
+                observation = dict(observation, **additional_fields_dict)
+
+                # add observation to list of observations
                 cost_est_sample_data.append(observation)
 
             # update op_data

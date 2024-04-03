@@ -298,7 +298,7 @@ if __name__ == "__main__":
             sp = StatsProcessor(profiling_data)
 
             with open('profiling.json', 'w') as f:
-                json.dump(sp.profiling_data, f)
+                json.dump(sp.profiling_data.to_dict(), f)
 
     elif task == "enronoptimize":
         rootSet = buildEnronPlan(datasetid)
@@ -315,7 +315,7 @@ if __name__ == "__main__":
             sp = StatsProcessor(profiling_data)
 
             with open('profiling.json', 'w') as f:
-                json.dump(sp.profiling_data, f)
+                json.dump(sp.profiling_data.to_dict(), f)
 
     elif task == "enronmap":
         rootSet = computeEnronStats(datasetid)

@@ -65,7 +65,7 @@ class PhysicalOp:
         else:
             raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
 
-    def estimateCost(self, cost_estimates: dict={}) -> Dict[str, Any]:
+    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None) -> Dict[str, Any]:
         """Returns dict of time, cost, and quality metrics."""
         raise NotImplementedError("Abstract method")
 
@@ -300,11 +300,13 @@ class InduceFromCandidateOp(PhysicalOp):
         # if we have sample estimates, let's use those instead of our prescriptive estimates
         if cost_estimate_sample_data is not None:
             # get state variables
-            input_fields = json.dumps(sorted(self.source.outputSchema.fieldNames()))
-            generated_fields = json.dumps(sorted([field for field in self.outputSchema.fieldNames() if field not in input_fields]))
+            input_fields = self.source.outputSchema.fieldNames()
+            generated_fields = [field for field in self.outputSchema.fieldNames() if field not in input_fields]
+            input_fields_str = "-".join(sorted(input_fields))
+            generated_fields_str = "-".join(sorted(generated_fields))
 
             # compute estimates
-            filter = f"(input_fields == '{input_fields}') & (generated_fields == '{generated_fields}') & (op_name == 'induce'))"
+            filter = f"(input_fields == '{input_fields_str}') & (generated_fields == '{generated_fields_str}') & (op_name == 'induce')"
             time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
             usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, filter=filter)
             _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, filter=filter)
@@ -498,7 +500,9 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             generated_fields = json.dumps(sorted([field for field in self.outputSchema.fieldNames() if field not in input_fields]))
 
             # compute estimates
-            filter = f"(input_fields == '{input_fields}') & (generated_fields == '{generated_fields}') & (op_name == 'p_induce')"
+            input_fields_str = "-".join(sorted(input_fields))
+            generated_fields_str = "-".join(sorted(generated_fields))
+            filter = f"(input_fields == '{input_fields_str}') & (generated_fields == '{generated_fields_str}') & (op_name == 'p_induce')"
             time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
             usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, filter=filter)
             _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, filter=filter)
