@@ -35,6 +35,11 @@ class DataRecord:
 
         super().__setattr__(key, value)
 
+
+
+    def __getitem__(self, key):
+        return super().__getattr__(key)
+
     @property
     def schema(self):
         return self._schema

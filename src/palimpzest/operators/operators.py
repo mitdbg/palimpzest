@@ -15,6 +15,7 @@ from palimpzest.operators import (
     ParallelFilterCandidateOp,
     ParallelInduceFromCandidateOp,
     PhysicalOp,
+    ApplyGroupByOp
 )
 from palimpzest.sampler import Sampler
 
@@ -390,6 +391,27 @@ class FilteredScan(LogicalOperator):
             return ParallelFilterCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.filter, model=model, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
         else:
             return FilterCandidateOp(self.outputSchema, self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.filter, model=model, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
+
+
+class GroupByAggregate(LogicalOperator):
+    def __init__(self, outputSchema: Schema, inputOp: LogicalOperator, gbySig: elements.GroupBySig, targetCacheId: str=None):
+        super().__init__(outputSchema, inputOp.outputSchema)
+        (valid, error) = gbySig.validateSchema(inputOp.outputSchema)
+        if (not valid):
+            raise TypeError(error)
+        self.inputOp = inputOp 
+        self.gbySig = gbySig
+        self.targetCacheId = targetCacheId
+    def __str__(self):
+        descStr = "Grouping Fields:" 
+        return (f"GroupBy({elements.GroupBySig.serialize(self.gbySig)})")
+    
+    def dumpLogicalTree(self):
+        """Return the logical subtree rooted at this operator"""
+        return (self, self.inputOp.dumpLogicalTree())
+
+    def _getPhysicalTree(self, strategy: str=None, model: Model=None, shouldProfile: bool=False):
+        return ApplyGroupByOp(self.inputOp._getPhysicalTree(strategy=strategy, model=model, shouldProfile=shouldProfile), self.gbySig, targetCacheId=self.targetCacheId, shouldProfile=shouldProfile)
 
 
 class ApplyAggregateFunction(LogicalOperator):
