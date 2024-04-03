@@ -742,7 +742,8 @@ class StatsProcessor:
         model_quality = (MODEL_CARDS[model_name]['MMLU'] / 100.0)
 
         # compute true mean of model's prior quality and our measurement of avg. log probability
-        est_quality = np.mean([model_quality, avg_token_log_probability]) 
+        # NOTE: recall that avg_token_log_probability will be a small neg. number
+        est_quality = np.mean([model_quality, 1 + avg_token_log_probability])
 
         return est_quality
 
