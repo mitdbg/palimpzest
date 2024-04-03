@@ -75,7 +75,7 @@ class Execution:
         # Ok now reoptimize the logical plan, this time with the sample data.
         # (The data is not currently being used; let's see if this method can work first)
         logicalTree = self.rootset.getLogicalTree()
-        candidatePlans = logicalTree.createPhysicalPlanCandidates(cost_estimates=cost_estimate_sample_data, shouldProfile=shouldProfile)
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(cost_estimate_sample_data=cost_estimate_sample_data, shouldProfile=shouldProfile)
         if type(self.policy) == UserChoice or verbose:
             print("----- POST-SAMPLE PLANS -----")
             for idx, cp in enumerate(candidatePlans):

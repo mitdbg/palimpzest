@@ -165,7 +165,7 @@ class LogicalOperator:
 
         return physicalPlans
 
-    def createPhysicalPlanCandidates(self, cost_estimates: dict={}, shouldProfile: bool=False) -> List[PhysicalPlan]:
+    def createPhysicalPlanCandidates(self, cost_estimate_sample_data: List[Dict[str, Any]]=None, shouldProfile: bool=False) -> List[PhysicalPlan]:
         """Return a set of physical trees of operators."""
         # create set of logical plans (e.g. consider different filter/join orderings)
         logicalPlans = self._createLogicalPlans()
@@ -180,7 +180,7 @@ class LogicalOperator:
         # estimate the cost (in terms of USD, latency, throughput, etc.) for each plan
         plans = []
         for physicalPlan in physicalPlans:
-            planCost = physicalPlan.estimateCost(cost_estimates=cost_estimates)
+            planCost = physicalPlan.estimateCost(cost_estimate_sample_data=cost_estimate_sample_data)
 
             totalTime = planCost["totalTime"]
             totalCost = planCost["totalUSD"]  # for now, cost == USD
