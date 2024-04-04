@@ -7,7 +7,7 @@ from PIL import Image
 
 
 from palimpzest.execution import Execution
-from palimpzest.elements import DataRecord
+from palimpzest.elements import DataRecord, GroupBySig
 
 import gradio as gr
 import numpy as np
@@ -148,6 +148,40 @@ def computeEnronStats(datasetId):
     subjectLineLengths = emails.convert(pz.Number, desc = "The number of words in the subject field")
     return subjectLineLengths
 
+def enronGbyPlan(datasetId):
+    emails = pz.Dataset(datasetId, schema=Email)
+    ops = ["count"]
+    fields = ["sender"]
+    groupbyfields = ["sender"]
+    gbyDesc = GroupBySig(emails.schema(), groupbyfields, ops, fields)
+    groupedEmails = emails.groupby(gbyDesc)
+    return groupedEmails
+
+def enronCountPlan(datasetId):
+    emails = pz.Dataset(datasetId, schema=Email)
+    ops = ["count"]
+    fields = ["sender"]
+    groupbyfields = []
+    gbyDesc = GroupBySig(groupbyfields, ops, fields)
+    countEmails = emails.groupby(gbyDesc)
+    return countEmails
+
+def enronAverageCountPlan(datasetId):
+    emails = pz.Dataset(datasetId, schema=Email)
+    ops = ["count"]
+    fields = ["sender"]
+    groupbyfields = ["sender"]
+    gbyDesc = GroupBySig(groupbyfields, ops, fields)
+    groupedEmails = emails.groupby(gbyDesc)
+    ops = ["average"]
+    fields = ["count(sender)"]
+    groupbyfields = []
+    gbyDesc = GroupBySig(groupbyfields, ops, fields)
+    averageEmailsPerSender = groupedEmails.groupby(gbyDesc)
+
+    return averageEmailsPerSender
+
+
 class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required = True)
 
@@ -156,6 +190,17 @@ def buildImagePlan(datasetId):
     filteredImages = images.filterByStr("The image contains one or more dogs")
     dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
     return dogImages
+
+def buildImageAggPlan(datasetId):
+    images = pz.Dataset(datasetId, schema=pz.ImageFile)
+    filteredImages = images.filterByStr("The image contains one or more dogs")
+    dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
+    ops = ["count"]
+    fields = ["breed"]
+    groupbyfields = ["breed"]
+    gbyDesc = GroupBySig(dogImages, groupbyfields, ops, fields)
+    groupedDogImages = dogImages.groupby(gbyDesc)
+    return groupedDogImages
 
 
 def buildNestedStr(node, indent=0, buildStr=""):
@@ -319,6 +364,29 @@ if __name__ == "__main__":
         print("----------")
         print()
         printTable(records, cols=["sender", "subject"], gradio=True, plan=physicalTree)
+    elif task == "enronGby":
+        rootSet = enronGbyPlan(datasetid)
+        physicalTree = emitDataset(rootSet, policy, title="Enron email counts", verbose=args.verbose)
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records, cols=["sender", "count(sender)"], gradio=True, plan=physicalTree)
+    elif task == "enronCount":
+        rootSet = enronCountPlan(datasetid)
+        physicalTree = emitDataset(rootSet, policy, title="Enron email counts", verbose=args.verbose)
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records, cols=["count(sender)"], gradio=True, plan=physicalTree)
+    elif task == "enronAvgCount":
+        rootSet = enronAverageCountPlan(datasetid)
+        physicalTree = emitDataset(rootSet, policy, title="Enron email counts", verbose=args.verbose)
+        records = [r for r in physicalTree]
+        print("----------")
+        print()
+        printTable(records, cols=["average(count(sender))"], gradio=True, plan=physicalTree)
+
+
 
         # if profiling was turned on; capture statistics
         if args.profile:
@@ -449,6 +517,12 @@ if __name__ == "__main__":
             with open('profiling-data/streaming-profiling.json', 'w') as f:
                 json.dump(sp.profiling_data.to_dict(), f)
 
+    elif task =="gbyImage":
+        # TODO: integrate w/profiling
+        rootSet = buildImageAggPlan(datasetid)
+        physicalTree = emitDataset(rootSet, policy, title="Dogs", verbose=args.verbose)
+        for r in physicalTree:
+            print(r)
 
     elif task == "image":
         print("Starting image task")
