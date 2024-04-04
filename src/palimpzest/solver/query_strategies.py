@@ -1,7 +1,7 @@
 from palimpzest.constants import PromptStrategy
 from palimpzest.elements import DataRecord
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-# from palimpzest.profiler import Stats
+from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats
 from palimpzest.solver.task_descriptors import TaskDescriptor
 
 from typing import Any, Dict, List, Tuple
@@ -98,8 +98,7 @@ def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
 
 def _create_data_record_from_json(jsonObj: Any, td: TaskDescriptor, candidate: DataRecord) -> DataRecord:
     # initialize data record
-    dr = DataRecord(td.outputSchema)
-    dr.parent_uuid = candidate.uuid
+    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
 
     # copy fields from the candidate (input) record if they already exist,
     # otherwise parse them from the generated jsonObj
@@ -112,8 +111,8 @@ def _create_data_record_from_json(jsonObj: Any, td: TaskDescriptor, candidate: D
 
     return dr
 
-# TODO: Stats
-def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[List[DataRecord], dict, str]:
+
+def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[List[DataRecord], Stats, str]:
     """
     Run a bonded query, in which all new fields in the outputSchema are generated simultaneously
     in a single LLM call. This is in contrast to a conventional query, in which each output field
@@ -143,16 +142,19 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
     promptQuestion = _construct_query_prompt(td, doc_type, generate_field_names)
 
     # generate LLM response and capture statistics
-    answer, query_stats = None, None
+    answer, bonded_query_stats = None, None
     try:
         if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # invoke LLM to generate output JSON
             generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-            answer, query_stats = generator.generate(text_content, promptQuestion)
+            answer, gen_stats = generator.generate(text_content, promptQuestion)
 
-            # add input and *computed* output fields to query_stats object
-            query_stats["in_fields"] = td.inputSchema.fieldNames()
-            query_stats["out_fields"] = generate_field_names
+            # construct BondedQueryStats object
+            bonded_query_stats = BondedQueryStats(
+                gen_stats=gen_stats,
+                input_fields=td.inputSchema.fieldNames(),
+                generated_fields=generate_field_names,
+            )
 
         elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
             # b64 decode of candidate.contents
@@ -160,11 +162,14 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
 
             # invoke LLM to generate output JSON
             generator = ImageTextGenerator(td.model.value)
-            answer, query_stats = generator.generate(image_b64, promptQuestion)
+            answer, gen_stats = generator.generate(image_b64, promptQuestion)
 
-            # add input and *computed* output fields to query_stats object
-            query_stats["in_fields"] = td.inputSchema.fieldNames()
-            query_stats["out_fields"] = generate_field_names
+            # construct BondedQueryStats object
+            bonded_query_stats = BondedQueryStats(
+                gen_stats=gen_stats,
+                input_fields=td.inputSchema.fieldNames(),
+                generated_fields=generate_field_names,
+            )
 
         # TODO
         elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:
@@ -183,24 +188,24 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
                 dr = _create_data_record_from_json(elt, td, candidate)
                 drs.append(dr)
         else:
-            dr = _create_data_record_from_json(elt, td, candidate)
+            dr = _create_data_record_from_json(jsonObj, td, candidate)
             drs = [dr]
 
     except Exception as e:
-        return None, query_stats, str(e)
+        print(f"Bonded query processing error: {str(e)}")
+        return None, bonded_query_stats, str(e)
 
-    return drs, query_stats, None
+    return drs, bonded_query_stats, None
 
-# TODO: Stats
-def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[DataRecord, dict]:
+
+def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[DataRecord, Stats]:
     """
     Run a conventional query, in which each output field is generated using its own LLM call.
 
     At the moment, conventional queries cannot execute tasks with cardinality == "oneToMany".
     """
     # initialize output data record
-    dr = DataRecord(td.outputSchema)
-    dr.parent_uuid = candidate.uuid
+    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
 
     # copy fields from the candidate (input) record if they already exist
     # and construct list of fields in outputSchema which will need to be generated
@@ -255,4 +260,25 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
             setattr(dr, field_name, None)
             query_stats[f"{field_name}"] = None
 
-    return dr, query_stats
+    # construct ConventionalQueryStats object
+    field_query_stats_lst = [FieldQueryStats(gen_stats=gen_stats, field_name=field_name) for field_name, gen_stats in query_stats.items()]
+    conventional_query_stats = ConventionalQueryStats(
+        field_query_stats_lst=field_query_stats_lst,
+        input_fields=td.inputSchema.fieldNames(),
+        generated_fields=generate_field_names,
+    )
+
+    return dr, conventional_query_stats
+
+
+# TODO: @Zui
+def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[DataRecord, Stats]:
+    """
+    I think this would roughly map to the internals of _makeCodeGenTypeConversionFn() in your branch.
+    Similar to the functions above, I moved most of the details of generating responses
+    """
+    # dr = None
+    # full_code_gen_stats = None
+    
+    # return dr, full_code_gen_stats
+    raise Exception("not implemented yet")
