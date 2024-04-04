@@ -1,27 +1,72 @@
-from palimpzest.tools.profiler import Profiler
-
+from palimpzest.constants import log_attempt_number, RETRY_MAX_ATTEMPTS, RETRY_MAX_SECS, RETRY_MULTIPLIER
 from dsp.modules.hf import HFModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+import dspy
 import requests
 
-# retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
-RETRY_MULTIPLIER = 2
-RETRY_MAX_SECS = 10
-RETRY_MAX_ATTEMPTS = 1
+### DSPy Signatures ###
+# Given a questionn, we'll feed it with the paper context for answer generation.
+class FilterOverPaper(dspy.Signature):
+    """Answer condition questions about a scientific paper."""
 
-def log_attempt_number(retry_state):
-    """return the result of the last call attempt"""
-    print(f"Retrying: {retry_state.attempt_number}...")
+    context = dspy.InputField(desc="contains full text of the paper, including author, institution, title, and body")
+    question = dspy.InputField(desc="one or more conditions about the paper")
+    answer = dspy.OutputField(desc="often a TRUE/FALSE answer to the condition question(s) about the paper")
+
+class QuestionOverPaper(dspy.Signature):
+    """Answer question(s) about a scientific paper."""
+
+    context = dspy.InputField(desc="contains full text of the paper, including author, institution, title, and body")
+    question = dspy.InputField(desc="one or more question about the paper")
+    answer = dspy.OutputField(desc="print the answer only, separated by a newline character")
+
+# functions which generate signatures
+def gen_signature_class(instruction, context_desc, question_desc, answer_desc):
+    class QuestionOverDoc(dspy.Signature):
+        __doc__ = instruction
+        context = dspy.InputField(desc= context_desc)
+        question = dspy.InputField(desc= question_desc)
+        answer = dspy.OutputField(desc= answer_desc)
+    return QuestionOverDoc
+
+def gen_filter_signature_class(doc_schema, doc_type):
+    instruction = f"Answer condition questions about a {doc_schema}."
+    context_desc = f"contains full text of the {doc_type}"
+    question_desc = f"one or more conditions about the {doc_type}"
+    answer_desc = f"often a TRUE/FALSE answer to the condition question(s) about the {doc_type}"
+    return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
+
+def gen_qa_signature_class(doc_schema, doc_type):
+    instruction = f"Answer question(s) about a {doc_schema}."
+    context_desc = f"contains full text of the {doc_type}"
+    question_desc = f"one or more question about the {doc_type}"
+    answer_desc = f"print the answer only, separated by a newline character"
+    return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
 
+### DSPy Modules ###
+class dspyCOT(dspy.Module):
+    """
+    Invoke dspy in chain of thought mode
+    """
+    def __init__(self, f_signature=FilterOverPaper):
+        super().__init__()
+        self.generate_answer = dspy.ChainOfThought(f_signature)
+
+    def forward(self, question, context):
+        context = context
+        answer = self.generate_answer(context=context, question=question)
+        return answer
+
+
+### DSPy wrapped LLM calls ###
 class TogetherHFAdaptor(HFModel):
-    def __init__(self, model, apiKey, shouldProfile, **kwargs):
+    def __init__(self, model, apiKey, **kwargs):
         super().__init__(model=model, is_client=True)
         self.api_base = "https://api.together.xyz/inference"
         self.token = apiKey
         self.model = model
-        self.shouldProfile = shouldProfile
 
         self.use_inst_template = False
         if any(keyword in self.model.lower() for keyword in ["inst", "instruct"]):
@@ -29,7 +74,7 @@ class TogetherHFAdaptor(HFModel):
 
         stop_default = "\n\n---"
 
-#        print("Stop procedure", stop_default)
+        # print("Stop procedure", stop_default)
         self.kwargs = {
             "temperature": 0.0,
             "max_tokens": 8192,
@@ -37,7 +82,7 @@ class TogetherHFAdaptor(HFModel):
             "top_k": 20,
             "repetition_penalty": 1,
             "n": 1,
-#            "stop": stop_default if "stop" not in kwargs else kwargs["stop"],
+            # "stop": stop_default if "stop" not in kwargs else kwargs["stop"],
             **kwargs
         }
 
@@ -97,14 +142,8 @@ class TogetherHFAdaptor(HFModel):
                     "prompt": resp_json['prompt'][-1],
                     "choices": [{"text": c} for c in completions],
                 }
-
-                # add key(s) for usage, finish_reason if profiling the system
-#                print("COMPLETIONS:", completions)
-#               print("STOP REASON", resp_json['output']['finish_reason'])
-
-                if self.shouldProfile:
-                    response['usage'] = resp_json['output']['usage']
-                    response['finish_reason'] = resp_json['output']['finish_reason']
+                response['usage'] = resp_json['output']['usage']
+                response['finish_reason'] = resp_json['output']['finish_reason']
 
                 return response
         except Exception as e:

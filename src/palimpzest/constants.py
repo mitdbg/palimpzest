@@ -5,6 +5,11 @@ import os
 
 # ENUMS
 class Model(Enum):
+    """
+    Model describes the underlying LLM which should be used to perform some operation
+    which requires invoking an LLM. It does NOT specify whether the model need be executed
+    remotely or locally (if applicable).
+    """
     LLAMA2 = "meta-llama/Llama-2-7b-hf"
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
     GPT_3_5 = "gpt-3.5-turbo-0125"
@@ -14,11 +19,36 @@ class Model(Enum):
     GEMINI_1V = "gemini-1.0-pro-vision-latest"
 
 class PromptStrategy(Enum):
+    """
+    PromptStrategy describes the prompting technique to be used by a Generator when
+    performing some task with a specified Model.
+    """
     ZERO_SHOT = "zero-shot"
     FEW_SHOT = "few-shot"
     IMAGE_TO_TEXT = "image-to-text"
-    DSPY_COT = "dspy-chain-of-thought"
-    DSPY_BOOL = "dspy-bool"
+    DSPY_COT_BOOL = "dspy-chain-of-thought-bool"
+    DSPY_COT_QA = "dspy-chain-of-thought-question"
+    CODE_GEN_BOOL = "code-gen-bool"
+
+class QueryStrategy(Enum):
+    """
+    QueryStrategy describes the high-level approach to querying a Model (or generated code)
+    in order to perform a specified task.
+    """
+    CONVENTIONAL = "conventional"
+    BONDED = "bonded"
+    BONDED_WITH_FALLBACK = "bonded-with-fallback"
+    CODE_GEN = "code-gen"
+    CODE_GEN_WITH_FALLBACK = "codegen-with-fallback"
+
+# retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
+RETRY_MULTIPLIER = 2
+RETRY_MAX_SECS = 10
+RETRY_MAX_ATTEMPTS = 1
+
+def log_attempt_number(retry_state):
+    """return the result of the last call attempt"""
+    print(f"Retrying: {retry_state.attempt_number}...")
 
 # Palimpzest root directory
 PZ_DIR = os.path.join(os.path.expanduser("~"), ".palimpzest")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from palimpzest.tools.profiler import Profiler
+from palimpzest.profiler import Profiler
 import palimpzest as pz
 
 from tabulate import tabulate

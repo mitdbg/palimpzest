@@ -24,6 +24,9 @@ class Profiler:
             # total number of records returned by the iterator for this operator
             "total_records": 0,
 
+            # TODO: compute this as sum of individual record times
+            # TODO: for each individual record, subtract the (cumulative_)iter_time of its source/parent to get
+            #       the actual time spent in this operator
             # total time spent in this iterator; this will include time spent in input operators
             "total_iter_time": 0.0,
 
@@ -126,7 +129,7 @@ class Profiler:
 
         To use the profiler, simply apply it to an iterator as follows:
 
-        @profiler(name="foo", op_id="some-logical-op")
+        @profiler(name="foo", op_id="some-logical-op", shouldProfile=True)
         def someIterator():
             # do normal iterator things
             yield dr
@@ -138,7 +141,6 @@ class Profiler:
 
             @wraps(iterator)
             def timed_iterator():
-                t_op_start = time.time()
                 t_record_start = time.time()
                 for record in iterator():
                     t_record_end = time.time()
@@ -151,6 +153,9 @@ class Profiler:
                     # add time spent in iteration for operator
                     record._stats[op_id]["iter_time"] = t_record_end - t_record_start
 
+                    # TODO: since we were trying to have records be re-created by each operator,
+                    #       this _state dict should only have one (key, value) for a given record
+                    #       which means we can just replace this with a {} and put op_id in as a key
                     # update state of record for complete history of computation
                     record._state[op_id] = {
                         "name": name,
@@ -191,9 +196,8 @@ class Profiler:
                     # start timer for next iteration
                     t_record_start = time.time()
 
-                # compute total time for iterator to finish
-                t_final = time.time()
-                self.agg_operator_stats["total_iter_time"] = t_final - t_op_start
-
             return timed_iterator
         return profile_decorator
+
+    
+    # TODO: define generator_profiler?
