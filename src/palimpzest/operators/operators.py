@@ -153,8 +153,9 @@ class LogicalOperator:
         if os.getenv('TOGETHER_API_KEY') is not None:
             models.extend([Model.MIXTRAL])
 
-        if os.getenv('GOOGLE_API_KEY') is not None:
-            models.extend([Model.GEMINI_1])
+        # TODO: uncomment once dspy pushes v2.4.1 to PyPI
+        # if os.getenv('GOOGLE_API_KEY') is not None:
+        #     models.extend([Model.GEMINI_1])
 
         assert len(models) > 0, "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
 

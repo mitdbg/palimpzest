@@ -192,6 +192,7 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
             drs = [dr]
 
     except Exception as e:
+        print(f"Bonded query processing error: {str(e)}")
         return None, bonded_query_stats, str(e)
 
     return drs, bonded_query_stats, None
@@ -260,7 +261,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
             query_stats[f"{field_name}"] = None
 
     # construct ConventionalQueryStats object
-    field_query_stats_lst = [FieldQueryStats(gen_stats, field_name) for field_name, gen_stats in query_stats.items()]
+    field_query_stats_lst = [FieldQueryStats(gen_stats=gen_stats, field_name=field_name) for field_name, gen_stats in query_stats.items()]
     conventional_query_stats = ConventionalQueryStats(
         field_query_stats_lst=field_query_stats_lst,
         input_fields=td.inputSchema.fieldNames(),

@@ -106,7 +106,7 @@ class DSPyGenerator(BaseGenerator):
 
         # get indices of the start and end token for the answer
         start_idx, end_idx = 0, 0
-        while not answer == "".join(tokens[start_idx:end_idx+1]):
+        while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
             if answer.startswith(tokens[start_idx]):
                 end_idx += 1
             else:
@@ -231,7 +231,7 @@ class ImageTextGenerator(BaseGenerator):
             candidate = completion.choices[-1]
             answer = candidate.message.content
             finish_reason = candidate.finish_reason
-            usage = completion.usage
+            usage = dict(completion.usage)
             tokens = list(map(lambda elt: elt.token, completion.choices[-1].logprobs.content))
             token_logprobs = list(map(lambda elt: elt.logprob, completion.choices[-1].logprobs.content))
 
@@ -256,7 +256,7 @@ class ImageTextGenerator(BaseGenerator):
         """
         # get indices of the start and end token for the answer
         start_idx, end_idx = 0, 0
-        while not answer == "".join(tokens[start_idx:end_idx+1]):
+        while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
             if answer.startswith(tokens[start_idx]):
                 end_idx += 1
             else:

@@ -63,7 +63,7 @@ class PhysicalOp:
 
         # raise an exception if this method is called w/out profiling turned on
         else:
-            raise Exception("Profiling was not turned on; please set PZ_PROFILING=TRUE in your shell.")
+            raise Exception("Profiling was not turned on; please ensure shouldProfile=True when executing plan.")
 
     def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None) -> Dict[str, Any]:
         """Returns dict of time, cost, and quality metrics."""
@@ -238,8 +238,17 @@ class InduceFromCandidateOp(PhysicalOp):
             if self.model in [Model.GPT_3_5, Model.GPT_4]:
                 self.model = Model.GPT_4V
             if self.model == Model.GEMINI_1:
-                self.model = Model.GEMINI_1V               
+                self.model = Model.GEMINI_1V
+            if self.model in [Model.MIXTRAL, Model.LLAMA2]:
+                import random
+                self.model = random.choice([Model.GPT_4V, Model.GEMINI_1V])
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
+
+        # TODO: remove once dspy pushes v2.4.1 to PyPI
+        if self.model == Model.GEMINI_1:
+            self.model = Model.GPT_4
+        elif self.model == Model.GEMINI_1V:
+            self.model = Model.GPT_4V
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
@@ -431,8 +440,17 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             if self.model in [Model.GPT_3_5, Model.GPT_4]:
                 self.model = Model.GPT_4V
             if self.model == Model.GEMINI_1:
-                self.model = Model.GEMINI_1V               
+                self.model = Model.GEMINI_1V
+            if self.model in [Model.MIXTRAL, Model.LLAMA2]:
+                import random
+                self.model = random.choice([Model.GPT_4V, Model.GEMINI_1V])
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
+
+        # TODO: remove once dspy pushes v2.4.1 to PyPI
+        if self.model == Model.GEMINI_1:
+            self.model = Model.GPT_4
+        elif self.model == Model.GEMINI_1V:
+            self.model = Model.GPT_4V
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
@@ -1021,10 +1039,13 @@ class ApplyCountAggregateOp(PhysicalOp):
         @self.profile(name="count", shouldProfile=self.shouldProfile)
         def iteratorFn():
             counter = 0
-            for _ in self.source:
+            for record in self.source:
                 counter += 1
 
-            dr = DataRecord(Number)
+            # NOTE: this will set the parent_uuid to be the uuid of the final source record;
+            #       this is ideal for computing the op_time of the count operation, but maybe
+            #       we should set this DataRecord as having multiple parents in the future
+            dr = DataRecord(Number, parent_uuid=record._uuid)
             dr.value = counter
             if shouldCache:
                 datadir.appendCache(self.targetCacheId, dr)
@@ -1190,7 +1211,10 @@ class ApplyAverageAggregateOp(PhysicalOp):
                 except:
                     pass
 
-            dr = DataRecord(Number)
+            # NOTE: this will set the parent_uuid to be the uuid of the final source record;
+            #       this is ideal for computing the op_time of the count operation, but maybe
+            #       we should set this DataRecord as having multiple parents in the future
+            dr = DataRecord(Number, parent_uuid=nextCandidate._uuid)
             dr.value = sum / float(counter)
             if shouldCache:
                 datadir.appendCache(self.targetCacheId, dr)
