@@ -440,12 +440,6 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 self.model = random.choice([Model.GPT_4V, Model.GEMINI_1V])
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
-        # TODO: remove once dspy pushes v2.4.1 to PyPI
-        if self.model == Model.GEMINI_1:
-            self.model = Model.GPT_4
-        elif self.model == Model.GEMINI_1V:
-            self.model = Model.GPT_4V
-
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
