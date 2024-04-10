@@ -65,6 +65,9 @@ class Execution:
         # TODO: remove
         if verbose:
             import json
+            import os
+            if not os.path.exists('profiling-data'):
+                os.makedirs('profiling-data')
             with open('profiling-data/eo-raw_profiling.json', 'w') as f:
                 sp = StatsProcessor(profileData)
                 json.dump(sp.profiling_data.to_dict(), f)
