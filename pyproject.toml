@@ -12,8 +12,7 @@ dependencies = [
     "charset-normalizer>=3.3.2",
     "click>=8.1.7",
     "click-aliases>=1.0.4",
-    # updated dspy to make it work with Google Gemini
-    "dspy-ai>=2.4.1", # not available on pypi, install from source
+    "dspy-ai>=2.4.1",
     "fastapi~=0.100.0",
     "google-generativeai==0.4.1",
     "gradio>=4.20.1",
