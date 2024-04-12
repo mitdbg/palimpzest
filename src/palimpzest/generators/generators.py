@@ -113,17 +113,16 @@ class DSPyGenerator(BaseGenerator):
             raise ValueError("Model must be one of the language models specified in palimpzest.constants.Model")
 
         # get indices of the start and end token for the answer
-        start_idx, end_idx = 0, 0
-        while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
-            if answer.startswith(tokens[start_idx]):
-                end_idx += 1
-            else:
-                start_idx += 1
-                end_idx = start_idx
-
+        # start_idx, end_idx = 0, 0
+        # while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
+            # if answer.startswith(tokens[start_idx]):
+                # end_idx += 1
+            # else:
+                # start_idx += 1
+                # end_idx = start_idx
         # filter for log probs of tokens which appear in answer
-        answer_log_probs = token_logprobs[start_idx:end_idx+1]
-
+        # answer_log_probs = token_logprobs[start_idx:end_idx+1]
+        answer_log_probs = token_logprobs
         # return those tokens log probabilities
         return answer_log_probs
 
@@ -270,17 +269,19 @@ class ImageTextGenerator(BaseGenerator):
         Filter and return the list of log probabilities for the tokens which appear in `answer`.
         """
         # get indices of the start and end token for the answer
-        start_idx, end_idx = 0, 0
-        while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
-            if answer.startswith(tokens[start_idx]):
-                end_idx += 1
-            else:
-                start_idx += 1
-                end_idx = start_idx
+
+        # start_idx, end_idx = 0, 0
+        # while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
+            # if answer.startswith(tokens[start_idx]):
+                # end_idx += 1
+            # else:
+                # start_idx += 1
+                # end_idx = start_idx
 
         # filter for log probs of tokens which appear in answer
-        answer_log_probs = token_logprobs[start_idx:end_idx+1]
-
+        # answer_log_probs = token_logprobs[start_idx:end_idx+1]
+        answer_log_probs = token_logprobs
+        
         # return those tokens log probabilities
         return answer_log_probs
 
