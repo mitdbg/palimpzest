@@ -3,6 +3,7 @@ from palimpzest.datamanager import DataDirectory
 from palimpzest.corelib import URL, WebPage, Download
 
 import requests
+from requests_html import HTMLSession # for downloading JavaScript content
 import datetime
 from bs4 import BeautifulSoup
 
@@ -32,11 +33,20 @@ class DownloadHTMLFunction(UserFunction):
         text = soup.get_text(separator='\n', strip=True)        
         return text
 
+    def get_page_text(self, url):
+        headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
+        }
+
+        session = HTMLSession()
+        response = session.get(url, headers=headers)
+        return response.text
+
     # Someday we should introduce an abstraction that lets us
     # coalesce many requests into a bulk operation. This code is
     # fine for a dozen requests, but not for a million.
     def map(self, dr: DataRecord):
-        textcontent = requests.get(dr.url).text
+        textcontent = self.get_page_text(dr.url)
         dr2 = DataRecord(self.outputSchema, parent_uuid=dr._uuid)
         dr2.url = dr.url
 
