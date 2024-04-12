@@ -68,7 +68,7 @@ class DataRecord:
 
     def __str__(self):
         keys = sorted(self.__dict__)
-        items = ("{}={!r}".format(k, str(self.__dict__[k])[:15]) for k in keys)
+        items = ("{}={!r}...".format(k, str(self.__dict__[k])[:15]) for k in keys)
         return "{}({})".format(type(self).__name__, ", ".join(items))
 
     def __eq__(self, other):
