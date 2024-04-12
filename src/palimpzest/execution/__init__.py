@@ -1,2 +1,1 @@
-
-from .execution import Execution
+from .execution import Execution, SimpleExecution
