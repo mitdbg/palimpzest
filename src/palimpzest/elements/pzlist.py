@@ -1,4 +1,4 @@
-from .elements import Field
+from palimpzest.elements import Field
 
 class ListField(Field, list):
     """A field representing a list of elements of specified types, with full list functionality."""

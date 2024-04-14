@@ -178,7 +178,7 @@ class Solver:
                 dr.sheet_names = xls.sheet_names
 
                 if shouldProfile:
-                    candidate._stats[td.op_id] = InduceNonLLMStats()
+                    candidate._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
                 return [dr]
             return _fileToXLS
 

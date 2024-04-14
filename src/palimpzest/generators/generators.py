@@ -77,7 +77,24 @@ class DSPyGenerator(BaseGenerator):
 
         return model
 
-    def _get_attn(dspy_lm: dsp.LM):
+    def _get_usage_and_finish_reason(self, dspy_lm: dsp.LM):
+        """
+        Parse and return the usage statistics and finish reason.
+        """
+        usage, finish_reason = None, None
+        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+            usage = dspy_lm.history[-1]['response']['usage']
+            finish_reason = dspy_lm.history[-1]['response']['choices'][-1]['finish_reason']
+        elif self.model_name in [Model.GEMINI_1.value]:
+            usage = {}
+            finish_reason = dspy_lm.history[-1]['response'][0]._result.candidates[0].finish_reason
+        elif self.model_name in [Model.MIXTRAL.value]:
+            usage = dspy_lm.history[-1]['response']['usage']
+            finish_reason = dspy_lm.history[-1]['response']['finish_reason']
+
+        return usage, finish_reason
+
+    def _get_attn(self, dspy_lm: dsp.LM):
         """
         TODO
         """
@@ -147,16 +164,7 @@ class DSPyGenerator(BaseGenerator):
 
         # extract the log probabilities for the actual result(s) which are returned
         answer_log_probs = self._get_answer_log_probs(dspy_lm, pred.answer)
-        # TODO refactor this out in a method like in ImageTextGenerator?
-        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
-            usage = dspy_lm.history[-1]['response']['usage']
-            finish_reason = dspy_lm.history[-1]['response']['choices'][-1]['finish_reason']
-        elif self.model_name in [Model.GEMINI_1.value]:
-            usage = {}
-            finish_reason = dspy_lm.history[-1]['response'][0]._result.candidates[0].finish_reason
-        elif self.model_name in [Model.MIXTRAL.value]:
-            usage = dspy_lm.history[-1]['response']['usage']
-            finish_reason = dspy_lm.history[-1]['response']['finish_reason']        
+        usage, finish_reason = self._get_usage_and_finish_reason(dspy_lm)
 
         # collect statistics on prompt, usage, and timing
         stats = GenerationStats(
