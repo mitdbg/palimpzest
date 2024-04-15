@@ -1,4 +1,4 @@
-from palimpzest.elements import BytesField, Schema, StringField, File
+from palimpzest.elements import BytesField, Schema, StringField, File, NumericField, ListField
 
 ###################################################################################
 # "Core" useful Schemas. These are Schemas that almost everyone will need.
@@ -37,3 +37,18 @@ class WebPage(Schema):
     text = StringField(desc="The text contents of the web page", required=True)
     html = StringField(desc="The html contents of the web page", required=True)
     timestamp = StringField(desc="The timestamp of the download", required=True)
+
+class XLSFile(File):
+    """An XLS file is a File that contains one or more Excel spreadsheets."""
+    number_sheets = NumericField(desc="The number of sheets in the Excel file", required=True)
+    sheet_names = ListField(element_type=NumericField, desc="The names of the sheets in the Excel file", required=True)
+
+class TabularRow(Schema):
+    """A Row is a list of cells. For simplicity, we assume that all cell values are strings."""
+    cells = ListField(element_type=StringField, desc="The cells in the row", required=True)
+
+class Table(Schema):
+    """A Table is an object composed of a header and rows."""
+    name = StringField(desc="The name of the table", required=False)
+    header = ListField(element_type=StringField, desc="The header of the table", required=True)
+    rows = ListField(element_type=TabularRow, desc="The rows of the table", required=True)

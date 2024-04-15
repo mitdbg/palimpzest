@@ -70,14 +70,31 @@ class DSPyGenerator(BaseGenerator):
 
         elif self.model_name in [Model.GEMINI_1.value]:
             google_key = get_api_key('GOOGLE_API_KEY')
-            model = dspy.Google(model=self.model_name, api_key=google_key, return_dict=True)
+            model = dspy.Google(model=self.model_name, api_key=google_key)
 
         else:
             raise ValueError("Model must be one of the language models specified in palimpzest.constants.Model")
 
         return model
 
-    def _get_attn(dspy_lm: dsp.LM):
+    def _get_usage_and_finish_reason(self, dspy_lm: dsp.LM):
+        """
+        Parse and return the usage statistics and finish reason.
+        """
+        usage, finish_reason = None, None
+        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+            usage = dspy_lm.history[-1]['response']['usage']
+            finish_reason = dspy_lm.history[-1]['response']['choices'][-1]['finish_reason']
+        elif self.model_name in [Model.GEMINI_1.value]:
+            usage = {}
+            finish_reason = dspy_lm.history[-1]['response'][0]._result.candidates[0].finish_reason
+        elif self.model_name in [Model.MIXTRAL.value]:
+            usage = dspy_lm.history[-1]['response']['usage']
+            finish_reason = dspy_lm.history[-1]['response']['finish_reason']
+
+        return usage, finish_reason
+
+    def _get_attn(self, dspy_lm: dsp.LM):
         """
         TODO
         """
@@ -92,11 +109,19 @@ class DSPyGenerator(BaseGenerator):
         """
         # get log probabilities data structure
         tokens, token_logprobs = None, None
-        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value, Model.GEMINI_1.value]:
+
+        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
             log_probs = dspy_lm.history[-1]['response']['choices'][-1]['logprobs']['content']
             tokens = list(map(lambda elt: elt['token'], log_probs))
             token_logprobs = list(map(lambda elt: elt['logprob'], log_probs))
+        elif self.model_name in [Model.GEMINI_1.value]:
+            return None
+            # TODO Google gemini does not provide log probabilities! 
+            # https://github.com/google/generative-ai-python/issues/238
+            # tok_count = dspy_lm.llm.count_tokens(answer).total_tokens
+            # tokens = [""] * tok_count
+            # token_logprobs = [0] * len(tokens)
         elif self.model_name in [Model.MIXTRAL.value]:
             # reponse: dict_keys(['prompt', 'choices', 'usage', 'finish_reason', 'tokens', 'token_logprobs'])
             tokens = dspy_lm.history[-1]['response']['tokens']
@@ -105,17 +130,16 @@ class DSPyGenerator(BaseGenerator):
             raise ValueError("Model must be one of the language models specified in palimpzest.constants.Model")
 
         # get indices of the start and end token for the answer
-        start_idx, end_idx = 0, 0
-        while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
-            if answer.startswith(tokens[start_idx]):
-                end_idx += 1
-            else:
-                start_idx += 1
-                end_idx = start_idx
-
+        # start_idx, end_idx = 0, 0
+        # while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
+            # if answer.startswith(tokens[start_idx]):
+                # end_idx += 1
+            # else:
+                # start_idx += 1
+                # end_idx = start_idx
         # filter for log probs of tokens which appear in answer
-        answer_log_probs = token_logprobs[start_idx:end_idx+1]
-
+        # answer_log_probs = token_logprobs[start_idx:end_idx+1]
+        answer_log_probs = token_logprobs
         # return those tokens log probabilities
         return answer_log_probs
 
@@ -123,6 +147,7 @@ class DSPyGenerator(BaseGenerator):
         wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
         after=log_attempt_number,
+        reraise=True,
     )
     def generate(self, context: str, question: str) -> GenerationOutput:
         # fetch model
@@ -139,18 +164,15 @@ class DSPyGenerator(BaseGenerator):
 
         # extract the log probabilities for the actual result(s) which are returned
         answer_log_probs = self._get_answer_log_probs(dspy_lm, pred.answer)
+        usage, finish_reason = self._get_usage_and_finish_reason(dspy_lm)
 
         # collect statistics on prompt, usage, and timing
         stats = GenerationStats(
             model_name=self.model_name,
             llm_call_duration_secs=end_time - start_time,
             prompt=dspy_lm.history[-1]['prompt'],
-            usage=dspy_lm.history[-1]['response']['usage'],
-            finish_reason=(
-                dspy_lm.history[-1]['response']['finish_reason']
-                if isinstance(dspy_lm, TogetherHFAdaptor)
-                else dspy_lm.history[-1]['response']['choices'][-1]['finish_reason']
-            ),
+            usage=usage,
+            finish_reason=finish_reason,
             answer_log_probs=answer_log_probs,
             answer=pred.answer,
         )
@@ -255,17 +277,19 @@ class ImageTextGenerator(BaseGenerator):
         Filter and return the list of log probabilities for the tokens which appear in `answer`.
         """
         # get indices of the start and end token for the answer
-        start_idx, end_idx = 0, 0
-        while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
-            if answer.startswith(tokens[start_idx]):
-                end_idx += 1
-            else:
-                start_idx += 1
-                end_idx = start_idx
+
+        # start_idx, end_idx = 0, 0
+        # while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
+            # if answer.startswith(tokens[start_idx]):
+                # end_idx += 1
+            # else:
+                # start_idx += 1
+                # end_idx = start_idx
 
         # filter for log probs of tokens which appear in answer
-        answer_log_probs = token_logprobs[start_idx:end_idx+1]
-
+        # answer_log_probs = token_logprobs[start_idx:end_idx+1]
+        answer_log_probs = token_logprobs
+        
         # return those tokens log probabilities
         return answer_log_probs
 

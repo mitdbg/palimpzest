@@ -1,6 +1,7 @@
+from io import BytesIO
 from palimpzest.constants import PromptStrategy, QueryStrategy
 from palimpzest.elements import DataRecord, File, TextFile, Schema
-from palimpzest.corelib import EquationImage, ImageFile, PDFFile
+from palimpzest.corelib import EquationImage, ImageFile, PDFFile, Download, XLSFile, Table, TabularRow
 from palimpzest.generators import DSPyGenerator
 from palimpzest.profiler import ApiStats, FilterLLMStats, InduceLLMStats, InduceNonLLMStats
 from palimpzest.solver.query_strategies import runBondedQuery, runConventionalQuery, runCodeGenQuery
@@ -13,7 +14,7 @@ from papermage import Document
 import json
 import modal
 import time
-
+import pandas as pd
 
 class Solver:
     """
@@ -32,9 +33,14 @@ class Solver:
         self._hardcodedFns = {}
         self._simpleTypeConversions = set()
         self._hardcodedFns = set()
+        # TODO GV: As we add more hardcoded functions, we should find a more scalable way to manage them,
+        # a simple idea could be to have a dictionary of hardcoded functions, where the key is a tuple of the input and output schema
         self._hardcodedFns.add((PDFFile, File))
         self._hardcodedFns.add((PDFFile, File))
         self._hardcodedFns.add((TextFile, File))
+        self._hardcodedFns.add((File, Download))
+        self._hardcodedFns.add((XLSFile, File))
+        self._hardcodedFns.add((Table, XLSFile))
         # self._hardcodedFns.add((ImageFile, File))
         # self._hardcodedFns.add((EquationImage, ImageFile))
         self._verbose = verbose
@@ -105,7 +111,7 @@ class Solver:
                 dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
                 dr.filename = pdf_filename
                 dr.contents = pdf_bytes
-                dr.text_contents = text_content
+                dr.text_contents = text_content[:10000] # TODO Very hacky
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
@@ -143,8 +149,72 @@ class Solver:
                 return [dr]
             return _imageToEquation
 
+        elif td.outputSchema == File and td.inputSchema == Download: # TODO make sure this is also true for children classes of File
+            def _downloadToFile(candidate: DataRecord):
+                if not candidate.schema == td.inputSchema:
+                    return None
+                dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
+                # Assign a filename that is parsed from the URL
+                dr.filename = candidate.url.split("/")[-1]
+                dr.contents = candidate.content
+                if shouldProfile:
+                    candidate._stats[td.op_id] = InduceNonLLMStats()
+                return [dr]
+            return _downloadToFile
+
+        elif td.outputSchema == XLSFile and td.inputSchema == File:
+            def _fileToXLS(candidate: DataRecord):
+                if not candidate.schema == td.inputSchema:
+                    return None
+                dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
+                dr.filename = candidate.filename
+                dr.contents = candidate.contents
+
+                start_time = time.time()
+                xls = pd.ExcelFile(BytesIO(candidate.contents), engine='openpyxl')
+                api_stats = ApiStats(api_call_duration_secs=time.time() - start_time)
+
+                dr.number_sheets = len(xls.sheet_names)
+                dr.sheet_names = xls.sheet_names
+
+                if shouldProfile:
+                    candidate._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
+                return [dr]
+            return _fileToXLS
+
+        elif td.outputSchema == Table and td.inputSchema == XLSFile:
+            cardinality = td.cardinality
+            def _excelToTable(candidate: DataRecord):
+                xls_bytes = candidate.contents
+                # dr.sheets = [xls.parse(name) for name in candidate.sheet_names]
+                sheet_names = [candidate.sheet_names[0]] if cardinality is None else candidate.sheet_names
+
+                records = []
+                for sheet_name in sheet_names:
+                    start_time = time.time()
+                    dataframe = pd.read_excel(BytesIO(xls_bytes), sheet_name=sheet_name, engine='openpyxl')
+                    api_stats = ApiStats(api_call_duration_secs=time.time() - start_time)
+
+                    # construct data record
+                    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
+                    rows = []
+                    for row in dataframe.values[:100]: # TODO Extend this with dynamic sizing of context length
+                        row_record = DataRecord(TabularRow, parent_uuid=dr._uuid)
+                        row_record.cells = [str(x) for x in row]
+                        rows += [row_record]
+                    dr.rows = rows
+
+                    dr.header = dataframe.columns.values
+                    dr.name = candidate.filename.split("/")[-1] + " - " + sheet_name
+
+                    if shouldProfile:
+                        dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
+                    records.append(dr)
+                return records
+            return _excelToTable
+
         else:
-            raise Exception(f"Cannot hard-code conversion from {td.inputSchema} to {td.outputSchema}")
+            raise Exception(f"There is no hard-coded conversion from {td.inputSchema} to {td.outputSchema}")
 
 
     def _makeLLMTypeConversionFn(self, td: TaskDescriptor, shouldProfile: bool=False):
