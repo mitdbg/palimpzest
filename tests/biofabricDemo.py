@@ -7,7 +7,7 @@ python src/cli/cli_main.py reg --path testdata/biofabric-urls/ --name biofabric-
 import context
 from palimpzest.constants import PZ_DIR
 import palimpzest as pz
-
+import pdb 
 import gradio as gr
 import numpy as np
 import pandas as pd
@@ -27,6 +27,27 @@ class ScientificPaper(pz.PDFFile):
    journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
    subject = pz.Field(desc="A summary of the paper contribution in one sentence", required=False)
    doiURL = pz.Field(desc="The DOI URL for the paper", required=True)
+
+class CaseData(pz.Schema):
+    """An individual row extracted from a table containing medical study data."""
+    case_submitter_id = pz.Field(desc="The ID of the case", required=True)
+    age_at_diagnosis = pz.Field(desc="The age of the patient in days at the time of diagnosis", required=False)
+    race = pz.Field(desc="An arbitrary classification of a taxonomic group that is a division of a species.", required=False)
+    ethnicity = pz.Field(desc="Whether an individual describes themselves as Hispanic or Latino or not.", required=False)
+    gender = pz.Field(desc="Text designations that identify gender.", required=False)
+    vital_status = pz.Field(desc="The vital status of the patient", required=False)
+    ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
+    ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
+    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
+    tumor_grade = pz.Field(desc="The tumor grade", required=False)
+    tumor_focality = pz.Field(desc="The tumor focality", required=False)
+    tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter", required=False)
+    primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
+    morphology = pz.Field(desc="The morphology", required=False)
+    tissue_or_organ_of_origin = pz.Field(desc="The tissue or organ of origin", required=False)
+    # tumor_code = pz.Field(desc="The tumor code", required=False)
+    # study = pz.Field(desc="The study", required=False)
+
 
 if __name__ == "__main__":
     startTime = time.time()
@@ -65,29 +86,44 @@ if __name__ == "__main__":
     tables = binary_tables.convert(pz.File)
     xls = tables.convert(pz.XLSFile)
 
-    if from_xls:
-        xls = pz.Dataset('biofabric-xls', schema=pz.XLSFile)
+    # if from_xls:
+    xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)
         
     patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
     # patient_tables = patient_tables.filterByStr("The table explains the meaning of attributes")
-    # patient_tables = patient_tables.filterByStr("The table records if the patient is excluded from the study")
     # patient_tables = patient_tables.filterByStr("The table contains patient biometric data")
+    # patient_tables = patient_tables.filterByStr("The rows of the table contain the patient age")
     # patient_tables = patient_tables.filterByStr("The table contains proteomic data")
 
-    output = patient_tables
+    patient_tables = patient_tables.filterByStr("The table records if the patient is excluded from the study")
+    # output = patient_tables
+
+    case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
+    output = case_data
+
     execution = pz.SimpleExecution(output, policy)
-    physicalTree = execution.executeAndOptimize(verbose=args.verbose)
+    physicalTree = execution.executeAndOptimize(args.verbose)
 
+
+    output_rows = []
     for table in physicalTree:
-        header = table.header
-        subset_rows = table.rows[:3]
+        if table.schema == pz.Table:
+            header = table.header
+            subset_rows = table.rows[:3]
 
-        print("Table name:", table.name)
-        print(" | ".join(header)[:100], "...")
-        for row in subset_rows:
-            print(" | ".join(row.cells)[:100], "...")
-        print()
+            print("Table name:", table.name)
+            print(" | ".join(header)[:100], "...")
+            for row in subset_rows:
+                print(" | ".join(row)[:100], "...")
+            print()
+        else:
+            print([k+":"+str(v)+"\n" for k,v in table.asDict().items()])
+            print("------------------------------")
+            output_rows.append(table.asDict()) 
 
+    output_df = pd.DataFrame(output_rows)
+    print(output_df)
+    output_df.to_csv("output.csv", index=False)
 
     endTime = time.time()
     print("Elapsed time:", endTime - startTime)
