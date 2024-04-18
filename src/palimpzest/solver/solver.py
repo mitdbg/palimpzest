@@ -1,4 +1,5 @@
 from io import BytesIO
+import numpy as np
 from palimpzest.constants import PromptStrategy, QueryStrategy
 from palimpzest.elements import DataRecord, File, TextFile, Schema
 from palimpzest.corelib import EquationImage, ImageFile, PDFFile, Download, XLSFile, Table, TabularRow
@@ -199,10 +200,9 @@ class Solver:
                     dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
                     rows = []
                     for row in dataframe.values[:100]: # TODO Extend this with dynamic sizing of context length
-                        row_record = DataRecord(TabularRow, parent_uuid=dr._uuid)
-                        row_record.cells = [str(x) for x in row]
+                        row_record = [str(x) for x in row]
                         rows += [row_record]
-                    dr.rows = rows
+                    dr.rows = np.asarray(rows)
 
                     dr.header = dataframe.columns.values
                     dr.name = candidate.filename.split("/")[-1] + " - " + sheet_name
@@ -258,8 +258,7 @@ class Solver:
                     print(f"BondedQuery Error: {err_msg}")
                     print("Falling back to conventional query")
                     dr, conventional_query_stats = runConventionalQuery(candidate, td, self._verbose)
-                    drs = [dr]
-
+                    drs = [dr] if type(dr) is not list else dr
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     for dr in drs:
@@ -348,7 +347,7 @@ class Solver:
                         raise Exception("not implemented yet")
 
                     # invoke LLM to generate filter decision (True or False)
-                    text_content = candidate.asTextJSON()
+                    text_content = candidate.asJSON()
                     response, gen_stats = generator.generate(context=text_content, question=filterCondition)
 
                     # if profiling, set record's stats for the given op_id

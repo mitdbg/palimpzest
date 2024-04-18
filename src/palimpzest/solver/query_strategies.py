@@ -1,3 +1,4 @@
+import re
 from palimpzest.constants import PromptStrategy
 from palimpzest.elements import DataRecord
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
@@ -93,6 +94,8 @@ def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
     # is returning these, but the JSON parser can't take them
     answer = answer.replace("\_", "_")
 
+    # Handle comments in the JSON response. Use regex from // until end of line 
+    answer = re.sub(r'\/\/.*$', '', answer)
     return json.loads(answer)
 
 
@@ -107,7 +110,7 @@ def _create_data_record_from_json(jsonObj: Any, td: TaskDescriptor, candidate: D
             setattr(dr, field_name, getattr(candidate, field_name))
         else:
             # parse the json object and set the DataRecord's fields with their generated values 
-            setattr(dr, field_name, jsonObj[field_name])
+            setattr(dr, field_name, jsonObj.get(field_name, None)) # the use of get prevents a KeyError if an individual field is missing. TODO: is this behavior desired?
 
     return dr
 
@@ -134,7 +137,7 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
             generate_field_names.append(field_name)
 
     # fetch input information
-    text_content = candidate.asTextJSON()
+    text_content = candidate.asJSON()
     doc_schema = str(td.outputSchema)
     doc_type = td.outputSchema.className()
 
@@ -148,7 +151,6 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
             # invoke LLM to generate output JSON
             generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
             answer, gen_stats = generator.generate(text_content, promptQuestion)
-
             # construct BondedQueryStats object
             bonded_query_stats = BondedQueryStats(
                 gen_stats=gen_stats,
@@ -184,6 +186,8 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
 
         # parse JSON output and construct data records
         if td.cardinality == "oneToMany":
+            if len(jsonObj["items"]) == 0:
+                raise Exception("No output objects were generated with bonded query - trying with conventional query...")
             for elt in jsonObj["items"]:
                 dr = _create_data_record_from_json(elt, td, candidate)
                 drs.append(dr)
@@ -192,7 +196,7 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
             drs = [dr]
 
     except Exception as e:
-        print(f"Bonded query processing error: {str(e)}")
+        print(f"Bonded query processing error: {e}")
         return None, bonded_query_stats, str(e)
 
     return drs, bonded_query_stats, None
@@ -217,9 +221,52 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
             generate_field_names.append(field_name)
 
     # fetch input information
-    text_content = candidate.asTextJSON()
+    text_content = candidate.asJSON()
     doc_schema = str(td.outputSchema)
     doc_type = td.outputSchema.className()
+
+    if td.cardinality == "oneToMany":
+        # TODO here the problem is: which is the 1:N field that we are splitting the output into?
+        # do we need to know this to construct the prompt question ?
+        # for now, we will just assume there is only one list in the JSON.
+        dct = json.loads(text_content)
+        split_attribute = [att for att in dct.keys() if type(dct[att]) == list][0]
+        n_splits = len(dct[split_attribute])
+
+        if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+            # TODO Hacky to nest return and not disrupt the rest of method!!!
+            query_stats = {}
+            drs = [] 
+            promptQuestion = _construct_query_prompt(td, doc_type, generate_field_names)
+           
+            # iterate over the length of the split attribute, and generate a new JSON for each split
+            for idx in range(n_splits):
+                # if verbose: 
+                print(f"Processing {split_attribute} with index {idx}")
+                new_json = {k:v for k,v in dct.items() if k != split_attribute}
+                new_json[split_attribute] = dct[split_attribute][idx]
+
+                text_content = json.dumps(new_json)
+                generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
+                answer, record_stats = generator.generate(text_content, promptQuestion)
+                try:
+                    jsonObj = _get_JSON_from_answer(answer)["items"][0]
+                except IndexError as e:
+                    print("Could not find any items in the JSON response")
+                    continue
+                except json.JSONDecodeError as e:
+                    print(f"Could not decode JSON response: {e}")
+                    print(answer)
+                    continue
+                dr = _create_data_record_from_json(jsonObj, td, candidate)
+                drs.append(dr)
+
+                # TODO how to stat this? I feel that we need a new Stats class for this type of query
+
+            return drs, None                
+
+        else:
+            raise Exception("Conventional queries cannot execute tasks with cardinality == 'oneToMany'")
 
     # iterate over fields and generate their values using an LLM
     query_stats = {}
