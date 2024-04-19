@@ -422,7 +422,7 @@ class StatsProcessor:
             usd_per_input_token = MODEL_CARDS[gen_stats.model_name]["usd_per_input_token"]
             usd_per_output_token = MODEL_CARDS[gen_stats.model_name]["usd_per_output_token"]
             agg_op_stats.total_input_usd += gen_stats.usage["prompt_tokens"] * usd_per_input_token
-            agg_op_stats.total_output_usd += gen_stats.usage["prompt_tokens"] * usd_per_output_token
+            agg_op_stats.total_output_usd += gen_stats.usage["completion_tokens"] * usd_per_output_token
             agg_op_stats.total_usd = agg_op_stats.total_input_usd + agg_op_stats.total_output_usd
 
             # update distribution of finish reasons

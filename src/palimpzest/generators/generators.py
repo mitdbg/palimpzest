@@ -210,7 +210,23 @@ class DSPyGenerator(BaseGenerator):
 
         # execute LLM generation
         start_time = time.time()
+        # num_tries = 3
+        # while num_tries > 0:
+        #     try:
+        print(f"Generating")
         pred = cot(question, context)
+        print(pred.answer)
+                # num_tries = -1
+
+            # # TODO: explicitly filter for context length exceeded error
+            # except:
+            #     context = context[:int(len(context)/2)]
+            #     num_tries -= 1
+            #     print(f"num_tries left: {num_tries}")
+
+        # if num_tries == 0:
+        #     raise Exception("message too long")
+
         end_time = time.time()
 
         # if reduction is enabled but the answer is None, fallback to the full context

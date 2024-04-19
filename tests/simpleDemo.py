@@ -204,13 +204,13 @@ def buildImageAggPlan(datasetId):
 
 
 def buildNestedStr(node, indent=0, buildStr=""):
-        elt, child = node
-        indentation = " " * indent
-        buildStr =  f"{indentation}{elt}" if indent == 0 else buildStr + f"\n{indentation}{elt}"
-        if child is not None:
-            return buildNestedStr(child, indent=indent+2, buildStr=buildStr)
-        else:
-            return buildStr
+    elt, child = node
+    indentation = " " * indent
+    buildStr =  f"{indentation}{elt}" if indent == 0 else buildStr + f"\n{indentation}{elt}"
+    if child is not None:
+        return buildNestedStr(child, indent=indent+2, buildStr=buildStr)
+    else:
+        return buildStr
 
 def printTable(records, cols=None, gradio=False, query=None, plan=None):
     records = [
