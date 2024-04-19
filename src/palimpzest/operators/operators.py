@@ -149,7 +149,8 @@ class LogicalOperator:
         # choose set of acceptable models based on possible llmservices
         models = []
         if os.getenv('OPENAI_API_KEY') is not None:
-            models.extend([Model.GPT_3_5, Model.GPT_4])
+            # models.extend([Model.GPT_3_5, Model.GPT_4])
+            models.extend([Model.GPT_4])
 
         if os.getenv('TOGETHER_API_KEY') is not None:
             models.extend([Model.MIXTRAL])
@@ -170,6 +171,7 @@ class LogicalOperator:
         """Return a set of physical trees of operators."""
         # create set of logical plans (e.g. consider different filter/join orderings)
         logicalPlans = self._createLogicalPlans()
+        print(f"LOGICAL PLANS: {len(logicalPlans)}")
 
         # iterate through logical plans and evaluate multiple physical plans
         physicalPlans = [
@@ -177,6 +179,7 @@ class LogicalOperator:
             for logicalPlan in logicalPlans
             for physicalPlan in logicalPlan._createPhysicalPlans(shouldProfile=shouldProfile)
         ]
+        print(f"INITIAL PLANS: {len(physicalPlans)}")
 
         # estimate the cost (in terms of USD, latency, throughput, etc.) for each plan
         plans = []
@@ -197,6 +200,8 @@ class LogicalOperator:
             if planDesc not in dedup_desc_set:
                 dedup_desc_set.add(planDesc)
                 dedup_plans.append(plan)
+        
+        print(f"DEDUP PLANS: {len(dedup_plans)}")
 
         # compute the pareto frontier of candidate physical plans and return the list of such plans
         # - brute force: O(d*n^2);
@@ -223,6 +228,8 @@ class LogicalOperator:
             # add plan i to pareto frontier if it's not dominated
             if paretoFrontier:
                 paretoFrontierPlans.append((totalTime_i, totalCost_i, quality_i, plan))
+        
+        print(f"PARETO PLANS: {len(paretoFrontierPlans)}")
 
         return paretoFrontierPlans
 
