@@ -86,7 +86,7 @@ class DSPyGenerator(BaseGenerator):
             usage = dspy_lm.history[-1]['response']['usage']
             finish_reason = dspy_lm.history[-1]['response']['choices'][-1]['finish_reason']
         elif self.model_name in [Model.GEMINI_1.value]:
-            usage = {}
+            usage = {"prompt_tokens": 0, "completion_tokens": 0}
             finish_reason = dspy_lm.history[-1]['response'][0]._result.candidates[0].finish_reason
         elif self.model_name in [Model.MIXTRAL.value]:
             usage = dspy_lm.history[-1]['response']['usage']

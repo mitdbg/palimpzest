@@ -502,33 +502,9 @@ class StatsProcessor:
 
         return profiling_data
 
-
-    def _compute_agg_op_stats(self, profiling_data: OperatorStats) -> OperatorStats:
+    def _aggregate_record_stats(self, profiling_data: OperatorStats) -> OperatorStats:
         """
-        This function computes the aggregate fields for the given OperatorStats object (`profiling_data`).
-        The OperatorStats object has a `records` field which is a a list of record dictionaries processed
-        by the operation. Each record dictionary has the format:
-        
-        {"op_id": str, "uuid": str "parent_uuid": str, "stats": Stats, **record.asDict()}
-
-        A record dictionary's "stats" field must be one of:
-        - Stats
-        - InduceNonLLMStats
-        - InduceLLMStats
-        - FilterLLMStats
-
-        Stats is only present for non-induce/filter operations, and its only field will
-        be the cumulative_iter_time for the record.
-
-        InduceNonLLMStats is either empty or has a single field (api_stats).
-
-        InduceLLMStats is the most complex Stats object, it can contain one or more of
-        the following sub-fields:
-        - bonded_query_stats
-        - conventional_query_stats
-        - full_code_gen_stats
-
-        FilterLLMStats has a single field gen_stats which is guaranteed to be filled.
+        Implements the aggregation functionality of _compute_agg_op_stats.
         """
         for record_dict in profiling_data.records:
             # retrieve stats for this operation
@@ -581,6 +557,44 @@ class StatsProcessor:
 
         return profiling_data
 
+    def _compute_agg_op_stats(self, profiling_data: OperatorStats) -> OperatorStats:
+        """
+        This function computes the aggregate fields for the given OperatorStats object (`profiling_data`).
+        The OperatorStats object has a `records` field which is a a list of record dictionaries processed
+        by the operation. Each record dictionary has the format:
+        
+        {"op_id": str, "uuid": str "parent_uuid": str, "stats": Stats, **record.asDict()}
+
+        A record dictionary's "stats" field must be one of:
+        - Stats
+        - InduceNonLLMStats
+        - InduceLLMStats
+        - FilterLLMStats
+
+        Stats is only present for non-induce/filter operations, and its only field will
+        be the cumulative_iter_time for the record.
+
+        InduceNonLLMStats is either empty or has a single field (api_stats).
+
+        InduceLLMStats is the most complex Stats object, it can contain one or more of
+        the following sub-fields:
+        - bonded_query_stats
+        - conventional_query_stats
+        - full_code_gen_stats
+
+        FilterLLMStats has a single field gen_stats which is guaranteed to be filled.
+        """
+        # base case: this is the source operation
+        if profiling_data.source_op_stats is None:
+            return self._aggregate_record_stats(profiling_data)
+
+        # compute aggregates for this set of profiling data
+        profiling_data = self._aggregate_record_stats(profiling_data)
+
+        # recurse
+        profiling_data.source_op_stats = self._aggregate_record_stats(profiling_data.source_op_stats)
+
+        return profiling_data
 
     def _compute_op_time(self, profiling_data: OperatorStats) -> OperatorStats:
         """
