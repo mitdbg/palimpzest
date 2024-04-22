@@ -254,9 +254,9 @@ GEMINI_1_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.042 / 10.0, # TODO: 
     ##### Agg. Benchmark #####
-    "MMLU": 90.0,
+    "MMLU": 65.0, # 90.0 TODO: we are using the free version of Gemini which is substantially worse than its paid version; I'm manually revising it's quality below that of Mixtral
     ##### Commonsense Reasoning #####
-    "reasoning": 87.8,
+    "reasoning": 80.0, # 87.8, TODO: see note above on MMLU
     # "HellaSwag": 87.8,  # 10-shot
     ##### World Knowledge #####
     ##### Reading Comprehension #####
@@ -278,9 +278,9 @@ GEMINI_1V_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.042 / 10.0, # TODO: 
     ##### Agg. Benchmark #####
-    "MMLU": 90.0,
+    "MMLU": 65.0, # 90.0, TODO: see note above in Gemini_1 model card
     ##### Commonsense Reasoning #####
-    "reasoning": 87.8,
+    "reasoning": 80.0, # 87.8, TODO: see note above in Gemini_1 model card
     # "HellaSwag": 87.8,  # 10-shot
     ##### World Knowledge #####
     ##### Reading Comprehension #####

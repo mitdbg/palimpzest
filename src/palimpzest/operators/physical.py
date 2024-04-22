@@ -1389,13 +1389,14 @@ class LimitScanOp(PhysicalOp):
         @self.profile(name="limit", shouldProfile=self.shouldProfile)
         def iteratorFn():
             counter = 0
-            for nextCandidate in self.source: 
-                if counter >= self.limit:
-                    break
+            for nextCandidate in self.source:
                 if shouldCache:
                     datadir.appendCache(self.targetCacheId, nextCandidate)
                 yield nextCandidate
+
                 counter += 1
+                if counter >= self.limit:
+                    break
 
             if shouldCache:
                 datadir.closeCache(self.targetCacheId)
