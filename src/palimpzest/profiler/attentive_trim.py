@@ -2,10 +2,10 @@ import json
 import time
 
 import numpy as np
-from palimpzest import dspyCOT, SingleQuestionOverSample
+from palimpzest import dspyCOT, SingleQuestionOverSample, TOKEN_REDUCTION_GRANULARITY
 from fuzzywuzzy import process, fuzz
 
-def get_hist_save(task, resolution=0.001):
+def get_hist_save(task, resolution=TOKEN_REDUCTION_GRANULARITY):
     ranges = []
     with open("../data/test_v16_inputfile100-result-What is the aut-0.1-location.json", "rb") as file:
         data = file.read()
@@ -37,7 +37,7 @@ def get_hist_save(task, resolution=0.001):
                delimiter=",",
                fmt='%.3f')
 
-def find_best_range(values, budget, trim_zeros=True):
+def find_best_range(values, budget, trim_zeros=False):
     """
     Finds the consecutive range with the biggest sum within a budget.
 
@@ -102,10 +102,10 @@ def find_best_range(values, budget, trim_zeros=True):
             best_start = best_start - (best_end-n+1)
             best_end = n-1
 
-    return best_start, best_end
+    return best_start, best_end+1
 
 
-def get_range_from_hist(file_path, range_budget, resolution=0.001, trim_zeros=True):
+def get_range_from_hist(file_path, range_budget, resolution=TOKEN_REDUCTION_GRANULARITY, trim_zeros=True):
     # Load data from csv file and extract he second column as values
     values = []
     with open(file_path, "r") as file:
@@ -119,50 +119,32 @@ def get_range_from_hist(file_path, range_budget, resolution=0.001, trim_zeros=Tr
     print("start:", start, "end:", end, "index_range:", index_range)
     return  start *1.0/index_range, end *1.0/index_range
 
-def get_test_result(file_path, question, sr, er):
-    # Load document
-    with open('/Users/chunwei/pvldb_1-16/16/' + file_path) as f_in:
-        doc_dict = json.load(f_in)
-
-    context = doc_dict["symbols"]
+def get_trimed(context, sr, er):
     test_len = len(context)
-
-
     start = int(sr * test_len)
     end = int(er * test_len)
-
     print("character start:", start, "end:", end)
-    sample = context[start:end+1]
-    if sr == er:
-        end = int((er+0.001) * test_len)-1
-        sample = context[start:end+1]
-    print("sample size:", len(sample))
+    sample = context[start:end]
+    return sample
 
-    # Generate prediction
-    cot = dspyCOT(SingleQuestionOverSample)
-    pred = cot(question, sample)
-    return pred.answer
-
-def run_file_batch(list_of_files, question, hist_file, budget=0.05):
-    sr, er = get_range_from_hist(hist_file, budget, resolution=0.001, trim_zeros=False)
-    print("start ratio:", sr, "end ratio:", er)
-
-    results = {"question": question, "files": []}
-    for file in list_of_files:
-        start_time = time.time()
-        test_result = get_test_result(file, question, sr, er)
-        duration = time.time() - start_time
-
-        results["files"].append({"file": file, "result": test_result, "duration": duration})
-        print("file:", file, " result:", test_result)
-
-    return results
+# update the heatmap json object by increase the counter and refresh the heat region based on the new start and end index
+#                 json_object = {'prompt_schema': prompt_schema,
+#                                'question': question,
+#                                'resolution': TOKEN_REDUCTION_GRANULARITY,
+#                                'count': 0,
+#                                'heatmap': {hist}}
+def update_heatmap_json(j_obj, si, ei):
+    j_obj["count"] += 1
+    # iterate from si to ei in heatmap array and increase the counter
+    for i in range(si, ei):
+        # now we add all the count by 1, we may consider the variable weight based result quality in the future
+        j_obj["heatmap"][i] += 1
+    return j_obj
 
 
-
-def best_substring_match(query, string):
+def best_substring_match(query, context):
     # This will extract all substrings of length equal to the query from the string
-    candidates = [string[i:i + len(query)] for i in range(len(string) - len(query) + 1)]
+    candidates = [context[i:i + len(query)] for i in range(len(context) - len(query) + 1)]
     print("grd:", query)
     # Find the best match among the candidates
     ret = process.extractOne(query, candidates, scorer=fuzz.ratio)

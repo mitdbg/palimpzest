@@ -90,6 +90,7 @@ LOG_LLM_OUTPUT = False
 
 # Resolution of the token reduction granularity
 TOKEN_REDUCTION_GRANULARITY = 0.001
+TOKEN_REDUCTION_SAMPLE = 10
 
 #### MODEL PERFORMANCE & COST METRICS ####
 # I've looked across models and grouped knowledge into commonly used categories:
