@@ -1,0 +1,134 @@
+age_at_diagnosis,ajcc_pathologic_n,ajcc_pathologic_stage,ajcc_pathologic_t,case_submitter_id,ethnicity,gender,morphology,primary_diagnosis,race,study,tissue_or_organ_of_origin,tumor_focality,tumor_grade,tumor_largest_dimension_diameter,vital_status
+15330,pN2,Stage III,pT2,C3L-00102,,Male,,PDAC,White,cao,head,Unifocal,,3.0,Deceased
+24820,pN1,Stage IIB,pT2,C3L-00189,Not reported,Female,Not reported,PDAC,Not reported,cao,head,Unifocal,Not reported,27,Deceased
+25185,pN1,Stage IIB,pT3,C3L-00277,Not specified,Male,Not specified,Not specified,White,cao,tail,Unifocal,Not specified,5.0,Deceased
+22630,pN1,Stage IIB,pT2,C3L-00401,,Female,PDAC,PDAC,,cao,body,Unifocal,,2.8,Living
+21535,pN1,Stage IIB,pT3,C3L-00640,,Female,,PDAC,White,cao,body,Unifocal,,4.5,Living
+27010,pN1,Stage IIB,pT2,C3L-00819,,Male,,PDAC,White,cao,head,Unifocal,,28,Deceased
+29200,pN1,Stage IIB,pT2,C3L-00881,Not Hispanic or Latino,Male,PDAC,PDAC,White,cao,head,Unifocal,Not identified,2.2,Living
+21170,pN1,Stage IIB,pT3,C3L-00928,,Female,,PDAC,White,cao,tail,Unifocal,,45,Deceased
+23360,pN0,Stage IB,pT2,C3L-01031,,Female,,PDAC,,cao,body and tail,Unifocal,,35,Living
+23360,pN1,Stage IIB,pT2,C3L-01036,,Male,,PDAC,,cao,head,Unifocal,,2.5,Living
+15330,pN1,Stage IIB,pT3,C3L-01037,,Male,PDAC,pancreatic carcinoma,,cao,head,Unifocal,,4.5,Deceased
+21900,pN1,Stage IIB,pT2,C3L-01051,,Male,,PDAC,,cao,head,Unifocal,,2.5,Living
+23360,pN0,Stage IA,pT1c,C3L-01052,,Female,PDAC,Chronic pancreatitis,,cao,head,Unifocal,,2.0,Deceased
+27740,pN1,Stage IIB,pT2,C3L-01053,Not reported,Female,PDAC,PDAC,Not reported,cao,head,Unifocal,Not reported,2.5,Deceased
+13870,pN1,Stage IIB,pT2,C3L-01054,,Female,,PDAC,,cao,head,Unifocal,,3.5,Living
+26280,pNX,Stage III,pT3,C3L-00004,White,Male,Clear cell renal cell carcinoma,Clear cell renal cell carcinoma,White,ccrcc,Lower pole,Unifocal,G3,12.0,
+10950,pN0,Stage I,pT1b,C3L-00010,White,Male,Clear cell renal cell carcinoma,Clear cell renal cell carcinoma,White,ccrcc,Upper pole,Unifocal,G3,6.5,
+22995,pNX,Stage IV,pT3a,C3L-00011,White,Female,Clear cell renal cell carcinoma,Clear cell renal cell carcinoma,White,ccrcc,Lower pole,Unifocal,G4,12.0,
+23360,pN0,Stage I,pT1a (FIGO IA),C3L-00006,Not-Hispanic or Latino,Female,Endometrioid,Cannot be determined,White,UCEC_CPTAC3,Anterior endometrium,Unifocal,FIGO grade 1,2.9,Not provided
+58.0,pNX,Stage IV,pT1a (FIGO IA),C3L-00008,Not-Hispanic or Latino,Female,Endometrioid,Staging Incomplete,White,UCEC_CPTAC3,Posterior endometrium,Unifocal,FIGO grade 1,3.5,Normal
+Not provided,pN0,Stage I,pT1a (FIGO IA),C3L-00032,Not-Hispanic or Latino,Female,Not provided,Endometrioid,White,UCEC_CPTAC3,Anterior and Posterior endometrium,Unifocal,FIGO grade 2,4.5,Not provided
+,,,,C3L-00084,,,,Carcinosarcoma,,UCEC_CPTAC3,,,,,
+,pNX,Stage I,pT1a (FIGO IA),C3L-00090,Not-Hispanic or Latino,Female,,Endometrioid,White,UCEC_CPTAC3,Anterior and Posterior endometrium,Unifocal,FIGO grade 2,3.5,
+22995,pNX,Stage I,pT1a (FIGO IA),C3L-00098,Not-Hispanic or Latino,Female,Serous,Cannot be determined,White,UCEC_CPTAC3,Anterior and Posterior endometrium,Unifocal,Cannot be determined,6.0,Normal
+Not provided,pNX,Stage I,pT1a (FIGO IA),C3L-00136,Not-Hispanic or Latino,Female,Not provided,Endometrioid,White,UCEC_CPTAC3,Anterior and Posterior endometrium,Unifocal,FIGO grade 1,4.5,Not provided
+Not provided,pNX,Stage I,pT1a (FIGO IA),C3L-00137,Not-Hispanic or Latino,Female,Endometrioid,Not provided,White,UCEC_CPTAC3,"Other, specify",Unifocal,FIGO grade 2,5.0,Not provided
+83.0,pNX,Stage III,pT3a (FIGO IIIA),C3L-00139,Not-Hispanic or Latino,Female,Serous,Cannot be determined,White,UCEC_CPTAC3,"Other, specify",Unifocal,Cannot be determined,4.0,Not provided
+Not provided,pN0,Stage I,pT1 (FIGO I),C3L-00143,Not-Hispanic or Latino,Female,Not provided,Not provided,White,UCEC,Anterior and Posterior endometrium,Unifocal,FIGO grade 1,5.2,Not provided
+,pNX,Stage I,pT1a (FIGO IA),S011,Not-Hispanic or Latino,Female,,Endometrioid,White,UCEC,"Other, specify",Unifocal,FIGO grade 1,4.7,
+20440,pNX,Stage I,pT1a (FIGO IA),C3L-00156,Not-Hispanic or Latino,Female,Endometrioid,FIGO grade 1,White,UCEC_CPTAC3,Anterior endometrium,Unifocal,Cannot be determined,2.2,Normal
+Not provided,pN2 (FIGO IIIC2),Stage III,pT3a (FIGO IIIA),C3L-00157,Hispanic or Latino,Female,Not provided,Clear cell,White,UCEC,Anterior endometrium,Unifocal,Not provided,4.2,Not provided
+16790,pN0,Stage I,pT1b (FIGO IB),C3L-00161,Hispanic or Latino,Female,,,,UCEC,,,,,
+73.0,pN0,Stage I,pT1a (FIGO IA),C3L-00356,Not-Hispanic or Latino,Female,,Carcinosarcoma,White,,"Other, specify, Both anterior and posterior endometrium",Unifocal,,3.9,
+29565,,2A,,C3N-01799,not Hispanic or Latino,male,,,Caucasian,gilette,Terminal Respiratory Unit,,,,
+29565,,,,C3N-01799,caucasian,male,,,,gilette,,,,,
+21170,,1A,,C3L-01890,caucasian,female,acinar,,caucasian,gilette,,,,,
+17520,,1A,,C3N-00572,asian,female,micropapillary,ALK-Fusion,asian,gilette,Terminal Respiratory Unit,,,,
+,,,,C3N-00572,asian,female,,,asian,gilette,,,,,
+25550,,,,C3N-02423,,male,,,asian,gilette,,,,,
+25550,,,,C3N-02423,han,male,,,asian,Annotions,,,,,
+16425,nan,nan,nan,C3N-02729,han,male,nan,nan,asian,,Terminal Respiratory Unit,nan,nan,nan,nan
+Not provided,Not provided,Not provided,Not provided,C3N-02729,Not Hispanic or Latino,male,Not provided,Not provided,Asian,Annotions_S1A,Not provided,Not provided,Not provided,Not provided,Not provided
+28835,,,,C3L-00263,not Hispanic or Latino,male,,,white,gilette,,,,,
+23376.0,,,,C3N-01410,,male,,,,gilette,,,,,
+23360,,,,C3N-01410,asian,male,,,asian,gilette,,,,,
+20440,pN1,Stage III,pT1,C3L-00977,,Male,"Squamous cell carcinoma, conventional",,Russia,huang,Oral cavity,Unifocal,G1 Well differentiated,1.2,
+22265,pN1,Stage III,pT2,C3L-00987,,Male,"Squamous cell carcinoma, conventional",G2 Moderately differentiated,,huang,Oral cavity,Unifocal,G2 Moderately differentiated,4.0,
+18250,pN0,Stage II,pT2,C3L-00994,,Male,"Squamous cell carcinoma, conventional",G2 Moderately differentiated,,huang,Oral cavity,Unifocal,G2 Moderately differentiated,3.0,
+20440,pN1,Stage III,pT2,C3L-00995,,Male,"Squamous cell carcinoma, conventional","Squamous cell carcinoma, conventional",,huang,Buccal mucosa,Unifocal,G1 Well differentiated,4.0,
+17155,pN1,Stage II,pT2,C3L-00997,,Male,"Squamous cell carcinoma, conventional",,,huang,Oropharynx,Unifocal,G2 Moderately differentiated,4.0,
+20440,pN0,Stage II,pT2,C3L-00999,Not Evaluated,Male,"Squamous cell carcinoma, conventional",G1 Well differentiated,Not Evaluated,huang,Floor of mouth,Unifocal,G1 Well differentiated,2.2,Not Evaluated
+22630,pN1,Stage IV,pT4a,C3L-01138,,Male,"Squamous cell carcinoma, conventional","Squamous cell carcinoma, conventional",,huang,Larynx,Unifocal,G1 Well differentiated,60,
+20822.25,pN2,Stage IV,pT2,C3L-01237,,Male,"Squamous cell carcinoma, conventional","Floor of mouth Squamous cell carcinoma, conventional",,huang,Oral cavity,Unifocal,G2 Moderately differentiated,40.0,
+23360,pNX,Stage II,pT2,C3L-02617,,Male,"Squamous cell carcinoma, conventional",Squamous cell carcinoma,,huang,Larynx,Unifocal,G3 Poorly differentiated,6.0,
+24820,pNX,Stage I,pT1,C3L-02621,,Male,"Squamous cell carcinoma, conventional",G3 Poorly differentiated,,huang,Larynx,Multifocal,G3 Poorly differentiated,0.6,
+Not provided,pNX,Stage II,pT2,C3L-02651,Not provided,Male,Keratinizing Squamous Cell Carcinoma,Not provided,Not provided,huang,Larynx,Unifocal,G2 Moderately differentiated,2.5,Not provided
+19710,pN2c,Stage IV,pT4a,C3L-03378,Not Evaluated,Male,"Squamous cell carcinoma, conventional",Not provided,Not provided,huang,Oral cavity,Unifocal,G2 Moderately differentiated,1.8,Not provided
+69,pNX,Stage I,pT1b,C3L-04025,,Male,,,,huang,Buccal mucosa,Unifocal,G2 Moderately differentiated,1.5,
+21900,pNX,Stage II,pT2,C3L-04354,,Male,Non-Keratinized Squamous Cell Carcinoma,Larynx,,Huang,Larynx,Unifocal,G3 Poorly differentiated,20,
+29565,pNX,Stage I,pT1,C3L-04791,,Male,Keratinizing Squamous Cell Carcinoma,,,huang,Larynx,Unifocal,G2 Moderately differentiated,3.0,
+unknown,unknown,Stage IIA,unknown,CPT000814,unknown,unknown,unknown,unknown,black or african american,krug,unknown,unknown,unknown,unknown,unknown
+unknown,not applicable,Stage III,not applicable,CPT001846,not applicable,unknown,not applicable,not applicable,white,krug,not applicable,not applicable,not applicable,not applicable,not applicable
+19800,,Stage IIB,,X01BR001,black.or.african.american,female,,,,krug,,,,,
+,,,,X01BR008,unknown,unknown,,,unknown,krug,,,,,
+unknown,unknown,unknown,unknown,X01BR010,unknown,unknown,unknown,unknown,unknown,krug,unknown,unknown,unknown,unknown,unknown
+12600,,,,X01BR015,white,female,,,,krug,,,,,
+16200,N,Stage III,not performed,X01BR017,not Hispanic or Latino,female,not provided,positive,white,krug,not provided,not provided,not provided,not provided,not provided
+23760,129N,Stage IIIA,,X01BR018,not Hispanic or Latino,female,,Basal,white,krug,,,,,
+unknown,unknown,unknown,unknown,X01BR020,unknown,unknown,unknown,unknown,unknown,krug,unknown,unknown,unknown,unknown,unknown
+,,,,X01BR023,unknown,unknown,,,unknown,krug,,,,,
+,,,,X01BR026,white,,,,white,krug,,,,,
+28800,,,,X01BR027,,female,,,black.or.african.american,krug,,,,,
+30744,,,,X01BR030,,female,,,black or african american,krug,,,,,
+15330,pN2,Stage III,pT2,C3L-00102,Not provided,Male,Not provided,PDAC,White,li,head,Unifocal,Not provided,3.0,Deceased
+24820,pN1,Stage IIB,pT2,C3L-00189,Not provided,Female,Not provided,PDAC,Not provided,li,head,Unifocal,Not provided,2.7,Deceased
+25185,pN1,Stage IIB,pT3,C3L-00277,Not provided,Male,Not provided,PDAC,White,li,tail,Unifocal,Not provided,5.0,Deceased
+22630,pN1,Stage IIB,pT2,C3L-00401,Not provided,Female,Not provided,PDAC,Not provided,li,body,Unifocal,Not provided,2.8,Living
+21535,pN1,Stage IIB,pT3,C3L-00640,Not provided,Female,Not provided,PDAC,White,li,body,Unifocal,Not provided,4.5,Living
+24955.6,,,,C01OV007,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Peritoneum,White,mcdermott,Omentum,,G3,,
+19950,,IIIC,,01OV008,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Fallopian tube,White,mcdermott,Ovary,,G3,,
+19062.5,,IIIC,,01OV010,Unknown,Female,Serous Adenocarcinoma,Fallopian tube,Black or African American,mcdermott,Ovary,,G3,1-10 mm,
+24840,,,,,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Ovary,White,mcdermott,Ovary,,G3,,
+20160,,,,C01OV017,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Ovary,White,mcdermott,Ovary,,G3,,
+16005,,,,01OV018,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Fallopian tube,White,mcdermott,Omentum,,G3,,
+21125,,IIIC,,01OV019,Not Hispanic or Latino,Female,Serous Adenocarcinoma,,White,mcdermott,Ovary,,G3,,
+21210,,,,C01OV023,Not Hispanic or Latino,Female,Serous Adenocarcinoma,nan,White,mcdermott,Peritoneum,,G3,,
+28372.8,,,,C01OV026,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Peritoneum,White,mcdermott,Pelvic mass,,G3,,
+17550,,IIIA,,01OV029,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Serous Adenocarcinoma,White,mcdermott,Peritoneum,,G3,,
+26973.64,,,,01OV030,Unknown,Female,Serous Adenocarcinoma,Ovary,White,mcdermott,Ovary,,G3,,
+18686.4,,,,01OV039,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Tumor resection,White,mcdermott,Omentum,,G3,,
+25470,,,,01OV041,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Serous Adenocarcinoma,White,mcdermott,Omentum,,G3,15.5,
+25132,,,,01OV047,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Serous Adenocarcinoma,White,mcdermott,Ovary,,G3,,
+23460,,,,02OV001,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Tumor resection,White,mcdermott,Ovary,,G3,,
+nan,nan,nan,nan,C3L-00081,caucasian,female,nan,nan,caucasian,satpathy,nan,nan,nan,nan,nan
+22265,,,,C3L-00081,Caucasian,,,,,satpathy,,,,,
+23360,,,,C3L-00415,Caucasian,female,,,caucasian,satpathy,,,,,
+23360,,II,,C3L-00415,Caucasian,female,MD SqCC with focal basaloid features,nan,caucasian,satpathy,,,,,
+27010,,,,C3L-00445,Caucasian,male,,,caucasian,satpathy,,,,,
+27010,,,,C3L-00445,Caucasian,male,classical SqCC,,caucasian,satpathy,,,,,
+,,,,C3L-00603,caucasian,male,,,,satpathy,,,,,
+25915,,,,C3L-00904,Caucasian,male,,,caucasian,satpathy,,,,,
+,,IIB,,C3L-00904,Not Hispanic or Latino,male,MD SqCC with focal basaloid features,,Caucasian,satpathy,,,,,
+25915,,,,C3L-00923,Caucasian,female,,,,satpathy,,,,,
+,,,,C3L-00927,Caucasian,male,,,caucasian,satpathy,,,,,
+266085,N2b,Stage III,T4a,01CO001,,Male,Mucinous,,,vasaikar,Sigmoid Colon,,,,Living
+306020,N0,Stage II,T3,01CO005,,Female,,,,vasaikar,Sigmoid Colon,,,,Deceased
+330260,N2b,Stage III,T4a,01CO006,,Female,Mucinous,With tumor,,vasaikar,Ascending Colon,,,,Living
+238130,N0,Stage II,T3,01CO008,,Female,,,,vasaikar,Descending Colon,,,,Living
+253675,N0,Stage I,T2,01CO013,,Male,,,,vasaikar,Sigmoid Colon,,,,Living
+930,N2a,Stage III,T3,01CO014,,Female,,,,vasaikar,,,,,Living
+1065,N0,Stage I,T2,01CO015,,Male,,,,vasaikar,Cecum,,,,Living
+276605,N2a,Stage III,T4a,01CO019,,Female,,,,vasaikar,Sigmoid Colon,,,,Living
+33660,N0,Stage I,T2,01CO022,,Female,,,,vasaikar,Cecum,,,,Living
+,N1a,Stage III,T2,05CO002,,Female,,,,vasaikar,Sigmoid Colon,,,,Living
+,N0,Stage II,T3,05CO003,,Male,,,,vasaikar,Ascending Colon,,,,Living
+175200,N1b,Stage III,T3,05CO004,,Female,,,,vasaikar,Sigmoid Colon,,,,Living
+271560,N0,Stage I,T2,05CO005,,Male,,,,vasaikar,Sigmoid Colon,,,,Living
+30295,N1b,Stage III,T3,05CO006,,Female,,,,vasaikar,Cecum,,,,Living
+58,,,,C3L-00104,Not-Hispanic or Latino,Male,,,White,wang,Frontal Lobe,,,,Deceased
+21535,,,,C3L-00365,Not-Hispanic or Latino,Female,,,White,wang,Parietal Lobe,,,,Deceased
+16425,,,,C3L-00674,Not-Hispanic or Latino,Male,,,White,wang,Frontal Lobe,,,,Deceased
+25185,,,,C3L-00677,Not-Hispanic or Latino,Female,,,White,wang,Frontal Lobe,,,,Deceased
+,,,,C3L-01040,,Male,,,,wang,Frontal Lobe,,,,Living
+21535,,,,C3L-01043,Caucasian,Male,,,,wang,,,,,Deceased
+,,,,C3L-01045,Caucasian,Female,,,,wang,Temporal Lobe,,,,Deceased
+,,,,C3L-01046,Caucasian,Male,,,,wang,Temporal Lobe,,,,Deceased
+,,,,C3L-01048,Caucasian,Male,,,nan,wang,Temporal Lobe,,,,Living
+16790,,,,C3L-01049,Caucasian,Male,,GBM,,wang,Frontal Lobe,,,,Deceased
+,,,,C3L-01061,Caucasian,Male,,,,wang,Occipital Lobe,,,,Living
+,,,,C3L-01142,Caucasian,Female,,,,wang,Frontal Lobe,,,,Living
+,,,,C3L-01146,,Male,,,nan,wang,Temporal Lobe,,,,Deceased
+17520,,,,C3L-01149,,Male,,,,wang,Parietal and Temporal Lobe,,,,Living
+,,,,C3L-01154,Caucasian,Female,,,,wang,"Parietal, Occipital, Temporal Lobe",,,,Deceased

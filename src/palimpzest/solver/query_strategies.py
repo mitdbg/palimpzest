@@ -95,7 +95,7 @@ def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
     answer = answer.replace("\_", "_")
 
     # Handle comments in the JSON response. Use regex from // until end of line 
-    answer = re.sub(r'\/\/.*$', '', answer)
+    answer = re.sub(r'\/\/.*$', '', answer, flags=re.MULTILINE)
     return json.loads(answer)
 
 
@@ -241,8 +241,8 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
            
             # iterate over the length of the split attribute, and generate a new JSON for each split
             for idx in range(n_splits):
-                # if verbose: 
-                print(f"Processing {split_attribute} with index {idx}")
+                if verbose: 
+                    print(f"Processing {split_attribute} with index {idx}")
                 new_json = {k:v for k,v in dct.items() if k != split_attribute}
                 new_json[split_attribute] = dct[split_attribute][idx]
 

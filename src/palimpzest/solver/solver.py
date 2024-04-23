@@ -205,7 +205,7 @@ class Solver:
                     dr.rows = np.asarray(rows)
 
                     dr.header = dataframe.columns.values
-                    dr.name = candidate.filename.split("/")[-1] + " - " + sheet_name
+                    dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
 
                     if shouldProfile:
                         dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
