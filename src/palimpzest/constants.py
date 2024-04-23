@@ -88,6 +88,9 @@ EST_FILTER_SELECTIVITY = 0.5
 # Whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False
 
+# Resolution of the token reduction granularity
+TOKEN_REDUCTION_GRANULARITY = 0.001
+
 #### MODEL PERFORMANCE & COST METRICS ####
 # I've looked across models and grouped knowledge into commonly used categories:
 # - Agg. Benchmark (we only use MMLU for this)
