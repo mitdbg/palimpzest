@@ -1,6 +1,10 @@
+import hashlib
+import json
+
 from palimpzest.constants import *
 from palimpzest.generators import dspyCOT, gen_filter_signature_class, gen_qa_signature_class, TogetherHFAdaptor
 from palimpzest.profiler import GenerationStats
+from palimpzest.datamanager import DataDirectory
 
 from openai import OpenAI
 from PIL import Image
@@ -149,13 +153,42 @@ class DSPyGenerator(BaseGenerator):
         after=log_attempt_number,
         reraise=True,
     )
-    def generate(self, context: str, question: str) -> GenerationOutput:
+    # the generate method requires a user-provided budget parameter to specify te token budget. Default is 1.0, meaning the full context will be used.
+    def generate(self, context: str, question: str, budget: float = 1.0) -> GenerationOutput:
         # fetch model
         dspy_lm = self._get_model()
+
 
         # configure DSPy to use this model; both DSPy prompt strategies currently use COT
         dspy.settings.configure(lm=dspy_lm)
         cot = dspyCOT(self.promptSignature)
+
+        # check if the promptSignature is a QA signature, so we can match the answer to get heatmap
+        if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+            file_cache = DataDirectory().getFileCacheDir()
+            prompt_schema = self.promptSignature
+            print("Prompt QA Signature: ", prompt_schema)
+            print('Question: ', question)
+            ordered = f'{prompt_schema} {question}'
+            task_hash = hashlib.sha256(ordered.encode()).hexdigest()
+            heatmap_file = os.path.join(file_cache, f"heatmap-{task_hash}.json")
+            print("Heatmap file: ", heatmap_file)
+            if not os.path.exists(heatmap_file):
+                # create the heatmap structure with default resolution of 0.001
+                with open(heatmap_file, 'w') as f:
+                    json_object = {'prompt_schema': prompt_schema,
+                                   'question': question,
+                                   'resolution': 0.001,
+                                   'heatmap': {}}
+                    json.dump(json_object, f)
+            else:
+                with open(heatmap_file, 'r') as f:
+                    json_object = json.load(f)
+                    heatmap = json_object['heatmap']
+            if budget < 1.0:
+                context = dspy_lm.llm.truncate(context, budget)
+
+
 
         # execute LLM generation
         start_time = time.time()
