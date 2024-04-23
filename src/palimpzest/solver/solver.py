@@ -355,7 +355,7 @@ class Solver:
                         candidate._stats[td.op_id] = FilterLLMStats(gen_stats=gen_stats, filter=filterCondition)
 
                     # set _passed_filter attribute and return record
-                    setattr(candidate, "_passed_filter", response.lower() == "true")
+                    setattr(candidate, "_passed_filter", "true" in response.lower()) # response.lower() == "true"
 
                     return candidate
 

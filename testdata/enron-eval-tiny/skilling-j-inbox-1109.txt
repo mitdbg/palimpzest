@@ -1,0 +1,158 @@
+Message-ID: <16177083.1075852671497.JavaMail.evans@thyme>
+Date: Tue, 25 Sep 2001 15:39:29 -0700 (PDT)
+From: gary@cioclub.com
+To: jeff.skilling@enron.com
+Subject: Information Security Executive
+                                  -092501
+Mime-Version: 1.0
+Content-Type: text/plain; charset=ANSI_X3.4-1968
+Content-Transfer-Encoding: 7bit
+X-From: Gary@CIOClub.com@ENRON <IMCEANOTES-Gary+40CIOClub+2Ecom+40ENRON@ENRON.com>
+X-To: Skilling, Jeff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JSKILLIN>
+X-cc: 
+X-bcc: 
+X-Folder: \JSKILLIN (Non-Privileged)\Inbox
+X-Origin: Dasovich-J
+X-FileName: JDASOVIC (Non-Privileged).pst
+
+Dear Jeff,
+
+This will introduce an outstanding Information Security Executive who is available in the near term through the CIO Club.
+
+Executive Summary:
+15 years of management experience in the planning, design, development, and implementation  of information security policies, controls, services and  systems.  Most recently VP Information Security for the World's Largest Bank Group  with responsibility for North and South America.  Prior information security management experience with Insurance, Telecommunications and Health Care Companies.
+MA in Finance, BA in Mathematics
+
+Experience Detail
+World's Largest Bank -06/98
+Vice President,  Information Security Officer - Americas
+Supervise staff of 55+ consultants, engineers, and administrators performing information security consulting, risk analysis, and administrative services.
+
+Member of Banker's Trust and Bank merger team
+Regional-Audit Resolution Manager
+Budget, Pricing, and Strategic Initiatives
+
+-Report to CTO and Global InfoSec Officer
+-Risk Analysis and Security Solutions for all hardware, software, applications, and Internet/Extranet
+-Responsible for implementation of:
+-Intrusion Detection and Monitoring (IBM ERS, Tripwire, NetRanger)
+-Education & Awareness Program (Intranet based)
+-Firewall Engineering and Operations (Firewall-1, fwtk, Gauntlet)
+-Proxy Servers/Cache
+-Remote Access Security (VPN, SecurID)
+-Supervised over 15,000 service requests per month
+Subsidiary of of Bank Group.  Developed ground-up information security architecture and program, including
+-Policy and Standards development, Education & Awareness
+-Firewall Engineering and Management (Raptor, Cisco)
+-SecurID implementation
+-Directory Services (NT, Netscape, X.500)
+-penetration studies, intrusion detection
+
+12/96 - 06/98     Big 5 Accounting Firm
+
+Manager, Information Systems Auditing and Assurance Services Consulted directly with clients for information security services including Policy & Procedures, Education & Awareness, Firewalls, Disaster Recovery, Business Resumption Planning, Remote Access, and Network Security.
+
+?Assisted in development of national Information Security Services methodology.
+?Extensive Project Management/Cost Realization/Utilization.
+?Performed Penetration Studies and Risk Portfolios.
+?Managed multiple matrixed consulting and implementation teams.
+?Experience presenting at Board level of Fortune 100/500 firms.
+
+
+05/95 - 12/96  Nation's Largest Stock Brokerage
+
+Information Security Manager
+Developed ground-up information security and risk management program for firm, including:
+
+-Policy and Standards development
+-Firewall implementation (Raptor)
+-Technology Business Resumption
+-Education & Awareness
+-Dial-up Access and Network connectivity (Enigma Logic/Secure Computing, SecurID)
+-Board and Executive level interaction and presentations
+
+
+
+05/90 - 05/95  Regional Bell Operating Company
+
+ Process Specialist
+
+-Performed network design, protocol analysis, programming, DR, and systems analysis for installation of FileNet Imaging server to support Legal, A/P, A/R, and Human Resource functions.
+-Performed application, network, and programming support for the SWBT Legal Department.
+-Programmed financial/billing systems in COBOL, PL/I, and Assembler in MVS environment.
+
+08/88 - 05/90   Risk Analysis & Management Corporation
+
+                        Systems Manager
+
+-Performed all information systems installation, design, and support functions for insurance and risk management consulting firm.
+-Implemented and supported Local Area Network.
+-Designed and implemented Novell LAN including installation of all hubs, cabling, etc.
+-Assisted in purchase/merger of DSG, Inc. consulting firm.
+
+
+
+12/87 - 08/88   Insurance Company
+
+                        Actuarial Technician
+
+-Performed pension actuarial functions for numerous Defined Benefit plans.
+-Programmed mathematical/financial functions in COBOL/Fortran.
+
+
+
+08/86 - 12/87  Pension Associates, Inc.,
+
+                        Actuarial Technician
+
+-Performed pension actuarial functions for numerous Taft-Hartley trusts.
+-Programmed mathematical/financial functions in COBOL/Fortran.
+-Performed pension administration duties including extensive client interaction.
+
+ Participation:
+
+-International Information Integrity Institute (I-4)
+-Information Systems Security Association (ISSA) - Chapter Officer
+-Information Systems Audit and Control Association (ISACA)
+-Center for Application of Information Technology (CAIT) at Washington University - St. Louis
+-Generally Accepted Systems Security Principles (GASSP)
+-International Information Security Foundation (I2SF)
+
+ Key Skills:
+
+
+
+-X.500, X.509, firewalls, intrusion detection and emergency response services, LDAP
+
+-UNIX, NT, MVS, Novell
+-International Business Experience
+-Tactical and Strategic Management/Planning
+-Board of Director/CEO/CIO Level Presentation Experience
+
+CIO Club is a fee based staffing orgainisation.  For resume or questions please contact::
+
+Regards
+
+Gary Erlinger
+Vice President
+CIO Club
+2330 Marinship Way  Suite 350
+Sausalito, CA  94965
+Phone : 415-332-2030  ext.  4320
+or  800-956-8331
+Fax: 415-449-3588
+
+Gary@CIOClub.com
+www.CIOClub.com
+********************************************************************************************
+You are receiving this e-mail because we feel you are a likely prospect for CIOClUB .
+
+This mail has been sent to Jeff.Skilling@enron.com
+
+To be removed click here
+mailto:gary@cioclub.com?Subject=Remove#Jeff.Skilling@enron.com
+
+Please include enron complete list of email addresses to be removed.
+We apologize for the inconvenience if any caused.Please note that we take
+due care to remove all the mails with the reply of remove .
+*********************************************************************

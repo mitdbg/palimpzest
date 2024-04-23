@@ -86,7 +86,7 @@ class DSPyGenerator(BaseGenerator):
             usage = dspy_lm.history[-1]['response']['usage']
             finish_reason = dspy_lm.history[-1]['response']['choices'][-1]['finish_reason']
         elif self.model_name in [Model.GEMINI_1.value]:
-            usage = {}
+            usage = {"prompt_tokens": 0, "completion_tokens": 0}
             finish_reason = dspy_lm.history[-1]['response'][0]._result.candidates[0].finish_reason
         elif self.model_name in [Model.MIXTRAL.value]:
             usage = dspy_lm.history[-1]['response']['usage']
@@ -159,7 +159,23 @@ class DSPyGenerator(BaseGenerator):
 
         # execute LLM generation
         start_time = time.time()
+        # num_tries = 3
+        # while num_tries > 0:
+        #     try:
+        print(f"Generating")
         pred = cot(question, context)
+        print(pred.answer)
+                # num_tries = -1
+
+            # # TODO: explicitly filter for context length exceeded error
+            # except:
+            #     context = context[:int(len(context)/2)]
+            #     num_tries -= 1
+            #     print(f"num_tries left: {num_tries}")
+
+        # if num_tries == 0:
+        #     raise Exception("message too long")
+
         end_time = time.time()
 
         # extract the log probabilities for the actual result(s) which are returned
