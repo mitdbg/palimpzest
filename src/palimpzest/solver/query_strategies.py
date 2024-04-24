@@ -1,8 +1,10 @@
-from palimpzest.constants import PromptStrategy
+from palimpzest.datamanager import DataDirectory
+from palimpzest.constants import PromptStrategy, CodeGenStrategy
 from palimpzest.elements import DataRecord
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats
+from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats, FullCodeGenStats
 from palimpzest.solver.task_descriptors import TaskDescriptor
+from palimpzest.utils import API, codeEnsembleGeneration, codeEnsembleExecution, reGenerationCondition
 
 from typing import Any, Dict, List, Tuple
 
@@ -213,6 +215,8 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
     for field_name in td.outputSchema.fieldNames():
         if field_name in td.inputSchema.fieldNames():
             setattr(dr, field_name, getattr(candidate, field_name))
+        elif hasattr(candidate, field_name) and (getattr(candidate, field_name) is not None):
+            setattr(dr, field_name, getattr(candidate, field_name))
         else:
             generate_field_names.append(field_name)
 
@@ -271,14 +275,42 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
     return dr, conventional_query_stats
 
 
-# TODO: @Zui
 def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[DataRecord, Stats]:
     """
     I think this would roughly map to the internals of _makeCodeGenTypeConversionFn() in your branch.
     Similar to the functions above, I moved most of the details of generating responses
     """
-    # dr = None
-    # full_code_gen_stats = None
+    # initialize output data record
+    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
+
+    # copy fields from the candidate (input) record if they already exist
+    # and construct list of fields in outputSchema which will need to be generated
+    generate_field_names = []
+    for field_name in td.outputSchema.fieldNames():
+        if field_name in td.inputSchema.fieldNames():
+            setattr(dr, field_name, getattr(candidate, field_name))
+        else:
+            generate_field_names.append(field_name)
     
-    # return dr, full_code_gen_stats
-    raise Exception("not implemented yet")
+    full_code_gen_stats = FullCodeGenStats()
+    cache = DataDirectory().getCacheService()
+    for field_name in generate_field_names:
+        code_ensemble_id = "_".join([td.op_id, field_name])
+        cached_code_ensemble_info = cache.getCachedData("codeEnsemble", code_ensemble_id)
+        if cached_code_ensemble_info is not None:
+            code_ensemble, stats = cached_code_ensemble_info
+            examples = cache.getCachedData("codeSamples", code_ensemble_id)
+        else:
+            code_ensemble, gen_stats, examples = dict(), None, list()
+        examples.append(candidate)
+        cache.putCachedData("codeSamples", code_ensemble_id, examples)
+        api = API.from_task_descriptor(td, field_name)
+        if (code_ensemble is None) or reGenerationCondition(api, examples=examples):
+            code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples)
+            cache.putCachedData("codeEnsemble", code_ensemble_id, (code_ensemble, gen_stats))
+        answer, exec_stats = codeEnsembleExecution(api, code_ensemble, candidate)
+        full_code_gen_stats.code_gen_stats[field_name] = gen_stats
+        full_code_gen_stats.code_exec_stats[field_name] = exec_stats
+        setattr(dr, field_name, answer)
+
+    return dr, full_code_gen_stats

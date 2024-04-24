@@ -35,11 +35,24 @@ class QueryStrategy(Enum):
     QueryStrategy describes the high-level approach to querying a Model (or generated code)
     in order to perform a specified task.
     """
+    DEFAULT = "codegen-with-fallback"
     CONVENTIONAL = "conventional"
     BONDED = "bonded"
     BONDED_WITH_FALLBACK = "bonded-with-fallback"
     CODE_GEN = "code-gen"
     CODE_GEN_WITH_FALLBACK = "codegen-with-fallback"
+
+class CodeGenStrategy(Enum):
+    """
+    CodeGenStrategy describes the high-level approach to generating code.
+    in order to perform a specified task.
+    """
+    DEFAULT = "single"
+    NONE = "none"
+    SINGLE = "single"
+    EXAMPLE_ENSEMBLE = "example-ensemble"
+    ADVICE_ENSEMBLE = "advice-ensemble"
+    ADVICE_ENSEMBLE_WITH_VALIDATION = "advice-ensemble-with-validation"
 
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
 RETRY_MULTIPLIER = 2
