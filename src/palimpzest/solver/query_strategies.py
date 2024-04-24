@@ -57,9 +57,9 @@ def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_na
         """ + "" if td.conversionDesc is None else f" Keep in mind that this process is described by this text: {td.conversionDesc}."                
 
     else:
-        promptQuestion = f"""You are an image analysis bot. Analyze the supplied image and create {targetOutputDescriptor} {doc_type}.
-        You will use the information in the image that I will provide. The input image has type {td.inputSchema.className()}.
-        All of the fields in {outputSingleOrPlural} can be derived using information from the input image.
+        promptQuestion = f"""You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor} {doc_type}.
+        You will use the information in the image that I will provide. The input image(s) has type {td.inputSchema.className()}.
+        All of the fields in {outputSingleOrPlural} can be derived using information from the input image(s).
         {optionalInputDesc}
         {optionalOutputDesc}
         Here is every output field name and a description:
@@ -159,12 +159,17 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
             )
 
         elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
-            # b64 decode of candidate.contents
-            image_b64 = base64.b64encode(candidate.contents).decode('utf-8')
+            # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
+            # b64 decode of candidate.contents or candidate.image_contents
+            base64_images = []
+            if hasattr(candidate, "contents"):
+                base64_images = [base64.b64encode(candidate.contents).decode('utf-8')]
+            else:
+                base64_images = [base64.b64encode(image).decode('utf-8') for image in candidate.image_contents]
 
             # invoke LLM to generate output JSON
             generator = ImageTextGenerator(td.model.value)
-            answer, gen_stats = generator.generate(image_b64, promptQuestion)
+            answer, gen_stats = generator.generate(base64_images, promptQuestion)
 
             # construct BondedQueryStats object
             bonded_query_stats = BondedQueryStats(
@@ -238,12 +243,17 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
                 answer, field_stats = generator.generate(text_content, promptQuestion)
 
             elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:                               
-                # b64 decode of candidate.contents
-                image_b64 = base64.b64encode(candidate.contents).decode('utf-8')
+                # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
+                # b64 decode of candidate.contents or candidate.image_contents
+                base64_images = []
+                if hasattr(candidate, "contents"):
+                    base64_images = [base64.b64encode(candidate.contents).decode('utf-8')]
+                else:
+                    base64_images = [base64.b64encode(image).decode('utf-8') for image in candidate.image_contents]
 
                 # invoke LLM to generate output JSON
                 generator = ImageTextGenerator(td.model.value)
-                answer, field_stats = generator.generate(image_b64, promptQuestion)
+                answer, field_stats = generator.generate(base64_images, promptQuestion)
 
             # TODO
             elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:

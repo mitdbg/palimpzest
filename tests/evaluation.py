@@ -32,27 +32,36 @@ class Email(pz.TextFile):
 #       here is to have a schema which represents the different (sets of) files, but I feel like users
 #       will naturally just want to define the fields they wish to extract from the underlying (set of) files
 #       and have PZ take care of the rest
-class RealEstateListing(pz.Schema):
+class RealEstateListingFiles(pz.Schema):
     """The source text and image data for a real estate listing."""
     listing = pz.StringField(desc="The name of the listing", required=True)
     text_content = pz.BytesField(desc="The content of the listing's text description", required=True)
     image_contents = pz.ListField(element_type=pz.BytesField, desc="A list of the contents of each image of the listing", required=True)
 
-# TODO: if we want to apply filters based on images, right now we have to get a description and then
-#       apply a filter on that description; we want a way to directly query the model for what it is
-#       we seek to know about the image in its output description (and possibly filter directly on that)
-class ModernNearMITRealEstateListing(RealEstateListing):
-    """Represents a real estate listing which consists of text as well as a set of photos."""
-    location = pz.StringField(desc="The address of the property")
+# TODO: longer-term we will want to support one or more of the following:
+#       0. allow use of multimodal models on text + image inputs
+#
+#       1. allow users to define fields and specify which source fields they
+#          should be converted from (e.g. text_content or image_contents);
+#          PZ can then re-order these separate conversion steps with downstream
+#          filters automatically to minimize execution cost
+#      
+class TextRealEstateListing(RealEstateListingFiles):
+    """Represents a real estate listing with specific fields extracted from its text."""
+    address = pz.StringField(desc="The address of the property")
     sq_ft = pz.NumericField(desc="The square footage (sq. ft.) of the property")
     year_built = pz.NumericField(desc="The year in which the property was built")
     bedrooms = pz.NumericField(desc="The number of bedrooms")
     bathrooms = pz.NumericField(desc="The number of bathrooms")
-    image_descriptions = # TODO
+
+class FullRealEstateListing(TextRealEstateListing):
+    """Represents a real estate listing with specific fields extracted from its text and images."""
+    is_modern_and_attractive = pz.BooleanField(desc="True if the home interior is modern and attractive and False otherwise")
+    has_natural_sunlight = pz.BooleanField(desc="True if the home interior has lots of natural sunlight and False otherwise")
 
 class RealEstateListingSource(pz.UserSource):
     def __init__(self, datasetId, listings_dir):
-        super().__init__(RealEstateListing, datasetId)
+        super().__init__(RealEstateListingFiles, datasetId)
         self.listings_dir = listings_dir
 
     def userImplementedIterator(self):
@@ -82,19 +91,10 @@ def buildNestedStr(node, indent=0, buildStr=""):
     else:
         return buildStr
 
-def compute_label(physicalTree, label_idx):
-    """
-    Map integer to physical plan.
-    """
-    physicalOps = physicalTree.dumpPhysicalTree()
-    label = buildNestedStr(physicalOps)
-    print(f"LABEL {label_idx}: {label}")
-    return f"PZ-{label_idx}"
 
-
-def score_enron_plan(datasetid, records) -> float:
+def score_plan(datasetid, records) -> float:
     """
-    Computes the F1 score of the enron plan
+    Computes the F1 score of the plan
     """
     # parse records
     records = [
@@ -112,11 +112,14 @@ def score_enron_plan(datasetid, records) -> float:
     pred_filenames = records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
 
     # get groundtruth
-    gt_df = (
-        pd.read_csv("testdata/groundtruth/enron-eval.csv")
-        if datasetid == "enron-eval"
-        else pd.read_csv("testdata/groundtruth/enron-eval-tiny.csv")
-    )
+    gt_df = None
+    if datasetid == "enron-eval":
+        gt_df = pd.read_csv("testdata/groundtruth/enron-eval.csv")
+    elif datasetid == "enron-eval-tiny":
+        gt_df = pd.read_csv("testdata/groundtruth/enron-eval-tiny.csv")
+    elif datasetid == "real-estate-eval":
+        gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval.csv")
+
     target_filenames = list(gt_df[gt_df.label == 1].filename.unique())
 
     # compute true and false positives
@@ -207,9 +210,9 @@ def evaluate_enron_baseline(model, datasetid):
     return runtime, cost, f1_score, label
 
 
-def run_enron_pz_plan(datasetid, plan, idx):
+def run_pz_plan(datasetid, plan, idx):
     """
-    I'm placing this in a separate file from evaluate_enron_pz to see if this prevents
+    I'm placing this in a separate file from evaluate_pz_plans to see if this prevents
     an error where the DSPy calls to Gemini (and other models?) opens too many files.
     My hope is that placing this inside a separate function will cause the file descriptors
     to be cleaned up once the function returns.
@@ -223,49 +226,96 @@ def run_enron_pz_plan(datasetid, plan, idx):
     # get profiling data for plan and compute its cost
     profileData = plan.getProfilingData()
     sp = StatsProcessor(profileData)
-    with open(f'eval-results/enron-profiling-{idx}.json', 'w') as f:
+
+    with open(f'eval-results/{datasetid}-profiling-{idx}.json', 'w') as f:
         json.dump(sp.profiling_data.to_dict(), f)
 
     # score plan based on its output records
-    _, _, f1_score = score_enron_plan(datasetid, records)
+    _, _, f1_score = score_plan(datasetid, records)
 
-    cost = 0.0
+    cost, models = 0.0, []
     stats = sp.profiling_data
     while stats is not None:
         cost += stats.total_usd
+        if stats.model_name is not None:
+            models.append(stats.model_name)
         stats = stats.source_op_stats
 
     # compute label
-    label = compute_label(plan, idx)
+    print(f"PLAN {idx}: {buildNestedStr(plan.dumpPhysicalTree())}")
 
-    return runtime, cost, f1_score, label
+    return runtime, cost, f1_score, models
 
 
-def evaluate_enron_pz(datasetid, reoptimize=False, limit=None):
+def evaluate_pz_plans(datasetid, reoptimize=False, limit=None):
     """
     This creates the PZ set of plans for the Enron email evaluation.
 
-    Make sure to pre-register the dataset with:
+    Make sure to pre-register the dataset(s) with:
 
     $ pz reg --path testdata/enron-eval --name enron-eval
-    """
-    # TODO: we can expand this dataset, but it's good enough for now
-    emails = pz.Dataset(datasetid, schema=Email)
-    emails = emails.filterByStr("The email refers to a fraudulent scheme (i.e., \"Raptor\", \"Deathstar\", \"Chewco\", and/or \"Fat Boy\")")
-    # emails = emails.filterByStr("The email is sent by Jeffrey Skilling (jeff.skilling@enron.com), or Andy Fastow (andy.fastow@enron.com), or refers to either one of them by name")
-    emails = emails.filterByStr("The email is not quoting from a news article or an article written by someone outside of Enron")
 
-    logicalTree = emails.getLogicalTree()
-    candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True)
+    (Note that the real-estate dataset is registered dynamically.)
+    """
+    # TODO: we can expand these datasets, but they're good enough for now
+    logicalTree = None
+    if "enron" in datasetid:
+        emails = pz.Dataset(datasetid, schema=Email)
+        emails = emails.filterByStr("The email refers to a fraudulent scheme (i.e., \"Raptor\", \"Deathstar\", \"Chewco\", and/or \"Fat Boy\")")
+        # emails = emails.filterByStr("The email is sent by Jeffrey Skilling (jeff.skilling@enron.com), or Andy Fastow (andy.fastow@enron.com), or refers to either one of them by name")
+        emails = emails.filterByStr("The email is not quoting from a news article or an article written by someone outside of Enron")
+        logicalTree = emails.getLogicalTree()
+
+    elif "real-estate" in datasetid:
+        def within_two_miles_of_mit(record):
+            # NOTE: I'm using this hard-coded function so that folks w/out a
+            #       Geocoding API key from google can still run this example
+            far_away_addrs = ["Melcher St", "Sleeper St", "437 D St", "Seaport", "Liberty"]
+            if any([street.lower() in record.address.lower() for street in far_away_addrs]):
+                return False
+            return True
+
+        # TODO: update logical plan creation to consider swapping (pairs of) (convert and filter)
+        listings = pz.Dataset(datasetid, schema=RealEstateListingFiles)
+        listings = listings.convert(TextRealEstateListing)
+        listings = listings.convert(FullRealEstateListing)
+        listings = listings.filterByStr(
+            "The interior is modern and attractive, and has lots of natural sunlight",
+            depends_on=["is_modern_and_attractive", "has_natural_sunlight"]
+        )
+        listings = listings.filterByFn(within_two_miles_of_mit, depends_on=["address"])
+        logicalTree = listings.getLogicalTree()
+
+    # get total number of plans
+    num_plans = len(logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True))
+
     results = []
-    for idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
+    for idx in range(num_plans):
+    # for idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
+        # skip all-Gemini plan which opens too many files
+        if idx == 17:
+            continue
+
+        # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True)
+        _, _, _, plan = candidatePlans[idx]
+
+        # workaround to disabling cache: delete all cached generations after each plan
+        bad_files = ["testdata/enron-eval/assertion.log", "testdata/enron-eval/azure_openai_usage.log", "testdata/enron-eval/openai_usage.log"]
+        for file in bad_files:
+            if os.path.exists(file):
+                os.remove(file)
+
         print("----------------------")
         print(f"Plan: {buildNestedStr(plan.dumpPhysicalTree())}")
         print("---")
-        runtime, cost, f1_score, label = run_enron_pz_plan(datasetid, plan, idx)
+        runtime, cost, f1_score, models = run_pz_plan(datasetid, plan, idx)
 
         # add to results
-        results.append((runtime, cost, f1_score, label))
+        result_dict = {"runtime": runtime, "cost": cost, "f1_score": f1_score, "models": models}
+        results.append(result_dict)
+        with open(f'eval-results/{datasetid}-results-{idx}.json', 'w') as f:
+            json.dump(result_dict, f)
 
         # workaround to disabling cache: delete all cached generations after each plan
         dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
@@ -275,61 +325,52 @@ def evaluate_enron_pz(datasetid, reoptimize=False, limit=None):
     return results
 
 
-def evaluate_real_estate_pz(datasetid, reoptimize=False, limit=None):
-    """
-    This creates the PZ set of plans for the Real Estate evaluation.
 
-    Make sure to pre-register the dataset with:
-
-    $ pz reg --path testdata/real-estate-eval --name real-estate-eval
-    """
-    # TODO: we can expand this dataset, but it's good enough for now
-    listings = pz.Dataset(datasetid, schema=RealEstateListing)
-    listings = listings.filterByStr("The email refers to a fraudulent scheme (i.e., \"Raptor\", \"Deathstar\", \"Chewco\", and/or \"Fat Boy\")")
-    # listings = listings.filterByStr("The email is sent by Jeffrey Skilling (jeff.skilling@enron.com), or Andy Fastow (andy.fastow@enron.com), or refers to either one of them by name")
-    listings = listings.filterByStr("The email is not quoting from a news article or an article written by someone outside of Enron")
-
-    logicalTree = listings.getLogicalTree()
-    candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True)
-    results = []
-    for idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
-        print("----------------------")
-        print(f"Plan: {buildNestedStr(plan.dumpPhysicalTree())}")
-        print("---")
-        runtime, cost, f1_score, label = run_enron_pz_plan(datasetid, plan, idx)
-
-        # add to results
-        results.append((runtime, cost, f1_score, label))
-
-        # workaround to disabling cache: delete all cached generations after each plan
-        dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
-        if os.path.exists(dspy_cache_dir):
-            shutil.rmtree(dspy_cache_dir)
-
-    return results
-
-def plot_runtime_cost_vs_quality(results):
+def plot_runtime_cost_vs_quality(results, datasetid):
     # create figure
     fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True)
 
     # parse results into fields
-    for runtime, cost, f1_score, label in results:
+    for result_dict in results:
+        runtime = result_dict["runtime"]
+        cost = result_dict["cost"]
+        f1_score = result_dict["f1_score"]
+        models = result_dict["models"]
+        text = None
+        if all([model == "gpt-4-0125-preview" for model in models]):
+            # add text for ALL-GPT4
+            text = "ALL-GPT4"
+        elif all([model == "mistralai/Mixtral-8x7B-Instruct-v0.1" for model in models]):
+            # add text for ALL-MIXTRAL
+            text = "ALL-MIXTRAL"
+        elif datasetid == "enron-eval" and models == ["gpt-4-0125-preview"] * 2 + ["mistralai/Mixtral-8x7B-Instruct-v0.1"]:
+            # add text for Mixtral-GPT4
+            text = "MIXTRAL-GPT4"
+        elif datasetid == "enron-eval" and models == ["gpt-4-0125-preview"] * 2 + ["gemini-1.0-pro-001"]:
+            # add text for Gemini-GPT4
+            text = "GEMINI-GPT4"
+
         # set label and color
         color = None
-        marker = "*" if "PZ" in label else "^"
+        marker = None
+        # marker = "*" if "PZ" in label else "^"
 
         # plot runtime vs. f1_score
-        axs[0].scatter(f1_score, runtime, label=label, alpha=0.4, color=color, marker=marker)
+        axs[0].scatter(f1_score, runtime, alpha=0.4, color=color, marker=marker)
+        if text is not None:
+            axs[0].annotate(text, (f1_score, runtime))
 
         # plot cost vs. f1_score
-        axs[1].scatter(f1_score, cost, label=label, alpha=0.4, color=color, marker=marker)
+        axs[1].scatter(f1_score, cost, alpha=0.4, color=color, marker=marker)
+        if text is not None:
+            axs[1].annotate(text, (f1_score, cost))
 
     # savefig
     axs[0].set_title("Runtime and Cost vs. F1 Score")
     axs[0].set_ylabel("runtime (seconds)")
     axs[1].set_ylabel("cost (USD)")
     axs[1].set_xlabel("F1 Score")
-    axs[0].legend(bbox_to_anchor=(1.03, 1.0))
+    # axs[0].legend(bbox_to_anchor=(1.03, 1.0))
     fig.savefig("eval-results/enron.png", bbox_inches="tight")
 
 
@@ -340,6 +381,7 @@ if __name__ == "__main__":
     parser.add_argument('--datasetid', type=str, help='The dataset id')
     parser.add_argument('--eval' , type=str, help='The evaluation to run')
     parser.add_argument('--limit' , type=int, help='The number of plans to consider')
+    parser.add_argument('--listings-dir', type=str, help='The directory with real-estate listings')
 
     args = parser.parse_args()
 
@@ -355,31 +397,47 @@ if __name__ == "__main__":
         # get PZ plan metrics
         print("Running PZ Plans")
         print("----------------")
-        results = evaluate_enron_pz(args.datasetid, limit=args.limit)
+        results = evaluate_pz_plans(args.datasetid, limit=args.limit)
 
-        # get baseline metrics
-        print("Running Baselines")
-        print("-----------------")
-        all_gpt4_runtime, all_gpt4_cost, all_gpt4_quality, all_gpt4_label = evaluate_enron_baseline(Model.GPT_4, args.datasetid)
-        # all_gpt35_runtime, all_gpt35_cost, all_gpt35_quality, all_gpt35_label = evaluate_enron_baseline(Model.GPT_3_5)
-        all_mixtral_runtime, all_mixtral_cost, all_mixtral_quality, mixtral_label = evaluate_enron_baseline(Model.MIXTRAL, args.datasetid)
+        # # get baseline metrics
+        # print("Running Baselines")
+        # print("-----------------")
+        # all_gpt4_runtime, all_gpt4_cost, all_gpt4_quality, all_gpt4_label = evaluate_enron_baseline(Model.GPT_4, args.datasetid)
+        # # all_gpt35_runtime, all_gpt35_cost, all_gpt35_quality, all_gpt35_label = evaluate_enron_baseline(Model.GPT_3_5)
+        # all_mixtral_runtime, all_mixtral_cost, all_mixtral_quality, mixtral_label = evaluate_enron_baseline(Model.MIXTRAL, args.datasetid)
 
-        # plot runtime vs quality and cost vs quality
-        baselines = [
-            (all_gpt4_runtime, all_gpt4_cost, all_gpt4_quality, all_gpt4_label),
-            # (all_gpt35_runtime, all_gpt35_cost, all_gpt35_quality, all_gpt35_label),
-            (all_mixtral_runtime, all_mixtral_cost, all_mixtral_quality, mixtral_label),
-        ]
-        pz_plans = [
-            (runtime, cost, f1_score, label)
-            for runtime, cost, f1_score, label in results
-        ]
-        all_results = baselines + pz_plans
+        # # plot runtime vs quality and cost vs quality
+        # baselines = [
+        #     (all_gpt4_runtime, all_gpt4_cost, all_gpt4_quality, all_gpt4_label),
+        #     # (all_gpt35_runtime, all_gpt35_cost, all_gpt35_quality, all_gpt35_label),
+        #     (all_mixtral_runtime, all_mixtral_cost, all_mixtral_quality, mixtral_label),
+        # ]
+        # pz_plans = [
+        #     (runtime, cost, f1_score, label)
+        #     for runtime, cost, f1_score, label in results
+        # ]
+        # all_results = baselines + pz_plans
+
+        # results = []
+        # for idx in range(17):
+        #     with open(f'eval-results/{args.datasetid}-results-{idx}.json', 'r') as f:
+        #         result_dict = json.load(f)
+        #         results.append(result_dict)
+
         with open("eval-results/enron.json", 'w') as f:
-            json.dump(all_results, f)
-
-        plot_runtime_cost_vs_quality(all_results)
+            json.dump(results, f)
+ 
+        plot_runtime_cost_vs_quality(results, args.datasetid)
 
     if args.eval == "real-estate":
         # register user data source
-        pz.DataDirectory().registerUserSource(GitHubCommitSource(datasetid), datasetid)
+        print("Registering Datasource")
+        pz.DataDirectory().registerUserSource(RealEstateListingSource(args.datasetid, args.listings_dir), args.datasetid)
+        
+        print("Running PZ plans")
+        results = evaluate_pz_plans(args.datasetid, limit=args.limit)
+
+        with open("eval-results/real-estate.json", 'w') as f:
+            json.dump(results, f)
+
+        plot_runtime_cost_vs_quality(results)

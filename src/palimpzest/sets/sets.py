@@ -15,7 +15,7 @@ from palimpzest.operators import (
 )
 from palimpzest.datasources import DataSource, DirectorySource, FileSource, MemorySource
 
-from typing import Union
+from typing import List, Union
 
 import hashlib
 import json
@@ -51,8 +51,9 @@ class Set:
                  aggFunc: AggregateFunction=None, 
                  groupBy: GroupBySig = None,
                  limit: int=None, 
-                 fnid:str = None, 
-                 cardinality: str = None,
+                 fnid: str=None, 
+                 cardinality: str=None,
+                 image_conversion: bool=None,
                  nocache: bool=False):
         self._schema = schema
         self._source = source
@@ -63,6 +64,7 @@ class Set:
         self._limit = limit
         self._fnid = fnid
         self._cardinality = cardinality
+        self._image_conversion = image_conversion
         self._nocache = nocache
 
     def __str__(self):
@@ -75,8 +77,9 @@ class Set:
              "desc": repr(self._desc),
              "filter": None if self._filter is None else self._filter.serialize(),
              "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(),
-             "fnid": None if self._fnid is None else self._fnid,
-             "cardinality": None if self._cardinality is None else self._cardinality,
+             "fnid": self._fnid,
+             "cardinality": self._cardinality,
+             "image_conversion": self._image_conversion,
              "limit": self._limit,
              "groupBy": None if self._groupBy is None else GroupBySig.serialize(self._groupBy)}
 
@@ -112,14 +115,13 @@ class Set:
         groupByStr = inputObj.get("groupBy", None)
         groupBy = None if groupByStr is None else GroupBySig.deserialize(groupByStr)
 
-
-
         # deserialize limit
         limitStr = inputObj.get("limit", None)
         limit = None if limitStr is None else int(limitStr)
 
         fnid = inputObj.get("fnid", None)
         cardinality = inputObj.get("cardinality", None)
+        image_conversion = inputObj.get("image_conversion", None)
 
         return Set(schema=inputObj["schema"].jsonSchema(), 
                    source=source, 
@@ -128,6 +130,7 @@ class Set:
                    aggFunc=aggFunc,
                    fnid=fnid,
                    cardinality=cardinality,
+                   image_conversion=image_conversion,
                    limit=limit,
                    groupBy=groupBy)
 
@@ -182,7 +185,7 @@ class Set:
         elif self._fnid is not None:
             return ApplyUserFunction(self._schema, self._source.getLogicalTree(), self._fnid, targetCacheId=uid)
         elif not self._schema == self._source._schema:
-            return ConvertScan(self._schema, self._source.getLogicalTree(), self._cardinality, targetCacheId=uid)
+            return ConvertScan(self._schema, self._source.getLogicalTree(), self._cardinality, self._image_conversion, targetCacheId=uid)
         else:
             return self._source.getLogicalTree()
 
@@ -206,7 +209,7 @@ class Dataset(Set):
     provide a Schema for the Dataset. This Schema will be enforced when the Dataset iterates
     over the source in its __iter__ method and constructs DataRecords.
     """
-    def __init__(self, source: Union[str, Set], schema: Schema=File, cardinality: str = None, desc: str=None, filter: Filter=None, groupBy: GroupBySig=None, aggFunc: AggregateFunction=None, limit: int=None, fnid: str=None, nocache: bool=False):
+    def __init__(self, source: Union[str, Set], schema: Schema=File, cardinality: str = None, desc: str=None, filter: Filter=None, groupBy: GroupBySig=None, aggFunc: AggregateFunction=None, limit: int=None, fnid: str=None, image_conversion: bool=None, nocache: bool=False):
         # convert source (str) -> source (DataSource) if need be
         self.source = (
             DataDirectory().getRegisteredDataset(source)
@@ -214,7 +217,7 @@ class Dataset(Set):
             else source
         )
 
-        super().__init__(schema, self.source, cardinality=cardinality, desc=desc, filter=filter, aggFunc=aggFunc, groupBy=groupBy, limit=limit, fnid=fnid, nocache=nocache)
+        super().__init__(schema, self.source, cardinality=cardinality, desc=desc, filter=filter, aggFunc=aggFunc, groupBy=groupBy, limit=limit, fnid=fnid, image_conversion=image_conversion, nocache=nocache)
 
     def deserialize(inputObj):
         # TODO: this deserialize operation will not work; I need to finish the deserialize impl. for Schema
@@ -247,9 +250,15 @@ class Dataset(Set):
 
         return self.filter(f, desc)
 
-    def convert(self, newSchema: Schema, cardinality: str = None, desc: str="Convert to new schema") -> Dataset:
+    def filterByFn(self, filterFn: callable, desc: str="Apply filter(s)") -> Dataset:
+        """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
+        f = Filter(filterFn=filterFn)
+
+        return self.filter(f, desc)
+
+    def convert(self, newSchema: Schema, cardinality: str = None, image_conversion: bool=False, desc: str="Convert to new schema") -> Dataset:
         """Convert the Set to a new schema."""
-        return Dataset(source=self, schema=newSchema, cardinality=cardinality, desc=desc)
+        return Dataset(source=self, schema=newSchema, cardinality=cardinality, image_conversion=image_conversion, desc=desc)
 
     def map(self, fn: UserFunction) -> Dataset:
         """Convert the Set to a new schema."""

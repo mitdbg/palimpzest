@@ -50,6 +50,7 @@ class LogicalOperator:
     def _getPhysicalTree(self, strategy: str=None, source: PhysicalOp=None, shouldProfile: bool=False) -> PhysicalOp:
         raise NotImplementedError("Abstract method")
 
+    # TODO: debug if deepcopy is not making valid copies to resolve duplicate profiler issue
     @staticmethod
     def _computeFilterReorderings(rootOp: LogicalOperator) -> List[LogicalOperator]:
         """
@@ -115,8 +116,18 @@ class LogicalOperator:
         Given the logical plan implied by this LogicalOperator, enumerate up to `max`
         other logical plans (including this one) and return the list.
         """
+        # # base case: this operator has no input, simply return
+        # if self.inputOp is None:
+        #     pass
         logicalPlans = []
 
+        # TODO: eliminate (_computeFilterReorderings); instead:
+        # - traverse the tree and grab all filters and convert operations
+        #   - (have users optionally specify convert dependencies;
+        #      if not specified we assume user's scripted logical plan implies dependencies)
+
+        # - compute all possible valid interleavings of filter(s) and convert(s)
+        # - keep base operators in-place 
         # enumerate filter orderings
         filterReorderedPlans = LogicalOperator._computeFilterReorderings(self)
         logicalPlans.extend(filterReorderedPlans)
@@ -164,11 +175,18 @@ class LogicalOperator:
         if isinstance(self, ConvertScan) or isinstance(self, FilteredScan):
             for model in models:
                 for subTreePhysicalPlan in subTreePhysicalPlans:
+                    # NOTE: failing to make a copy will lead to duplicate profile information being captured
+                    # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
+                    subTreePhysicalPlan = subTreePhysicalPlan.copy()
                     physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, shouldProfile=shouldProfile)
                     physicalPlans.append(physicalPlan)
         else:
             for subTreePhysicalPlan in subTreePhysicalPlans:
-                physicalPlans.append(self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, shouldProfile=shouldProfile))
+                # NOTE: failing to make a copy will lead to duplicate profile information being captured
+                # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
+                subTreePhysicalPlan = subTreePhysicalPlan.copy()
+                physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, shouldProfile=shouldProfile)
+                physicalPlans.append(physicalPlan)
 
         return physicalPlans
 
@@ -244,10 +262,11 @@ class LogicalOperator:
 
 class ConvertScan(LogicalOperator):
     """A ConvertScan is a logical operator that represents a scan of a particular data source, with conversion applied."""
-    def __init__(self, outputSchema: Schema, inputOp: LogicalOperator, cardinality: str=None, desc: str=None, targetCacheId: str=None):
+    def __init__(self, outputSchema: Schema, inputOp: LogicalOperator, cardinality: str=None, image_conversion: bool=False, desc: str=None, targetCacheId: str=None):
         super().__init__(outputSchema, inputOp.outputSchema)
         self.inputOp = inputOp
         self.cardinality = cardinality
+        self.image_conversion = image_conversion
         self.desc = desc
         self.targetCacheId = targetCacheId
 
@@ -273,6 +292,7 @@ class ConvertScan(LogicalOperator):
                                                      source,
                                                      model,
                                                      self.cardinality,
+                                                     self.image_conversion,
                                                      desc=self.desc,
                                                      targetCacheId=self.targetCacheId,
                                                      shouldProfile=shouldProfile)
@@ -281,6 +301,7 @@ class ConvertScan(LogicalOperator):
                                              source,
                                              model,
                                              self.cardinality,
+                                             self.image_conversion,
                                              desc=self.desc,
                                              targetCacheId=self.targetCacheId,
                                              shouldProfile=shouldProfile)
@@ -293,6 +314,7 @@ class ConvertScan(LogicalOperator):
                                                          source,
                                                          model,
                                                          self.cardinality,
+                                                         self.image_conversion,
                                                          shouldProfile=shouldProfile),
                                                      model,
                                                      "oneToOne",
@@ -306,6 +328,7 @@ class ConvertScan(LogicalOperator):
                                                  source,
                                                  model,
                                                  self.cardinality,
+                                                 self.image_conversion,
                                                  shouldProfile=shouldProfile),
                                              model,
                                              "oneToOne",
