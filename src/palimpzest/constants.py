@@ -46,6 +46,9 @@ RETRY_MULTIPLIER = 2
 RETRY_MAX_SECS = 10
 RETRY_MAX_ATTEMPTS = 1
 
+# maximum number of rows to display in a table
+MAX_ROWS = 5
+
 def log_attempt_number(retry_state):
     """return the result of the last call attempt"""
     print(f"Retrying: {retry_state.attempt_number}...")

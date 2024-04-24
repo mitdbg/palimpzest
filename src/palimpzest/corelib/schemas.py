@@ -1,3 +1,4 @@
+from palimpzest.constants import MAX_ROWS
 from palimpzest.elements import BytesField, Schema, StringField, File, NumericField, ListField
 import json
 
@@ -61,7 +62,7 @@ class Table(Schema):
         dct = value_dict
 
         rows = []
-        for i, row in enumerate(dct["rows"][:15]): # only sample the first 15 rows
+        for i, row in enumerate(dct["rows"][:MAX_ROWS]): # only sample the first MAX_ROWS
             rows += [",".join(row) + "\n"]
         dct["rows"] = rows
 
