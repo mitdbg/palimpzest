@@ -290,6 +290,7 @@ class Solver:
                     if hasattr(new_candidate, field_name) and (getattr(new_candidate, field_name) is None):
                         delattr(new_candidate, field_name)
                 dr, conventional_query_stats = runConventionalQuery(new_candidate, td, self._verbose)
+                dr._parent_uuid = candidate._uuid
                 drs = [dr]
 
                 # if profiling, set record's stats for the given op_id
