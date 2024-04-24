@@ -259,7 +259,7 @@ class InduceFromCandidateOp(PhysicalOp):
         return "InduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
 
     def _makeTaskDescriptor(self):
-        return TaskDescriptor(
+        td = TaskDescriptor(
             physical_op="InduceFromCandidateOp",
             inputSchema=self.source.outputSchema,
             outputSchema=self.outputSchema,
@@ -271,6 +271,15 @@ class InduceFromCandidateOp(PhysicalOp):
             conversionDesc=self.desc,
             pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
         )
+
+        # This code checks if the function has been synthesized before, and if so, whether it is hardcoded. If so, set model and prompt_strategy to None.
+        fn = PhysicalOp.synthesizedFns.get(str(td), None)
+        if fn is not None:
+            if (td.outputSchema, td.inputSchema) in PhysicalOp.solver._hardcodedFns:
+                td.model = None
+                td.prompt_strategy = None
+
+        return td
 
     def _is_quick_conversion(self):
         td = self._makeTaskDescriptor()

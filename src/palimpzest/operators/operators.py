@@ -139,8 +139,8 @@ class LogicalOperator:
         # choose set of acceptable models based on possible llmservices
         models = []
         if os.getenv('OPENAI_API_KEY') is not None:
-            # models.extend([Model.GPT_3_5, Model.GPT_4])
-            models.extend([Model.GPT_4])
+            models.extend([Model.GPT_3_5, Model.GPT_4])
+            # models.extend([Model.GPT_4])
 
         if os.getenv('TOGETHER_API_KEY') is not None:
             models.extend([Model.MIXTRAL])
@@ -166,6 +166,10 @@ class LogicalOperator:
                 for subTreePhysicalPlan in subTreePhysicalPlans:
                     physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, shouldProfile=shouldProfile)
                     physicalPlans.append(physicalPlan)
+                    # GV Checking if there is an hardcoded function exposes that we need to refactor the solver/physical function generation
+                    td = physicalPlan._makeTaskDescriptor()
+                    if td.model == None:
+                        break
         else:
             for subTreePhysicalPlan in subTreePhysicalPlans:
                 physicalPlans.append(self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, shouldProfile=shouldProfile))
