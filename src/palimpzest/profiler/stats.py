@@ -110,7 +110,6 @@ class OperatorStats:
         # convert defaultdict -> dict before calling asdict()
         self_copy.finish_reasons = dict(self_copy.finish_reasons)
         self_copy.per_field_op_stats = dict(self_copy.per_field_op_stats)
-        self_copy.code_gen_op_stats = dict(self_copy.code_gen_op_stats)
 
         # call to_dict() on source_op_stats
         if self_copy.source_op_stats is not None:
@@ -197,7 +196,7 @@ class CodeGenSingleStats(Stats):
     prompt_template: str=None
     context: Dict[str, Any]=field(default_factory=dict)
     code: str=None
-    gen_stats: GenerationStats=None
+    gen_stats: GenerationStats=field(default_factory=GenerationStats)
 
 @dataclass
 class CodeGenEnsembleStats(Stats):
