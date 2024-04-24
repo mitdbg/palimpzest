@@ -2,7 +2,8 @@
 
 
 
-from palimpzest.profiler import Stats, GenerationStats, CodeGenSingleStats, CodeGenEnsembleStats, CodeExecutionSingleStats, CodeExecutionEnsembleStats, FullCodeGenStats
+from palimpzest.profiler import GenerationStats, CodeGenSingleStats, CodeGenEnsembleStats, CodeExecutionSingleStats, CodeExecutionEnsembleStats
+from palimpzest.generators import CustomGenerator
 from palimpzest.utils import API
 from palimpzest.constants import Model, CodeGenStrategy
 from palimpzest.elements import DataRecord
@@ -12,24 +13,9 @@ from collections import Counter
 
 import time
 
-from seed import LLM
-turbo = LLM()
-def _run_basic_request(prompt, model_name):
-    start_time = time.time()
-    response = turbo.q([{'role': 'user', 'content': prompt}])
-    pred = response['text'] if response['status'] and response['text'] else None
-    end_time = time.time()
-    
-    stats = GenerationStats(
-        model_name = model_name,
-        llm_call_duration_secs = end_time - start_time,
-        prompt = prompt,
-        # ...
-    )
-    return pred, stats
-
-def run_codegen(prompt, model_name=Model.GPT_4.value, language='Python'):
-    pred, stats = _run_basic_request(prompt, model_name)
+llm = CustomGenerator(model_name=Model.GPT_4.value)
+def run_codegen(prompt, language='Python'):
+    pred, stats = llm.generate(prompt=prompt)
     ordered_keys = [
         f'```{language}',
         f'```{language.lower()}',
@@ -56,8 +42,8 @@ def parse_multiple_outputs(text, outputs=['Thought', 'Action']):
 def parse_ideas(text, limit=3):
     return parse_multiple_outputs(text, outputs=[f'Idea {i}' for i in range(1, limit+1)])
 
-def run_advgen(prompt, model_name=Model.GPT_4.value):
-    pred, stats = _run_basic_request(prompt, model_name)
+def run_advgen(prompt):
+    pred, stats = llm.generate(prompt=prompt)
     advs = parse_ideas(pred); return advs, stats
 
 def codeGenDefault(api):
@@ -73,12 +59,13 @@ CODEGEN_PROMPT = """You are a helpful programming assistant and an expert {langu
 Notice that the evaluation will severely punish incorrect outputs. Thus, when the function is uncertain, it should return `None` to abstain instead of returning an incorrect guess.
 {advice}
 Return the implementation only."""
-def codeGenSingle(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), advice: str=None, model_name=Model.GPT_4.value, language='Python'):
+def codeGenSingle(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), advice: str=None, language='Python'):
     prompt_template = CODEGEN_PROMPT
     context = {
         'language': language,
         'api': api.args_call(),
         'output': api.output,
+        'inputs_desc': "\n".join([f"- {k} ({api.input_descs[i]})" for i, k in enumerate(api.inputs)]),
         'output_desc': api.output_desc,
         'examples_desc': "\n".join([
             EXAMPLE_PROMPT.format(
@@ -90,7 +77,7 @@ def codeGenSingle(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(),
         'advice': f"Hint: {advice}" if advice else "",
     }
     prompt = prompt_template.format(**context)
-    code, gen_stats = run_codegen(prompt, model_name)
+    code, gen_stats = run_codegen(prompt, language=language)
     stats = CodeGenSingleStats(
         prompt_template = prompt_template,
         context = context,
@@ -109,12 +96,13 @@ Now, consider the following {language} programming task that extracts `{output}`
 {examples_desc}
 Please provide me with {n} different ideas to complete this task. Return the ideas only, following the format above.
 """
-def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), model_name=Model.GPT_4.value, language='Python', n_advices=4):
+def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), language='Python', n_advices=4):
     prompt_template = ADVICEGEN_PROMPT
     context = {
         'language': language,
         'api': api.args_call(),
         'output': api.output,
+        'inputs_desc': "\n".join([f"- {k} ({api.input_descs[i]})" for i, k in enumerate(api.inputs)]),
         'output_desc': api.output_desc,
         'examples_desc': "\n".join([
             EXAMPLE_PROMPT.format(
@@ -126,7 +114,7 @@ def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), mod
         'n': n_advices,
     }
     prompt = prompt_template.format(**context)
-    advs, stats = run_advgen(prompt, model_name)
+    advs, stats = run_advgen(prompt)
     return advs, stats
 
 def reGenerationCondition(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), strategy: CodeGenStrategy=CodeGenStrategy.DEFAULT,
@@ -144,34 +132,34 @@ def reGenerationCondition(api: API, examples: List[Dict[DataRecord, DataRecord]]
         return len(examples)%code_regenerate_frequency == 0
 
 def codeEnsembleGeneration(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), strategy: CodeGenStrategy=CodeGenStrategy.DEFAULT,
-    code_ensemble: int=4,               # if strategy != SINGLE
+    code_ensemble_num: int=4,           # if strategy != SINGLE
     code_num_examples: int=1,           # if strategy != EXAMPLE_ENSEMBLE
     code_regenerate_frequency: int=200, # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION
 ) -> Tuple[Dict[str, str], CodeGenEnsembleStats]:
     code_ensemble = dict(); code_gen_stats = CodeGenEnsembleStats()
     if strategy == CodeGenStrategy.NONE:
         code, stats = codeGenDefault(api)
-        for i in range(code_ensemble):
+        for i in range(code_ensemble_num):
             code_name = f"{api.name}_v{i}"
             code_gen_stats.code_versions_stats[code_name] = stats
             code_ensemble[code_name] = code
         return code_ensemble, code_gen_stats
     if strategy == CodeGenStrategy.SINGLE:
         code, stats = codeGenSingle(api, examples=examples[:code_num_examples])
-        for i in range(code_ensemble):
+        for i in range(code_ensemble_num):
             code_name = f"{api.name}_v{i}"
             code_gen_stats.code_versions_stats[code_name] = stats
             code_ensemble[code_name] = code
         return code_ensemble, code_gen_stats
     if strategy == CodeGenStrategy.EXAMPLE_ENSEMBLE:
-        for i in range(code_ensemble):
+        for i in range(code_ensemble_num):
             code_name = f"{api.name}_v{i}"
             code, stats = codeGenSingle(api, examples=[examples[i]])
             code_gen_stats.code_versions_stats[code_name] = stats
             code_ensemble[code_name] = code
         return code_ensemble, code_gen_stats
     if strategy == CodeGenStrategy.ADVICE_ENSEMBLE:
-        advices, adv_stats = adviceGen(api, examples=examples[:code_num_examples])
+        advices, adv_stats = adviceGen(api, examples=examples[:code_num_examples], n_advices=code_ensemble_num)
         code_gen_stats.advice_gen_stats = adv_stats
         for i, adv in enumerate(advices):
             code_name = f"{api.name}_v{i}"
@@ -202,6 +190,7 @@ def codeEnsembleExecution(api: API, code_ensemble: List[str], candidate: DataRec
         preds.append(pred)
         ensemble_stats.code_versions_stats[code_name] = stats
     preds = [pred for pred in preds if pred is not None]
+    print(preds)
     if len(preds) > 0:
         majority_response = Counter(preds).most_common(1)[0][0]
         ensemble_stats.majority_response = majority_response

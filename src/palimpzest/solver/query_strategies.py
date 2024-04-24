@@ -2,7 +2,7 @@ from palimpzest.datamanager import DataDirectory
 from palimpzest.constants import PromptStrategy, CodeGenStrategy
 from palimpzest.elements import DataRecord
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats, FullCodeGenStats
+from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats, CodeGenEnsembleStats, FullCodeGenStats
 from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.utils import API, codeEnsembleGeneration, codeEnsembleExecution, reGenerationCondition
 
@@ -253,8 +253,11 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
             elif td.prompt_strategy == PromptStrategy.FEW_SHOT:
                 raise Exception("not implemented yet")
 
+            # parse JSON object from the answer
+            jsonObj = _get_JSON_from_answer(answer)
+
             # set the DataRecord's field with its generated value
-            setattr(dr, field_name, answer)
+            setattr(dr, field_name, jsonObj[field_name])
 
             # update query_stats
             query_stats[f"{field_name}"] = field_stats
@@ -298,14 +301,15 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
         code_ensemble_id = "_".join([td.op_id, field_name])
         cached_code_ensemble_info = cache.getCachedData("codeEnsemble", code_ensemble_id)
         if cached_code_ensemble_info is not None:
-            code_ensemble, stats = cached_code_ensemble_info
+            code_ensemble, _ = cached_code_ensemble_info
+            gen_stats = CodeGenEnsembleStats()
             examples = cache.getCachedData("codeSamples", code_ensemble_id)
         else:
             code_ensemble, gen_stats, examples = dict(), None, list()
         examples.append(candidate)
         cache.putCachedData("codeSamples", code_ensemble_id, examples)
         api = API.from_task_descriptor(td, field_name)
-        if (code_ensemble is None) or reGenerationCondition(api, examples=examples):
+        if len(code_ensemble)==0 or reGenerationCondition(api, examples=examples):
             code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples)
             cache.putCachedData("codeEnsemble", code_ensemble_id, (code_ensemble, gen_stats))
         answer, exec_stats = codeEnsembleExecution(api, code_ensemble, candidate)
