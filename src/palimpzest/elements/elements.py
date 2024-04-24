@@ -51,6 +51,15 @@ class Field:
         return {"description": self._desc, "type": "undefined"}
 
 
+class BooleanField(Field):
+    """A BooleanField is a Field that is True or False."""
+    def __init__(self, desc: str, required: bool=False):
+        super().__init__(desc=desc, required=required)
+
+    def jsonSchema(self) -> Dict[str, str]:
+        return {"description": self._desc, "type": "boolean"}
+
+
 class StringField(Field):
     """A StringField is a Field that is definitely a string of text."""
     def __init__(self, desc: str, required: bool=False):

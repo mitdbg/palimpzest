@@ -3,7 +3,7 @@ from palimpzest.constants import PromptStrategy, QueryStrategy
 from palimpzest.elements import DataRecord, File, TextFile, Schema
 from palimpzest.corelib import EquationImage, ImageFile, PDFFile, Download, XLSFile, Table, TabularRow
 from palimpzest.generators import DSPyGenerator
-from palimpzest.profiler import ApiStats, FilterLLMStats, InduceLLMStats, InduceNonLLMStats
+from palimpzest.profiler import ApiStats, FilterLLMStats, FilterNonLLMStats, InduceLLMStats, InduceNonLLMStats
 from palimpzest.solver.query_strategies import runBondedQuery, runConventionalQuery, runCodeGenQuery
 from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.tools.pdfparser import get_text_from_pdf
@@ -323,45 +323,62 @@ class Solver:
             # compute record schema and type
             doc_schema = str(td.inputSchema)
             doc_type = td.inputSchema.className()
-
-            # By default, a filter requires an LLM invocation to run
-            # Someday maybe we will offer the user the chance to run a hard-coded function.
-            # Or maybe we will ask the LLM to synthesize traditional code here.
-            def createLLMFilter(filterCondition: str):
-                def llmFilter(candidate: DataRecord):
-                    # do not filter candidate if it doesn't match inputSchema
-                    if not candidate.schema == td.inputSchema:
-                        return False
-
-                    # create generator
-                    generator = None
-                    if td.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
-                        generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, self._verbose)
-                    # TODO
-                    elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:
-                        raise Exception("not implemented yet")
-                    # TODO
-                    elif td.prompt_strategy == PromptStrategy.FEW_SHOT:
-                        raise Exception("not implemented yet")
-                    # TODO
-                    elif td.prompt_strategy == PromptStrategy.CODE_GEN_BOOL:
-                        raise Exception("not implemented yet")
-
-                    # invoke LLM to generate filter decision (True or False)
-                    text_content = candidate.asTextJSON()
-                    response, gen_stats = generator.generate(context=text_content, question=filterCondition)
+    
+            # if filter has a function, simply return a wrapper around that function
+            if td.filter.filterFn is not None:
+                def nonLLMFilter(candidate: DataRecord):
+                    start_time = time.time()
+                    result = td.filter.filterFn(candidate)
+                    fn_call_duration_secs = time.time() - start_time
 
                     # if profiling, set record's stats for the given op_id
                     if shouldProfile:
-                        candidate._stats[td.op_id] = FilterLLMStats(gen_stats=gen_stats, filter=filterCondition)
+                        candidate._stats[td.op_id] = FilterNonLLMStats(
+                            fn_call_duration_secs=fn_call_duration_secs,
+                            filter=str(td.filter),
+                        )
 
                     # set _passed_filter attribute and return record
-                    setattr(candidate, "_passed_filter", "true" in response.lower()) # response.lower() == "true"
+                    setattr(candidate, "_passed_filter", result)
 
                     return candidate
 
-                return llmFilter
-            return createLLMFilter(str(td.filter))
+                return nonLLMFilter
+
+            # otherwise, the filter requires an LLM invocation to run
+            def llmFilter(candidate: DataRecord):
+                # do not filter candidate if it doesn't match inputSchema
+                if not candidate.schema == td.inputSchema:
+                    return False
+
+                # create generator
+                generator = None
+                if td.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
+                    generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, self._verbose)
+                # TODO
+                elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:
+                    raise Exception("not implemented yet")
+                # TODO
+                elif td.prompt_strategy == PromptStrategy.FEW_SHOT:
+                    raise Exception("not implemented yet")
+                # TODO
+                elif td.prompt_strategy == PromptStrategy.CODE_GEN_BOOL:
+                    raise Exception("not implemented yet")
+
+                # invoke LLM to generate filter decision (True or False)
+                text_content = candidate.asTextJSON()
+                response, gen_stats = generator.generate(context=text_content, question=td.filter.filterCondition)
+
+                # if profiling, set record's stats for the given op_id
+                if shouldProfile:
+                    candidate._stats[td.op_id] = FilterLLMStats(gen_stats=gen_stats, filter=td.filter.filterCondition)
+
+                # set _passed_filter attribute and return record
+                setattr(candidate, "_passed_filter", "true" in response.lower())
+
+                return candidate
+
+            return llmFilter
 
 
     def synthesize(self, td: TaskDescriptor, shouldProfile: bool=False):

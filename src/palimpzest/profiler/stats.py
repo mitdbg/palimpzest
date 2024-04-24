@@ -102,6 +102,13 @@ class OperatorStats:
     # time spent waiting for API calls to return (in seconds)
     total_api_call_duration: float=0.0
 
+    ##########################################
+    ##### Optional Non-LLM Filter Fields #####
+    #####  [computed in StatsProcessor]  #####
+    ##########################################
+    # time spent waiting for API calls to return (in seconds)
+    total_fn_call_duration: float=0.0
+
     def to_dict(self):
         # create copy of self
         self_copy = deepcopy(self)
@@ -279,6 +286,14 @@ class FilterLLMStats(Stats):
     # the filter condition for this filter
     filter: str=None
 
+@dataclass
+class FilterNonLLMStats(Stats):
+    """Dataclass containing all possible statistics which could be returned from a filter operation."""
+    # the time it takes to execute the filter function
+    fn_call_duration_secs: float=None
+    # the filter condition for this filter
+    filter: str=None
+
 
 class StatsProcessor:
     """
@@ -318,6 +333,8 @@ class StatsProcessor:
             "finish_reasons": Dict[str, int],
             #### total time spent waiting on non-LLM API calls (in seconds)
             "total_api_call_duration": float,
+            #### total time spent waiting on non-LLM filter function calls (in seconds)
+            "total_fn_call_duration": float,
             #### name of the model used to perform generation (if operation used LLM)
             "model_name": str,
             #### the input fields for records coming into this op, and the fields this op generated
@@ -550,6 +567,10 @@ class StatsProcessor:
                 if full_code_gen_stats is not None:
                     profiling_data = self._update_code_gen_stats(profiling_data, full_code_gen_stats)
 
+            # non-LLM induce objects will have no stats or a single ApiStats object
+            elif isinstance(stats, FilterNonLLMStats):
+                profiling_data.total_fn_call_duration += stats.fn_call_duration_secs
+
             # filter llm objects will have a single GenerationStats object
             elif isinstance(stats, FilterLLMStats):
                 # update aggregate statistics with filter generation stats
@@ -569,6 +590,7 @@ class StatsProcessor:
         - Stats
         - InduceNonLLMStats
         - InduceLLMStats
+        - FilterNonLLMStats
         - FilterLLMStats
 
         Stats is only present for non-induce/filter operations, and its only field will
@@ -582,6 +604,8 @@ class StatsProcessor:
         - conventional_query_stats
         - full_code_gen_stats
 
+        FilterNonLLMStats has a single field (fn_call_duration_secs)
+
         FilterLLMStats has a single field gen_stats which is guaranteed to be filled.
         """
         # base case: this is the source operation
@@ -592,7 +616,7 @@ class StatsProcessor:
         profiling_data = self._aggregate_record_stats(profiling_data)
 
         # recurse
-        profiling_data.source_op_stats = self._aggregate_record_stats(profiling_data.source_op_stats)
+        profiling_data.source_op_stats = self._compute_agg_op_stats(profiling_data.source_op_stats)
 
         return profiling_data
 

@@ -41,6 +41,9 @@ class PhysicalOp:
     def opId(self) -> str:
         raise NotImplementedError("Abstract method")
 
+    def copy(self) -> PhysicalOp:
+        raise NotImplementedError
+
     def dumpPhysicalTree(self) -> Tuple[PhysicalOp, Union[PhysicalOp, None]]:
         """Return the physical tree of operators."""
         if self.source is None:
@@ -80,6 +83,9 @@ class MarshalAndScanDataOp(PhysicalOp):
 
     def __str__(self):
         return "MarshalAndScanDataOp(" + str(self.outputSchema) + ", " + self.datasetIdentifier + ")"
+
+    def copy(self):
+        return MarshalAndScanDataOp(self.outputSchema, self.datasetIdentifier, self.shouldProfile)
 
     def opId(self):
         d = {
@@ -152,6 +158,9 @@ class CacheScanDataOp(PhysicalOp):
     def __str__(self):
         return "CacheScanDataOp(" + str(self.outputSchema) + ", " + self.cacheIdentifier + ")"
 
+    def copy(self):
+        return CacheScanDataOp(self.outputSchema, self.cacheIdentifier, self.shouldProfile)
+
     def opId(self):
         d = {
             "operator": "CacheScanDataOp",
@@ -223,16 +232,17 @@ class CacheScanDataOp(PhysicalOp):
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, image_conversion: bool=False, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, source=source, shouldProfile=shouldProfile)
         self.model = model
         self.cardinality = cardinality
+        self.image_conversion = image_conversion
         self.prompt_strategy = prompt_strategy
         self.query_strategy = query_strategy
         self.desc = desc
         self.targetCacheId = targetCacheId
 
-        if outputSchema == ImageFile and source.outputSchema == File:
+        if outputSchema == ImageFile and source.outputSchema == File or self.image_conversion:
             # TODO : find a more general way by llm provider 
             # TODO : which module is responsible of setting PromptStrategy.IMAGE_TO_TEXT? 
             if self.model in [Model.GPT_3_5, Model.GPT_4]:
@@ -266,6 +276,7 @@ class InduceFromCandidateOp(PhysicalOp):
             op_id=self.opId(),
             model=self.model,
             cardinality=self.cardinality,
+            image_conversion=self.image_conversion,
             prompt_strategy=self.prompt_strategy,
             query_strategy=self.query_strategy,
             conversionDesc=self.desc,
@@ -277,6 +288,13 @@ class InduceFromCandidateOp(PhysicalOp):
         is_file_to_text_file = (td.outputSchema == TextFile and td.inputSchema == File)
 
         return PhysicalOp.solver.isSimpleConversion(td) or is_file_to_text_file
+
+    def copy(self):
+        return InduceFromCandidateOp(
+            self.outputSchema, self.source, self.model, self.cardinality,
+            self.image_conversion, self.prompt_strategy, self.query_strategy,
+            self.desc, self.targetCacheId, self.shouldProfile
+        )
 
     def opId(self):
         d = {
@@ -416,11 +434,12 @@ class InduceFromCandidateOp(PhysicalOp):
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, image_conversion: bool=False, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.model = model
         self.cardinality = cardinality
+        self.image_conversion = image_conversion
         self.prompt_strategy = prompt_strategy
         self.query_strategy = query_strategy
         self.desc = desc
@@ -428,7 +447,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         self.max_workers = 20
         self.streaming = streaming
 
-        if outputSchema == ImageFile and source.outputSchema == File:
+        if outputSchema == ImageFile and source.outputSchema == File or self.image_conversion:
             # TODO : find a more general way by llm provider 
             # TODO : which module is responsible of setting PromptStrategy.IMAGE_TO_TEXT? 
             if self.model in [Model.GPT_3_5, Model.GPT_4]:
@@ -462,6 +481,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             op_id=self.opId(),
             model=self.model,
             cardinality=self.cardinality,
+            image_conversion=self.image_conversion,
             prompt_strategy=self.prompt_strategy,
             query_strategy=self.query_strategy,
             conversionDesc=self.desc,
@@ -473,6 +493,13 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         is_file_to_text_file = td.outputSchema == TextFile and td.inputSchema == File
 
         return PhysicalOp.solver.isSimpleConversion(td) or is_file_to_text_file
+
+    def copy(self):
+        return ParallelInduceFromCandidateOp(
+            self.outputSchema, self.source, self.model, self.cardinality,
+            self.image_conversion, self.prompt_strategy, self.query_strategy,
+            self.desc, self.targetCacheId, self.streaming, self.shouldProfile,
+        )
 
     def opId(self):
         d = {
@@ -662,6 +689,9 @@ class FilterCandidateOp(PhysicalOp):
             prompt_strategy=self.prompt_strategy,
         )
 
+    def copy(self):
+        return FilterCandidateOp(self.outputSchema, self.source, self.filter, self.model, self.prompt_strategy, self.targetCacheId, self.shouldProfile)
+
     def opId(self):
         d = {
             "operator": "FilterCandidateOp",
@@ -703,6 +733,31 @@ class FilterCandidateOp(PhysicalOp):
                 "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
                 "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
                 "estOutputTokensPerElement": est_num_output_tokens,
+                "quality": quality,
+            }
+
+        # otherwise, if this filter is a function call (not an LLM call) estimate accordingly
+        if self.filter.filterFn is not None:
+            # estimate output cardinality using a constant assumption of the filter selectivity
+            selectivity = EST_FILTER_SELECTIVITY
+            cardinality = selectivity * inputEstimates["cardinality"]
+
+            # estimate 1 ms execution for filter function
+            time_per_record = 0.001
+
+            # estimate quality of output based on the strength of the model being used
+            quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
+
+            return {
+                "cardinality": cardinality,
+                "timePerElement": time_per_record,
+                "usdPerElement": 0.0,
+                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
+                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'],
+                "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
+                "totalUSD": inputEstimates['totalUSD'],
+                # next operator processes input based on contents, not T/F output by this operator
+                "estOutputTokensPerElement": inputEstimates["estOutputTokensPerElement"],
                 "quality": quality,
             }
 
@@ -755,7 +810,8 @@ class FilterCandidateOp(PhysicalOp):
             "cumulativeUSDPerElement": cumulativeUSDPerElement,
             "totalTime": totalTime,
             "totalUSD": totalUSD,
-            "estOutputTokensPerElement": est_num_output_tokens,
+            # next operator processes input based on contents, not T/F output by this operator
+            "estOutputTokensPerElement": inputEstimates["estOutputTokensPerElement"],
             "quality": quality,
         }
 
@@ -824,6 +880,9 @@ class ParallelFilterCandidateOp(PhysicalOp):
             prompt_strategy=self.prompt_strategy,
         )
 
+    def copy(self):
+        return ParallelFilterCandidateOp(self.outputSchema, self.source, self.filter, self.model, self.prompt_strategy, self.targetCacheId, self.streaming, self.shouldProfile)
+
     def opId(self):
         d = {
             "operator": "ParallelFilterCandidateOp",
@@ -862,6 +921,31 @@ class ParallelFilterCandidateOp(PhysicalOp):
                 "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
                 "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
                 "estOutputTokensPerElement": est_num_output_tokens,
+                "quality": quality,
+            }
+
+        # otherwise, if this filter is a function call (not an LLM call) estimate accordingly
+        if self.filter.filterFn is not None:
+            # estimate output cardinality using a constant assumption of the filter selectivity
+            selectivity = EST_FILTER_SELECTIVITY
+            cardinality = selectivity * inputEstimates["cardinality"]
+
+            # estimate 0.1 ms execution for filter function (divide non-parallel est. by 10x for parallelism speed-up)
+            time_per_record = 0.0001
+
+            # estimate quality of output based on the strength of the model being used
+            quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
+
+            return {
+                "cardinality": cardinality,
+                "timePerElement": time_per_record,
+                "usdPerElement": 0.0,
+                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
+                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'],
+                "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
+                "totalUSD": inputEstimates['totalUSD'],
+                # next operator processes input based on contents, not T/F output by this operator
+                "estOutputTokensPerElement": inputEstimates["estOutputTokensPerElement"],
                 "quality": quality,
             }
 
@@ -914,7 +998,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
             "cumulativeUSDPerElement": cumulativeUSDPerElement,
             "totalTime": totalTime,
             "totalUSD": totalUSD,
-            "estOutputTokensPerElement": est_num_output_tokens,
+            # next operator processes input based on contents, not T/F output by this operator
+            "estOutputTokensPerElement": inputEstimates["estOutputTokensPerElement"],
             "quality": quality,
         }
 
@@ -999,6 +1084,10 @@ class ApplyGroupByOp(PhysicalOp):
 
         def __str__(self):
             return str(self.gbySig)
+        
+        def copy(self):
+            return ApplyGroupByOp(self.source, self.gbySig, self.targetCacheId, self.shouldProfile)
+
         def opId(self):
             d = {
                 "operator": "ApplyGroupByOp",
@@ -1091,6 +1180,9 @@ class ApplyCountAggregateOp(PhysicalOp):
     def __str__(self):
         return "ApplyCountAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
 
+    def copy(self):
+        return ApplyCountAggregateOp(self.source, self.aggFunction, self.targetCacheId, self.shouldProfile)
+
     def opId(self):
         d = {
             "operator": "ApplyCountAggregateOp",
@@ -1175,6 +1267,9 @@ class ApplyUserFunctionOp(PhysicalOp):
     def __str__(self):
         return "ApplyUserFunctionOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.fn.udfid) + ")"
 
+    def copy(self):
+        return ApplyUserFunctionOp(self.source, self.fn, self.targetCacheId, self.shouldProfile)
+
     def opId(self):
         d = {
             "operator": "ApplyUserFunctionOp",
@@ -1254,6 +1349,9 @@ class ApplyAverageAggregateOp(PhysicalOp):
 
     def __str__(self):
         return "ApplyAverageAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
+
+    def copy(self):
+        return ApplyAverageAggregateOp(self.source, self.aggFunction, self.targetCacheId, self.shouldProfile)
 
     def opId(self):
         d = {
@@ -1341,6 +1439,9 @@ class LimitScanOp(PhysicalOp):
 
     def __str__(self):
         return "LimitScanOp(" + str(self.outputSchema) + ", " + "Limit: " + str(self.limit) + ")"
+
+    def copy(self):
+        return LimitScanOp(self.outputSchema, self.source, self.limit, self.targetCacheId, self.shouldProfile)
 
     def opId(self):
         d = {

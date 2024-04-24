@@ -159,22 +159,10 @@ class DSPyGenerator(BaseGenerator):
 
         # execute LLM generation
         start_time = time.time()
-        # num_tries = 3
-        # while num_tries > 0:
-        #     try:
+
         print(f"Generating")
         pred = cot(question, context)
         print(pred.answer)
-                # num_tries = -1
-
-            # # TODO: explicitly filter for context length exceeded error
-            # except:
-            #     context = context[:int(len(context)/2)]
-            #     num_tries -= 1
-            #     print(f"num_tries left: {num_tries}")
-
-        # if num_tries == 0:
-        #     raise Exception("message too long")
 
         end_time = time.time()
 
@@ -227,45 +215,49 @@ class ImageTextGenerator(BaseGenerator):
 
         return client
 
-    def _make_payload(self, prompt: str, base64_image: str):
-        payload = None
+    def _make_payloads(self, prompt: str, base64_images: List[str]):
+        payloads = []
         if self.model_name == Model.GPT_4V.value:
-            payload = {
+            # create content list
+            content = [{"type": "text", "text": prompt}]
+            for base64_image in base64_images:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_image}"
+                    },
+                })
+
+            # create payload
+            payloads = [{
                 "model": "gpt-4-vision-preview",
                 "messages": [
                     {
                         "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": prompt,
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
-                                },
-                            }
-                        ]
+                        "content": content,
                     }
                 ],
                 "max_tokens": 4000,
                 "logprobs": True,
-            }
+            }]
 
         elif self.model_name == Model.GEMINI_1V.value:
-            payload = [prompt, Image.open(io.BytesIO(self._decode_image(base64_image)))]
+            payloads = [
+                [prompt, Image.open(io.BytesIO(self._decode_image(base64_image)))]
+                for base64_image in base64_images
+            ]
 
         else:
             raise ValueError(f"Model must be one of the image models specified in palimpzest.constants.Model")
 
-        return payload
+        return payloads
 
-    def _generate_response(self, client: Union[OpenAI, genai.GenerativeModel], payload: Any) -> Tuple[str, str, dict]:
+    def _generate_response(self, client: Union[OpenAI, genai.GenerativeModel], payloads: List[Any]) -> Tuple[str, str, dict]:
         answer, finish_reason, usage = None, None, None
 
         if self.model_name == Model.GPT_4V.value:
-            completion = client.chat.completions.create(**payload)
+            # GPT-4V will always have a single payload
+            completion = client.chat.completions.create(**payloads[0])
             candidate = completion.choices[-1]
             answer = candidate.message.content
             finish_reason = candidate.finish_reason
@@ -274,10 +266,20 @@ class ImageTextGenerator(BaseGenerator):
             token_logprobs = list(map(lambda elt: elt.logprob, completion.choices[-1].logprobs.content))
 
         elif self.model_name == Model.GEMINI_1V.value:
-            response = client.generate_content(payload)
-            candidate = response.candidates[-1]
-            answer = candidate.content.parts[0].text
-            finish_reason = candidate.finish_reason
+            # iterate through images to generate multiple responses
+            answers, finish_reasons = [], []
+            for idx, payload in enumerate(payloads):
+                response = client.generate_content(payload)
+                candidate = response.candidates[-1]
+                answer = f"Image {idx}: " + candidate.content.parts[0].text
+                finish_reason = candidate.finish_reason
+                answers.append(answer)
+                finish_reasons.append(finish_reason)
+
+            # combine answers and compute most frequent finish reason
+            answer = "\n".join(answers)
+            finish_reason = max(set(finish_reasons), key=finish_reasons.count)
+
             # TODO: implement when google suppports usage and logprob stats
             usage = {}
             tokens = []
@@ -314,21 +316,26 @@ class ImageTextGenerator(BaseGenerator):
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
         after=log_attempt_number,
     )
-    def generate(self, image_b64: str, prompt: str) -> GenerationOutput:
+    def generate(self, base64_images: str, prompt: str) -> GenerationOutput:
         # fetch model client
         client = self._get_model_client()
 
         # create payload
-        payload = self._make_payload(prompt, image_b64)
+        payloads = self._make_payloads(prompt, base64_images)
 
         # generate response
         start_time = time.time()
-        answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(client, payload)
+        answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(client, payloads)
         end_time = time.time()
 
         # extract the log probabilities for the actual result(s) which are returned
         answer_log_probs = self._get_answer_log_probs(tokens, token_logprobs, answer)
 
+        # TODO: To simplify life for the time being, I am aggregating stats for multiple call(s)
+        #       to the Gemini vision model into a single GenerationStats object (when we have
+        #       more than one image to process). This has no effect on most of our fields --
+        #       especially since many of them are not implemented for the Gemini model -- but
+        #       we will likely want a more robust solution in the future.
         # collect statistics on prompt, usage, and timing
         stats = GenerationStats(
             model_name=self.model_name,
