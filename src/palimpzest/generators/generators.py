@@ -44,6 +44,139 @@ class BaseGenerator:
         raise NotImplementedError("Abstract method")
 
 
+class CustomGenerator(BaseGenerator):
+    """
+    Class for generating outputs with a given model using a custom prompt.
+    """
+    def __init__(self, model_name: str, verbose: bool=False):
+        super().__init__()
+        self.model_name = model_name
+        self.verbose = verbose
+
+    def _get_model(self) -> dsp.LM:
+        model = None
+        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+            openai_key = get_api_key('OPENAI_API_KEY')
+            max_tokens = 4096
+            model = dspy.OpenAI(model=self.model_name, api_key=openai_key, temperature=0.0, max_tokens=max_tokens, logprobs=True)
+
+        elif self.model_name in [Model.MIXTRAL.value]:
+            together_key = get_api_key('TOGETHER_API_KEY')
+            model = TogetherHFAdaptor(self.model_name, together_key, logprobs=1)
+
+        elif self.model_name in [Model.GEMINI_1.value]:
+            google_key = get_api_key('GOOGLE_API_KEY')
+            model = dspy.Google(model=self.model_name, api_key=google_key)
+
+        else:
+            raise ValueError("Model must be one of the language models specified in palimpzest.constants.Model")
+
+        return model
+
+    def _get_usage_and_finish_reason(self, dspy_lm: dsp.LM):
+        """
+        Parse and return the usage statistics and finish reason.
+        """
+        usage, finish_reason = None, None
+        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+            usage = dspy_lm.history[-1]['response']['usage']
+            finish_reason = dspy_lm.history[-1]['response']['choices'][-1]['finish_reason']
+        elif self.model_name in [Model.GEMINI_1.value]:
+            usage = {"prompt_tokens": 0, "completion_tokens": 0}
+            finish_reason = dspy_lm.history[-1]['response'][0]._result.candidates[0].finish_reason
+        elif self.model_name in [Model.MIXTRAL.value]:
+            usage = dspy_lm.history[-1]['response']['usage']
+            finish_reason = dspy_lm.history[-1]['response']['finish_reason']
+
+        return usage, finish_reason
+
+    def _get_attn(self, dspy_lm: dsp.LM):
+        """
+        TODO
+        """
+        pass
+
+    def _get_answer_log_probs(self, dspy_lm: dsp.LM, answer: str) -> List[float]:
+        """
+        For the given DSPy LM object:
+        1. fetch the data structure containing its output log probabilities
+        2. filter the data structure for the specific tokens which appear in `answer`
+        3. return the list of those tokens' log probabilities
+        """
+        # get log probabilities data structure
+        tokens, token_logprobs = None, None
+
+        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+            # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
+            log_probs = dspy_lm.history[-1]['response']['choices'][-1]['logprobs']['content']
+            tokens = list(map(lambda elt: elt['token'], log_probs))
+            token_logprobs = list(map(lambda elt: elt['logprob'], log_probs))
+        elif self.model_name in [Model.GEMINI_1.value]:
+            return None
+            # TODO Google gemini does not provide log probabilities! 
+            # https://github.com/google/generative-ai-python/issues/238
+            # tok_count = dspy_lm.llm.count_tokens(answer).total_tokens
+            # tokens = [""] * tok_count
+            # token_logprobs = [0] * len(tokens)
+        elif self.model_name in [Model.MIXTRAL.value]:
+            # reponse: dict_keys(['prompt', 'choices', 'usage', 'finish_reason', 'tokens', 'token_logprobs'])
+            tokens = dspy_lm.history[-1]['response']['tokens']
+            token_logprobs = dspy_lm.history[-1]['response']['token_logprobs']
+        else:
+            raise ValueError("Model must be one of the language models specified in palimpzest.constants.Model")
+
+        # get indices of the start and end token for the answer
+        # start_idx, end_idx = 0, 0
+        # while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
+            # if answer.startswith(tokens[start_idx]):
+                # end_idx += 1
+            # else:
+                # start_idx += 1
+                # end_idx = start_idx
+        # filter for log probs of tokens which appear in answer
+        # answer_log_probs = token_logprobs[start_idx:end_idx+1]
+        answer_log_probs = token_logprobs
+        # return those tokens log probabilities
+        return answer_log_probs
+
+    @retry(
+        wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
+        stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
+        after=log_attempt_number,
+        reraise=True,
+    )
+    def generate(self, prompt: str) -> GenerationOutput:
+        # fetch model
+        dspy_lm = self._get_model()
+
+        start_time = time.time()
+        
+        response = dspy_lm.request(prompt)
+        
+        end_time = time.time()
+        
+        answer = response['choices'][0]['message']['content']
+        answer_log_probs = response['choices'][0]['logprobs']
+        finish_reason = response['choices'][0]['finish_reason']
+        usage = response['usage']
+
+        # collect statistics on prompt, usage, and timing
+        stats = GenerationStats(
+            model_name=self.model_name,
+            llm_call_duration_secs=end_time - start_time,
+            prompt=dspy_lm.history[-1]['prompt'],
+            usage=usage,
+            finish_reason=finish_reason,
+            answer_log_probs=answer_log_probs,
+            answer=answer,
+        )
+
+        if self.verbose:
+            print("Prompt history:")
+            dspy_lm.inspect_history(n=1)
+
+        return answer, stats
+
 class DSPyGenerator(BaseGenerator):
     """
     Class for generating outputs with a given model using DSPy for prompting optimization(s).
