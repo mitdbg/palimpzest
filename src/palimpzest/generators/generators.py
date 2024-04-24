@@ -155,7 +155,7 @@ class DSPyGenerator(BaseGenerator):
         reraise=True,
     )
     # the generate method requires a user-provided budget parameter to specify te token budget. Default is 1.0, meaning the full context will be used.
-    def generate(self, context: str, question: str, budget: float = 1.0) -> GenerationOutput:
+    def generate(self, context: str, question: str, budget: float = 0.9) -> GenerationOutput:
         reduction = False
         full_context = context
         # fetch model
@@ -182,11 +182,11 @@ class DSPyGenerator(BaseGenerator):
                 # create the heatmap structure with default resolution of 0.001 and count of 0
                 buckets = int(1.0 / TOKEN_REDUCTION_GRANULARITY)
                 hist = [0] * buckets
-                json_object = {'prompt_schema': prompt_schema,
+                json_object = {'prompt_schema': f'{prompt_schema}',
                                'question': question,
                                'resolution': TOKEN_REDUCTION_GRANULARITY,
                                'count': 0,
-                               'heatmap': {hist}}
+                               'heatmap': hist}
 
             else:
                 # only parse the heatmap file if token reduction is enabled (budget is less than 1.0)
@@ -195,11 +195,13 @@ class DSPyGenerator(BaseGenerator):
                         json_object = json.load(f)
                         heatmap = json_object['heatmap']
                         count = json_object['count']
+                        print("count:", count)
                     # only refer to the heatmap if the count is greater than a enough sample size
                     # TODO: only trim the context if the attention is clustered in a small region
                     if count >= TOKEN_REDUCTION_SAMPLE:
-                        si, ei = find_best_range(heatmap, budget, trim_zeros=False)
+                        si, ei = find_best_range(heatmap, int(budget/TOKEN_REDUCTION_GRANULARITY), trim_zeros=False)
                         sr, er = si * TOKEN_REDUCTION_GRANULARITY, ei * TOKEN_REDUCTION_GRANULARITY
+                        print("start ratio:", sr, "end ratio:", er)
                         context = get_trimed(context, sr, er)
                         reduction = True
 
@@ -223,7 +225,9 @@ class DSPyGenerator(BaseGenerator):
 
         # taken reduction post processing if enabled
         if budget< 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-            gsi, gei = best_substring_match(question, full_context)
+            print("Reduction enabled")
+            print("answer:", pred.answer)
+            gsi, gei = best_substring_match(pred.answer, full_context)
             context_len = len(full_context)
             gsr, ger = gsi/context_len, gei/context_len
             norm_si, norm_ei = int(gsr/TOKEN_REDUCTION_GRANULARITY), int(ger/TOKEN_REDUCTION_GRANULARITY)

@@ -121,6 +121,6 @@ def best_substring_match(query, context):
     positions = [can == best_match for can in candidates]
     start = positions.index(True)
     end = start + len(query)
-    print("best match:", best_match, "score:", score, "start:", start, "end:", end)
+    # print("best match:", best_match, "score:", score, "start:", start, "end:", end)
     # print("-------", string[start:end])
     return start, end
