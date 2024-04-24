@@ -269,55 +269,40 @@ class Solver:
                         )
 
                 return drs
+            
+            elif td.query_strategy == QueryStrategy.CODE_GEN:
+                dr, full_code_gen_stats = runCodeGenQuery(candidate, td, self._verbose)
+                drs = [dr]
 
-            else:
-                raise ValueError(f"Unrecognized QueryStrategy: {td.query_strategy.value}")
+                # if profiling, set record's stats for the given op_id
+                if shouldProfile:
+                    for dr in drs:
+                        dr._stats[td.op_id] = InduceLLMStats(full_code_gen_stats=full_code_gen_stats)
 
-        return fn
+                return drs
 
-
-    # TODO: @Zui
-    def _makeCodeGenTypeConversionFn(self, td: TaskDescriptor, shouldProfile: bool=False):
-        """
-        If you look at my implementation of _makeLLMTypeConversionFn above, you'll see that
-        I've moved a lot of the core logic around generating outputs and collecting statistics
-        into a set of functions which are defined in palimpzest.solver.query_strategies.
-        """
-        def fn(candidate: DataRecord):
-            # initialize stats objects
-            full_code_gen_stats = None
-
-            # TODO
-            if td.query_strategy == QueryStrategy.CODE_GEN:
-                # drs, full_code_gen_stats, err_msg = runCodeGenQuery(candidate, td, self._verbose)
-
-                # # if code gen query failed, manually set fields to None
-                # if err_msg is not None:
-                #     print(f"CodeGenQuery Error: {err_msg}")
-                #     dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
-                #     for field_name in td.outputSchema.fieldNames():
-                #         setattr(dr, field_name, None)
-                #     drs = [dr]
-
-                # # if profiling, set record's stats for the given op_id
-                # if shouldProfile:
-                #     for dr in drs:
-                #         dr._stats[td.op_id] = InduceLLMStats(full_code_gen_stats=full_code_gen_stats)
-
-                # return drs
-                raise Exception("not implemented yet")
-
-            # TODO
             elif td.query_strategy == QueryStrategy.CODE_GEN_WITH_FALLBACK:
                 # similar to in _makeLLMTypeConversionFn; maybe we can have one strategy in which we try
                 # to use code generation, but if it fails then we fall back to a conventional query strategy?
-                raise Exception("not implemented yet")
+                new_candidate, full_code_gen_stats = runCodeGenQuery(candidate, td, self._verbose)
+                # Deleting all failure fields
+                for field_name in td.outputSchema.fieldNames():
+                    if hasattr(new_candidate, field_name) and (getattr(new_candidate, field_name) is None):
+                        delattr(new_candidate, field_name)
+                dr, conventional_query_stats = runConventionalQuery(new_candidate, td, self._verbose)
+                drs = [dr]
+
+                # if profiling, set record's stats for the given op_id
+                if shouldProfile:
+                    for dr in drs:
+                        dr._stats[td.op_id] = InduceLLMStats(full_code_gen_stats=full_code_gen_stats, conventional_query_stats=conventional_query_stats)
+
+                return drs
 
             else:
                 raise ValueError(f"Unrecognized QueryStrategy: {td.query_strategy.value}")
 
         return fn
-
 
     def _makeFilterFn(self, td: TaskDescriptor, shouldProfile: bool=False):
             # compute record schema and type
