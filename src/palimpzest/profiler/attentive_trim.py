@@ -1,41 +1,5 @@
-import json
-import time
-
-import numpy as np
-from palimpzest import dspyCOT, SingleQuestionOverSample, TOKEN_REDUCTION_GRANULARITY
 from fuzzywuzzy import process, fuzz
 
-def get_hist_save(task, resolution=TOKEN_REDUCTION_GRANULARITY):
-    ranges = []
-    with open("../data/test_v16_inputfile100-result-What is the aut-0.1-location.json", "rb") as file:
-        data = file.read()
-        json_obj = json.loads(data)
-
-    for loc in json_obj["files"]:
-        minv = loc["start"]/loc["total_chars"]
-        maxv = loc["end"]/loc["total_chars"]
-        print("min and max:", minv, maxv)
-        ranges.append((minv, maxv))
-
-    # Determine the overall min and max from the ranges for the heatmap extent
-    overall_min = 0.0
-    overall_max = 1.0
-
-    # Create a frequency matrix based on the ranges
-    index_range =  1/resolution
-    bins = np.arange(overall_min, overall_max, resolution)
-    frequency_matrix = np.zeros(len(bins)-1)
-
-    # Populate the frequency matrix based on the ranges
-    for r in ranges:
-        start_index = int(float(r[0] - overall_min)/resolution)
-        end_index = int(float(r[1] - overall_min)/resolution)
-        frequency_matrix[start_index:end_index] += 1
-    # save the index and the frequency_matrix to a csv file
-    np.savetxt("../data/frequency-"+task+".csv",
-               np.column_stack((bins[:-1] * index_range, frequency_matrix)),
-               delimiter=",",
-               fmt='%.3f')
 
 def find_best_range(values, budget, trim_zeros=False):
     """
@@ -70,7 +34,7 @@ def find_best_range(values, budget, trim_zeros=False):
             best_start = current_start
 
     best_end = best_start + budget - 1
-    print ("best_start:", best_start, "best_end:", best_end)
+    print("best_start:", best_start, "best_end:", best_end)
     if trim_zeros:
         # Trim leading/trailing zeros
         while best_start >= 0 and values[best_start] == 0:
@@ -90,22 +54,22 @@ def find_best_range(values, budget, trim_zeros=False):
         while end_idx < n and values[end_idx] == 0:
             trailing_zeros += 1
             end_idx -= 1
-        half_zeros = int((leading_zeros+trailing_zeros)/2)
+        half_zeros = int((leading_zeros + trailing_zeros) / 2)
         print("leading_zeros:", leading_zeros, "trailing_zeros:", trailing_zeros, "half_zeros:", half_zeros)
-        best_start = best_start - half_zeros+leading_zeros
-        best_end = best_end - trailing_zeros + leading_zeros+trailing_zeros-half_zeros
+        best_start = best_start - half_zeros + leading_zeros
+        best_end = best_end - trailing_zeros + leading_zeros + trailing_zeros - half_zeros
 
         if best_start < 0:
             best_end = best_end - best_start
             best_start = 0
         if best_end >= n:
-            best_start = best_start - (best_end-n+1)
-            best_end = n-1
+            best_start = best_start - (best_end - n + 1)
+            best_end = n - 1
 
-    return best_start, best_end+1
+    return best_start, best_end + 1
 
 
-def get_range_from_hist(file_path, range_budget, resolution=TOKEN_REDUCTION_GRANULARITY, trim_zeros=True):
+def get_range_from_hist(file_path, range_budget, resolution=0.001, trim_zeros=True):
     # Load data from csv file and extract he second column as values
     values = []
     with open(file_path, "r") as file:
@@ -117,7 +81,8 @@ def get_range_from_hist(file_path, range_budget, resolution=TOKEN_REDUCTION_GRAN
     # Find the best range
     start, end = find_best_range(values, budget, trim_zeros=trim_zeros)
     print("start:", start, "end:", end, "index_range:", index_range)
-    return  start *1.0/index_range, end *1.0/index_range
+    return start * 1.0 / index_range, end * 1.0 / index_range
+
 
 def get_trimed(context, sr, er):
     test_len = len(context)
@@ -126,6 +91,7 @@ def get_trimed(context, sr, er):
     print("character start:", start, "end:", end)
     sample = context[start:end]
     return sample
+
 
 # update the heatmap json object by increase the counter and refresh the heat region based on the new start and end index
 #                 json_object = {'prompt_schema': prompt_schema,

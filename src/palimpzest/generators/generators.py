@@ -20,6 +20,7 @@ import io
 import os
 import time
 
+from palimpzest.profiler.attentive_trim import find_best_range, get_trimed, best_substring_match, update_heatmap_json
 
 # DEFINITIONS
 GenerationOutput = Tuple[str, GenerationStats]
@@ -155,6 +156,8 @@ class DSPyGenerator(BaseGenerator):
     )
     # the generate method requires a user-provided budget parameter to specify te token budget. Default is 1.0, meaning the full context will be used.
     def generate(self, context: str, question: str, budget: float = 1.0) -> GenerationOutput:
+        reduction = False
+        full_context = context
         # fetch model
         dspy_lm = self._get_model()
 
@@ -163,8 +166,10 @@ class DSPyGenerator(BaseGenerator):
         dspy.settings.configure(lm=dspy_lm)
         cot = dspyCOT(self.promptSignature)
 
+        json_object = {}
+        heatmap_file = ''
         # check if the promptSignature is a QA signature, so we can match the answer to get heatmap
-        if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+        if budget< 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             file_cache = DataDirectory().getFileCacheDir()
             prompt_schema = self.promptSignature
             print("Prompt QA Signature: ", prompt_schema)
@@ -174,19 +179,30 @@ class DSPyGenerator(BaseGenerator):
             heatmap_file = os.path.join(file_cache, f"heatmap-{task_hash}.json")
             print("Heatmap file: ", heatmap_file)
             if not os.path.exists(heatmap_file):
-                # create the heatmap structure with default resolution of 0.001
-                with open(heatmap_file, 'w') as f:
-                    json_object = {'prompt_schema': prompt_schema,
-                                   'question': question,
-                                   'resolution': 0.001,
-                                   'heatmap': {}}
-                    json.dump(json_object, f)
+                # create the heatmap structure with default resolution of 0.001 and count of 0
+                buckets = int(1.0 / TOKEN_REDUCTION_GRANULARITY)
+                hist = [0] * buckets
+                json_object = {'prompt_schema': prompt_schema,
+                               'question': question,
+                               'resolution': TOKEN_REDUCTION_GRANULARITY,
+                               'count': 0,
+                               'heatmap': {hist}}
+
             else:
-                with open(heatmap_file, 'r') as f:
-                    json_object = json.load(f)
-                    heatmap = json_object['heatmap']
-            if budget < 1.0:
-                context = dspy_lm.llm.truncate(context, budget)
+                # only parse the heatmap file if token reduction is enabled (budget is less than 1.0)
+                if budget < 1.0:
+                    with open(heatmap_file, 'r') as f:
+                        json_object = json.load(f)
+                        heatmap = json_object['heatmap']
+                        count = json_object['count']
+                    # only refer to the heatmap if the count is greater than a enough sample size
+                    # TODO: only trim the context if the attention is clustered in a small region
+                    if count >= TOKEN_REDUCTION_SAMPLE:
+                        si, ei = find_best_range(heatmap, budget, trim_zeros=False)
+                        sr, er = si * TOKEN_REDUCTION_GRANULARITY, ei * TOKEN_REDUCTION_GRANULARITY
+                        context = get_trimed(context, sr, er)
+                        reduction = True
+
 
 
 
@@ -195,9 +211,26 @@ class DSPyGenerator(BaseGenerator):
         pred = cot(question, context)
         end_time = time.time()
 
+        # if reduction is enabled but the answer is None, fallback to the full context
+        if reduction and pred.answer==None:
+            start_time = time.time()
+            pred = cot(question, full_context)
+            end_time = time.time()
+
         # extract the log probabilities for the actual result(s) which are returned
         answer_log_probs = self._get_answer_log_probs(dspy_lm, pred.answer)
         usage, finish_reason = self._get_usage_and_finish_reason(dspy_lm)
+
+        # taken reduction post processing if enabled
+        if budget< 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+            gsi, gei = best_substring_match(question, full_context)
+            context_len = len(full_context)
+            gsr, ger = gsi/context_len, gei/context_len
+            norm_si, norm_ei = int(gsr/TOKEN_REDUCTION_GRANULARITY), int(ger/TOKEN_REDUCTION_GRANULARITY)
+            print("best_start:", gsi, "best_end:", gei)
+            json_object = update_heatmap_json(json_object, norm_si, norm_ei)
+            with open(heatmap_file, 'w') as f:
+                json.dump(json_object, f)
 
         # collect statistics on prompt, usage, and timing
         stats = GenerationStats(

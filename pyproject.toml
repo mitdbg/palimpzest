@@ -27,6 +27,7 @@ dependencies = [
     "pandas~=2.1.1",
     "papermage>=0.16.0",
     "pdf2image",
+    "python-Levenshtein",
     "pdfplumber==0.7.4",
     "pillow>=10.2.0",
     "prettytable>=3.9.0",
