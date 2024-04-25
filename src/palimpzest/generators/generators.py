@@ -324,9 +324,11 @@ class ImageTextGenerator(BaseGenerator):
         payloads = self._make_payloads(prompt, base64_images)
 
         # generate response
+        print(f"Generating")
         start_time = time.time()
         answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(client, payloads)
         end_time = time.time()
+        print(answer)
 
         # extract the log probabilities for the actual result(s) which are returned
         answer_log_probs = self._get_answer_log_probs(tokens, token_logprobs, answer)

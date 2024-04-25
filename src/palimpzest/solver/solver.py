@@ -340,6 +340,7 @@ class Solver:
 
                     # set _passed_filter attribute and return record
                     setattr(candidate, "_passed_filter", result)
+                    print(f"ran filter function on {candidate}")
 
                     return candidate
 

@@ -238,7 +238,7 @@ GPT_4V_MODEL_CARD = {
     "usd_per_input_token": 10 / 1E6,
     "usd_per_output_token": 30 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.042 / 10.0, # TODO: / 10.0 is a hack; need to figure out why time estimates are so off
+    "seconds_per_output_token": 0.042, # / 10.0, # TODO: / 10.0 is a hack; need to figure out why time estimates are so off
     ##### Agg. Benchmark #####
     "MMLU": 86.4,
 }
@@ -272,7 +272,7 @@ GEMINI_1V_MODEL_CARD = {
     "usd_per_input_token": 25 / 1E6,  # Gemini is free but rate limited for now. Pricing will be updated 
     "usd_per_output_token": 375 / 1E9,
     ##### Time #####
-    "seconds_per_output_token": 0.042 / 10.0, # TODO: 
+    "seconds_per_output_token": 0.042, # / 10.0, # TODO: 
     ##### Agg. Benchmark #####
     "MMLU": 65.0, # 90.0, TODO: see note above in Gemini_1 model card
     ##### Commonsense Reasoning #####

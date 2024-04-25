@@ -252,6 +252,9 @@ class InduceFromCandidateOp(PhysicalOp):
             if self.model in [Model.MIXTRAL, Model.LLAMA2]:
                 import random
                 self.model = random.choice([Model.GPT_4V, Model.GEMINI_1V])
+            
+            # TODO: remove; for evaluations just use GPT_4V
+            self.model = Model.GPT_4V
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
@@ -355,6 +358,12 @@ class InduceFromCandidateOp(PhysicalOp):
         # estimate number of output tokens as constant multiple of input tokens (for now)
         est_num_output_tokens = OUTPUT_TOKENS_MULTIPLE * est_num_input_tokens
 
+        # override for GPT-4V image conversion
+        if self.model == Model.GPT_4V:
+            # 1024x1024 image is 765 tokens
+            est_num_input_tokens = 765
+            est_num_output_tokens = inputEstimates["estOutputTokensPerElement"]
+
         # if we're using a few-shot prompt strategy, the est_num_input_tokens will increase
         # by a small factor due to the added examples; we multiply after computing the
         # est_num_output_tokens b/c the few-shot examples likely won't affect the output length
@@ -457,6 +466,9 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             if self.model in [Model.MIXTRAL, Model.LLAMA2]:
                 import random
                 self.model = random.choice([Model.GPT_4V, Model.GEMINI_1V])
+
+            # TODO: remove; for evaluations just use GPT_4V
+            self.model = Model.GPT_4V
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
@@ -562,6 +574,12 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
         # estimate number of output tokens as constant multiple of input tokens (for now)
         est_num_output_tokens = OUTPUT_TOKENS_MULTIPLE * est_num_input_tokens
+
+        # override for GPT-4V image conversion
+        if self.model == Model.GPT_4V:
+            # 1024x1024 image is 765 tokens
+            est_num_input_tokens = 765
+            est_num_output_tokens = inputEstimates["estOutputTokensPerElement"]
 
         # if we're using a few-shot prompt strategy, the est_num_input_tokens will increase
         # by a small factor due to the added examples; we multiply after computing the

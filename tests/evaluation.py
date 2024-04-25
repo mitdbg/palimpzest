@@ -35,7 +35,7 @@ class Email(pz.TextFile):
 class RealEstateListingFiles(pz.Schema):
     """The source text and image data for a real estate listing."""
     listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.BytesField(desc="The content of the listing's text description", required=True)
+    text_content = pz.StringField(desc="The content of the listing's text description", required=True)
     image_contents = pz.ListField(element_type=pz.BytesField, desc="A list of the contents of each image of the listing", required=True)
 
 # TODO: longer-term we will want to support one or more of the following:
@@ -49,12 +49,13 @@ class RealEstateListingFiles(pz.Schema):
 class TextRealEstateListing(RealEstateListingFiles):
     """Represents a real estate listing with specific fields extracted from its text."""
     address = pz.StringField(desc="The address of the property")
+    price = pz.NumericField(desc="The listed price of the property")
     sq_ft = pz.NumericField(desc="The square footage (sq. ft.) of the property")
     year_built = pz.NumericField(desc="The year in which the property was built")
     bedrooms = pz.NumericField(desc="The number of bedrooms")
     bathrooms = pz.NumericField(desc="The number of bathrooms")
 
-class FullRealEstateListing(TextRealEstateListing):
+class ImageRealEstateListing(RealEstateListingFiles):
     """Represents a real estate listing with specific fields extracted from its text and images."""
     is_modern_and_attractive = pz.BooleanField(desc="True if the home interior is modern and attractive and False otherwise")
     has_natural_sunlight = pz.BooleanField(desc="True if the home interior has lots of natural sunlight and False otherwise")
@@ -76,7 +77,7 @@ class RealEstateListingSource(pz.UserSource):
             for file in files:
                 bytes_data = open(os.path.join(root, file), "rb").read()
                 if file.endswith('.txt'):
-                    dr.text_content = bytes_data
+                    dr.text_content = str(bytes_data)
                 elif file.endswith('.png'):
                     dr.image_contents.append(bytes_data)
             yield dr
@@ -109,7 +110,11 @@ def score_plan(datasetid, records) -> float:
     if records_df.empty:
         return 0.0, 0.0, 0.0
 
-    pred_filenames = records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
+    preds = None
+    if "enron" in datasetid:
+        preds = records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
+    elif "real-estate" in datasetid:
+        preds = list(records_df.listing)
 
     # get groundtruth
     gt_df = None
@@ -120,20 +125,24 @@ def score_plan(datasetid, records) -> float:
     elif datasetid == "real-estate-eval":
         gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval.csv")
 
-    target_filenames = list(gt_df[gt_df.label == 1].filename.unique())
+    targets = None
+    if "enron" in datasetid:
+        targets = list(gt_df[gt_df.label == 1].filename)
+    elif "real-estate" in datasetid:
+        targets = list(gt_df[gt_df.label == 1].listing)
 
     # compute true and false positives
     tp, fp = 0, 0
-    for filename in pred_filenames:
-        if filename in target_filenames:
+    for pred in preds:
+        if pred in targets:
             tp += 1
         else:
             fp += 1
 
     # compute false negatives
     fn = 0
-    for filename in target_filenames:
-        if filename not in pred_filenames:
+    for target in targets:
+        if target not in preds:
             fn += 1
 
     # compute precision, recall, f1 score
@@ -227,24 +236,27 @@ def run_pz_plan(datasetid, plan, idx):
     profileData = plan.getProfilingData()
     sp = StatsProcessor(profileData)
 
-    with open(f'eval-results/{datasetid}-profiling-{idx}.json', 'w') as f:
-        json.dump(sp.profiling_data.to_dict(), f)
+    # TODO: debug profiling issue w/conventional query stats for per-field stats
+    # with open(f'eval-results/{datasetid}-profiling-{idx}.json', 'w') as f:
+    #     json.dump(sp.profiling_data.to_dict(), f)
 
     # score plan based on its output records
     _, _, f1_score = score_plan(datasetid, records)
 
-    cost, models = 0.0, []
+    plan_info = {"models": [], "op_names": [], "generated_fields": []}
+    cost = 0.0
     stats = sp.profiling_data
     while stats is not None:
         cost += stats.total_usd
-        if stats.model_name is not None:
-            models.append(stats.model_name)
+        plan_info["models"].append(stats.model_name)
+        plan_info["op_names"].append(stats.op_name)
+        plan_info["generated_fields"].append(stats.generated_fields)
         stats = stats.source_op_stats
 
     # compute label
     print(f"PLAN {idx}: {buildNestedStr(plan.dumpPhysicalTree())}")
 
-    return runtime, cost, f1_score, models
+    return runtime, cost, f1_score, plan_info
 
 
 def evaluate_pz_plans(datasetid, reoptimize=False, limit=None):
@@ -270,20 +282,34 @@ def evaluate_pz_plans(datasetid, reoptimize=False, limit=None):
         def within_two_miles_of_mit(record):
             # NOTE: I'm using this hard-coded function so that folks w/out a
             #       Geocoding API key from google can still run this example
-            far_away_addrs = ["Melcher St", "Sleeper St", "437 D St", "Seaport", "Liberty"]
-            if any([street.lower() in record.address.lower() for street in far_away_addrs]):
+            try:
+                far_away_addrs = ["Melcher St", "Sleeper St", "437 D St", "Seaport", "Liberty"]
+                if any([street.lower() in record.address.lower() for street in far_away_addrs]):
+                    return False
+                return True
+            except:
                 return False
-            return True
+
+        def in_price_range(record):
+            try:
+                price = record.price
+                if type(price) == str:
+                    price = price.strip()
+                    price = int(price.replace("$","").replace(",",""))
+                return 6e5 < price and price <= 2e6
+            except:
+                return False
 
         # TODO: update logical plan creation to consider swapping (pairs of) (convert and filter)
         listings = pz.Dataset(datasetid, schema=RealEstateListingFiles)
-        listings = listings.convert(TextRealEstateListing)
-        listings = listings.convert(FullRealEstateListing)
+        listings = listings.convert(TextRealEstateListing, depends_on="text_content")
+        listings = listings.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_contents")
         listings = listings.filterByStr(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"]
         )
-        listings = listings.filterByFn(within_two_miles_of_mit, depends_on=["address"])
+        listings = listings.filterByFn(within_two_miles_of_mit, depends_on="address")
+        listings = listings.filterByFn(in_price_range, depends_on="price")
         logicalTree = listings.getLogicalTree()
 
     # get total number of plans
@@ -293,8 +319,8 @@ def evaluate_pz_plans(datasetid, reoptimize=False, limit=None):
     for idx in range(num_plans):
     # for idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
         # skip all-Gemini plan which opens too many files
-        if idx == 17:
-            continue
+        # if "enron" in datasetid and idx == 17:
+        #     continue
 
         # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
         candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True)
@@ -309,10 +335,10 @@ def evaluate_pz_plans(datasetid, reoptimize=False, limit=None):
         print("----------------------")
         print(f"Plan: {buildNestedStr(plan.dumpPhysicalTree())}")
         print("---")
-        runtime, cost, f1_score, models = run_pz_plan(datasetid, plan, idx)
+        runtime, cost, f1_score, plan_info = run_pz_plan(datasetid, plan, idx)
 
         # add to results
-        result_dict = {"runtime": runtime, "cost": cost, "f1_score": f1_score, "models": models}
+        result_dict = {"runtime": runtime, "cost": cost, "f1_score": f1_score, "plan_info": plan_info}
         results.append(result_dict)
         with open(f'eval-results/{datasetid}-results-{idx}.json', 'w') as f:
             json.dump(result_dict, f)
@@ -335,20 +361,73 @@ def plot_runtime_cost_vs_quality(results, datasetid):
         runtime = result_dict["runtime"]
         cost = result_dict["cost"]
         f1_score = result_dict["f1_score"]
-        models = result_dict["models"]
-        text = None
-        if all([model == "gpt-4-0125-preview" for model in models]):
-            # add text for ALL-GPT4
-            text = "ALL-GPT4"
-        elif all([model == "mistralai/Mixtral-8x7B-Instruct-v0.1" for model in models]):
-            # add text for ALL-MIXTRAL
-            text = "ALL-MIXTRAL"
-        elif datasetid == "enron-eval" and models == ["gpt-4-0125-preview"] * 2 + ["mistralai/Mixtral-8x7B-Instruct-v0.1"]:
-            # add text for Mixtral-GPT4
-            text = "MIXTRAL-GPT4"
-        elif datasetid == "enron-eval" and models == ["gpt-4-0125-preview"] * 2 + ["gemini-1.0-pro-001"]:
-            # add text for Gemini-GPT4
-            text = "GEMINI-GPT4"
+        models = (
+            result_dict["models"]
+            if "models" in result_dict
+            else result_dict["plan_info"]["models"]
+        )
+        op_names = (
+            result_dict["plan_info"]["op_names"]
+            if "plan_info" in result_dict
+            else None
+        )
+        generated_fields = (
+            result_dict["plan_info"]["generated_fields"]
+            if "plan_info" in result_dict
+            else None
+        )
+
+        if "enron" in datasetid:
+            text = None
+            if all([model == "gpt-4-0125-preview" for model in models]):
+                # add text for ALL-GPT4
+                text = "ALL-GPT4"
+            elif all([model == "mistralai/Mixtral-8x7B-Instruct-v0.1" for model in models]):
+                # add text for ALL-MIXTRAL
+                text = "ALL-MIXTRAL"
+            elif datasetid == "enron-eval" and models == ["gpt-4-0125-preview"] * 2 + ["mistralai/Mixtral-8x7B-Instruct-v0.1"]:
+                # add text for Mixtral-GPT4
+                text = "MIXTRAL-GPT4"
+            elif datasetid == "enron-eval" and models == ["gpt-4-0125-preview"] * 2 + ["gemini-1.0-pro-001"]:
+                # add text for Gemini-GPT4
+                text = "GEMINI-GPT4"
+
+        elif "real-estate" in datasetid:
+            text = ""
+            if all([model is None or "gpt-4" in model for model in models]):
+                # add text for ALL-GPT4
+                text = "ALL-GPT4"
+            elif any([model is not None and "mistralai" in model for model in models]):
+                text = "MIXTRAL-GPT4"
+            elif any([model is not None and "gemini" in model for model in models]):
+                text = "GEMINI-GPT4"
+
+
+            all_convert_then_filter, text_then_image, image_then_text = True, False, False
+            num_converts = 0
+            for op_name, gen_fields in zip(list(reversed(op_names)), list(reversed(generated_fields))):
+                if "induce" not in op_name and "filter" not in op_name:
+                    continue
+
+                if "induce" in op_name:
+                    num_converts += 1
+
+                    if num_converts == 1 and "address" in gen_fields:
+                        text_then_image = True
+                    elif num_converts == 1 and "has_natural_sunlight" in gen_fields:
+                        image_then_text = True
+
+                if "filter" in op_name and num_converts < 2:
+                    all_convert_then_filter = False
+
+            # add text depending on whether all converts happen before filters
+            # and whether images or text are processed first
+            if all_convert_then_filter:
+                text += "-CONVERT-BOTH-THEN-FILTER"
+            elif text_then_image:
+                text += "-TEXT-BEFORE-IMAGE"
+            elif image_then_text:
+                text += "-IMAGE-BEFORE-TEXT"
 
         # set label and color
         color = None
@@ -371,7 +450,7 @@ def plot_runtime_cost_vs_quality(results, datasetid):
     axs[1].set_ylabel("cost (USD)")
     axs[1].set_xlabel("F1 Score")
     # axs[0].legend(bbox_to_anchor=(1.03, 1.0))
-    fig.savefig("eval-results/enron.png", bbox_inches="tight")
+    fig.savefig(f"eval-results/{datasetid}.png", bbox_inches="tight")
 
 
 if __name__ == "__main__":
@@ -399,32 +478,7 @@ if __name__ == "__main__":
         print("----------------")
         results = evaluate_pz_plans(args.datasetid, limit=args.limit)
 
-        # # get baseline metrics
-        # print("Running Baselines")
-        # print("-----------------")
-        # all_gpt4_runtime, all_gpt4_cost, all_gpt4_quality, all_gpt4_label = evaluate_enron_baseline(Model.GPT_4, args.datasetid)
-        # # all_gpt35_runtime, all_gpt35_cost, all_gpt35_quality, all_gpt35_label = evaluate_enron_baseline(Model.GPT_3_5)
-        # all_mixtral_runtime, all_mixtral_cost, all_mixtral_quality, mixtral_label = evaluate_enron_baseline(Model.MIXTRAL, args.datasetid)
-
-        # # plot runtime vs quality and cost vs quality
-        # baselines = [
-        #     (all_gpt4_runtime, all_gpt4_cost, all_gpt4_quality, all_gpt4_label),
-        #     # (all_gpt35_runtime, all_gpt35_cost, all_gpt35_quality, all_gpt35_label),
-        #     (all_mixtral_runtime, all_mixtral_cost, all_mixtral_quality, mixtral_label),
-        # ]
-        # pz_plans = [
-        #     (runtime, cost, f1_score, label)
-        #     for runtime, cost, f1_score, label in results
-        # ]
-        # all_results = baselines + pz_plans
-
-        # results = []
-        # for idx in range(17):
-        #     with open(f'eval-results/{args.datasetid}-results-{idx}.json', 'r') as f:
-        #         result_dict = json.load(f)
-        #         results.append(result_dict)
-
-        with open("eval-results/enron.json", 'w') as f:
+        with open(f"eval-results/enron.json", 'w') as f:
             json.dump(results, f)
  
         plot_runtime_cost_vs_quality(results, args.datasetid)
@@ -435,9 +489,17 @@ if __name__ == "__main__":
         pz.DataDirectory().registerUserSource(RealEstateListingSource(args.datasetid, args.listings_dir), args.datasetid)
         
         print("Running PZ plans")
-        results = evaluate_pz_plans(args.datasetid, limit=args.limit)
+        print("----------------")
+        _ = evaluate_pz_plans(args.datasetid, limit=args.limit)
+
+        results = []
+        for file in os.listdir("eval-results"):
+            if file.startswith('real-estate-eval-results') and file.endswith('.json'):
+                with open(f"eval-results/{file}", 'r') as f:
+                    result = json.load(f)
+                    results.append(result)
 
         with open("eval-results/real-estate.json", 'w') as f:
             json.dump(results, f)
 
-        plot_runtime_cost_vs_quality(results)
+        plot_runtime_cost_vs_quality(results, args.datasetid)

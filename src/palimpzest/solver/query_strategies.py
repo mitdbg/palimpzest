@@ -1,7 +1,7 @@
 from palimpzest.constants import PromptStrategy
 from palimpzest.elements import DataRecord
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats
+from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats, GenerationStats
 from palimpzest.solver.task_descriptors import TaskDescriptor
 
 from typing import Any, Dict, List, Tuple
@@ -10,7 +10,7 @@ import base64
 import json
 
 
-def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_names: List[str]) -> str:
+def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_names: List[str], is_conventional: bool=False) -> str:
     """
     This function constructs the prompt for a bonded query.
     """
@@ -31,18 +31,22 @@ def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_na
     optionalOutputDesc = "" if td.outputSchema.__doc__ is None else f"Here is a description of the output object: {td.outputSchema.__doc__}."
 
     # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
-    targetOutputDescriptor = "an output JSON object that describes an object of type"
+    targetOutputDescriptor = f"an output JSON object that describes an object of type {doc_type}."
     outputSingleOrPlural = "the output object"
     appendixInstruction = "Be sure to emit a JSON object only"
     if td.cardinality == "oneToMany":
-        targetOutputDescriptor = "an output array of zero or more JSON objects that describe objects of type"
+        targetOutputDescriptor = f"an output array of zero or more JSON objects that describe objects of type {doc_type}."
         outputSingleOrPlural = "the output objects"
         appendixInstruction = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields described above. You must decide the correct number of output objects."
+
+    # if this is a conventional query, focus only on generating output field
+    if is_conventional:
+        targetOutputDescriptor = f"an output JSON object with a single key \"{generate_field_names[0]}\" whose value is specified in the input object."
 
     # construct promptQuestion
     promptQuestion = None
     if td.prompt_strategy != PromptStrategy.IMAGE_TO_TEXT:
-        promptQuestion = f"""I would like you to create {targetOutputDescriptor} {doc_type}. 
+        promptQuestion = f"""I would like you to create {targetOutputDescriptor}. 
         You will use the information in an input JSON object that I will provide. The input object has type {td.inputSchema.className()}.
         All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
         {optionalInputDesc}
@@ -50,7 +54,7 @@ def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_na
         Here is every input field name and a description: 
         {multilineInputFieldDescription}
         Here is every output field name and a description:
-        {multilineOutputFieldDescription}.
+        {multilineOutputFieldDescription}
         {appendixInstruction}
         """ + "" if td.conversionDesc is None else f" Keep in mind that this process is described by this text: {td.conversionDesc}."                
 
@@ -61,7 +65,7 @@ def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_na
         {optionalInputDesc}
         {optionalOutputDesc}
         Here is every output field name and a description:
-        {multilineOutputFieldDescription}.
+        {multilineOutputFieldDescription}
         {appendixInstruction}
         """ + "" if td.conversionDesc is None else f" Keep in mind that this process is described by this text: {td.conversionDesc}." 
 
@@ -231,6 +235,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
     for field_name in generate_field_names:
         # construct prompt question
         promptQuestion = _construct_query_prompt(td, doc_type, [field_name])
+        field_stats = None
         try:
             field_stats = None
             if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
@@ -259,16 +264,17 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
             elif td.prompt_strategy == PromptStrategy.FEW_SHOT:
                 raise Exception("not implemented yet")
 
-            # set the DataRecord's field with its generated value
-            setattr(dr, field_name, answer)
-
             # update query_stats
             query_stats[f"{field_name}"] = field_stats
+
+            # extract result from JSON and set the DataRecord's field with its generated value
+            jsonObj = _get_JSON_from_answer(answer)
+            setattr(dr, field_name, jsonObj[field_name])
 
         except Exception as e:
             print(f"Conventional field processing error: {e}")
             setattr(dr, field_name, None)
-            query_stats[f"{field_name}"] = None
+            query_stats[f"{field_name}"] = field_stats
 
     # construct ConventionalQueryStats object
     field_query_stats_lst = [FieldQueryStats(gen_stats=gen_stats, field_name=field_name) for field_name, gen_stats in query_stats.items()]
