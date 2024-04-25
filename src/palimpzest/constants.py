@@ -255,7 +255,7 @@ GPT_4V_MODEL_CARD = {
     "usd_per_input_token": 10 / 1E6,
     "usd_per_output_token": 30 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.042, # / 10.0, # TODO: / 10.0 is a hack; need to figure out why time estimates are so off
+    "seconds_per_output_token": 0.042 / 10.0, # TODO: / 10.0 is a hack; need to figure out why time estimates are so off
     ##### Agg. Benchmark #####
     "MMLU": 86.4,
 }
