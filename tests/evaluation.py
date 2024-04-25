@@ -312,6 +312,14 @@ def evaluate_pz_plans(datasetid, reoptimize=False, limit=None):
         listings = listings.filterByFn(in_price_range, depends_on="price")
         logicalTree = listings.getLogicalTree()
 
+    # NOTE: the following weird iteration over physical plans by idx is intentional and necessary
+    #       at the moment in order for stats collection to work properly. For some yet-to-be-discovered
+    #       reason, `createPhysicalPlanCandidates` is creating physical plans which share the same
+    #       copy of some operators. This means that if we naively iterate over the plans and execute them
+    #       some plans' profilers will count 2x (or 3x or 4x etc.) the number of records processed,
+    #       dollars spent, time spent, etc. This workaround recreates the physical plans on each
+    #       iteration to ensure that they are new.
+ 
     # get total number of plans
     num_plans = len(logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True))
 
