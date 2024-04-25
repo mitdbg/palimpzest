@@ -40,7 +40,15 @@ class DataRecord:
         """Return a JSON representation of this DataRecord"""
         keys = sorted(self.__dict__)
         # Make a dictionary out of the key/value pairs
-        d = {k: str(self.__dict__[k]) for k in keys if not k.startswith("_") and not isinstance(self.__dict__[k] , bytes)}
+        d = {
+            k: str(self.__dict__[k])
+            for k in keys
+            if (
+                not k.startswith("_")
+                and not isinstance(self.__dict__[k], bytes)
+                and not (isinstance(self.__dict__[k], list) and isinstance(self.__dict__[k][0], bytes))
+            )
+        }
         d["data type"] = str(self._schema.__name__)
         d["data type description"]  = str(self._schema.__doc__)
 
@@ -53,7 +61,16 @@ class DataRecord:
         d = (
             {k: self.__dict__[k] for k in keys if not k.startswith("_")}
             if include_bytes
-            else {k: self.__dict__[k] if not isinstance(self.__dict__[k] , bytes) else "<bytes>" for k in keys if not k.startswith("_")}
+            else {
+                k: self.__dict__[k]
+                if (
+                    not isinstance(self.__dict__[k], bytes)
+                    and not (isinstance(self.__dict__[k], list) and isinstance(self.__dict__[k][0], bytes))
+                )
+                else "<bytes>"
+                for k in keys
+                if not k.startswith("_")
+            }
         )
         return d
 
