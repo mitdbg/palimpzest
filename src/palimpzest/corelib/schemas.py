@@ -51,6 +51,7 @@ class TabularRow(Schema):
 
 class Table(Schema):
     """A Table is an object composed of a header and rows."""
+    filename = StringField(desc="The name of the file the table was extracted from", required=False)
     name = StringField(desc="The name of the table", required=False)
     header = ListField(element_type=StringField, desc="The header of the table", required=True)
     # TODO currently no support for nesting data records on data records

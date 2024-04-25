@@ -203,7 +203,7 @@ class Solver:
                         row_record = [str(x) for x in row]
                         rows += [row_record]
                     dr.rows = np.asarray(rows)
-
+                    dr.filename = candidate.filename
                     dr.header = dataframe.columns.values
                     dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
 

@@ -162,9 +162,9 @@ class DSPyGenerator(BaseGenerator):
         # num_tries = 3
         # while num_tries > 0:
         #     try:
-        print(f"Generating")
+        # print(f"Generating")
         pred = cot(question, context)
-        print(pred.answer)
+        # print(pred.answer)
                 # num_tries = -1
 
             # # TODO: explicitly filter for context length exceeded error

@@ -252,8 +252,8 @@ class InduceFromCandidateOp(PhysicalOp):
         taskDescriptor = self._makeTaskDescriptor()
 
         # synthesize task function
-        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[str(taskDescriptor)] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "InduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -271,10 +271,8 @@ class InduceFromCandidateOp(PhysicalOp):
             conversionDesc=self.desc,
             pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
         )
-
         # This code checks if the function has been synthesized before, and if so, whether it is hardcoded. If so, set model and prompt_strategy to None.
-        fn = PhysicalOp.synthesizedFns.get(str(td), None)
-        if fn is not None:
+        if td.op_id in PhysicalOp.synthesizedFns:
             if (td.outputSchema, td.inputSchema) in PhysicalOp.solver._hardcodedFns:
                 td.model = None
                 td.prompt_strategy = None
@@ -419,9 +417,9 @@ class InduceFromCandidateOp(PhysicalOp):
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputSchema. Return None if it fails."""
         taskDescriptor = self._makeTaskDescriptor()
-        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
-            raise Exception("This function should have been synthesized during init():", str(taskDescriptor))
-        return PhysicalOp.synthesizedFns[str(taskDescriptor)](candidate)
+        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+            raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
+        return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
@@ -457,8 +455,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         taskDescriptor = self._makeTaskDescriptor()
 
         # synthesize task function
-        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[str(taskDescriptor)] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "ParallelInduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -633,9 +631,9 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputSchema. Return None if it fails."""
         taskDescriptor = self._makeTaskDescriptor()
-        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
-            raise Exception("This function should have been synthesized during init():", str(taskDescriptor))
-        return PhysicalOp.synthesizedFns[str(taskDescriptor)](candidate)
+        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+            raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
+        return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
 
 
 class FilterCandidateOp(PhysicalOp):
@@ -655,8 +653,8 @@ class FilterCandidateOp(PhysicalOp):
         taskDescriptor = self._makeTaskDescriptor()
 
         # synthesize task function
-        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[str(taskDescriptor)] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "FilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -793,9 +791,9 @@ class FilterCandidateOp(PhysicalOp):
     def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
         taskDescriptor = self._makeTaskDescriptor()
-        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
-            raise Exception("This function should have been synthesized during init():", str(taskDescriptor))
-        return PhysicalOp.synthesizedFns[str(taskDescriptor)](candidate)
+        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+            raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
+        return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
 
 
 class ParallelFilterCandidateOp(PhysicalOp):
@@ -817,8 +815,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
         taskDescriptor = self._makeTaskDescriptor()
 
         # synthesize task function
-        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[str(taskDescriptor)] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+            PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "ParallelFilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -966,10 +964,10 @@ class ParallelFilterCandidateOp(PhysicalOp):
     def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
         taskDescriptor = self._makeTaskDescriptor()
-        if not str(taskDescriptor) in PhysicalOp.synthesizedFns:
+        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
             raise Exception("This function should have been synthesized during init():", str(taskDescriptor))
 
-        return PhysicalOp.synthesizedFns[str(taskDescriptor)](candidate)
+        return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
 
 def agg_init(func):
     if (func.lower() == 'count'):

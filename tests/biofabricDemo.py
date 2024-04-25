@@ -31,7 +31,7 @@ class ScientificPaper(pz.PDFFile):
 class CaseData(pz.Schema):
     """An individual row extracted from a table containing medical study data."""
     case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-    age_at_diagnosis = pz.Field(desc="The age of the patient in days at the time of diagnosis", required=False)
+    age_at_diagnosis = pz.Field(desc="The age of the patient at the time of diagnosis", required=False)
     race = pz.Field(desc="An arbitrary classification of a taxonomic group that is a division of a species.", required=False)
     ethnicity = pz.Field(desc="Whether an individual describes themselves as Hispanic or Latino or not.", required=False)
     gender = pz.Field(desc="Text designations that identify gender.", required=False)
@@ -49,7 +49,7 @@ class CaseData(pz.Schema):
     study = pz.Field(desc="The last name of the author of the study, from the table name", required=False)
 
 
-def filtering(input_dataset):
+def filtering(input_dataset, policy):
     patient_tables = input_dataset.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
     patient_tables = patient_tables.filterByStr("The rows of the table contain the patient age")
     # patient_tables = patient_tables.filterByStr("The table explains the meaning of attributes")
@@ -75,7 +75,7 @@ def filtering(input_dataset):
     return filtered, output
 
 
-def matching(input_dataset):
+def matching(input_dataset, policy):
     patient_tables = input_dataset.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
     case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
     
@@ -132,8 +132,8 @@ if __name__ == "__main__":
 
 
     elif experiment == 'filtering':
-        xls = pz.Dataset('biofabric-xls', schema=pz.XLSFile)       
-        filtered_tables, _ = filtering(xls)
+        xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)       
+        filtered_tables, _ = filtering(xls, policy)
         
         with open("results/biofabric/filtered_tables.txt", "w") as f:
             for item in filtered_tables:
@@ -143,23 +143,39 @@ if __name__ == "__main__":
     elif experiment == 'matching':
         xls = pz.Dataset('biofabric-matching', schema=pz.XLSFile)
             
-        output_df, matched_tables = matching(xls)
+        output_df, matched_tables = matching(xls, policy)
 
-        output_df, _ = matching(xls)
+        output_df, _ = matching(xls, policy)
         print("Matched table:", output_df)
         out_path = "results/biofabric/"
         output_df.to_csv(out_path+"matched.csv", index=False)
     
     elif experiment == "endtoend":
-        xls = pz.Dataset('biofabric-xls', schema=pz.XLSFile)
-        filtered_tables, output = filtering(xls)
-        output_df, matched_tables = matching(output)
+        xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)
+        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        patient_tables = patient_tables.filterByStr("The rows of the table contain the patient age")
+        case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
+        
+        output_1 = pz.SimpleExecution(patient_tables, policy)
+        output_1 = output_1.executeAndOptimize(args.verbose)
 
-        with open("results/biofabric/filtered_tables_endtoend.txt", "w") as f:
+        filtered_tables = []
+        for table in output_1:            
+            filtered_tables.append(table.name)
+
+        out_path = "results/biofabric/"
+        with open(out_path+"filtered_tables_endtoend.txt", "w") as f:
             for item in filtered_tables:
                 f.write("%s\n" % item)
 
-        out_path = "results/biofabric/"
+        output_2 = pz.SimpleExecution(case_data, policy)           
+        output_2 = output_2.executeAndOptimize(args.verbose)
+        
+        output_rows = []
+        for output_table in output_2:
+            output_rows.append(output_table.asDict()) 
+        output_df = pd.DataFrame(output_rows)
+
         output_df.to_csv(out_path+"matched_endtoend.csv", index=False)
 
         print("Filtered tables:" ,"\n".join(filtered_tables))
