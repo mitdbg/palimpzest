@@ -122,7 +122,7 @@ def score_plan(datasetid, records) -> float:
         gt_df = pd.read_csv("testdata/groundtruth/enron-eval.csv")
     elif datasetid == "enron-eval-tiny":
         gt_df = pd.read_csv("testdata/groundtruth/enron-eval-tiny.csv")
-    elif datasetid == "real-estate-eval":
+    elif "real-estate" in datasetid:
         gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval.csv")
 
     targets = None
@@ -365,7 +365,7 @@ def plot_runtime_cost_vs_quality(results, datasetid):
     fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True)
 
     # parse results into fields
-    for result_dict in results:
+    for idx, result_dict in enumerate(results):
         runtime = result_dict["runtime"]
         cost = result_dict["cost"]
         f1_score = result_dict["f1_score"]
@@ -431,11 +431,11 @@ def plot_runtime_cost_vs_quality(results, datasetid):
             # add text depending on whether all converts happen before filters
             # and whether images or text are processed first
             if all_convert_then_filter:
-                text += "-CONVERT-BOTH-THEN-FILTER"
+                text += "-CONVERT-BOTH"
             elif text_then_image:
-                text += "-TEXT-BEFORE-IMAGE"
+                text += "-TEXT-FIRST"
             elif image_then_text:
-                text += "-IMAGE-BEFORE-TEXT"
+                text += "-IMAGE-FIRST"
 
         # set label and color
         color = None
@@ -443,14 +443,33 @@ def plot_runtime_cost_vs_quality(results, datasetid):
         # marker = "*" if "PZ" in label else "^"
 
         # plot runtime vs. f1_score
-        axs[0].scatter(f1_score, runtime, alpha=0.4, color=color, marker=marker)
-        if text is not None:
-            axs[0].annotate(text, (f1_score, runtime))
+        axs[0].scatter(f1_score, runtime, alpha=0.4, color=color, marker=marker) 
 
         # plot cost vs. f1_score
         axs[1].scatter(f1_score, cost, alpha=0.4, color=color, marker=marker)
+
+        # add annotations
         if text is not None:
-            axs[1].annotate(text, (f1_score, cost))
+            if "enron" in datasetid:
+                ha, va = 'right', None
+                if text == "ALL-GPT4":
+                    va = 'top'
+                elif text == "MIXTRAL-GPT4":
+                    va = 'bottom'
+                elif text == "GEMINI-GPT4":
+                    va = 'top'
+                elif text == "ALL-MIXTRAL":
+                    va = 'bottom'
+                print(f"{ha} -- {va}")
+                axs[0].annotate(text, (f1_score, runtime), ha=ha, va=va)
+                axs[1].annotate(text, (f1_score, cost), ha=ha, va=va)
+
+            elif "real-estate" in datasetid and (f1_score > 0.8 or runtime < 100):
+                ha = 'left' if f1_score < 0.8 else 'right'
+                runtime_va = 'bottom' if runtime < 100 else 'top'
+                cost_va = 'bottom' if f1_score < 0.8 else 'top'
+                axs[0].annotate(text, (f1_score, runtime), ha=ha, va=runtime_va)
+                axs[1].annotate(text, (f1_score, cost), ha=ha, va=cost_va)
 
     # savefig
     axs[0].set_title("Runtime and Cost vs. F1 Score")
@@ -484,9 +503,16 @@ if __name__ == "__main__":
         # get PZ plan metrics
         print("Running PZ Plans")
         print("----------------")
-        results = evaluate_pz_plans(args.datasetid, limit=args.limit)
+        _ = evaluate_pz_plans(args.datasetid, limit=args.limit)
 
-        with open(f"eval-results/enron.json", 'w') as f:
+        results = []
+        for file in os.listdir("eval-results"):
+            if file.startswith(f'{args.datasetid}-results') and file.endswith('.json'):
+                with open(f"eval-results/{file}", 'r') as f:
+                    result = json.load(f)
+                    results.append(result)
+
+        with open(f"eval-results/{args.datasetid}.json", 'w') as f:
             json.dump(results, f)
  
         plot_runtime_cost_vs_quality(results, args.datasetid)
@@ -495,19 +521,19 @@ if __name__ == "__main__":
         # register user data source
         print("Registering Datasource")
         pz.DataDirectory().registerUserSource(RealEstateListingSource(args.datasetid, args.listings_dir), args.datasetid)
-        
+
         print("Running PZ plans")
         print("----------------")
         _ = evaluate_pz_plans(args.datasetid, limit=args.limit)
 
         results = []
         for file in os.listdir("eval-results"):
-            if file.startswith('real-estate-eval-results') and file.endswith('.json'):
+            if file.startswith(f'{args.datasetid}-results') and file.endswith('.json'):
                 with open(f"eval-results/{file}", 'r') as f:
                     result = json.load(f)
                     results.append(result)
 
-        with open("eval-results/real-estate.json", 'w') as f:
+        with open(f"eval-results/{args.datasetid}.json", 'w') as f:
             json.dump(results, f)
 
         plot_runtime_cost_vs_quality(results, args.datasetid)

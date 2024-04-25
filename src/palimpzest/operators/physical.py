@@ -361,8 +361,9 @@ class InduceFromCandidateOp(PhysicalOp):
         # override for GPT-4V image conversion
         if self.model == Model.GPT_4V:
             # 1024x1024 image is 765 tokens
-            est_num_input_tokens = 765
-            est_num_output_tokens = inputEstimates["estOutputTokensPerElement"]
+            # TODO: revert / 10 after running real-estate demo
+            est_num_input_tokens = 765/10
+            est_num_output_tokens = inputEstimates["estOutputTokensPerElement"] / 10
 
         # if we're using a few-shot prompt strategy, the est_num_input_tokens will increase
         # by a small factor due to the added examples; we multiply after computing the
