@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from palimpzest.constants import Model
+from palimpzest.constants import Model, QueryStrategy
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.operators import (
@@ -163,7 +163,7 @@ class LogicalOperator:
             return list(map(lambda ops: ops[0], opPermutations))
 
 
-    def _createPhysicalPlans(self, shouldProfile: bool=False) -> List[PhysicalOp]:
+    def _createPhysicalPlans(self, allow_codegen: bool=False, shouldProfile: bool=False) -> List[PhysicalOp]:
         """
         Given the logical plan implied by this LogicalOperator, enumerate up to `max`
         possible physical plans and return them as a list.
@@ -190,6 +190,11 @@ class LogicalOperator:
 
         assert len(models) > 0, "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
 
+        # determine which query strategies may be used
+        query_strategies = [QueryStrategy.BONDED_WITH_FALLBACK]
+        if allow_codegen:
+            query_strategies.append(QueryStrategy.CODE_GEN_WITH_FALLBACK)
+
         # base case: this is a root op
         if self.inputOp is None:
             # NOTE: right now, the root op must be a CacheScan or BaseScan which does not require an LLM;
@@ -197,11 +202,20 @@ class LogicalOperator:
             return [self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, shouldProfile=shouldProfile)]
 
         # recursive case: get list of possible input physical plans
-        subTreePhysicalPlans = self.inputOp._createPhysicalPlans(shouldProfile)
+        subTreePhysicalPlans = self.inputOp._createPhysicalPlans(allow_codegen=allow_codegen, shouldProfile=shouldProfile)
 
         # compute (list of) physical plans for this op
         physicalPlans = []
-        if isinstance(self, ConvertScan) or isinstance(self, FilteredScan):
+        if isinstance(self, ConvertScan):
+            for model in models:
+                for qs in query_strategies:
+                    for subTreePhysicalPlan in subTreePhysicalPlans:
+                        # NOTE: failing to make a copy will lead to duplicate profile information being captured
+                        # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
+                        subTreePhysicalPlan = subTreePhysicalPlan.copy()
+                        physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, query_strategy=qs, shouldProfile=shouldProfile)
+                        physicalPlans.append(physicalPlan)
+        elif isinstance(self, FilteredScan):
             for model in models:
                 for subTreePhysicalPlan in subTreePhysicalPlans:
                     # NOTE: failing to make a copy will lead to duplicate profile information being captured
@@ -219,7 +233,7 @@ class LogicalOperator:
 
         return physicalPlans
 
-    def createPhysicalPlanCandidates(self, max: int=None, cost_estimate_sample_data: List[Dict[str, Any]]=None, shouldProfile: bool=False) -> List[PhysicalPlan]:
+    def createPhysicalPlanCandidates(self, max: int=None, cost_estimate_sample_data: List[Dict[str, Any]]=None, allow_codegen: bool=False, shouldProfile: bool=False) -> List[PhysicalPlan]:
         """Return a set of physical trees of operators."""
         # create set of logical plans (e.g. consider different filter/join orderings)
         logicalPlans = LogicalOperator._createLogicalPlans(self)
@@ -229,7 +243,7 @@ class LogicalOperator:
         physicalPlans = [
             physicalPlan
             for logicalPlan in logicalPlans
-            for physicalPlan in logicalPlan._createPhysicalPlans(shouldProfile=shouldProfile)
+            for physicalPlan in logicalPlan._createPhysicalPlans(allow_codegen=allow_codegen, shouldProfile=shouldProfile)
         ]
         print(f"INITIAL PLANS: {len(physicalPlans)}")
 
@@ -314,7 +328,7 @@ class ConvertScan(LogicalOperator):
         """Return the logical tree of this LogicalOperator."""
         return (self, self.inputOp.dumpLogicalTree())
 
-    def _getPhysicalTree(self, strategy: str=None, source: PhysicalOp=None, model: Model=None, shouldProfile: bool=False):
+    def _getPhysicalTree(self, strategy: str=None, source: PhysicalOp=None, model: Model=None, query_strategy: QueryStrategy=None, shouldProfile: bool=False):
         # TODO: dont set input op here
         # If the input is in core, and the output is NOT in core but its superclass is, then we should do a
         # 2-stage conversion. This will maximize chances that there is a pre-existing conversion to the superclass
@@ -330,6 +344,7 @@ class ConvertScan(LogicalOperator):
                                                      model,
                                                      self.cardinality,
                                                      self.image_conversion,
+                                                     query_strategy=query_strategy,
                                                      desc=self.desc,
                                                      targetCacheId=self.targetCacheId,
                                                      shouldProfile=shouldProfile)
@@ -339,6 +354,7 @@ class ConvertScan(LogicalOperator):
                                              model,
                                              self.cardinality,
                                              self.image_conversion,
+                                             query_strategy=query_strategy,
                                              desc=self.desc,
                                              targetCacheId=self.targetCacheId,
                                              shouldProfile=shouldProfile)
@@ -351,6 +367,7 @@ class ConvertScan(LogicalOperator):
                                                          model,
                                                          self.cardinality,
                                                          self.image_conversion,
+                                                         query_strategy=query_strategy,
                                                          shouldProfile=shouldProfile),
                                                      model,
                                                      "oneToOne",
@@ -365,6 +382,7 @@ class ConvertScan(LogicalOperator):
                                                  model,
                                                  self.cardinality,
                                                  self.image_conversion,
+                                                 query_strategy=query_strategy,
                                                  shouldProfile=shouldProfile),
                                              model,
                                              "oneToOne",

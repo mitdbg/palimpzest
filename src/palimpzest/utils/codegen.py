@@ -59,6 +59,7 @@ CODEGEN_PROMPT = """You are a helpful programming assistant and an expert {langu
 Notice that the evaluation will severely punish incorrect outputs. Thus, when the function is uncertain, it should return `None` to abstain instead of returning an incorrect guess.
 {advice}
 Return the implementation only."""
+# NOTE: I think examples was List[DataRecord] and is now List[dict]
 def codeGenSingle(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), advice: str=None, language='Python'):
     prompt_template = CODEGEN_PROMPT
     context = {
@@ -70,14 +71,21 @@ def codeGenSingle(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(),
         'examples_desc': "\n".join([
             EXAMPLE_PROMPT.format(
                 idx = f" {i}" if len(examples)>1 else "",
-                example_inputs = "\n".join([f"- {k} = {repr(getattr(example, k))}" for k in api.inputs]),
+                example_inputs = "\n".join([f"- {k} = {repr(example[k])}" for k in api.inputs]),
                 example_output = ""
             ) for i, example in enumerate(examples, 1)
         ]),
         'advice': f"Hint: {advice}" if advice else "",
     }
     prompt = prompt_template.format(**context)
+    print("PROMPT")
+    print("-------")
+    print(f"{prompt}")
     code, gen_stats = run_codegen(prompt, language=language)
+    print("-------")
+    print("GENERATED CODE")
+    print("---------------")
+    print(f"{code}")
     stats = CodeGenSingleStats(
         prompt_template = prompt_template,
         context = context,
@@ -96,6 +104,7 @@ Now, consider the following {language} programming task that extracts `{output}`
 {examples_desc}
 Please provide me with {n} different ideas to complete this task. Return the ideas only, following the format above.
 """
+# NOTE: I think examples was List[DataRecord] and is now List[dict]
 def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), language='Python', n_advices=4):
     prompt_template = ADVICEGEN_PROMPT
     context = {
@@ -107,7 +116,7 @@ def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), lan
         'examples_desc': "\n".join([
             EXAMPLE_PROMPT.format(
                 idx = f" {i}" if len(examples)>1 else "",
-                example_inputs = "\n".join([f"- {k} = {repr(getattr(example, k))}" for k in api.inputs]),
+                example_inputs = "\n".join([f"- {k} = {repr(example[k])}" for k in api.inputs]),
                 example_output = ""
             ) for i, example in enumerate(examples, 1)
         ]),
@@ -117,6 +126,7 @@ def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), lan
     advs, stats = run_advgen(prompt)
     return advs, stats
 
+# NOTE: I think examples was List[DataRecord] and is now List[dict]
 def reGenerationCondition(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), strategy: CodeGenStrategy=CodeGenStrategy.DEFAULT,
     code_ensemble: int=4,               # if strategy != SINGLE
     code_num_examples: int=1,           # if strategy != EXAMPLE_ENSEMBLE
@@ -131,8 +141,9 @@ def reGenerationCondition(api: API, examples: List[Dict[DataRecord, DataRecord]]
     if strategy == CodeGenStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION:
         return len(examples)%code_regenerate_frequency == 0
 
+# NOTE: I think examples was List[DataRecord] and is now List[dict]
 def codeEnsembleGeneration(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), strategy: CodeGenStrategy=CodeGenStrategy.DEFAULT,
-    code_ensemble_num: int=3,           # if strategy != SINGLE
+    code_ensemble_num: int=1,           # if strategy != SINGLE
     code_num_examples: int=1,           # if strategy != EXAMPLE_ENSEMBLE
     code_regenerate_frequency: int=200, # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION
 ) -> Tuple[Dict[str, str], CodeGenEnsembleStats]:
@@ -170,9 +181,9 @@ def codeEnsembleGeneration(api: API, examples: List[Dict[DataRecord, DataRecord]
     if strategy == CodeGenStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION:
         raise Exception("not implemented yet")
 
-def codeExecution(api: API, code: str, candidate: DataRecord, verbose:bool=False):
+def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose:bool=False):
     start_time = time.time()
-    inputs = {field_name:getattr(candidate,field_name) for field_name in api.inputs}
+    inputs = {field_name: candidate_dict[field_name] for field_name in api.inputs}
     response = api.api_execute(code, inputs)
     pred = response['response'] if response['status'] and response['response'] else None
     end_time = time.time()
@@ -183,10 +194,10 @@ def codeExecution(api: API, code: str, candidate: DataRecord, verbose:bool=False
     return pred, stats
 
 # Temporarily set default verbose to True for debugging
-def codeEnsembleExecution(api: API, code_ensemble: List[str], candidate: DataRecord, verbose:bool=True) -> Tuple[DataRecord, Dict]:
+def codeEnsembleExecution(api: API, code_ensemble: List[str], candidate_dict: Dict[str, Any], verbose:bool=True) -> Tuple[DataRecord, Dict]:
     ensemble_stats = CodeExecutionEnsembleStats(); preds = list()
     for code_name, code in code_ensemble.items():
-        pred, stats = codeExecution(api, code, candidate)
+        pred, stats = codeExecution(api, code, candidate_dict)
         preds.append(pred)
         ensemble_stats.code_versions_stats[code_name] = stats
     preds = [pred for pred in preds if pred is not None]
@@ -194,5 +205,6 @@ def codeEnsembleExecution(api: API, code_ensemble: List[str], candidate: DataRec
     if len(preds) > 0:
         majority_response = Counter(preds).most_common(1)[0][0]
         ensemble_stats.majority_response = majority_response
-        return majority_response+(" (codegen)" if verbose else ""), ensemble_stats
+        # return majority_response+(" (codegen)" if verbose else ""), ensemble_stats
+        return majority_response, ensemble_stats
     return None, ensemble_stats

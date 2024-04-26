@@ -55,6 +55,20 @@ class TextRealEstateListing(RealEstateListingFiles):
     bedrooms = pz.NumericField(desc="The number of bedrooms")
     bathrooms = pz.NumericField(desc="The number of bathrooms")
 
+class CodeGenEasyTextRealEstateListing(RealEstateListingFiles):
+    """Represents a real estate listing with specific fields extracted from its text."""
+    address = pz.StringField(desc="The address of the property")
+    price = pz.NumericField(desc="The listed price of the property")
+    sq_ft = pz.NumericField(desc="The square footage (sq. ft.) of the property")
+    bedrooms = pz.NumericField(desc="The number of bedrooms")
+    bathrooms = pz.NumericField(desc="The number of bathrooms")
+
+class CodeGenHardTextRealEstateListing(RealEstateListingFiles):
+    """Represents a real estate listing with specific fields extracted from its text."""
+    has_walk_in_closet = pz.BooleanField(desc="True if the property has a walk-in closet and False otherwise")
+    garage_spaces = pz.NumericField(desc="The number of garage spaces the property has")
+    has_city_view = pz.BooleanField(desc="True if the propery has a view of the city and False otherwise")
+
 class ImageRealEstateListing(RealEstateListingFiles):
     """Represents a real estate listing with specific fields extracted from its text and images."""
     is_modern_and_attractive = pz.BooleanField(desc="True if the home interior is modern and attractive and False otherwise")
@@ -77,7 +91,8 @@ class RealEstateListingSource(pz.UserSource):
             for file in files:
                 bytes_data = open(os.path.join(root, file), "rb").read()
                 if file.endswith('.txt'):
-                    dr.text_content = str(bytes_data)
+                    dr.text_content = bytes_data.decode("utf-8")
+                    # dr.text_content = str(bytes_data)
                 elif file.endswith('.png'):
                     dr.image_contents.append(bytes_data)
             yield dr
@@ -115,6 +130,8 @@ def score_plan(datasetid, records) -> float:
         preds = records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
     elif "real-estate" in datasetid:
         preds = list(records_df.listing)
+    elif "codegen" in datasetid:
+        preds = list(records_df.listing)
 
     # get groundtruth
     gt_df = None
@@ -124,11 +141,19 @@ def score_plan(datasetid, records) -> float:
         gt_df = pd.read_csv("testdata/groundtruth/enron-eval-tiny.csv")
     elif "real-estate" in datasetid:
         gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval.csv")
+    elif "codegen-easy" in datasetid:
+        gt_df = pd.read_csv("testdata/groundtruth/codegen-easy-eval.csv")
+    elif "codegen-hard" in datasetid:
+        gt_df = pd.read_csv("testdata/groundtruth/codegen-hard-eval.csv")
 
     targets = None
     if "enron" in datasetid:
         targets = list(gt_df[gt_df.label == 1].filename)
     elif "real-estate" in datasetid:
+        targets = list(gt_df[gt_df.label == 1].listing)
+    elif "codegen-easy" in datasetid:
+        targets = list(gt_df[gt_df.label == 1].listing)
+    elif "codegen-hard" in datasetid:
         targets = list(gt_df[gt_df.label == 1].listing)
 
     # compute true and false positives
@@ -243,7 +268,7 @@ def run_pz_plan(datasetid, plan, idx):
     # score plan based on its output records
     _, _, f1_score = score_plan(datasetid, records)
 
-    plan_info = {"models": [], "op_names": [], "generated_fields": []}
+    plan_info = {"models": [], "op_names": [], "generated_fields": [], "query_strategies": []}
     cost = 0.0
     stats = sp.profiling_data
     while stats is not None:
@@ -251,6 +276,7 @@ def run_pz_plan(datasetid, plan, idx):
         plan_info["models"].append(stats.model_name)
         plan_info["op_names"].append(stats.op_name)
         plan_info["generated_fields"].append(stats.generated_fields)
+        plan_info["query_strategies"].append(stats.query_strategy)
         stats = stats.source_op_stats
 
     # compute label
@@ -300,7 +326,6 @@ def evaluate_pz_plans(datasetid, reoptimize=False, limit=None):
             except:
                 return False
 
-        # TODO: update logical plan creation to consider swapping (pairs of) (convert and filter)
         listings = pz.Dataset(datasetid, schema=RealEstateListingFiles)
         listings = listings.convert(TextRealEstateListing, depends_on="text_content")
         listings = listings.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_contents")
@@ -312,6 +337,96 @@ def evaluate_pz_plans(datasetid, reoptimize=False, limit=None):
         listings = listings.filterByFn(in_price_range, depends_on="price")
         logicalTree = listings.getLogicalTree()
 
+    elif "codegen-easy" in datasetid:
+        # address
+        def within_two_miles_of_mit(record):
+            # NOTE: I'm using this hard-coded function so that folks w/out a
+            #       Geocoding API key from google can still run this example
+            try:
+                far_away_addrs = ["Melcher St", "Sleeper St", "437 D St", "Seaport", "Liberty"]
+                if any([street.lower() in record.address.lower() for street in far_away_addrs]):
+                    return False
+                return True
+            except:
+                return False
+
+        # price
+        def in_price_range(record):
+            try:
+                price = record.price
+                if type(price) == str:
+                    price = price.strip()
+                    price = int(price.replace("$","").replace(",",""))
+                return price <= 3e6
+            except:
+                return False
+
+        # sq_ft
+        def big_enough(record):
+            try:
+                sq_ft = record.sq_ft
+                if type(sq_ft) == str:
+                    sq_ft = sq_ft.strip()
+                    sq_ft = int(sq_ft.replace(",",""))
+                return sq_ft > 550
+            except:
+                return False
+
+        # bedrooms
+        def one_bed(record):
+            try:
+                bedrooms = record.bedrooms
+                if type(bedrooms) == str:
+                    bedrooms = float(bedrooms.strip())
+                return bedrooms == 1
+            except:
+                return False
+
+        listings = pz.Dataset(datasetid, schema=RealEstateListingFiles)
+        listings = listings.convert(CodeGenEasyTextRealEstateListing, depends_on="text_content")
+        listings = listings.filterByFn(within_two_miles_of_mit)
+        listings = listings.filterByFn(in_price_range)
+        listings = listings.filterByFn(big_enough)
+        listings = listings.filterByFn(one_bed)
+        logicalTree = listings.getLogicalTree()
+
+    elif "codegen-hard" in datasetid:
+        def has_walk_in_closet(record):
+            try:
+                has_walk_in_closet = record.has_walk_in_closet
+                if type(has_walk_in_closet) == str:
+                    has_walk_in_closet = float(has_walk_in_closet.strip())
+                return has_walk_in_closet >= 0.01
+            except:
+                return False
+
+        # garage space
+        def one_garage_space(record):
+            try:
+                garage_spaces = record.garage_spaces
+                if type(garage_spaces) == str:
+                    garage_spaces = int(garage_spaces.strip())
+                return garage_spaces == 1
+            except:
+                return False
+
+        # has deck or not
+        def has_city_view(record):
+            try:
+                has_city_view = record.has_city_view
+                if type(has_city_view) == str:
+                    has_city_view = True if has_city_view.lower() == "true" else False
+                return has_city_view
+            except:
+                return False
+
+        listings = pz.Dataset(datasetid, schema=RealEstateListingFiles)
+        listings = listings.convert(CodeGenHardTextRealEstateListing, depends_on="text_content")
+        listings = listings.filterByFn(has_walk_in_closet)
+        listings = listings.filterByFn(one_garage_space)
+        listings = listings.filterByFn(has_city_view)
+        logicalTree = listings.getLogicalTree()
+
     # NOTE: the following weird iteration over physical plans by idx is intentional and necessary
     #       at the moment in order for stats collection to work properly. For some yet-to-be-discovered
     #       reason, `createPhysicalPlanCandidates` is creating physical plans which share the same
@@ -321,17 +436,20 @@ def evaluate_pz_plans(datasetid, reoptimize=False, limit=None):
     #       iteration to ensure that they are new.
  
     # get total number of plans
-    num_plans = len(logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True))
-
+    allow_codegen = "codegen" in datasetid
+    # num_plans = len(logicalTree.createPhysicalPlanCandidates(max=limit, allow_codegen=allow_codegen, shouldProfile=True))
+    num_plans = 4
     results = []
     for idx in range(num_plans):
+        if idx != 1:
+            continue
     # for idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
         # skip all-Gemini plan which opens too many files
         # if "enron" in datasetid and idx == 17:
         #     continue
 
         # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
-        candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True)
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, allow_codegen=allow_codegen, shouldProfile=True)
         _, _, _, plan = candidatePlans[idx]
 
         # workaround to disabling cache: delete all cached generations after each plan
@@ -382,6 +500,11 @@ def plot_runtime_cost_vs_quality(results, datasetid):
         generated_fields = (
             result_dict["plan_info"]["generated_fields"]
             if "plan_info" in result_dict
+            else None
+        )
+        query_strategies = (
+            result_dict["plan_info"]["query_strategies"]
+            if "plan_info" in result_dict and "query_strategies" in result_dict
             else None
         )
 
@@ -437,6 +560,21 @@ def plot_runtime_cost_vs_quality(results, datasetid):
             elif image_then_text:
                 text += "-IMAGE-FIRST"
 
+        elif "codegen" in datasetid:
+            text = ""
+            if all([model is None or "gpt-4" in model for model in models]):
+                # add text for ALL-GPT4
+                text = "ALL-GPT4"
+            if all([model is None or "mistralai" in model for model in models]):
+                # add text for ALL-MIXTRAL
+                text = "ALL-MIXTRAL"
+            if all([model is None or "gemini" in model for model in models]):
+                # add text for ALL-GEMINI
+                text = "ALL-GEMINI"
+            
+            if text == "" and any(["codegen" in qs.value for qs in query_strategies]):
+                text = "CODEGEN"
+
         # set label and color
         color = None
         marker = None
@@ -470,6 +608,20 @@ def plot_runtime_cost_vs_quality(results, datasetid):
                 cost_va = 'bottom' if f1_score < 0.8 else 'top'
                 axs[0].annotate(text, (f1_score, runtime), ha=ha, va=runtime_va)
                 axs[1].annotate(text, (f1_score, cost), ha=ha, va=cost_va)
+            
+            # elif "codegen-easy" in datasetid and (f1_score > 0.8 or runtime < 100):
+            #     ha = 'left' if f1_score < 0.8 else 'right'
+            #     runtime_va = 'bottom' if runtime < 100 else 'top'
+            #     cost_va = 'bottom' if f1_score < 0.8 else 'top'
+            #     axs[0].annotate(text, (f1_score, runtime), ha=ha, va=runtime_va)
+            #     axs[1].annotate(text, (f1_score, cost), ha=ha, va=cost_va)
+            
+            # elif "codegen-hard" in datasetid and (f1_score > 0.8 or runtime < 100):
+            #     ha = 'left' if f1_score < 0.8 else 'right'
+            #     runtime_va = 'bottom' if runtime < 100 else 'top'
+            #     cost_va = 'bottom' if f1_score < 0.8 else 'top'
+            #     axs[0].annotate(text, (f1_score, runtime), ha=ha, va=runtime_va)
+            #     axs[1].annotate(text, (f1_score, cost), ha=ha, va=cost_va)
 
     # savefig
     axs[0].set_title("Runtime and Cost vs. F1 Score")
@@ -536,4 +688,48 @@ if __name__ == "__main__":
         with open(f"eval-results/{args.datasetid}.json", 'w') as f:
             json.dump(results, f)
 
+        plot_runtime_cost_vs_quality(results, args.datasetid)
+
+    if args.eval == "codegen-easy":
+        # register user data source
+        print("Registering Datasource")
+        pz.DataDirectory().registerUserSource(RealEstateListingSource(args.datasetid, args.listings_dir), args.datasetid)
+
+        # get PZ plan metrics
+        print("Running PZ Plans")
+        print("----------------")
+        _ = evaluate_pz_plans(args.datasetid, limit=args.limit)
+
+        results = []
+        for file in os.listdir("eval-results"):
+            if file.startswith(f'{args.datasetid}-results') and file.endswith('.json'):
+                with open(f"eval-results/{file}", 'r') as f:
+                    result = json.load(f)
+                    results.append(result)
+
+        with open(f"eval-results/{args.datasetid}.json", 'w') as f:
+            json.dump(results, f)
+ 
+        plot_runtime_cost_vs_quality(results, args.datasetid)
+    
+    if args.eval == "codegen-hard":
+        # register user data source
+        print("Registering Datasource")
+        pz.DataDirectory().registerUserSource(RealEstateListingSource(args.datasetid, args.listings_dir), args.datasetid)
+
+        # get PZ plan metrics
+        print("Running PZ Plans")
+        print("----------------")
+        _ = evaluate_pz_plans(args.datasetid, limit=args.limit)
+
+        results = []
+        for file in os.listdir("eval-results"):
+            if file.startswith(f'{args.datasetid}-results') and file.endswith('.json'):
+                with open(f"eval-results/{file}", 'r') as f:
+                    result = json.load(f)
+                    results.append(result)
+
+        with open(f"eval-results/{args.datasetid}.json", 'w') as f:
+            json.dump(results, f)
+ 
         plot_runtime_cost_vs_quality(results, args.datasetid)

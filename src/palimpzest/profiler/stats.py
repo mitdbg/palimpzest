@@ -79,6 +79,8 @@ class OperatorStats:
     answers: List[str]=field(default_factory=list)
     # list of lists of token log probabilities for the subset of tokens that comprise the answer
     answer_log_probs: List[List[float]]=field(default_factory=list)
+    # the query strategy used
+    query_strategy: str=None
 
     #################################################
     ##### Field for Induce w/Conventional Query #####
@@ -229,6 +231,8 @@ class FullCodeGenStats(Stats):
 @dataclass
 class InduceLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from an induce w/LLM operation."""
+    # query strategy used
+    query_strategy: str=None
     # stats from bonded query
     bonded_query_stats: BondedQueryStats=None
     # stats from conventional query
@@ -471,6 +475,9 @@ class StatsProcessor:
             # - ConventionalQueryStats
             # - FullCodeGenStats
             elif isinstance(stats, InduceLLMStats):
+                # set query strategy
+                profiling_data.query_strategy = stats.query_strategy
+
                 # process bonded query stats
                 bonded_query_stats = stats.bonded_query_stats
                 if bonded_query_stats is not None:

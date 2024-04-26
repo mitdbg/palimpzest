@@ -228,7 +228,10 @@ class Solver:
 
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
-                    dr._stats[td.op_id] = InduceLLMStats(conventional_query_stats=conventional_query_stats)
+                    dr._stats[td.op_id] = InduceLLMStats(
+                        query_strategy=td.query_strategy.value,
+                        conventional_query_stats=conventional_query_stats,
+                    )
 
                 return [dr]
 
@@ -246,7 +249,10 @@ class Solver:
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     for dr in drs:
-                        dr._stats[td.op_id] = InduceLLMStats(bonded_query_stats=bonded_query_stats)
+                        dr._stats[td.op_id] = InduceLLMStats(
+                            query_strategy=td.query_strategy.value,
+                            bonded_query_stats=bonded_query_stats,
+                        )
 
                 return drs
 
@@ -264,6 +270,7 @@ class Solver:
                 if shouldProfile:
                     for dr in drs:
                         dr._stats[td.op_id] = InduceLLMStats(
+                            query_strategy=td.query_strategy.value,
                             bonded_query_stats=bonded_query_stats,
                             conventional_query_stats=conventional_query_stats,
                         )
@@ -277,7 +284,10 @@ class Solver:
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     for dr in drs:
-                        dr._stats[td.op_id] = InduceLLMStats(full_code_gen_stats=full_code_gen_stats)
+                        dr._stats[td.op_id] = InduceLLMStats(
+                            query_strategy=td.query_strategy.value,
+                            full_code_gen_stats=full_code_gen_stats,
+                        )
 
                 return drs
 
@@ -296,7 +306,11 @@ class Solver:
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     for dr in drs:
-                        dr._stats[td.op_id] = InduceLLMStats(full_code_gen_stats=full_code_gen_stats, conventional_query_stats=conventional_query_stats)
+                        dr._stats[td.op_id] = InduceLLMStats(
+                            query_strategy=td.query_strategy.value,
+                            full_code_gen_stats=full_code_gen_stats,
+                            conventional_query_stats=conventional_query_stats,
+                        )
 
                 return drs
 

@@ -85,9 +85,11 @@ class API:
             self.env = Sandbox(codes=self.config['env'])
     
     @classmethod
-    def from_task_descriptor(cls, td, field_name):
+    def from_task_descriptor(cls, td, field_name, input_fields=None):
         name, inputs, outputs = "extraction", list(), list()
-        for input_field_name in td.inputSchema.fieldNames():
+        if input_fields is None:
+            input_fields = td.inputSchema.fieldNames()
+        for input_field_name in input_fields:
             inputs.append({'name':input_field_name, 'desc':getattr(td.inputSchema,input_field_name).desc})
         outputs = [{'name':field_name, 'desc':getattr(td.outputSchema,field_name).desc}]
         return cls(name=name, inputs=inputs, outputs=outputs)
