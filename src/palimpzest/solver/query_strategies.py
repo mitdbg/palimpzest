@@ -2,7 +2,7 @@ from palimpzest.datamanager import DataDirectory
 from palimpzest.constants import PromptStrategy, CodeGenStrategy
 from palimpzest.elements import DataRecord
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats, CodeGenEnsembleStats, FullCodeGenStats
+from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats, CodeGenEnsembleStats, FullCodeGenStats, GenerationStats
 from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.utils import API, codeEnsembleGeneration, codeEnsembleExecution, reGenerationCondition
 
@@ -12,7 +12,7 @@ import base64
 import json
 
 
-def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_names: List[str]) -> str:
+def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_names: List[str], is_conventional: bool=False) -> str:
     """
     This function constructs the prompt for a bonded query.
     """
@@ -33,18 +33,22 @@ def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_na
     optionalOutputDesc = "" if td.outputSchema.__doc__ is None else f"Here is a description of the output object: {td.outputSchema.__doc__}."
 
     # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
-    targetOutputDescriptor = "an output JSON object that describes an object of type"
+    targetOutputDescriptor = f"an output JSON object that describes an object of type {doc_type}."
     outputSingleOrPlural = "the output object"
     appendixInstruction = "Be sure to emit a JSON object only"
     if td.cardinality == "oneToMany":
-        targetOutputDescriptor = "an output array of zero or more JSON objects that describe objects of type"
+        targetOutputDescriptor = f"an output array of zero or more JSON objects that describe objects of type {doc_type}."
         outputSingleOrPlural = "the output objects"
         appendixInstruction = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields described above. You must decide the correct number of output objects."
+
+    # if this is a conventional query, focus only on generating output field
+    if is_conventional:
+        targetOutputDescriptor = f"an output JSON object with a single key \"{generate_field_names[0]}\" whose value is specified in the input object."
 
     # construct promptQuestion
     promptQuestion = None
     if td.prompt_strategy != PromptStrategy.IMAGE_TO_TEXT:
-        promptQuestion = f"""I would like you to create {targetOutputDescriptor} {doc_type}. 
+        promptQuestion = f"""I would like you to create {targetOutputDescriptor}. 
         You will use the information in an input JSON object that I will provide. The input object has type {td.inputSchema.className()}.
         All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
         {optionalInputDesc}
@@ -52,18 +56,18 @@ def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_na
         Here is every input field name and a description: 
         {multilineInputFieldDescription}
         Here is every output field name and a description:
-        {multilineOutputFieldDescription}.
+        {multilineOutputFieldDescription}
         {appendixInstruction}
         """ + "" if td.conversionDesc is None else f" Keep in mind that this process is described by this text: {td.conversionDesc}."                
 
     else:
-        promptQuestion = f"""You are an image analysis bot. Analyze the supplied image and create {targetOutputDescriptor} {doc_type}.
-        You will use the information in the image that I will provide. The input image has type {td.inputSchema.className()}.
-        All of the fields in {outputSingleOrPlural} can be derived using information from the input image.
+        promptQuestion = f"""You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor} {doc_type}.
+        You will use the information in the image that I will provide. The input image(s) has type {td.inputSchema.className()}.
+        All of the fields in {outputSingleOrPlural} can be derived using information from the input image(s).
         {optionalInputDesc}
         {optionalOutputDesc}
         Here is every output field name and a description:
-        {multilineOutputFieldDescription}.
+        {multilineOutputFieldDescription}
         {appendixInstruction}
         """ + "" if td.conversionDesc is None else f" Keep in mind that this process is described by this text: {td.conversionDesc}." 
 
@@ -159,12 +163,17 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
             )
 
         elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
-            # b64 decode of candidate.contents
-            image_b64 = base64.b64encode(candidate.contents).decode('utf-8')
+            # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
+            # b64 decode of candidate.contents or candidate.image_contents
+            base64_images = []
+            if hasattr(candidate, "contents"):
+                base64_images = [base64.b64encode(candidate.contents).decode('utf-8')]
+            else:
+                base64_images = [base64.b64encode(image).decode('utf-8') for image in candidate.image_contents]
 
             # invoke LLM to generate output JSON
             generator = ImageTextGenerator(td.model.value)
-            answer, gen_stats = generator.generate(image_b64, promptQuestion)
+            answer, gen_stats = generator.generate(base64_images, promptQuestion)
 
             # construct BondedQueryStats object
             bonded_query_stats = BondedQueryStats(
@@ -230,6 +239,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
     for field_name in generate_field_names:
         # construct prompt question
         promptQuestion = _construct_query_prompt(td, doc_type, [field_name])
+        field_stats = None
         try:
             field_stats = None
             if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
@@ -238,12 +248,17 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
                 answer, field_stats = generator.generate(text_content, promptQuestion)
 
             elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:                               
-                # b64 decode of candidate.contents
-                image_b64 = base64.b64encode(candidate.contents).decode('utf-8')
+                # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
+                # b64 decode of candidate.contents or candidate.image_contents
+                base64_images = []
+                if hasattr(candidate, "contents"):
+                    base64_images = [base64.b64encode(candidate.contents).decode('utf-8')]
+                else:
+                    base64_images = [base64.b64encode(image).decode('utf-8') for image in candidate.image_contents]
 
                 # invoke LLM to generate output JSON
                 generator = ImageTextGenerator(td.model.value)
-                answer, field_stats = generator.generate(image_b64, promptQuestion)
+                answer, field_stats = generator.generate(base64_images, promptQuestion)
 
             # TODO
             elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:
@@ -253,19 +268,17 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
             elif td.prompt_strategy == PromptStrategy.FEW_SHOT:
                 raise Exception("not implemented yet")
 
-            # parse JSON object from the answer
-            jsonObj = _get_JSON_from_answer(answer)
-
-            # set the DataRecord's field with its generated value
-            setattr(dr, field_name, jsonObj[field_name])
-
             # update query_stats
             query_stats[f"{field_name}"] = field_stats
+
+            # extract result from JSON and set the DataRecord's field with its generated value
+            jsonObj = _get_JSON_from_answer(answer)
+            setattr(dr, field_name, jsonObj[field_name])
 
         except Exception as e:
             print(f"Conventional field processing error: {e}")
             setattr(dr, field_name, None)
-            query_stats[f"{field_name}"] = None
+            query_stats[f"{field_name}"] = field_stats
 
     # construct ConventionalQueryStats object
     field_query_stats_lst = [FieldQueryStats(gen_stats=gen_stats, field_name=field_name) for field_name, gen_stats in query_stats.items()]

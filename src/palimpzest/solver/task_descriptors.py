@@ -18,6 +18,8 @@ class TaskDescriptor:
     model: Model = None
     # the cardinality ("oneToOne" or "oneToMany") of the operation
     cardinality: str = None
+    # whether or not the task is an image conversion task
+    image_conversion: bool = None
     # the prompt strategy
     prompt_strategy: PromptStrategy = None
     # the query strategy
