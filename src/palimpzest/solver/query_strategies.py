@@ -243,6 +243,8 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
         try:
             field_stats = None
             if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+                print(f"FALL BACK FIELD: {field_name}")
+                print("---------------")
                 # invoke LLM to generate output JSON
                 generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
                 answer, field_stats = generator.generate(text_content, promptQuestion)
@@ -319,15 +321,27 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
             examples = cache.getCachedData("codeSamples", code_ensemble_id)
         else:
             code_ensemble, gen_stats, examples = dict(), None, list()
-        examples.append(candidate)
+
+        # remove bytes data from candidate
+        candidate_dict = candidate.asDict(include_bytes=False)
+        candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
+
+        examples.append(candidate_dict)
         cache.putCachedData("codeSamples", code_ensemble_id, examples)
-        api = API.from_task_descriptor(td, field_name)
+        api = API.from_task_descriptor(td, field_name, input_fields=candidate_dict.keys())
         if len(code_ensemble)==0 or reGenerationCondition(api, examples=examples):
             code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples)
             cache.putCachedData("codeEnsemble", code_ensemble_id, (code_ensemble, gen_stats))
-        answer, exec_stats = codeEnsembleExecution(api, code_ensemble, candidate)
+
+        for code_name, code in code_ensemble.items():
+            print(f"CODE NAME: {code_name}")
+            print("-----------------------")
+            print(code)
+
+        answer, exec_stats = codeEnsembleExecution(api, code_ensemble, candidate_dict)
         full_code_gen_stats.code_gen_stats[field_name] = gen_stats
         full_code_gen_stats.code_exec_stats[field_name] = exec_stats
+        print(f'SETTING {field_name} to be {answer}')
         setattr(dr, field_name, answer)
 
     return dr, full_code_gen_stats

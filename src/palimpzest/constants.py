@@ -35,7 +35,7 @@ class QueryStrategy(Enum):
     QueryStrategy describes the high-level approach to querying a Model (or generated code)
     in order to perform a specified task.
     """
-    DEFAULT = "codegen-with-fallback" # "bonded" # 
+    DEFAULT = "bonded-with-fallback" # "codegen-with-fallback"
     CONVENTIONAL = "conventional"
     BONDED = "bonded"
     BONDED_WITH_FALLBACK = "bonded-with-fallback"

@@ -269,7 +269,7 @@ class InduceFromCandidateOp(PhysicalOp):
             PhysicalOp.synthesizedFns[str(taskDescriptor)] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
-        return "InduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
+        return "InduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value) + ", Query Strategy: " + str(self.query_strategy.value) + ")"
 
     def _makeTaskDescriptor(self):
         return TaskDescriptor(
@@ -385,6 +385,12 @@ class InduceFromCandidateOp(PhysicalOp):
             model_conversion_time_per_record *= DSPY_TIME_INFLATION
             model_conversion_usd_per_record *= DSPY_COST_INFLATION
 
+        # TODO: make this better after arxiv; right now codegen is hard-coded to use GPT-4
+        # if we're using code generation, assume that model conversion time and cost are low
+        if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
+            model_conversion_time_per_record = 1e-5
+            model_conversion_usd_per_record = 1e-4  # amortize code gen cost across records
+
         # estimate cardinality and selectivity given the "cardinality" set by the user
         selectivity = 1.0 if self.cardinality != "oneToMany" else 2.0
         cardinality = selectivity * inputEstimates["cardinality"]
@@ -404,6 +410,11 @@ class InduceFromCandidateOp(PhysicalOp):
 
         # estimate quality of output based on the strength of the model being used
         quality = (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * inputEstimates["quality"]
+
+        # TODO: make this better after arxiv; right now codegen is hard-coded to use GPT-4
+        # if we're using code generation, assume that quality goes down (or view it as E[Quality] = (p=gpt4[code])*1.0 + (p=0.25)*0.0))
+        if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
+            quality = quality * GPT_4_MODEL_CARD["code"]
 
         return {
             "cardinality": cardinality,
@@ -484,7 +495,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             PhysicalOp.synthesizedFns[str(taskDescriptor)] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
-        return "ParallelInduceFromCandidateOp(" + str(self.outputSchema) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
+        return "ParallelInduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value) + ", Query Strategy: " + str(self.query_strategy.value) + ")"
 
     def _makeTaskDescriptor(self):
         return TaskDescriptor(
@@ -602,6 +613,12 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             model_conversion_time_per_record *= DSPY_TIME_INFLATION
             model_conversion_usd_per_record *= DSPY_COST_INFLATION
 
+        # TODO: make this better after arxiv; right now codegen is hard-coded to use GPT-4
+        # if we're using code generation, assume that model conversion time and cost are low
+        if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
+            model_conversion_time_per_record = 1e-5
+            model_conversion_usd_per_record = 1e-4  # amortize code gen cost across records
+
         # estimate cardinality and selectivity given the "cardinality" set by the user
         selectivity = 1.0 if self.cardinality != "oneToMany" else 2.0
         cardinality = selectivity * inputEstimates["cardinality"]
@@ -617,6 +634,11 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
 
         # estimate quality of output based on the strength of the model being used
         quality = (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * inputEstimates["quality"]
+
+        # TODO: make this better after arxiv; right now codegen is hard-coded to use GPT-4
+        # if we're using code generation, assume that quality goes down (or view it as E[Quality] = (p=gpt4[code])*1.0 + (p=0.25)*0.0))
+        if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
+            quality = quality * GPT_4_MODEL_CARD["code"]
 
         return {
             "cardinality": cardinality,
