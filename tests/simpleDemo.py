@@ -364,6 +364,15 @@ if __name__ == "__main__":
         print("----------")
         print()
         printTable(records, cols=["sender", "subject"], gradio=True, plan=physicalTree)
+
+        # if profiling was turned on; capture statistics
+        if args.profile:
+            profiling_data = physicalTree.getProfilingData()
+            sp = StatsProcessor(profiling_data)
+
+            with open('profiling-data/enron-profiling.json', 'w') as f:
+                json.dump(sp.profiling_data.to_dict(), f)
+
     elif task == "enronGby":
         rootSet = enronGbyPlan(datasetid)
         physicalTree = emitDataset(rootSet, policy, title="Enron email counts", verbose=args.verbose)

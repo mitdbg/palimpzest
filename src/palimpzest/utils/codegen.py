@@ -132,7 +132,7 @@ def reGenerationCondition(api: API, examples: List[Dict[DataRecord, DataRecord]]
         return len(examples)%code_regenerate_frequency == 0
 
 def codeEnsembleGeneration(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), strategy: CodeGenStrategy=CodeGenStrategy.DEFAULT,
-    code_ensemble_num: int=4,           # if strategy != SINGLE
+    code_ensemble_num: int=3,           # if strategy != SINGLE
     code_num_examples: int=1,           # if strategy != EXAMPLE_ENSEMBLE
     code_regenerate_frequency: int=200, # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION
 ) -> Tuple[Dict[str, str], CodeGenEnsembleStats]:
