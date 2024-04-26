@@ -18,6 +18,9 @@ class Model(Enum):
     GEMINI_1 = "gemini-1.0-pro-001"
     GEMINI_1V = "gemini-1.0-pro-vision-latest"
 
+    def __repr__(self):
+        return f'{self.name}'
+    
 class PromptStrategy(Enum):
     """
     PromptStrategy describes the prompting technique to be used by a Generator when

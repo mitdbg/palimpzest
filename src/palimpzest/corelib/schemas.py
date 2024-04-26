@@ -45,9 +45,9 @@ class XLSFile(File):
     number_sheets = NumericField(desc="The number of sheets in the Excel file", required=True)
     sheet_names = ListField(element_type=NumericField, desc="The names of the sheets in the Excel file", required=True)
 
-class TabularRow(Schema):  
-    """A Row is a list of cells. For simplicity, we assume that all cell values are strings."""
-    cells = ListField(element_type=StringField, desc="The cells in the row", required=True)
+# class TabularRow(Schema):  
+    # """A Row is a list of cells. For simplicity, we assume that all cell values are strings."""
+    # cells = ListField(element_type=StringField, desc="The cells in the row", required=True)
 
 class Table(Schema):
     """A Table is an object composed of a header and rows."""

@@ -40,6 +40,13 @@ class PhysicalOp:
 
     def opId(self) -> str:
         raise NotImplementedError("Abstract method")
+    
+    def is_hardcoded(self) -> bool:
+        if self.source is None:
+            return True
+        in_schema = self.source.outputSchema
+        out_schema = self.outputSchema
+        return (out_schema, in_schema) in self.solver._hardcodedFns
 
     def dumpPhysicalTree(self) -> Tuple[PhysicalOp, Union[PhysicalOp, None]]:
         """Return the physical tree of operators."""
@@ -273,7 +280,7 @@ class InduceFromCandidateOp(PhysicalOp):
         )
         # This code checks if the function has been synthesized before, and if so, whether it is hardcoded. If so, set model and prompt_strategy to None.
         if td.op_id in PhysicalOp.synthesizedFns:
-            if (td.outputSchema, td.inputSchema) in PhysicalOp.solver._hardcodedFns:
+            if self.is_hardcoded():
                 td.model = None
                 td.prompt_strategy = None
 

@@ -2,7 +2,7 @@ from io import BytesIO
 import numpy as np
 from palimpzest.constants import PromptStrategy, QueryStrategy
 from palimpzest.elements import DataRecord, File, TextFile, Schema
-from palimpzest.corelib import EquationImage, ImageFile, PDFFile, Download, XLSFile, Table, TabularRow
+from palimpzest.corelib import EquationImage, ImageFile, PDFFile, Download, XLSFile, Table
 from palimpzest.generators import DSPyGenerator
 from palimpzest.profiler import ApiStats, FilterLLMStats, InduceLLMStats, InduceNonLLMStats
 from palimpzest.solver.query_strategies import runBondedQuery, runConventionalQuery, runCodeGenQuery
@@ -202,9 +202,9 @@ class Solver:
                     for row in dataframe.values[:100]: # TODO Extend this with dynamic sizing of context length
                         row_record = [str(x) for x in row]
                         rows += [row_record]
-                    dr.rows = np.asarray(rows)
+                    dr.rows = rows
                     dr.filename = candidate.filename
-                    dr.header = dataframe.columns.values
+                    dr.header = dataframe.columns.values.tolist()
                     dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
 
                     if shouldProfile:

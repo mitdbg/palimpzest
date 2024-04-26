@@ -24,7 +24,6 @@ import pdb
 from sklearn.metrics import precision_recall_fscore_support
 
 IN_DIR= "testdata/biofabric-matching/"
-RESULT_PATH = "eval-results/biofabric/"
 
 # def evaluate_matching():
 
@@ -65,71 +64,93 @@ def compute_label(physicalTree, label_idx):
     physicalOps = physicalTree.dumpPhysicalTree()
     label = buildNestedStr(physicalOps)
     print(f"LABEL {label_idx}: {label}")
-    return f"PZ-{label_idx}"
+
+    flat = flatten_nested_tuples(physicalOps)
+    ops = [op for op in flat if not op.is_hardcoded()]
+    label = "-".join([repr(op.model) for op in ops])
+    return f"PZ-{label_idx}-{label}"
 
 
-def score_biofabric_plan(records) -> float:
+def score_biofabric_plans(result_dir) -> float:
     """
-    Computes the F1 score of the biofabric plan
+    Computes the results of all biofabric plans
     """
-    # parse records
-    output_rows = []
-    for rec in records:
-        dct = rec.asDict()
-        output_rows.append(dct) 
-    records_df = pd.DataFrame(output_rows)
 
-    if records_df.empty:
-        return 0.0, 0.0, 0.0
-
-    output = records_df
-    index = [x for x in output.columns if x != "study"]
-    target_matching = pd.read_csv(os.path.join(RESULT_PATH, "target_matching.csv"), index_col=0).reindex(index)
-
-    studies = output["study"].unique()
-    # Group by output by the "study" column and split it into many dataframes indexed by the "study" column
-    df = pd.DataFrame(columns=target_matching.columns, index = index)
-    cols = output.columns
-    predicted = []
-    targets = []
-
-    for study in studies:
-        output_study = output[output["study"] == study]
-        study = study.split(".xlsx")[0]
-        try:
-            input_df = pd.read_excel(os.path.join(IN_DIR, f"{study}.xlsx"))
-        except:
-            targets += [study]*5 
-            predicted += ["missing"]*5
+    results = []
+    for file in os.listdir(result_dir):
+        if not file.endswith(".json"):
             continue
-        # for every column in output_study, check which column in input_df is the closest, i.e. the one with the highest number of matching values
-        for col in cols:
-            if col == "study":
+
+        stats_dict = json.load(open(f"{result_dir}/{file}"))
+        records = stats_dict["records"]
+        
+        # parse records
+        exclude_keys = ["filename", "op_id", "uuid", "parent_uuid", "stats"]
+        output_rows = []
+        for rec in records:
+            dct = {k:v for k,v in rec.items() if k not in exclude_keys}
+            filename = os.path.basename(rec["filename"])
+            dct["study"] = filename.split("_")[0]
+            output_rows.append(dct) 
+        records_df = pd.DataFrame(output_rows)
+
+        if records_df.empty:
+            stats_dict["f1_score"] = 0
+            results.append(stats_dict)
+            continue
+
+        output = records_df
+        index = [x for x in output.columns if x != "study"]
+        target_matching = pd.read_csv(os.path.join(RESULT_PATH, "target_matching.csv"), index_col=0).reindex(index)
+
+        studies = output["study"].unique()
+        # Group by output by the "study" column and split it into many dataframes indexed by the "study" column
+        df = pd.DataFrame(columns=target_matching.columns, index = index)
+        cols = output.columns
+        predicted = []
+        targets = []
+
+        for study in studies:
+            output_study = output[output["study"] == study]
+            study = study.split(".xlsx")[0]
+            try:
+                input_df = pd.read_excel(os.path.join(IN_DIR, f"{study}.xlsx"))
+            except:
+                print("Cannot find the study", study)
+                targets += [study]*5 
+                predicted += ["missing"]*5
                 continue
-            max_matches = 0
-            max_col = "missing"
-            for input_col in input_df.columns:
-                try:
-                    matches = sum([1 for idx,x in enumerate(output_study[col]) if x == input_df[input_col]
-                    [idx]])
-                except:
-                    pdb.set_trace()
-                if matches > max_matches:
-                    max_matches = matches
-                    max_col = input_col
-            df.loc[col, study] = max_col
+            # for every column in output_study, check which column in input_df is the closest, i.e. the one with the highest number of matching values
+            for col in cols:
+                if col == "study":
+                    continue
+                max_matches = 0
+                max_col = "missing"
+                for input_col in input_df.columns:
+                    try:
+                        matches = sum([1 for idx,x in enumerate(output_study[col]) if x == input_df[input_col]
+                        [idx]])
+                    except:
+                        pdb.set_trace()
+                    if matches > max_matches:
+                        max_matches = matches
+                        max_col = input_col
+                df.loc[col, study] = max_col
 
-            # build a matrix that has the study on the columns and the predicted column names on the rows
-        df.fillna("missing", inplace=True)
+                # build a matrix that has the study on the columns and the predicted column names on the rows
+            df.fillna("missing", inplace=True)
 
-        targets += list(target_matching[study].values)
-        predicted += list(df[study].values)
+            targets += list(target_matching[study].values)
+            predicted += list(df[study].values)
 
-    # print(df)
-    # get groundtruth
-    p,r,f1,sup = precision_recall_fscore_support(targets, predicted, average="micro", zero_division=0)
+        # print(df)
+        p,r,f1,sup = precision_recall_fscore_support(targets, predicted, average="micro", zero_division=0)
     
-    return p, r, f1
+        stats_dict["f1_score"] = f1
+        print("Plan", stats_dict["plan_label"], "F1", f1, "runtime", stats_dict["runtime"], "cost", stats_dict["total_usd"])
+        results.append(stats_dict)
+
+    return results
 
 
 
@@ -177,6 +198,7 @@ def stub_scores(records_df):
 
             # build a matrix that has the study on the columns and the predicted column names on the rows
         df.fillna("missing", inplace=True)
+        df.to_csv(RESULT_PATH+"/predicted_matching.csv", index=False)
 
         targets += list(target_matching[study].values)
         predicted += list(df[study].values)
@@ -252,13 +274,10 @@ def evaluate_biofabric_baseline(model, datasetid):
 
     return runtime, cost, f1_score, label
 
-def evaluate_biofabric_pz(datasetid, reoptimize=False, limit=None):
+def execute_biofabric_pz(datasetid, result_dir, reoptimize=False, limit=None):
     """
     This creates the PZ set of plans
     """
-
-    records_df = pd.read_csv("eval-results/biofabric/clean_output.csv")
-    stub_scores(records_df)
 
     # pz reg --name biofabric-matching-tiny --path testdata/biofabric-matching-tiny
     # xls = pz.Dataset('biofabric-matching-tiny', schema=pz.XLSFile)
@@ -269,8 +288,12 @@ def evaluate_biofabric_pz(datasetid, reoptimize=False, limit=None):
 
     logicalTree = case_data.getLogicalTree()
     candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True)
-    results = []
+
     for idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
+
+        if os.path.exists(f'{result_dir}/profiling-{idx}.json'):
+            continue
+
         print("----------------------")
         ops = plan.dumpPhysicalTree()
         flatten_ops = flatten_nested_tuples(ops)
@@ -284,47 +307,110 @@ def evaluate_biofabric_pz(datasetid, reoptimize=False, limit=None):
         profileData = plan.getProfilingData()
 
         sp = StatsProcessor(profileData)
-        # TODO profiling data contains arrays ?
-        # with open(f'eval-results/biofabric/profiling-{idx}.json', 'w') as f:
-            # json.dump(sp.profiling_data.to_dict(), f)
+        profile_dict = sp.profiling_data.to_dict()
+        profile_dict["runtime"] = runtime
+        profile_dict["plan_idx"] = idx
+        profile_dict["plan_label"] = compute_label(plan, idx)
 
-        # score plan based on its output records
-        p, r, f1_score = score_biofabric_plan(records)
+        profile_dict["models"] = [op.model.value for op in flatten_ops if not op.is_hardcoded()]
+        profile_dict["op_names"] = []
+        profile_dict["generated_fields"] = []
+        profile_dict["query_strategies"] = []
 
-        cost = 0.0
         stats = sp.profiling_data
+        cost=0
         while stats is not None:
             cost += stats.total_usd
             stats = stats.source_op_stats
+            if stats is not None:
+                profile_dict["op_names"].append(stats.op_name)
+                profile_dict["generated_fields"].append(stats.generated_fields)
+            # profile_dict["query_strategies"].append(stats.query_strategy)
+            
 
-        # compute label
-        label = compute_label(plan, idx)
-        results.append((runtime, cost, f1_score, label))
+
+        profile_dict["total_usd"] = cost
+
+        with open(f'{result_dir}/profiling-{idx}.json', 'w') as f:
+            json.dump(profile_dict, f)
 
         # workaround to disabling cache: delete all cached generations after each plan
         dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
         if os.path.exists(dspy_cache_dir):
             shutil.rmtree(dspy_cache_dir)
 
-    return results
 
-
-def plot_runtime_cost_vs_quality(results):
+def plot_runtime_cost_vs_quality(results, result_dir):
+    # create figure
     fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True)
-    for runtime, cost, f1_score, label in results:
-        color = None
-        marker = "*" if "PZ" in label else "^"
-        # plot runtime vs. f1_score
-        axs[0].scatter(f1_score, runtime, label=label, alpha=0.4, color=color, marker=marker)
-        # plot cost vs. f1_score
-        axs[1].scatter(f1_score, cost, label=label, alpha=0.4, color=color, marker=marker)
 
+    # parse results into fields2
+    for result_dict in results:
+        runtime = result_dict["runtime"]
+        cost = result_dict["total_usd"]
+        f1_score = result_dict["f1_score"]
+        models = [mod for mod in result_dict["models"] if mod is not None]
+
+        text = None
+        if len(set(models)) == 1:
+            mod = Model(models[0])
+            text = f"ALL-{repr(mod)}"
+        elif len(set(models)) > 1:
+            text = "-".join(map(lambda x: repr(Model(x)),models))
+
+        text = text.replace("GEMINI_1", "GEMINI")
+        text = text.replace("GPT_4", "GPT-4")
+        text = text.replace("GPT_3_5", "GPT-3.5")
+
+        # set label and color
+        color = None
+        marker = None
+        # marker = "*" if "PZ" in label else "^"
+
+        axs[0].scatter(f1_score, runtime, alpha=0.4, color=color, marker=marker) 
+        axs[1].scatter(f1_score, cost, alpha=0.4, color=color, marker=marker)
+
+        # add annotations
+        if text is not None:
+            ha, va = 'right', 'top'
+            if text == "MIXTRAL-GPT-4":
+                va = 'bottom'
+            elif text in ["GEMINI-GPT-3.5"]:
+                continue
+            if text == 'GPT-3.5-GEMINI':
+                continue
+                ha = 'right'
+                va = 'bottom'
+            elif text == "ALL-GPT-3.5":
+                ha = 'left'
+                continue
+            elif text == "ALL-GPT-4":
+                ha = 'right'
+            elif text == "ALL-GEMINI":
+                va = 'top'
+            elif text == "GPT-3.5-MIXTRAL":
+                ha = 'left'
+            elif text == "GPT-3.5-GPT-4":
+                va = 'center'
+                continue
+            elif text == "GEMINI-MIXTRAL":
+                ha = 'left'
+                va = 'bottom'
+
+            axs[0].annotate(text, (f1_score, runtime), ha=ha, va=va)
+            axs[1].annotate(text, (f1_score, cost), ha=ha, va=va)
+
+    # savefig
     axs[0].set_title("Runtime and Cost vs. F1 Score")
     axs[0].set_ylabel("runtime (seconds)")
     axs[1].set_ylabel("cost (USD)")
     axs[1].set_xlabel("F1 Score")
-    axs[0].legend(bbox_to_anchor=(1.03, 1.0))
-    fig.savefig("eval-results/biofabric/cost-quality.png", bbox_inches="tight")
+
+    axs[0].grid(True)
+    axs[1].grid(True)
+    # axs[0].legend(bbox_to_anchor=(1.03, 1.0))
+    fig.savefig(f"{result_dir}/biofabric.png", bbox_inches="tight")
+
 
 
 if __name__ == "__main__":
@@ -334,41 +420,25 @@ if __name__ == "__main__":
     parser.add_argument('--datasetid', type=str, help='The dataset id')
     parser.add_argument('--limit' , type=int, help='The number of plans to consider')
     parser.add_argument('--no-cache', action='store_true', help='Do not use cached results', default=False)
+    parser.add_argument('--dry-run', action='store_true', help='Do not use cached results', default=False)
 
     args = parser.parse_args()
     no_cache = args.no_cache
     datasetid = args.datasetid
-
+   
     if no_cache:
         pz.DataDirectory().clearCache(keep_registry=True)
 
-    datasetid = "biofabric-tiny"
+    # records_df = pd.read_csv("eval-results/biofabric/clean_output.csv")
+    # stub_scores(records_df)
+
+    datasetid = "biofabric-medium"
+    RESULT_PATH = f"eval-results/{datasetid}/"
     # get PZ plan metrics
     print("Running PZ Plans")
     print("----------------")
-    results = evaluate_biofabric_pz(datasetid, limit=args.limit)
+    if not args.dry_run:
+        execute_biofabric_pz(datasetid, limit=args.limit, result_dir=RESULT_PATH)
+    pz_results = score_biofabric_plans(result_dir=RESULT_PATH)
 
-    datasetid = "biofabric-tiny-csv"
-    # get baseline metrics
-    print("Running Baselines")
-    print("-----------------")
-    # all_gpt4_runtime, all_gpt4_cost, all_gpt4_quality, all_gpt4_label = evaluate_biofabric_baseline(Model.GPT_4, datasetid)
-    # all_gpt35_runtime, all_gpt35_cost, all_gpt35_quality, all_gpt35_label = evaluate_biofabric_baseline(Model.GPT_3_5, datasetid)
-    # all_gemini_runtime, all_gemini_cost, all_gemini_quality, gemini_label = evaluate_biofabric_baseline(Model.GEMINI_1, datasetid)
-
-    # plot runtime vs quality and cost vs quality
-    # baselines = [
-        # (all_gpt4_runtime, all_gpt4_cost, all_gpt4_quality, all_gpt4_label),
-        # (all_gpt35_runtime, all_gpt35_cost, all_gpt35_quality, all_gpt35_label),
-        # (all_gemini_runtime, all_gemini_cost, all_gemini_quality, gemini_label),
-    # ]
-    baselines = []
-    pz_plans = [
-        (runtime, cost, f1_score, label)
-        for runtime, cost, f1_score, label in results
-    ]
-    all_results = baselines + pz_plans
-    with open("eval-results/biofabric.json", 'w') as f:
-        json.dump(all_results, f)
-
-    plot_runtime_cost_vs_quality(all_results)
+    plot_runtime_cost_vs_quality(pz_results, RESULT_PATH)

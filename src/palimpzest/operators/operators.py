@@ -141,6 +141,7 @@ class LogicalOperator:
         if os.getenv('OPENAI_API_KEY') is not None:
             models.extend([Model.GPT_3_5, Model.GPT_4])
             # models.extend([Model.GPT_4])
+            # models.extend([Model.GPT_3_5])
 
         if os.getenv('TOGETHER_API_KEY') is not None:
             models.extend([Model.MIXTRAL])
@@ -162,8 +163,8 @@ class LogicalOperator:
         # compute (list of) physical plans for this op
         physicalPlans = []
         if isinstance(self, ConvertScan) or isinstance(self, FilteredScan):
-            for model in models:
-                for subTreePhysicalPlan in subTreePhysicalPlans:
+            for subTreePhysicalPlan in subTreePhysicalPlans:
+                for model in models:
                     physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, shouldProfile=shouldProfile)
                     physicalPlans.append(physicalPlan)
                     # GV Checking if there is an hardcoded function exposes that we need to refactor the solver/physical function generation
