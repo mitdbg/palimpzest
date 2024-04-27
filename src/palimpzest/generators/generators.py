@@ -294,10 +294,10 @@ class DSPyGenerator(BaseGenerator):
         start_time = time.time()
 
         print(f"Generating")
-        print(f"FALL BACK question: {question}")
-        print(f"FALL BACK CONTEXT")
-        print("--------------------")
-        print(f"{context}")
+        # print(f"FALL BACK question: {question}")
+        # print(f"FALL BACK CONTEXT")
+        # print("--------------------")
+        # print(f"{context}")
         pred = cot(question, context)
 
         end_time = time.time()
@@ -305,16 +305,15 @@ class DSPyGenerator(BaseGenerator):
         # extract the log probabilities for the actual result(s) which are returned
         answer_log_probs = self._get_answer_log_probs(dspy_lm, pred.answer)
         usage, finish_reason = self._get_usage_and_finish_reason(dspy_lm)
-        print("----------------")
-        print(f"FALL BACK PROMPT")
-        print("----------------")
-        print(dspy_lm.history[-1]['prompt'])
+        # print("----------------")
+        # print(f"FALL BACK PROMPT")
+        # print("----------------")
+        # print(dspy_lm.history[-1]['prompt'])
 
-        print("----------------")
-        print(f"FALL BACK ANSWER")
-        print("----------------")
+        # print("----------------")
+        # print(f"FALL BACK ANSWER")
+        # print("----------------")
         print(pred.answer)
-
 
         # collect statistics on prompt, usage, and timing
         stats = GenerationStats(

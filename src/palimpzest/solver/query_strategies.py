@@ -243,8 +243,8 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
         try:
             field_stats = None
             if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-                print(f"FALL BACK FIELD: {field_name}")
-                print("---------------")
+                # print(f"FALL BACK FIELD: {field_name}")
+                # print("---------------")
                 # invoke LLM to generate output JSON
                 generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
                 answer, field_stats = generator.generate(text_content, promptQuestion)
