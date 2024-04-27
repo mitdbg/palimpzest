@@ -249,7 +249,7 @@ class Dataset(Set):
         This function creates and returns a new Set. The newly created Set uses this Set
         as its source and applies the provided filter to it.
         """
-        return Dataset(source=self, schema=self.schema(), desc=desc, filter=f, depends_on=depends_on)
+        return Dataset(source=self, schema=self.schema(), desc=desc, filter=f, depends_on=depends_on, nocache=self._nocache)
 
     def filterByStr(self, filterCondition: str, depends_on: Union[str, List[str]]=None, desc: str="Apply filter(s)") -> Dataset:
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
@@ -265,21 +265,21 @@ class Dataset(Set):
 
     def convert(self, newSchema: Schema, cardinality: str = None, image_conversion: bool=False, depends_on: Union[str, List[str]]=None, desc: str="Convert to new schema") -> Dataset:
         """Convert the Set to a new schema."""
-        return Dataset(source=self, schema=newSchema, cardinality=cardinality, image_conversion=image_conversion, depends_on=depends_on, desc=desc)
+        return Dataset(source=self, schema=newSchema, cardinality=cardinality, image_conversion=image_conversion, depends_on=depends_on, desc=desc, nocache=self._nocache)
 
     def map(self, fn: UserFunction) -> Dataset:
         """Convert the Set to a new schema."""
         if not fn.inputSchema == self.schema():
             raise Exception("Input schema of function (" + str(fn.inputSchema.getDesc()) + ") does not match schema of input Set (" + str(self.schema().getDesc()) + ")" )        
-        return Dataset(source=self, schema=fn.outputSchema, fnid=fn.udfid)
+        return Dataset(source=self, schema=fn.outputSchema, fnid=fn.udfid, nocache=self._nocache)
 
     def aggregate(self, aggFuncDesc: str) -> Dataset:
         """Apply an aggregate function to this set"""
-        return Dataset(source=self, schema=Number, desc="Aggregate results", aggFunc=AggregateFunction(aggFuncDesc))
+        return Dataset(source=self, schema=Number, desc="Aggregate results", aggFunc=AggregateFunction(aggFuncDesc), nocache=self._nocache)
     
     def groupby(self, groupBy: GroupBySig) -> Dataset:
-        return Dataset(source=self, schema=groupBy.outputSchema(), desc="Group By", groupBy=groupBy)
+        return Dataset(source=self, schema=groupBy.outputSchema(), desc="Group By", groupBy=groupBy, nocache=self._nocache)
 
     def limit(self, n: int) -> Dataset:
         """Limit the set size to no more than n rows"""
-        return Dataset(source=self, schema=self.schema(), desc="LIMIT " + str(n), limit=n)
+        return Dataset(source=self, schema=self.schema(), desc="LIMIT " + str(n), limit=n, nocache=self._nocache)
