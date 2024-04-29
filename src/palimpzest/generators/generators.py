@@ -156,14 +156,14 @@ class DSPyGenerator(BaseGenerator):
         # configure DSPy to use this model; both DSPy prompt strategies currently use COT
         dspy.settings.configure(lm=dspy_lm)
         cot = dspyCOT(self.promptSignature)
-
+    
         # execute LLM generation
         start_time = time.time()
         # num_tries = 3
         # while num_tries > 0:
         #     try:
         # print(f"Generating")
-        pred = cot(question, context)
+        pred = cot(question, context)            
         # print(pred.answer)
                 # num_tries = -1
 

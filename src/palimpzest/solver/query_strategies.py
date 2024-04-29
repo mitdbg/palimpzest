@@ -248,13 +248,17 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
 
                 text_content = json.dumps(new_json)
                 generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-                answer, record_stats = generator.generate(text_content, promptQuestion)
                 try:
+                    answer, record_stats = generator.generate(text_content, promptQuestion)
                     jsonObj = _get_JSON_from_answer(answer)["items"][0]
                 except IndexError as e:
                     print("Could not find any items in the JSON response")
                     continue
                 except json.JSONDecodeError as e:
+                    print(f"Could not decode JSON response: {e}")
+                    print(answer)
+                    continue
+                except Exception as e:
                     print(f"Could not decode JSON response: {e}")
                     print(answer)
                     continue

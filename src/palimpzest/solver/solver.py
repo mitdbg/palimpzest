@@ -348,14 +348,18 @@ class Solver:
 
                     # invoke LLM to generate filter decision (True or False)
                     text_content = candidate.asJSON()
-                    response, gen_stats = generator.generate(context=text_content, question=filterCondition)
+                    try:
+                        response, gen_stats = generator.generate(context=text_content, question=filterCondition)
+                        # if profiling, set record's stats for the given op_id
+                        if shouldProfile:
+                            candidate._stats[td.op_id] = FilterLLMStats(gen_stats=gen_stats, filter=filterCondition)
 
-                    # if profiling, set record's stats for the given op_id
-                    if shouldProfile:
-                        candidate._stats[td.op_id] = FilterLLMStats(gen_stats=gen_stats, filter=filterCondition)
-
-                    # set _passed_filter attribute and return record
-                    setattr(candidate, "_passed_filter", "true" in response.lower()) # response.lower() == "true"
+                        # set _passed_filter attribute and return record
+                        setattr(candidate, "_passed_filter", "true" in response.lower()) # response.lower() == "true"
+                    except Exception as e:
+                        # If there is an exception consider the record as not passing the filter
+                        print(f"Error invoking LLM for filter: {e}")
+                        setattr(candidate, "_passed_filter", False)
 
                     return candidate
 

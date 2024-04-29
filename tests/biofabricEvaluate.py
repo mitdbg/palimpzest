@@ -303,6 +303,11 @@ def execute_biofabric_pz(datasetid, result_dir, reoptimize=False, limit=None):
         # Running the plan
         start_time = time.time()
         records = [r for r in plan]
+        # try:
+            # records = [r for r in plan]
+        # except Exception as e:
+            # print(f"Error running plan {idx}: {e}")
+            # continue
         runtime = time.time() - start_time
         profileData = plan.getProfilingData()
 
@@ -375,12 +380,13 @@ def plot_runtime_cost_vs_quality(results, result_dir):
             ha, va = 'right', 'top'
             if text == "MIXTRAL-GPT-4":
                 va = 'bottom'
-            elif text in ["GEMINI-GPT-3.5"]:
+            elif text in ["GEMINI-GPT-4","GEMINI-GPT-3.5"]:
+                ha = 'right'
                 continue
             if text == 'GPT-3.5-GEMINI':
-                continue
                 ha = 'right'
-                va = 'bottom'
+                va = 'top'
+                # continue
             elif text == "ALL-GPT-3.5":
                 ha = 'left'
                 continue
@@ -388,11 +394,12 @@ def plot_runtime_cost_vs_quality(results, result_dir):
                 ha = 'right'
             elif text == "ALL-GEMINI":
                 va = 'top'
+                continue
             elif text == "GPT-3.5-MIXTRAL":
                 ha = 'left'
             elif text == "GPT-3.5-GPT-4":
                 va = 'center'
-                continue
+                # continue
             elif text == "GEMINI-MIXTRAL":
                 ha = 'left'
                 va = 'bottom'
