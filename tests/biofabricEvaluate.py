@@ -289,10 +289,14 @@ def execute_biofabric_pz(datasetid, result_dir, reoptimize=False, limit=None):
     logicalTree = case_data.getLogicalTree()
     candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True)
 
-    for idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
+    num_plans = len(candidatePlans)
+    # for idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
+    for idx in range(num_plans):
 
         if os.path.exists(f'{result_dir}/profiling-{idx}.json'):
             continue
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True)
+        _, _, _, plan = candidatePlans[idx]
 
         print("----------------------")
         ops = plan.dumpPhysicalTree()
