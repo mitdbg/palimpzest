@@ -1,7 +1,8 @@
 from io import BytesIO
+import numpy as np
 from palimpzest.constants import PromptStrategy, QueryStrategy
 from palimpzest.elements import DataRecord, File, TextFile, Schema
-from palimpzest.corelib import EquationImage, ImageFile, PDFFile, Download, XLSFile, Table, TabularRow
+from palimpzest.corelib import EquationImage, ImageFile, PDFFile, Download, XLSFile, Table
 from palimpzest.generators import DSPyGenerator
 from palimpzest.profiler import ApiStats, FilterLLMStats, FilterNonLLMStats, InduceLLMStats, InduceNonLLMStats
 from palimpzest.solver.query_strategies import runBondedQuery, runConventionalQuery, runCodeGenQuery
@@ -199,13 +200,12 @@ class Solver:
                     dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
                     rows = []
                     for row in dataframe.values[:100]: # TODO Extend this with dynamic sizing of context length
-                        row_record = DataRecord(TabularRow, parent_uuid=dr._uuid)
-                        row_record.cells = [str(x) for x in row]
+                        row_record = [str(x) for x in row]
                         rows += [row_record]
                     dr.rows = rows
-
-                    dr.header = dataframe.columns.values
-                    dr.name = candidate.filename.split("/")[-1] + " - " + sheet_name
+                    dr.filename = candidate.filename
+                    dr.header = dataframe.columns.values.tolist()
+                    dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
 
                     if shouldProfile:
                         dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
@@ -264,8 +264,7 @@ class Solver:
                     print(f"BondedQuery Error: {err_msg}")
                     print("Falling back to conventional query")
                     dr, conventional_query_stats = runConventionalQuery(candidate, td, self._verbose)
-                    drs = [dr]
-
+                    drs = [dr] if type(dr) is not list else dr
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     for dr in drs:
@@ -320,54 +319,55 @@ class Solver:
         return fn
 
     def _makeFilterFn(self, td: TaskDescriptor, shouldProfile: bool=False):
-            # compute record schema and type
-            doc_schema = str(td.inputSchema)
-            doc_type = td.inputSchema.className()
-    
-            # if filter has a function, simply return a wrapper around that function
-            if td.filter.filterFn is not None:
-                def nonLLMFilter(candidate: DataRecord):
-                    start_time = time.time()
-                    result = td.filter.filterFn(candidate)
-                    fn_call_duration_secs = time.time() - start_time
+        # compute record schema and type
+        doc_schema = str(td.inputSchema)
+        doc_type = td.inputSchema.className()
 
-                    # if profiling, set record's stats for the given op_id
-                    if shouldProfile:
-                        candidate._stats[td.op_id] = FilterNonLLMStats(
-                            fn_call_duration_secs=fn_call_duration_secs,
-                            filter=str(td.filter.filterFn),
-                        )
+        # if filter has a function, simply return a wrapper around that function
+        if td.filter.filterFn is not None:
+            def nonLLMFilter(candidate: DataRecord):
+                start_time = time.time()
+                result = td.filter.filterFn(candidate)
+                fn_call_duration_secs = time.time() - start_time
 
-                    # set _passed_filter attribute and return record
-                    setattr(candidate, "_passed_filter", result)
-                    print(f"ran filter function on {candidate}")
+                # if profiling, set record's stats for the given op_id
+                if shouldProfile:
+                    candidate._stats[td.op_id] = FilterNonLLMStats(
+                        fn_call_duration_secs=fn_call_duration_secs,
+                        filter=str(td.filter.filterFn),
+                    )
 
-                    return candidate
+                # set _passed_filter attribute and return record
+                setattr(candidate, "_passed_filter", result)
+                print(f"ran filter function on {candidate}")
 
-                return nonLLMFilter
+                return candidate
 
-            # otherwise, the filter requires an LLM invocation to run
-            def llmFilter(candidate: DataRecord):
-                # do not filter candidate if it doesn't match inputSchema
-                if not candidate.schema == td.inputSchema:
-                    return False
+            return nonLLMFilter
 
-                # create generator
-                generator = None
-                if td.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
-                    generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, self._verbose)
-                # TODO
-                elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:
-                    raise Exception("not implemented yet")
-                # TODO
-                elif td.prompt_strategy == PromptStrategy.FEW_SHOT:
-                    raise Exception("not implemented yet")
-                # TODO
-                elif td.prompt_strategy == PromptStrategy.CODE_GEN_BOOL:
-                    raise Exception("not implemented yet")
+        # otherwise, the filter requires an LLM invocation to run
+        def llmFilter(candidate: DataRecord):
+            # do not filter candidate if it doesn't match inputSchema
+            if not candidate.schema == td.inputSchema:
+                return False
 
-                # invoke LLM to generate filter decision (True or False)
-                text_content = candidate.asTextJSON()
+            # create generator
+            generator = None
+            if td.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
+                generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, self._verbose)
+            # TODO
+            elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:
+                raise Exception("not implemented yet")
+            # TODO
+            elif td.prompt_strategy == PromptStrategy.FEW_SHOT:
+                raise Exception("not implemented yet")
+            # TODO
+            elif td.prompt_strategy == PromptStrategy.CODE_GEN_BOOL:
+                raise Exception("not implemented yet")
+
+            # invoke LLM to generate filter decision (True or False)
+            text_content = candidate.asTextJSON()
+            try:
                 response, gen_stats = generator.generate(context=text_content, question=td.filter.filterCondition)
 
                 # if profiling, set record's stats for the given op_id
@@ -376,10 +376,14 @@ class Solver:
 
                 # set _passed_filter attribute and return record
                 setattr(candidate, "_passed_filter", "true" in response.lower())
+            except Exception as e:
+                # If there is an exception consider the record as not passing the filter
+                print(f"Error invoking LLM for filter: {e}")
+                setattr(candidate, "_passed_filter", False)
 
-                return candidate
+            return candidate
 
-            return llmFilter
+        return llmFilter
 
 
     def synthesize(self, td: TaskDescriptor, shouldProfile: bool=False):

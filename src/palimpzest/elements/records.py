@@ -33,8 +33,6 @@ class DataRecord:
 
         super().__setattr__(key, value)
 
-
-
     def __getitem__(self, key):
         return super().__getattr__(key)
 
@@ -42,55 +40,22 @@ class DataRecord:
     def schema(self):
         return self._schema
 
-    def asTextJSON(self):
-        """Return a JSON representation of this DataRecord"""
-        keys = sorted(self.__dict__)
-        # Make a dictionary out of the key/value pairs
-        d = {
-            k: str(self.__dict__[k])
-            for k in keys
-            if (
-                not k.startswith("_")
-                and not isinstance(self.__dict__[k], bytes)
-                and not (isinstance(self.__dict__[k], list) and isinstance(self.__dict__[k][0], bytes))
-            )
-        }
-        d["data type"] = str(self._schema.__name__)
-        d["data type description"]  = str(self._schema.__doc__)
-
-        return json.dumps(d, indent=2)
-    
-    def asDict(self, include_bytes: bool=True):
-        """Return a dictionary representation of this DataRecord"""
-        keys = sorted(self.__dict__)
-        # Make a dictionary out of the key/value pairs
-        d = (
-            {k: self.__dict__[k] for k in keys if not k.startswith("_")}
-            if include_bytes
-            else {
-                k: self.__dict__[k]
-                if (
-                    not isinstance(self.__dict__[k], bytes)
-                    and not (isinstance(self.__dict__[k], list) and isinstance(self.__dict__[k][0], bytes))
-                )
-                else "<bytes>"
-                for k in keys
-                if not k.startswith("_")
-            }
-        )
-        return d
-
     def asJSON(self):
         """Return a JSON representation of this DataRecord"""
-        keys = sorted(self.__dict__)
-        # Make a dictionary out of the key/value pairs
-        d = {k: self.__dict__[k] for k in keys if not k.startswith("_")}
-        d["data type"] = str(self._schema.__name__)
-        d["data type description"]  = str(self._schema.__doc__)
-        return json.dumps(d, indent=2)
+        value_dict = self.asDict() # should pass include_bytes argument? Before was unspecified
+        return self.schema().asJSON(value_dict)
+
+    def asDict(self, include_bytes: bool=True):
+        """Return a dictionary representation of this DataRecord"""
+        dct = {k: self.__dict__[k] for k in self.schema.fieldNames()}
+        if not include_bytes:
+            for k in dct:
+                if isinstance(dct[k], bytes) or (isinstance(dct[k], list) and isinstance(dct[k][0], bytes)):
+                    dct[k] = "<bytes>"
+        return dct
 
     def __str__(self):
-        keys = sorted(self.__dict__)
+        keys = sorted(self.__dict__.keys())
         items = ("{}={!r}...".format(k, str(self.__dict__[k])[:15]) for k in keys)
         return "{}({})".format(type(self).__name__, ", ".join(items))
 

@@ -1,0 +1,51 @@
+age_at_diagnosis,ajcc_pathologic_n,ajcc_pathologic_stage,ajcc_pathologic_t,case_submitter_id,ethnicity,gender,morphology,primary_diagnosis,race,study,tissue_or_organ_of_origin,tumor_focality,tumor_grade,tumor_largest_dimension_diameter,vital_status
+42,pN2,Stage III,pT2,C3L-00102,Not provided,Male,PDAC,Pancreatic carcinoma,White,cao,head,Unifocal,Not provided,3.0,Deceased
+68,pN1,Stage IIB,pT2,C3L-00189,Not provided,Female,PDAC,Pancreatic carcinoma,Not provided,cao,head,Unifocal,Not provided,2.7,Deceased
+69,pN1,Stage IIB,pT3,C3L-00277,Not provided,Male,PDAC,Pancreatic carcinoma,White,cao,tail,Unifocal,Not provided,5.0,Deceased
+62,pN1,Stage IIB,pT2,C3L-00401,Not provided,Female,PDAC,Pancreatic carcinoma,Not provided,cao,body,Unifocal,Not provided,2.8,Living
+59,pN1,Stage IIB,pT3,C3L-00640,Not provided,Female,PDAC,Pancreatic carcinoma,White,cao,body,Unifocal,Not provided,4.5,Living
+72,NX,Stage III,pT3,C3L-00004,White,Male,Clear cell renal cell carcinoma,Clear cell renal cell carcinoma,White,ccrcc,Lower pole,Unifocal,G3,12.0,Alive
+30,N0,Stage I,pT1b,C3L-00010,White,Male,Clear cell renal cell carcinoma,Clear cell renal cell carcinoma,White,ccrcc,Upper pole,Unifocal,G3,6.5,Alive
+63,NX,Stage IV,pT3a,C3L-00011,White,Female,Clear cell renal cell carcinoma,Clear cell renal cell carcinoma,White,ccrcc,Lower pole,Unifocal,G4,12.0,Alive
+65,NX,Stage I,pT1a,C3L-00026,White,Female,Clear cell renal cell carcinoma,Clear cell renal cell carcinoma,White,ccrcc,Lower pole,Unifocal,G3,2.0,Alive
+49,N1,Stage III,pT3a,C3L-00079,White,Male,Clear cell renal cell carcinoma,Clear cell renal cell carcinoma,White,ccrcc,Other mid-inferior,Unifocal,G3,14.0,Alive
+38.88,pN0,Stage I,pT1a (FIGO IA),C3L-00006,Not-Hispanic or Latino,Female,Endometrioid,Carcinosarcoma,White,dou,Anterior endometrium,Unifocal,Cannot be determined,2.9,PASS
+39.76,pNX,Stage IV,pT1a (FIGO IA),C3L-00008,Not-Hispanic or Latino,Female,Endometrioid,Carcinosarcoma,White,dou,Posterior endometrium,Unifocal,Cannot be determined,3.5,PASS
+51.19,pN0,Stage I,pT1a (FIGO IA),C3L-00032,Not-Hispanic or Latino,Female,Endometrioid,Carcinosarcoma,White,dou,Anterior and Posterior endometrium,Unifocal,Cannot be determined,4.5,PASS
+32.69,pNX,Stage I,pT1a (FIGO IA),C3L-00090,Not-Hispanic or Latino,Female,Endometrioid,Carcinosarcoma,White,dou,Anterior and Posterior endometrium,Unifocal,Cannot be determined,3.5,PASS
+81.0,126,2A,Tumor,C3N.01799,caucasian,male,C4,Terminal Respiratory Unit,western,gilette,Terminal Respiratory Unit,0.455,CIMP-1,0.515138548607387,nan
+58.0,127C,1A,Tumor,C3L.01890,caucasian,female,C3,Terminal Respiratory Unit,western,gilette,Terminal Respiratory Unit,0.633,nan,0.572553954118675,nan
+48.0,128C,1A,Tumor,C3N.00572,asian,female,C4,Terminal Respiratory Unit,asian,gilette,Terminal Respiratory Unit,0.428,CIMP-2,0.89001733153767,nan
+56,N1,Stage III,pT1,C3L-00977,Not Hispanic or Latino,Male,"Squamous cell carcinoma, conventional",G1 Well differentiated,Unknown,huang,Oral cavity,Unifocal,G1,1.2,Alive
+61,N1,Stage III,pT2,C3L-00987,Not Hispanic or Latino,Male,"Squamous cell carcinoma, conventional",G2 Moderately differentiated,Unknown,huang,Oral cavity,Unifocal,G2,4.0,Alive
+50,N0,Stage II,pT2,C3L-00994,Not Hispanic or Latino,Male,"Squamous cell carcinoma, conventional",G2 Moderately differentiated,Unknown,huang,Oral cavity,Unifocal,G2,3.0,Alive
+56,N1,Stage III,pT2,C3L-00995,Not Hispanic or Latino,Male,"Squamous cell carcinoma, conventional",G1 Well differentiated,Unknown,huang,Oral cavity,Unifocal,G1,4.0,Alive
+47,N1,Stage II,pT2,C3L-00997,Not Hispanic or Latino,Male,"Squamous cell carcinoma, conventional",G2 Moderately differentiated,Unknown,huang,Oropharynx,Unifocal,G2,4.0,Alive
+unknown,0,Stage IIA,nan,CPT000814,black.or.african.american,unknown,Basal,Basal-I,unknown,krug.xlsx_A) Metadata,unknown,0,0,0,0
+unknown,0,Stage III,nan,CPT001846,white,unknown,Basal,Basal-I,unknown,krug.xlsx_A) Metadata,unknown,0,0,0,0
+660,0,Stage IIB,0.0,X01BR001,black.or.african.american,female,Basal,Basal-I,unknown,krug.xlsx_A) Metadata,unknown,0,0,0,0
+unknown,0,unknown,nan,X01BR008,unknown,unknown,Basal,Basal-I,unknown,krug.xlsx_A) Metadata,unknown,0,0,0,0
+unknown,0,unknown,nan,X01BR009,unknown,unknown,Basal,Basal-I,unknown,krug.xlsx_A) Metadata,unknown,0,0,0,0
+42,pN2,Stage III,pT2,C3L-00102,,Male,PDAC,pancreatic carcinoma,White,li,head,Unifocal,,3.0,Deceased
+68,pN1,Stage IIB,pT2,C3L-00189,,Female,PDAC,pancreatic carcinoma,,li,head,Unifocal,,2.7,Deceased
+69,pN1,Stage IIB,pT3,C3L-00277,,Male,PDAC,pancreatic carcinoma,White,li,tail,Unifocal,,5.0,Deceased
+62,pN1,Stage IIB,pT2,C3L-00401,,Female,PDAC,pancreatic carcinoma,,li,body,Unifocal,,2.8,Living
+59,pN1,Stage IIB,pT3,C3L-00640,,Female,PDAC,pancreatic carcinoma,White,li,body,Unifocal,,4.5,Living
+820.0,N01OV007,IV,nan,01OV007,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Tumor resection,White,mcdermott,Ovary,Not applicable,G3,nan,No
+665.0,N01OV008,IIIC,nan,01OV008,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Tumor resection,White,mcdermott,Ovary,Right,G3,nan,No
+625.0,N01OV010,IIIC,nan,01OV010,Unknown,Female,Serous Adenocarcinoma,Tumor resection,Black or African American,mcdermott,Ovary,Right,G3,1-10 mm,No
+828.0,N01OV013,IIIC,nan,01OV013,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Tumor resection,White,mcdermott,Ovary,Right,G3,nan,No
+672.0,N01OV017,IIIC,nan,01OV017,Not Hispanic or Latino,Female,Serous Adenocarcinoma,Tumor resection,White,mcdermott,Ovary,Right,G3,nan,No
+61,129N,IIA,II,C3L.00081,caucasian,female,classical SqCC,nan,caucasian,satpathy,NAT,nan,nan,0.2745,0.3206
+64,131N,IIA,II,C3L.00415,caucasian,female,MD SqCC with focal basaloid features,nan,caucasian,satpathy,NAT,nan,nan,0.2831,0.2626
+64,130N,IIA,II,C3L.00415,caucasian,female,nan,nan,caucasian,satpathy,Tumor,nan,nan,0.3606,0.2508
+74,130N,nan,nan,C3L.00445,caucasian,male,nan,nan,caucasian,satpathy,NAT,nan,nan,0.1537,0.0028
+729,N2b,Stage III,T4a,01CO001,nan,Male,Mucinous,Sigmoid Colon,CON,vasaikar,Sigmoid Colon,No,No,4.9,Living
+838,N0,Stage II,T3,01CO005,nan,Female,Not Mucinous,Sigmoid Colon,CON,vasaikar,Sigmoid Colon,No,No,1,Deceased
+904,N2b,Stage III,T4a,01CO006,nan,Female,Mucinous,Ascending Colon,CON,vasaikar,Ascending Colon,Yes,Yes,3.16666666666667,Living
+652,N0,Stage II,T3,01CO008,nan,Female,Mucinous,Descending Colon,CON,vasaikar,Descending Colon,No,No,6.7,Living
+58,nan,PASS,1.0,C3L-00104,Not-Hispanic or Latino,Male,nan,Diagnostic pathology report,White,wang,Frontal Lobe,nan,nan,nan,Deceased
+59,nan,FAIL,1.0,C3L-00365,Not-Hispanic or Latino,Female,nan,Diagnostic pathology report,White,wang,Parietal Lobe,nan,nan,nan,Deceased
+45,nan,PASS,1.0,C3L-00674,Not-Hispanic or Latino,Male,nan,MRI review,White,wang,Frontal Lobe,nan,nan,nan,Deceased
+69,nan,PASS,1.0,C3L-00677,Not-Hispanic or Latino,Female,nan,MRI review,White,wang,Frontal Lobe,nan,nan,nan,Deceased
+77,nan,PASS,2.0,C3L-01040,nan,Male,nan,MRI review,nan,wang,Frontal Lobe,nan,nan,nan,Living

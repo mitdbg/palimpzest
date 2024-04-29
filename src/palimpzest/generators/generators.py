@@ -289,7 +289,7 @@ class DSPyGenerator(BaseGenerator):
         # configure DSPy to use this model; both DSPy prompt strategies currently use COT
         dspy.settings.configure(lm=dspy_lm)
         cot = dspyCOT(self.promptSignature)
-
+    
         # execute LLM generation
         start_time = time.time()
 

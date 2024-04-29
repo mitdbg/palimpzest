@@ -18,6 +18,9 @@ class Model(Enum):
     GEMINI_1 = "gemini-1.0-pro-001"
     GEMINI_1V = "gemini-1.0-pro-vision-latest"
 
+    def __repr__(self):
+        return f'{self.name}'
+    
 class PromptStrategy(Enum):
     """
     PromptStrategy describes the prompting technique to be used by a Generator when
@@ -58,6 +61,9 @@ class CodeGenStrategy(Enum):
 RETRY_MULTIPLIER = 2
 RETRY_MAX_SECS = 10
 RETRY_MAX_ATTEMPTS = 1
+
+# maximum number of rows to display in a table
+MAX_ROWS = 5
 
 def log_attempt_number(retry_state):
     """return the result of the last call attempt"""

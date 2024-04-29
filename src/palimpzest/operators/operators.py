@@ -179,8 +179,9 @@ class LogicalOperator:
         # choose set of acceptable models based on possible llmservices
         models = []
         if os.getenv('OPENAI_API_KEY') is not None:
-            # models.extend([Model.GPT_3_5, Model.GPT_4])
-            models.extend([Model.GPT_4])
+            models.extend([Model.GPT_3_5, Model.GPT_4])
+            # models.extend([Model.GPT_4])
+            # models.extend([Model.GPT_3_5])
 
         if os.getenv('TOGETHER_API_KEY') is not None:
             models.extend([Model.MIXTRAL])
@@ -207,22 +208,30 @@ class LogicalOperator:
         # compute (list of) physical plans for this op
         physicalPlans = []
         if isinstance(self, ConvertScan):
-            for model in models:
+            for subTreePhysicalPlan in subTreePhysicalPlans:
                 for qs in query_strategies:
-                    for subTreePhysicalPlan in subTreePhysicalPlans:
+                    for model in models:
                         # NOTE: failing to make a copy will lead to duplicate profile information being captured
                         # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
                         subTreePhysicalPlan = subTreePhysicalPlan.copy()
                         physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, query_strategy=qs, shouldProfile=shouldProfile)
                         physicalPlans.append(physicalPlan)
+                        # GV Checking if there is an hardcoded function exposes that we need to refactor the solver/physical function generation
+                        td = physicalPlan._makeTaskDescriptor()
+                        if td.model == None:
+                            break
         elif isinstance(self, FilteredScan):
-            for model in models:
-                for subTreePhysicalPlan in subTreePhysicalPlans:
+            for subTreePhysicalPlan in subTreePhysicalPlans:
+                for model in models:
                     # NOTE: failing to make a copy will lead to duplicate profile information being captured
                     # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
                     subTreePhysicalPlan = subTreePhysicalPlan.copy()
                     physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, shouldProfile=shouldProfile)
                     physicalPlans.append(physicalPlan)
+                    # GV Checking if there is an hardcoded function exposes that we need to refactor the solver/physical function generation
+                    td = physicalPlan._makeTaskDescriptor()
+                    if td.model == None:
+                        break
         else:
             for subTreePhysicalPlan in subTreePhysicalPlans:
                 # NOTE: failing to make a copy will lead to duplicate profile information being captured

@@ -290,6 +290,8 @@ def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
     # is returning these, but the JSON parser can't take them
     answer = answer.replace("\_", "_")
 
+    # Handle comments in the JSON response. Use regex from // until end of line 
+    answer = re.sub(r'\/\/.*$', '', answer, flags=re.MULTILINE)
     return json.loads(answer)
 
 

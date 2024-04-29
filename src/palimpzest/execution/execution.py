@@ -40,10 +40,12 @@ def graphicEmit(flatten_ops):
         # if right.desc is not None:
         #     print(f" ({right.desc})", end="")
         # check if right has a model attribute
-        if hasattr(right, 'model'):
+        if right.is_hardcoded():
+            print(f"\n    Using hardcoded function", end="")
+        elif hasattr(right, 'model'):
             print(f"\n    Using {right.model}", end="")
-        if hasattr(right, 'filter'):
-            print(f'\n    Filter: "{right.filter.filterCondition}"', end="")
+            if hasattr(right, 'filter'):
+                print(f'\n    Filter: "{right.filter.filterCondition}"', end="")
         print()
         print(f"    ({','.join(in_schema.fieldNames())[:15]}...) -> ({','.join(out_schema.fieldNames())[:15]}...)")
         print()
