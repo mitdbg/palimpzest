@@ -287,7 +287,9 @@ def execute_biofabric_pz(datasetid, result_dir, reoptimize=False, limit=None):
     case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
 
     logicalTree = case_data.getLogicalTree()
-    candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True)
+
+    allow_codegen = "codegen" in datasetid
+    candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, allow_codegen=allow_codegen, shouldProfile=True)
 
     num_plans = len(candidatePlans)
     # for idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
@@ -295,7 +297,7 @@ def execute_biofabric_pz(datasetid, result_dir, reoptimize=False, limit=None):
 
         if os.path.exists(f'{result_dir}/profiling-{idx}.json'):
             continue
-        candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, shouldProfile=True)
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, allow_codegen=allow_codegen, shouldProfile=True)
         _, _, _, plan = candidatePlans[idx]
 
         print("----------------------")
@@ -444,6 +446,7 @@ if __name__ == "__main__":
     # stub_scores(records_df)
 
     datasetid = "biofabric-medium"
+    # datasetid = "biofabric-medium-codegen"
     RESULT_PATH = f"eval-results/{datasetid}/"
     # get PZ plan metrics
     print("Running PZ Plans")
