@@ -293,7 +293,7 @@ class DSPyGenerator(BaseGenerator):
         # execute LLM generation
         start_time = time.time()
 
-        print(f"Generating")
+        print(f"Generating -- {self.model_name}")
         # print(f"FALL BACK question: {question}")
         # print(f"FALL BACK CONTEXT")
         # print("--------------------")

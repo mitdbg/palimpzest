@@ -1,5 +1,6 @@
 from palimpzest.elements import Schema
 
+import hashlib
 import json
 import uuid
 
@@ -8,12 +9,17 @@ MAX_UUID_CHARS = 10
 
 class DataRecord:
     """A DataRecord is a single record of data matching some Schema."""
-    def __init__(self, schema: Schema, parent_uuid=None):
+    def __init__(self, schema: Schema, parent_uuid: str=None, scan_idx: int=None):
         # schema for the data record
         self._schema = schema
 
+        # TODO: this uuid should be a hash of the parent_uuid and/or the record index in the current operator
+        #       this way we can compare records across plans (e.g. for determining majority answer when gathering
+        #       samples from plans in parallel)
         # unique identifier for the record
-        self._uuid = str(uuid.uuid4())[:MAX_UUID_CHARS]
+        # self._uuid = str(uuid.uuid4())[:MAX_UUID_CHARS]
+        uuid_str = str(schema) + (parent_uuid if parent_uuid is not None else str(scan_idx))
+        self._uuid = hashlib.sha256(uuid_str.encode('utf-8')).hexdigest()[:MAX_UUID_CHARS]
         self._parent_uuid = parent_uuid
 
         # attribute which may collect profiling stats pertaining to a record;

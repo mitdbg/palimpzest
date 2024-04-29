@@ -5,7 +5,6 @@ import palimpzest as pz
 from tabulate import tabulate
 from PIL import Image
 
-
 from palimpzest.constants import Model
 from palimpzest.execution import Execution
 from palimpzest.elements import DataRecord, GroupBySig
@@ -19,18 +18,6 @@ import shutil
 import subprocess
 import time
 import os
-
-def _run_bash_command(command_str: str) -> tuple:
-    """Helper function to split a bash command on spaces and execute it using subprocess."""
-    # split command on spaces into list of strings
-    command_str_lst = command_str.split(" ")
-
-    # execute command and capture the output
-    out = subprocess.run(command_str_lst, capture_output=True)
-
-    # return stdout as string
-    return str(out.stdout, "utf-8"), str(out.stderr, "utf-8")
-
 
 
 class Email(pz.TextFile):
@@ -63,10 +50,10 @@ class TextRealEstateListing(RealEstateListingFiles):
     """Represents a real estate listing with specific fields extracted from its text."""
     address = pz.StringField(desc="The address of the property")
     price = pz.NumericField(desc="The listed price of the property")
-    sq_ft = pz.NumericField(desc="The square footage (sq. ft.) of the property")
-    year_built = pz.NumericField(desc="The year in which the property was built")
-    bedrooms = pz.NumericField(desc="The number of bedrooms")
-    bathrooms = pz.NumericField(desc="The number of bathrooms")
+    # sq_ft = pz.NumericField(desc="The square footage (sq. ft.) of the property")
+    # year_built = pz.NumericField(desc="The year in which the property was built")
+    # bedrooms = pz.NumericField(desc="The number of bedrooms")
+    # bathrooms = pz.NumericField(desc="The number of bathrooms")
 
 class CodeGenEasyTextRealEstateListing(RealEstateListingFiles):
     """Represents a real estate listing with specific fields extracted from its text."""
@@ -91,6 +78,7 @@ class RealEstateListingSource(pz.UserSource):
     def __init__(self, datasetId, listings_dir):
         super().__init__(RealEstateListingFiles, datasetId)
         self.listings_dir = listings_dir
+        self.idx = 0
 
     def userImplementedIterator(self):
         for root, _, files in os.walk(self.listings_dir):
@@ -98,7 +86,7 @@ class RealEstateListingSource(pz.UserSource):
                 continue
 
             # create data record
-            dr = pz.DataRecord(self.schema)
+            dr = pz.DataRecord(self.schema, scan_idx=self.idx)
             dr.listing = root.split("/")[-1]
             dr.image_contents = []
             for file in files:
@@ -110,6 +98,7 @@ class RealEstateListingSource(pz.UserSource):
                     dr.image_contents.append(bytes_data)
             yield dr
 
+            self.idx += 1
 
 def buildNestedStr(node, indent=0, buildStr=""):
     elt, child = node
@@ -120,8 +109,17 @@ def buildNestedStr(node, indent=0, buildStr=""):
     else:
         return buildStr
 
+def get_models_from_physical_plan(plan) -> list:
+    models = []
+    while plan is not None:
+        model = getattr(plan, "model", None)
+        models.append(model.value if model is not None else None)
+        plan = plan.source
 
-def score_plan(datasetid, records, size) -> float:
+    return models
+
+
+def score_plan(datasetid, records, idx, size) -> float:
     """
     Computes the F1 score of the plan
     """
@@ -137,6 +135,8 @@ def score_plan(datasetid, records, size) -> float:
     records_df = pd.DataFrame(records)
     if records_df.empty:
         return 0.0, 0.0, 0.0
+
+    records_df.to_csv(f'eval-results/{datasetid}-preds-{idx}.csv', index=False)
 
     preds = None
     if "enron" in datasetid:
@@ -167,7 +167,7 @@ def score_plan(datasetid, records, size) -> float:
     elif "codegen-easy" in datasetid:
         targets = list(gt_df[gt_df.label == 1].listing)
     elif "codegen-hard" in datasetid:
-        targets = list(gt_df[gt_df.label == 1].listing)
+        targets = list(gt_df[gt_df.label == 1].listing) 
 
     # compute true and false positives
     tp, fp = 0, 0
@@ -279,7 +279,7 @@ def run_pz_plan(datasetid, plan, idx, size=None):
     #     json.dump(sp.profiling_data.to_dict(), f)
 
     # score plan based on its output records
-    _, _, f1_score = score_plan(datasetid, records, size)
+    _, _, f1_score = score_plan(datasetid, records, idx, size)
 
     plan_info = {"models": [], "op_names": [], "generated_fields": [], "query_strategies": []}
     cost = 0.0
@@ -298,7 +298,7 @@ def run_pz_plan(datasetid, plan, idx, size=None):
     return runtime, cost, f1_score, plan_info
 
 
-def evaluate_pz_plans(dataset_ids, reoptimize=False, limit=None):
+def evaluate_pz_plans(dataset_ids, limit=None):
     """
     This creates the PZ set of plans for the Enron email evaluation.
 
@@ -317,8 +317,6 @@ def evaluate_pz_plans(dataset_ids, reoptimize=False, limit=None):
     # TODO: we can expand these datasets, but they're good enough for now
     for datasetid in dataset_ids:
         size = None if "codegen" not in datasetid else int(datasetid.split("-")[-1])
-        # if size < 15:
-        #     continue
 
         logicalTree = None
         if "enron" in datasetid:
@@ -470,9 +468,6 @@ def evaluate_pz_plans(dataset_ids, reoptimize=False, limit=None):
 
         results = []
         for idx in range(num_plans):
-            # skip gemini for code gen
-            if idx == 3:
-                continue
         # for idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
             # skip all-Gemini plan which opens too many files
             # if "enron" in datasetid and idx == 17:
@@ -480,7 +475,7 @@ def evaluate_pz_plans(dataset_ids, reoptimize=False, limit=None):
 
             # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
             candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, allow_codegen=allow_codegen, shouldProfile=True)
-            _, _, _, plan = candidatePlans[idx]
+            _, _, _, plan, _ = candidatePlans[idx]
 
             # workaround to disabling cache: delete all cached generations after each plan
             bad_files = ["testdata/enron-eval/assertion.log", "testdata/enron-eval/azure_openai_usage.log", "testdata/enron-eval/openai_usage.log"]
@@ -538,6 +533,10 @@ def plot_runtime_cost_vs_quality(all_results, datasetid):
         )
 
         if "enron" in datasetid:
+            # hack adjustment: original enron evaluation script only took models for LLM operators;
+            # we do this by taking the first three elements in the list
+            models = models[:3]
+ 
             text = None
             if all([model == "gpt-4-0125-preview" for model in models]):
                 # add text for ALL-GPT4
@@ -561,7 +560,6 @@ def plot_runtime_cost_vs_quality(all_results, datasetid):
                 text = "MIXTRAL-GPT4"
             elif any([model is not None and "gemini" in model for model in models]):
                 text = "GEMINI-GPT4"
-
 
             all_convert_then_filter, text_then_image, image_then_text = True, False, False
             num_converts = 0
@@ -592,7 +590,6 @@ def plot_runtime_cost_vs_quality(all_results, datasetid):
         # set label and color
         color = None
         marker = None
-        # marker = "*" if "PZ" in label else "^"
 
         # plot runtime vs. f1_score
         axs[0].scatter(f1_score, runtime, alpha=0.4, color=color, marker=marker) 
@@ -624,14 +621,15 @@ def plot_runtime_cost_vs_quality(all_results, datasetid):
 
     # savefig
     axs[0].set_title("Runtime and Cost vs. F1 Score")
-    axs[0].set_ylabel("runtime (seconds)")
-    axs[1].set_ylabel("cost (USD)")
+    axs[0].set_ylabel("Runtime (seconds)")
+    axs[1].set_ylabel("Cost (USD)")
     axs[1].set_xlabel("F1 Score")
     # axs[0].legend(bbox_to_anchor=(1.03, 1.0))
-    fig.savefig(f"eval-results/{datasetid}.png", bbox_inches="tight")
+    fig_name = f"eval-results/{datasetid}.png"
+    fig.savefig(fig_name, bbox_inches="tight")
 
 
-def plot_runtime_vs_dataset_size(all_results, dataset_ids, plot_filename):
+def plot_runtime_vs_dataset_size(all_results, plot_filename):
     # create figure
     fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True)
 
@@ -708,6 +706,250 @@ def plot_runtime_vs_dataset_size(all_results, dataset_ids, plot_filename):
     fig.savefig(f"eval-results/{plot_filename}.png", bbox_inches="tight")
 
 
+def run_reoptimize_eval(datasetid):
+    # set number of samples to draw
+    num_samples=3
+
+    # create query for enron dataset
+    emails = pz.Dataset(datasetid, schema=Email, num_samples=num_samples, nocache=True)
+    emails = emails.filterByStr("The email refers to a fraudulent scheme (i.e., \"Raptor\", \"Deathstar\", \"Chewco\", and/or \"Fat Boy\")")
+    # emails = emails.filterByStr("The email is sent by Jeffrey Skilling (jeff.skilling@enron.com), or Andy Fastow (andy.fastow@enron.com), or refers to either one of them by name")
+    emails = emails.filterByStr("The email is not quoting from a news article or an article written by someone outside of Enron")
+    logicalTree = emails.getLogicalTree()
+
+    # compute number of plans
+    candidatePlans = logicalTree.createPhysicalPlanCandidates(shouldProfile=True)
+    num_plans = len(candidatePlans)
+
+    # identify initial est of best plan
+    policy = pz.MaxQualityMinRuntime()
+    best_plan, init_best_plan_idx = policy.choose(candidatePlans, return_idx=True)
+    print(f"Initial best plan idx: {init_best_plan_idx}")
+    print(f"Initial best plan: {buildNestedStr(best_plan[3].dumpPhysicalTree())}")
+
+    # define helper function to get models for induce/filter operations that use LLMs;
+    # this is a dirty hack for now, but we can easily return this info from createPhysicalPlanCandidates()
+    def filter_for_llm_ops(models, limit=False):
+        return models[:3]
+
+    # compute all initial estimates
+    best_models = None
+    estimates_and_results = {"init_estimates": [], "v1_estimates": [], "v2_estimates": [], "results": []}
+    for idx in range(num_plans):
+        # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
+        totalTimeInitEst, totalCostInitEst, qualityInitEst, plan, _ = candidatePlans[idx]
+
+        models = get_models_from_physical_plan(plan)
+        models = filter_for_llm_ops(models)
+        result_dict = {"runtime": totalTimeInitEst, "cost": totalCostInitEst, "f1_score": qualityInitEst, "models": models}
+        estimates_and_results["init_estimates"].append(result_dict)
+        with open(f'eval-results/reoptimize-enron-init-est-{idx}.json', 'w') as f:
+            json.dump(result_dict, f)
+
+        if idx == init_best_plan_idx:
+            best_models = models
+
+    # iterate over plans to get ones matching best_plan but w/different end models
+    other_plan_idxs = []
+    for idx in range(num_plans):
+        totalTimeInitEst, totalCostInitEst, qualityInitEst, plan, _ = candidatePlans[idx]
+        models = get_models_from_physical_plan(plan)
+        models = filter_for_llm_ops(models)
+        
+        if (
+            all([model == "mistralai/Mixtral-8x7B-Instruct-v0.1" for model in models])
+            or all([model == "gemini-1.0-pro-001" for model in models])
+        ):
+        # if models[:-1] == best_models[:-1] and models[-1] != best_models[-1]:
+        #     other_plan_idxs.append(idx)
+    
+            print(f"CONSIDERING OTHER PLAN: (PLAN IDX: {idx})")
+            print("---")
+            print(f"{buildNestedStr(plan.dumpPhysicalTree())}")
+            print("-------")
+            other_plan_idxs.append(idx)
+
+    # run init_best_plan_idx + other_plan_idxs to get sample data
+    all_cost_estimate_data = []
+    for plan_idx in [init_best_plan_idx] + other_plan_idxs:
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(shouldProfile=True)
+        _, _, _, plan, _ = candidatePlans[plan_idx]
+
+        # workaround to disabling cache: delete all cached generations after each plan
+        bad_files = ["testdata/enron-eval/assertion.log", "testdata/enron-eval/azure_openai_usage.log", "testdata/enron-eval/openai_usage.log"]
+        for file in bad_files:
+            if os.path.exists(file):
+                os.remove(file)
+        
+        print("------------ABOUT TO RUN--------------")
+        print(f"Plan IDX: {plan_idx}")
+        print(f"Plan: {buildNestedStr(plan.dumpPhysicalTree())}")
+        print("---")
+    
+        # execute plan to get records and runtime;
+        start_time = time.time()
+        records = [r for r in plan]
+        runtime = time.time() - start_time
+
+        # get profiling data for plan and compute its cost
+        profileData = plan.getProfilingData()
+        sp = StatsProcessor(profileData)
+        cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
+        all_cost_estimate_data.extend(cost_estimate_sample_data)
+
+    import pandas as pd
+    df = pd.DataFrame(all_cost_estimate_data)
+    df.to_csv("cost-est-data.csv", index=False)
+
+    # create FULL query for enron dataset
+    emails = pz.Dataset(datasetid, schema=Email, nocache=True, scan_start_idx=num_samples)
+    emails = emails.filterByStr("The email refers to a fraudulent scheme (i.e., \"Raptor\", \"Deathstar\", \"Chewco\", and/or \"Fat Boy\")")
+    # emails = emails.filterByStr("The email is sent by Jeffrey Skilling (jeff.skilling@enron.com), or Andy Fastow (andy.fastow@enron.com), or refers to either one of them by name")
+    emails = emails.filterByStr("The email is not quoting from a news article or an article written by someone outside of Enron")
+    logicalTree = emails.getLogicalTree()
+
+    # re-compute best plan index using sample data
+    print("-----------------------")
+    print("-----------------------")
+    print("-----------------------")
+    candidatePlans = logicalTree.createPhysicalPlanCandidates(cost_estimate_sample_data=all_cost_estimate_data, shouldProfile=True)
+
+    # identify new est of best plan
+    policy = pz.MaxQualityMinRuntime()
+    best_plan, new_best_plan_idx = policy.choose(candidatePlans, return_idx=True)
+    print(f"NEW best plan idx: {new_best_plan_idx}")
+    print(f"NEW best plan: {buildNestedStr(best_plan[3].dumpPhysicalTree())}")
+    os.makedirs("cost-est", exist_ok=True)
+    for idx, plan in enumerate(candidatePlans):
+        print("--------------------")
+        print(f"Plan IDX: {idx}")
+        print(f"Plan: {buildNestedStr(plan[3].dumpPhysicalTree())}")
+        print(f"time: {plan[0]}")
+        print(f"cost: {plan[1]}")
+        print(f"quality: {plan[2]}")
+        print("---")
+        with open(f'cost-est/plan-{idx}.json', 'w') as f:
+            json.dump(plan[4], f)
+
+    # create figure
+    fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
+
+    # get groundtruth results from enron evaluation
+    enron_eval_data = []
+    for idx in range(17):
+        with open(f"eval-results/enron-eval-results-{idx}.json", 'r') as f:
+            result = json.load(f)
+            enron_eval_data.append(result)
+
+    # get initial estimates from this experiment
+    init_est_data = []
+    with idx in range(18):
+        with open(f"eval-results/enron-eval-init-est-{idx}.json", 'r') as f:
+            result = json.load(f)
+            init_est_data.append(result)
+
+    # get estimates after 3 samples
+    sample_est_data = []
+    with idx in range(12):
+        with open(f"cost-est/plan-{idx}.json", 'r') as f:
+            result = json.load(f)
+            sample_est_data.append(result)
+
+    # plot actual result data in background
+    for idx in range(18):
+        runtime = init_est_data[idx]["runtime"]
+        f1_score = init_est_data[idx]["f1_score"]
+        models = init_est_data[idx]["models"]
+
+        text = None
+        if all([model == "gpt-4-0125-preview" for model in models]):
+            # add text for ALL-GPT4
+            text = "ALL-GPT4"
+        elif all([model == "mistralai/Mixtral-8x7B-Instruct-v0.1" for model in models]):
+            # add text for ALL-MIXTRAL
+            text = "ALL-MIXTRAL"
+        elif datasetid == "enron-eval" and models == ["gpt-4-0125-preview"] * 2 + ["mistralai/Mixtral-8x7B-Instruct-v0.1"]:
+            # add text for Mixtral-GPT4
+            text = "MIXTRAL-GPT4"
+        elif datasetid == "enron-eval" and models == ["gpt-4-0125-preview"] * 2 + ["gemini-1.0-pro-001"]:
+            # add text for Gemini-GPT4
+            text = "GEMINI-GPT4"
+        
+        if idx == init_best_plan_idx:
+            text = "BEST-PLAN (ALL-GPT4)"
+    
+        # set label and color
+        color = None
+        marker = None
+
+        # plot runtime vs. f1_score
+        axs[0].scatter(f1_score, runtime, alpha=0.4, color=color, marker=marker) 
+
+        # add annotations
+        if text is not None:
+            ha, va = 'right', 'bottom'
+            if text == "ALL-GPT4":
+                va = 'top'
+            elif text == "MIXTRAL-GPT4":
+                va = 'bottom'
+            elif text == "GEMINI-GPT4":
+                va = 'top'
+            elif text == "ALL-MIXTRAL":
+                va = 'bottom'
+            axs[0].annotate(text, (f1_score, runtime), ha=ha, va=va)
+
+    for idx in range(12):
+        runtime = sample_est_data[idx]["runtime"]
+        f1_score = sample_est_data[idx]["f1_score"]
+        models = sample_est_data[idx]["models"]
+
+        text = None
+        if all([model == "gpt-4-0125-preview" for model in models]):
+            # add text for ALL-GPT4
+            text = "ALL-GPT4"
+        elif all([model == "mistralai/Mixtral-8x7B-Instruct-v0.1" for model in models]):
+            # add text for ALL-MIXTRAL
+            text = "ALL-MIXTRAL"
+        elif datasetid == "enron-eval" and models == ["gpt-4-0125-preview"] * 2 + ["mistralai/Mixtral-8x7B-Instruct-v0.1"]:
+            # add text for Mixtral-GPT4
+            text = "MIXTRAL-GPT4"
+        elif datasetid == "enron-eval" and models == ["gpt-4-0125-preview"] * 2 + ["gemini-1.0-pro-001"]:
+            # add text for Gemini-GPT4
+            text = "GEMINI-GPT4"
+        
+        if idx == new_best_plan_idx:
+            text = "BEST-PLAN (MIXTRAL-GPT4)"
+    
+        # set label and color
+        color = None
+        marker = None
+
+        # plot runtime vs. f1_score
+        axs[1].scatter(f1_score, runtime, alpha=0.4, color=color, marker=marker) 
+
+        # add annotations
+        if text is not None:
+            ha, va = 'right', 'bottom'
+            if text == "ALL-GPT4":
+                va = 'top'
+            elif text == "MIXTRAL-GPT4":
+                va = 'bottom'
+            elif text == "GEMINI-GPT4":
+                va = 'top'
+            elif text == "ALL-MIXTRAL":
+                va = 'bottom'
+            axs[1].annotate(text, (f1_score, runtime), ha=ha, va=va)
+
+    # savefig
+    axs[0].set_title("Runtime and Cost vs. Quality")
+    axs[0].set_ylabel("Runtime (seconds)")
+    axs[0].set_xlabel("Est. Quality")
+    axs[1].set_xlabel("Est. Quality")
+    # axs[0].legend(bbox_to_anchor=(1.03, 1.0))
+    fig_name = f"eval-results/{datasetid}-reoptimize.png"
+    fig.savefig(fig_name, bbox_inches="tight")
+
+
 if __name__ == "__main__":
     # parse arguments
     startTime = time.time()
@@ -726,6 +968,11 @@ if __name__ == "__main__":
     # The user has to indicate the evaluation to be run
     if args.eval is None:
         print("Please provide an evaluation")
+        exit(1)
+
+    # re-optimization is unique enough to warrant its own code path
+    if args.eval == "reoptimize":
+        run_reoptimize_eval(args.datasetid)
         exit(1)
 
     dataset_ids = []
@@ -759,21 +1006,22 @@ if __name__ == "__main__":
             datasetid = f"{args.datasetid}-{size}"
             dataset_ids.append(datasetid)
 
-    all_results = []
-    for datasetid in dataset_ids:
-        results = []
-        for plan_idx in range(4): # range(num_plans):
-            # skip gemini plan for codegen plot b/c we don't have cost for it
-            if args.eval == "codegen-easy" and plan_idx == 3:
-                continue
-            with open(f"eval-results/{datasetid}-results-{plan_idx}.json", 'r') as f:
-                result = json.load(f)
-                results.append(result)
-        
-        all_results.append(results)
-    
-    if args.eval in ["enron", "real-estate"]:
-        plot_runtime_cost_vs_quality(all_results, args.datasetid)
+    # all_results = []
+    # for datasetid in dataset_ids:
+    #     results, estimates = [], []
+    #     for plan_idx in range(num_plans):
+    #         # skip gemini plan for codegen plot b/c we don't have cost for it
+    #         if args.eval == "codegen-easy" and plan_idx == 3:
+    #             continue
 
-    elif "codegen" in args.eval:
-        plot_runtime_vs_dataset_size(all_results, dataset_ids, plot_filename=f"{args.eval}-eval")
+    #         with open(f"eval-results/{datasetid}-results-{plan_idx}.json", 'r') as f:
+    #             result = json.load(f)
+    #             results.append(result)
+
+    #     all_results.append(results)
+
+    # if args.eval in ["enron", "real-estate"]:
+    #     plot_runtime_cost_vs_quality(all_results, args.datasetid)
+
+    # elif "codegen" in args.eval:
+    #     plot_runtime_vs_dataset_size(all_results, plot_filename=f"{args.eval}-eval")

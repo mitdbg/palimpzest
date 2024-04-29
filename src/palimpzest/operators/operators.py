@@ -250,13 +250,13 @@ class LogicalOperator:
         # estimate the cost (in terms of USD, latency, throughput, etc.) for each plan
         plans = []
         for physicalPlan in physicalPlans:
-            planCost = physicalPlan.estimateCost(cost_estimate_sample_data=cost_estimate_sample_data)
+            planCost, fullPlanCostEst = physicalPlan.estimateCost(cost_estimate_sample_data=cost_estimate_sample_data)
 
             totalTime = planCost["totalTime"]
             totalCost = planCost["totalUSD"]  # for now, cost == USD
             quality = planCost["quality"]
 
-            plans.append((totalTime, totalCost, quality, physicalPlan))
+            plans.append((totalTime, totalCost, quality, physicalPlan, fullPlanCostEst))
 
         # drop duplicate plans in terms of time, cost, and quality, as these can cause
         # plans on the pareto frontier to be dropped if they are "dominated" by a duplicate
@@ -278,11 +278,11 @@ class LogicalOperator:
         # brute force; it may ultimately be best to compute a cheap approx. of the pareto front:
         # - e.g.: https://link.springer.com/chapter/10.1007/978-3-642-12002-2_6
         paretoFrontierPlans = []
-        for i, (totalTime_i, totalCost_i, quality_i, plan) in enumerate(dedup_plans):
+        for i, (totalTime_i, totalCost_i, quality_i, plan, fullPlanCostEst) in enumerate(dedup_plans):
             paretoFrontier = True
 
             # check if any other plan dominates plan i
-            for j, (totalTime_j, totalCost_j, quality_j, _) in enumerate(dedup_plans):
+            for j, (totalTime_j, totalCost_j, quality_j, _, _) in enumerate(dedup_plans):
                 if i == j:
                     continue
 
@@ -293,7 +293,7 @@ class LogicalOperator:
 
             # add plan i to pareto frontier if it's not dominated
             if paretoFrontier:
-                paretoFrontierPlans.append((totalTime_i, totalCost_i, quality_i, plan))
+                paretoFrontierPlans.append((totalTime_i, totalCost_i, quality_i, plan, fullPlanCostEst))
 
         print(f"PARETO PLANS: {len(paretoFrontierPlans)}")
         if max is not None:
@@ -393,9 +393,11 @@ class ConvertScan(LogicalOperator):
 
 class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached Set."""
-    def __init__(self, outputSchema: Schema, cachedDataIdentifier: str):
+    def __init__(self, outputSchema: Schema, cachedDataIdentifier: str, num_samples: int=None, scan_start_idx: int=0):
         super().__init__(outputSchema, None)
         self.cachedDataIdentifier = cachedDataIdentifier
+        self.num_samples = num_samples
+        self.scan_start_idx = scan_start_idx
 
     def __str__(self):
         return "CacheScan(" + str(self.outputSchema) + ", " + str(self.cachedDataIdentifier) + ")"
@@ -405,14 +407,16 @@ class CacheScan(LogicalOperator):
         return (self, None)
 
     def _getPhysicalTree(self, strategy: str=None, source: PhysicalOp=None, shouldProfile: bool=False):
-        return CacheScanDataOp(self.outputSchema, self.cachedDataIdentifier, shouldProfile=shouldProfile)
+        return CacheScanDataOp(self.outputSchema, self.cachedDataIdentifier, num_samples=self.num_samples, scan_start_idx=self.scan_start_idx, shouldProfile=shouldProfile)
 
 
 class BaseScan(LogicalOperator):
     """A BaseScan is a logical operator that represents a scan of a particular data source."""
-    def __init__(self, outputSchema: Schema, datasetIdentifier: str):
+    def __init__(self, outputSchema: Schema, datasetIdentifier: str, num_samples: int=None, scan_start_idx: int=0):
         super().__init__(outputSchema, None)
         self.datasetIdentifier = datasetIdentifier
+        self.num_samples = num_samples
+        self.scan_start_idx = scan_start_idx
 
     def __str__(self):
         return "BaseScan(" + str(self.outputSchema) + ", " + self.datasetIdentifier + ")"
@@ -422,7 +426,7 @@ class BaseScan(LogicalOperator):
         return (self, None)
 
     def _getPhysicalTree(self, strategy: str=None, source: PhysicalOp=None, shouldProfile: bool=False):
-        return MarshalAndScanDataOp(self.outputSchema, self.datasetIdentifier, shouldProfile=shouldProfile)
+        return MarshalAndScanDataOp(self.outputSchema, self.datasetIdentifier, num_samples=self.num_samples, scan_start_idx=self.scan_start_idx, shouldProfile=shouldProfile)
 
 
 class LimitScan(LogicalOperator):

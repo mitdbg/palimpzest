@@ -73,9 +73,11 @@ class PhysicalOp:
         raise NotImplementedError("Abstract method")
 
 class MarshalAndScanDataOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, datasetIdentifier: str, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, datasetIdentifier: str, num_samples: int=None, scan_start_idx: int=0, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.datasetIdentifier = datasetIdentifier
+        self.num_samples = num_samples
+        self.scan_start_idx = scan_start_idx
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
@@ -85,7 +87,7 @@ class MarshalAndScanDataOp(PhysicalOp):
         return "MarshalAndScanDataOp(" + str(self.outputSchema) + ", " + self.datasetIdentifier + ")"
 
     def copy(self):
-        return MarshalAndScanDataOp(self.outputSchema, self.datasetIdentifier, self.shouldProfile)
+        return MarshalAndScanDataOp(self.outputSchema, self.datasetIdentifier, self.num_samples, self.scan_start_idx, self.shouldProfile)
 
     def opId(self):
         d = {
@@ -126,7 +128,7 @@ class MarshalAndScanDataOp(PhysicalOp):
         # assume no cost for reading data
         usdPerElement = 0
 
-        return {
+        costEst = {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
             "usdPerElement": usdPerElement,
@@ -137,19 +139,32 @@ class MarshalAndScanDataOp(PhysicalOp):
             "estOutputTokensPerElement": estOutputTokensPerElement,
             "quality": 1.0,
         }
+    
+        return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
 
     def __iter__(self) -> IteratorFn:
         @self.profile(name="base_scan", shouldProfile=self.shouldProfile)
         def iteratorFn():
-            for nextCandidate in self.datadir.getRegisteredDataset(self.datasetIdentifier):
+            counter = 0
+            for idx, nextCandidate in enumerate(self.datadir.getRegisteredDataset(self.datasetIdentifier)):
+                if idx < self.scan_start_idx:
+                    continue
+
                 yield nextCandidate
+
+                if self.num_samples:
+                    counter += 1
+                    if counter >= self.num_samples:
+                        break
 
         return iteratorFn()
 
 class CacheScanDataOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, cacheIdentifier: str, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, cacheIdentifier: str, num_samples: int=None, scan_start_idx: int=0, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.cacheIdentifier = cacheIdentifier
+        self.num_samples = num_samples
+        self.scan_start_idx = scan_start_idx
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
@@ -159,7 +174,7 @@ class CacheScanDataOp(PhysicalOp):
         return "CacheScanDataOp(" + str(self.outputSchema) + ", " + self.cacheIdentifier + ")"
 
     def copy(self):
-        return CacheScanDataOp(self.outputSchema, self.cacheIdentifier, self.shouldProfile)
+        return CacheScanDataOp(self.outputSchema, self.cacheIdentifier, self.num_samples, self.shouldProfile)
 
     def opId(self):
         d = {
@@ -210,7 +225,7 @@ class CacheScanDataOp(PhysicalOp):
             * BYTES_TO_TOKENS           # convert bytes to tokens
         )
 
-        return {
+        costEst = {
             "cardinality": cardinality,
             "timePerElement": timePerElement,
             "usdPerElement": usdPerElement,
@@ -222,12 +237,24 @@ class CacheScanDataOp(PhysicalOp):
             "quality": 1.0,
         }
 
+        return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
+
     def __iter__(self) -> IteratorFn:
         @self.profile(name="cache_scan", shouldProfile=self.shouldProfile)
         def iteratorFn():
             # NOTE: see comment in `estimateCost()` 
-            for nextCandidate in self.datadir.getCachedResult(self.cacheIdentifier):
+            counter = 0
+            for idx, nextCandidate in enumerate(self.datadir.getCachedResult(self.cacheIdentifier)):
+                if idx < self.scan_start_idx:
+                    continue
+
                 yield nextCandidate
+
+                if self.num_samples:
+                    counter += 1
+                    if counter >= self.num_samples:
+                        break
+
         return iteratorFn()
 
 
@@ -304,7 +331,7 @@ class InduceFromCandidateOp(PhysicalOp):
             "operator": "InduceFromCandidateOp",
             "outputSchema": str(self.outputSchema),
             "source": self.source.opId(),
-            "model": self.model.value,
+            # "model": self.model.value,
             "prompt_strategy": self.prompt_strategy.value,
             "desc": self.desc,
             "targetCacheId": self.targetCacheId,
@@ -314,12 +341,15 @@ class InduceFromCandidateOp(PhysicalOp):
 
     def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # fetch cost estimates from source operation
-        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
+        inputEstimates, subPlanCostEst = self.source.estimateCost(cost_estimate_sample_data)
 
         # if induce has a quick conversion; set "no-op" cost estimates
         if self._is_quick_conversion():
             # we assume time cost of these conversions is negligible
-            return inputEstimates
+            outputEstimates = {**inputEstimates}
+            outputEstimates["timePerElement"] = 0.0
+            outputEstimates["usdPerElement"] = 0.0
+            return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {}, "subPlan": subPlanCostEst}
 
         # if we have sample estimates, let's use those instead of our prescriptive estimates
         if cost_estimate_sample_data is not None:
@@ -330,17 +360,29 @@ class InduceFromCandidateOp(PhysicalOp):
             generated_fields_str = "-".join(sorted(generated_fields))
 
             # compute estimates
-            filter = f"(input_fields == '{input_fields_str}') & (generated_fields == '{generated_fields_str}') & (op_name == 'induce')"
-            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
-            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, filter=filter)
-            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, filter=filter)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, filter=filter)
-            quality = StatsProcessor._est_quality(cost_estimate_sample_data, filter=filter)
+            all_model_filter = f"(input_fields == '{input_fields_str}') & (generated_fields == '{generated_fields_str}') & (op_name == 'induce')"
+            # all_model_filter = f"op_id == '{str(self.opId())}'"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter)
+            quality = StatsProcessor._est_quality(cost_estimate_sample_data, "induce", all_model_filter, self.model.value)
 
             # estimate cardinality using sample selectivity and input cardinality est.
             cardinality = inputEstimates['cardinality'] * selectivity
 
-            return {
+            # apply quality for this filter to overall quality est.
+            quality = inputEstimates['quality'] * quality
+
+            thisCostEst = {
+                "time_per_record": time_per_record,
+                "usd_per_record": usd_per_record,
+                "est_num_output_tokens": est_num_output_tokens,
+                "selectivity": selectivity,
+                "quality": quality,
+            }
+
+            costEst = {
                 "cardinality": cardinality,
                 "timePerElement": time_per_record,
                 "usdPerElement": usd_per_record,
@@ -351,6 +393,8 @@ class InduceFromCandidateOp(PhysicalOp):
                 "estOutputTokensPerElement": est_num_output_tokens,
                 "quality": quality,
             }
+
+            return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
@@ -416,7 +460,7 @@ class InduceFromCandidateOp(PhysicalOp):
         if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
             quality = quality * GPT_4_MODEL_CARD["code"]
 
-        return {
+        costEst = {
             "cardinality": cardinality,
             "timePerElement": model_conversion_time_per_record,
             "usdPerElement": model_conversion_usd_per_record,
@@ -427,6 +471,8 @@ class InduceFromCandidateOp(PhysicalOp):
             "estOutputTokensPerElement": est_num_output_tokens,
             "quality": quality,
         }
+
+        return costEst, None
 
     def __iter__(self) -> IteratorFn:
         shouldCache = self.datadir.openCache(self.targetCacheId)
@@ -543,33 +589,48 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         See InduceFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
         """
         # fetch cost estimates from source operation
-        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
+        inputEstimates, subPlanCostEst = self.source.estimateCost(cost_estimate_sample_data)
 
         # if induce has a quick conversion; set "no-op" cost estimates
         if self._is_quick_conversion():
             # we assume time cost of these conversions is negligible
-            return inputEstimates
+            outputEstimates = {**inputEstimates}
+            outputEstimates["timePerElement"] = 0.0
+            outputEstimates["usdPerElement"] = 0.0
+            return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {}, "subPlan": subPlanCostEst}
 
         # if we have sample estimates, let's use those instead of our prescriptive estimates
         if cost_estimate_sample_data is not None:
             # get state variables
-            input_fields = json.dumps(sorted(self.source.outputSchema.fieldNames()))
-            generated_fields = json.dumps(sorted([field for field in self.outputSchema.fieldNames() if field not in input_fields]))
-
-            # compute estimates
+            input_fields = self.source.outputSchema.fieldNames()
+            generated_fields = [field for field in self.outputSchema.fieldNames() if field not in input_fields]
             input_fields_str = "-".join(sorted(input_fields))
             generated_fields_str = "-".join(sorted(generated_fields))
-            filter = f"(input_fields == '{input_fields_str}') & (generated_fields == '{generated_fields_str}') & (op_name == 'p_induce')"
-            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
-            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, filter=filter)
-            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, filter=filter)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, filter=filter)
-            quality = StatsProcessor._est_quality(cost_estimate_sample_data, filter=filter)
+
+            # compute estimates
+            all_model_filter = f"(input_fields == '{input_fields_str}') & (generated_fields == '{generated_fields_str}') & (op_name == 'p_induce')"
+            # all_model_filter = f"op_id == '{str(self.opId())}'"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter)
+            quality = StatsProcessor._est_quality(cost_estimate_sample_data, "induce", all_model_filter, self.model.value)
 
             # estimate cardinality using sample selectivity and input cardinality est.
             cardinality = inputEstimates['cardinality'] * selectivity
 
-            return {
+            # apply quality for this filter to overall quality est.
+            quality = inputEstimates['quality'] * quality
+
+            thisCostEst = {
+                "time_per_record": time_per_record,
+                "usd_per_record": usd_per_record,
+                "est_num_output_tokens": est_num_output_tokens,
+                "selectivity": selectivity,
+                "quality": quality,
+            }
+
+            costEst = {
                 "cardinality": cardinality,
                 "timePerElement": time_per_record,
                 "usdPerElement": usd_per_record,
@@ -580,6 +641,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
                 "estOutputTokensPerElement": est_num_output_tokens,
                 "quality": quality,
             }
+
+            return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
@@ -640,7 +703,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
             quality = quality * GPT_4_MODEL_CARD["code"]
 
-        return {
+        costEst = {
             "cardinality": cardinality,
             "timePerElement": model_conversion_time_per_record,
             "usdPerElement": model_conversion_usd_per_record,
@@ -651,6 +714,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             "estOutputTokensPerElement": est_num_output_tokens,
             "quality": quality,
         }
+
+        return costEst, None
 
     def __iter__(self):
         # This is very crudely implemented right now, since we materialize everything
@@ -739,7 +804,7 @@ class FilterCandidateOp(PhysicalOp):
             "outputSchema": str(self.outputSchema),
             "source": self.source.opId(),
             "filter": str(self.filter),
-            "model": self.model.value,
+            # "model": self.model.value,
             "prompt_strategy": self.prompt_strategy.value,
             "targetCacheId": self.targetCacheId,
         }
@@ -751,21 +816,34 @@ class FilterCandidateOp(PhysicalOp):
         See InduceFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
         """
         # fetch cost estimates from source operation
-        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
+        inputEstimates, subPlanCostEst = self.source.estimateCost(cost_estimate_sample_data)
 
         if cost_estimate_sample_data is not None:
             # compute estimates
-            filter = f"(filter == '{str(self.filter)}') & (op_name == 'filter')"
-            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
-            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, filter=filter)
-            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, filter=filter)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, filter=filter)
-            quality = StatsProcessor._est_quality(cost_estimate_sample_data, filter=filter)
+            filter_str = self.filter.filterCondition if self.filter.filterCondition is not None else str(self.filter.filterFn)
+            all_model_filter = f"(filter == '{str(filter_str)}') & (op_name == 'filter')"
+            # all_model_filter = f"op_id == '{str(self.opId())}'"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter)
+            quality = StatsProcessor._est_quality(cost_estimate_sample_data, "filter", all_model_filter, self.model.value)
 
             # estimate cardinality using sample selectivity and input cardinality est.
             cardinality = inputEstimates['cardinality'] * selectivity
 
-            return {
+            # apply quality for this filter to overall quality est.
+            quality = inputEstimates['quality'] * quality
+
+            thisCostEst = {
+                "time_per_record": time_per_record,
+                "usd_per_record": usd_per_record,
+                "est_num_output_tokens": est_num_output_tokens,
+                "selectivity": selectivity,
+                "quality": quality,
+            }
+
+            costEst = {
                 "cardinality": cardinality,
                 "timePerElement": time_per_record,
                 "usdPerElement": usd_per_record,
@@ -776,6 +854,8 @@ class FilterCandidateOp(PhysicalOp):
                 "estOutputTokensPerElement": est_num_output_tokens,
                 "quality": quality,
             }
+
+            return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
 
         # otherwise, if this filter is a function call (not an LLM call) estimate accordingly
         if self.filter.filterFn is not None:
@@ -843,7 +923,7 @@ class FilterCandidateOp(PhysicalOp):
         # estimate quality of output based on the strength of the model being used
         quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
 
-        return {
+        costEst = {
             "cardinality": cardinality,
             "timePerElement": model_conversion_time_per_record,
             "usdPerElement": model_conversion_usd_per_record,
@@ -855,6 +935,8 @@ class FilterCandidateOp(PhysicalOp):
             "estOutputTokensPerElement": inputEstimates["estOutputTokensPerElement"],
             "quality": quality,
         }
+
+        return costEst, None
 
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
@@ -939,21 +1021,33 @@ class ParallelFilterCandidateOp(PhysicalOp):
 
     def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # fetch cost estimates from source operation
-        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
+        inputEstimates, subPlanCostEst = self.source.estimateCost(cost_estimate_sample_data)
 
         if cost_estimate_sample_data is not None:
             # compute estimates
-            filter = f"(filter == '{str(self.filter)}') & (op_name == 'p_filter')"
-            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
-            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, filter=filter)
-            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, filter=filter)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, filter=filter)
-            quality = StatsProcessor._est_quality(cost_estimate_sample_data, filter=filter)
+            all_model_filter = f"(filter == '{str(self.filter)}') & (op_name == 'p_filter')"
+            # all_model_filter = f"op_id == '{str(self.opId())}'"
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter)
+            quality = StatsProcessor._est_quality(cost_estimate_sample_data, "filter", all_model_filter, self.model.value)
 
             # estimate cardinality using sample selectivity and input cardinality est.
             cardinality = inputEstimates['cardinality'] * selectivity
 
-            return {
+            # apply quality for this filter to overall quality est.
+            quality = inputEstimates['quality'] * quality
+
+            thisCostEst = {
+                "time_per_record": time_per_record,
+                "usd_per_record": usd_per_record,
+                "est_num_output_tokens": est_num_output_tokens,
+                "selectivity": selectivity,
+                "quality": quality,
+            }
+
+            costEst = {
                 "cardinality": cardinality,
                 "timePerElement": time_per_record,
                 "usdPerElement": usd_per_record,
@@ -964,6 +1058,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
                 "estOutputTokensPerElement": est_num_output_tokens,
                 "quality": quality,
             }
+
+            return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
 
         # otherwise, if this filter is a function call (not an LLM call) estimate accordingly
         if self.filter.filterFn is not None:
@@ -1031,7 +1127,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
         # estimate quality of output based on the strength of the model being used
         quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
 
-        return {
+        costEst = {
             "cardinality": cardinality,
             "timePerElement": model_conversion_time_per_record,
             "usdPerElement": model_conversion_usd_per_record,
@@ -1043,6 +1139,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
             "estOutputTokensPerElement": inputEstimates["estOutputTokensPerElement"],
             "quality": quality,
         }
+
+        return costEst, None
 
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
@@ -1143,7 +1241,7 @@ class ApplyGroupByOp(PhysicalOp):
             return (self, self.source.dumpPhysicalTree())
         
         def estimateCost(self):
-            inputEstimates = self.source.estimateCost()
+            inputEstimates, subPlanCostEst = self.source.estimateCost()
 
             outputEstimates = {**inputEstimates}
             outputEstimates['cardinality'] = 1
@@ -1153,7 +1251,7 @@ class ApplyGroupByOp(PhysicalOp):
             outputEstimates['usdPerElement'] = 0
             outputEstimates['estOutputTokensPerElement'] = 0
 
-            return outputEstimates
+            return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {}, "subPlan": subPlanCostEst}
 
 
 
@@ -1236,7 +1334,7 @@ class ApplyCountAggregateOp(PhysicalOp):
 
     def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # get input estimates and pass through to output
-        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
+        inputEstimates, subPlanCostEst = self.source.estimateCost(cost_estimate_sample_data)
         outputEstimates = {**inputEstimates}
 
         # the profiler will record timing info for this operator, which can be used
@@ -1255,7 +1353,7 @@ class ApplyCountAggregateOp(PhysicalOp):
             outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + time_per_record
             outputEstimates['totalTime'] = cardinality * time_per_record + inputEstimates['totalTime']
 
-            return outputEstimates
+            return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {"time_per_record": time_per_record}, "subPlan": subPlanCostEst}
 
         # output cardinality for an aggregate will be 1
         outputEstimates['cardinality'] = 1
@@ -1265,7 +1363,7 @@ class ApplyCountAggregateOp(PhysicalOp):
         outputEstimates['usdPerElement'] = 0
         outputEstimates['estOutputTokensPerElement'] = 0
 
-        return outputEstimates
+        return outputEstimates, None
 
     def __iter__(self):
         datadir = DataDirectory()
@@ -1323,7 +1421,7 @@ class ApplyUserFunctionOp(PhysicalOp):
 
     def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # get input estimates and pass through to output
-        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
+        inputEstimates, subPlanCostEst = self.source.estimateCost(cost_estimate_sample_data)
         outputEstimates = {**inputEstimates}
 
         # the profiler will record selectivity and timing info for this operator,
@@ -1343,14 +1441,14 @@ class ApplyUserFunctionOp(PhysicalOp):
             outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + time_per_record
             outputEstimates['totalTime'] = cardinality * time_per_record + inputEstimates['totalTime']
 
-            return outputEstimates
+            return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {"time_per_record": time_per_record, "selectivity": selectivity}, "subPlan": subPlanCostEst}
 
         # for now, assume applying the user function takes negligible additional time (and no cost in USD)
         outputEstimates["timePerElement"] = 0
         outputEstimates["usdPerElement"] = 0
         outputEstimates["estOutputTokensPerElement"] = 0
 
-        return outputEstimates
+        return outputEstimates, None
 
     def __iter__(self):
         datadir = DataDirectory()
@@ -1406,7 +1504,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
 
     def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # get input estimates and pass through to output
-        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
+        inputEstimates, subPlanCostEst = self.source.estimateCost(cost_estimate_sample_data)
         outputEstimates = {**inputEstimates}
 
         # the profiler will record timing info for this operator, which can be used
@@ -1425,7 +1523,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
             outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + time_per_record
             outputEstimates['totalTime'] = cardinality * time_per_record + inputEstimates['totalTime']
 
-            return outputEstimates
+            return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {"time_per_record": time_per_record}, "subPlan": subPlanCostEst}
 
         # output cardinality for an aggregate will be 1
         outputEstimates["cardinality"] = 1
@@ -1435,7 +1533,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
         outputEstimates["usdPerElement"] = 0
         outputEstimates["estOutputTokensPerElement"] = 0
 
-        return outputEstimates
+        return outputEstimates, None
 
     def __iter__(self):
         datadir = DataDirectory()
@@ -1497,7 +1595,7 @@ class LimitScanOp(PhysicalOp):
 
     def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]]=None):
         # get input estimates and pass through to output
-        inputEstimates = self.source.estimateCost(cost_estimate_sample_data)
+        inputEstimates, subPlanCostEst = self.source.estimateCost(cost_estimate_sample_data)
         outputEstimates = {**inputEstimates}
         
         # the profiler will record selectivity and timing info for this operator,
@@ -1516,12 +1614,12 @@ class LimitScanOp(PhysicalOp):
             outputEstimates['cumulativeTimePerElement'] = inputEstimates['cumulativeTimePerElement'] + time_per_record
             outputEstimates['totalTime'] = cardinality * time_per_record + inputEstimates['totalTime']
 
-            return outputEstimates
+            return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {"time_per_record": time_per_record}, "subPlan": subPlanCostEst}
 
         # output cardinality for limit can be at most self.limit
         outputEstimates["cardinality"] = min(self.limit, inputEstimates["cardinality"])
 
-        return outputEstimates
+        return outputEstimates, None
 
     def __iter__(self):
         datadir = DataDirectory()

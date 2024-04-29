@@ -85,7 +85,7 @@ class Execution:
                     emitNestedTuple(physicalOps)
                     print("----------")
 
-            planTime, planCost, quality, physicalTree = MaxQuality().choose(candidatePlans)
+            planTime, planCost, quality, physicalTree, _ = MaxQuality().choose(candidatePlans)
 
             if verbose:
                 print("----------")
@@ -133,7 +133,7 @@ class Execution:
                 emitNestedTuple(physicalOps)
                 print("----------")
 
-        planTime, planCost, quality, physicalTree = self.policy.choose(candidatePlans)
+        planTime, planCost, quality, physicalTree, _ = self.policy.choose(candidatePlans)
 
         if verbose:
             print("----------")
@@ -187,7 +187,7 @@ class SimpleExecution(Execution):
                 # graphicEmit(flatten_ops)
                 # print("----------")
 
-        planTime, planCost, quality, physicalTree = self.policy.choose(candidatePlans)
+        planTime, planCost, quality, physicalTree, _ = self.policy.choose(candidatePlans)
 
         if verbose:
             print("----------")

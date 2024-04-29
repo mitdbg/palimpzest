@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
     # have policy select the candidate plan to execute
     myPolicy = MinCost()
-    planTime, planCost, quality, physicalTree = myPolicy.choose(candidatePlans)
+    planTime, planCost, quality, physicalTree, _ = myPolicy.choose(candidatePlans)
     print("----------")
     print(f"Policy is: {str(myPolicy)}")
     print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")

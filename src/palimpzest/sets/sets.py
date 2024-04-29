@@ -55,6 +55,8 @@ class Set:
                  cardinality: str=None,
                  image_conversion: bool=None,
                  depends_on: List[str]=None,
+                 num_samples: int=None,
+                 scan_start_idx: int=0,
                  nocache: bool=False):
         self._schema = schema
         self._source = source
@@ -67,6 +69,8 @@ class Set:
         self._cardinality = cardinality
         self._image_conversion = image_conversion
         self._depends_on = depends_on
+        self._num_samples = num_samples
+        self._scan_start_idx = scan_start_idx
         self._nocache = nocache
 
     def __str__(self):
@@ -83,6 +87,8 @@ class Set:
              "cardinality": self._cardinality,
              "image_conversion": self._image_conversion,
              "depends_on": self._depends_on,
+             "num_samples": self._num_samples,
+             "scan_start_idx": self._scan_start_idx,
              "limit": self._limit,
              "groupBy": None if self._groupBy is None else GroupBySig.serialize(self._groupBy)}
 
@@ -126,6 +132,8 @@ class Set:
         cardinality = inputObj.get("cardinality", None)
         image_conversion = inputObj.get("image_conversion", None)
         depends_on = inputObj.get("depends_on", None)
+        num_samples = inputObj.get("num_samples", None)
+        scan_start_idx = inputObj.get("scan_start_idx", None)
 
         return Set(schema=inputObj["schema"].jsonSchema(), 
                    source=source, 
@@ -136,6 +144,8 @@ class Set:
                    cardinality=cardinality,
                    image_conversion=image_conversion,
                    depends_on=depends_on,
+                   num_samples=num_samples,
+                   scan_start_idx=scan_start_idx,
                    limit=limit,
                    groupBy=groupBy)
 
@@ -166,7 +176,7 @@ class Set:
         # first, check to see if this set has previously been cached
         uid = self.universalIdentifier()
         if not self._nocache and DataDirectory().hasCachedAnswer(uid):
-            return CacheScan(self._schema, uid)
+            return CacheScan(self._schema, uid, self._num_samples, self._scan_start_idx)
 
         # otherwise, if this Set's source is a DataSource
         if isinstance(self._source, DataSource):
@@ -174,9 +184,9 @@ class Set:
             sourceSchema = self._source.schema
 
             if self._schema == sourceSchema:
-                return BaseScan(self._schema, dataset_id)
+                return BaseScan(self._schema, dataset_id, self._num_samples, self._scan_start_idx)
             else:
-                return ConvertScan(self._schema, BaseScan(sourceSchema, dataset_id), targetCacheId=uid)
+                return ConvertScan(self._schema, BaseScan(sourceSchema, dataset_id, self._num_samples, self._scan_start_idx), targetCacheId=uid)
 
         # if the Set's source is another Set, apply the appropriate scan to the Set
         if self._filter is not None:
@@ -214,7 +224,7 @@ class Dataset(Set):
     provide a Schema for the Dataset. This Schema will be enforced when the Dataset iterates
     over the source in its __iter__ method and constructs DataRecords.
     """
-    def __init__(self, source: Union[str, Set], schema: Schema=File, cardinality: str = None, desc: str=None, filter: Filter=None, groupBy: GroupBySig=None, aggFunc: AggregateFunction=None, limit: int=None, fnid: str=None, image_conversion: bool=None, depends_on: Union[str, List[str]]=None, nocache: bool=False):
+    def __init__(self, source: Union[str, Set], schema: Schema=File, cardinality: str = None, desc: str=None, filter: Filter=None, groupBy: GroupBySig=None, aggFunc: AggregateFunction=None, limit: int=None, fnid: str=None, image_conversion: bool=None, depends_on: Union[str, List[str]]=None, num_samples: int=None, scan_start_idx: int=0, nocache: bool=False):
         # convert source (str) -> source (DataSource) if need be
         self.source = (
             DataDirectory().getRegisteredDataset(source)
@@ -224,7 +234,7 @@ class Dataset(Set):
         if type(depends_on) == str:
             depends_on = [depends_on]
 
-        super().__init__(schema, self.source, cardinality=cardinality, desc=desc, filter=filter, aggFunc=aggFunc, groupBy=groupBy, limit=limit, fnid=fnid, image_conversion=image_conversion, depends_on=depends_on, nocache=nocache)
+        super().__init__(schema, self.source, cardinality=cardinality, desc=desc, filter=filter, aggFunc=aggFunc, groupBy=groupBy, limit=limit, fnid=fnid, image_conversion=image_conversion, depends_on=depends_on, num_samples=num_samples, scan_start_idx=scan_start_idx, nocache=nocache)
 
     def deserialize(inputObj):
         # TODO: this deserialize operation will not work; I need to finish the deserialize impl. for Schema

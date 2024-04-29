@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from palimpzest.constants import MODEL_CARDS
+from palimpzest.constants import Model, MODEL_CARDS
 
 from collections import defaultdict
 from copy import deepcopy
@@ -70,6 +70,8 @@ class OperatorStats:
     total_llm_call_duration: float=0.0
     # name of the model used for generation
     model_name: str=None
+    # the string associated with the filter
+    filter: str=None
     # keep track of finish reasons
     finish_reasons: defaultdict[int]=field(default_factory=lambda: defaultdict(int))
     # record input fields and the output fields generated in an induce operation
@@ -261,6 +263,34 @@ class FilterNonLLMStats(Stats):
     fn_call_duration_secs: float=None
     # the filter condition for this filter
     filter: str=None
+
+# TODO: move to utils
+def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
+    """
+    This function parses an LLM response which is supposed to output a JSON object
+    and optimistically searches for the substring containing the JSON object.
+    """
+    if not answer.strip().startswith('{'):
+        # Find the start index of the actual JSON string
+        # assuming the prefix is followed by the JSON object/array
+        start_index = answer.find('{') if '{' in answer else answer.find('[')
+        if start_index != -1:
+            # Remove the prefix and any leading characters before the JSON starts
+            answer = answer[start_index:]
+
+    if not answer.strip().endswith('}'):
+        # Find the end index of the actual JSON string
+        # assuming the suffix is preceded by the JSON object/array
+        end_index = answer.rfind('}') if '}' in answer else answer.rfind(']')
+        if end_index != -1:
+            # Remove the suffix and any trailing characters after the JSON ends
+            answer = answer[:end_index + 1]
+
+    # Handle weird escaped values. I am not sure why the model
+    # is returning these, but the JSON parser can't take them
+    answer = answer.replace("\_", "_")
+
+    return json.loads(answer)
 
 
 class StatsProcessor:
@@ -509,11 +539,13 @@ class StatsProcessor:
 
             # non-LLM induce objects will have no stats or a single ApiStats object
             elif isinstance(stats, FilterNonLLMStats):
+                profiling_data.filter = stats.filter
                 profiling_data.total_fn_call_duration += stats.fn_call_duration_secs
 
             # filter llm objects will have a single GenerationStats object
             elif isinstance(stats, FilterLLMStats):
                 # update aggregate statistics with filter generation stats
+                profiling_data.filter = stats.filter
                 profiling_data = self._update_gen_stats(profiling_data, stats.gen_stats)
 
         return profiling_data
@@ -613,7 +645,7 @@ class StatsProcessor:
         return profiling_data
 
     @staticmethod
-    def _est_time_per_record(cost_est_sample_data: List[Dict[str, Any]], filter: str=None, agg: str="mean") -> float:
+    def _est_time_per_record(cost_est_sample_data: List[Dict[str, Any]], filter: str=None, model_name: str=None, agg: str="mean") -> float:
         """
         Given sample cost data observations, and potentially a filter to identify a unique operator,
         compute the aggregate over the `op_time` column.
@@ -625,11 +657,17 @@ class StatsProcessor:
         if filter is not None:
             df = df.query(filter)
 
+        # use model-specific estimate if possible
+        if model_name is not None:
+            model_df = df[df.model_name == model_name]
+            if not model_df.empty:
+                return model_df['op_time'].agg(agg=agg).iloc[0]
+
         # compute aggregate
         return df['op_time'].agg(agg=agg).iloc[0]
 
     @staticmethod
-    def _est_num_input_output_tokens(cost_est_sample_data: List[Dict[str, Any]], filter: str=None, agg: str="mean") -> Tuple[float, float]:
+    def _est_num_input_output_tokens(cost_est_sample_data: List[Dict[str, Any]], filter: str=None, model_name: str=None, agg: str="mean") -> Tuple[float, float]:
         """
         Given sample cost data observations, and potentially a filter to identify a unique operator,
         compute the aggregate over the `num_input_tokens` and `num_output_tokens` columns.
@@ -643,11 +681,17 @@ class StatsProcessor:
         if filter is not None:
             df = df.query(filter)
 
+        # use model-specific estimate if possible
+        if model_name is not None:
+            model_df = df[df.model_name == model_name]
+            if not model_df.empty:
+                return model_df['num_input_tokens'].agg(agg=agg).iloc[0], model_df['num_output_tokens'].agg(agg=agg).iloc[0]
+
         # compute aggregate
         return df['num_input_tokens'].agg(agg=agg).iloc[0], df['num_output_tokens'].agg(agg=agg).iloc[0]
 
     @staticmethod
-    def _est_usd_per_record(cost_est_sample_data: List[Dict[str, Any]], filter: str=None, agg: str="mean") -> float:
+    def _est_usd_per_record(cost_est_sample_data: List[Dict[str, Any]], filter: str=None, model_name: str=None, agg: str="mean") -> float:
         """
         Given sample cost data observations, and potentially a filter to identify a unique operator,
         compute the aggregate over the sum of the `input_usd` and `output_usd` columns.
@@ -658,6 +702,12 @@ class StatsProcessor:
         df = pd.DataFrame(cost_est_sample_data)
         if filter is not None:
             df = df.query(filter)
+
+        # use model-specific estimate if possible
+        if model_name is not None:
+            model_df = df[df.model_name == model_name]
+            if not model_df.empty:
+                return (model_df['input_usd'] + model_df['output_usd']).agg(agg=agg).iloc[0]
 
         # compute average combined input/output usd spent
         return (df['input_usd'] + df['output_usd']).agg(agg=agg).iloc[0]
@@ -683,7 +733,7 @@ class StatsProcessor:
         return len(op_df) / len(source_op_df)
 
     @staticmethod
-    def _est_quality(cost_est_sample_data: List[Dict[str, Any]], filter: str=None) -> float:
+    def _est_quality(cost_est_sample_data: List[Dict[str, Any]], induce_or_filter: str, filter: str, this_model_name: str=None) -> float:
         """
         Given an operator's aggregate stats, estimate the quality of its answers as
         an average of its model quality as measured by is MMLU score and the average of its
@@ -703,29 +753,67 @@ class StatsProcessor:
         # return est_quality
 
         # convert data to dataframe and filter if applicable
-        df = pd.DataFrame(cost_est_sample_data)
-        if filter is not None:
-            df = df.query(filter)
+        df = pd.DataFrame(cost_est_sample_data).query(filter)
+        # if filter is not None:
+        #     # turn off warnings about setting results on copy
+        #     pd.options.mode.chained_assignment = None
 
-        # get all answer token log probabilities and compute the mean
-        all_answer_log_probs = np.array([
-            log_prob
-            for log_probs in df.answer_log_probs.tolist()
-            for log_prob in log_probs
-        ])
-        avg_token_log_probability = np.mean(all_answer_log_probs)
+        #     # filter for sub df
+        #     df = df.query(filter)
 
-        # get prior believe of model quality
-        model_name = df.model_name.iloc[0]
-        model_quality = (MODEL_CARDS[model_name]['MMLU'] / 100.0)
+        # get unique set of records
+        record_uuids = df.record_uuid.unique()
 
-        # compute true mean of model's prior quality and our measurement of avg. log probability
-        # NOTE: recall that avg_token_log_probability will be a small neg. number
-        est_quality = np.mean([model_quality, 1 + avg_token_log_probability])
+        # compute GPT-4's answer (per-record) across all models; fall-back to most common answer if GPT-4 is not present
+        record_uuid_to_answer = {}
+        for record_uuid in record_uuids:
+            record_df = df[df.record_uuid == record_uuid]
+            gpt4_most_common_answer = record_df[record_df.model_name == Model.GPT_4.value].answer.mode()
+
+            if not gpt4_most_common_answer.empty:
+                record_uuid_to_answer[record_uuid] = gpt4_most_common_answer.iloc[0]
+            else:
+                record_uuid_to_answer[record_uuid] = record_df.answer.mode().iloc[0]
+
+        def _is_correct(row):
+            return row['answer'] == row['accepted_answer']
+
+        # compute accepted answers and clean all answers
+        df.loc[:, 'accepted_answer'] = df.record_uuid.apply(lambda uuid: record_uuid_to_answer[uuid])
+        df.loc[:, 'correct'] = df.apply(lambda row: _is_correct(row), axis=1)
+
+        # get subset of observations for this_model_name and estimate quality w/fraction of answers that match accepted answer
+        model_df = df[df.model_name == this_model_name]
+
+        est_quality = (
+            model_df[model_df.correct].shape[0] / model_df.shape[0]
+            if not model_df.empty
+            else (
+                df[df.correct].shape[0] / df.shape[0]
+                if not df.empty
+                else MODEL_CARDS[this_model_name]["MMLU"] / 100.0
+            )
+        )
+
+        # # get all answer token log probabilities and compute the mean
+        # all_answer_log_probs = np.array([
+        #     log_prob
+        #     for log_probs in df.answer_log_probs.tolist()
+        #     for log_prob in log_probs
+        # ])
+        # avg_token_log_probability = np.mean(all_answer_log_probs)
+
+        # # get prior believe of model quality
+        # model_name = df.model_name.iloc[0]
+        # model_quality = (MODEL_CARDS[model_name]['MMLU'] / 100.0)
+
+        # # compute true mean of model's prior quality and our measurement of avg. log probability
+        # # NOTE: recall that avg_token_log_probability will be a small neg. number
+        # est_quality = np.mean([model_quality, 1 + avg_token_log_probability])
 
         return est_quality
 
-    def _parse_record_llm_stats(self, record_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def _parse_record_llm_stats(self, record_dict: Dict[str, Any], op_name: str) -> Dict[str, Any]:
         """
         Extract gen_stats fields for get_cost_estimate_sample_data.
         """
@@ -736,16 +824,29 @@ class StatsProcessor:
         # re-use _compute_agg_op_stats to compute statistics across all possible stats objects
         op_stats = self._compute_agg_op_stats(op_stats)
 
+        def _clean_answer(answer, op_name):
+            # extract JSON for induce
+            if "induce" in op_name:
+                return _get_JSON_from_answer(answer)
+
+            # extract T/F for filter
+            elif "filter" in op_name:
+                return "true" in answer.lower()
+
+            else:
+                return answer
+
         # get values needed to compute observation metrics
         additional_fields_dict = {
             "model_name": op_stats.model_name,
+            "filter": op_stats.filter,
             "input_fields": "-".join(sorted(op_stats.input_fields)),
             "generated_fields": "-".join(sorted(op_stats.generated_fields)),
             "num_input_tokens": op_stats.total_input_tokens,
             "num_output_tokens": op_stats.total_output_tokens,
             "input_usd": op_stats.total_input_usd,
             "output_usd": op_stats.total_output_usd,
-            "answer": op_stats.answers[0] if len(op_stats.answers) > 0 else None,
+            "answer": _clean_answer(op_stats.answers[0], op_name) if len(op_stats.answers) > 0 else None,
             "answer_log_probs": op_stats.answer_log_probs[0] if len(op_stats.answer_log_probs) > 0 else None,
         }
 
@@ -769,6 +870,8 @@ class StatsProcessor:
                 # TODO: one issue with this setup is that cache_scans of previously computed queries
                 #       may not match w/these observations due to the diff. op_name
                 observation = {
+                    "record_uuid": record_dict["uuid"],
+                    "record_parent_uuid": record_dict["parent_uuid"],
                     "op_id": op_data.op_id,
                     "op_name": op_data.op_name,
                     "source_op_id": op_data.source_op_stats.op_id if op_data.source_op_stats is not None else None,
@@ -776,7 +879,7 @@ class StatsProcessor:
                 }
 
                 # add additional fields for induce or filter w/LLM
-                additional_fields_dict = self._parse_record_llm_stats(record_dict)
+                additional_fields_dict = self._parse_record_llm_stats(record_dict, op_data.op_name)
                 observation = dict(observation, **additional_fields_dict)
 
                 # add observation to list of observations

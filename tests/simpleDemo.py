@@ -276,7 +276,7 @@ def emitDataset(rootSet, policy, title="Dataset", verbose=False, shouldProfile=F
             print("----------")
 
     # have policy select the candidate plan to execute
-    planTime, planCost, quality, physicalTree = policy.choose(candidatePlans)
+    planTime, planCost, quality, physicalTree, _ = policy.choose(candidatePlans)
     print("----------")
     print(f"Policy is: {str(policy)}")
     print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")

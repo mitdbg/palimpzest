@@ -64,7 +64,7 @@ def emitDataset(rootSet, policy, title="Dataset", verbose=False):
         emitNestedTuple(physicalOps)
 
     # have policy select the candidate plan to execute
-    planTime, planCost, quality, physicalTree = policy.choose(candidatePlans)
+    planTime, planCost, quality, physicalTree, _ = policy.choose(candidatePlans)
     # planTime, planCost, quality, physicalTree =  candidatePlans[-1]
     print("----------")
     print(f"Policy is: {str(policy)}")

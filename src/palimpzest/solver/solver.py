@@ -335,7 +335,7 @@ class Solver:
                     if shouldProfile:
                         candidate._stats[td.op_id] = FilterNonLLMStats(
                             fn_call_duration_secs=fn_call_duration_secs,
-                            filter=str(td.filter),
+                            filter=str(td.filter.filterFn),
                         )
 
                     # set _passed_filter attribute and return record
