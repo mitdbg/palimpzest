@@ -160,8 +160,6 @@ def compute_label(physicalTree, label_idx):
     return f"PZ-{label_idx}-{label}"
 
 
-# TODO: I think I need IN_DIR to run this?
-IN_DIR= "testdata/biofabric-matching/"
 def score_biofabric_plans(opt, workload, records, plan_idx) -> float:
     """
     Computes the results of all biofabric plans
@@ -196,7 +194,7 @@ def score_biofabric_plans(opt, workload, records, plan_idx) -> float:
         output_study = output[output["study"] == study]
         study = study.split(".xlsx")[0]
         try:
-            input_df = pd.read_excel(os.path.join(IN_DIR, f"{study}.xlsx"))
+            input_df = pd.read_excel(os.path.join("testdata/biofabric-matching/", f"{study}.xlsx"))
         except:
             print("Cannot find the study", study)
             targets += [study]*5 
