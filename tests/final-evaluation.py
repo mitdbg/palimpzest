@@ -161,7 +161,7 @@ def compute_label(physicalTree, label_idx):
 
 
 # TODO: I think I need IN_DIR to run this?
-IN_DIR= "testdata/biofabric-medium/"
+IN_DIR= "testdata/biofabric-matching/"
 def score_biofabric_plans(opt, workload, records, plan_idx) -> float:
     """
     Computes the results of all biofabric plans
