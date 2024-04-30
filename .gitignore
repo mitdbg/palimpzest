@@ -20,3 +20,7 @@ testdata/maildir/
 
 # jupyter
 .ipynb_checkpoints/
+
+# evaluation
+old-eval-results/
+eval-results/
