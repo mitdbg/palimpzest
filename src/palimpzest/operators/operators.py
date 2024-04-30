@@ -344,11 +344,6 @@ class LogicalOperator:
             paretoFrontierPlans = paretoFrontierPlans[:max]
             print(f"LIMIT PARETO PLANS: {len(paretoFrontierPlans)}")
 
-        print(f"PARETO PLANS: {len(paretoFrontierPlans)}")
-        if max is not None:
-            paretoFrontierPlans = paretoFrontierPlans[:max]
-            print(f"LIMIT PARETO PLANS: {len(paretoFrontierPlans)}")
-
         return paretoFrontierPlans
 
 

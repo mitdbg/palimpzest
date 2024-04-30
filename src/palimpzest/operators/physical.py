@@ -489,7 +489,7 @@ class InduceFromCandidateOp(PhysicalOp):
         # TODO: make this better after arxiv; right now codegen is hard-coded to use GPT-4
         # if we're using code generation, assume that quality goes down (or view it as E[Quality] = (p=gpt4[code])*1.0 + (p=0.25)*0.0))
         if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
-            quality = quality * GPT_4_MODEL_CARD["code"]
+            quality = quality * (GPT_4_MODEL_CARD["code"] / 100.0)
 
         if self.token_budget is not None:
             quality = quality * math.sqrt(math.sqrt(self.token_budget)) # now assume quality is proportional to sqrt(token_budget)
@@ -748,7 +748,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         # TODO: make this better after arxiv; right now codegen is hard-coded to use GPT-4
         # if we're using code generation, assume that quality goes down (or view it as E[Quality] = (p=gpt4[code])*1.0 + (p=0.25)*0.0))
         if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
-            quality = quality * GPT_4_MODEL_CARD["code"]
+            quality = quality * (GPT_4_MODEL_CARD["code"] / 100.0)
 
         if self.token_budget is not None:
             quality = quality * math.sqrt(math.sqrt(self.token_budget)) # now assume quality is proportional to sqrt(token_budget)
