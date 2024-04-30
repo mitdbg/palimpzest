@@ -410,7 +410,7 @@ class Solver:
                 raise Exception("not implemented yet")
 
             # invoke LLM to generate filter decision (True or False)
-            text_content = candidate.asJSON()
+            text_content = candidate.asJSON(include_bytes=False)
             try:
                 response, gen_stats = generator.generate(context=text_content, question=td.filter.filterCondition)
 

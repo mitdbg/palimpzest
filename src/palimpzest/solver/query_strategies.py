@@ -143,7 +143,7 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
             generate_field_names.append(field_name)
 
     # fetch input information
-    text_content = candidate.asJSON()
+    text_content = candidate.asJSON(include_bytes=False)
     doc_schema = str(td.outputSchema)
     doc_type = td.outputSchema.className()
 
@@ -235,7 +235,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
             generate_field_names.append(field_name)
 
     # fetch input information
-    text_content = candidate.asJSON()
+    text_content = candidate.asJSON(include_bytes=False)
     doc_schema = str(td.outputSchema)
     doc_type = td.outputSchema.className()
 

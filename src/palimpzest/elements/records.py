@@ -42,7 +42,7 @@ class DataRecord:
 
     def asJSON(self, include_bytes: bool=True):
         """Return a JSON representation of this DataRecord"""
-        value_dict = self.asDict()
+        value_dict = self.asDict(include_bytes)
         return self.schema().asJSON(value_dict)
 
     def asDict(self, include_bytes: bool=True):
