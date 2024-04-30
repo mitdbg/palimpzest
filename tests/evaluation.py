@@ -63,10 +63,10 @@ class TextRealEstateListing(RealEstateListingFiles):
     """Represents a real estate listing with specific fields extracted from its text."""
     address = pz.StringField(desc="The address of the property")
     price = pz.NumericField(desc="The listed price of the property")
-    sq_ft = pz.NumericField(desc="The square footage (sq. ft.) of the property")
-    year_built = pz.NumericField(desc="The year in which the property was built")
-    bedrooms = pz.NumericField(desc="The number of bedrooms")
-    bathrooms = pz.NumericField(desc="The number of bathrooms")
+    # sq_ft = pz.NumericField(desc="The square footage (sq. ft.) of the property")
+    # year_built = pz.NumericField(desc="The year in which the property was built")
+    # bedrooms = pz.NumericField(desc="The number of bedrooms")
+    # bathrooms = pz.NumericField(desc="The number of bathrooms")
 
 class CodeGenEasyTextRealEstateListing(RealEstateListingFiles):
     """Represents a real estate listing with specific fields extracted from its text."""
@@ -143,6 +143,8 @@ def score_plan(datasetid, records, size) -> float:
         preds = records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
     elif "real-estate" in datasetid:
         preds = list(records_df.listing)
+    elif "token-reduction" in datasetid:
+        preds = list(records_df.listing)
     elif "codegen" in datasetid:
         preds = list(records_df.listing)
 
@@ -154,6 +156,8 @@ def score_plan(datasetid, records, size) -> float:
         gt_df = pd.read_csv("testdata/groundtruth/enron-eval-tiny.csv")
     elif "real-estate" in datasetid:
         gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval.csv")
+    elif "token-reduction" in datasetid:
+        gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval.csv")
     elif "codegen-easy" in datasetid:
         gt_df = pd.read_csv(f"testdata/groundtruth/codegen-easy-eval-{size}.csv")
     elif "codegen-hard" in datasetid:
@@ -163,6 +167,8 @@ def score_plan(datasetid, records, size) -> float:
     if "enron" in datasetid:
         targets = list(gt_df[gt_df.label == 1].filename)
     elif "real-estate" in datasetid:
+        targets = list(gt_df[gt_df.label == 1].listing)
+    elif "token-reduction" in datasetid:
         targets = list(gt_df[gt_df.label == 1].listing)
     elif "codegen-easy" in datasetid:
         targets = list(gt_df[gt_df.label == 1].listing)
@@ -361,6 +367,39 @@ def evaluate_pz_plans(dataset_ids, reoptimize=False, limit=None):
             listings = listings.filterByFn(in_price_range, depends_on="price")
             logicalTree = listings.getLogicalTree()
 
+        elif "token-reduction" in datasetid:
+            def within_two_miles_of_mit(record):
+                # NOTE: I'm using this hard-coded function so that folks w/out a
+                #       Geocoding API key from google can still run this example
+                try:
+                    far_away_addrs = ["Melcher St", "Sleeper St", "437 D St", "Seaport", "Liberty"]
+                    if any([street.lower() in record.address.lower() for street in far_away_addrs]):
+                        return False
+                    return True
+                except:
+                    return False
+
+            def in_price_range(record):
+                try:
+                    price = record.price
+                    if type(price) == str:
+                        price = price.strip()
+                        price = int(price.replace("$","").replace(",",""))
+                    return 6e5 < price and price <= 2e6
+                except:
+                    return False
+
+            listings = pz.Dataset(datasetid, schema=RealEstateListingFiles)
+            listings = listings.convert(TextRealEstateListing, depends_on="text_content")
+            listings = listings.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_contents")
+            listings = listings.filterByStr(
+                "The interior is modern and attractive, and has lots of natural sunlight",
+                depends_on=["is_modern_and_attractive", "has_natural_sunlight"]
+            )
+            listings = listings.filterByFn(within_two_miles_of_mit, depends_on="address")
+            listings = listings.filterByFn(in_price_range, depends_on="price")
+            logicalTree = listings.getLogicalTree()
+
         elif "codegen-easy" in datasetid:
             # address
             def within_two_miles_of_mit(record):
@@ -461,7 +500,8 @@ def evaluate_pz_plans(dataset_ids, reoptimize=False, limit=None):
     
         # get total number of plans
         allow_codegen = "codegen" in datasetid
-        num_plans = len(logicalTree.createPhysicalPlanCandidates(max=limit, allow_codegen=allow_codegen, shouldProfile=True))
+        allow_token_reduction = "token-reduction" in datasetid
+        num_plans = len(logicalTree.createPhysicalPlanCandidates(max=limit, allow_codegen=allow_codegen, allow_token_reduction=allow_token_reduction, shouldProfile=True))
 
         # remove codegen samples from previous dataset from cache
         cache = pz.DataDirectory().getCacheService()
@@ -733,6 +773,12 @@ if __name__ == "__main__":
         dataset_ids.append(args.datasetid)
 
     elif args.eval == "real-estate":
+        # register user data source
+        print("Registering Datasource")
+        pz.DataDirectory().registerUserSource(RealEstateListingSource(args.datasetid, args.listings_dir), args.datasetid)
+        dataset_ids.append(args.datasetid)
+
+    elif args.eval == "token-reduction":
         # register user data source
         print("Registering Datasource")
         pz.DataDirectory().registerUserSource(RealEstateListingSource(args.datasetid, args.listings_dir), args.datasetid)

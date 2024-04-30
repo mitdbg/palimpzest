@@ -288,7 +288,8 @@ class DSPyGenerator(BaseGenerator):
         reraise=True,
     )
     # the generate method requires a user-provided budget parameter to specify te token budget. Default is 1.0, meaning the full context will be used.
-    def generate(self, context: str, question: str, budget: float = 0.9) -> GenerationOutput:
+    def generate(self, context: str, question: str, budget: float = 1.0) -> GenerationOutput:
+        print("Token budget:", budget)
         reduction = False
         full_context = context
         # fetch model

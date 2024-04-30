@@ -24,6 +24,8 @@ class TaskDescriptor:
     prompt_strategy: PromptStrategy = None
     # the query strategy
     query_strategy: QueryStrategy = None
+    # the token budget
+    token_budget: float = None
     # the filter for filter operations
     filter: Filter = None
     # the optional description of the conversion being applied (if task is a conversion)

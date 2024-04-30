@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from palimpzest.constants import *
 from palimpzest.corelib.schemas import ImageFile
 from palimpzest.datamanager import DataDirectory
@@ -232,13 +234,14 @@ class CacheScanDataOp(PhysicalOp):
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, image_conversion: bool=False, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, image_conversion: bool=False, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, token_budget: float=None, desc: str=None, targetCacheId: str=None, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, source=source, shouldProfile=shouldProfile)
         self.model = model
         self.cardinality = cardinality
         self.image_conversion = image_conversion
         self.prompt_strategy = prompt_strategy
         self.query_strategy = query_strategy
+        self.token_budget = token_budget
         self.desc = desc
         self.targetCacheId = targetCacheId
 
@@ -282,6 +285,7 @@ class InduceFromCandidateOp(PhysicalOp):
             image_conversion=self.image_conversion,
             prompt_strategy=self.prompt_strategy,
             query_strategy=self.query_strategy,
+            token_budget=self.token_budget,
             conversionDesc=self.desc,
             pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
         )
@@ -296,7 +300,7 @@ class InduceFromCandidateOp(PhysicalOp):
         return InduceFromCandidateOp(
             self.outputSchema, self.source, self.model, self.cardinality,
             self.image_conversion, self.prompt_strategy, self.query_strategy,
-            self.desc, self.targetCacheId, self.shouldProfile
+            self.token_budget, self.desc, self.targetCacheId, self.shouldProfile
         )
 
     def opId(self):
@@ -322,6 +326,7 @@ class InduceFromCandidateOp(PhysicalOp):
             return inputEstimates
 
         # if we have sample estimates, let's use those instead of our prescriptive estimates
+        # TODO: for re-optimization w/token reduction, let's think through this
         if cost_estimate_sample_data is not None:
             # get state variables
             input_fields = self.source.outputSchema.fieldNames()
@@ -354,6 +359,9 @@ class InduceFromCandidateOp(PhysicalOp):
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
+
+        if self.token_budget is not None:
+            est_num_input_tokens = self.token_budget * est_num_input_tokens
 
         # estimate number of output tokens as constant multiple of input tokens (for now)
         est_num_output_tokens = OUTPUT_TOKENS_MULTIPLE * est_num_input_tokens
@@ -416,6 +424,9 @@ class InduceFromCandidateOp(PhysicalOp):
         if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
             quality = quality * GPT_4_MODEL_CARD["code"]
 
+        if self.token_budget is not None:
+            quality = quality * math.sqrt(self.token_budget) # now assume quality is proportional to sqrt(token_budget)
+
         return {
             "cardinality": cardinality,
             "timePerElement": model_conversion_time_per_record,
@@ -455,7 +466,7 @@ class InduceFromCandidateOp(PhysicalOp):
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, image_conversion: bool=False, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, image_conversion: bool=False, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, token_budget: float=None, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.model = model
@@ -463,6 +474,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         self.image_conversion = image_conversion
         self.prompt_strategy = prompt_strategy
         self.query_strategy = query_strategy
+        self.token_budget = token_budget
         self.desc = desc
         self.targetCacheId = targetCacheId
         self.max_workers = 20
@@ -508,6 +520,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             image_conversion=self.image_conversion,
             prompt_strategy=self.prompt_strategy,
             query_strategy=self.query_strategy,
+            token_budget=self.token_budget,
             conversionDesc=self.desc,
             pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
         )
@@ -522,7 +535,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         return ParallelInduceFromCandidateOp(
             self.outputSchema, self.source, self.model, self.cardinality,
             self.image_conversion, self.prompt_strategy, self.query_strategy,
-            self.desc, self.targetCacheId, self.streaming, self.shouldProfile,
+            self.token_budget, self.desc, self.targetCacheId, self.streaming, self.shouldProfile,
         )
 
     def opId(self):
@@ -584,6 +597,9 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
 
+        if self.token_budget is not None:
+            est_num_input_tokens = self.token_budget * est_num_input_tokens
+
         # estimate number of output tokens as constant multiple of input tokens (for now)
         est_num_output_tokens = OUTPUT_TOKENS_MULTIPLE * est_num_input_tokens
 
@@ -639,6 +655,10 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         # if we're using code generation, assume that quality goes down (or view it as E[Quality] = (p=gpt4[code])*1.0 + (p=0.25)*0.0))
         if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
             quality = quality * GPT_4_MODEL_CARD["code"]
+
+        if self.token_budget is not None:
+            quality = quality * math.sqrt(self.token_budget) # now assume quality is proportional to sqrt(token_budget)
+
 
         return {
             "cardinality": cardinality,

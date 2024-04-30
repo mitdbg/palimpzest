@@ -163,7 +163,7 @@ class LogicalOperator:
             return list(map(lambda ops: ops[0], opPermutations))
 
 
-    def _createPhysicalPlans(self, allow_codegen: bool=False, shouldProfile: bool=False) -> List[PhysicalOp]:
+    def _createPhysicalPlans(self, allow_codegen: bool=False, allow_token_reduction: bool=False, shouldProfile: bool=False) -> List[PhysicalOp]:
         """
         Given the logical plan implied by this LogicalOperator, enumerate up to `max`
         possible physical plans and return them as a list.
@@ -195,6 +195,10 @@ class LogicalOperator:
         if allow_codegen:
             query_strategies.append(QueryStrategy.CODE_GEN_WITH_FALLBACK)
 
+        token_budgets = [1.0]
+        if allow_token_reduction:
+            token_budgets.extend([0.1, 0.5, 0.9])
+
         # base case: this is a root op
         if self.inputOp is None:
             # NOTE: right now, the root op must be a CacheScan or BaseScan which does not require an LLM;
@@ -209,12 +213,13 @@ class LogicalOperator:
         if isinstance(self, ConvertScan):
             for model in models:
                 for qs in query_strategies:
-                    for subTreePhysicalPlan in subTreePhysicalPlans:
-                        # NOTE: failing to make a copy will lead to duplicate profile information being captured
-                        # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
-                        subTreePhysicalPlan = subTreePhysicalPlan.copy()
-                        physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, query_strategy=qs, shouldProfile=shouldProfile)
-                        physicalPlans.append(physicalPlan)
+                    for token_budget in token_budgets:
+                        for subTreePhysicalPlan in subTreePhysicalPlans:
+                            # NOTE: failing to make a copy will lead to duplicate profile information being captured
+                            # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
+                            subTreePhysicalPlan = subTreePhysicalPlan.copy()
+                            physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, query_strategy=qs, token_budget=token_budget, shouldProfile=shouldProfile)
+                            physicalPlans.append(physicalPlan)
         elif isinstance(self, FilteredScan):
             for model in models:
                 for subTreePhysicalPlan in subTreePhysicalPlans:
@@ -233,7 +238,7 @@ class LogicalOperator:
 
         return physicalPlans
 
-    def createPhysicalPlanCandidates(self, max: int=None, cost_estimate_sample_data: List[Dict[str, Any]]=None, allow_codegen: bool=False, shouldProfile: bool=False) -> List[PhysicalPlan]:
+    def createPhysicalPlanCandidates(self, max: int=None, cost_estimate_sample_data: List[Dict[str, Any]]=None, allow_codegen: bool=False, allow_token_reduction: bool=False, shouldProfile: bool=False) -> List[PhysicalPlan]:
         """Return a set of physical trees of operators."""
         # create set of logical plans (e.g. consider different filter/join orderings)
         logicalPlans = LogicalOperator._createLogicalPlans(self)
@@ -243,7 +248,7 @@ class LogicalOperator:
         physicalPlans = [
             physicalPlan
             for logicalPlan in logicalPlans
-            for physicalPlan in logicalPlan._createPhysicalPlans(allow_codegen=allow_codegen, shouldProfile=shouldProfile)
+            for physicalPlan in logicalPlan._createPhysicalPlans(allow_codegen=allow_codegen, allow_token_reduction=allow_token_reduction, shouldProfile=shouldProfile)
         ]
         print(f"INITIAL PLANS: {len(physicalPlans)}")
 
@@ -328,7 +333,7 @@ class ConvertScan(LogicalOperator):
         """Return the logical tree of this LogicalOperator."""
         return (self, self.inputOp.dumpLogicalTree())
 
-    def _getPhysicalTree(self, strategy: str=None, source: PhysicalOp=None, model: Model=None, query_strategy: QueryStrategy=None, shouldProfile: bool=False):
+    def _getPhysicalTree(self, strategy: str=None, source: PhysicalOp=None, model: Model=None, query_strategy: QueryStrategy=None, token_budget: float=None, shouldProfile: bool=False):
         # TODO: dont set input op here
         # If the input is in core, and the output is NOT in core but its superclass is, then we should do a
         # 2-stage conversion. This will maximize chances that there is a pre-existing conversion to the superclass
@@ -345,6 +350,7 @@ class ConvertScan(LogicalOperator):
                                                      self.cardinality,
                                                      self.image_conversion,
                                                      query_strategy=query_strategy,
+                                                     token_budget=token_budget,
                                                      desc=self.desc,
                                                      targetCacheId=self.targetCacheId,
                                                      shouldProfile=shouldProfile)
@@ -355,6 +361,7 @@ class ConvertScan(LogicalOperator):
                                              self.cardinality,
                                              self.image_conversion,
                                              query_strategy=query_strategy,
+                                             token_budget=token_budget,
                                              desc=self.desc,
                                              targetCacheId=self.targetCacheId,
                                              shouldProfile=shouldProfile)
@@ -368,6 +375,7 @@ class ConvertScan(LogicalOperator):
                                                          self.cardinality,
                                                          self.image_conversion,
                                                          query_strategy=query_strategy,
+                                                         token_budget=token_budget,
                                                          shouldProfile=shouldProfile),
                                                      model,
                                                      "oneToOne",
@@ -382,6 +390,7 @@ class ConvertScan(LogicalOperator):
                                                  model,
                                                  self.cardinality,
                                                  self.image_conversion,
+                                                 token_budget=token_budget,
                                                  query_strategy=query_strategy,
                                                  shouldProfile=shouldProfile),
                                              model,
