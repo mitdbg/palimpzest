@@ -242,7 +242,7 @@ def score_plan(opt, workload, records, plan_idx) -> float:
         {
             key: record.__dict__[key]
             for key in record.__dict__
-            if not key.startswith('_')
+            if not key.startswith('_') and key not in ["image_contents"]
         }
         for record in records
     ]

@@ -417,12 +417,15 @@ class ConvertScan(LogicalOperator):
                                                          source,
                                                          model,
                                                          self.cardinality,
-                                                         self.image_conversion,
+                                                         self.image_conversion,          # TODO: only one of these should have image_conversion
                                                          query_strategy=query_strategy,
                                                          token_budget=token_budget,
                                                          shouldProfile=shouldProfile),
                                                      model,
                                                      "oneToOne",
+                                                     image_conversion=self.image_conversion,  # TODO: only one of these should have image_conversion
+                                                     query_strategy=query_strategy,
+                                                     token_budget=token_budget,
                                                      desc=self.desc,
                                                      targetCacheId=self.targetCacheId,
                                                      shouldProfile=shouldProfile)
@@ -433,12 +436,15 @@ class ConvertScan(LogicalOperator):
                                                  source,
                                                  model,
                                                  self.cardinality,
-                                                 self.image_conversion,
+                                                 self.image_conversion,          # TODO: only one of these should have image_conversion
                                                  query_strategy=query_strategy,
                                                  token_budget=token_budget,
                                                  shouldProfile=shouldProfile),
                                              model,
                                              "oneToOne",
+                                             image_conversion=self.image_conversion,  # TODO: only one of these should have image_conversion
+                                             query_strategy=query_strategy,
+                                             token_budget=token_budget,
                                              desc=self.desc,
                                              targetCacheId=self.targetCacheId,
                                              shouldProfile=shouldProfile)
