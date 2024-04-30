@@ -2,7 +2,12 @@ from palimpzest.sets import Set
 from palimpzest.policy import Policy, MaxQuality, UserChoice
 from palimpzest.profiler import StatsProcessor
 from palimpzest.datamanager import DataDirectory
-import itertools 
+
+# for those of us who resist change and are still on Python 3.9
+try:
+    from itertools import pairwise
+except:
+    from more_itertools import pairwise
 
 def emitNestedTuple(node, indent=0):
     elt, child = node
@@ -33,7 +38,7 @@ def graphicEmit(flatten_ops):
     start = flatten_ops[0]
     print(f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n")
 
-    for idx, (left, right) in enumerate(itertools.pairwise(flatten_ops)):
+    for idx, (left, right) in enumerate(pairwise(flatten_ops)):
         in_schema = left.outputSchema
         out_schema = right.outputSchema
         print(f" {idx+1}. {in_schema.__name__} -> {type(right).__name__} -> {out_schema.__name__} ", end="")
@@ -45,7 +50,8 @@ def graphicEmit(flatten_ops):
         elif hasattr(right, 'model'):
             print(f"\n    Using {right.model}", end="")
             if hasattr(right, 'filter'):
-                print(f'\n    Filter: "{right.filter.filterCondition}"', end="")
+                filter_str = right.filter.filterCondition if right.filter.filterCondition is not None else str(right.filter.filterFn)
+                print(f'\n    Filter: "{filter_str}"', end="")
         print()
         print(f"    ({','.join(in_schema.fieldNames())[:15]}...) -> ({','.join(out_schema.fieldNames())[:15]}...)")
         print()

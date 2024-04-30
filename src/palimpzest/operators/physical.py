@@ -25,7 +25,7 @@ class PhysicalOp:
     LOCAL_PLAN = "LOCAL"
     REMOTE_PLAN = "REMOTE"
 
-    synthesizedFns = {}
+    # synthesizedFns = {}
     solver = Solver(verbose=LOG_LLM_OUTPUT)
 
     def __init__(self, outputSchema: Schema, source: PhysicalOp=None, shouldProfile=False) -> None:
@@ -271,7 +271,7 @@ class CacheScanDataOp(PhysicalOp):
 
 
 class InduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, image_conversion: bool=False, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, token_budget: float=None, desc: str=None, targetCacheId: str=None, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, image_conversion: bool=False, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, token_budget: float=1.0, desc: str=None, targetCacheId: str=None, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, source=source, shouldProfile=shouldProfile)
         self.model = model
         self.cardinality = cardinality
@@ -282,6 +282,7 @@ class InduceFromCandidateOp(PhysicalOp):
         self.desc = desc
         self.targetCacheId = targetCacheId
 
+        # use image model if this is an image conversion
         if outputSchema == ImageFile and source.outputSchema == File or self.image_conversion:
             # TODO : find a more general way by llm provider 
             # TODO : which module is responsible of setting PromptStrategy.IMAGE_TO_TEXT? 
@@ -297,19 +298,24 @@ class InduceFromCandidateOp(PhysicalOp):
             self.model = Model.GPT_4V
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
+        # set model to None if this is a simple conversion
+        if self._is_quick_conversion():
+            self.model = None
+            self.prompt_strategy = None
+
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
 
-        # construct TaskDescriptor
-        taskDescriptor = self._makeTaskDescriptor()
+        # # construct TaskDescriptor
+        # taskDescriptor = self._makeTaskDescriptor()
 
-        # synthesize task function
-        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        # # synthesize task function
+        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+        #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
-        return "InduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value) + ", Query Strategy: " + str(self.query_strategy.value) + ", Token Budget: " + str(self.token_budget) + ")"
+        return "InduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value if self.model is not None else None) + ", Query Strategy: " + str(self.query_strategy.value) + ", Token Budget: " + str(self.token_budget) + ")"
 
     def _makeTaskDescriptor(self):
         td = TaskDescriptor(
@@ -326,11 +332,11 @@ class InduceFromCandidateOp(PhysicalOp):
             conversionDesc=self.desc,
             pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
         )
-        # This code checks if the function has been synthesized before, and if so, whether it is hardcoded. If so, set model and prompt_strategy to None.
-        if td.op_id in PhysicalOp.synthesizedFns:
-            if self.is_hardcoded():
-                td.model = None
-                td.prompt_strategy = None
+        # # This code checks if the function has been synthesized before, and if so, whether it is hardcoded. If so, set model and prompt_strategy to None.
+        # if td.op_id in PhysicalOp.synthesizedFns:
+        #     if self.is_hardcoded():
+        #         td.model = None
+        #         td.prompt_strategy = None
 
         return td
 
@@ -352,8 +358,8 @@ class InduceFromCandidateOp(PhysicalOp):
             "operator": "InduceFromCandidateOp",
             "outputSchema": str(self.outputSchema),
             "source": self.source.opId(),
-            # "model": self.model.value,
-            "prompt_strategy": self.prompt_strategy.value,
+            "model": self.model.value if self.model is not None else None,
+            "prompt_strategy": self.prompt_strategy.value if self.prompt_strategy is not None else None,
             "desc": self.desc,
             "targetCacheId": self.targetCacheId,
         }
@@ -523,13 +529,15 @@ class InduceFromCandidateOp(PhysicalOp):
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputSchema. Return None if it fails."""
         taskDescriptor = self._makeTaskDescriptor()
-        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
-            raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
-        return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
+        taskFn = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+        #     raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
+        # return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
+        return taskFn(candidate)
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
-    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, image_conversion: bool=False, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, token_budget: float=None, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
+    def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, image_conversion: bool=False, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, token_budget: float=1.0, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.model = model
@@ -543,6 +551,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         self.max_workers = 20
         self.streaming = streaming
 
+        # use image model if this is an image conversion
         if outputSchema == ImageFile and source.outputSchema == File or self.image_conversion:
             # TODO : find a more general way by llm provider 
             # TODO : which module is responsible of setting PromptStrategy.IMAGE_TO_TEXT? 
@@ -558,19 +567,24 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             self.model = Model.GPT_4V
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
+        # set model to None if this is a simple conversion
+        if self._is_quick_conversion():
+            self.model = None
+            self.prompt_strategy = None
+
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
 
-        # construct TaskDescriptor
-        taskDescriptor = self._makeTaskDescriptor()
+        # # construct TaskDescriptor
+        # taskDescriptor = self._makeTaskDescriptor()
 
-        # synthesize task function
-        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        # # synthesize task function
+        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+        #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
-        return "ParallelInduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value) + ", Query Strategy: " + str(self.query_strategy.value) + ", Token Budget: " + str(self.token_budget) + ")"
+        return "ParallelInduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value if self.model is not None else None) + ", Query Strategy: " + str(self.query_strategy.value) + ", Token Budget: " + str(self.token_budget) + ")"
 
     def _makeTaskDescriptor(self):
         return TaskDescriptor(
@@ -606,8 +620,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             "operator": "ParallelInduceFromCandidateOp",
             "outputSchema": str(self.outputSchema),
             "source": self.source.opId(),
-            "model": self.model.value,
-            "prompt_strategy": self.prompt_strategy.value,
+            "model": self.model.value if self.model is not None else None,
+            "prompt_strategy": self.prompt_strategy.value if self.prompt_strategy is not None else None,
             "desc": self.desc,
             "targetCacheId": self.targetCacheId,
         }
@@ -794,9 +808,11 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
     def _attemptMapping(self, candidate: DataRecord):
         """Attempt to map the candidate to the outputSchema. Return None if it fails."""
         taskDescriptor = self._makeTaskDescriptor()
-        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
-            raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
-        return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
+        taskFn = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+        #     raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
+        # return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
+        return taskFn(candidate)
 
 
 class FilterCandidateOp(PhysicalOp):
@@ -812,12 +828,12 @@ class FilterCandidateOp(PhysicalOp):
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
 
-        # construct TaskDescriptor
-        taskDescriptor = self._makeTaskDescriptor()
+        # # construct TaskDescriptor
+        # taskDescriptor = self._makeTaskDescriptor()
 
-        # synthesize task function
-        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        # # synthesize task function
+        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+        #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "FilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -841,7 +857,7 @@ class FilterCandidateOp(PhysicalOp):
             "outputSchema": str(self.outputSchema),
             "source": self.source.opId(),
             "filter": str(self.filter),
-            # "model": self.model.value,
+            "model": self.model.value,
             "prompt_strategy": self.prompt_strategy.value,
             "targetCacheId": self.targetCacheId,
         }
@@ -1000,10 +1016,11 @@ class FilterCandidateOp(PhysicalOp):
     def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
         taskDescriptor = self._makeTaskDescriptor()
-        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
-            raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
-        return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
-
+        taskFn = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+        #     raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
+        # return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
+        return taskFn(candidate)
 
 class ParallelFilterCandidateOp(PhysicalOp):
     def __init__(self, outputSchema: Schema, source: PhysicalOp, filter: Filter, model: Model, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_BOOL, targetCacheId: str=None, streaming=False, shouldProfile=False):
@@ -1020,12 +1037,12 @@ class ParallelFilterCandidateOp(PhysicalOp):
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
 
-        # construct TaskDescriptor
-        taskDescriptor = self._makeTaskDescriptor()
+        # # construct TaskDescriptor
+        # taskDescriptor = self._makeTaskDescriptor()
 
-        # synthesize task function
-        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
-            PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        # # synthesize task function
+        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+        #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
         return "ParallelFilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -1218,10 +1235,11 @@ class ParallelFilterCandidateOp(PhysicalOp):
     def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
         taskDescriptor = self._makeTaskDescriptor()
-        if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
-            raise Exception("This function should have been synthesized during init():", str(taskDescriptor))
-
-        return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
+        taskFn = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+        #     raise Exception("This function should have been synthesized during init():", str(taskDescriptor))
+        # return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
+        return taskFn(candidate)
 
 def agg_init(func):
     if (func.lower() == 'count'):
