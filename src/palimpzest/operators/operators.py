@@ -163,7 +163,7 @@ class LogicalOperator:
             return list(map(lambda ops: ops[0], opPermutations))
 
 
-    def _createPhysicalPlans(self, allow_codegen: bool=False, allow_token_reduction: bool=False, shouldProfile: bool=False) -> List[PhysicalOp]:
+    def _createPhysicalPlans(self, allow_model_selection: bool=False, allow_codegen: bool=False, allow_token_reduction: bool=False, shouldProfile: bool=False) -> List[PhysicalOp]:
         """
         Given the logical plan implied by this LogicalOperator, enumerate up to `max`
         possible physical plans and return them as a list.
@@ -207,7 +207,20 @@ class LogicalOperator:
             return [self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, shouldProfile=shouldProfile)]
 
         # recursive case: get list of possible input physical plans
-        subTreePhysicalPlans = self.inputOp._createPhysicalPlans(allow_codegen=allow_codegen, allow_token_reduction=allow_token_reduction, shouldProfile=shouldProfile)
+        subTreePhysicalPlans = self.inputOp._createPhysicalPlans(
+            allow_model_selection=allow_model_selection,
+            allow_codegen=allow_codegen,
+            allow_token_reduction=allow_token_reduction,
+            shouldProfile=shouldProfile,
+        )
+
+        def get_models_from_subtree(phys_op):
+            phys_op_models = []
+            while phys_op is not None:
+                phys_op_models.append(getattr(phys_op, 'model', None))
+                phys_op = phys_op.source
+
+            return phys_op_models
 
         # compute (list of) physical plans for this op
         physicalPlans = []
@@ -216,6 +229,11 @@ class LogicalOperator:
                 for qs in query_strategies:
                     for token_budget in token_budgets:
                         for model in models:
+                            # if model selection is disallowed; skip any plans which would use a different model in this operator
+                            subtree_models = [m for m in get_models_from_subtree(subTreePhysicalPlan) if m is not None]
+                            if not allow_model_selection and len(subtree_models) > 0 and subtree_models[0] != model:
+                                continue
+
                             # NOTE: failing to make a copy will lead to duplicate profile information being captured
                             # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
                             subTreePhysicalPlan = subTreePhysicalPlan.copy()
@@ -225,9 +243,15 @@ class LogicalOperator:
                             td = physicalPlan._makeTaskDescriptor()
                             if td.model == None:
                                 break
+
         elif isinstance(self, FilteredScan):
             for subTreePhysicalPlan in subTreePhysicalPlans:
                 for model in models:
+                    # if model selection is disallowed; skip any plans which would use a different model in this operator
+                    subtree_models = [m for m in get_models_from_subtree() if m is not None]
+                    if not allow_model_selection and len(subtree_models) > 0 and subtree_models[0] != model:
+                        continue
+
                     # NOTE: failing to make a copy will lead to duplicate profile information being captured
                     # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
                     subTreePhysicalPlan = subTreePhysicalPlan.copy()
@@ -237,6 +261,7 @@ class LogicalOperator:
                     td = physicalPlan._makeTaskDescriptor()
                     if td.model == None:
                         break
+
         else:
             for subTreePhysicalPlan in subTreePhysicalPlans:
                 # NOTE: failing to make a copy will lead to duplicate profile information being captured
@@ -247,7 +272,7 @@ class LogicalOperator:
 
         return physicalPlans
 
-    def createPhysicalPlanCandidates(self, max: int=None, cost_estimate_sample_data: List[Dict[str, Any]]=None, allow_codegen: bool=False, allow_token_reduction: bool=False, shouldProfile: bool=False) -> List[PhysicalPlan]:
+    def createPhysicalPlanCandidates(self, max: int=None, cost_estimate_sample_data: List[Dict[str, Any]]=None, allow_model_selection: bool=False, allow_codegen: bool=False, allow_token_reduction: bool=False, shouldProfile: bool=False) -> List[PhysicalPlan]:
         """Return a set of physical trees of operators."""
         # create set of logical plans (e.g. consider different filter/join orderings)
         logicalPlans = LogicalOperator._createLogicalPlans(self)
@@ -257,7 +282,12 @@ class LogicalOperator:
         physicalPlans = [
             physicalPlan
             for logicalPlan in logicalPlans
-            for physicalPlan in logicalPlan._createPhysicalPlans(allow_codegen=allow_codegen, allow_token_reduction=allow_token_reduction, shouldProfile=shouldProfile)
+            for physicalPlan in logicalPlan._createPhysicalPlans(
+                allow_model_selection=allow_model_selection,
+                allow_codegen=allow_codegen,
+                allow_token_reduction=allow_token_reduction,
+                shouldProfile=shouldProfile,
+            )
         ]
         print(f"INITIAL PLANS: {len(physicalPlans)}")
 

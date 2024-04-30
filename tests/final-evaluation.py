@@ -429,9 +429,15 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
     #       iteration to ensure that they are new.
 
     # get total number of plans
+    allow_model_selection = (opt == "model")
     allow_codegen = (opt == "codegen")
     allow_token_reduction = (opt == "token-reduction")
-    num_plans = len(logicalTree.createPhysicalPlanCandidates(allow_codegen=allow_codegen, allow_token_reduction=allow_token_reduction, shouldProfile=True))
+    num_plans = len(logicalTree.createPhysicalPlanCandidates(
+        allow_model_selection=allow_model_selection,
+        allow_codegen=allow_codegen,
+        allow_token_reduction=allow_token_reduction,
+        shouldProfile=True,
+    ))
 
     # # remove codegen samples from previous dataset from cache
     # if allow_codegen:
@@ -445,7 +451,12 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
             continue
 
         # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
-        candidatePlans = logicalTree.createPhysicalPlanCandidates(allow_codegen=allow_codegen, allow_token_reduction=allow_token_reduction, shouldProfile=True)
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(
+            allow_model_selection=allow_model_selection,
+            allow_codegen=allow_codegen,
+            allow_token_reduction=allow_token_reduction,
+            shouldProfile=True,
+        )
         _, _, _, plan, _ = candidatePlans[plan_idx]
 
         # workaround to disabling cache: delete all cached generations after each plan
