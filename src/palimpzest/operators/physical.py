@@ -425,7 +425,7 @@ class InduceFromCandidateOp(PhysicalOp):
             quality = quality * GPT_4_MODEL_CARD["code"]
 
         if self.token_budget is not None:
-            quality = quality * math.sqrt(self.token_budget) # now assume quality is proportional to sqrt(token_budget)
+            quality = quality * math.sqrt(math.sqrt(self.token_budget)) # now assume quality is proportional to sqrt(token_budget)
 
         return {
             "cardinality": cardinality,
@@ -657,7 +657,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             quality = quality * GPT_4_MODEL_CARD["code"]
 
         if self.token_budget is not None:
-            quality = quality * math.sqrt(self.token_budget) # now assume quality is proportional to sqrt(token_budget)
+            quality = quality * math.sqrt(math.sqrt(self.token_budget)) # now assume quality is proportional to sqrt(token_budget)
 
 
         return {

@@ -81,6 +81,8 @@ class OperatorStats:
     answer_log_probs: List[List[float]]=field(default_factory=list)
     # the query strategy used
     query_strategy: str=None
+    # the token budget used during generation
+    token_budget: float = None
 
     #################################################
     ##### Field for Induce w/Conventional Query #####
@@ -233,6 +235,8 @@ class InduceLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from an induce w/LLM operation."""
     # query strategy used
     query_strategy: str=None
+    # the token budget used during generation
+    token_budget: float = None
     # stats from bonded query
     bonded_query_stats: BondedQueryStats=None
     # stats from conventional query
@@ -477,6 +481,7 @@ class StatsProcessor:
             elif isinstance(stats, InduceLLMStats):
                 # set query strategy
                 profiling_data.query_strategy = stats.query_strategy
+                profiling_data.token_budget = stats.token_budget
 
                 # process bonded query stats
                 bonded_query_stats = stats.bonded_query_stats

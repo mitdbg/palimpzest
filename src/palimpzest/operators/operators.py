@@ -195,7 +195,7 @@ class LogicalOperator:
         if allow_codegen:
             query_strategies.append(QueryStrategy.CODE_GEN_WITH_FALLBACK)
 
-        token_budgets = [1.0]
+        token_budgets = [0.2]
         if allow_token_reduction:
             token_budgets.extend([0.1, 0.5, 0.9])
 
@@ -206,7 +206,7 @@ class LogicalOperator:
             return [self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, shouldProfile=shouldProfile)]
 
         # recursive case: get list of possible input physical plans
-        subTreePhysicalPlans = self.inputOp._createPhysicalPlans(allow_codegen=allow_codegen, shouldProfile=shouldProfile)
+        subTreePhysicalPlans = self.inputOp._createPhysicalPlans(allow_codegen=allow_codegen, allow_token_reduction=allow_token_reduction, shouldProfile=shouldProfile)
 
         # compute (list of) physical plans for this op
         physicalPlans = []

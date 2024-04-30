@@ -287,7 +287,7 @@ def run_pz_plan(datasetid, plan, idx, size=None):
     # score plan based on its output records
     _, _, f1_score = score_plan(datasetid, records, size)
 
-    plan_info = {"models": [], "op_names": [], "generated_fields": [], "query_strategies": []}
+    plan_info = {"models": [], "op_names": [], "generated_fields": [], "query_strategies": [], "token_budgets": []}
     cost = 0.0
     stats = sp.profiling_data
     while stats is not None:
@@ -296,6 +296,7 @@ def run_pz_plan(datasetid, plan, idx, size=None):
         plan_info["op_names"].append(stats.op_name)
         plan_info["generated_fields"].append(stats.generated_fields)
         plan_info["query_strategies"].append(stats.query_strategy)
+        plan_info["token_budgets"].append(stats.token_budget)
         stats = stats.source_op_stats
 
     # compute label
@@ -511,15 +512,15 @@ def evaluate_pz_plans(dataset_ids, reoptimize=False, limit=None):
         results = []
         for idx in range(num_plans):
             # skip gemini for code gen
-            if idx == 3:
-                continue
+            # if idx == 3:
+            #     continue
         # for idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
             # skip all-Gemini plan which opens too many files
             # if "enron" in datasetid and idx == 17:
             #     continue
 
             # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
-            candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, allow_codegen=allow_codegen, shouldProfile=True)
+            candidatePlans = logicalTree.createPhysicalPlanCandidates(max=limit, allow_codegen=allow_codegen, allow_token_reduction=allow_token_reduction, shouldProfile=True)
             _, _, _, plan = candidatePlans[idx]
 
             # workaround to disabling cache: delete all cached generations after each plan
@@ -574,6 +575,11 @@ def plot_runtime_cost_vs_quality(all_results, datasetid):
         generated_fields = (
             result_dict["plan_info"]["generated_fields"]
             if "plan_info" in result_dict
+            else None
+        )
+        token_budgets = (
+            result_dict["plan_info"]["token_budgets"]
+            if "token_budgets" in result_dict
             else None
         )
 
