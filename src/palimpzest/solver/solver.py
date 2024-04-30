@@ -230,6 +230,7 @@ class Solver:
                 if shouldProfile:
                     dr._stats[td.op_id] = InduceLLMStats(
                         query_strategy=td.query_strategy.value,
+                        token_budget=td.token_budget,
                         conventional_query_stats=conventional_query_stats,
                     )
 
@@ -251,6 +252,7 @@ class Solver:
                     for dr in drs:
                         dr._stats[td.op_id] = InduceLLMStats(
                             query_strategy=td.query_strategy.value,
+                            token_budget=td.token_budget,
                             bonded_query_stats=bonded_query_stats,
                         )
 
@@ -270,6 +272,7 @@ class Solver:
                     for dr in drs:
                         dr._stats[td.op_id] = InduceLLMStats(
                             query_strategy=td.query_strategy.value,
+                            token_budget=td.token_budget,
                             bonded_query_stats=bonded_query_stats,
                             conventional_query_stats=conventional_query_stats,
                         )
@@ -285,6 +288,7 @@ class Solver:
                     for dr in drs:
                         dr._stats[td.op_id] = InduceLLMStats(
                             query_strategy=td.query_strategy.value,
+                            token_budget=td.token_budget,
                             full_code_gen_stats=full_code_gen_stats,
                         )
 
@@ -307,6 +311,7 @@ class Solver:
                     for dr in drs:
                         dr._stats[td.op_id] = InduceLLMStats(
                             query_strategy=td.query_strategy.value,
+                            token_budget=td.token_budget,
                             full_code_gen_stats=full_code_gen_stats,
                             conventional_query_stats=conventional_query_stats,
                         )
@@ -322,6 +327,7 @@ class Solver:
                     for dr in drs:
                         dr._stats[td.op_id] = InduceLLMStats(
                             query_strategy=td.query_strategy.value,
+                            token_budget=td.token_budget,
                             full_code_gen_stats=full_code_gen_stats,
                         )
 
@@ -344,6 +350,7 @@ class Solver:
                     for dr in drs:
                         dr._stats[td.op_id] = InduceLLMStats(
                             query_strategy=td.query_strategy.value,
+                            token_budget=td.token_budget,
                             full_code_gen_stats=full_code_gen_stats,
                             conventional_query_stats=conventional_query_stats,
                         )

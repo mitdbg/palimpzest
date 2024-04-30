@@ -207,7 +207,7 @@ class LogicalOperator:
             return [self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, shouldProfile=shouldProfile)]
 
         # recursive case: get list of possible input physical plans
-        subTreePhysicalPlans = self.inputOp._createPhysicalPlans(allow_codegen=allow_codegen, shouldProfile=shouldProfile)
+        subTreePhysicalPlans = self.inputOp._createPhysicalPlans(allow_codegen=allow_codegen, allow_token_reduction=allow_token_reduction, shouldProfile=shouldProfile)
 
         # compute (list of) physical plans for this op
         physicalPlans = []

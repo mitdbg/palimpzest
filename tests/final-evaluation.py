@@ -322,6 +322,7 @@ def run_pz_plan(opt, workload, plan, plan_idx):
         "op_names": [],
         "generated_fields": [],
         "query_strategies": [],
+        "token_budgets": []
     }
     cost = 0.0
     stats = sp.profiling_data
@@ -331,6 +332,7 @@ def run_pz_plan(opt, workload, plan, plan_idx):
         plan_info["op_names"].append(stats.op_name)
         plan_info["generated_fields"].append(stats.generated_fields)
         plan_info["query_strategies"].append(stats.query_strategy)
+        plan_info["token_budgets"].append(stats.token_budget)
         stats = stats.source_op_stats
 
     # construct and return result_dict
