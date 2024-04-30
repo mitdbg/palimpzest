@@ -156,7 +156,8 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
         if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # invoke LLM to generate output JSON
             generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-            answer, gen_stats = generator.generate(text_content, promptQuestion)
+            answer, gen_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget)
+
             # construct BondedQueryStats object
             bonded_query_stats = BondedQueryStats(
                 gen_stats=gen_stats,
@@ -298,7 +299,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
                 # print("---------------")
                 # invoke LLM to generate output JSON
                 generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-                answer, field_stats = generator.generate(text_content, promptQuestion)
+                answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget)
 
             elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:                               
                 # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas

@@ -40,14 +40,23 @@ class DataRecord:
     def schema(self):
         return self._schema
 
-    def asJSON(self):
+    def asJSON(self, include_bytes: bool=True):
         """Return a JSON representation of this DataRecord"""
-        value_dict = self.asDict() # should pass include_bytes argument? Before was unspecified
+        value_dict = self.asDict()
         return self.schema().asJSON(value_dict)
 
     def asDict(self, include_bytes: bool=True):
         """Return a dictionary representation of this DataRecord"""
-        dct = {k: self.__dict__[k] for k in self.schema.fieldNames()}
+        dct = {
+            k: self.__dict__[k]
+            for k in self.schema.fieldNames()
+            # adding this back out of an abundance of paranoia; technically schema.fieldNames()
+            # only filters .startswith("__") (two '__' instead of one '_'), but this shouldn't matter
+            # b/c the schema doesn't contain fields like `_stats` or `_uuid` which are stored at the DataRecord level
+            # 
+            # so TL;DR this next line probably does nothing but help me sleep better at night
+            if not k.startswith("_")
+        }
         if not include_bytes:
             for k in dct:
                 if isinstance(dct[k], bytes) or (isinstance(dct[k], list) and isinstance(dct[k][0], bytes)):

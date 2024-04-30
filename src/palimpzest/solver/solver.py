@@ -312,6 +312,43 @@ class Solver:
                         )
 
                 return drs
+            
+            elif td.query_strategy == QueryStrategy.CODE_GEN:
+                dr, full_code_gen_stats = runCodeGenQuery(candidate, td, self._verbose)
+                drs = [dr]
+
+                # if profiling, set record's stats for the given op_id
+                if shouldProfile:
+                    for dr in drs:
+                        dr._stats[td.op_id] = InduceLLMStats(
+                            query_strategy=td.query_strategy.value,
+                            full_code_gen_stats=full_code_gen_stats,
+                        )
+
+                return drs
+
+            elif td.query_strategy == QueryStrategy.CODE_GEN_WITH_FALLBACK:
+                # similar to in _makeLLMTypeConversionFn; maybe we can have one strategy in which we try
+                # to use code generation, but if it fails then we fall back to a conventional query strategy?
+                new_candidate, full_code_gen_stats = runCodeGenQuery(candidate, td, self._verbose)
+                # Deleting all failure fields
+                for field_name in td.outputSchema.fieldNames():
+                    if hasattr(new_candidate, field_name) and (getattr(new_candidate, field_name) is None):
+                        delattr(new_candidate, field_name)
+                dr, conventional_query_stats = runConventionalQuery(new_candidate, td, self._verbose)
+                dr._parent_uuid = candidate._uuid
+                drs = [dr]
+
+                # if profiling, set record's stats for the given op_id
+                if shouldProfile:
+                    for dr in drs:
+                        dr._stats[td.op_id] = InduceLLMStats(
+                            query_strategy=td.query_strategy.value,
+                            full_code_gen_stats=full_code_gen_stats,
+                            conventional_query_stats=conventional_query_stats,
+                        )
+
+                return drs
 
             else:
                 raise ValueError(f"Unrecognized QueryStrategy: {td.query_strategy.value}")
@@ -366,7 +403,7 @@ class Solver:
                 raise Exception("not implemented yet")
 
             # invoke LLM to generate filter decision (True or False)
-            text_content = candidate.asTextJSON()
+            text_content = candidate.asJSON()
             try:
                 response, gen_stats = generator.generate(context=text_content, question=td.filter.filterCondition)
 

@@ -119,8 +119,8 @@ class Execution:
         # TODO: remove
         if verbose:
             import json
-            with open('profiling-data/eo-sample_profiling.json', 'w') as f:
-                json.dump(sp.profiling_data.to_dict(), f)
+            with open('profiling-data/eo-cost-estimate.json', 'w') as f:
+                json.dump(cost_estimate_sample_data, f)
 
         # Ok now reoptimize the logical plan, this time with the sample data.
         # (The data is not currently being used; let's see if this method can work first)
