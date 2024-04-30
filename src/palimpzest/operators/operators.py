@@ -230,7 +230,7 @@ class LogicalOperator:
                     for token_budget in token_budgets:
                         for model in models:
                             # if model selection is disallowed; skip any plans which would use a different model in this operator
-                            subtree_models = [m for m in get_models_from_subtree(subTreePhysicalPlan) if m is not None]
+                            subtree_models = [m for m in get_models_from_subtree(subTreePhysicalPlan) if m is not None and m != Model.GPT_4V]
                             if not allow_model_selection and len(subtree_models) > 0 and subtree_models[0] != model:
                                 continue
 
@@ -248,7 +248,7 @@ class LogicalOperator:
             for subTreePhysicalPlan in subTreePhysicalPlans:
                 for model in models:
                     # if model selection is disallowed; skip any plans which would use a different model in this operator
-                    subtree_models = [m for m in get_models_from_subtree(subTreePhysicalPlan) if m is not None]
+                    subtree_models = [m for m in get_models_from_subtree(subTreePhysicalPlan) if m is not None and m != Model.GPT_4V]
                     if not allow_model_selection and len(subtree_models) > 0 and subtree_models[0] != model:
                         continue
 

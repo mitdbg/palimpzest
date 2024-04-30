@@ -52,6 +52,10 @@ def graphicEmit(flatten_ops):
             if hasattr(right, 'filter'):
                 filter_str = right.filter.filterCondition if right.filter.filterCondition is not None else str(right.filter.filterFn)
                 print(f'\n    Filter: "{filter_str}"', end="")
+            if hasattr(right, 'token_budget'):
+                print(f'\n    Token budget: {right.token_budget}', end="")
+            if hasattr(right, 'query_strategy'):
+                print(f'\n    Query strategy: {right.query_strategy}', end="")
         print()
         print(f"    ({','.join(in_schema.fieldNames())[:15]}...) -> ({','.join(out_schema.fieldNames())[:15]}...)")
         print()

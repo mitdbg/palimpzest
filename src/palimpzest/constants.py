@@ -38,7 +38,7 @@ class QueryStrategy(Enum):
     QueryStrategy describes the high-level approach to querying a Model (or generated code)
     in order to perform a specified task.
     """
-    DEFAULT = "bonded-with-fallback" # "codegen-with-fallback"
+    # DEFAULT = "bonded-with-fallback" # "codegen-with-fallback"
     CONVENTIONAL = "conventional"
     BONDED = "bonded"
     BONDED_WITH_FALLBACK = "bonded-with-fallback"
@@ -50,7 +50,7 @@ class CodeGenStrategy(Enum):
     CodeGenStrategy describes the high-level approach to generating code.
     in order to perform a specified task.
     """
-    DEFAULT = "single"
+    # DEFAULT = "single"
     NONE = "none"
     SINGLE = "single"
     EXAMPLE_ENSEMBLE = "example-ensemble"

@@ -127,7 +127,7 @@ def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), lan
     return advs, stats
 
 # NOTE: I think examples was List[DataRecord] and is now List[dict]
-def reGenerationCondition(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), strategy: CodeGenStrategy=CodeGenStrategy.DEFAULT,
+def reGenerationCondition(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), strategy: CodeGenStrategy=CodeGenStrategy.SINGLE,
     code_ensemble: int=4,               # if strategy != SINGLE
     code_num_examples: int=1,           # if strategy != EXAMPLE_ENSEMBLE
     code_regenerate_frequency: int=200, # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION
@@ -142,7 +142,7 @@ def reGenerationCondition(api: API, examples: List[Dict[DataRecord, DataRecord]]
         return len(examples)%code_regenerate_frequency == 0
 
 # NOTE: I think examples was List[DataRecord] and is now List[dict]
-def codeEnsembleGeneration(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), strategy: CodeGenStrategy=CodeGenStrategy.DEFAULT,
+def codeEnsembleGeneration(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), strategy: CodeGenStrategy=CodeGenStrategy.SINGLE,
     code_ensemble_num: int=1,           # if strategy != SINGLE
     code_num_examples: int=1,           # if strategy != EXAMPLE_ENSEMBLE
     code_regenerate_frequency: int=200, # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION

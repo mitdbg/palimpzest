@@ -922,7 +922,15 @@ class FilterCandidateOp(PhysicalOp):
             # estimate quality of output based on the strength of the model being used
             quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
 
-            return {
+            thisCostEst = {
+                "time_per_record": time_per_record,
+                "usd_per_record": 0.0,
+                "est_num_output_tokens": inputEstimates["estOutputTokensPerElement"],
+                "selectivity": selectivity,
+                "quality": quality,
+            }
+
+            costEst = {
                 "cardinality": cardinality,
                 "timePerElement": time_per_record,
                 "usdPerElement": 0.0,
@@ -934,6 +942,8 @@ class FilterCandidateOp(PhysicalOp):
                 "estOutputTokensPerElement": inputEstimates["estOutputTokensPerElement"],
                 "quality": quality,
             }
+
+            return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
@@ -1127,7 +1137,15 @@ class ParallelFilterCandidateOp(PhysicalOp):
             # estimate quality of output based on the strength of the model being used
             quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
 
-            return {
+            thisCostEst = {
+                "time_per_record": time_per_record,
+                "usd_per_record": 0.0,
+                "est_num_output_tokens": inputEstimates["estOutputTokensPerElement"],
+                "selectivity": selectivity,
+                "quality": quality,
+            }
+
+            costEst = {
                 "cardinality": cardinality,
                 "timePerElement": time_per_record,
                 "usdPerElement": 0.0,
@@ -1139,6 +1157,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
                 "estOutputTokensPerElement": inputEstimates["estOutputTokensPerElement"],
                 "quality": quality,
             }
+
+            return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
