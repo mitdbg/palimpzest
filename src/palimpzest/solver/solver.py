@@ -270,7 +270,7 @@ class Solver:
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     for dr in drs:
-                        # TODO: is this double counting induce stats?
+                        # TODO: conventional doesn't capture stats for one-to-many cardinality
                         dr._stats[td.op_id] = InduceLLMStats(
                             query_strategy=td.query_strategy.value,
                             token_budget=td.token_budget,
@@ -311,7 +311,7 @@ class Solver:
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     for dr in drs:
-                        # TODO: is this double counting induce stats?
+                        # TODO: conventional doesn't capture stats for one-to-many cardinality
                         dr._stats[td.op_id] = InduceLLMStats(
                             query_strategy=td.query_strategy.value,
                             token_budget=td.token_budget,
