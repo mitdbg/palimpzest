@@ -247,11 +247,12 @@ def score_plan(opt, workload, records, plan_idx) -> float:
         for record in records
     ]
     records_df = pd.DataFrame(records)
-    if records_df.empty:
-        return 0.0
 
     # save predictions for this plan
     records_df.to_csv(f'final-eval-results/{opt}/{workload}/preds-{plan_idx}.csv', index=False)
+
+    if records_df.empty:
+        return 0.0
 
     # get list of predictions
     preds = None
@@ -436,9 +437,13 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
         allow_model_selection=allow_model_selection,
         allow_codegen=allow_codegen,
         allow_token_reduction=allow_token_reduction,
+        pareto_optimal=False if opt == "codegen" and workload == "enron" else True,
         shouldProfile=True,
     ))
 
+    # NOTE: we don't need to do this within a dataset invocation b/c codegen is tied to the opId
+    #       which changes for every operator and every plan (now that I've added model back to self.opId())
+    #
     # # remove codegen samples from previous dataset from cache
     # if allow_codegen:
     #     cache = pz.DataDirectory().getCacheService()
@@ -455,6 +460,7 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
             allow_model_selection=allow_model_selection,
             allow_codegen=allow_codegen,
             allow_token_reduction=allow_token_reduction,
+            pareto_optimal=False if opt == "codegen" and workload == "enron" else True,
             shouldProfile=True,
         )
         _, _, _, plan, _ = candidatePlans[plan_idx]

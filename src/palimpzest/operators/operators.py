@@ -272,7 +272,7 @@ class LogicalOperator:
 
         return physicalPlans
 
-    def createPhysicalPlanCandidates(self, max: int=None, cost_estimate_sample_data: List[Dict[str, Any]]=None, allow_model_selection: bool=False, allow_codegen: bool=False, allow_token_reduction: bool=False, shouldProfile: bool=False) -> List[PhysicalPlan]:
+    def createPhysicalPlanCandidates(self, max: int=None, cost_estimate_sample_data: List[Dict[str, Any]]=None, allow_model_selection: bool=False, allow_codegen: bool=False, allow_token_reduction: bool=False, pareto_optimal: bool=True, shouldProfile: bool=False) -> List[PhysicalPlan]:
         """Return a set of physical trees of operators."""
         # create set of logical plans (e.g. consider different filter/join orderings)
         logicalPlans = LogicalOperator._createLogicalPlans(self)
@@ -312,6 +312,14 @@ class LogicalOperator:
                 dedup_plans.append(plan)
         
         print(f"DEDUP PLANS: {len(dedup_plans)}")
+
+        # return de-duplicated set of plans if we don't want to compute the pareto frontier
+        if not pareto_optimal:
+            if max is not None:
+                dedup_plans = dedup_plans[:max]
+                print(f"LIMIT DEDUP PLANS: {len(dedup_plans)}")
+
+            return dedup_plans
 
         # compute the pareto frontier of candidate physical plans and return the list of such plans
         # - brute force: O(d*n^2);
