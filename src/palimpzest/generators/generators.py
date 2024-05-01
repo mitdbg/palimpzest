@@ -534,7 +534,11 @@ class DSPyGenerator(BaseGenerator):
         if budget < 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             print("Reduction enabled")
             print("answer:", pred.answer)
-            gsi, gei = best_substring_match(pred.answer, full_context)
+            try:
+                gsi, gei = best_substring_match(pred.answer, full_context)
+            except Exception as e:
+                print("Error in substring match:", e)
+                gsi, gei = 0, len(full_context)
             context_len = len(full_context)
             gsr, ger = gsi/context_len, gei/context_len
             norm_si, norm_ei = int(gsr/TOKEN_REDUCTION_GRANULARITY), int(ger/TOKEN_REDUCTION_GRANULARITY)
