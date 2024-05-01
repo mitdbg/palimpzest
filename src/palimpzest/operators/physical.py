@@ -298,10 +298,12 @@ class InduceFromCandidateOp(PhysicalOp):
             self.model = Model.GPT_4V
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
+        # TODO: combine these functions
         # set model to None if this is a simple conversion
-        if self._is_quick_conversion():
+        if self._is_quick_conversion() or self.is_hardcoded():
             self.model = None
             self.prompt_strategy = None
+            self.query_strategy = None
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
@@ -315,7 +317,7 @@ class InduceFromCandidateOp(PhysicalOp):
         #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
-        return "InduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value if self.model is not None else None) + ", Query Strategy: " + str(self.query_strategy.value) + ", Token Budget: " + str(self.token_budget) + ")"
+        return "InduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value if self.model is not None else None) + ", Query Strategy: " + str(self.query_strategy.value if self.query_strategy is not None else None) + ", Token Budget: " + str(self.token_budget) + ")"
 
     def _makeTaskDescriptor(self):
         td = TaskDescriptor(
@@ -371,7 +373,7 @@ class InduceFromCandidateOp(PhysicalOp):
         inputEstimates, subPlanCostEst = self.source.estimateCost(cost_estimate_sample_data)
 
         # if induce has a quick conversion; set "no-op" cost estimates
-        if self._is_quick_conversion():
+        if self._is_quick_conversion() or self.is_hardcoded():
             # we assume time cost of these conversions is negligible
             outputEstimates = {**inputEstimates}
             outputEstimates["timePerElement"] = 0.0
@@ -568,9 +570,10 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
 
         # set model to None if this is a simple conversion
-        if self._is_quick_conversion():
+        if self._is_quick_conversion() or self.is_hardcoded():
             self.model = None
             self.prompt_strategy = None
+            self.query_strategy = None
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
@@ -584,7 +587,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
-        return "ParallelInduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value if self.model is not None else None) + ", Query Strategy: " + str(self.query_strategy.value) + ", Token Budget: " + str(self.token_budget) + ")"
+        return "ParallelInduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value if self.model is not None else None) + ", Query Strategy: " + str(self.query_strategy.value if self.query_strategy is not None else None) + ", Token Budget: " + str(self.token_budget) + ")"
 
     def _makeTaskDescriptor(self):
         return TaskDescriptor(
@@ -636,7 +639,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         inputEstimates, subPlanCostEst = self.source.estimateCost(cost_estimate_sample_data)
 
         # if induce has a quick conversion; set "no-op" cost estimates
-        if self._is_quick_conversion():
+        if self._is_quick_conversion() or self.is_hardcoded():
             # we assume time cost of these conversions is negligible
             outputEstimates = {**inputEstimates}
             outputEstimates["timePerElement"] = 0.0

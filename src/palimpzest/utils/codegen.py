@@ -11,6 +11,7 @@ from palimpzest.elements import DataRecord
 from typing import Any, Dict, List, Tuple
 from collections import Counter
 
+import json
 import time
 
 llm = CustomGenerator(model_name=Model.GPT_4.value)
@@ -202,6 +203,14 @@ def codeEnsembleExecution(api: API, code_ensemble: List[str], candidate_dict: Di
         ensemble_stats.code_versions_stats[code_name] = stats
     preds = [pred for pred in preds if pred is not None]
     print(preds)
+
+    # TODO: short-term hack to avoid calling Counter(preds) when preds is a list for biofabric (which is unhashable)
+    #       
+    if len(preds) == 1:
+        majority_response = preds[0]
+        ensemble_stats.majority_response = majority_response
+        return majority_response, ensemble_stats
+
     if len(preds) > 0:
         majority_response = Counter(preds).most_common(1)[0][0]
         ensemble_stats.majority_response = majority_response

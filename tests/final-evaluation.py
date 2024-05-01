@@ -168,8 +168,8 @@ def score_biofabric_plans(opt, workload, records, plan_idx) -> float:
     exclude_keys = ["filename", "op_id", "uuid", "parent_uuid", "stats"]
     output_rows = []
     for rec in records:
-        dct = {k:v for k,v in rec.items() if k not in exclude_keys}
-        filename = os.path.basename(rec["filename"])
+        dct = {k:v for k,v in rec.asDict().items() if k not in exclude_keys}
+        filename = os.path.basename(rec.asDict()["filename"])
         dct["study"] = filename.split("_")[0]
         output_rows.append(dct)
 
@@ -181,7 +181,8 @@ def score_biofabric_plans(opt, workload, records, plan_idx) -> float:
 
     output = records_df
     index = [x for x in output.columns if x != "study"]
-    target_matching = pd.read_csv(os.path.join(f'final-eval-results/{opt}/{workload}/', "target_matching.csv"), index_col=0).reindex(index)
+    # target_matching = pd.read_csv(os.path.join(f'final-eval-results/{opt}/{workload}/', "target_matching.csv"), index_col=0).reindex(index)
+    target_matching = pd.read_csv(os.path.join(f'testdata/', "target_matching.csv"), index_col=0).reindex(index)
 
     studies = output["study"].unique()
     # Group by output by the "study" column and split it into many dataframes indexed by the "study" column
@@ -441,14 +442,11 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
         shouldProfile=True,
     ))
 
-    # NOTE: we don't need to do this within a dataset invocation b/c codegen is tied to the opId
-    #       which changes for every operator and every plan (now that I've added model back to self.opId())
-    #
-    # # remove codegen samples from previous dataset from cache
-    # if allow_codegen:
-    #     cache = pz.DataDirectory().getCacheService()
-    #     cache.rmCachedData("codeEnsemble")
-    #     cache.rmCachedData("codeSamples")
+    # remove codegen samples from previous dataset from cache
+    if allow_codegen:
+        cache = pz.DataDirectory().getCacheService()
+        cache.rmCachedData("codeEnsemble")
+        cache.rmCachedData("codeSamples")
 
     for plan_idx in range(num_plans):
     # for plan_idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
@@ -508,7 +506,7 @@ def plot_runtime_cost_vs_quality(results, opt, workload):
     fig_clean, axs_clean = plt.subplots(nrows=2, ncols=1, sharex=True)
 
     # parse results into fields
-    for plan_idx, result_dict in enumerate(results):
+    for plan_idx, result_dict in results:
         runtime = result_dict["runtime"]
         cost = result_dict["cost"]
         f1_score = result_dict["f1_score"]
@@ -538,13 +536,18 @@ def plot_runtime_cost_vs_quality(results, opt, workload):
     axs_clean[1].grid(True)
 
     # savefigs
-    axs_text[0].set_title("Runtime and Cost vs. F1 Score")
+    workload_to_title = {
+        "enron": "Enron Legal Discovery",
+        "real-estate": "Real Estate Search",
+        "biofabric": "Biofabric-medium"
+    }
+    axs_text[0].set_title(f"{workload_to_title[workload]}")
     axs_text[0].set_ylabel("Runtime (seconds)")
     axs_text[1].set_ylabel("Cost (USD)")
     axs_text[1].set_xlabel("F1 Score")
     fig_text.savefig(f"final-eval-results/{opt}/{workload}/{opt}-{workload}-text.png", dpi=500, bbox_inches="tight")
 
-    axs_clean[0].set_title("Runtime and Cost vs. F1 Score")
+    axs_clean[0].set_title(f"{workload_to_title[workload]}")
     axs_clean[0].set_ylabel("Runtime (seconds)")
     axs_clean[1].set_ylabel("Cost (USD)")
     axs_clean[1].set_xlabel("F1 Score")
@@ -915,6 +918,6 @@ if __name__ == "__main__":
     for plan_idx in range(num_plans):
         with open(f"final-eval-results/{args.opt}/{args.workload}/results-{plan_idx}.json", 'r') as f:
             result = json.load(f)
-            results.append(result)
+            results.append((plan_idx, result))
 
     plot_runtime_cost_vs_quality(results, args.opt, args.workload)
