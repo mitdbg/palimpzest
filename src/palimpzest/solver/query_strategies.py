@@ -249,6 +249,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
 
         if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # TODO Hacky to nest return and not disrupt the rest of method!!!
+            # NOTE: this is a bonded query, but we are treating it as a conventional query
             query_stats = {}
             drs = [] 
             promptQuestion = _construct_query_prompt(td, doc_type, generate_field_names)
@@ -262,26 +263,40 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
 
                 text_content = json.dumps(new_json)
                 generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
+                answer, record_stats = None, None
                 try:
                     answer, record_stats = generator.generate(text_content, promptQuestion)
                     jsonObj = _get_JSON_from_answer(answer)["items"][0]
+                    query_stats[f"all_fields_one_to_many_conventional"] = record_stats
                 except IndexError as e:
+                    query_stats[f"all_fields_one_to_many_conventional"] = record_stats
                     print("Could not find any items in the JSON response")
                     continue
                 except json.JSONDecodeError as e:
+                    query_stats[f"all_fields_one_to_many_conventional"] = record_stats
                     print(f"Could not decode JSON response: {e}")
                     print(answer)
                     continue
                 except Exception as e:
+                    query_stats[f"all_fields_one_to_many_conventional"] = record_stats
                     print(f"Could not decode JSON response: {e}")
                     print(answer)
                     continue
+
                 dr = _create_data_record_from_json(jsonObj, td, candidate)
                 drs.append(dr)
 
                 # TODO how to stat this? I feel that we need a new Stats class for this type of query
+                # construct ConventionalQueryStats object
+                field_query_stats_lst = [FieldQueryStats(gen_stats=gen_stats, field_name=field_name) for
+                                         field_name, gen_stats in query_stats.items()]
+                conventional_query_stats = ConventionalQueryStats(
+                    field_query_stats_lst=field_query_stats_lst,
+                    input_fields=td.inputSchema.fieldNames(),
+                    generated_fields=generate_field_names,
+                )
 
-            return drs, None                
+            return drs, conventional_query_stats
 
         else:
             raise Exception("Conventional queries cannot execute tasks with cardinality == 'oneToMany'")
