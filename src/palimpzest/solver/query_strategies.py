@@ -411,13 +411,19 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                 new_json[split_attribute] = dct[split_attribute][idx]
 
                 # examples.append(new_json)
-                print(type(dct[split_attribute]))
-                print(dct[split_attribute])
-                examples.extend(dct[split_attribute])
+                candidate_dicts = []
+                for _idx in range(n_splits):
+                    candidate_dict = dict(new_json)
+                    candidate_dict["row"] = dct[split_attribute][_idx] # TODO: hard-coding rows --> row to try to induce single output
+                    candidate_dicts.append(candidate_dict)
+
+                # print(type(candidate_dicts))
+                # print(candidate_dicts)
+                examples.extend(candidate_dicts)
                 cache.putCachedData("codeSamples", code_ensemble_id, examples)
                 api = API.from_task_descriptor(td, field_name, input_fields=new_json.keys())
                 if len(code_ensemble)==0 or reGenerationCondition(api, examples=examples):
-                    code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples)
+                    code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples, code_num_examples=n_splits)
                     cache.putCachedData("codeEnsemble", code_ensemble_id, (code_ensemble, gen_stats))
 
                 for code_name, code in code_ensemble.items():
