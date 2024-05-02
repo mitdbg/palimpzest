@@ -163,7 +163,7 @@ def compute_label(physicalTree, label_idx):
 def score_biofabric_plans(opt, workload, records, plan_idx) -> float:
     """
     Computes the results of all biofabric plans
-    """   
+    """
     # parse records
     exclude_keys = ["filename", "op_id", "uuid", "parent_uuid", "stats"]
     output_rows = []

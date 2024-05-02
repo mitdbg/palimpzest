@@ -410,7 +410,10 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                 new_json = {k:v for k,v in dct.items() if k != split_attribute}
                 new_json[split_attribute] = dct[split_attribute][idx]
 
-                examples.append(new_json)
+                # examples.append(new_json)
+                print(type(dct[split_attribute]))
+                print(dct[split_attribute])
+                examples.extend(dct[split_attribute])
                 cache.putCachedData("codeSamples", code_ensemble_id, examples)
                 api = API.from_task_descriptor(td, field_name, input_fields=new_json.keys())
                 if len(code_ensemble)==0 or reGenerationCondition(api, examples=examples):
@@ -453,6 +456,11 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                         answer = None
 
                 print(f'SETTING {field_name} to be {answer}')
+                if type(answer) == list and len(answer) == 1:
+                    answer = answer[0]
+                elif type(answer) == list and len(answer) > 1:
+                    import pdb
+                    pdb.set_trace()
                 setattr(dr, field_name, answer)
                 
             # TODO: last minute hack; for some reason some records are not setting a filename
