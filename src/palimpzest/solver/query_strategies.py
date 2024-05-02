@@ -414,7 +414,7 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                 candidate_dicts = []
                 for _idx in range(n_splits):
                     candidate_dict = dict(new_json)
-                    candidate_dict["row"] = dct[split_attribute][_idx] # TODO: hard-coding rows --> row to try to induce single output
+                    candidate_dict[split_attribute] = dct[split_attribute][_idx]
                     candidate_dicts.append(candidate_dict)
 
                 # print(type(candidate_dicts))
@@ -462,11 +462,8 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                         answer = None
 
                 print(f'SETTING {field_name} to be {answer}')
-                if type(answer) == list and len(answer) == 1:
+                while type(answer) == type([]):
                     answer = answer[0]
-                elif type(answer) == list and len(answer) > 1:
-                    import pdb
-                    pdb.set_trace()
                 setattr(dr, field_name, answer)
                 
             # TODO: last minute hack; for some reason some records are not setting a filename
