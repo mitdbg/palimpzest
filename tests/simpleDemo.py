@@ -204,13 +204,13 @@ def buildImageAggPlan(datasetId):
 
 
 def buildNestedStr(node, indent=0, buildStr=""):
-        elt, child = node
-        indentation = " " * indent
-        buildStr =  f"{indentation}{elt}" if indent == 0 else buildStr + f"\n{indentation}{elt}"
-        if child is not None:
-            return buildNestedStr(child, indent=indent+2, buildStr=buildStr)
-        else:
-            return buildStr
+    elt, child = node
+    indentation = " " * indent
+    buildStr =  f"{indentation}{elt}" if indent == 0 else buildStr + f"\n{indentation}{elt}"
+    if child is not None:
+        return buildNestedStr(child, indent=indent+2, buildStr=buildStr)
+    else:
+        return buildStr
 
 def printTable(records, cols=None, gradio=False, query=None, plan=None):
     records = [
@@ -276,7 +276,7 @@ def emitDataset(rootSet, policy, title="Dataset", verbose=False, shouldProfile=F
             print("----------")
 
     # have policy select the candidate plan to execute
-    planTime, planCost, quality, physicalTree = policy.choose(candidatePlans)
+    planTime, planCost, quality, physicalTree, _ = policy.choose(candidatePlans)
     print("----------")
     print(f"Policy is: {str(policy)}")
     print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")
@@ -364,6 +364,15 @@ if __name__ == "__main__":
         print("----------")
         print()
         printTable(records, cols=["sender", "subject"], gradio=True, plan=physicalTree)
+
+        # if profiling was turned on; capture statistics
+        if args.profile:
+            profiling_data = physicalTree.getProfilingData()
+            sp = StatsProcessor(profiling_data)
+
+            with open('profiling-data/enron-profiling.json', 'w') as f:
+                json.dump(sp.profiling_data.to_dict(), f)
+
     elif task == "enronGby":
         rootSet = enronGbyPlan(datasetid)
         physicalTree = emitDataset(rootSet, policy, title="Enron email counts", verbose=args.verbose)

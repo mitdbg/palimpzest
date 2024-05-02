@@ -33,6 +33,10 @@ class CacheService:
     def putCachedData(self, cacheName, cacheKey, cacheVal):
         self.allCaches.setdefault(cacheName, {})[cacheKey] = cacheVal
 
+    def rmCachedData(self, cacheName):
+        if cacheName in self.allCaches:
+            del self.allCaches[cacheName]
+
 # TODO: possibly rename to the PZManager, as it also manages the current config
 class DataDirectory(metaclass=DataDirectorySingletonMeta):
     """The DataDirectory is a registry of data sources."""

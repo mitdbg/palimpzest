@@ -18,6 +18,9 @@ class Model(Enum):
     GEMINI_1 = "gemini-1.0-pro-001"
     GEMINI_1V = "gemini-1.0-pro-vision-latest"
 
+    def __repr__(self):
+        return f'{self.name}'
+    
 class PromptStrategy(Enum):
     """
     PromptStrategy describes the prompting technique to be used by a Generator when
@@ -35,16 +38,32 @@ class QueryStrategy(Enum):
     QueryStrategy describes the high-level approach to querying a Model (or generated code)
     in order to perform a specified task.
     """
+    # DEFAULT = "bonded-with-fallback" # "codegen-with-fallback"
     CONVENTIONAL = "conventional"
     BONDED = "bonded"
     BONDED_WITH_FALLBACK = "bonded-with-fallback"
     CODE_GEN = "code-gen"
     CODE_GEN_WITH_FALLBACK = "codegen-with-fallback"
 
+class CodeGenStrategy(Enum):
+    """
+    CodeGenStrategy describes the high-level approach to generating code.
+    in order to perform a specified task.
+    """
+    # DEFAULT = "single"
+    NONE = "none"
+    SINGLE = "single"
+    EXAMPLE_ENSEMBLE = "example-ensemble"
+    ADVICE_ENSEMBLE = "advice-ensemble"
+    ADVICE_ENSEMBLE_WITH_VALIDATION = "advice-ensemble-with-validation"
+
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
 RETRY_MULTIPLIER = 2
 RETRY_MAX_SECS = 10
 RETRY_MAX_ATTEMPTS = 1
+
+# maximum number of rows to display in a table
+MAX_ROWS = 5
 
 def log_attempt_number(retry_state):
     """return the result of the last call attempt"""
@@ -87,6 +106,10 @@ EST_FILTER_SELECTIVITY = 0.5
 
 # Whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False
+
+# Resolution of the token reduction granularity
+TOKEN_REDUCTION_GRANULARITY = 0.001
+TOKEN_REDUCTION_SAMPLE = 10
 
 #### MODEL PERFORMANCE & COST METRICS ####
 # I've looked across models and grouped knowledge into commonly used categories:
@@ -250,9 +273,9 @@ GEMINI_1_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.042 / 10.0, # TODO: 
     ##### Agg. Benchmark #####
-    "MMLU": 90.0,
+    "MMLU": 65.0, # 90.0 TODO: we are using the free version of Gemini which is substantially worse than its paid version; I'm manually revising it's quality below that of Mixtral
     ##### Commonsense Reasoning #####
-    "reasoning": 87.8,
+    "reasoning": 80.0, # 87.8, TODO: see note above on MMLU
     # "HellaSwag": 87.8,  # 10-shot
     ##### World Knowledge #####
     ##### Reading Comprehension #####
@@ -272,11 +295,11 @@ GEMINI_1V_MODEL_CARD = {
     "usd_per_input_token": 25 / 1E6,  # Gemini is free but rate limited for now. Pricing will be updated 
     "usd_per_output_token": 375 / 1E9,
     ##### Time #####
-    "seconds_per_output_token": 0.042 / 10.0, # TODO: 
+    "seconds_per_output_token": 0.042, # / 10.0, # TODO: 
     ##### Agg. Benchmark #####
-    "MMLU": 90.0,
+    "MMLU": 65.0, # 90.0, TODO: see note above in Gemini_1 model card
     ##### Commonsense Reasoning #####
-    "reasoning": 87.8,
+    "reasoning": 80.0, # 87.8, TODO: see note above in Gemini_1 model card
     # "HellaSwag": 87.8,  # 10-shot
     ##### World Knowledge #####
     ##### Reading Comprehension #####

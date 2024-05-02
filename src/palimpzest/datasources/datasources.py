@@ -52,8 +52,8 @@ class MemorySource(DataSource):
 
     def __iter__(self) -> Callable[[], DataRecord]:
         def valIterator():
-            for v in self.vals:
-                dr = DataRecord(self.schema)
+            for idx, v in enumerate(self.vals):
+                dr = DataRecord(self.schema, scan_idx=idx)
                 dr.value = v
                 yield dr
 
@@ -65,17 +65,20 @@ class DirectorySource(DataSource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(File, dataset_id)
         self.path = path
+        self.idx = 0
 
     def __iter__(self) -> Callable[[], DataRecord]:
         def filteredIterator():
             for filename in os.listdir(self.path):
                 file_path = os.path.join(self.path, filename)
                 if os.path.isfile(file_path):
-                    dr = DataRecord(self.schema)
+                    dr = DataRecord(self.schema, scan_idx=self.idx)
                     dr.filename = file_path
                     bytes_data = open(file_path, "rb").read()
                     dr.contents = bytes_data
                     yield dr
+
+                    self.idx += 1
 
         return filteredIterator()
 
@@ -92,16 +95,19 @@ class FileSource(DataSource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(File, dataset_id)
         self.path = path
+        self.idx = 0
 
     def __iter__(self) -> Callable[[], DataRecord]:
         def filteredIterator():
             for path in [self.path]:
-                dr = DataRecord(self.schema)
+                dr = DataRecord(self.schema, scan_idx=self.idx)
                 dr.filename = path
                 bytes_data = open(path, "rb").read()
                 dr.contents = bytes_data
 
                 yield dr
+
+                self.idx += 1
 
         return filteredIterator()
 

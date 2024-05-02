@@ -1,0 +1,52 @@
+Message-ID: <5973689.1075852351200.JavaMail.evans@thyme>
+Date: Wed, 18 Jul 2001 16:06:10 -0700 (PDT)
+From: kevin.garland@enron.com
+To: ken.rice@enron.com, greg.whalley@enron.com, david.delainey@enron.com
+Subject: Enron Principal Investments Update
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Garland, Kevin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=KGARLAN>
+X-To: Rice, Ken </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=a7db55d9-f1759ddd-8825687a-69ec86>, Whalley, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gwhalle>, Delainey, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=28fc501b-22d3a001-62569fb-57caaa>
+X-cc: 
+X-bcc: 
+X-Folder: \GWHALLE (Non-Privileged)\Merchant Investments
+X-Origin: WHALLEY-G
+X-FileName: GWHALLE (Non-Privileged).pst
+
+
+Here is an update of our activities.
+
+All of my standard reports should be completed by the end of next week, which will allow me to provide thorough and concise report of all positions and values.
+
+Portfolio Management
+Completed assignment of all portfolio companies to senior team members
+Sold 20% stake in Paladin Resources (a UK public E&P company) for 44p totaling $25 million.  This was a good price (average price LTM of 37p), but was below the quarter end price.  Therefore, there is a Q3 loss of $6.4 million.  Andrew Marsden is managing this in London.
+Completed all requirements to sell COPEL shares (a $100+ million investment in the Brazilian utility).  Began selling shares on 7/17.  Current price is approximately $14 million below carrying value of approximately $120 million.  Likely to take a couple of months to exit entire position.  Investment is carried as "Strategic", and any losses upon the sale will fall "below the line" in the sale of non-merchant asset line.  Steven Sheldon is managing this.
+Completed negotiations on the sale of Utiliquest for $62.5 million.  Should sign on Thursday.  Enron had invested $11.6 million in cash (net of JEDI II) and will receive $14.3 million.  The sale will net a cash gain to Enron, but below our carrying value of $16.3 million, yielding a $2 million accounting loss.  Kevin Kuykendall is managing this.
+Finalized processes to begin selling Hanover Compressor shares.  We own 4.6 million shares, which are trading at $30.00/share for a total value of $138 million.  Hanover has been hedged through Raptor.  However, the structure that was used to hedge is a costless collar that leaves Enron exposed below $34.875/share.  Therefore, at current trading levels we are facing a $23 million loss.  We are working with CSFB, which has proposed to execute a block trade sale.  However, the stock continues to decline each day, and CSFB will not make an offer until the price stabilizes.  If we have to sell at a block discount, or if the price continues to fall we could be facing a $35 million to $40 million loss.  Needless to say, we are very focused on this investment.
+Losses from Venture Capital positions appear to be approximately $10 million for Q3, which is primarily the result of write-offs in the HEOF portfolio.
+Net quarterly expectations: Cash proceeds received from sales - ~$250 million, losses from sales below carrying value ~$60 million ($46 million "above the line" and $14 million "below the line").  
+
+Integration
+All personnel decisions made.
+Legal (Gil Melman), RAC (Randy Petersen), accounting (Hope Vargas), HR (Sheila Walton) and Tax (Jim Sandt) support personnel determined.
+Everyone moving to same location (EB36) today.
+Preparation of 2nd half 2001 budget (revenue and expense) still in process.  To be completed by 7/31.
+Back office systems and filing systems in process of integration.  To be completed by 7/31.
+
+Process Standardization
+Mid stream of development of deal filtering, deal evaluation and due diligence, modeling, approval, portfolio management, and exit (all to be completed by 8/15).
+Need to develop permanent approval process, including approval limits.
+
+Strategy Development
+Strategy is currently being vetted through a collaborative process including all senior members of the group and RAC.
+Final drafting session for 5-7 page strategy/charter paper and 10 page powerpoint presentation scheduled for July 27.
+Presentation of strategy to Greg and Ken is scheduled for July 30, to Jeff Skilling on August 15.
+
+Other Issues
+Given Andy Fastow's involvement with Corp Dev, and our groups need for capital, I would like to add Andy to the Investment Committee.  Please provide feedback.
+
+Thanks,
+KG
+

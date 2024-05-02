@@ -1,0 +1,16 @@
+li,cao,clark,dou,gilette,huang,krug,mcdermott,satpathy,vasaikar,wang
+missing,missing,missing,missing,missing,missing,Tumor.Stage,missing,missing,missing,missing
+pathologic_staging_regional_lymph_nodes_pn,pathologic_staging_regional_lymph_nodes_pn,missing,Path_Stage_Reg_Lymph_Nodes-pN,missing,patho_staging_pn,Tumor.Stage,missing,missing,PN,missing
+tumor_stage_pathological,tumor_stage_pathological,missing,tumor_Stage-Pathological,Stage,tumor_stage,Tumor.Stage,Tumor Stage (Pathological) Ovary FIGO Staging System,Stage,missing,missing
+pathologic_staging_primary_tumor_pt,pathologic_staging_primary_tumor_pt,missing,Path_Stage_Primary_Tumor-pT,missing,patho_staging_pt,Tumor.Stage,missing,missing,PT,missing
+case_id,case_id,missing,missing,Participant,case_id,Sample.ID,missing,Participant,missing,case_id
+missing,missing,missing,Race,Ethnicity,P16,Ethnicity,Ethnicity,Ethnicity_mod,missing,ethnicity_self_identify
+sex,sex,missing,Gender,Gender,gender,Gender,Gender,Gender,Gender,gender
+histology_diagnosis,missing,missing,Histologic_type,missing,histologic_type,Tumor.Stage,Histological Subtype,Pathology.based.histology.assessment,Mucinous,missing
+histology_diagnosis,histology_diagnosis,missing,missing,missing,histologic_grade,Tumor.Stage,Histological Subtype,CIMP.status.meth,Mucinous,cause_of_death
+race,race,missing,Race,Region.of.Origin,country,Ethnicity,Race,Ethnicity_mod,missing,race
+tumor_site,tumor_site,missing,missing,mRNA.Expression.Subtype.TCGA,tumor_site_original,Tumor.Stage,Anatomic site of Tumor Specimen,missing,Subsite,tumor_site_curated
+tumor_focality,tumor_focality,missing,Tumor_Focality,missing,tumor_focality,Tumor.Stage,missing,missing,missing,missing
+tumor_necrosis,missing,missing,Estrogen_Receptor,missing,histologic_grade,Tumor.Stage,Tumor Grade,missing,missing,missing
+missing,missing,missing,missing,missing,missing,Tumor.Stage,missing,missing,missing,missing
+vital_status,vital_status,missing,Tumor_purity,missing,P16,Tumor.Stage,missing,missing,Vital.Status,vital_status

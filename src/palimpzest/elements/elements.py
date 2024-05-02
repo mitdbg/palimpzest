@@ -51,6 +51,15 @@ class Field:
         return {"description": self._desc, "type": "undefined"}
 
 
+class BooleanField(Field):
+    """A BooleanField is a Field that is True or False."""
+    def __init__(self, desc: str, required: bool=False):
+        super().__init__(desc=desc, required=required)
+
+    def jsonSchema(self) -> Dict[str, str]:
+        return {"description": self._desc, "type": "boolean"}
+
+
 class StringField(Field):
     """A StringField is a Field that is definitely a string of text."""
     def __init__(self, desc: str, required: bool=False):
@@ -156,7 +165,6 @@ class SchemaMetaclass(type):
                 schema["required"].append(k)
         return schema
 
-
 # TODO: how does deserialize actually work with Schema (formerly Element)
 # TODO: should we put the SchemaMetaclass functionality into Schema and make it a @dataclass?
 class Schema(metaclass=SchemaMetaclass):
@@ -179,6 +187,17 @@ class Schema(metaclass=SchemaMetaclass):
     """
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
+
+    def asJSON(self, value_dict: Dict[str, Any], include_data_cols: bool=True) -> str:
+        """Return a JSON representation of an instantiated object of this Schema"""
+        fields = self.__class__.fieldNames()
+        # Make a dictionary out of the key/value pairs
+        d = {k: value_dict[k] for k in fields}
+        if include_data_cols:
+            d["data type"] = str(self.__class__.__name__)
+            d["data type description"]  = str(self.__class__.__doc__)
+
+        return json.dumps(d, indent=2)
 
 
 # TODO: Under the definition of __eq__ in SchemaMetaclass, I think that an equality check like

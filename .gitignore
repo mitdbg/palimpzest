@@ -6,6 +6,9 @@ build/*
 *.egg-info
 **/__pycache__/
 
+# other
+.DS_Store
+
 # logs
 *.log
 
@@ -17,3 +20,7 @@ testdata/maildir/
 
 # jupyter
 .ipynb_checkpoints/
+
+# evaluation
+old-eval-results/
+eval-results/

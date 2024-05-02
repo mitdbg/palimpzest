@@ -21,6 +21,14 @@ class QuestionOverPaper(dspy.Signature):
     question = dspy.InputField(desc="one or more question about the paper")
     answer = dspy.OutputField(desc="print the answer only, separated by a newline character")
 
+class SingleQuestionOverSample(dspy.Signature):
+    """Answer question(s) about a scientific paper."""
+
+    context = dspy.InputField(desc="contains a snippet of the paper, including the most possible answer to the question.")
+    question = dspy.InputField(desc="one question about the paper")
+    answer = dspy.OutputField(desc="print the answer close to the original text as you can, and print 'None' if an answer cannot be found. Please do not helucinate the answer")
+
+
 # functions which generate signatures
 def gen_signature_class(instruction, context_desc, question_desc, answer_desc):
     class QuestionOverDoc(dspy.Signature):
@@ -77,7 +85,7 @@ class TogetherHFAdaptor(HFModel):
         # print("Stop procedure", stop_default)
         self.kwargs = {
             "temperature": 0.0,
-            "max_tokens": 256, # 8192
+            "max_tokens": 512, # 8192
             "top_p": 1,
             "top_k": 20,
             "repetition_penalty": 1,

@@ -18,10 +18,14 @@ class TaskDescriptor:
     model: Model = None
     # the cardinality ("oneToOne" or "oneToMany") of the operation
     cardinality: str = None
+    # whether or not the task is an image conversion task
+    image_conversion: bool = None
     # the prompt strategy
     prompt_strategy: PromptStrategy = None
     # the query strategy
     query_strategy: QueryStrategy = None
+    # the token budget
+    token_budget: float = None
     # the filter for filter operations
     filter: Filter = None
     # the optional description of the conversion being applied (if task is a conversion)
