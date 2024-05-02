@@ -438,7 +438,7 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
         allow_model_selection=allow_model_selection,
         allow_codegen=allow_codegen,
         allow_token_reduction=allow_token_reduction,
-        pareto_optimal=False if opt == "codegen" and workload == "enron" else True,
+        pareto_optimal=False if opt in ["codegen", "token-reduction"] and workload == "enron" else True,
         shouldProfile=True,
     ))
 
@@ -528,6 +528,17 @@ def plot_runtime_cost_vs_quality(results, opt, workload):
 
     # TODO:
     # set x,y-lim for each workload
+    left, right = -0.05, 1.05
+    if workload == "real-estate":
+        left = 0.5
+        right = 0.85
+    elif workload == "biofabric":
+        left = 0.3
+        right = 0.6
+    axs_text[0].set_xlim(left, right)
+    axs_text[1].set_xlim(left, right)
+    axs_clean[0].set_xlim(left, right)
+    axs_clean[1].set_xlim(left, right)
 
     # turn on grid lines
     axs_text[0].grid(True)
@@ -537,9 +548,9 @@ def plot_runtime_cost_vs_quality(results, opt, workload):
 
     # savefigs
     workload_to_title = {
-        "enron": "Enron Legal Discovery",
+        "enron": "Legal Discovery",
         "real-estate": "Real Estate Search",
-        "biofabric": "Biofabric-medium"
+        "biofabric": "Biofabric Integration"
     }
     axs_text[0].set_title(f"{workload_to_title[workload]}")
     axs_text[0].set_ylabel("Runtime (seconds)")
