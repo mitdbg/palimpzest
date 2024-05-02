@@ -40,10 +40,10 @@ class DataRecord:
     def schema(self):
         return self._schema
 
-    def asJSON(self, include_bytes: bool=True):
+    def asJSON(self, include_bytes: bool=True, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
         value_dict = self.asDict(include_bytes)
-        return self.schema().asJSON(value_dict)
+        return self.schema().asJSON(value_dict, *args, **kwargs)
 
     def asDict(self, include_bytes: bool=True):
         """Return a dictionary representation of this DataRecord"""

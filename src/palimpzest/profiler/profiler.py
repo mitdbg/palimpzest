@@ -83,6 +83,9 @@ class Profiler:
                     self.operator_stats.total_cumulative_iter_time += t_record_end - t_record_start
 
                     # update state of record for complete history of computation
+                    if 'filename' not in record.__dict__.keys():
+                        import pdb
+                        pdb.set_trace()
                     record_state = record.asDict(include_bytes=False)
                     record_state["op_id"] = self.op_id
                     record_state["uuid"] = record._uuid

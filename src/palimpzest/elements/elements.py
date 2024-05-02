@@ -188,13 +188,14 @@ class Schema(metaclass=SchemaMetaclass):
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
 
-    def asJSON(self, value_dict: Dict[str, Any]) -> str:
+    def asJSON(self, value_dict: Dict[str, Any], include_data_cols: bool=True) -> str:
         """Return a JSON representation of an instantiated object of this Schema"""
         fields = self.__class__.fieldNames()
         # Make a dictionary out of the key/value pairs
         d = {k: value_dict[k] for k in fields}
-        d["data type"] = str(self.__class__.__name__)
-        d["data type description"]  = str(self.__class__.__doc__)
+        if include_data_cols:
+            d["data type"] = str(self.__class__.__name__)
+            d["data type description"]  = str(self.__class__.__doc__)
 
         return json.dumps(d, indent=2)
 

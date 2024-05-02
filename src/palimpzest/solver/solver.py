@@ -298,13 +298,16 @@ class Solver:
             elif td.query_strategy == QueryStrategy.CODE_GEN_WITH_FALLBACK:
                 # similar to in _makeLLMTypeConversionFn; maybe we can have one strategy in which we try
                 # to use code generation, but if it fails then we fall back to a conventional query strategy?
-                new_candidate, full_code_gen_stats = runCodeGenQuery(candidate, td, self._verbose)
+                dr, full_code_gen_stats, conventional_query_stats = runCodeGenQuery(candidate, td, self._verbose)
+                drs = [dr] if type(dr) is not list else dr
                 # # Deleting all failure fields
                 # for field_name in td.outputSchema.fieldNames():
                 #     if hasattr(new_candidate, field_name) and (getattr(new_candidate, field_name) is None):
                 #         delattr(new_candidate, field_name)
-                dr, conventional_query_stats = runConventionalQuery(new_candidate, td, self._verbose)
-                drs = [dr] if type(dr) is not list else dr
+                # if td.cardinality == 'oneToMany':
+                #     td.cardinality = 'oneToOne'
+                # dr, conventional_query_stats = runConventionalQuery(new_candidate, td, self._verbose)
+                # drs = [dr] if type(dr) is not list else dr
                 for dr in drs:
                     dr._parent_uuid = candidate._uuid
 

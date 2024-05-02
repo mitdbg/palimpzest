@@ -4,7 +4,7 @@ from palimpzest.elements import DataRecord
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
 from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats, CodeGenEnsembleStats, FullCodeGenStats, GenerationStats
 from palimpzest.solver.task_descriptors import TaskDescriptor
-from palimpzest.utils import API, codeEnsembleGeneration, codeEnsembleExecution, reGenerationCondition
+from palimpzest.utils import API, codeEnsembleGeneration, codeEnsembleExecution, reGenerationCondition, CodeGenSingleStats
 
 from typing import Any, Dict, List, Tuple
 
@@ -377,38 +377,180 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
         else:
             generate_field_names.append(field_name)
     
-    full_code_gen_stats = FullCodeGenStats()
-    cache = DataDirectory().getCacheService()
-    for field_name in generate_field_names:
-        code_ensemble_id = "_".join([td.op_id, field_name])
-        cached_code_ensemble_info = cache.getCachedData("codeEnsemble", code_ensemble_id)
-        if cached_code_ensemble_info is not None:
-            code_ensemble, _ = cached_code_ensemble_info
-            gen_stats = CodeGenEnsembleStats()
-            examples = cache.getCachedData("codeSamples", code_ensemble_id)
-        else:
-            code_ensemble, gen_stats, examples = dict(), None, list()
+    if td.cardinality == "oneToMany":
+        # TODO here the problem is: which is the 1:N field that we are splitting the output into?
+        # do we need to know this to construct the prompt question ?
+        # for now, we will just assume there is only one list in the JSON.
+        dct = candidate.asJSON(include_bytes=False, include_data_cols=False)
+        dct = json.loads(dct)
+        split_attribute = [att for att in dct.keys() if type(dct[att]) == list][0]
+        n_splits = len(dct[split_attribute])
 
-        # remove bytes data from candidate
-        candidate_dict = candidate.asDict(include_bytes=False)
-        candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
+        # TODO Hacky to nest return and not disrupt the rest of method!!!
+        # NOTE: this is a bonded query, but we are treating it as a conventional query
+        drs = []
+        full_code_gen_stats, conv_query_stats = FullCodeGenStats(), {}
+        for idx in range(n_splits):
+            # initialize output data record
+            dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
 
-        examples.append(candidate_dict)
-        cache.putCachedData("codeSamples", code_ensemble_id, examples)
-        api = API.from_task_descriptor(td, field_name, input_fields=candidate_dict.keys())
-        if len(code_ensemble)==0 or reGenerationCondition(api, examples=examples):
-            code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples)
-            cache.putCachedData("codeEnsemble", code_ensemble_id, (code_ensemble, gen_stats))
+            cache = DataDirectory().getCacheService()
+            for field_name in generate_field_names:
+                code_ensemble_id = "_".join([td.op_id, field_name])
+                cached_code_ensemble_info = cache.getCachedData("codeEnsemble", code_ensemble_id)
+                if cached_code_ensemble_info is not None:
+                    code_ensemble, _ = cached_code_ensemble_info
+                    gen_stats = CodeGenEnsembleStats()
+                    examples = cache.getCachedData("codeSamples", code_ensemble_id)
+                else:
+                    code_ensemble, gen_stats, examples = dict(), None, list()
 
-        for code_name, code in code_ensemble.items():
-            print(f"CODE NAME: {code_name}")
-            print("-----------------------")
-            print(code)
+                if verbose: 
+                    print(f"Processing {split_attribute} with index {idx}")
+                new_json = {k:v for k,v in dct.items() if k != split_attribute}
+                new_json[split_attribute] = dct[split_attribute][idx]
 
-        answer, exec_stats = codeEnsembleExecution(api, code_ensemble, candidate_dict)
-        full_code_gen_stats.code_gen_stats[field_name] = gen_stats
-        full_code_gen_stats.code_exec_stats[field_name] = exec_stats
-        print(f'SETTING {field_name} to be {answer}')
-        setattr(dr, field_name, answer)
+                examples.append(new_json)
+                cache.putCachedData("codeSamples", code_ensemble_id, examples)
+                api = API.from_task_descriptor(td, field_name, input_fields=new_json.keys())
+                if len(code_ensemble)==0 or reGenerationCondition(api, examples=examples):
+                    code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples)
+                    cache.putCachedData("codeEnsemble", code_ensemble_id, (code_ensemble, gen_stats))
 
-    return dr, full_code_gen_stats
+                for code_name, code in code_ensemble.items():
+                    print(f"CODE NAME: {code_name}")
+                    print("-----------------------")
+                    print(code)
+                
+                answer, exec_stats = codeEnsembleExecution(api, code_ensemble, new_json)
+                full_code_gen_stats.code_gen_stats[f"{field_name}_{idx}"] = gen_stats
+                full_code_gen_stats.code_exec_stats[f"{field_name}_{idx}"] = exec_stats
+                
+                if answer is None:
+                    print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
+                    # construct prompt question
+                    doc_schema = str(td.outputSchema)
+                    doc_type = td.outputSchema.className()
+                    promptQuestion = _construct_query_prompt(td, doc_type, [field_name])
+                    field_stats = None
+                    try:
+                        # print(f"FALL BACK FIELD: {field_name}")
+                        # print("---------------")
+                        # invoke LLM to generate output JSON
+                        text_content = json.dumps(new_json)
+                        generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
+                        answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget)
+
+                        # update conv_query_stats
+                        conv_query_stats[f"{field_name}_{idx}_fallback"] = field_stats
+
+                        # extract result from JSON and set the DataRecord's field with its generated value
+                        jsonObj = _get_JSON_from_answer(answer)
+                        answer = jsonObj[field_name]
+                    except:
+                        # update conv_query_stats
+                        conv_query_stats[f"{field_name}_{idx}_fallback"] = field_stats
+                        answer = None
+
+                print(f'SETTING {field_name} to be {answer}')
+                setattr(dr, field_name, answer)
+                
+            # TODO: last minute hack; for some reason some records are not setting a filename
+            # I will need to debug this more thoroughly in the future, but for now this is an easy fix
+            if not hasattr(dr, 'filename'):
+                setattr(dr, 'filename', candidate.filename)
+
+            drs.append(dr)
+        
+        # construct ConventionalQueryStats object
+        field_query_stats_lst = [
+            FieldQueryStats(gen_stats=gen_stats, field_name=field_name)
+            for field_name, gen_stats in conv_query_stats.items()
+        ]
+        conventional_query_stats = ConventionalQueryStats(
+            field_query_stats_lst=field_query_stats_lst,
+            input_fields=td.inputSchema.fieldNames(),
+            generated_fields=generate_field_names,
+        )
+
+        return drs, full_code_gen_stats, conventional_query_stats
+
+    else:
+        full_code_gen_stats, conv_query_stats = FullCodeGenStats(), {}
+        cache = DataDirectory().getCacheService()
+        for field_name in generate_field_names:
+            code_ensemble_id = "_".join([td.op_id, field_name])
+            cached_code_ensemble_info = cache.getCachedData("codeEnsemble", code_ensemble_id)
+            if cached_code_ensemble_info is not None:
+                code_ensemble, _ = cached_code_ensemble_info
+                gen_stats = CodeGenEnsembleStats()
+                examples = cache.getCachedData("codeSamples", code_ensemble_id)
+            else:
+                code_ensemble, gen_stats, examples = dict(), None, list()
+
+            # remove bytes data from candidate
+            candidate_dict = candidate.asJSON(include_bytes=False, include_data_cols=False)
+            candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
+
+            examples.append(candidate_dict)
+            cache.putCachedData("codeSamples", code_ensemble_id, examples)
+            api = API.from_task_descriptor(td, field_name, input_fields=candidate_dict.keys())
+            if len(code_ensemble)==0 or reGenerationCondition(api, examples=examples):
+                code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples)
+                cache.putCachedData("codeEnsemble", code_ensemble_id, (code_ensemble, gen_stats))
+
+            for code_name, code in code_ensemble.items():
+                print(f"CODE NAME: {code_name}")
+                print("-----------------------")
+                print(code)
+        
+            answer, exec_stats = codeEnsembleExecution(api, code_ensemble, candidate_dict)
+            full_code_gen_stats.code_gen_stats[field_name] = gen_stats
+            full_code_gen_stats.code_exec_stats[field_name] = exec_stats
+
+            if answer is None:
+                print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
+                # construct prompt question
+                doc_schema = str(td.outputSchema)
+                doc_type = td.outputSchema.className()
+                promptQuestion = _construct_query_prompt(td, doc_type, [field_name])
+                field_stats = None
+                try:
+                    # print(f"FALL BACK FIELD: {field_name}")
+                    # print("---------------")
+                    # invoke LLM to generate output JSON
+                    text_content = json.loads(candidate_dict)
+                    generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
+                    answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget)
+
+                    # update stats
+                    conv_query_stats[f"{field_name}_fallback"] = field_stats
+
+                    # extract result from JSON and set the DataRecord's field with its generated value
+                    jsonObj = _get_JSON_from_answer(answer)
+                    answer = jsonObj[field_name]
+                except:
+                    # update stats
+                    conv_query_stats[f"{field_name}_fallback"] = field_stats
+                    answer = None
+
+            print(f'SETTING {field_name} to be {answer}')
+            setattr(dr, field_name, answer)
+
+        # TODO: last minute hack; for some reason some records are not setting a filename
+        # I will need to debug this more thoroughly in the future, but for now this is an easy fix
+        if not hasattr(dr, 'filename'):
+            setattr(dr, 'filename', candidate.filename)
+        
+        # construct ConventionalQueryStats object
+        field_query_stats_lst = [
+            FieldQueryStats(gen_stats=gen_stats, field_name=field_name)
+            for field_name, gen_stats in conv_query_stats.items()
+        ]
+        conventional_query_stats = ConventionalQueryStats(
+            field_query_stats_lst=field_query_stats_lst,
+            input_fields=td.inputSchema.fieldNames(),
+            generated_fields=generate_field_names,
+        )
+
+        return dr, full_code_gen_stats, conventional_query_stats

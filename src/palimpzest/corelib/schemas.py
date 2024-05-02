@@ -57,7 +57,7 @@ class Table(Schema):
     # TODO currently no support for nesting data records on data records
     rows = ListField(element_type=ListField, desc="The rows of the table", required=True)
 
-    def asJSON(self, value_dict) -> str:
+    def asJSON(self, value_dict, *args, **kwargs) -> str:
         """Return a JSON representation of an instantiated object of this Schema"""
         # Take the value_dict for the rows and make them into comma separated strings
         dct = value_dict
@@ -70,4 +70,4 @@ class Table(Schema):
         header = ",".join(dct["header"])
         dct["header"] = header
 
-        return super(Table, self).asJSON(dct)
+        return super(Table, self).asJSON(dct, *args, **kwargs)
