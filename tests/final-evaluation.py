@@ -499,13 +499,25 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
     allow_model_selection = (opt == "model")
     allow_codegen = (opt == "codegen")
     allow_token_reduction = (opt == "token-reduction")
-    num_plans = len(logicalTree.createPhysicalPlanCandidates(
+    plans = logicalTree.createPhysicalPlanCandidates(
         allow_model_selection=allow_model_selection,
         allow_codegen=allow_codegen,
         allow_token_reduction=allow_token_reduction,
         pareto_optimal=False if opt in ["codegen", "token-reduction"] and workload == "enron" else True,
         shouldProfile=True,
-    ))
+    )
+    num_plans = len(plans)
+
+    if dry_run:
+        for plan_idx, (_, _, _, plan, _) in enumerate(plans):
+            # display the plan output
+            print("----------------------")
+            ops = plan.dumpPhysicalTree()
+            flatten_ops = flatten_nested_tuples(ops)
+            print(f"Plan {plan_idx}:")
+            graphicEmit(flatten_ops)
+            print("---")
+        return
 
     # remove codegen samples from previous dataset from cache
     if allow_codegen:
