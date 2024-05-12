@@ -184,7 +184,7 @@ class LogicalOperator:
             # models.extend([Model.GPT_3_5])
 
         if os.getenv('TOGETHER_API_KEY') is not None:
-            models.extend([Model.MIXTRAL])
+            models.extend([Model.MIXTRAL, Model.LLAMA3])
 
         if os.getenv('GOOGLE_API_KEY') is not None:
             models.extend([Model.GEMINI_1])

@@ -11,6 +11,7 @@ class Model(Enum):
     remotely or locally (if applicable).
     """
     LLAMA2 = "meta-llama/Llama-2-7b-hf"
+    LLAMA3 = "meta-llama/Llama-3-8b-chat-hf"
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
     GPT_3_5 = "gpt-3.5-turbo-0125"
     GPT_4 = "gpt-4-0125-preview"
@@ -176,8 +177,8 @@ LLAMA2_7B_MODEL_CARD = {
 }
 MIXTRAL_8X_7B_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 0.7 / 1E6,
-    "usd_per_output_token": 0.7 / 1E6,
+    "usd_per_input_token": 0.6 / 1E6,
+    "usd_per_output_token": 0.6 / 1E6,
     ##### Time #####
     "seconds_per_output_token": 0.009,
     ##### Agg. Benchmark #####
@@ -201,6 +202,26 @@ MIXTRAL_8X_7B_MODEL_CARD = {
     "math": 74.4,
     ### "MATH": 28.4,
     ### "GSM8K": 74.4, # 5-shot
+}
+LLAMA3_8B_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.2 / 1E6,
+    "usd_per_output_token": 0.2 / 1E6,
+    ##### Time #####
+    "seconds_per_output_token": 0.00285,
+    ##### Agg. Benchmark #####
+    "MMLU": 68.4,
+    ##### Commonsense Reasoning #####
+    "reasoning": 78.6,
+    ### "Arc-e": 78.6,^      # 25-shot
+    ##### Reading Comprehension #####
+    ##### Code #####
+    "code": 62.2,
+    ### "HumanEval": 62.2,
+    ##### Math #####
+    "math": 79.6,
+    ### "MATH": 30.0,
+    ### "GSM8K": 79.6, # 5-shot
 }
 # NOTE: seconds_per_output_token is based on `gpt-3.5-turbo-1106`
 GPT_3_5_MODEL_CARD = {
@@ -317,6 +338,7 @@ GEMINI_1V_MODEL_CARD = {
 
 MODEL_CARDS = {
     Model.LLAMA2.value: LLAMA2_7B_MODEL_CARD,
+    Model.LLAMA3.value: LLAMA3_8B_MODEL_CARD,
     Model.MIXTRAL.value: MIXTRAL_8X_7B_MODEL_CARD,
     Model.GPT_3_5.value: GPT_3_5_MODEL_CARD,
     Model.GPT_4.value: GPT_4_MODEL_CARD,
