@@ -70,7 +70,11 @@ def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_na
         Here is every output field name and a description:
         {multilineOutputFieldDescription}
         {appendixInstruction}
-        """ + "" if td.conversionDesc is None else f" Keep in mind that this process is described by this text: {td.conversionDesc}." 
+        """ + "" if td.conversionDesc is None else f" Keep in mind that this process is described by this text: {td.conversionDesc}."
+
+    # TODO: add this for boolean questions?
+    # if td.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
+    #     promptQuestion += "\nRemember, your output MUST be one of TRUE or FALSE."
 
     return promptQuestion
 

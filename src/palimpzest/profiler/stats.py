@@ -716,12 +716,27 @@ class StatsProcessor:
             model_df = df[df.model_name == model_name]
             if not model_df.empty:
                 return (model_df['input_usd'] + model_df['output_usd']).agg(agg=agg).iloc[0]
+        
+        # # adjust cost from sample model to this model
+        # this_model_usd_per_input_token = MODEL_CARDS[model_name]['usd_per_input_token']
+        # model_to_usd_per_input_token = {
+        #     model_name: model_card['usd_per_input_token']
+        #     for model_name, model_card in MODEL_CARDS.items()
+        # }
+        # this_model_usd_per_output_token = MODEL_CARDS[model_name]['usd_per_output_token']
+        # model_to_usd_per_output_token = {
+        #     model_name: model_card['usd_per_output_token']
+        #     for model_name, model_card in MODEL_CARDS.items()
+        # }
+        # df.loc[:, 'adj_input_usd'] = df.apply(lambda row: row['input_usd'] * (this_model_usd_per_input_token / model_to_usd_per_input_token[row['model_name']]), axis=1)
+        # df.loc[:, 'adj_output_usd'] = df.apply(lambda row: row['output_usd'] * (this_model_usd_per_output_token / model_to_usd_per_output_token[row['model_name']]), axis=1)
 
-        # compute average combined input/output usd spent
+        # # compute average combined input/output usd spent
+        # return (df['adj_input_usd'] + df['adj_output_usd']).agg(agg=agg).iloc[0]
         return (df['input_usd'] + df['output_usd']).agg(agg=agg).iloc[0]
 
     @staticmethod
-    def _est_selectivity(cost_est_sample_data: List[Dict[str, Any]], filter: str) -> float:
+    def _est_selectivity(cost_est_sample_data: List[Dict[str, Any]], filter: str, model_name: str=None) -> float:
         """
         Given sample cost data observations and a filter to identify a unique operator,
         compute the ratio of records between this operator and its source operator.
@@ -734,11 +749,36 @@ class StatsProcessor:
         # get subset of records matching filter (this should uniquely identify an operator)
         op_df = df.query(filter)
 
-        # get subset of records that were the source to this operator
-        source_op_id = op_df.source_op_id.iloc[0]
-        source_op_df = df.query(f"op_id=='{source_op_id}'")
+        # use model-specific estimate if possible
+        if model_name is not None:
+            model_op_df = op_df[op_df.model_name == model_name]
+            if not model_op_df.empty:
+                num_input_records = model_op_df.shape[0]
 
-        return len(op_df) / len(source_op_df)
+                # get subset of records that were the source to this operator
+                op_name = str(model_op_df.op_name.iloc[0])
+                num_output_records = None
+                if "filter" in op_name:
+                    num_output_records = model_op_df.passed_filter.sum()
+                else:
+                    op_ids = model_op_df.op_id.unique().tolist()
+                    num_output_records = df[df.source_op_id.isin(op_ids)].shape[0]
+
+                return num_output_records / num_input_records
+
+        # otherwise average selectivity across all ops
+        num_input_records = op_df.shape[0]
+
+        # get subset of records that were the source to this operator
+        op_name = str(op_df.op_name.iloc[0])
+        num_output_records = None
+        if "filter" in op_name:
+            num_output_records = op_df.passed_filter.sum()
+        else:
+            op_ids = op_df.op_id.unique().tolist()
+            num_output_records = df[df.source_op_id.isin(op_ids)].shape[0]
+
+        return num_output_records / num_input_records
 
     @staticmethod
     def _est_quality(cost_est_sample_data: List[Dict[str, Any]], induce_or_filter: str, filter: str, this_model_name: str=None) -> float:
@@ -884,6 +924,7 @@ class StatsProcessor:
                     "op_name": op_data.op_name,
                     "source_op_id": op_data.source_op_stats.op_id if op_data.source_op_stats is not None else None,
                     "op_time": record_dict["stats"].op_time,
+                    "passed_filter": record_dict["_passed_filter"] if "_passed_filter" in record_dict else None,
                 }
 
                 # add additional fields for induce or filter w/LLM

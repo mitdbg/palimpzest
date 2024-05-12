@@ -395,7 +395,7 @@ class InduceFromCandidateOp(PhysicalOp):
             time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             quality = StatsProcessor._est_quality(cost_estimate_sample_data, "induce", all_model_filter, self.model.value)
 
             # estimate cardinality using sample selectivity and input cardinality est.
@@ -508,7 +508,7 @@ class InduceFromCandidateOp(PhysicalOp):
             "quality": quality,
         }
 
-        return costEst, None
+        return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
 
     def __iter__(self) -> IteratorFn:
         shouldCache = self.datadir.openCache(self.targetCacheId)
@@ -660,7 +660,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             quality = StatsProcessor._est_quality(cost_estimate_sample_data, "induce", all_model_filter, self.model.value)
 
             # estimate cardinality using sample selectivity and input cardinality est.
@@ -769,7 +769,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             "quality": quality,
         }
 
-        return costEst, None
+        return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
 
     def __iter__(self):
         # This is very crudely implemented right now, since we materialize everything
@@ -823,7 +823,7 @@ class FilterCandidateOp(PhysicalOp):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.filter = filter
-        self.model = model
+        self.model = model if filter.filterFn is None else None
         self.prompt_strategy = prompt_strategy
         self.targetCacheId = targetCacheId
 
@@ -839,7 +839,8 @@ class FilterCandidateOp(PhysicalOp):
         #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
-        return "FilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
+        model_str = self.model.value if self.model is not None else str(None)
+        return "FilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + model_str + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
 
     def _makeTaskDescriptor(self):
         return TaskDescriptor(
@@ -860,7 +861,7 @@ class FilterCandidateOp(PhysicalOp):
             "outputSchema": str(self.outputSchema),
             "source": self.source.opId(),
             "filter": str(self.filter),
-            "model": self.model.value,
+            "model": self.model.value if self.model is not None else None,
             "prompt_strategy": self.prompt_strategy.value,
             "targetCacheId": self.targetCacheId,
         }
@@ -882,7 +883,7 @@ class FilterCandidateOp(PhysicalOp):
             time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             quality = StatsProcessor._est_quality(cost_estimate_sample_data, "filter", all_model_filter, self.model.value)
 
             # estimate cardinality using sample selectivity and input cardinality est.
@@ -922,8 +923,8 @@ class FilterCandidateOp(PhysicalOp):
             # estimate 1 ms execution for filter function
             time_per_record = 0.001
 
-            # estimate quality of output based on the strength of the model being used
-            quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
+            # assume filter fn has perfect quality
+            quality = inputEstimates["quality"]
 
             thisCostEst = {
                 "time_per_record": time_per_record,
@@ -1002,7 +1003,7 @@ class FilterCandidateOp(PhysicalOp):
             "quality": quality,
         }
 
-        return costEst, None
+        return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
 
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
@@ -1040,7 +1041,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.source = source
         self.filter = filter
-        self.model = model
+        self.model = model if filter.filterFn is None else None
         self.prompt_strategy = prompt_strategy
         self.targetCacheId = targetCacheId
         self.max_workers = 20
@@ -1058,7 +1059,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
         #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
     def __str__(self):
-        return "ParallelFilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + str(self.model.value) + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
+        model_str = self.model.value if self.model is not None else str(None)
+        return "ParallelFilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + model_str + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
 
     def _makeTaskDescriptor(self):
         return TaskDescriptor(
@@ -1079,7 +1081,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
             "outputSchema": str(self.outputSchema),
             "source": self.source.opId(),
             "filter": str(self.filter),
-            "model": self.model.value,
+            "model": self.model.value if self.model is not None else None,
             "prompt_strategy": self.prompt_strategy.value,
             "targetCacheId": self.targetCacheId,
         }
@@ -1097,7 +1099,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
             time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
             quality = StatsProcessor._est_quality(cost_estimate_sample_data, "filter", all_model_filter, self.model.value)
 
             # estimate cardinality using sample selectivity and input cardinality est.
@@ -1137,8 +1139,8 @@ class ParallelFilterCandidateOp(PhysicalOp):
             # estimate 0.1 ms execution for filter function (divide non-parallel est. by 10x for parallelism speed-up)
             time_per_record = 0.0001
 
-            # estimate quality of output based on the strength of the model being used
-            quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * inputEstimates["quality"]
+            # assume filter fn has perfect quality
+            quality = inputEstimates["quality"]
 
             thisCostEst = {
                 "time_per_record": time_per_record,
@@ -1217,7 +1219,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
             "quality": quality,
         }
 
-        return costEst, None
+        return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
 
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)
@@ -1441,7 +1443,7 @@ class ApplyCountAggregateOp(PhysicalOp):
         outputEstimates['usdPerElement'] = 0
         outputEstimates['estOutputTokensPerElement'] = 0
 
-        return outputEstimates, None
+        return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {}, "subPlan": subPlanCostEst}
 
     def __iter__(self):
         datadir = DataDirectory()
@@ -1508,7 +1510,7 @@ class ApplyUserFunctionOp(PhysicalOp):
             # compute estimates
             filter = f"(filter == '{str(self.filter)}') & (op_name == 'p_filter')"
             time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, filter=filter)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, filter=filter)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, filter=filter, model_name=self.model.value)
 
             # estimate cardinality using sample selectivity and input cardinality est.
             cardinality = inputEstimates['cardinality'] * selectivity
@@ -1526,7 +1528,7 @@ class ApplyUserFunctionOp(PhysicalOp):
         outputEstimates["usdPerElement"] = 0
         outputEstimates["estOutputTokensPerElement"] = 0
 
-        return outputEstimates, None
+        return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {}, "subPlan": subPlanCostEst}
 
     def __iter__(self):
         datadir = DataDirectory()
@@ -1611,7 +1613,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
         outputEstimates["usdPerElement"] = 0
         outputEstimates["estOutputTokensPerElement"] = 0
 
-        return outputEstimates, None
+        return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {}, "subPlan": subPlanCostEst}
 
     def __iter__(self):
         datadir = DataDirectory()
@@ -1697,7 +1699,7 @@ class LimitScanOp(PhysicalOp):
         # output cardinality for limit can be at most self.limit
         outputEstimates["cardinality"] = min(self.limit, inputEstimates["cardinality"])
 
-        return outputEstimates, None
+        return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {}, "subPlan": subPlanCostEst}
 
     def __iter__(self):
         datadir = DataDirectory()
