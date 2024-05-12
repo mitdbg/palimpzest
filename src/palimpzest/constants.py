@@ -10,7 +10,7 @@ class Model(Enum):
     which requires invoking an LLM. It does NOT specify whether the model need be executed
     remotely or locally (if applicable).
     """
-    LLAMA2 = "meta-llama/Llama-2-7b-hf"
+    LLAMA2 = "togethercomputer/Llama-2-7B-32K-Instruct" # "meta-llama/Llama-2-7b-hf"
     LLAMA3 = "meta-llama/Llama-3-8b-chat-hf"
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
     GPT_3_5 = "gpt-3.5-turbo-0125"
