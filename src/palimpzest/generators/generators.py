@@ -60,7 +60,7 @@ class CustomGenerator(BaseGenerator):
             max_tokens = 4096
             model = dspy.OpenAI(model=self.model_name, api_key=openai_key, temperature=0.0, max_tokens=max_tokens, logprobs=True)
 
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             together_key = get_api_key('TOGETHER_API_KEY')
             model = TogetherHFAdaptor(self.model_name, together_key, logprobs=1)
 
@@ -84,7 +84,7 @@ class CustomGenerator(BaseGenerator):
         elif self.model_name in [Model.GEMINI_1.value]:
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
             finish_reason = dspy_lm.history[-1]['response'][0]._result.candidates[0].finish_reason
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             usage = dspy_lm.history[-1]['response']['usage']
             finish_reason = dspy_lm.history[-1]['response']['finish_reason']
 
@@ -118,7 +118,7 @@ class CustomGenerator(BaseGenerator):
             # tok_count = dspy_lm.llm.count_tokens(answer).total_tokens
             # tokens = [""] * tok_count
             # token_logprobs = [0] * len(tokens)
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             # reponse: dict_keys(['prompt', 'choices', 'usage', 'finish_reason', 'tokens', 'token_logprobs'])
             tokens = dspy_lm.history[-1]['response']['tokens']
             token_logprobs = dspy_lm.history[-1]['response']['token_logprobs']
@@ -203,7 +203,7 @@ class DSPyGenerator(BaseGenerator):
             max_tokens = 4096 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 150
             model = dspy.OpenAI(model=self.model_name, api_key=openai_key, temperature=0.0, max_tokens=max_tokens, logprobs=True)
 
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             together_key = get_api_key('TOGETHER_API_KEY')
             model = TogetherHFAdaptor(self.model_name, together_key, logprobs=1)
 
@@ -227,7 +227,7 @@ class DSPyGenerator(BaseGenerator):
         elif self.model_name in [Model.GEMINI_1.value]:
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
             finish_reason = dspy_lm.history[-1]['response'][0]._result.candidates[0].finish_reason
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             usage = dspy_lm.history[-1]['response']['usage']
             finish_reason = dspy_lm.history[-1]['response']['finish_reason']
 
@@ -261,7 +261,7 @@ class DSPyGenerator(BaseGenerator):
             # tok_count = dspy_lm.llm.count_tokens(answer).total_tokens
             # tokens = [""] * tok_count
             # token_logprobs = [0] * len(tokens)
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             # reponse: dict_keys(['prompt', 'choices', 'usage', 'finish_reason', 'tokens', 'token_logprobs'])
             tokens = dspy_lm.history[-1]['response']['tokens']
             token_logprobs = dspy_lm.history[-1]['response']['token_logprobs']
