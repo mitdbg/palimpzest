@@ -10,6 +10,7 @@ from sklearn.metrics import precision_recall_fscore_support
 from tabulate import tabulate
 
 from collections import defaultdict
+from multiprocessing import Pool
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -418,6 +419,58 @@ def get_logical_tree(workload, nocache: bool=True, num_samples: int=None, scan_s
     return None
 
 
+def evaluate_pz_plan(opt, workload, plan_idx):
+    if os.path.exists(f'final-eval-results/{opt}/{workload}/results-{plan_idx}.json'):
+        return
+
+    # get logicalTree
+    logicalTree = get_logical_tree(workload)
+
+    allow_model_selection = (opt == "model")
+    allow_codegen = (opt == "codegen")
+    allow_token_reduction = (opt == "token-reduction")
+
+    # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
+    candidatePlans = logicalTree.createPhysicalPlanCandidates(
+        allow_model_selection=allow_model_selection,
+        allow_codegen=allow_codegen,
+        allow_token_reduction=allow_token_reduction,
+        pareto_optimal=False if opt in ["codegen", "token-reduction"] and workload == "enron" else True,
+        shouldProfile=True,
+    )
+    _, _, _, plan, _ = candidatePlans[plan_idx]
+
+    # workaround to disabling cache: delete all cached generations after each plan
+    bad_files = ["testdata/enron-eval/assertion.log", "testdata/enron-eval/azure_openai_usage.log", "testdata/enron-eval/openai_usage.log"]
+    for file in bad_files:
+        if os.path.exists(file):
+            os.remove(file)
+
+    # display the plan output
+    print("----------------------")
+    ops = plan.dumpPhysicalTree()
+    flatten_ops = flatten_nested_tuples(ops)
+    print(f"Plan {plan_idx}:")
+    graphicEmit(flatten_ops)
+    print("---")
+
+    # run the plan
+    result_dict = run_pz_plan(opt, workload, plan, plan_idx)
+    print(f"Plan: {result_dict['plan_info']['plan_label']}")
+    print(f"  F1: {result_dict['f1_score']}")
+    print(f"  rt: {result_dict['runtime']}")
+    print(f"  $$: {result_dict['cost']}")
+    print("---")
+
+    # write result json object
+    with open(f'final-eval-results/{opt}/{workload}/results-{plan_idx}.json', 'w') as f:
+        json.dump(result_dict, f)
+
+    # workaround to disabling cache: delete all cached generations after each plan
+    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+    if os.path.exists(dspy_cache_dir):
+        shutil.rmtree(dspy_cache_dir)
+
 def evaluate_pz_plans(opt, workload, dry_run=False):
     """
     This creates the PZ set of plans for the Enron email evaluation.
@@ -460,54 +513,57 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
         cache.rmCachedData("codeEnsemble")
         cache.rmCachedData("codeSamples")
 
-    for plan_idx in range(num_plans):
-    # for plan_idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
-        if os.path.exists(f'final-eval-results/{opt}/{workload}/results-{plan_idx}.json'):
-            continue
+    with Pool(processes=num_plans) as pool:
+        results = pool.starmap(evaluate_pz_plan, [(opt, workload, plan_idx) for plan_idx in range(num_plans)])
 
-        # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
-        candidatePlans = logicalTree.createPhysicalPlanCandidates(
-            allow_model_selection=allow_model_selection,
-            allow_codegen=allow_codegen,
-            allow_token_reduction=allow_token_reduction,
-            pareto_optimal=False if opt in ["codegen", "token-reduction"] and workload == "enron" else True,
-            shouldProfile=True,
-        )
-        _, _, _, plan, _ = candidatePlans[plan_idx]
+    # for plan_idx in range(num_plans):
+    # # for plan_idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
+    #     if os.path.exists(f'final-eval-results/{opt}/{workload}/results-{plan_idx}.json'):
+    #         continue
 
-        # workaround to disabling cache: delete all cached generations after each plan
-        bad_files = ["testdata/enron-eval/assertion.log", "testdata/enron-eval/azure_openai_usage.log", "testdata/enron-eval/openai_usage.log"]
-        for file in bad_files:
-            if os.path.exists(file):
-                os.remove(file)
+    #     # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
+    #     candidatePlans = logicalTree.createPhysicalPlanCandidates(
+    #         allow_model_selection=allow_model_selection,
+    #         allow_codegen=allow_codegen,
+    #         allow_token_reduction=allow_token_reduction,
+    #         pareto_optimal=False if opt in ["codegen", "token-reduction"] and workload == "enron" else True,
+    #         shouldProfile=True,
+    #     )
+    #     _, _, _, plan, _ = candidatePlans[plan_idx]
 
-        # display the plan output
-        print("----------------------")
-        ops = plan.dumpPhysicalTree()
-        flatten_ops = flatten_nested_tuples(ops)
-        print(f"Plan {plan_idx}:")
-        graphicEmit(flatten_ops)
-        print("---")
+    #     # workaround to disabling cache: delete all cached generations after each plan
+    #     bad_files = ["testdata/enron-eval/assertion.log", "testdata/enron-eval/azure_openai_usage.log", "testdata/enron-eval/openai_usage.log"]
+    #     for file in bad_files:
+    #         if os.path.exists(file):
+    #             os.remove(file)
 
-        if dry_run:
-            continue
+    #     # display the plan output
+    #     print("----------------------")
+    #     ops = plan.dumpPhysicalTree()
+    #     flatten_ops = flatten_nested_tuples(ops)
+    #     print(f"Plan {plan_idx}:")
+    #     graphicEmit(flatten_ops)
+    #     print("---")
 
-        # run the plan
-        result_dict = run_pz_plan(opt, workload, plan, plan_idx)
-        print(f"Plan: {result_dict['plan_info']['plan_label']}")
-        print(f"  F1: {result_dict['f1_score']}")
-        print(f"  rt: {result_dict['runtime']}")
-        print(f"  $$: {result_dict['cost']}")
-        print("---")
+    #     if dry_run:
+    #         continue
 
-        # write result json object
-        with open(f'final-eval-results/{opt}/{workload}/results-{plan_idx}.json', 'w') as f:
-            json.dump(result_dict, f)
+    #     # run the plan
+    #     result_dict = run_pz_plan(opt, workload, plan, plan_idx)
+    #     print(f"Plan: {result_dict['plan_info']['plan_label']}")
+    #     print(f"  F1: {result_dict['f1_score']}")
+    #     print(f"  rt: {result_dict['runtime']}")
+    #     print(f"  $$: {result_dict['cost']}")
+    #     print("---")
 
-        # workaround to disabling cache: delete all cached generations after each plan
-        dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
-        if os.path.exists(dspy_cache_dir):
-            shutil.rmtree(dspy_cache_dir)
+    #     # write result json object
+    #     with open(f'final-eval-results/{opt}/{workload}/results-{plan_idx}.json', 'w') as f:
+    #         json.dump(result_dict, f)
+
+    #     # workaround to disabling cache: delete all cached generations after each plan
+    #     dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+    #     if os.path.exists(dspy_cache_dir):
+    #         shutil.rmtree(dspy_cache_dir)
 
     return num_plans
 
