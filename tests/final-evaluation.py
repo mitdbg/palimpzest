@@ -439,7 +439,7 @@ def evaluate_pz_plan(opt, workload, plan_idx):
         shouldProfile=True,
     )
     _, _, _, plan, _ = candidatePlans[plan_idx]
-    plan.setPlanIdx(plan_idx % 13)
+    plan.setPlanIdx(plan_idx)
 
     # workaround to disabling cache: delete all cached generations after each plan
     bad_files = ["testdata/enron-eval/assertion.log", "testdata/enron-eval/azure_openai_usage.log", "testdata/enron-eval/openai_usage.log"]

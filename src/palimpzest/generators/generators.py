@@ -308,7 +308,7 @@ class DSPyGenerator(BaseGenerator):
             prompt_schema = self.promptSignature
             print("Prompt QA Signature: ", prompt_schema)
             print('Question: ', question)
-            ordered = f'{prompt_schema} {question}'
+            ordered = f'{prompt_schema} {question} {plan_idx}'
             task_hash = hashlib.sha256(ordered.encode()).hexdigest()
             heatmap_file = os.path.join(file_cache, f"heatmap-{task_hash}.json")
             print("Heatmap file: ", heatmap_file)
