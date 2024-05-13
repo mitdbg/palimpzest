@@ -526,7 +526,7 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
         cache.rmCachedData("codeEnsemble")
         cache.rmCachedData("codeSamples")
 
-    with Pool(processes=num_plans) as pool:
+    with Pool(processes=13) as pool:
         results = pool.starmap(evaluate_pz_plan, [(opt, workload, plan_idx) for plan_idx in range(num_plans)])
 
     # for plan_idx in range(num_plans):
