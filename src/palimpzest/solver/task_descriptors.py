@@ -32,6 +32,8 @@ class TaskDescriptor:
     conversionDesc: str = None
     # name of the pdfprocessing tool to use (if applicable)
     pdfprocessor: str = None
+    # TODO: remove
+    plan_idx: int = None
 
     def __str__(self) -> str:
         """Use the __repr__() function which is automagically implemented by @dataclass"""

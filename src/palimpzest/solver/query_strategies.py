@@ -160,7 +160,7 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
         if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # invoke LLM to generate output JSON
             generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-            answer, gen_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget)
+            answer, gen_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx)
 
             # construct BondedQueryStats object
             bonded_query_stats = BondedQueryStats(
@@ -269,7 +269,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
                 generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
                 answer, record_stats = None, None
                 try:
-                    answer, record_stats = generator.generate(text_content, promptQuestion)
+                    answer, record_stats = generator.generate(text_content, promptQuestion, plan_idx=td.plan_idx)
                     jsonObj = _get_JSON_from_answer(answer)["items"][0]
                     query_stats[f"all_fields_one_to_many_conventional_{idx}"] = record_stats
                 except IndexError as e:
@@ -318,7 +318,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
                 # print("---------------")
                 # invoke LLM to generate output JSON
                 generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-                answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget)
+                answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx)
 
             elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:                               
                 # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
@@ -452,7 +452,7 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                         # invoke LLM to generate output JSON
                         text_content = json.dumps(new_json)
                         generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-                        answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget)
+                        answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx)
 
                         # update conv_query_stats
                         conv_query_stats[f"{field_name}_{idx}_fallback"] = field_stats
@@ -536,7 +536,7 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                     # invoke LLM to generate output JSON
                     text_content = json.loads(candidate_dict)
                     generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-                    answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget)
+                    answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx)
 
                     # update stats
                     conv_query_stats[f"{field_name}_fallback"] = field_stats

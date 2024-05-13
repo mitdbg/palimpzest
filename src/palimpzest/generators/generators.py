@@ -196,7 +196,7 @@ class DSPyGenerator(BaseGenerator):
         else:
             raise ValueError(f"DSPyGenerator does not support prompt_strategy: {prompt_strategy.value}")
 
-    def _get_model(self) -> dsp.LM:
+    def _get_model(self, plan_idx) -> dsp.LM:
         model = None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             openai_key = get_api_key('OPENAI_API_KEY')
@@ -208,7 +208,7 @@ class DSPyGenerator(BaseGenerator):
             model = TogetherHFAdaptor(self.model_name, together_key, logprobs=1)
 
         elif self.model_name in [Model.GEMINI_1.value]:
-            google_key = get_api_key('GOOGLE_API_KEY')
+            google_key = get_api_key(f'GOOGLE_API_KEY_{plan_idx}')
             model = dspy.Google(model=self.model_name, api_key=google_key)
 
         else:
@@ -289,12 +289,12 @@ class DSPyGenerator(BaseGenerator):
         reraise=True,
     )
     # the generate method requires a user-provided budget parameter to specify te token budget. Default is 1.0, meaning the full context will be used.
-    def generate(self, context: str, question: str, budget: float = 1.0) -> GenerationOutput:
+    def generate(self, context: str, question: str, budget: float = 1.0, plan_idx: int=0) -> GenerationOutput:
         # initialize variables around token reduction
         reduction, full_context = False, context
 
         # fetch model
-        dspy_lm = self._get_model()
+        dspy_lm = self._get_model(plan_idx)
 
         # configure DSPy to use this model; both DSPy prompt strategies currently use COT
         dspy.settings.configure(lm=dspy_lm)

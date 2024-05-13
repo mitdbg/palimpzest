@@ -63,6 +63,11 @@ class PhysicalOp:
 
         return (self, self.source.dumpPhysicalTree())
 
+    def setPlanIdx(self, idx) -> None:
+        self.plan_idx = idx
+        if self.source is not None:
+            self.source.setPlanIdx(idx)
+
     def getProfilingData(self) -> OperatorStats:
         # simply return stats for this operator if there is no source
         if self.shouldProfile and self.source is None:
@@ -333,6 +338,7 @@ class InduceFromCandidateOp(PhysicalOp):
             token_budget=self.token_budget,
             conversionDesc=self.desc,
             pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
+            plan_idx=self.plan_idx,
         )
         # # This code checks if the function has been synthesized before, and if so, whether it is hardcoded. If so, set model and prompt_strategy to None.
         # if td.op_id in PhysicalOp.synthesizedFns:
@@ -850,6 +856,7 @@ class FilterCandidateOp(PhysicalOp):
             filter=self.filter,
             model=self.model,
             prompt_strategy=self.prompt_strategy,
+            plan_idx=self.plan_idx,
         )
 
     def copy(self):

@@ -379,7 +379,7 @@ class Solver:
             # invoke LLM to generate filter decision (True or False)
             text_content = candidate.asJSON(include_bytes=False)
             try:
-                response, gen_stats = generator.generate(context=text_content, question=td.filter.filterCondition)
+                response, gen_stats = generator.generate(context=text_content, question=td.filter.filterCondition, plan_idx=td.plan_idx)
 
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
