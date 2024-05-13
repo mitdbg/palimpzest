@@ -24,3 +24,5 @@ testdata/maildir/
 # evaluation
 old-eval-results/
 eval-results/
+
+testdata/enron-eval/*.txt
