@@ -180,7 +180,7 @@ MIXTRAL_8X_7B_MODEL_CARD = {
     "usd_per_input_token": 0.6 / 1E6,
     "usd_per_output_token": 0.6 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.009,
+    "seconds_per_output_token": 0.005,
     ##### Agg. Benchmark #####
     "MMLU": 70.6,
     ##### Commonsense Reasoning #####
