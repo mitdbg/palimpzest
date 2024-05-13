@@ -505,6 +505,7 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
 
             # remove bytes data from candidate
             candidate_dict = candidate.asJSON(include_bytes=False, include_data_cols=False)
+            candidate_dict = json.loads(candidate_dict)
             candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
 
             examples.append(candidate_dict)
