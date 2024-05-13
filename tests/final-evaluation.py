@@ -523,8 +523,9 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
     # remove codegen samples from previous dataset from cache
     if allow_codegen:
         cache = pz.DataDirectory().getCacheService()
-        cache.rmCachedData("codeEnsemble")
-        cache.rmCachedData("codeSamples")
+        for plan_idx in range(num_plans):
+            cache.rmCachedData(f"codeEnsemble{plan_idx}")
+            cache.rmCachedData(f"codeSamples{plan_idx}")
 
     with Pool(processes=num_plans) as pool:
         results = pool.starmap(evaluate_pz_plan, [(opt, workload, plan_idx) for plan_idx in range(num_plans)])

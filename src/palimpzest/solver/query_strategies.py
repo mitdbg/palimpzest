@@ -401,11 +401,11 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
             cache = DataDirectory().getCacheService()
             for field_name in generate_field_names:
                 code_ensemble_id = "_".join([td.op_id, field_name])
-                cached_code_ensemble_info = cache.getCachedData("codeEnsemble", code_ensemble_id)
+                cached_code_ensemble_info = cache.getCachedData(f"codeEnsemble{td.plan_idx}", code_ensemble_id)
                 if cached_code_ensemble_info is not None:
                     code_ensemble, _ = cached_code_ensemble_info
                     gen_stats = CodeGenEnsembleStats()
-                    examples = cache.getCachedData("codeSamples", code_ensemble_id)
+                    examples = cache.getCachedData(f"codeSamples{td.plan_idx}", code_ensemble_id)
                 else:
                     code_ensemble, gen_stats, examples = dict(), None, list()
 
@@ -424,11 +424,11 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                 # print(type(candidate_dicts))
                 # print(candidate_dicts)
                 examples.extend(candidate_dicts)
-                cache.putCachedData("codeSamples", code_ensemble_id, examples)
+                cache.putCachedData(f"codeSamples{td.plan_idx}", code_ensemble_id, examples)
                 api = API.from_task_descriptor(td, field_name, input_fields=new_json.keys())
                 if len(code_ensemble)==0 or reGenerationCondition(api, examples=examples):
                     code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples, code_num_examples=n_splits)
-                    cache.putCachedData("codeEnsemble", code_ensemble_id, (code_ensemble, gen_stats))
+                    cache.putCachedData(f"codeEnsemble{td.plan_idx}", code_ensemble_id, (code_ensemble, gen_stats))
 
                 for code_name, code in code_ensemble.items():
                     print(f"CODE NAME: {code_name}")
@@ -495,11 +495,11 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
         cache = DataDirectory().getCacheService()
         for field_name in generate_field_names:
             code_ensemble_id = "_".join([td.op_id, field_name])
-            cached_code_ensemble_info = cache.getCachedData("codeEnsemble", code_ensemble_id)
+            cached_code_ensemble_info = cache.getCachedData(f"codeEnsemble{td.plan_idx}", code_ensemble_id)
             if cached_code_ensemble_info is not None:
                 code_ensemble, _ = cached_code_ensemble_info
                 gen_stats = CodeGenEnsembleStats()
-                examples = cache.getCachedData("codeSamples", code_ensemble_id)
+                examples = cache.getCachedData(f"codeSamples{td.plan_idx}", code_ensemble_id)
             else:
                 code_ensemble, gen_stats, examples = dict(), None, list()
 
@@ -508,11 +508,11 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
             candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
 
             examples.append(candidate_dict)
-            cache.putCachedData("codeSamples", code_ensemble_id, examples)
+            cache.putCachedData(f"codeSamples{td.plan_idx}", code_ensemble_id, examples)
             api = API.from_task_descriptor(td, field_name, input_fields=candidate_dict.keys())
             if len(code_ensemble)==0 or reGenerationCondition(api, examples=examples):
                 code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples)
-                cache.putCachedData("codeEnsemble", code_ensemble_id, (code_ensemble, gen_stats))
+                cache.putCachedData(f"codeEnsemble{td.plan_idx}", code_ensemble_id, (code_ensemble, gen_stats))
 
             for code_name, code in code_ensemble.items():
                 print(f"CODE NAME: {code_name}")
