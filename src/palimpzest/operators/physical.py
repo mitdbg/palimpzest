@@ -33,6 +33,7 @@ class PhysicalOp:
         self.source = source
         self.datadir = DataDirectory()
         self.shouldProfile = shouldProfile
+        self.plan_idx = None
 
         # NOTE: this must be overridden in each physical operator's __init__ method;
         #       we have to do it their b/c the opId() (which is an argument to the
@@ -286,7 +287,6 @@ class InduceFromCandidateOp(PhysicalOp):
         self.token_budget = token_budget
         self.desc = desc
         self.targetCacheId = targetCacheId
-        self.plan_idx = None
 
         # use image model if this is an image conversion
         if outputSchema == ImageFile and source.outputSchema == File or self.image_conversion:
