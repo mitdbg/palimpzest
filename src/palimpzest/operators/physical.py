@@ -286,6 +286,7 @@ class InduceFromCandidateOp(PhysicalOp):
         self.token_budget = token_budget
         self.desc = desc
         self.targetCacheId = targetCacheId
+        self.plan_idx = None
 
         # use image model if this is an image conversion
         if outputSchema == ImageFile and source.outputSchema == File or self.image_conversion:
