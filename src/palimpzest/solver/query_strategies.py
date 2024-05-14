@@ -160,7 +160,7 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
         if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # invoke LLM to generate output JSON
             generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-            answer, new_heatmap_json_obj, gen_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx, heatmap=td.heatmap_json_obj)
+            answer, new_heatmap_json_obj, gen_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx, heatmap_json_obj=td.heatmap_json_obj)
 
             # construct BondedQueryStats object
             bonded_query_stats = BondedQueryStats(
@@ -213,7 +213,7 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
 
     except Exception as e:
         print(f"Bonded query processing error: {e}")
-        return None, bonded_query_stats, str(e)
+        return None, new_heatmap_json_obj, bonded_query_stats, str(e)
 
     return drs, new_heatmap_json_obj, bonded_query_stats, None
 
