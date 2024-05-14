@@ -75,7 +75,7 @@ class Solver:
             if shouldProfile:
                 candidate._stats[td.op_id] = InduceNonLLMStats()
 
-            return [dr]
+            return [dr], None
         return _simpleTypeConversionFn
 
 
@@ -116,7 +116,7 @@ class Solver:
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
-                return [dr]
+                return [dr], None
             return _fileToPDF
 
         elif td.outputSchema == TextFile and td.inputSchema == File:
@@ -130,7 +130,7 @@ class Solver:
                 # if profiling, set record's stats for the given op_id to be an empty Stats object
                 if shouldProfile:
                     candidate._stats[td.op_id] = InduceNonLLMStats()
-                return [dr]
+                return [dr], None
             return _fileToText
 
         elif td.outputSchema == EquationImage and td.inputSchema == ImageFile:
@@ -147,7 +147,7 @@ class Solver:
                 # if profiling, set record's stats for the given op_id
                 if shouldProfile:
                     dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
-                return [dr]
+                return [dr], None
             return _imageToEquation
 
         elif td.outputSchema == File and td.inputSchema == Download: # TODO make sure this is also true for children classes of File
@@ -160,7 +160,7 @@ class Solver:
                 dr.contents = candidate.content
                 if shouldProfile:
                     candidate._stats[td.op_id] = InduceNonLLMStats()
-                return [dr]
+                return [dr], None
             return _downloadToFile
 
         elif td.outputSchema == XLSFile and td.inputSchema == File:
@@ -180,7 +180,7 @@ class Solver:
 
                 if shouldProfile:
                     candidate._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
-                return [dr]
+                return [dr], None
             return _fileToXLS
 
         elif td.outputSchema == Table and td.inputSchema == XLSFile:
@@ -210,7 +210,7 @@ class Solver:
                     if shouldProfile:
                         dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
                     records.append(dr)
-                return records
+                return records, None
             return _excelToTable
 
         else:
@@ -412,11 +412,9 @@ class Solver:
         if "InduceFromCandidateOp" in td.physical_op:
             typeConversionDescriptor = (td.outputSchema, td.inputSchema)
             if typeConversionDescriptor in self._simpleTypeConversions:
-                drs = self._makeSimpleTypeConversionFn(td, shouldProfile)
-                return drs, None
+                return self._makeSimpleTypeConversionFn(td, shouldProfile)
             elif typeConversionDescriptor in self._hardcodedFns:
-                drs = self._makeHardCodedTypeConversionFn(td, shouldProfile)
-                return drs, None
+                return self._makeHardCodedTypeConversionFn(td, shouldProfile)
             else:
                 return self._makeLLMTypeConversionFn(td, shouldProfile)
 
