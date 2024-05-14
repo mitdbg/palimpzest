@@ -65,6 +65,7 @@ RETRY_MAX_ATTEMPTS = 1
 
 # maximum number of rows to display in a table
 MAX_ROWS = 5
+MAX_HEATMAP_UPDATES = 5
 
 def log_attempt_number(retry_state):
     """return the result of the last call attempt"""

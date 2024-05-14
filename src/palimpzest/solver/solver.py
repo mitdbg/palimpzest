@@ -234,10 +234,10 @@ class Solver:
                         conventional_query_stats=conventional_query_stats,
                     )
 
-                return [dr]
+                return [dr], None
 
             elif td.query_strategy == QueryStrategy.BONDED:
-                drs, bonded_query_stats, err_msg = runBondedQuery(candidate, td, self._verbose)
+                drs, new_heatmap_obj, bonded_query_stats, err_msg = runBondedQuery(candidate, td, self._verbose)
 
                 # if bonded query failed, manually set fields to None
                 if err_msg is not None:
@@ -256,10 +256,10 @@ class Solver:
                             bonded_query_stats=bonded_query_stats,
                         )
 
-                return drs
+                return drs, new_heatmap_obj
 
             elif td.query_strategy == QueryStrategy.BONDED_WITH_FALLBACK:
-                drs, bonded_query_stats, err_msg = runBondedQuery(candidate, td, self._verbose)
+                drs, new_heatmap_obj, bonded_query_stats, err_msg = runBondedQuery(candidate, td, self._verbose)
 
                 # if bonded query failed, run conventional query
                 if err_msg is not None:
@@ -278,8 +278,8 @@ class Solver:
                             conventional_query_stats=conventional_query_stats,
                         )
 
-                return drs
-            
+                return drs, new_heatmap_obj
+
             elif td.query_strategy == QueryStrategy.CODE_GEN:
                 dr, full_code_gen_stats = runCodeGenQuery(candidate, td, self._verbose)
                 drs = [dr]
@@ -293,7 +293,7 @@ class Solver:
                             full_code_gen_stats=full_code_gen_stats,
                         )
 
-                return drs
+                return drs, None
 
             elif td.query_strategy == QueryStrategy.CODE_GEN_WITH_FALLBACK:
                 # similar to in _makeLLMTypeConversionFn; maybe we can have one strategy in which we try
@@ -322,7 +322,7 @@ class Solver:
                             conventional_query_stats=conventional_query_stats,
                         )
 
-                return drs
+                return drs, None
 
             else:
                 raise ValueError(f"Unrecognized QueryStrategy: {td.query_strategy.value}")
@@ -412,9 +412,11 @@ class Solver:
         if "InduceFromCandidateOp" in td.physical_op:
             typeConversionDescriptor = (td.outputSchema, td.inputSchema)
             if typeConversionDescriptor in self._simpleTypeConversions:
-                return self._makeSimpleTypeConversionFn(td, shouldProfile)
+                drs = self._makeSimpleTypeConversionFn(td, shouldProfile)
+                return drs, None
             elif typeConversionDescriptor in self._hardcodedFns:
-                return self._makeHardCodedTypeConversionFn(td, shouldProfile)
+                drs = self._makeHardCodedTypeConversionFn(td, shouldProfile)
+                return drs, None
             else:
                 return self._makeLLMTypeConversionFn(td, shouldProfile)
 

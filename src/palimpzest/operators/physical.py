@@ -287,6 +287,7 @@ class InduceFromCandidateOp(PhysicalOp):
         self.token_budget = token_budget
         self.desc = desc
         self.targetCacheId = targetCacheId
+        self.heatmap_json_obj = None
 
         # use image model if this is an image conversion
         if outputSchema == ImageFile and source.outputSchema == File or self.image_conversion:
@@ -340,6 +341,7 @@ class InduceFromCandidateOp(PhysicalOp):
             conversionDesc=self.desc,
             pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
             plan_idx=self.plan_idx,
+            heatmap_json_obj=self.heatmap_json_obj,
         )
         # # This code checks if the function has been synthesized before, and if so, whether it is hardcoded. If so, set model and prompt_strategy to None.
         # if td.op_id in PhysicalOp.synthesizedFns:
@@ -542,7 +544,9 @@ class InduceFromCandidateOp(PhysicalOp):
         # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
         #     raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
         # return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
-        return taskFn(candidate)
+        drs, new_heatmap_json_obj = taskFn(candidate)
+        self.heatmap_json_obj = new_heatmap_json_obj
+        return drs
 
 
 class ParallelInduceFromCandidateOp(PhysicalOp):

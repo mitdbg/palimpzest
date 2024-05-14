@@ -155,12 +155,12 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
     promptQuestion = _construct_query_prompt(td, doc_type, generate_field_names)
 
     # generate LLM response and capture statistics
-    answer, bonded_query_stats = None, None
+    answer, new_heatmap_json_obj, bonded_query_stats = None, None, None
     try:
         if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # invoke LLM to generate output JSON
             generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-            answer, gen_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx)
+            answer, new_heatmap_json_obj, gen_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx, heatmap=td.heatmap_json_obj)
 
             # construct BondedQueryStats object
             bonded_query_stats = BondedQueryStats(
@@ -215,7 +215,7 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
         print(f"Bonded query processing error: {e}")
         return None, bonded_query_stats, str(e)
 
-    return drs, bonded_query_stats, None
+    return drs, new_heatmap_json_obj, bonded_query_stats, None
 
 
 def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[DataRecord, Stats]:

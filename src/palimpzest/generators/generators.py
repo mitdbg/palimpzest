@@ -289,7 +289,7 @@ class DSPyGenerator(BaseGenerator):
         reraise=True,
     )
     # the generate method requires a user-provided budget parameter to specify te token budget. Default is 1.0, meaning the full context will be used.
-    def generate(self, context: str, question: str, budget: float = 1.0, plan_idx: int=0) -> GenerationOutput:
+    def generate(self, context: str, question: str, budget: float = 1.0, plan_idx: int=0, heatmap_json_obj: dict=None) -> GenerationOutput:
         # initialize variables around token reduction
         reduction, full_context = False, context
 
@@ -304,19 +304,20 @@ class DSPyGenerator(BaseGenerator):
         heatmap_file = ''
         # check if the promptSignature is a QA signature, so we can match the answer to get heatmap
         if budget < 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-            file_cache = DataDirectory().getFileCacheDir()
+            # file_cache = DataDirectory().getFileCacheDir()
             prompt_schema = self.promptSignature
-            print("Prompt QA Signature: ", prompt_schema)
-            print('Question: ', question)
-            ordered = f'{prompt_schema} {question} {plan_idx}'
-            task_hash = hashlib.sha256(ordered.encode()).hexdigest()
-            heatmap_file = os.path.join(file_cache, f"heatmap-{task_hash}.json")
-            print("Heatmap file: ", heatmap_file)
-            if not os.path.exists(heatmap_file):
+            # print("Prompt QA Signature: ", prompt_schema)
+            # print('Question: ', question)
+            # ordered = f'{prompt_schema} {question} {plan_idx}'
+            # task_hash = hashlib.sha256(ordered.encode()).hexdigest()
+            # heatmap_file = os.path.join(file_cache, f"heatmap-{task_hash}.json")
+            # print("Heatmap file: ", heatmap_file)
+            # if not os.path.exists(heatmap_file):
+            if heatmap_json_obj is None:
                 # create the heatmap structure with default resolution of 0.001 and count of 0
                 buckets = int(1.0 / TOKEN_REDUCTION_GRANULARITY)
                 hist = [0] * buckets
-                json_object = {'prompt_schema': f'{prompt_schema}',
+                heatmap_json_obj = {'prompt_schema': f'{prompt_schema}',
                                'question': question,
                                'resolution': TOKEN_REDUCTION_GRANULARITY,
                                'count': 0,
@@ -324,20 +325,22 @@ class DSPyGenerator(BaseGenerator):
 
             else:
                 # only parse the heatmap file if token reduction is enabled (budget is less than 1.0)
-                if budget < 1.0:
-                    with open(heatmap_file, 'r') as f:
-                        json_object = json.load(f)
-                        heatmap = json_object['heatmap']
-                        count = json_object['count']
-                        print("count:", count)
-                    # only refer to the heatmap if the count is greater than a enough sample size
-                    # TODO: only trim the context if the attention is clustered in a small region
-                    if count >= TOKEN_REDUCTION_SAMPLE:
-                        si, ei = find_best_range(heatmap, int(budget/TOKEN_REDUCTION_GRANULARITY), trim_zeros=False)
-                        sr, er = si * TOKEN_REDUCTION_GRANULARITY, ei * TOKEN_REDUCTION_GRANULARITY
-                        print("start ratio:", sr, "end ratio:", er)
-                        context = get_trimed(context, sr, er)
-                        reduction = True
+                # with open(heatmap_file, 'r') as f:
+                #     json_object = json.load(f)
+                #     heatmap = json_object['heatmap']
+                #     count = json_object['count']
+                #     print("count:", count)
+                heatmap = heatmap_json_obj['heatmap']
+                count = heatmap_json_obj['count']
+                print("count:", count)
+                # only refer to the heatmap if the count is greater than a enough sample size
+                # TODO: only trim the context if the attention is clustered in a small region
+                if count >= TOKEN_REDUCTION_SAMPLE:
+                    si, ei = find_best_range(heatmap, int(budget/TOKEN_REDUCTION_GRANULARITY), trim_zeros=False)
+                    sr, er = si * TOKEN_REDUCTION_GRANULARITY, ei * TOKEN_REDUCTION_GRANULARITY
+                    print("start ratio:", sr, "end ratio:", er)
+                    context = get_trimed(context, sr, er)
+                    reduction = True
 
 
         # execute LLM generation
@@ -399,7 +402,7 @@ class DSPyGenerator(BaseGenerator):
         print(pred.answer)
 
         # taken reduction post processing if enabled
-        if budget < 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+        if budget < 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA and heatmap_json_obj['count'] < MAX_HEATMAP_UPDATES:
             print("Reduction enabled")
             print("answer:", pred.answer)
             try:
@@ -411,15 +414,15 @@ class DSPyGenerator(BaseGenerator):
             gsr, ger = gsi/context_len, gei/context_len
             norm_si, norm_ei = int(gsr/TOKEN_REDUCTION_GRANULARITY), int(ger/TOKEN_REDUCTION_GRANULARITY)
             print("best_start:", gsi, "best_end:", gei)
-            json_object = update_heatmap_json(json_object, norm_si, norm_ei)
-            with open(heatmap_file, 'w') as f:
-                json.dump(json_object, f)
+            heatmap_json_obj = update_heatmap_json(heatmap_json_obj, norm_si, norm_ei)
+            # with open(heatmap_file, 'w') as f:
+            #     json.dump(json_object, f)
 
         if self.verbose:
             print("Prompt history:")
             dspy_lm.inspect_history(n=1)
 
-        return pred.answer, stats
+        return pred.answer, heatmap_json_obj, stats
 
 
 class ImageTextGenerator(BaseGenerator):
