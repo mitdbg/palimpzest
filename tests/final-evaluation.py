@@ -537,8 +537,8 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
 
     with Pool(processes=num_plans) as pool:
         results = pool.starmap(evaluate_pz_plan, [(opt, workload, plan_idx) for plan_idx in range(num_plans)])
-    # with Pool(processes=1) as pool:
-    #     results = pool.starmap(evaluate_pz_plan, [(opt, workload, 5) for _ in range(1)])
+    # with Pool(processes=2) as pool:
+    #     results = pool.starmap(evaluate_pz_plan, [(opt, workload, idx) for idx in [0,3]])
 
     # for plan_idx in range(num_plans):
     # # for plan_idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
