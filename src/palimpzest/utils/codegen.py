@@ -203,9 +203,6 @@ def codeEnsembleExecution(api: API, code_ensemble: List[str], candidate_dict: Di
         ensemble_stats.code_versions_stats[code_name] = stats
     preds = [pred for pred in preds if pred is not None]
     print(preds)
-    if preds == []:
-        import pdb
-        pdb.set_trace()
 
     # TODO: short-term hack to avoid calling Counter(preds) when preds is a list for biofabric (which is unhashable)
     #       
