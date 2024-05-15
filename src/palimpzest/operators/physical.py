@@ -304,6 +304,8 @@ class InduceFromCandidateOp(PhysicalOp):
             # TODO: remove; for evaluations just use GPT_4V
             self.model = Model.GPT_4V
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
+            self.query_strategy = QueryStrategy.BONDED_WITH_FALLBACK
+            self.token_budget = 1.0
 
         # TODO: combine these functions
         # set model to None if this is a simple conversion
