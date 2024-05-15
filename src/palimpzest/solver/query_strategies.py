@@ -470,10 +470,10 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                     answer = answer[0]
                 setattr(dr, field_name, answer)
                 
-            # TODO: last minute hack; for some reason some records are not setting a filename
-            # I will need to debug this more thoroughly in the future, but for now this is an easy fix
-            if not hasattr(dr, 'filename'):
-                setattr(dr, 'filename', candidate.filename)
+            # # TODO: last minute hack for Biofabric; for some reason some records are not setting a filename
+            # # I will need to debug this more thoroughly in the future, but for now this is an easy fix
+            # if not hasattr(dr, 'filename'):
+            #     setattr(dr, 'filename', candidate.filename)
 
             drs.append(dr)
         
@@ -553,10 +553,10 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
             print(f'SETTING {field_name} to be {answer}')
             setattr(dr, field_name, answer)
 
-        # TODO: last minute hack; for some reason some records are not setting a filename
-        # I will need to debug this more thoroughly in the future, but for now this is an easy fix
-        if not hasattr(dr, 'filename'):
-            setattr(dr, 'filename', candidate.filename)
+        # # TODO: last minute hack for Biofabric; for some reason some records are not setting a filename
+        # # I will need to debug this more thoroughly in the future, but for now this is an easy fix
+        # if not hasattr(dr, 'filename'):
+        #     setattr(dr, 'filename', candidate.filename)
         
         # construct ConventionalQueryStats object
         field_query_stats_lst = [
