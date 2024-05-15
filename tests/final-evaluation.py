@@ -24,6 +24,13 @@ import time
 import os
 import pdb
 
+# Addresses far from MIT; we use a simple lookup like this to make the
+# experiments re-producible w/out needed a Google API key for geocoding lookups
+FAR_AWAY_ADDRS = [
+    "Melcher St", "Sleeper St", "437 D St", "Seaport Blvd", "50 Liberty Dr",
+    "Telegraph St", "Columbia Rd", "E 6th St", "E 7th St", "E 5th St",
+]
+
 
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
@@ -382,8 +389,7 @@ def get_logical_tree(workload, nocache: bool=True, num_samples: int=None, scan_s
             # NOTE: I'm using this hard-coded function so that folks w/out a
             #       Geocoding API key from google can still run this example
             try:
-                far_away_addrs = ["Melcher St", "Sleeper St", "437 D St", "Seaport", "Liberty", "Telegraph St"]
-                if any([street.lower() in record.address.lower() for street in far_away_addrs]):
+                if any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
                     return False
                 return True
             except:
