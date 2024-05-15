@@ -290,7 +290,7 @@ def score_plan(opt, workload, records, plan_idx) -> float:
         gt_df = pd.read_csv("testdata/groundtruth/enron-eval.csv")
         targets = list(gt_df[gt_df.label == 1].filename)
     elif workload == "real-estate":
-        gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval-30.csv")
+        gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval-100.csv")
         targets = list(gt_df[gt_df.label == 1].listing)
 
     # compute true and false positives
@@ -864,7 +864,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run the evaluation(s) for the paper')
     parser.add_argument('--workload', type=str, help='The workload: one of ["biofabric", "enron", "real-estate"]')
     parser.add_argument('--opt' , type=str, help='The optimization: one of ["model", "codegen", "token-reduction"]')
-    parser.add_argument('--listings-dir', default="testdata/real-estate-eval-30", type=str, help='The directory with real-estate listings')
+    parser.add_argument('--listings-dir', default="testdata/real-estate-eval-100", type=str, help='The directory with real-estate listings')
     parser.add_argument('--reoptimize', default=False, action='store_true', help='Run reoptimization')
     parser.add_argument('--dry-run', default=False, action='store_true', help='Just print plans w/out actually running any')
 
