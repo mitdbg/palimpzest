@@ -313,6 +313,8 @@ class LogicalOperator:
             # - for induce, this is based on the generated field(s) (per-model)
             op_filters_to_estimates = {}
             logical_op = logicalPlans[0]
+            import pdb
+            pdb.set_trace()
             while logical_op is not None:
                 op_filter, estimates = None, None
                 if isinstance(logical_op, BaseScan):
