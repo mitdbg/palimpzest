@@ -49,9 +49,9 @@ def get_pareto_indices(result_dicts, col):
         paretoFrontier = True
 
         # check if any other plan dominates plan i
-        for j, _result_dict in result_dicts:
+        for j, (_, _result_dict) in enumerate(result_dicts):
             col_j, quality_j = _result_dict[col], _result_dict["f1_score"]
-            if i == j:
+            if idx == j:
                 continue
 
             # if plan i is dominated by plan j, set paretoFrontier = False and break
