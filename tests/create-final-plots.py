@@ -180,18 +180,18 @@ if __name__ == "__main__":
     # opt and workload to # of plots
     opt_workload_to_num_plans = {
         "model": {
-            "enron": 21,
-            "real-estate": 21,
+            "enron": 11,
+            "real-estate": 10,
             "biofabric": 14,
         },
         "codegen": {
-            "enron": 8,
-            "real-estate": 12,
+            "enron": 6,
+            "real-estate": 7,
             "biofabric": 6,
         },
         "token-reduction": {
-            "enron": 16,
-            "real-estate": 24,
+            "enron": 12,
+            "real-estate": 16,
             "biofabric": 16,
         },
     }
