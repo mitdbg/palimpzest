@@ -675,8 +675,6 @@ def run_sentinel_plan(plan_idx, workload, num_samples):
 
 
 def run_reoptimize_eval(workload, policy_str):
-    true_start_time = time.time()
-
     workload_to_fixed_cost = {
         "enron": 20.0,
         "real-estate": 3.0,
@@ -771,7 +769,12 @@ def run_reoptimize_eval(workload, policy_str):
         
         return single_model_plan_idxs
 
+    # NOTE: we don't count the cost of logical plan creation in the other PZ plans (it's just
+    #       a constant applied equally to all plans which is no more than a few seconds), thus
+    #       I am starting the clock here (i.e. after the first logical plan creation) to make
+    #       comparing reoptimization results to other results more apples-to-apples.
     # execute sentinel plans
+    true_start_time = time.time()
     estimates, all_cost_estimate_data = defaultdict(list), []
     all_records = []
 

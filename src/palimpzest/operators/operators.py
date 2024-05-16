@@ -17,10 +17,13 @@ from palimpzest.operators import (
     PhysicalOp,
     ApplyGroupByOp
 )
+from palimpzest.profiler import StatsProcessor
 
 from copy import deepcopy
 from itertools import permutations
 from typing import List, Tuple
+
+import pandas as pd
 
 import os
 import random
@@ -49,6 +52,24 @@ class LogicalOperator:
 
     def _getPhysicalTree(self, strategy: str=None, source: PhysicalOp=None, shouldProfile: bool=False) -> PhysicalOp:
         raise NotImplementedError("Abstract method")
+
+    def _getModels(self, include_vision: bool=False):
+        models = []
+        if os.getenv('OPENAI_API_KEY') is not None:
+            models.extend([Model.GPT_3_5, Model.GPT_4])
+            # models.extend([Model.GPT_4])
+            # models.extend([Model.GPT_3_5])
+
+        if os.getenv('TOGETHER_API_KEY') is not None:
+            models.extend([Model.MIXTRAL])
+
+        if os.getenv('GOOGLE_API_KEY') is not None:
+            models.extend([Model.GEMINI_1])
+
+        if include_vision:
+            models.append(Model.GPT_4V)
+
+        return models
 
     @staticmethod
     def _compute_legal_permutations(filterAndConvertOps: List[LogicalOperator]) -> List[List[LogicalOperator]]:
@@ -177,18 +198,7 @@ class LogicalOperator:
         #    a. vector DB, LLM attention, ask-the-LLM
 
         # choose set of acceptable models based on possible llmservices
-        models = []
-        if os.getenv('OPENAI_API_KEY') is not None:
-            models.extend([Model.GPT_3_5, Model.GPT_4])
-            # models.extend([Model.GPT_4])
-            # models.extend([Model.GPT_3_5])
-
-        if os.getenv('TOGETHER_API_KEY') is not None:
-            models.extend([Model.MIXTRAL])
-
-        if os.getenv('GOOGLE_API_KEY') is not None:
-            models.extend([Model.GEMINI_1])
-
+        models = self._getModels()
         assert len(models) > 0, "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
 
         # determine which query strategies may be used
@@ -291,10 +301,116 @@ class LogicalOperator:
         ]
         print(f"INITIAL PLANS: {len(physicalPlans)}")
 
+        # compute estimates for every operator
+        op_filters_to_estimates = {}
+        if cost_estimate_sample_data is not None:
+            # construct full dataset of samples
+            df = pd.DataFrame(cost_estimate_sample_data)
+
+            # get unique set of operator filters:
+            # - for base/cache scans this is very simple
+            # - for filters, this is based on the unique filter string or function (per-model)
+            # - for induce, this is based on the generated field(s) (per-model)
+            op_filters_to_estimates = {}
+            logical_op = logicalPlans[0]
+            while logical_op is not None:
+                op_filter, estimates = None, None
+                if isinstance(logical_op, BaseScan):
+                    op_filter = "op_name == 'base_scan'"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        estimates = {
+                            "time_per_record": StatsProcessor._est_time_per_record(op_df)
+                        }
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif isinstance(logical_op, CacheScan):
+                    op_filter = "op_name == 'cache_scan'"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        estimates = {
+                            "time_per_record": StatsProcessor._est_time_per_record(op_df)
+                        }
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif isinstance(logical_op, ConvertScan):
+                    generated_fields_str = "-".join(sorted(logical_op.generated_fields))
+                    op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'induce' | op_name == 'p_induce')"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        models = self._getModels(include_vision=True)
+                        estimates = {model: None for model in models}
+                        for model in models:
+                            est_tokens = StatsProcessor._est_num_input_output_tokens(op_df, model_name=model.value)
+                            model_estimates = {
+                                "time_per_record": StatsProcessor._est_time_per_record(op_df, model_name=model.value),
+                                "cost_per_record": StatsProcessor._est_usd_per_record(op_df, model_name=model.value),
+                                "est_num_input_tokens": est_tokens[0],
+                                "est_num_output_tokens": est_tokens[1],
+                                "selectivity": StatsProcessor._est_selectivity(df, op_df, model_name=model.value),
+                                "quality": StatsProcessor._est_quality(op_df, model_name=model.value),
+                            }
+                            estimates[model.value] = model_estimates
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif isinstance(logical_op, FilteredScan):
+                    filter_str = self.filter.filterCondition if self.filter.filterCondition is not None else str(self.filter.filterFn)
+                    op_filter = f"(filter == '{str(filter_str)}') & (op_name == 'filter' | op_name == 'p_filter')"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        models = (
+                            self._getModels()
+                            if self.filter.filterCondition is not None
+                            else [None]
+                        )
+                        estimates = {model: None for model in models}
+                        for model in models:
+                            model_name = model.value if model is not None else None
+                            est_tokens = StatsProcessor._est_num_input_output_tokens(op_df, model_name=model_name)
+                            model_estimates = {
+                                "time_per_record": StatsProcessor._est_time_per_record(op_df, model_name=model_name),
+                                "cost_per_record": StatsProcessor._est_usd_per_record(op_df, model_name=model_name),
+                                "est_num_input_tokens": est_tokens[0],
+                                "est_num_output_tokens": est_tokens[1],
+                                "selectivity": StatsProcessor._est_selectivity(df, op_df, model_name=model_name),
+                                "quality": StatsProcessor._est_quality(op_df, model_name=model_name),
+                            }
+                            estimates[model_name] = model_estimates
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif isinstance(logical_op, LimitScan):
+                    op_filter = "(op_name == 'limit')"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        estimates = {
+                            "time_per_record": StatsProcessor._est_time_per_record(op_df)
+                        }
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif isinstance(logical_op, ApplyAggregateFunction) and logical_op.aggregationFunction.funcDesc == "COUNT":
+                    op_filter = "(op_name == 'count')"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        estimates = {
+                            "time_per_record": StatsProcessor._est_time_per_record(op_df)
+                        }
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif isinstance(logical_op, ApplyAggregateFunction) and logical_op.aggregationFunction.funcDesc == "AVERAGE":
+                    op_filter = "(op_name == 'average')"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        estimates = {
+                            "time_per_record": StatsProcessor._est_time_per_record(op_df)
+                        }
+                    op_filters_to_estimates[op_filter] = estimates
+
+                logical_op = logical_op.inputOp
+
         # estimate the cost (in terms of USD, latency, throughput, etc.) for each plan
         plans = []
         for physicalPlan in physicalPlans:
-            planCost, fullPlanCostEst = physicalPlan.estimateCost(cost_estimate_sample_data=cost_estimate_sample_data)
+            planCost, fullPlanCostEst = physicalPlan.estimateCost(cost_est_data=op_filters_to_estimates)
 
             totalTime = planCost["totalTime"]
             totalCost = planCost["totalUSD"]  # for now, cost == USD
@@ -544,7 +660,7 @@ class GroupByAggregate(LogicalOperator):
     def __str__(self):
         descStr = "Grouping Fields:" 
         return (f"GroupBy({elements.GroupBySig.serialize(self.gbySig)})")
-    
+
     def dumpLogicalTree(self):
         """Return the logical subtree rooted at this operator"""
         return (self, self.inputOp.dumpLogicalTree())

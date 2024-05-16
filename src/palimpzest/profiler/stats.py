@@ -653,70 +653,47 @@ class StatsProcessor:
         return profiling_data
 
     @staticmethod
-    def _est_time_per_record(cost_est_sample_data: List[Dict[str, Any]], filter: str=None, model_name: str=None, agg: str="mean") -> float:
+    def _est_time_per_record(op_df: pd.DataFrame, model_name: str=None, agg: str="mean") -> float:
         """
-        Given sample cost data observations, and potentially a filter to identify a unique operator,
-        compute the aggregate over the `op_time` column.
+        Given sample cost data observations for a specific operation, compute the aggregate over
+        the `op_time` column.
         """
-        # return self.profiling_data['total_op_time'] / self.profiling_data['total_records']
-
-        # convert data to dataframe and filter if applicable
-        df = pd.DataFrame(cost_est_sample_data)
-        if filter is not None:
-            df = df.query(filter)
-
         # use model-specific estimate if possible
         if model_name is not None:
-            model_df = df[df.model_name == model_name]
+            model_df = op_df[op_df.model_name == model_name]
             if not model_df.empty:
                 return model_df['op_time'].agg(agg=agg).iloc[0]
 
         # compute aggregate
-        return df['op_time'].agg(agg=agg).iloc[0]
+        return op_df['op_time'].agg(agg=agg).iloc[0]
 
     @staticmethod
-    def _est_num_input_output_tokens(cost_est_sample_data: List[Dict[str, Any]], filter: str=None, model_name: str=None, agg: str="mean") -> Tuple[float, float]:
+    def _est_num_input_output_tokens(op_df: pd.DataFrame, model_name: str=None, agg: str="mean") -> Tuple[float, float]:
         """
-        Given sample cost data observations, and potentially a filter to identify a unique operator,
-        compute the aggregate over the `num_input_tokens` and `num_output_tokens` columns.
+        Given sample cost data observations for a specific operation, compute the aggregate over
+        the `num_input_tokens` and `num_output_tokens` columns.
         """
-        # avg_num_input_tokens = self.profiling_data['total_input_tokens'] / self.profiling_data['total_records']
-        # avg_num_output_tokens = self.profiling_data['total_output_tokens'] / self.profiling_data['total_records']
-        # return avg_num_input_tokens, avg_num_output_tokens
-
-        # convert data to dataframe and filter if applicable
-        df = pd.DataFrame(cost_est_sample_data)
-        if filter is not None:
-            df = df.query(filter)
-
         # use model-specific estimate if possible
         if model_name is not None:
-            model_df = df[df.model_name == model_name]
+            model_df = op_df[op_df.model_name == model_name]
             if not model_df.empty:
                 return model_df['num_input_tokens'].agg(agg=agg).iloc[0], model_df['num_output_tokens'].agg(agg=agg).iloc[0]
 
         # compute aggregate
-        return df['num_input_tokens'].agg(agg=agg).iloc[0], df['num_output_tokens'].agg(agg=agg).iloc[0]
+        return op_df['num_input_tokens'].agg(agg=agg).iloc[0], op_df['num_output_tokens'].agg(agg=agg).iloc[0]
 
     @staticmethod
-    def _est_usd_per_record(cost_est_sample_data: List[Dict[str, Any]], filter: str=None, model_name: str=None, agg: str="mean") -> float:
+    def _est_usd_per_record(op_df: pd.DataFrame, model_name: str=None, agg: str="mean") -> float:
         """
-        Given sample cost data observations, and potentially a filter to identify a unique operator,
-        compute the aggregate over the sum of the `input_usd` and `output_usd` columns.
+        Given sample cost data observations for a specific operation, compute the aggregate over
+        the sum of the `input_usd` and `output_usd` columns.
         """
-        # return op_agg_stats['total_usd'] / op_agg_stats['total_records']
-
-        # convert data to dataframe and filter if applicable
-        df = pd.DataFrame(cost_est_sample_data)
-        if filter is not None:
-            df = df.query(filter)
-
         # use model-specific estimate if possible
         if model_name is not None:
-            model_df = df[df.model_name == model_name]
+            model_df = op_df[op_df.model_name == model_name]
             if not model_df.empty:
                 return (model_df['input_usd'] + model_df['output_usd']).agg(agg=agg).iloc[0]
-        
+
         # # adjust cost from sample model to this model
         # this_model_usd_per_input_token = MODEL_CARDS[model_name]['usd_per_input_token']
         # model_to_usd_per_input_token = {
@@ -733,22 +710,14 @@ class StatsProcessor:
 
         # # compute average combined input/output usd spent
         # return (df['adj_input_usd'] + df['adj_output_usd']).agg(agg=agg).iloc[0]
-        return (df['input_usd'] + df['output_usd']).agg(agg=agg).iloc[0]
+        return (op_df['input_usd'] + op_df['output_usd']).agg(agg=agg).iloc[0]
 
     @staticmethod
-    def _est_selectivity(cost_est_sample_data: List[Dict[str, Any]], filter: str, model_name: str=None) -> float:
+    def _est_selectivity(df: pd.DataFrame, op_df: pd.DataFrame, model_name: str=None) -> float:
         """
-        Given sample cost data observations and a filter to identify a unique operator,
-        compute the ratio of records between this operator and its source operator.
+        Given sample cost data observations for the plan and a specific operation, compute
+        the ratio of records between this operator and its source operator.
         """
-        # return op_agg_stats['total_records'] / source_op_agg_stats['total_records']
-
-        # convert data to dataframe and filter if applicable
-        df = pd.DataFrame(cost_est_sample_data)
-
-        # get subset of records matching filter (this should uniquely identify an operator)
-        op_df = df.query(filter)
-
         # use model-specific estimate if possible
         if model_name is not None:
             model_op_df = op_df[op_df.model_name == model_name]
@@ -781,41 +750,18 @@ class StatsProcessor:
         return num_output_records / num_input_records
 
     @staticmethod
-    def _est_quality(cost_est_sample_data: List[Dict[str, Any]], induce_or_filter: str, filter: str, this_model_name: str=None) -> float:
+    def _est_quality(op_df: pd.DataFrame, this_model_name: str=None) -> float:
         """
-        Given an operator's aggregate stats, estimate the quality of its answers as
-        an average of its model quality as measured by is MMLU score and the average of its
-        answer token log probabilities.
+        Given sample cost data observations for a specific operation, compute the an estimate
+        of the quality of its outputs by using GPT-4 as a champion model.
         """
-        # # we assume perfect quality for non-LLM operations
-        # est_quality = 1.0
-
-        # # if we generated outputs with an LLM, estimate quality as the average of
-        # # the general model quality and the avg. ouput token log probability
-        # if len(op_agg_stats['answers']) > 0:
-        #     all_answer_log_probs = np.array(op_agg_stats['answer_log_probs'])
-        #     avg_token_log_probability = np.mean(all_answer_log_probs)
-        #     model_quality = (MODEL_CARDS[op_agg_stats['model_name']]['MMLU'] / 100.0)
-        #     est_quality = np.mean([model_quality, avg_token_log_probability]) 
-
-        # return est_quality
-
-        # convert data to dataframe and filter if applicable
-        df = pd.DataFrame(cost_est_sample_data).query(filter)
-        # if filter is not None:
-        #     # turn off warnings about setting results on copy
-        #     pd.options.mode.chained_assignment = None
-
-        #     # filter for sub df
-        #     df = df.query(filter)
-
         # get unique set of records
-        record_uuids = df.record_uuid.unique()
+        record_uuids = op_df.record_uuid.unique()
 
         # compute GPT-4's answer (per-record) across all models; fall-back to most common answer if GPT-4 is not present
         record_uuid_to_answer = {}
         for record_uuid in record_uuids:
-            record_df = df[df.record_uuid == record_uuid]
+            record_df = op_df[op_df.record_uuid == record_uuid]
             gpt4_most_common_answer = record_df[record_df.model_name == Model.GPT_4.value].answer.mode()
 
             if not gpt4_most_common_answer.empty:
@@ -827,41 +773,25 @@ class StatsProcessor:
             return row['answer'] == row['accepted_answer']
 
         # compute accepted answers and clean all answers
-        df.loc[:, 'accepted_answer'] = df.record_uuid.apply(lambda uuid: record_uuid_to_answer[uuid])
-        df.loc[:, 'correct'] = df.apply(lambda row: _is_correct(row), axis=1)
+        op_df.loc[:, 'accepted_answer'] = op_df.record_uuid.apply(lambda uuid: record_uuid_to_answer[uuid])
+        op_df.loc[:, 'correct'] = op_df.apply(lambda row: _is_correct(row), axis=1)
 
         # get subset of observations for this_model_name and estimate quality w/fraction of answers that match accepted answer
         model_df = (
-            df[df.model_name == this_model_name]
+            op_df[op_df.model_name == this_model_name]
             if this_model_name is not None
-            else df[df.model_name.isna()]
+            else op_df[op_df.model_name.isna()]
         )
 
         est_quality = (
             model_df[model_df.correct].shape[0] / model_df.shape[0]
             if not model_df.empty
             else (
-                df[df.correct].shape[0] / df.shape[0]
-                if not df.empty
+                op_df[op_df.correct].shape[0] / op_df.shape[0]
+                if not op_df.empty
                 else MODEL_CARDS[this_model_name]["MMLU"] / 100.0
             )
         )
-
-        # # get all answer token log probabilities and compute the mean
-        # all_answer_log_probs = np.array([
-        #     log_prob
-        #     for log_probs in df.answer_log_probs.tolist()
-        #     for log_prob in log_probs
-        # ])
-        # avg_token_log_probability = np.mean(all_answer_log_probs)
-
-        # # get prior believe of model quality
-        # model_name = df.model_name.iloc[0]
-        # model_quality = (MODEL_CARDS[model_name]['MMLU'] / 100.0)
-
-        # # compute true mean of model's prior quality and our measurement of avg. log probability
-        # # NOTE: recall that avg_token_log_probability will be a small neg. number
-        # est_quality = np.mean([model_quality, 1 + avg_token_log_probability])
 
         return est_quality
 
