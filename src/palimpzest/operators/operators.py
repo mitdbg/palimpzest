@@ -409,8 +409,9 @@ class LogicalOperator:
 
         # estimate the cost (in terms of USD, latency, throughput, etc.) for each plan
         plans = []
+        cost_est_data = None if op_filters_to_estimates == {} else op_filters_to_estimates
         for physicalPlan in physicalPlans:
-            planCost, fullPlanCostEst = physicalPlan.estimateCost(cost_est_data=op_filters_to_estimates)
+            planCost, fullPlanCostEst = physicalPlan.estimateCost(cost_est_data=cost_est_data)
 
             totalTime = planCost["totalTime"]
             totalCost = planCost["totalUSD"]  # for now, cost == USD
