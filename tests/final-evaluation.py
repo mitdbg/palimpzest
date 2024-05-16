@@ -794,7 +794,7 @@ def run_reoptimize_eval(workload, policy_str):
     # get single model plan indices
     single_model_plan_idxs = get_single_model_plan_idxs(candidatePlans)
     print(f"SINGLE MODEL PLAN IDXS: {single_model_plan_idxs}")
-    return
+
     # get sentinel plans
     sentinel_plan_idxs = []
     for _, plan_idx in single_model_plan_idxs.items():
@@ -806,7 +806,7 @@ def run_reoptimize_eval(workload, policy_str):
     # run sentinel plans
     total_sentinel_cost = 0.0
     with Pool(processes=len(sentinel_plan_idxs)) as pool:
-        sample_records, result_dicts, sample_data = pool.starmap(evaluate_pz_plan, [(plan_idx, workload, num_samples) for plan_idx in sentinel_plan_idxs])
+        sample_records, result_dicts, sample_data = pool.starmap(run_sentinel_plan, [(plan_idx, workload, num_samples) for plan_idx in sentinel_plan_idxs])
         for cost_estimate_sample_data in sample_data:
             all_cost_estimate_data.extend(cost_estimate_sample_data)
         
