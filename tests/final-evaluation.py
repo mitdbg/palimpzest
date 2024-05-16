@@ -683,13 +683,13 @@ def run_reoptimize_eval(opt, workload, policy_str):
     policy = pz.MaxHarmonicMean()
     if policy_str is not None:
         if policy_str == "max-quality-at-fixed-cost":
-            policy = pz.MaxQualityAtFixedCost(cost=workload_to_fixed_cost[workload])
+            policy = pz.MaxQualityAtFixedCost(fixed_cost=workload_to_fixed_cost[workload])
         elif policy_str == "max-quality-at-fixed-runtime":
-            policy = pz.MaxQualityAtFixedRuntime(runtime=workload_to_fixed_runtime[workload])
+            policy = pz.MaxQualityAtFixedRuntime(fixed_runtime=workload_to_fixed_runtime[workload])
         elif policy_str == "min-runtime-at-fixed-quality":
-            policy = pz.MinRuntimeAtFixedQuality(quality=workload_to_fixed_quality[workload])
+            policy = pz.MinRuntimeAtFixedQuality(fixed_quality=workload_to_fixed_quality[workload])
         elif policy_str == "min-cost-at-fixed-quality":
-            policy = pz.MinCostAtFixedQuality(quality=workload_to_fixed_quality[workload])
+            policy = pz.MinCostAtFixedQuality(fixed_quality=workload_to_fixed_quality[workload])
         elif policy_str == "harmonic-mean":
             policy = pz.MaxHarmonicMean()
 
