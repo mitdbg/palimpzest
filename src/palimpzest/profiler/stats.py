@@ -831,7 +831,11 @@ class StatsProcessor:
         df.loc[:, 'correct'] = df.apply(lambda row: _is_correct(row), axis=1)
 
         # get subset of observations for this_model_name and estimate quality w/fraction of answers that match accepted answer
-        model_df = df[df.model_name == this_model_name]
+        model_df = (
+            df[df.model_name == this_model_name]
+            if this_model_name is not None
+            else df[df.model_name.isna()]
+        )
 
         est_quality = (
             model_df[model_df.correct].shape[0] / model_df.shape[0]

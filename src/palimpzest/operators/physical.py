@@ -12,6 +12,8 @@ from palimpzest.profiler import OperatorStats, Profiler, StatsProcessor
 
 from typing import Any, Callable, Dict, Tuple, Union
 
+import pandas as pd
+
 import concurrent
 import hashlib
 import sys
@@ -403,39 +405,44 @@ class InduceFromCandidateOp(PhysicalOp):
             # compute estimates
             all_model_filter = f"(input_fields == '{input_fields_str}') & (generated_fields == '{generated_fields_str}') & (op_name == 'induce')"
             # all_model_filter = f"op_id == '{str(self.opId())}'"
-            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            quality = StatsProcessor._est_quality(cost_estimate_sample_data, "induce", all_model_filter, self.model.value)
+            # convert data to dataframe and filter if applicable
+            op_df = pd.DataFrame(cost_estimate_sample_data).query(all_model_filter)
 
-            # estimate cardinality using sample selectivity and input cardinality est.
-            cardinality = inputEstimates['cardinality'] * selectivity
+            # if we have sample data for this operator, compute estimates using this data
+            if not op_df.empty:
+                time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                quality = StatsProcessor._est_quality(cost_estimate_sample_data, "induce", all_model_filter, self.model.value)
 
-            # apply quality for this filter to overall quality est.
-            quality = inputEstimates['quality'] * quality
+                # estimate cardinality using sample selectivity and input cardinality est.
+                cardinality = inputEstimates['cardinality'] * selectivity
 
-            thisCostEst = {
-                "time_per_record": time_per_record,
-                "usd_per_record": usd_per_record,
-                "est_num_output_tokens": est_num_output_tokens,
-                "selectivity": selectivity,
-                "quality": quality,
-            }
+                # apply quality for this filter to overall quality est.
+                quality = inputEstimates['quality'] * quality
 
-            costEst = {
-                "cardinality": cardinality,
-                "timePerElement": time_per_record,
-                "usdPerElement": usd_per_record,
-                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
-                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
-                "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
-                "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
-                "estOutputTokensPerElement": est_num_output_tokens,
-                "quality": quality,
-            }
+                thisCostEst = {
+                    "time_per_record": time_per_record,
+                    "usd_per_record": usd_per_record,
+                    "est_num_output_tokens": est_num_output_tokens,
+                    "selectivity": selectivity,
+                    "quality": quality,
+                }
 
-            return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
+                costEst = {
+                    "cardinality": cardinality,
+                    "timePerElement": time_per_record,
+                    "usdPerElement": usd_per_record,
+                    "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
+                    "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
+                    "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
+                    "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
+                    "estOutputTokensPerElement": est_num_output_tokens,
+                    "quality": quality,
+                }
+
+                return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
@@ -670,39 +677,44 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             # compute estimates
             all_model_filter = f"(input_fields == '{input_fields_str}') & (generated_fields == '{generated_fields_str}') & (op_name == 'p_induce')"
             # all_model_filter = f"op_id == '{str(self.opId())}'"
-            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            quality = StatsProcessor._est_quality(cost_estimate_sample_data, "induce", all_model_filter, self.model.value)
+            # convert data to dataframe and filter if applicable
+            op_df = pd.DataFrame(cost_estimate_sample_data).query(all_model_filter)
 
-            # estimate cardinality using sample selectivity and input cardinality est.
-            cardinality = inputEstimates['cardinality'] * selectivity
+            # if we have sample data for this operator, compute estimates using this data
+            if not op_df.empty:
+                time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                quality = StatsProcessor._est_quality(cost_estimate_sample_data, "induce", all_model_filter, self.model.value)
 
-            # apply quality for this filter to overall quality est.
-            quality = inputEstimates['quality'] * quality
+                # estimate cardinality using sample selectivity and input cardinality est.
+                cardinality = inputEstimates['cardinality'] * selectivity
 
-            thisCostEst = {
-                "time_per_record": time_per_record,
-                "usd_per_record": usd_per_record,
-                "est_num_output_tokens": est_num_output_tokens,
-                "selectivity": selectivity,
-                "quality": quality,
-            }
+                # apply quality for this filter to overall quality est.
+                quality = inputEstimates['quality'] * quality
 
-            costEst = {
-                "cardinality": cardinality,
-                "timePerElement": time_per_record,
-                "usdPerElement": usd_per_record,
-                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
-                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
-                "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
-                "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
-                "estOutputTokensPerElement": est_num_output_tokens,
-                "quality": quality,
-            }
+                thisCostEst = {
+                    "time_per_record": time_per_record,
+                    "usd_per_record": usd_per_record,
+                    "est_num_output_tokens": est_num_output_tokens,
+                    "selectivity": selectivity,
+                    "quality": quality,
+                }
 
-            return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
+                costEst = {
+                    "cardinality": cardinality,
+                    "timePerElement": time_per_record,
+                    "usdPerElement": usd_per_record,
+                    "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
+                    "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
+                    "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
+                    "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
+                    "estOutputTokensPerElement": est_num_output_tokens,
+                    "quality": quality,
+                }
+
+                return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
 
         # estimate number of input tokens from source
         est_num_input_tokens = inputEstimates["estOutputTokensPerElement"]
@@ -894,40 +906,45 @@ class FilterCandidateOp(PhysicalOp):
             filter_str = self.filter.filterCondition if self.filter.filterCondition is not None else str(self.filter.filterFn)
             all_model_filter = f"(filter == '{str(filter_str)}') & (op_name == 'filter')"
             # all_model_filter = f"op_id == '{str(self.opId())}'"
-            model_name = None if self.model is None else self.model.value
-            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=model_name)
-            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=model_name)
-            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=model_name)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=model_name)
-            quality = StatsProcessor._est_quality(cost_estimate_sample_data, "filter", all_model_filter, model_name)
+            # convert data to dataframe and filter if applicable
+            op_df = pd.DataFrame(cost_estimate_sample_data).query(all_model_filter)
 
-            # estimate cardinality using sample selectivity and input cardinality est.
-            cardinality = inputEstimates['cardinality'] * selectivity
+            # if we have sample data for this operator, compute estimates using this data
+            if not op_df.empty:
+                model_name = None if self.model is None else self.model.value
+                time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=model_name)
+                usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=model_name)
+                _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=model_name)
+                selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=model_name)
+                quality = StatsProcessor._est_quality(cost_estimate_sample_data, "filter", all_model_filter, model_name)
 
-            # apply quality for this filter to overall quality est.
-            quality = inputEstimates['quality'] * quality
+                # estimate cardinality using sample selectivity and input cardinality est.
+                cardinality = inputEstimates['cardinality'] * selectivity
 
-            thisCostEst = {
-                "time_per_record": time_per_record,
-                "usd_per_record": usd_per_record,
-                "est_num_output_tokens": est_num_output_tokens,
-                "selectivity": selectivity,
-                "quality": quality,
-            }
+                # apply quality for this filter to overall quality est.
+                quality = inputEstimates['quality'] * quality
 
-            costEst = {
-                "cardinality": cardinality,
-                "timePerElement": time_per_record,
-                "usdPerElement": usd_per_record,
-                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
-                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
-                "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
-                "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
-                "estOutputTokensPerElement": est_num_output_tokens,
-                "quality": quality,
-            }
+                thisCostEst = {
+                    "time_per_record": time_per_record,
+                    "usd_per_record": usd_per_record,
+                    "est_num_output_tokens": est_num_output_tokens,
+                    "selectivity": selectivity,
+                    "quality": quality,
+                }
 
-            return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
+                costEst = {
+                    "cardinality": cardinality,
+                    "timePerElement": time_per_record,
+                    "usdPerElement": usd_per_record,
+                    "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
+                    "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
+                    "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
+                    "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
+                    "estOutputTokensPerElement": est_num_output_tokens,
+                    "quality": quality,
+                }
+
+                return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
 
         # otherwise, if this filter is a function call (not an LLM call) estimate accordingly
         if self.filter.filterFn is not None:
@@ -1111,39 +1128,44 @@ class ParallelFilterCandidateOp(PhysicalOp):
             # compute estimates
             all_model_filter = f"(filter == '{str(self.filter)}') & (op_name == 'p_filter')"
             # all_model_filter = f"op_id == '{str(self.opId())}'"
-            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            quality = StatsProcessor._est_quality(cost_estimate_sample_data, "filter", all_model_filter, self.model.value)
+            # convert data to dataframe and filter if applicable
+            op_df = pd.DataFrame(cost_estimate_sample_data).query(all_model_filter)
 
-            # estimate cardinality using sample selectivity and input cardinality est.
-            cardinality = inputEstimates['cardinality'] * selectivity
+            # if we have sample data for this operator, compute estimates using this data
+            if not op_df.empty:
+                time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
+                quality = StatsProcessor._est_quality(cost_estimate_sample_data, "filter", all_model_filter, self.model.value)
 
-            # apply quality for this filter to overall quality est.
-            quality = inputEstimates['quality'] * quality
+                # estimate cardinality using sample selectivity and input cardinality est.
+                cardinality = inputEstimates['cardinality'] * selectivity
 
-            thisCostEst = {
-                "time_per_record": time_per_record,
-                "usd_per_record": usd_per_record,
-                "est_num_output_tokens": est_num_output_tokens,
-                "selectivity": selectivity,
-                "quality": quality,
-            }
+                # apply quality for this filter to overall quality est.
+                quality = inputEstimates['quality'] * quality
 
-            costEst = {
-                "cardinality": cardinality,
-                "timePerElement": time_per_record,
-                "usdPerElement": usd_per_record,
-                "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
-                "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
-                "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
-                "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
-                "estOutputTokensPerElement": est_num_output_tokens,
-                "quality": quality,
-            }
+                thisCostEst = {
+                    "time_per_record": time_per_record,
+                    "usd_per_record": usd_per_record,
+                    "est_num_output_tokens": est_num_output_tokens,
+                    "selectivity": selectivity,
+                    "quality": quality,
+                }
 
-            return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
+                costEst = {
+                    "cardinality": cardinality,
+                    "timePerElement": time_per_record,
+                    "usdPerElement": usd_per_record,
+                    "cumulativeTimePerElement": inputEstimates['cumulativeTimePerElement'] + time_per_record,
+                    "cumulativeUSDPerElement": inputEstimates['cumulativeUSDPerElement'] + usd_per_record,
+                    "totalTime": cardinality * time_per_record + inputEstimates['totalTime'],
+                    "totalUSD": cardinality * usd_per_record + inputEstimates['totalUSD'],
+                    "estOutputTokensPerElement": est_num_output_tokens,
+                    "quality": quality,
+                }
+
+                return costEst, {"cumulative": costEst, "thisPlan": thisCostEst, "subPlan": subPlanCostEst}
 
         # otherwise, if this filter is a function call (not an LLM call) estimate accordingly
         if self.filter.filterFn is not None:
