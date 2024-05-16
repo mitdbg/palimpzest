@@ -28,10 +28,10 @@ def get_color(opt, workload, result_dict):
     if opt == "model" and len(set(filter(None, result_dict['plan_info']['models']))) > 1:
         color = opt_to_color[opt]
 
-    elif opt == "codegen" and len(set(filter(None, result_dict['plan_info']['query_strategies']))) > 1:
+    elif opt == "codegen" and "codegen-with-fallback" in result_dict['plan_info']['query_strategies']:
         color = opt_to_color[opt]
 
-    elif opt == "token-reduction" and len(set(filter(None, result_dict['plan_info']['token_budgets']))) > 1:
+    elif opt == "token-reduction" and any([budget < 1.0 for budget in result_dict['plan_info']['token_budgets']]):
         color = opt_to_color[opt]
 
     elif workload == "real-estate":
