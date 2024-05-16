@@ -31,7 +31,7 @@ def get_color(opt, workload, result_dict):
     elif opt == "codegen" and "codegen-with-fallback" in result_dict['plan_info']['query_strategies']:
         color = opt_to_color[opt]
 
-    elif opt == "token-reduction" and any([budget < 1.0 for budget in result_dict['plan_info']['token_budgets']]):
+    elif opt == "token-reduction" and any([budget is not None and budget < 1.0 for budget in result_dict['plan_info']['token_budgets']]):
         color = opt_to_color[opt]
 
     elif workload == "real-estate":
@@ -44,7 +44,7 @@ def get_color(opt, workload, result_dict):
 
 def get_pareto_indices(result_dicts, col):
     pareto_indices = []
-    for i, result_dict in result_dicts:
+    for idx, result_dict in enumerate(result_dicts):
         col_i, quality_i = result_dict[col], result_dict["f1_score"]
         paretoFrontier = True
 
@@ -61,7 +61,7 @@ def get_pareto_indices(result_dicts, col):
 
         # add plan i to pareto frontier if it's not dominated
         if paretoFrontier:
-            pareto_indices.append(i)
+            pareto_indices.append(idx)
 
     return pareto_indices
 
