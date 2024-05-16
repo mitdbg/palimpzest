@@ -617,7 +617,7 @@ def run_sentinel_plan(plan_idx, workload, num_samples):
         allow_model_selection=True,
         allow_codegen=True,
         allow_token_reduction=True,
-        pareto_optimal=True,
+        pareto_optimal=False,
         shouldProfile=True,
     )
     _, _, _, plan, _ = candidatePlans[plan_idx]
@@ -722,7 +722,7 @@ def run_reoptimize_eval(workload, policy_str):
         allow_model_selection=True,
         allow_codegen=True,
         allow_token_reduction=True,
-        pareto_optimal=True,
+        pareto_optimal=False,
         shouldProfile=True,
     )
     num_plans = len(candidatePlans)
@@ -806,10 +806,11 @@ def run_reoptimize_eval(workload, policy_str):
     # run sentinel plans
     total_sentinel_cost = 0.0
     with Pool(processes=len(sentinel_plan_idxs)) as pool:
-        sample_records, result_dicts, sample_data = pool.starmap(run_sentinel_plan, [(plan_idx, workload, num_samples) for plan_idx in sentinel_plan_idxs])
+        results = pool.starmap(run_sentinel_plan, [(plan_idx, workload, num_samples) for plan_idx in sentinel_plan_idxs])
+        sample_records, result_dicts, sample_data = zip(*results)
         for cost_estimate_sample_data in sample_data:
             all_cost_estimate_data.extend(cost_estimate_sample_data)
-        
+
         # find GPT-4 plan records and add those to all_records
         for idx in range(len(sentinel_plan_idxs)):
             records = sample_records[idx]
