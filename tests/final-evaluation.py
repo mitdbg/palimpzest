@@ -793,7 +793,8 @@ def run_reoptimize_eval(workload, policy_str):
 
     # get single model plan indices
     single_model_plan_idxs = get_single_model_plan_idxs(candidatePlans)
-
+    print(f"SINGLE MODEL PLAN IDXS: {single_model_plan_idxs}")
+    return
     # get sentinel plans
     sentinel_plan_idxs = []
     for _, plan_idx in single_model_plan_idxs.items():
