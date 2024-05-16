@@ -750,7 +750,7 @@ class StatsProcessor:
         return num_output_records / num_input_records
 
     @staticmethod
-    def _est_quality(op_df: pd.DataFrame, this_model_name: str=None) -> float:
+    def _est_quality(op_df: pd.DataFrame, model_name: str=None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the an estimate
         of the quality of its outputs by using GPT-4 as a champion model.
@@ -776,10 +776,10 @@ class StatsProcessor:
         op_df.loc[:, 'accepted_answer'] = op_df.record_uuid.apply(lambda uuid: record_uuid_to_answer[uuid])
         op_df.loc[:, 'correct'] = op_df.apply(lambda row: _is_correct(row), axis=1)
 
-        # get subset of observations for this_model_name and estimate quality w/fraction of answers that match accepted answer
+        # get subset of observations for model_name and estimate quality w/fraction of answers that match accepted answer
         model_df = (
-            op_df[op_df.model_name == this_model_name]
-            if this_model_name is not None
+            op_df[op_df.model_name == model_name]
+            if model_name is not None
             else op_df[op_df.model_name.isna()]
         )
 
@@ -789,7 +789,7 @@ class StatsProcessor:
             else (
                 op_df[op_df.correct].shape[0] / op_df.shape[0]
                 if not op_df.empty
-                else MODEL_CARDS[this_model_name]["MMLU"] / 100.0
+                else MODEL_CARDS[model_name]["MMLU"] / 100.0
             )
         )
 
