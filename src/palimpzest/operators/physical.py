@@ -894,11 +894,12 @@ class FilterCandidateOp(PhysicalOp):
             filter_str = self.filter.filterCondition if self.filter.filterCondition is not None else str(self.filter.filterFn)
             all_model_filter = f"(filter == '{str(filter_str)}') & (op_name == 'filter')"
             # all_model_filter = f"op_id == '{str(self.opId())}'"
-            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=self.model.value)
-            quality = StatsProcessor._est_quality(cost_estimate_sample_data, "filter", all_model_filter, self.model.value)
+            model_name = None if self.model is None else self.model.value
+            time_per_record = StatsProcessor._est_time_per_record(cost_estimate_sample_data, all_model_filter, model_name=model_name)
+            usd_per_record = StatsProcessor._est_usd_per_record(cost_estimate_sample_data, all_model_filter, model_name=model_name)
+            _, est_num_output_tokens = StatsProcessor._est_num_input_output_tokens(cost_estimate_sample_data, all_model_filter, model_name=model_name)
+            selectivity = StatsProcessor._est_selectivity(cost_estimate_sample_data, all_model_filter, model_name=model_name)
+            quality = StatsProcessor._est_quality(cost_estimate_sample_data, "filter", all_model_filter, model_name)
 
             # estimate cardinality using sample selectivity and input cardinality est.
             cardinality = inputEstimates['cardinality'] * selectivity
