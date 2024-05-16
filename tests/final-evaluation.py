@@ -540,55 +540,6 @@ def evaluate_pz_plans(opt, workload, dry_run=False):
     # with Pool(processes=2) as pool:
     #     results = pool.starmap(evaluate_pz_plan, [(opt, workload, idx) for idx in [0,3]])
 
-    # for plan_idx in range(num_plans):
-    # # for plan_idx, (totalTimeInitEst, totalCostInitEst, qualityInitEst, plan) in enumerate(candidatePlans):
-    #     if os.path.exists(f'final-eval-results/{opt}/{workload}/results-{plan_idx}.json'):
-    #         continue
-
-    #     # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
-    #     candidatePlans = logicalTree.createPhysicalPlanCandidates(
-    #         allow_model_selection=allow_model_selection,
-    #         allow_codegen=allow_codegen,
-    #         allow_token_reduction=allow_token_reduction,
-    #         pareto_optimal=False if opt in ["codegen", "token-reduction"] and workload == "enron" else True,
-    #         shouldProfile=True,
-    #     )
-    #     _, _, _, plan, _ = candidatePlans[plan_idx]
-
-    #     # workaround to disabling cache: delete all cached generations after each plan
-    #     bad_files = ["testdata/enron-eval/assertion.log", "testdata/enron-eval/azure_openai_usage.log", "testdata/enron-eval/openai_usage.log"]
-    #     for file in bad_files:
-    #         if os.path.exists(file):
-    #             os.remove(file)
-
-    #     # display the plan output
-    #     print("----------------------")
-    #     ops = plan.dumpPhysicalTree()
-    #     flatten_ops = flatten_nested_tuples(ops)
-    #     print(f"Plan {plan_idx}:")
-    #     graphicEmit(flatten_ops)
-    #     print("---")
-
-    #     if dry_run:
-    #         continue
-
-    #     # run the plan
-    #     result_dict = run_pz_plan(opt, workload, plan, plan_idx)
-    #     print(f"Plan: {result_dict['plan_info']['plan_label']}")
-    #     print(f"  F1: {result_dict['f1_score']}")
-    #     print(f"  rt: {result_dict['runtime']}")
-    #     print(f"  $$: {result_dict['cost']}")
-    #     print("---")
-
-    #     # write result json object
-    #     with open(f'final-eval-results/{opt}/{workload}/results-{plan_idx}.json', 'w') as f:
-    #         json.dump(result_dict, f)
-
-    #     # workaround to disabling cache: delete all cached generations after each plan
-    #     dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
-    #     if os.path.exists(dspy_cache_dir):
-    #         shutil.rmtree(dspy_cache_dir)
-
     return num_plans
 
 
@@ -655,83 +606,6 @@ def plot_runtime_cost_vs_quality(results, opt, workload):
     axs_clean[1].set_ylabel("Cost (USD)")
     axs_clean[1].set_xlabel("F1 Score")
     fig_clean.savefig(f"final-eval-results/{opt}/{workload}/{opt}-{workload}-clean.png", dpi=500, bbox_inches="tight")
-
-
-def plot_runtime_vs_dataset_size(all_results, plot_filename):
-    # create figure
-    fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True)
-
-    # set up plot lists
-    num_plans = len(all_results[0])
-    plan_to_runtimes = {plan_idx: [] for plan_idx in range(num_plans)}
-    plan_to_costs = {plan_idx: [] for plan_idx in range(num_plans)}
-    plan_to_f1_scores = {plan_idx: [] for plan_idx in range(num_plans)}
-    plan_to_text = {plan_idx: None for plan_idx in range(num_plans)}
-
-    for results_idx, results in enumerate(all_results):
-        for plan_idx, result_dict in enumerate(results):
-            plan_to_runtimes[plan_idx].append(result_dict["runtime"])
-            plan_to_costs[plan_idx].append(result_dict["cost"])
-            plan_to_f1_scores[plan_idx].append(result_dict["f1_score"])
-
-            if "codegen-easy" in datasetid and results_idx == 5:
-                models = (
-                    result_dict["models"]
-                    if "models" in result_dict
-                    else result_dict["plan_info"]["models"]
-                )
-                query_strategies = (
-                    result_dict["plan_info"]["query_strategies"]
-                    if "plan_info" in result_dict and "query_strategies" in result_dict["plan_info"]
-                    else None
-                )
-
-                f1_score, runtime, cost = result_dict["f1_score"], result_dict["runtime"], result_dict["cost"]
-                if all([model is None or "gpt-4" in model for model in models]):
-                    # add text for ALL-GPT4
-                    plan_to_text[plan_idx] = ("ALL-GPT4", f1_score, runtime, cost)
-                if all([model is None or "mistralai" in model for model in models]):
-                    # add text for ALL-MIXTRAL
-                    plan_to_text[plan_idx] = ("ALL-MIXTRAL", f1_score, runtime, cost)
-                if all([model is None or "gemini" in model for model in models]):
-                    # add text for ALL-GEMINI
-                    plan_to_text[plan_idx] = ("ALL-GEMINI", f1_score, runtime, cost)
-
-                if query_strategies is not None and any([qs is not None and "codegen" in qs for qs in query_strategies]):
-                    plan_to_text[plan_idx] = ("CODEGEN (GPT4)", f1_score, runtime, cost)
-
-    # set label and color
-    color = None
-    marker = None
-
-    # iterate over plans and add line plots (one-per-plan)
-    for plan_idx in range(num_plans):
-        # plot runtime vs. f1_score
-        axs[0].plot([5, 10, 15, 20, 25, 30], plan_to_runtimes[plan_idx], alpha=0.4, color=color, marker=marker) 
-
-        # plot cost vs. f1_score
-        axs[1].plot([5, 10, 15, 20, 25, 30], plan_to_costs[plan_idx], alpha=0.4, color=color, marker=marker)
-
-        # add annotations
-        if plan_to_text[plan_idx] is not None:
-            text, f1_score, runtime, cost = plan_to_text[plan_idx]
-            runtime_x, cost_x = 30, 30
-            if text == "ALL-GPT4":
-                cost_x = 25
-                cost = 0.3
-            if text == "ALL-MIXTRAL":
-                runtime_x = 25
-                runtime = 250
-            axs[0].annotate(text, (runtime_x, runtime), ha='right', va='bottom')
-            axs[1].annotate(text, (cost_x, cost), ha='right', va='bottom')
-
-    # savefig
-    axs[0].set_title("Runtime and Cost vs. Dataset Size")
-    axs[0].set_ylabel("runtime (seconds)")
-    axs[1].set_ylabel("cost (USD)")
-    axs[1].set_xlabel("Dataset Size (# of records)")
-    # axs[0].legend(bbox_to_anchor=(1.03, 1.0))
-    fig.savefig(f"final-eval-results/{opt}/{workload}/{plot_filename}.png", bbox_inches="tight")
 
 
 def run_reoptimize_eval(opt, workload):
