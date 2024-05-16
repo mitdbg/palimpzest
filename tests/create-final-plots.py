@@ -112,7 +112,11 @@ def plot_runtime_cost_vs_quality(results):
         cost_pareto_curve = sorted(cost_pareto_curve, key=lambda tup: tup[0])
         if workload == "biofabric":
             cost_pareto_curve = list(filter(lambda tup: tup[0] < 0.3, cost_pareto_curve))
-        pareto_cost_xs, pareto_cost_ys = zip(*cost_pareto_curve)
+        try:
+            pareto_cost_xs, pareto_cost_ys = zip(*cost_pareto_curve)
+        except:
+            import pdb
+            pdb.set_trace()
 
         runtime_pareto_qualities = [all_result_dicts[idx][1]['f1_score'] for idx in runtime_pareto_lst_indices]
         pareto_runtimes = [all_result_dicts[idx][1]['runtime'] for idx in runtime_pareto_lst_indices]
