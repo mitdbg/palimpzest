@@ -313,8 +313,6 @@ class LogicalOperator:
             # - for induce, this is based on the generated field(s) (per-model)
             op_filters_to_estimates = {}
             logical_op = logicalPlans[0]
-            import pdb
-            pdb.set_trace()
             while logical_op is not None:
                 op_filter, estimates = None, None
                 if isinstance(logical_op, BaseScan):
@@ -356,6 +354,8 @@ class LogicalOperator:
                     op_filters_to_estimates[op_filter] = estimates
 
                 elif isinstance(logical_op, FilteredScan):
+                    import pdb
+                    pdb.set_trace()
                     filter_str = self.filter.filterCondition if self.filter.filterCondition is not None else str(self.filter.filterFn)
                     op_filter = f"(filter == '{str(filter_str)}') & (op_name == 'filter' | op_name == 'p_filter')"
                     op_df = df.query(op_filter)
