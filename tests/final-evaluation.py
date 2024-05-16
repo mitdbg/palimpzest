@@ -608,21 +608,109 @@ def plot_runtime_cost_vs_quality(results, opt, workload):
     fig_clean.savefig(f"final-eval-results/{opt}/{workload}/{opt}-{workload}-clean.png", dpi=500, bbox_inches="tight")
 
 
-def run_reoptimize_eval(opt, workload):
-    # create query for dataset
-    logicalTree = get_logical_tree(workload)
+def run_sentinel_plan(plan):
+    # display the plan output
+    print("----------------------")
+    ops = plan.dumpPhysicalTree()
+    flatten_ops = flatten_nested_tuples(ops)
+    print(f"Plan {plan_idx}:")
+    graphicEmit(flatten_ops)
+    print("---")
 
+    # run the plan
+    records = [r for r in plan]
+
+    # get profiling data for plan and compute its cost
+    profileData = plan.getProfilingData()
+    sp = StatsProcessor(profileData)
+    cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
+
+    plan_info = {
+        "plan_idx": plan_idx,
+        "plan_label": compute_label(plan, plan_idx),
+        "models": [],
+        "op_names": [],
+        "generated_fields": [],
+        "query_strategies": [],
+        "token_budgets": []
+    }
+    cost = 0.0
+    stats = sp.profiling_data
+    while stats is not None:
+        cost += stats.total_usd
+        plan_info["models"].append(stats.model_name)
+        plan_info["op_names"].append(stats.op_name)
+        plan_info["generated_fields"].append(stats.generated_fields)
+        plan_info["query_strategies"].append(stats.query_strategy)
+        plan_info["token_budgets"].append(stats.token_budget)
+        stats = stats.source_op_stats
+
+    # construct and return result_dict
+    result_dict = {
+        "runtime": None,
+        "cost": cost,
+        "f1_score": None,
+        "plan_info": plan_info,
+    }
+
+    # workaround to disabling cache: delete all cached generations after each plan
+    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+    if os.path.exists(dspy_cache_dir):
+        shutil.rmtree(dspy_cache_dir)
+
+    return records, result_dict, cost_estimate_sample_data
+
+
+def run_reoptimize_eval(opt, workload, policy_str):
+    true_start_time = time.time()
+
+    workload_to_fixed_cost = {
+        "enron": 20.0,
+        "real-estate": 3.0,
+        "biofabric": 3.0,
+    }
+    workload_to_fixed_runtime = {
+        "enron": 10000,
+        "real-estate": 750,
+        "biofabric": 1000,
+    }
+    workload_to_fixed_quality = {
+        "enron": 0.8,
+        "real-estate": 0.8,
+        "biofabric": 0.5,
+    }
+
+    policy = pz.MaxHarmonicMean()
+    if policy_str is not None:
+        if policy_str == "max-quality-at-fixed-cost":
+            policy = pz.MaxQualityAtFixedCost(cost=workload_to_fixed_cost[workload])
+        elif policy_str == "max-quality-at-fixed-runtime":
+            policy = pz.MaxQualityAtFixedRuntime(runtime=workload_to_fixed_runtime[workload])
+        elif policy_str == "min-runtime-at-fixed-quality":
+            policy = pz.MinRuntimeAtFixedQuality(quality=workload_to_fixed_quality[workload])
+        elif policy_str == "min-cost-at-fixed-quality":
+            policy = pz.MinCostAtFixedQuality(quality=workload_to_fixed_quality[workload])
+        elif policy_str == "harmonic-mean":
+            policy = pz.MaxHarmonicMean()
+
+    # TODO: in practice could move this inside of get_logical_tree w/flag indicating sentinel run;
+    #       for now just manually set to make sure evaluation is accurate
     # set samples and size of dataset
-    workload_to_dataset_size = {"enron": 18, "real-estate": 30, "biofabric": 11}
+    workload_to_dataset_size = {"enron": 1000, "real-estate": 100, "biofabric": 11}
     dataset_size = workload_to_dataset_size[workload]
-    samples_per_iter = int(np.floor(dataset_size/5.0))
+    num_samples = min(10, int(0.05 * dataset_size))
+    # samples_per_iter = int(np.floor(dataset_size/5.0))
+
+    # create query for dataset
+    logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
 
     # compute number of plans
     candidatePlans = logicalTree.createPhysicalPlanCandidates(
-        allow_model_selection=(opt == "model"),
-        allow_codegen=(opt == "codegen"),
-        allow_token_reduction=(opt == "token-reduction"),
-        pareto_optimal=False,
+        allow_model_selection=True,
+        allow_codegen=True,
+        allow_token_reduction=True,
+        pareto_optimal=True,
+        shouldProfile=True,
     )
     num_plans = len(candidatePlans)
 
@@ -634,102 +722,217 @@ def run_reoptimize_eval(opt, workload):
 
     # iterate over plans to identify all-mixtral, all-gemini, all-gpt-3.5, and all-gpt4
     def get_single_model_plan_idxs(candidatePlans):
-        single_model_plan_idxs = []
+        single_model_plan_idxs = {
+            "mistralai/Mixtral-8x7B-Instruct-v0.1": None,
+            "gemini-1.0-pro-001": None,
+            "gpt-3.5-turbo-0125": None,
+            "gpt-4-0125-preview": None,
+        }
         for idx in range(num_plans):
             _, _, _, plan, _ = candidatePlans[idx]
             models = get_models_from_physical_plan(plan)
 
             if (
-                all([model is None or model == "mistralai/Mixtral-8x7B-Instruct-v0.1" for model in models])
-                or all([model is None or model == "gemini-1.0-pro-001" for model in models])
-                or all([model is None or model == "gpt-3.5-turbo-0125" for model in models])
-                or all([model is None or model == "gpt-4-0125-preview" for model in models])
+                all([model is None or model in ["mistralai/Mixtral-8x7B-Instruct-v0.1", "gpt-4-vision-preview"] for model in models])
+                and single_model_plan_idxs["mistralai/Mixtral-8x7B-Instruct-v0.1"] is None
             ):
-                print(f"CONSIDERING PLAN: (PLAN IDX: {idx})")
-                print("---")
-                print(f"{buildNestedStr(plan.dumpPhysicalTree())}")
-                print("-------")
-                single_model_plan_idxs.append(idx)
+                single_model_plan_idxs["mistralai/Mixtral-8x7B-Instruct-v0.1"] = idx
+            
+            if (
+                all([model is None or model in ["gemini-1.0-pro-001", "gpt-4-vision-preview"] for model in models])
+                and single_model_plan_idxs["gemini-1.0-pro-001"] is None
+            ):
+                single_model_plan_idxs["gemini-1.0-pro-001"] = idx
+
+            if (
+                all([model is None or model in ["gpt-3.5-turbo-0125", "gpt-4-vision-preview"] for model in models])
+                and single_model_plan_idxs["gpt-3.5-turbo-0125"] is None
+            ):
+                single_model_plan_idxs["gpt-3.5-turbo-0125"] = idx
+
+            if (
+                all([model is None or model in ["gpt-4-0125-preview", "gpt-4-vision-preview"] for model in models])
+                and single_model_plan_idxs["gpt-4-0125-preview"] is None
+            ):
+                single_model_plan_idxs["gpt-4-0125-preview"] = idx
         
         return single_model_plan_idxs
 
-    # compute estimates for all plans
+    # execute sentinel plans
     estimates, all_cost_estimate_data = defaultdict(list), []
-    scan_start_idx, estimate_iter = 0, 0
-    while scan_start_idx < dataset_size:
-        # if estimate_iter == 3:
-        #     break
+    all_records = []
 
-        # create new logical tree based on scan_start_idx
-        logicalTree = get_logical_tree(workload, nocache=True, num_samples=samples_per_iter, scan_start_idx=scan_start_idx)
+    # # get cost estimates given current candidate plans
+    # for plan_idx in range(num_plans):
+    #     totalTimeInitEst, totalCostInitEst, qualityInitEst, plan, fullPlanCostEst = candidatePlans[plan_idx]
 
-        # create plan candidates based on current estimate data
-        candidatePlans = logicalTree.createPhysicalPlanCandidates(
-            cost_estimate_sample_data=all_cost_estimate_data if len(all_cost_estimate_data) > 0 else None,
-            allow_model_selection=(opt == "model"),
-            allow_codegen=(opt == "codegen"),
-            allow_token_reduction=(opt == "token-reduction"),
-            pareto_optimal=False,
-            shouldProfile=True,
-        )
+    #     models = get_models_from_physical_plan(plan)
+    #     result_dict = {
+    #         "plan_idx": plan_idx,
+    #         "plan_label": compute_label(plan, plan_idx),
+    #         "runtime": totalTimeInitEst,
+    #         "cost": totalCostInitEst,
+    #         "quality": qualityInitEst,
+    #         "models": models,
+    #         "full_plan_cost_est": fullPlanCostEst,
+    #     }
+    #     estimates[f"estimate_{estimate_iter}"].append(result_dict)
 
-        # get cost estimates given current candidate plans
-        for plan_idx in range(num_plans):
-            totalTimeInitEst, totalCostInitEst, qualityInitEst, plan, fullPlanCostEst = candidatePlans[plan_idx]
+    # get single model plan indices
+    single_model_plan_idxs = get_single_model_plan_idxs(candidatePlans)
 
-            models = get_models_from_physical_plan(plan)
-            result_dict = {
-                "plan_idx": plan_idx,
-                "plan_label": compute_label(plan, plan_idx),
-                "runtime": totalTimeInitEst,
-                "cost": totalCostInitEst,
-                "quality": qualityInitEst,
-                "models": models,
-                "full_plan_cost_est": fullPlanCostEst,
-            }
-            estimates[f"estimate_{estimate_iter}"].append(result_dict)
+    # get sentinel plans
+    sentinel_plans = []
+    for _, plan_idx in single_model_plan_idxs.items():
+        if plan_idx is None:
+            continue
 
-        # get single model plan indices
-        single_model_plan_idxs = get_single_model_plan_idxs(candidatePlans)
+        _, _, _, plan, _ = candidatePlans[plan_idx]
+        sentinel_plans.append(plan)
 
-        # run single_model_plan_idxs to get sample data
-        for plan_idx in single_model_plan_idxs:
-            _, _, _, plan, _ = candidatePlans[plan_idx]
-
-            # workaround to disabling cache: delete all cached generations after each plan
-            bad_files = ["testdata/enron-eval/assertion.log", "testdata/enron-eval/azure_openai_usage.log", "testdata/enron-eval/openai_usage.log"]
-            for file in bad_files:
-                if os.path.exists(file):
-                    os.remove(file)
-            
-            print("------------ABOUT TO RUN--------------")
-            print(f"Plan IDX: {plan_idx}")
-            print(f"Scan Start Idx: {scan_start_idx}")
-            print(f"Plan: {buildNestedStr(plan.dumpPhysicalTree())}")
-            print("---")
-        
-            # execute plan to get records and runtime;
-            start_time = time.time()
-            records = [r for r in plan]
-            runtime = time.time() - start_time
-
-            # get profiling data for plan and compute its cost
-            profileData = plan.getProfilingData()
-            sp = StatsProcessor(profileData)
-            cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
+    # run sentinel plans
+    total_sentinel_cost = 0.0
+    with Pool(processes=len(sentinel_plans)) as pool:
+        sample_records, result_dicts, sample_data = pool.map(run_sentinel_plan, sentinel_plans)
+        for cost_estimate_sample_data in sample_data:
             all_cost_estimate_data.extend(cost_estimate_sample_data)
+        
+        # find GPT-4 plan records and add those to all_records
+        for idx in range(len(sentinel_plans)):
+            records = sample_records[idx]
+            result_dict = result_dicts[idx]
+            if all([model is None or model in ["gpt-4-0125-preview", "gpt-4-vision-preview"] for model in result_dict['plan_info']['models']]):
+                all_records.extend(records)
+                break
 
-        # update scan start idx and estimation iter
-        scan_start_idx += samples_per_iter
-        estimate_iter += 1
+        for result_dict in result_dicts:
+            total_sentinel_cost += result_dict['cost']
 
-    # write cost estimate data we gather to disk
-    df = pd.DataFrame(all_cost_estimate_data)
-    df.to_csv(f"final-eval-results/reoptimization/{opt}/{workload}/cost-est-sample-data.csv", index=False)
+    # # write cost estimate data we gather to disk
+    # df = pd.DataFrame(all_cost_estimate_data)
+    # df.to_csv(f"final-eval-results/reoptimization/{opt}/{workload}/cost-est-sample-data.csv", index=False)
 
-    with open(f"final-eval-results/reoptimization/{opt}/{workload}/estimates.json", 'w') as f:
-        estimates = dict(estimates)
-        json.dump(estimates, f)
+    # with open(f"final-eval-results/reoptimization/{opt}/{workload}/estimates.json", 'w') as f:
+    #     estimates = dict(estimates)
+    #     json.dump(estimates, f)
+
+    # create new plan candidates based on current estimate data
+    logicalTree = get_logical_tree(workload, nocache=True, start_scan_idx=num_samples)
+    candidatePlans = logicalTree.createPhysicalPlanCandidates(
+        cost_estimate_sample_data=all_cost_estimate_data,
+        allow_model_selection=True,
+        allow_codegen=True,
+        allow_token_reduction=True,
+        pareto_optimal=True,
+        shouldProfile=True,
+    )
+
+    # choose best plan and execute it
+    _, _, _, plan, _ = policy.choose(candidatePlans)
+
+    # display the plan output
+    print("----------------------")
+    ops = plan.dumpPhysicalTree()
+    flatten_ops = flatten_nested_tuples(ops)
+    print(f"Final Plan:")
+    graphicEmit(flatten_ops)
+    print("---")
+
+    # run the plan
+    records = [r for r in plan]
+    true_runtime = time.time() - true_start_time
+    all_records.extend(records)
+
+    # get profiling data for plan and compute its cost
+    profileData = plan.getProfilingData()
+    sp = StatsProcessor(profileData)
+
+    # workaround to disabling cache: delete all cached generations after each plan
+    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+    if os.path.exists(dspy_cache_dir):
+        shutil.rmtree(dspy_cache_dir)
+
+    plan_info = {
+        "plan_idx": None,
+        "plan_label": compute_label(plan, plan_idx),
+        "models": [],
+        "op_names": [],
+        "generated_fields": [],
+        "query_strategies": [],
+        "token_budgets": []
+    }
+    cost = total_sentinel_cost
+    stats = sp.profiling_data
+    while stats is not None:
+        cost += stats.total_usd
+        plan_info["models"].append(stats.model_name)
+        plan_info["op_names"].append(stats.op_name)
+        plan_info["generated_fields"].append(stats.generated_fields)
+        plan_info["query_strategies"].append(stats.query_strategy)
+        plan_info["token_budgets"].append(stats.token_budget)
+        stats = stats.source_op_stats
+
+    # parse records
+    all_records = [
+        {
+            key: record.__dict__[key]
+            for key in record.__dict__
+            if not key.startswith('_') and key not in ["image_contents"]
+        }
+        for record in all_records
+    ]
+    all_records_df = pd.DataFrame(all_records)
+
+    # save predictions for this plan
+    all_records_df.to_csv(f'final-eval-results/reoptimization/{opt}/{workload}/{policy_str}.csv', index=False)
+    if all_records_df.empty:
+        return 0.0
+
+    # get list of predictions
+    preds = None
+    if workload == "enron":
+        preds = all_records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
+    elif workload == "real-estate":
+        preds = list(all_records_df.listing)
+
+    # get list of groundtruth answers
+    targets = None
+    if workload == "enron":
+        gt_df = pd.read_csv("testdata/groundtruth/enron-eval.csv")
+        targets = list(gt_df[gt_df.label == 1].filename)
+    elif workload == "real-estate":
+        gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval-100.csv")
+        targets = list(gt_df[gt_df.label == 1].listing)
+
+    # compute true and false positives
+    tp, fp = 0, 0
+    for pred in preds:
+        if pred in targets:
+            tp += 1
+        else:
+            fp += 1
+
+    # compute false negatives
+    fn = 0
+    for target in targets:
+        if target not in preds:
+            fn += 1
+
+    # compute precision, recall, f1 score
+    precision = tp/(tp + fp) if tp + fp > 0 else 0.0
+    recall = tp/(tp + fn) if tp + fn > 0 else 0.0
+    f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+
+    # construct and return result_dict
+    result_dict = {
+        "runtime": true_runtime,
+        "cost": cost,
+        "f1_score": f1_score,
+        "plan_info": plan_info,
+    }
+
+    with open(f"final-eval-results/reoptimization/{args.opt}/{args.workload}/{policy_str}.json", 'w') as f:
+        json.dump(result_dict)
 
 
 if __name__ == "__main__":
@@ -740,6 +943,7 @@ if __name__ == "__main__":
     parser.add_argument('--opt' , type=str, help='The optimization: one of ["model", "codegen", "token-reduction"]')
     parser.add_argument('--listings-dir', default="testdata/real-estate-eval-100", type=str, help='The directory with real-estate listings')
     parser.add_argument('--reoptimize', default=False, action='store_true', help='Run reoptimization')
+    parser.add_argument('--policy', type=str, help="One of 'user', 'mincost', 'mintime', 'maxquality', 'harmonicmean'")
     parser.add_argument('--dry-run', default=False, action='store_true', help='Just print plans w/out actually running any')
 
     args = parser.parse_args()
@@ -760,7 +964,7 @@ if __name__ == "__main__":
     # re-optimization is unique enough to warrant its own code path
     if args.reoptimize:
         os.makedirs(f"final-eval-results/reoptimization/{args.opt}/{args.workload}", exist_ok=True)
-        run_reoptimize_eval(args.opt, args.workload)
+        run_reoptimize_eval(args.opt, args.workload, args.policy)
         exit(1)
 
     # get PZ plan metrics
