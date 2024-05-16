@@ -916,6 +916,12 @@ class FilterCandidateOp(PhysicalOp):
 
         filter_str = self.filter.filterCondition if self.filter.filterCondition is not None else str(self.filter.filterFn)
         op_filter = f"(filter == '{str(filter_str)}') & (op_name == 'filter' | op_name == 'p_filter')"
+        try:
+            if cost_est_data is not None and cost_est_data[op_filter] is not None:
+                pass
+        except:
+            import pdb
+            pdb.set_trace()
         if cost_est_data is not None and cost_est_data[op_filter] is not None:
             # get estimate data for this physical op's model
             model_name = None if self.model is None else self.model.value
