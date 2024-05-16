@@ -44,7 +44,7 @@ def get_color(opt, workload, result_dict):
 
 def get_pareto_indices(result_dicts, col):
     pareto_indices = []
-    for idx, result_dict in enumerate(result_dicts):
+    for idx, (_, result_dict) in enumerate(result_dicts):
         col_i, quality_i = result_dict[col], result_dict["f1_score"]
         paretoFrontier = True
 
