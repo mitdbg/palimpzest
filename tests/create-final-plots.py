@@ -218,10 +218,10 @@ if __name__ == "__main__":
         for opt in ["model", "codegen", "token-reduction"]:
             num_plans = opt_workload_to_num_plans[opt][workload]
             for plan_idx in range(num_plans):
-                if workload == "biofabric" and args.opt == "codegen" and plan_idx == 3:
+                if workload == "biofabric" and opt == "codegen" and plan_idx == 3:
                     continue
 
-                with open(f"final-eval-results/{args.opt}/{workload}/results-{plan_idx}.json", 'r') as f:
+                with open(f"final-eval-results/{opt}/{workload}/results-{plan_idx}.json", 'r') as f:
                     result = json.load(f)
                     results[workload][opt].append((plan_idx, result))
 
