@@ -82,7 +82,7 @@ def plot_runtime_cost_vs_quality(results):
             cost_pareto_indices = get_pareto_indices(result_dicts, "cost")
             runtime_pareto_indices = get_pareto_indices(result_dicts, "runtime")
 
-            for plan_idx, result_dict in enumerate(result_dicts):
+            for plan_idx, result_dict in result_dicts:
                 runtime = result_dict["runtime"]
                 cost = result_dict["cost"]
                 f1_score = result_dict["f1_score"]
