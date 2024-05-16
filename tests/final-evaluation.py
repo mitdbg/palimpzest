@@ -608,12 +608,25 @@ def plot_runtime_cost_vs_quality(results, opt, workload):
     fig_clean.savefig(f"final-eval-results/{opt}/{workload}/{opt}-{workload}-clean.png", dpi=500, bbox_inches="tight")
 
 
-def run_sentinel_plan(plan):
+def run_sentinel_plan(plan_idx, workload, num_samples):
+    # create query for dataset
+    logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
+
+    # compute number of plans
+    candidatePlans = logicalTree.createPhysicalPlanCandidates(
+        allow_model_selection=True,
+        allow_codegen=True,
+        allow_token_reduction=True,
+        pareto_optimal=True,
+        shouldProfile=True,
+    )
+    _, _, _, plan, _ = candidatePlans[plan_idx]
+
     # display the plan output
     print("----------------------")
     ops = plan.dumpPhysicalTree()
     flatten_ops = flatten_nested_tuples(ops)
-    print(f"Plan {plan_idx}:")
+    print(f"Sentinel Plan {plan_idx}:")
     graphicEmit(flatten_ops)
     print("---")
 
@@ -661,7 +674,7 @@ def run_sentinel_plan(plan):
     return records, result_dict, cost_estimate_sample_data
 
 
-def run_reoptimize_eval(opt, workload, policy_str):
+def run_reoptimize_eval(workload, policy_str):
     true_start_time = time.time()
 
     workload_to_fixed_cost = {
@@ -782,23 +795,22 @@ def run_reoptimize_eval(opt, workload, policy_str):
     single_model_plan_idxs = get_single_model_plan_idxs(candidatePlans)
 
     # get sentinel plans
-    sentinel_plans = []
+    sentinel_plan_idxs = []
     for _, plan_idx in single_model_plan_idxs.items():
         if plan_idx is None:
             continue
 
-        _, _, _, plan, _ = candidatePlans[plan_idx]
-        sentinel_plans.append(plan)
+        sentinel_plan_idxs.append(plan_idx)
 
     # run sentinel plans
     total_sentinel_cost = 0.0
-    with Pool(processes=len(sentinel_plans)) as pool:
-        sample_records, result_dicts, sample_data = pool.map(run_sentinel_plan, sentinel_plans)
+    with Pool(processes=len(sentinel_plan_idxs)) as pool:
+        sample_records, result_dicts, sample_data = pool.starmap(evaluate_pz_plan, [(plan_idx, workload, num_samples) for plan_idx in sentinel_plan_idxs])
         for cost_estimate_sample_data in sample_data:
             all_cost_estimate_data.extend(cost_estimate_sample_data)
         
         # find GPT-4 plan records and add those to all_records
-        for idx in range(len(sentinel_plans)):
+        for idx in range(len(sentinel_plan_idxs)):
             records = sample_records[idx]
             result_dict = result_dicts[idx]
             if all([model is None or model in ["gpt-4-0125-preview", "gpt-4-vision-preview"] for model in result_dict['plan_info']['models']]):
@@ -884,7 +896,7 @@ def run_reoptimize_eval(opt, workload, policy_str):
     all_records_df = pd.DataFrame(all_records)
 
     # save predictions for this plan
-    all_records_df.to_csv(f'final-eval-results/reoptimization/{opt}/{workload}/{policy_str}.csv', index=False)
+    all_records_df.to_csv(f'final-eval-results/reoptimization/{workload}/{policy_str}.csv', index=False)
     if all_records_df.empty:
         return 0.0
 
@@ -931,7 +943,7 @@ def run_reoptimize_eval(opt, workload, policy_str):
         "plan_info": plan_info,
     }
 
-    with open(f"final-eval-results/reoptimization/{args.opt}/{args.workload}/{policy_str}.json", 'w') as f:
+    with open(f"final-eval-results/reoptimization/{args.workload}/{policy_str}.json", 'w') as f:
         json.dump(result_dict)
 
 
@@ -948,14 +960,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # create directory for intermediate results
-    os.makedirs(f"final-eval-results/{args.opt}/{args.workload}", exist_ok=True)
-
-    # The user has to indicate the evaluation to be run
-    if args.opt is None or args.workload is None:
-        print("Please provide an optimization (--opt) and a workload (--workload)")
-        exit(1)
-
     # register real-estate workload if necessary
     if args.workload == "real-estate":
         print("Registering Datasource")
@@ -963,8 +967,16 @@ if __name__ == "__main__":
 
     # re-optimization is unique enough to warrant its own code path
     if args.reoptimize:
-        os.makedirs(f"final-eval-results/reoptimization/{args.opt}/{args.workload}", exist_ok=True)
-        run_reoptimize_eval(args.opt, args.workload, args.policy)
+        os.makedirs(f"final-eval-results/reoptimization/{args.workload}", exist_ok=True)
+        run_reoptimize_eval(args.workload, args.policy)
+        exit(1)
+
+    # create directory for intermediate results
+    os.makedirs(f"final-eval-results/{args.opt}/{args.workload}", exist_ok=True)
+
+    # The user has to indicate the evaluation to be run
+    if args.opt is None or args.workload is None:
+        print("Please provide an optimization (--opt) and a workload (--workload)")
         exit(1)
 
     # get PZ plan metrics
