@@ -82,7 +82,7 @@ def plot_runtime_cost_vs_quality(results):
             cost_pareto_indices = get_pareto_indices(result_dicts, "cost")
             runtime_pareto_indices = get_pareto_indices(result_dicts, "runtime")
 
-            for plan_idx, result_dict in results:
+            for plan_idx, result_dict in enumerate(results):
                 runtime = result_dict["runtime"]
                 cost = result_dict["cost"]
                 f1_score = result_dict["f1_score"]
@@ -103,13 +103,14 @@ def plot_runtime_cost_vs_quality(results):
                 axs_text[1][col].annotate(text, (f1_score, cost))
             
             # plot line for pareto frontiers
-            pareto_qualities = [res[plan_idx]['f1_score'] for res in results]
-            pareto_costs = [res[plan_idx]['cost'] for res in results]
-            pareto_runtimes = [res[plan_idx]['runtime'] for res in results]
-            axs_text[0][col].plot(pareto_qualities, pareto_runtimes)
-            axs_text[0][col].plot(pareto_qualities, pareto_costs)
-            axs_clean[0][col].plot(pareto_qualities, pareto_runtimes)
-            axs_clean[0][col].plot(pareto_qualities, pareto_costs)
+            cost_pareto_qualities = [results[plan_idx]['f1_score'] for plan_idx in cost_pareto_indices]
+            runtime_pareto_qualities = [results[plan_idx]['f1_score'] for plan_idx in runtime_pareto_indices]
+            pareto_costs = [results[plan_idx]['cost'] for plan_idx in cost_pareto_indices]
+            pareto_runtimes = [results[plan_idx]['runtime'] for plan_idx in runtime_pareto_indices]
+            axs_text[0][col].plot(runtime_pareto_qualities, pareto_runtimes)
+            axs_text[1][col].plot(cost_pareto_qualities, pareto_costs)
+            axs_clean[0][col].plot(runtime_pareto_qualities, pareto_runtimes)
+            axs_clean[1][col].plot(cost_pareto_qualities, pareto_costs)
 
         # set x,y-lim for each workload
         left, right = -0.05, 1.05
