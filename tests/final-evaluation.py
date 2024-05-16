@@ -808,6 +808,16 @@ def run_reoptimize_eval(workload, policy_str):
     with Pool(processes=len(sentinel_plan_idxs)) as pool:
         results = pool.starmap(run_sentinel_plan, [(plan_idx, workload, num_samples) for plan_idx in sentinel_plan_idxs])
         sample_records, result_dicts, sample_data = zip(*results)
+
+        # write out result dict and samples collected for each sentinel
+        for idx, (_, res_dict, cost_est_data) in enumerate(results):
+            with open(f"final-eval-results/reoptimization/{workload}/sentinel-{idx}-{policy_str}-results.json", 'w') as f:
+                json.dump(res_dict, f)
+
+            sample_df = pd.DataFrame(cost_est_data)
+            sample_df.to_csv(f"final-eval-results/reoptimization/{workload}/sentinel-{idx}-{policy_str}-sample-data.csv", index=False)
+
+        # aggregate sentinel est. data
         for cost_estimate_sample_data in sample_data:
             all_cost_estimate_data.extend(cost_estimate_sample_data)
 
@@ -831,7 +841,7 @@ def run_reoptimize_eval(workload, policy_str):
     #     json.dump(estimates, f)
 
     # create new plan candidates based on current estimate data
-    logicalTree = get_logical_tree(workload, nocache=True, start_scan_idx=num_samples)
+    logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
     candidatePlans = logicalTree.createPhysicalPlanCandidates(
         cost_estimate_sample_data=all_cost_estimate_data,
         allow_model_selection=True,
@@ -945,8 +955,8 @@ def run_reoptimize_eval(workload, policy_str):
         "plan_info": plan_info,
     }
 
-    with open(f"final-eval-results/reoptimization/{args.workload}/{policy_str}.json", 'w') as f:
-        json.dump(result_dict)
+    with open(f"final-eval-results/reoptimization/{workload}/{policy_str}.json", 'w') as f:
+        json.dump(result_dict, f)
 
 
 if __name__ == "__main__":
