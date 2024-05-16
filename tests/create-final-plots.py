@@ -107,13 +107,25 @@ def plot_runtime_cost_vs_quality(results):
 
         # plot line for pareto frontiers
         cost_pareto_qualities = [all_result_dicts[idx][1]['f1_score'] for idx in cost_pareto_lst_indices]
-        runtime_pareto_qualities = [all_result_dicts[idx][1]['f1_score'] for idx in runtime_pareto_lst_indices]
         pareto_costs = [all_result_dicts[idx][1]['cost'] for idx in cost_pareto_lst_indices]
+        cost_pareto_curve = zip(cost_pareto_qualities, pareto_costs)
+        cost_pareto_curve = sorted(cost_pareto_curve, key=lambda tup: tup[0])
+        if workload == "biofabric":
+            cost_pareto_curve = list(filter(lambda tup: tup[0] < 0.3, cost_pareto_curve))
+        pareto_cost_xs, pareto_cost_ys = zip(*cost_pareto_curve)
+
+        runtime_pareto_qualities = [all_result_dicts[idx][1]['f1_score'] for idx in runtime_pareto_lst_indices]
         pareto_runtimes = [all_result_dicts[idx][1]['runtime'] for idx in runtime_pareto_lst_indices]
-        axs_text[0][col].plot(runtime_pareto_qualities, pareto_runtimes, color="#ef9b20", linestyle='--')
-        axs_text[1][col].plot(cost_pareto_qualities, pareto_costs, color="#ef9b20", linestyle='--')
-        axs_clean[0][col].plot(runtime_pareto_qualities, pareto_runtimes, color="#ef9b20", linestyle='--')
-        axs_clean[1][col].plot(cost_pareto_qualities, pareto_costs, color="#ef9b20", linestyle='--')
+        runtime_pareto_curve = zip(runtime_pareto_qualities, pareto_runtimes)
+        runtime_pareto_curve = sorted(runtime_pareto_curve, key=lambda tup: tup[0])
+        if workload == "biofabric":
+            runtime_pareto_curve = list(filter(lambda tup: tup[0] < 0.3, runtime_pareto_curve))
+        pareto_runtime_xs, pareto_runtime_ys = zip(*runtime_pareto_curve)
+
+        axs_text[0][col].plot(pareto_runtime_xs, pareto_runtime_ys, color="#ef9b20", linestyle='--')
+        axs_text[1][col].plot(pareto_cost_xs, pareto_cost_ys, color="#ef9b20", linestyle='--')
+        axs_clean[0][col].plot(pareto_runtime_xs, pareto_runtime_ys, color="#ef9b20", linestyle='--')
+        axs_clean[1][col].plot(pareto_cost_xs, pareto_cost_ys, color="#ef9b20", linestyle='--')
 
         # set x,y-lim for each workload
         left, right = -0.05, 1.05
