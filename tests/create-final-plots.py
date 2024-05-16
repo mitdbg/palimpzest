@@ -77,10 +77,9 @@ def plot_runtime_cost_vs_quality(results):
     for workload, opt_results in results.items():
         col = workload_to_col[workload]
 
+        all_result_dicts = []        
         for opt, result_dicts in opt_results.items():
-
-            cost_pareto_lst_indices = get_pareto_indices(result_dicts, "cost")
-            runtime_pareto_lst_indices = get_pareto_indices(result_dicts, "runtime")
+            all_result_dicts.extend(result_dicts)
 
             for plan_idx, result_dict in result_dicts:
                 runtime = result_dict["runtime"]
@@ -101,33 +100,39 @@ def plot_runtime_cost_vs_quality(results):
                 # add annotations
                 axs_text[0][col].annotate(text, (f1_score, runtime))
                 axs_text[1][col].annotate(text, (f1_score, cost))
-            
-            # plot line for pareto frontiers
-            cost_pareto_qualities = [result_dicts[idx][1]['f1_score'] for idx in cost_pareto_lst_indices]
-            runtime_pareto_qualities = [result_dicts[idx][1]['f1_score'] for idx in runtime_pareto_lst_indices]
-            pareto_costs = [result_dicts[idx][1]['cost'] for idx in cost_pareto_lst_indices]
-            pareto_runtimes = [result_dicts[idx][1]['runtime'] for idx in runtime_pareto_lst_indices]
-            axs_text[0][col].plot(runtime_pareto_qualities, pareto_runtimes)
-            axs_text[1][col].plot(cost_pareto_qualities, pareto_costs)
-            axs_clean[0][col].plot(runtime_pareto_qualities, pareto_runtimes)
-            axs_clean[1][col].plot(cost_pareto_qualities, pareto_costs)
+
+        # compute pareto frontiers across all optimizations
+        cost_pareto_lst_indices = get_pareto_indices(all_result_dicts, "cost")
+        runtime_pareto_lst_indices = get_pareto_indices(all_result_dicts, "runtime")
+
+        # plot line for pareto frontiers
+        cost_pareto_qualities = [all_result_dicts[idx][1]['f1_score'] for idx in cost_pareto_lst_indices]
+        runtime_pareto_qualities = [all_result_dicts[idx][1]['f1_score'] for idx in runtime_pareto_lst_indices]
+        pareto_costs = [all_result_dicts[idx][1]['cost'] for idx in cost_pareto_lst_indices]
+        pareto_runtimes = [all_result_dicts[idx][1]['runtime'] for idx in runtime_pareto_lst_indices]
+        axs_text[0][col].plot(runtime_pareto_qualities, pareto_runtimes, color="#ef9b20", linestyle='--')
+        axs_text[1][col].plot(cost_pareto_qualities, pareto_costs, color="#ef9b20", linestyle='--')
+        axs_clean[0][col].plot(runtime_pareto_qualities, pareto_runtimes, color="#ef9b20", linestyle='--')
+        axs_clean[1][col].plot(cost_pareto_qualities, pareto_costs, color="#ef9b20", linestyle='--')
 
         # set x,y-lim for each workload
         left, right = -0.05, 1.05
         if workload == "real-estate":
-            left = 0.5
-            right = 0.85
+            left = 0.65
+            right = 0.9
         elif workload == "biofabric":
             left = 0.3
             right = 0.6
         axs_text[0][col].set_xlim(left, right)
         axs_text[0][col].set_ylim(ymin=0)
         axs_text[1][col].set_xlim(left, right)
-        axs_text[1][col].set_ylim(ymin=0)
+        if workload != "biofabric":
+            axs_text[1][col].set_ylim(ymin=0)
         axs_clean[0][col].set_xlim(left, right)
         axs_clean[0][col].set_ylim(ymin=0)
         axs_clean[1][col].set_xlim(left, right)
-        axs_clean[1][col].set_ylim(ymin=0)
+        if workload != "biofabric":
+            axs_clean[1][col].set_ylim(ymin=0)
 
         # turn on grid lines
         axs_text[0][col].grid(True, alpha=0.4)
