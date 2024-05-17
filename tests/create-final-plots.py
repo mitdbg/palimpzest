@@ -231,13 +231,13 @@ def plot_reopt(results, policy):
     # parse results into fields
     results_df = pd.DataFrame(results)
 
-    ################### MAX QUALITY AT FIXED COST ###################
     plan_to_ord = {"Best": 0, "PZ": 1, "Naive": 2}
-    max_quality_fixed_cost_df = results_df[results_df.policy==policy]
-    max_quality_fixed_cost_df['ord'] = max_quality_fixed_cost_df.plan.apply(lambda plan: plan_to_ord[plan])
-    max_quality_fixed_cost_df.sort_values(by='ord', inplace=True)
+    policy_df = results_df[results_df.policy==policy]
+    policy_df['ord'] = policy_df.plan.apply(lambda plan: plan_to_ord[plan])
+    policy_df.sort_values(by='ord', inplace=True)
+
     g = sns.barplot(
-        data=max_quality_fixed_cost_df, # kind="bar",
+        data=policy_df, # kind="bar",
         x="workload", y="cost", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
         ax=axs[0], # order=["Best", "PZ", "Naive"],
@@ -247,7 +247,7 @@ def plot_reopt(results, policy):
     g.set_ylabel(None)
 
     g = sns.barplot(
-        data=max_quality_fixed_cost_df, # kind="bar",
+        data=policy_df, # kind="bar",
         x="workload", y="runtime", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
         ax=axs[1], # order=["Best", "PZ", "Naive"],
@@ -257,7 +257,7 @@ def plot_reopt(results, policy):
     g.set_ylabel(None)
 
     g = sns.barplot(
-        data=max_quality_fixed_cost_df, # kind="bar",
+        data=policy_df, # kind="bar",
         x="workload", y="f1_score", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
         ax=axs[2], # order=["Best", "PZ", "Naive"],
@@ -270,7 +270,8 @@ def plot_reopt(results, policy):
     axs[2].set_title("F1-Score", fontsize=15)
     if policy == "max-quality-at-fixed-cost":
         fig.suptitle("Max Quality @ Fixed Cost")
-        axs[0].axhline(y=3.0, xmin=0, xmax=1, color='#ef9b20', linestyle='--')
+        axs[0].axhline(y=20.0, xmin=0.0, xmax=0.5, color='#ef9b20', linestyle='--')
+        axs[0].axhline(y=3.0, xmin=0.5, xmax=1, color='#ef9b20', linestyle='--')
     elif policy == "max-quality-at-fixed-runtime":
         fig.suptitle("Max Quality @ Fixed Rutnime")
     elif policy == "min-cost-at-fixed-quality":
