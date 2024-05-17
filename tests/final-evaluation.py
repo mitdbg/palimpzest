@@ -709,7 +709,7 @@ def run_reoptimize_eval(workload, policy_str):
     # set samples and size of dataset
     workload_to_dataset_size = {"enron": 1000, "real-estate": 100, "biofabric": 11}
     dataset_size = workload_to_dataset_size[workload]
-    num_samples = min(10, int(0.05 * dataset_size))
+    num_samples = min(10, int(0.05 * dataset_size)) if workload != "biofabric" else 1
     # samples_per_iter = int(np.floor(dataset_size/5.0))
 
     # create query for dataset
