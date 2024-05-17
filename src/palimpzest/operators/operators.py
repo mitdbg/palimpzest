@@ -379,6 +379,7 @@ class LogicalOperator:
                             }
                             estimates[model_name] = model_estimates
                     op_filters_to_estimates[op_filter] = estimates
+                    pdb.set_trace()
 
                 elif isinstance(logical_op, LimitScan):
                     op_filter = "(op_name == 'limit')"
