@@ -297,7 +297,7 @@ def plot_reopt2(results, workload):
     g = sns.barplot(
         data=results_df, # kind="bar",
         x="policy", y="cost", hue="plan",
-        palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
+        palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
         ax=axs[0], # order=["Best", "PZ", "Naive"],
     )
     g.legend_.set_title(None)
@@ -307,7 +307,7 @@ def plot_reopt2(results, workload):
     g = sns.barplot(
         data=results_df, # kind="bar",
         x="policy", y="runtime", hue="plan",
-        palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
+        palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
         ax=axs[1], # order=["Best", "PZ", "Naive"],
     )
     g.legend_.remove()
@@ -317,7 +317,7 @@ def plot_reopt2(results, workload):
     g = sns.barplot(
         data=results_df, # kind="bar",
         x="policy", y="f1_score", hue="plan",
-        palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
+        palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
         ax=axs[2], # order=["Best", "PZ", "Naive"],
     )
     g.legend_.remove()
