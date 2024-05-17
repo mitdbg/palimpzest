@@ -354,15 +354,13 @@ class LogicalOperator:
                     op_filters_to_estimates[op_filter] = estimates
 
                 elif isinstance(logical_op, FilteredScan):
-                    import pdb
-                    pdb.set_trace()
-                    filter_str = self.filter.filterCondition if self.filter.filterCondition is not None else str(self.filter.filterFn)
+                    filter_str = logical_op.filter.filterCondition if logical_op.filter.filterCondition is not None else str(logical_op.filter.filterFn)
                     op_filter = f"(filter == '{str(filter_str)}') & (op_name == 'filter' | op_name == 'p_filter')"
                     op_df = df.query(op_filter)
                     if not op_df.empty:
                         models = (
                             self._getModels()
-                            if self.filter.filterCondition is not None
+                            if logical_op.filter.filterCondition is not None
                             else [None]
                         )
                         estimates = {model: None for model in models}
@@ -379,7 +377,6 @@ class LogicalOperator:
                             }
                             estimates[model_name] = model_estimates
                     op_filters_to_estimates[op_filter] = estimates
-                    pdb.set_trace()
 
                 elif isinstance(logical_op, LimitScan):
                     op_filter = "(op_name == 'limit')"

@@ -36,7 +36,7 @@ def get_color(opt, workload, result_dict):
 
     elif workload == "real-estate":
         # give color to logical re-orderings on real-estate
-        if result_dict['plan_info']['models'][1] == "gpt-4-vision-preview":
+        if result_dict['plan_info']['models'][-2] == "gpt-4-vision-preview":
             color = opt_to_color[opt]
     
     return color
