@@ -342,7 +342,7 @@ def plot_reopt2(results, workload):
     #     fig.suptitle("Min Runtime @ Fixed Quality")
     # fig.supxlabel('Policy')
     # fig.supylabel('Percent Error')
-    fig.savefig(f"final-eval-results/plots/reopt2-{policy}.png", dpi=500, bbox_inches="tight")
+    fig.savefig(f"final-eval-results/plots/reopt2-{workload}.png", dpi=500, bbox_inches="tight")
 
 
 if __name__ == "__main__":
