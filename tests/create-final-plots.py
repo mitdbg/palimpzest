@@ -226,7 +226,7 @@ def plot_runtime_cost_vs_quality(results):
 
 
 def plot_reopt(results, policy):
-    fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(15,3))
+    fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(15,6))
 
     # parse results into fields
     results_df = pd.DataFrame(results)
@@ -237,9 +237,9 @@ def plot_reopt(results, policy):
         data=max_quality_fixed_cost_df, # kind="bar",
         x="workload", y="cost", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[0],
+        ax=axs[0], order=["Best", "PZ", "Naive"],
     )
-    g.legend_.set_title(None)
+    g.legend_.remove()
     g.set_xlabel(None)
     g.set_ylabel(None)
 
@@ -247,9 +247,9 @@ def plot_reopt(results, policy):
         data=max_quality_fixed_cost_df, # kind="bar",
         x="workload", y="runtime", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[1],
+        ax=axs[1], order=["Best", "PZ", "Naive"],
     )
-    g.legend_.set_title(None)
+    g.legend_.remove()
     g.set_xlabel(None)
     g.set_ylabel(None)
 
@@ -257,9 +257,9 @@ def plot_reopt(results, policy):
         data=max_quality_fixed_cost_df, # kind="bar",
         x="workload", y="f1_score", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[2],
+        ax=axs[2], order=["Best", "PZ", "Naive"],
     )
-    g.legend_.set_title(None)
+    g.legend_.remove()
     g.set_xlabel(None)
     g.set_ylabel(None)
     axs[0].set_title("Cost (USD)", fontsize=15)
