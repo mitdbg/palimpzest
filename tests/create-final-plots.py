@@ -94,7 +94,7 @@ def plot_runtime_cost_vs_quality(results):
                 # set label and color
                 color = get_color(opt, workload, result_dict)
                 marker = 'D' if color == "black" else None
-                mcolor = "black" if color == "black" else "#27aeef"
+                mcolor = "black" if color == "black" else "#87bc45"
 
                 # plot runtime vs. f1_score and cost vs. f1_score
                 axs_text[0][col].scatter(f1_score, runtime, alpha=0.6, color=color)
