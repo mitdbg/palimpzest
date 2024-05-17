@@ -450,14 +450,16 @@ if __name__ == "__main__":
             "min-cost-at-fixed-quality": {
                 # "enron": ("token-reduction", 0), # ("model", 10),
                 "enron": ("token-reduction", 1),
-                "real-estate": ("codegen", 0),
+                # "real-estate": ("codegen", 0),
+                "real-estate": ("token-reduction", 9),
                 "biofabric": ("token-reduction", 8),
             },
             ### min runtime
             "min-runtime-at-fixed-quality": {
                 # "enron": ("token-reduction", 0), # ("model", 10),
                 "enron": ("token-reduction", 1),
-                "real-estate": ("codegen", 0),
+                # "real-estate": ("codegen", 0),
+                "real-estate": ("token-reduction", 9),
                 "biofabric": ("model", 0),
             },
         }
