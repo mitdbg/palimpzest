@@ -240,7 +240,6 @@ def plot_reopt(results, policy):
         ax=axs[0], # order=["Best", "PZ", "Naive"],
     )
     g.legend_.remove()
-    g.set_xlabel(None)
     g.set_ylabel(None)
 
     g = sns.barplot(
@@ -250,7 +249,6 @@ def plot_reopt(results, policy):
         ax=axs[1], # order=["Best", "PZ", "Naive"],
     )
     g.legend_.remove()
-    g.set_xlabel(None)
     g.set_ylabel(None)
 
     g = sns.barplot(
@@ -260,7 +258,6 @@ def plot_reopt(results, policy):
         ax=axs[2], # order=["Best", "PZ", "Naive"],
     )
     g.legend_.remove()
-    g.set_xlabel(None)
     g.set_ylabel(None)
     axs[0].set_title("Cost (USD)", fontsize=15)
     axs[1].set_title("Runtime (Seconds)", fontsize=15)
