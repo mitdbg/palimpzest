@@ -242,6 +242,7 @@ def plot_reopt(results, policy):
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
         ax=axs[0], # order=["Best", "PZ", "Naive"],
     )
+    g.legend_.set_title(None)
     g.set_xlabel(None)
     g.set_ylabel(None)
 
@@ -269,6 +270,7 @@ def plot_reopt(results, policy):
     axs[2].set_title("F1-Score", fontsize=15)
     if policy == "max-quality-at-fixed-cost":
         fig.suptitle("Max Quality @ Fixed Cost")
+        axs[0].axhline(y=3.0, xmin='real-estate', xmax='real-estate', color='#ef9b20', linestyle='--')
     elif policy == "max-quality-at-fixed-runtime":
         fig.suptitle("Max Quality @ Fixed Rutnime")
     elif policy == "min-cost-at-fixed-quality":
