@@ -329,7 +329,7 @@ def plot_reopt2(results, workload):
     axs[0].set_title("Cost (USD)", fontsize=15)
     axs[1].set_title("Runtime (Seconds)", fontsize=15)
     axs[2].set_title("F1-Score", fontsize=15)
-    fig.suptitle(f"Re-Optimization on {workload}")
+    fig.suptitle(f"Re-Optimization on {workload} by Policy")
     # if policy == "max-quality-at-fixed-cost":
     #     fig.suptitle("Max Quality @ Fixed Cost")
     #     axs[0].axhline(y=20.0, xmin=0.0, xmax=0.5, color='#ef9b20', linestyle='--')
@@ -340,7 +340,7 @@ def plot_reopt2(results, workload):
     #     fig.suptitle("Min Cost @ Fixed Quality")
     # elif policy == "min-runtime-at-fixed-quality":
     #     fig.suptitle("Min Runtime @ Fixed Quality")
-    fig.supxlabel('Policy')
+    # fig.supxlabel('Policy')
     # fig.supylabel('Percent Error')
     fig.savefig(f"final-eval-results/plots/reopt2-{policy}.png", dpi=500, bbox_inches="tight")
 
