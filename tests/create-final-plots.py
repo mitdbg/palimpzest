@@ -593,4 +593,4 @@ if __name__ == "__main__":
                     results.append({"plan": "PZ", "policy": policy, "workload": workload, "metric": "runtime", "value": result_dict["runtime"]})
 
         # plot_reopt(results, policy)
-        plot_reopt2(results, workload)
+        plot_reopt3(results, workload)
