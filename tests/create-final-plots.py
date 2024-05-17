@@ -36,7 +36,7 @@ def get_color(opt, workload, result_dict):
 
     elif workload == "real-estate":
         # give color to logical re-orderings on real-estate
-        if result_dict['plan_info']['models'] == "gpt-4-vision-preview":
+        if result_dict['plan_info']['models'][1] == "gpt-4-vision-preview":
             color = opt_to_color[opt]
     
     return color
@@ -70,6 +70,7 @@ def plot_runtime_cost_vs_quality(results):
     # create figure
     fig_text, axs_text = plt.subplots(nrows=2, ncols=3, figsize=(15,6))
     fig_clean, axs_clean = plt.subplots(nrows=2, ncols=3, figsize=(15,6))
+    fig_clean_bw, axs_clean_bw = plt.subplots(nrows=2, ncols=3, figsize=(15,6))
 
     workload_to_col = {"enron": 0, "real-estate": 1, "biofabric": 2}
 
@@ -86,7 +87,7 @@ def plot_runtime_cost_vs_quality(results):
                 cost = result_dict["cost"]
                 f1_score = result_dict["f1_score"]
 
-                text = f"{opt[0]}-{plan_idx}"
+                text = f"{opt[0]}{plan_idx}"
 
                 # set label and color
                 color = get_color(opt, workload, result_dict)
