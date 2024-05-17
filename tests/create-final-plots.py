@@ -277,7 +277,7 @@ def plot_reopt(results, policy):
         fig.suptitle("Min Cost @ Fixed Quality")
     elif policy == "min-runtime-at-fixed-quality":
         fig.suptitle("Min Runtime @ Fixed Quality")
-    # fig.supxlabel('Number of Profile Samples Prior to Plan Estimation')
+    fig.supxlabel('Workload')
     # fig.supylabel('Percent Error')
     fig.savefig(f"final-eval-results/plots/reopt-{policy}.png", dpi=500, bbox_inches="tight")
 
@@ -399,7 +399,7 @@ if __name__ == "__main__":
         for policy in ["max-quality-at-fixed-cost", "max-quality-at-fixed-runtime", "min-cost-at-fixed-quality", "min-runtime-at-fixed-quality"]:
             # for workload in ["enron", "real-estate", "biofabric"]:
             results = []
-            for workload in ["real-estate"]:
+            for workload in ["enron", "real-estate"]:
                 with open(f'final-eval-results/reoptimization/{workload}/{policy}.json', 'r') as f:
                     result_dict = json.load(f)
                     results.append({"plan": "PZ", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
