@@ -193,7 +193,7 @@ def plot_reopt(results):
     ################### MAX QUALITY AT FIXED COST ###################
     max_quality_fixed_cost_df = results_df[results_df.policy=="max-quality-at-fixed-cost"]
     g = sns.barplot(
-        data=max_quality_fixed_cost_df, kind="bar",
+        data=max_quality_fixed_cost_df, # kind="bar",
         x="workload", y="cost", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
         ax=axs[0],
@@ -203,20 +203,20 @@ def plot_reopt(results):
     g.set_ylabel(None)
 
     g = sns.barplot(
-        data=max_quality_fixed_cost_df, kind="bar",
+        data=max_quality_fixed_cost_df, # kind="bar",
         x="workload", y="runtime", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[0],
+        ax=axs[1],
     )
     g.legend_.set_title(None)
     g.set_xlabel(None)
     g.set_ylabel(None)
 
     g = sns.barplot(
-        data=max_quality_fixed_cost_df, kind="bar",
+        data=max_quality_fixed_cost_df, # kind="bar",
         x="workload", y="f1_score", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[0],
+        ax=axs[2],
     )
     g.legend_.set_title(None)
     g.set_xlabel(None)
