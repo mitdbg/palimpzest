@@ -303,7 +303,7 @@ class LogicalOperator:
 
         # compute estimates for every operator
         op_filters_to_estimates = {}
-        if cost_estimate_sample_data is not None:
+        if cost_estimate_sample_data is not None and cost_estimate_sample_data != []:
             # construct full dataset of samples
             df = pd.DataFrame(cost_estimate_sample_data)
 

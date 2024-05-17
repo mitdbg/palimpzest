@@ -182,7 +182,7 @@ def compute_label(physicalTree, label_idx):
     return f"PZ-{label_idx}-{label}"
 
 
-def score_biofabric_plans(opt, workload, records, plan_idx) -> float:
+def score_biofabric_plans(opt, workload, records, plan_idx, policy_str=None, reopt=False) -> float:
     """
     Computes the results of all biofabric plans
     """
@@ -196,7 +196,10 @@ def score_biofabric_plans(opt, workload, records, plan_idx) -> float:
         output_rows.append(dct)
 
     records_df = pd.DataFrame(output_rows)
-    records_df.to_csv(f'final-eval-results/{opt}/{workload}/preds-{plan_idx}.csv', index=False)
+    if not reopt:
+        records_df.to_csv(f'final-eval-results/{opt}/{workload}/preds-{plan_idx}.csv', index=False)
+    else:
+        records_df.to_csv(f'final-eval-results/reoptimization/{workload}/{policy_str}.csv', index=False)
 
     if records_df.empty:
         return 0.0
@@ -252,13 +255,13 @@ def score_biofabric_plans(opt, workload, records, plan_idx) -> float:
     return f1
 
 
-def score_plan(opt, workload, records, plan_idx) -> float:
+def score_plan(opt, workload, records, plan_idx, policy_str=None, reopt=False) -> float:
     """
     Computes the F1 score of the plan
     """
     # special handling for biofabric workload
     if workload == "biofabric":
-        return score_biofabric_plans(opt, workload, records, plan_idx)
+        return score_biofabric_plans(opt, workload, records, plan_idx, policy_str, reopt)
 
     # parse records
     records = [
@@ -272,7 +275,10 @@ def score_plan(opt, workload, records, plan_idx) -> float:
     records_df = pd.DataFrame(records)
 
     # save predictions for this plan
-    records_df.to_csv(f'final-eval-results/{opt}/{workload}/preds-{plan_idx}.csv', index=False)
+    if not reopt:
+        records_df.to_csv(f'final-eval-results/{opt}/{workload}/preds-{plan_idx}.csv', index=False)
+    else:
+        records_df.to_csv(f'final-eval-results/reoptimization/{workload}/{policy_str}.csv', index=False)
 
     if records_df.empty:
         return 0.0
@@ -709,131 +715,132 @@ def run_reoptimize_eval(workload, policy_str):
     # set samples and size of dataset
     workload_to_dataset_size = {"enron": 1000, "real-estate": 100, "biofabric": 11}
     dataset_size = workload_to_dataset_size[workload]
-    num_samples = min(10, int(0.05 * dataset_size)) if workload != "biofabric" else 1
+    num_samples = min(10, int(0.05 * dataset_size)) if workload != "biofabric" else 0
     # samples_per_iter = int(np.floor(dataset_size/5.0))
 
-    # create query for dataset
-    logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
-
-    # compute number of plans
-    candidatePlans = logicalTree.createPhysicalPlanCandidates(
-        allow_model_selection=True,
-        allow_codegen=True,
-        allow_token_reduction=True,
-        pareto_optimal=False,
-        shouldProfile=True,
-    )
-    num_plans = len(candidatePlans)
-
-    # # identify initial est of best plan
-    # policy = pz.MaxQualityMinRuntime()
-    # best_plan, init_best_plan_idx = policy.choose(candidatePlans, return_idx=True)
-    # print(f"Initial best plan idx: {init_best_plan_idx}")
-    # print(f"Initial best plan: {buildNestedStr(best_plan[3].dumpPhysicalTree())}")
-
-    # iterate over plans to identify all-mixtral, all-gemini, all-gpt-3.5, and all-gpt4
-    def get_single_model_plan_idxs(candidatePlans):
-        single_model_plan_idxs = {
-            "mistralai/Mixtral-8x7B-Instruct-v0.1": None,
-            "gemini-1.0-pro-001": None,
-            "gpt-3.5-turbo-0125": None,
-            "gpt-4-0125-preview": None,
-        }
-        for idx in range(num_plans):
-            _, _, _, plan, _ = candidatePlans[idx]
-            models = get_models_from_physical_plan(plan)
-
-            if (
-                all([model is None or model in ["mistralai/Mixtral-8x7B-Instruct-v0.1", "gpt-4-vision-preview"] for model in models])
-                and single_model_plan_idxs["mistralai/Mixtral-8x7B-Instruct-v0.1"] is None
-            ):
-                single_model_plan_idxs["mistralai/Mixtral-8x7B-Instruct-v0.1"] = idx
-            
-            if (
-                all([model is None or model in ["gemini-1.0-pro-001", "gpt-4-vision-preview"] for model in models])
-                and single_model_plan_idxs["gemini-1.0-pro-001"] is None
-            ):
-                single_model_plan_idxs["gemini-1.0-pro-001"] = idx
-
-            if (
-                all([model is None or model in ["gpt-3.5-turbo-0125", "gpt-4-vision-preview"] for model in models])
-                and single_model_plan_idxs["gpt-3.5-turbo-0125"] is None
-            ):
-                single_model_plan_idxs["gpt-3.5-turbo-0125"] = idx
-
-            if (
-                all([model is None or model in ["gpt-4-0125-preview", "gpt-4-vision-preview"] for model in models])
-                and single_model_plan_idxs["gpt-4-0125-preview"] is None
-            ):
-                single_model_plan_idxs["gpt-4-0125-preview"] = idx
-        
-        return single_model_plan_idxs
-
-    # NOTE: we don't count the cost of logical plan creation in the other PZ plans (it's just
-    #       a constant applied equally to all plans which is no more than a few seconds), thus
-    #       I am starting the clock here (i.e. after the first logical plan creation) to make
-    #       comparing reoptimization results to other results more apples-to-apples.
-    # execute sentinel plans
-    true_start_time = time.time()
     estimates, all_cost_estimate_data = defaultdict(list), []
     all_records = []
+    if workload != "biofabric":
+        # create query for dataset
+        logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
 
-    # # get cost estimates given current candidate plans
-    # for plan_idx in range(num_plans):
-    #     totalTimeInitEst, totalCostInitEst, qualityInitEst, plan, fullPlanCostEst = candidatePlans[plan_idx]
+        # compute number of plans
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(
+            allow_model_selection=True,
+            allow_codegen=True,
+            allow_token_reduction=True,
+            pareto_optimal=False,
+            shouldProfile=True,
+        )
+        num_plans = len(candidatePlans)
 
-    #     models = get_models_from_physical_plan(plan)
-    #     result_dict = {
-    #         "plan_idx": plan_idx,
-    #         "plan_label": compute_label(plan, plan_idx),
-    #         "runtime": totalTimeInitEst,
-    #         "cost": totalCostInitEst,
-    #         "quality": qualityInitEst,
-    #         "models": models,
-    #         "full_plan_cost_est": fullPlanCostEst,
-    #     }
-    #     estimates[f"estimate_{estimate_iter}"].append(result_dict)
+        # # identify initial est of best plan
+        # policy = pz.MaxQualityMinRuntime()
+        # best_plan, init_best_plan_idx = policy.choose(candidatePlans, return_idx=True)
+        # print(f"Initial best plan idx: {init_best_plan_idx}")
+        # print(f"Initial best plan: {buildNestedStr(best_plan[3].dumpPhysicalTree())}")
 
-    # get single model plan indices
-    single_model_plan_idxs = get_single_model_plan_idxs(candidatePlans)
-    print(f"SINGLE MODEL PLAN IDXS: {single_model_plan_idxs}")
+        # iterate over plans to identify all-mixtral, all-gemini, all-gpt-3.5, and all-gpt4
+        def get_single_model_plan_idxs(candidatePlans):
+            single_model_plan_idxs = {
+                "mistralai/Mixtral-8x7B-Instruct-v0.1": None,
+                "gemini-1.0-pro-001": None,
+                "gpt-3.5-turbo-0125": None,
+                "gpt-4-0125-preview": None,
+            }
+            for idx in range(num_plans):
+                _, _, _, plan, _ = candidatePlans[idx]
+                models = get_models_from_physical_plan(plan)
 
-    # get sentinel plans
-    sentinel_plan_idxs = []
-    for _, plan_idx in single_model_plan_idxs.items():
-        if plan_idx is None:
-            continue
+                if (
+                    all([model is None or model in ["mistralai/Mixtral-8x7B-Instruct-v0.1", "gpt-4-vision-preview"] for model in models])
+                    and single_model_plan_idxs["mistralai/Mixtral-8x7B-Instruct-v0.1"] is None
+                ):
+                    single_model_plan_idxs["mistralai/Mixtral-8x7B-Instruct-v0.1"] = idx
+                
+                if (
+                    all([model is None or model in ["gemini-1.0-pro-001", "gpt-4-vision-preview"] for model in models])
+                    and single_model_plan_idxs["gemini-1.0-pro-001"] is None
+                ):
+                    single_model_plan_idxs["gemini-1.0-pro-001"] = idx
 
-        sentinel_plan_idxs.append(plan_idx)
+                if (
+                    all([model is None or model in ["gpt-3.5-turbo-0125", "gpt-4-vision-preview"] for model in models])
+                    and single_model_plan_idxs["gpt-3.5-turbo-0125"] is None
+                ):
+                    single_model_plan_idxs["gpt-3.5-turbo-0125"] = idx
 
-    # run sentinel plans
-    total_sentinel_cost = 0.0
-    with Pool(processes=len(sentinel_plan_idxs)) as pool:
-        results = pool.starmap(run_sentinel_plan, [(plan_idx, workload, num_samples) for plan_idx in sentinel_plan_idxs])
-        sample_records, result_dicts, sample_data = zip(*results)
+                if (
+                    all([model is None or model in ["gpt-4-0125-preview", "gpt-4-vision-preview"] for model in models])
+                    and single_model_plan_idxs["gpt-4-0125-preview"] is None
+                ):
+                    single_model_plan_idxs["gpt-4-0125-preview"] = idx
+            
+            return single_model_plan_idxs
 
-        # write out result dict and samples collected for each sentinel
-        for idx, (_, res_dict, cost_est_data) in enumerate(results):
-            with open(f"final-eval-results/reoptimization/{workload}/sentinel-{idx}-{policy_str}-results.json", 'w') as f:
-                json.dump(res_dict, f)
+        # NOTE: we don't count the cost of logical plan creation in the other PZ plans (it's just
+        #       a constant applied equally to all plans which is no more than a few seconds), thus
+        #       I am starting the clock here (i.e. after the first logical plan creation) to make
+        #       comparing reoptimization results to other results more apples-to-apples.
+        # execute sentinel plans
+        true_start_time = time.time()
 
-            sample_df = pd.DataFrame(cost_est_data)
-            sample_df.to_csv(f"final-eval-results/reoptimization/{workload}/sentinel-{idx}-{policy_str}-sample-data.csv", index=False)
+        # # get cost estimates given current candidate plans
+        # for plan_idx in range(num_plans):
+        #     totalTimeInitEst, totalCostInitEst, qualityInitEst, plan, fullPlanCostEst = candidatePlans[plan_idx]
 
-        # aggregate sentinel est. data
-        for cost_estimate_sample_data in sample_data:
-            all_cost_estimate_data.extend(cost_estimate_sample_data)
+        #     models = get_models_from_physical_plan(plan)
+        #     result_dict = {
+        #         "plan_idx": plan_idx,
+        #         "plan_label": compute_label(plan, plan_idx),
+        #         "runtime": totalTimeInitEst,
+        #         "cost": totalCostInitEst,
+        #         "quality": qualityInitEst,
+        #         "models": models,
+        #         "full_plan_cost_est": fullPlanCostEst,
+        #     }
+        #     estimates[f"estimate_{estimate_iter}"].append(result_dict)
 
-        # find GPT-4 plan records and add those to all_records
-        for idx in range(len(sentinel_plan_idxs)):
-            records = sample_records[idx]
-            result_dict = result_dicts[idx]
-            if all([model is None or model in ["gpt-4-0125-preview", "gpt-4-vision-preview"] for model in result_dict['plan_info']['models']]):
-                all_records.extend(records)
-                break
+        # get single model plan indices
+        single_model_plan_idxs = get_single_model_plan_idxs(candidatePlans)
+        print(f"SINGLE MODEL PLAN IDXS: {single_model_plan_idxs}")
 
-        for result_dict in result_dicts:
-            total_sentinel_cost += result_dict['cost']
+        # get sentinel plans
+        sentinel_plan_idxs = []
+        for _, plan_idx in single_model_plan_idxs.items():
+            if plan_idx is None:
+                continue
+
+            sentinel_plan_idxs.append(plan_idx)
+
+        # run sentinel plans
+        total_sentinel_cost = 0.0
+        with Pool(processes=len(sentinel_plan_idxs)) as pool:
+            results = pool.starmap(run_sentinel_plan, [(plan_idx, workload, num_samples) for plan_idx in sentinel_plan_idxs])
+            sample_records, result_dicts, sample_data = zip(*results)
+
+            # write out result dict and samples collected for each sentinel
+            for idx, (_, res_dict, cost_est_data) in enumerate(results):
+                with open(f"final-eval-results/reoptimization/{workload}/sentinel-{idx}-{policy_str}-results.json", 'w') as f:
+                    json.dump(res_dict, f)
+
+                sample_df = pd.DataFrame(cost_est_data)
+                sample_df.to_csv(f"final-eval-results/reoptimization/{workload}/sentinel-{idx}-{policy_str}-sample-data.csv", index=False)
+
+            # aggregate sentinel est. data
+            for cost_estimate_sample_data in sample_data:
+                all_cost_estimate_data.extend(cost_estimate_sample_data)
+
+            # find GPT-4 plan records and add those to all_records
+            for idx in range(len(sentinel_plan_idxs)):
+                records = sample_records[idx]
+                result_dict = result_dicts[idx]
+                if all([model is None or model in ["gpt-4-0125-preview", "gpt-4-vision-preview"] for model in result_dict['plan_info']['models']]):
+                    all_records.extend(records)
+                    break
+
+            for result_dict in result_dicts:
+                total_sentinel_cost += result_dict['cost']
 
     # # write cost estimate data we gather to disk
     # df = pd.DataFrame(all_cost_estimate_data)
@@ -899,56 +906,59 @@ def run_reoptimize_eval(workload, policy_str):
         plan_info["token_budgets"].append(stats.token_budget)
         stats = stats.source_op_stats
 
-    # parse records
-    all_records = [
-        {
-            key: record.__dict__[key]
-            for key in record.__dict__
-            if not key.startswith('_') and key not in ["image_contents"]
-        }
-        for record in all_records
-    ]
-    all_records_df = pd.DataFrame(all_records)
+    # score plan
+    f1_score = score_plan(None, workload, all_records, None, policy_str=policy_str, reopt=True)
 
-    # save predictions for this plan
-    all_records_df.to_csv(f'final-eval-results/reoptimization/{workload}/{policy_str}.csv', index=False)
-    if all_records_df.empty:
-        return 0.0
+    # # parse records
+    # all_records = [
+    #     {
+    #         key: record.__dict__[key]
+    #         for key in record.__dict__
+    #         if not key.startswith('_') and key not in ["image_contents"]
+    #     }
+    #     for record in all_records
+    # ]
+    # all_records_df = pd.DataFrame(all_records)
 
-    # get list of predictions
-    preds = None
-    if workload == "enron":
-        preds = all_records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
-    elif workload == "real-estate":
-        preds = list(all_records_df.listing)
+    # # save predictions for this plan
+    # all_records_df.to_csv(f'final-eval-results/reoptimization/{workload}/{policy_str}.csv', index=False)
+    # if all_records_df.empty:
+    #     return 0.0
 
-    # get list of groundtruth answers
-    targets = None
-    if workload == "enron":
-        gt_df = pd.read_csv("testdata/groundtruth/enron-eval.csv")
-        targets = list(gt_df[gt_df.label == 1].filename)
-    elif workload == "real-estate":
-        gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval-100.csv")
-        targets = list(gt_df[gt_df.label == 1].listing)
+    # # get list of predictions
+    # preds = None
+    # if workload == "enron":
+    #     preds = all_records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
+    # elif workload == "real-estate":
+    #     preds = list(all_records_df.listing)
 
-    # compute true and false positives
-    tp, fp = 0, 0
-    for pred in preds:
-        if pred in targets:
-            tp += 1
-        else:
-            fp += 1
+    # # get list of groundtruth answers
+    # targets = None
+    # if workload == "enron":
+    #     gt_df = pd.read_csv("testdata/groundtruth/enron-eval.csv")
+    #     targets = list(gt_df[gt_df.label == 1].filename)
+    # elif workload == "real-estate":
+    #     gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval-100.csv")
+    #     targets = list(gt_df[gt_df.label == 1].listing)
 
-    # compute false negatives
-    fn = 0
-    for target in targets:
-        if target not in preds:
-            fn += 1
+    # # compute true and false positives
+    # tp, fp = 0, 0
+    # for pred in preds:
+    #     if pred in targets:
+    #         tp += 1
+    #     else:
+    #         fp += 1
 
-    # compute precision, recall, f1 score
-    precision = tp/(tp + fp) if tp + fp > 0 else 0.0
-    recall = tp/(tp + fn) if tp + fn > 0 else 0.0
-    f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+    # # compute false negatives
+    # fn = 0
+    # for target in targets:
+    #     if target not in preds:
+    #         fn += 1
+
+    # # compute precision, recall, f1 score
+    # precision = tp/(tp + fp) if tp + fp > 0 else 0.0
+    # recall = tp/(tp + fn) if tp + fn > 0 else 0.0
+    # f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
 
     # construct and return result_dict
     result_dict = {
