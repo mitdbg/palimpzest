@@ -237,7 +237,7 @@ def plot_reopt(results, policy):
         data=max_quality_fixed_cost_df, # kind="bar",
         x="workload", y="cost", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[0], order=["Best", "PZ", "Naive"],
+        ax=axs[0], # order=["Best", "PZ", "Naive"],
     )
     g.legend_.remove()
     g.set_xlabel(None)
@@ -247,7 +247,7 @@ def plot_reopt(results, policy):
         data=max_quality_fixed_cost_df, # kind="bar",
         x="workload", y="runtime", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[1], order=["Best", "PZ", "Naive"],
+        ax=axs[1], # order=["Best", "PZ", "Naive"],
     )
     g.legend_.remove()
     g.set_xlabel(None)
@@ -257,7 +257,7 @@ def plot_reopt(results, policy):
         data=max_quality_fixed_cost_df, # kind="bar",
         x="workload", y="f1_score", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[2], order=["Best", "PZ", "Naive"],
+        ax=axs[2], # order=["Best", "PZ", "Naive"],
     )
     g.legend_.remove()
     g.set_xlabel(None)
