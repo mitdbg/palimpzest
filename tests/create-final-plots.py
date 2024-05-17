@@ -351,7 +351,7 @@ if __name__ == "__main__":
             },
         }
         results = []
-        for policy in ["max-quality-at-fixed-cost"]:
+        for policy in ["max-quality-at-fixed-cost", "max-quality-at-fixed-runtime", "min-cost-at-fixed-quality", "min-runtime-at-fixed-quality"]:
             # for workload in ["enron", "real-estate", "biofabric"]:
             for workload in ["real-estate"]:
                 with open(f'final-eval-results/reoptimization/{workload}/{policy}.json', 'r') as f:
