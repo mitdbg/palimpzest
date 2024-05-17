@@ -232,14 +232,17 @@ def plot_reopt(results, policy):
     results_df = pd.DataFrame(results)
 
     ################### MAX QUALITY AT FIXED COST ###################
+    plan_to_ord = {"Best": 0, "PZ": 1, "Naive": 2}
     max_quality_fixed_cost_df = results_df[results_df.policy==policy]
+    max_quality_fixed_cost_df['ord'] = max_quality_fixed_cost_df.plan.apply(lambda plan: plan_to_ord[plan])
+    max_quality_fixed_cost_df.sort_values(by='ord', inplace=True)
     g = sns.barplot(
         data=max_quality_fixed_cost_df, # kind="bar",
         x="workload", y="cost", hue="plan",
         palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
         ax=axs[0], # order=["Best", "PZ", "Naive"],
     )
-    g.legend_.remove()
+    g.set_xlabel(None)
     g.set_ylabel(None)
 
     g = sns.barplot(
@@ -249,6 +252,7 @@ def plot_reopt(results, policy):
         ax=axs[1], # order=["Best", "PZ", "Naive"],
     )
     g.legend_.remove()
+    g.set_xlabel(None)
     g.set_ylabel(None)
 
     g = sns.barplot(
@@ -258,6 +262,7 @@ def plot_reopt(results, policy):
         ax=axs[2], # order=["Best", "PZ", "Naive"],
     )
     g.legend_.remove()
+    g.set_xlabel(None)
     g.set_ylabel(None)
     axs[0].set_title("Cost (USD)", fontsize=15)
     axs[1].set_title("Runtime (Seconds)", fontsize=15)
