@@ -21,6 +21,8 @@ import time
 import os
 import pdb
 
+def get_marker(opt, workload):
+    pass
 
 def get_color(opt, workload, result_dict):
     opt_to_color = {"model": "#87bc45", "codegen": "#27aeef", "token-reduction": "#b33dc6"}
@@ -93,12 +95,15 @@ def plot_runtime_cost_vs_quality(results):
 
                 # set label and color
                 color = get_color(opt, workload, result_dict)
+                marker = get_marker(opt, workload, result_dict)
 
                 # plot runtime vs. f1_score and cost vs. f1_score
                 axs_text[0][col].scatter(f1_score, runtime, alpha=0.6, color=color)
                 axs_text[1][col].scatter(f1_score, cost, alpha=0.6, color=color)
                 axs_clean[0][col].scatter(f1_score, runtime, alpha=0.6, color=color)
                 axs_clean[1][col].scatter(f1_score, cost, alpha=0.6, color=color)
+                axs_clean_bw[0][col].scatter(f1_score, runtime, alpha=0.6, color="black", marker=marker)
+                axs_clean_bw[1][col].scatter(f1_score, cost, alpha=0.6, color="black", marker=marker)
 
                 # add annotations
                 axs_text[0][col].annotate(text, (f1_score, runtime))
@@ -181,18 +186,18 @@ def plot_runtime_cost_vs_quality(results):
     for idx in range(3):
         axs_clean[1][idx].set_xlabel("F1 Score", fontsize=12)
 
-    fig_text.savefig(f"final-eval-results/plots/all-text-bw.png", dpi=500, bbox_inches="tight")
-    fig_clean.savefig(f"final-eval-results/plots/all-clean-bw.png", dpi=500, bbox_inches="tight")
+    fig_text.savefig(f"final-eval-results/plots/all-text.png", dpi=500, bbox_inches="tight")
+    fig_clean.savefig(f"final-eval-results/plots/all-clean.png", dpi=500, bbox_inches="tight")
 
 
-def plot_reopt(results):
+def plot_reopt(results, policy):
     fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(15,3))
 
     # parse results into fields
     results_df = pd.DataFrame(results)
 
     ################### MAX QUALITY AT FIXED COST ###################
-    max_quality_fixed_cost_df = results_df[results_df.policy=="max-quality-at-fixed-cost"]
+    max_quality_fixed_cost_df = results_df[results_df.policy==policy]
     g = sns.barplot(
         data=max_quality_fixed_cost_df, # kind="bar",
         x="workload", y="cost", hue="plan",
@@ -225,10 +230,11 @@ def plot_reopt(results):
     axs[0].set_title("Cost (USD)", fontsize=15)
     axs[1].set_title("Runtime (Seconds)", fontsize=15)
     axs[2].set_title("F1-Score", fontsize=15)
+    fig.suptitle("Max Quality @ Fixed Cost == $3.0")
     # fig.supxlabel('Number of Profile Samples Prior to Plan Estimation')
     # fig.supylabel('Percent Error')
-    fig.savefig(f"final-eval-results/plots/reopt-max-quality-at-fixed-cost.png", dpi=500, bbox_inches="tight")
-    plt.show()
+    fig.savefig(f"final-eval-results/plots/reopt-{policy}.png", dpi=500, bbox_inches="tight")
+
 
 if __name__ == "__main__":
     # parse arguments
@@ -301,14 +307,48 @@ if __name__ == "__main__":
                 "enron": ("model", 5),
                 "real-estate": ("token-reduction", 8),
                 "biofabric": ("token-reduction", 11),
-            }
+            },
+            "max-quality-at-fixed-runtime": {
+                "enron": ("model", 6),
+                "real-estate": ("token-reduction", 8),
+                "biofabric": ("token-reduction", 8),
+            },
+            "min-cost-at-fixed-quality": {
+                "enron": ("model", 6),
+                "real-estate": ("codegen", 6),
+                "biofabric": ("token-reduction", 11),
+            },
+            "min-runtime-at-fixed-quality": {
+                "enron": ("model", 6),
+                "real-estate": ("codegen", 6),
+                "biofabric": ("model", 3),
+            },
         }
         policy_to_naive_plan = {
+            ### max quality
             "max-quality-at-fixed-cost": {
                 "enron": ("token-reduction", 1),
                 "real-estate": ("token-reduction", 9),
                 "biofabric": ("token-reduction", 4),
-            }
+            },
+            ### max quality
+            "max-quality-at-fixed-runtime": {
+                "enron": ("token-reduction", 1),
+                "real-estate": ("token-reduction", 9),
+                "biofabric": ("token-reduction", 4),
+            },
+            ### min cost
+            "min-cost-at-fixed-quality": {
+                "enron": ("token-reduction", 0), # ("model", 10),
+                "real-estate": ("codegen", 0),
+                "biofabric": ("token-reduction", 8),
+            },
+            ### min runtime
+            "min-runtime-at-fixed-quality": {
+                "enron": ("token-reduction", 0), # ("model", 10),
+                "real-estate": ("codegen", 0),
+                "biofabric": ("model", 0),
+            },
         }
         results = []
         for policy in ["max-quality-at-fixed-cost"]:
@@ -328,4 +368,4 @@ if __name__ == "__main__":
                     result_dict = json.load(f)
                     results.append({"plan": "Naive", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
 
-        plot_reopt(results)
+            plot_reopt(results, policy)
