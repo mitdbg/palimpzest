@@ -329,7 +329,11 @@ def plot_reopt2(results, workload):
     axs[0].set_title("Cost (USD)", fontsize=15)
     axs[1].set_title("Runtime (Seconds)", fontsize=15)
     axs[2].set_title("F1-Score", fontsize=15)
-    fig.suptitle(f"Re-Optimization on {workload} by Policy")
+    workload_to_title = {
+        "real-estate": "Real Estate Search",
+        "enron": "Legal Discovery",
+    }
+    fig.suptitle(f"Re-Optimization on {workload_to_title[workload]} by Policy")
     # if policy == "max-quality-at-fixed-cost":
     #     fig.suptitle("Max Quality @ Fixed Cost")
     #     axs[0].axhline(y=20.0, xmin=0.0, xmax=0.5, color='#ef9b20', linestyle='--')
@@ -343,6 +347,106 @@ def plot_reopt2(results, workload):
     # fig.supxlabel('Policy')
     # fig.supylabel('Percent Error')
     fig.savefig(f"final-eval-results/plots/reopt2-{workload}.png", dpi=500, bbox_inches="tight")
+
+
+def plot_reopt3(results, workload):
+    fig, axs = plt.subplots(nrows=2, ncols=4, figsize=(15,6))
+
+    # parse results into fields
+    results_df = pd.DataFrame(results)
+
+    plan_to_ord = {"Best": 0, "PZ": 1, "Naive": 2}
+    # policy_df = results_df[results_df.policy==policy]
+    results_df['ord'] = results_df.plan.apply(lambda plan: plan_to_ord[plan])
+    results_df.sort_values(by='ord', inplace=True)
+
+    plots = [
+        ("max-quality-at-fixed-cost", "enron", 0, 0),
+        ("max-quality-at-fixed-runtime", "enron", 0, 1),
+        ("min-cost-at-fixed-quality", "enron", 0, 2),
+        ("min-runtime-at-fixed-quality", "enron", 0, 3),
+        ("max-quality-at-fixed-cost", "real-estate", 1, 0),
+        ("max-quality-at-fixed-runtime", "real-estate", 1, 1),
+        ("min-cost-at-fixed-quality", "real-estate", 1, 2),
+        ("min-runtime-at-fixed-quality", "real-estate", 1, 3),
+    ]
+
+    workload_metric_to_max = {
+        "enron": {
+            "cost": 53,
+            "runtime": 17500,
+            "f1_score": 1.0,
+        },
+        "real-estate": {
+            "cost": 3.0,
+            "runtime": 1200,
+            "f1_score": 1.0,
+        },
+    }
+
+    for policy, workload, row, col in plots:
+        data_df = results_df[(results_df.policy==policy) & (results_df.workload==workload)]
+        data_df['scaled_value'] = data_df.apply(lambda row: row["value"]/workload_metric_to_max[workload][row['metric']], axis=1)
+        g = sns.barplot(
+            data=data_df, # kind="bar",
+            x="metric", y="scaled_value", hue="plan",
+            palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
+            ax=axs[row][col], # order=["Best", "PZ", "Naive"],
+        )
+        if col == 0:
+            g.legend_.set_title(None)
+        else:
+            g.legend_.remove()
+        g.set_xlabel(None)
+        g.set_ylabel(None)
+
+        # g = sns.barplot(
+        #     data=results_df, # kind="bar",
+        #     x="policy", y="runtime", hue="plan",
+        #     palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
+        #     ax=axs[1], # order=["Best", "PZ", "Naive"],
+        # )
+        # g.legend_.remove()
+        # g.set_xlabel(None)
+        # g.set_ylabel(None)
+
+        # g = sns.barplot(
+        #     data=results_df, # kind="bar",
+        #     x="policy", y="f1_score", hue="plan",
+        #     palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
+        #     ax=axs[2], # order=["Best", "PZ", "Naive"],
+        # )
+        # g.legend_.remove()
+        # g.set_xlabel(None)
+        # g.set_ylabel(None)
+
+    # axs[0].tick_params(axis='x', rotation=45)
+    # axs[1].tick_params(axis='x', rotation=45)
+    # axs[2].tick_params(axis='x', rotation=45)
+    axs[0][0].set_title("Max F1 @ Fixed Cost", fontsize=10)
+    axs[0][1].set_title("Max F1 @ Fixed Runtime", fontsize=10)
+    axs[0][2].set_title("Min Cost @ Fixed F1", fontsize=10)
+    axs[0][3].set_title("Min Runtime @ Fixed F1", fontsize=10)
+    axs[0][0].set_ylabel("Legal Discovery", fontsize=10)
+    axs[1][0].set_ylabel("Real Estate Search", fontsize=10)
+    # workload_to_title = {
+    #     "real-estate": "Real Estate Search",
+    #     "enron": "Legal Discovery",
+    # }
+    # fig.suptitle(f"Re-Optimization on {workload_to_title[workload]} by Policy")
+    # if policy == "max-quality-at-fixed-cost":
+    #     fig.suptitle("Max Quality @ Fixed Cost")
+    #     axs[0].axhline(y=20.0, xmin=0.0, xmax=0.5, color='#ef9b20', linestyle='--')
+    #     axs[0].axhline(y=3.0, xmin=0.5, xmax=1, color='#ef9b20', linestyle='--')
+    # elif policy == "max-quality-at-fixed-runtime":
+    #     fig.suptitle("Max Quality @ Fixed Rutnime")
+    # elif policy == "min-cost-at-fixed-quality":
+    #     fig.suptitle("Min Cost @ Fixed Quality")
+    # elif policy == "min-runtime-at-fixed-quality":
+    #     fig.suptitle("Min Runtime @ Fixed Quality")
+    # fig.supxlabel('Policy')
+    # fig.supylabel('Percent Error')
+    fig.savefig(f"final-eval-results/plots/reopt3.png", dpi=500, bbox_inches="tight")
 
 
 if __name__ == "__main__":
@@ -463,14 +567,17 @@ if __name__ == "__main__":
                 "biofabric": ("model", 0),
             },
         }
+        results = []
         for workload in ["enron", "real-estate"]:
-            results = []
             for policy in ["max-quality-at-fixed-cost", "max-quality-at-fixed-runtime", "min-cost-at-fixed-quality", "min-runtime-at-fixed-quality"]:
             # for workload in ["enron", "real-estate", "biofabric"]:
             
                 with open(f'final-eval-results/reoptimization/{workload}/{policy}.json', 'r') as f:
                     result_dict = json.load(f)
-                    results.append({"plan": "PZ", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
+                    # results.append({"plan": "PZ", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
+                    results.append({"plan": "PZ", "policy": policy, "workload": workload, "metric": "f1_score", "value": result_dict["f1_score"]})
+                    results.append({"plan": "PZ", "policy": policy, "workload": workload, "metric": "cost", "value": result_dict["cost"]})
+                    results.append({"plan": "PZ", "policy": policy, "workload": workload, "metric": "runtime", "value": result_dict["runtime"]})
 
                 # best_plan_opt, best_plan_idx = policy_to_best_plan[policy][workload]
                 # with open(f'final-eval-results/{best_plan_opt}/{workload}/results-{best_plan_idx}.json', 'r') as f:
@@ -480,7 +587,10 @@ if __name__ == "__main__":
                 naive_plan_opt, naive_plan_idx = policy_to_naive_plan[policy][workload]
                 with open(f'final-eval-results/{naive_plan_opt}/{workload}/results-{naive_plan_idx}.json', 'r') as f:
                     result_dict = json.load(f)
-                    results.append({"plan": "Naive", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
+                    # results.append({"plan": "Naive", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
+                    results.append({"plan": "PZ", "policy": policy, "workload": workload, "metric": "f1_score", "value": result_dict["f1_score"]})
+                    results.append({"plan": "PZ", "policy": policy, "workload": workload, "metric": "cost", "value": result_dict["cost"]})
+                    results.append({"plan": "PZ", "policy": policy, "workload": workload, "metric": "runtime", "value": result_dict["runtime"]})
 
-            # plot_reopt(results, policy)
-            plot_reopt2(results, workload)
+        # plot_reopt(results, policy)
+        plot_reopt2(results, workload)
