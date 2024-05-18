@@ -861,8 +861,18 @@ def run_reoptimize_eval(workload, policy_str):
         shouldProfile=True,
     )
 
+    # TODO: print out plan 13
+    print("----------------------")
+    ops = candidatePlans[13][3].dumpPhysicalTree()
+    flatten_ops = flatten_nested_tuples(ops)
+    print(f"Plan:")
+    graphicEmit(flatten_ops)
+    print("---")
+
     # choose best plan and execute it
     _, _, _, plan, _ = policy.choose(candidatePlans)
+    import pdb
+    pdb.set_trace()
 
     # display the plan output
     print("----------------------")
