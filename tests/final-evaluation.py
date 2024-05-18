@@ -715,7 +715,8 @@ def run_reoptimize_eval(workload, policy_str):
     # set samples and size of dataset
     workload_to_dataset_size = {"enron": 1000, "real-estate": 100, "biofabric": 11}
     dataset_size = workload_to_dataset_size[workload]
-    num_samples = min(10, int(0.05 * dataset_size)) if workload != "biofabric" else 0
+    # num_samples = min(10, int(0.05 * dataset_size)) if workload != "biofabric" else 0
+    num_samples = int(0.05 * dataset_size)
     # samples_per_iter = int(np.floor(dataset_size/5.0))
 
     estimates, all_cost_estimate_data = defaultdict(list), []
@@ -863,8 +864,6 @@ def run_reoptimize_eval(workload, policy_str):
 
     # choose best plan and execute it
     _, _, _, plan, _ = policy.choose(candidatePlans)
-    import pdb
-    pdb.set_trace()
 
     # display the plan output
     print("----------------------")
