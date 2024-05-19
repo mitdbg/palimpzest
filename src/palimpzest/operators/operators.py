@@ -547,8 +547,6 @@ class LogicalOperator:
             
             # sort based on distance
             min_distances = sorted(min_distances, key=lambda tup: tup[0])
-            print("MIN DISTANCES:")
-            print(min_distances[:min - len(finalPlans)])
 
             # add closest plans to finalPlans
             k = min - len(finalPlans)
