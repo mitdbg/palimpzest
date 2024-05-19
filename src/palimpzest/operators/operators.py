@@ -390,14 +390,15 @@ class LogicalOperator:
                         models = self._getModels(include_vision=True) + [None]
                         estimates = {model: None for model in models}
                         for model in models:
-                            est_tokens = StatsProcessor._est_num_input_output_tokens(op_df, model_name=model.value)
+                            model_name = model.value if model is not None else None
+                            est_tokens = StatsProcessor._est_num_input_output_tokens(op_df, model_name=model_name)
                             model_estimates = {
-                                "time_per_record": StatsProcessor._est_time_per_record(op_df, model_name=model.value),
-                                "cost_per_record": StatsProcessor._est_usd_per_record(op_df, model_name=model.value),
+                                "time_per_record": StatsProcessor._est_time_per_record(op_df, model_name=model_name),
+                                "cost_per_record": StatsProcessor._est_usd_per_record(op_df, model_name=model_name),
                                 "est_num_input_tokens": est_tokens[0],
                                 "est_num_output_tokens": est_tokens[1],
-                                "selectivity": StatsProcessor._est_selectivity(df, op_df, model_name=model.value),
-                                "quality": StatsProcessor._est_quality(op_df, model_name=model.value),
+                                "selectivity": StatsProcessor._est_selectivity(df, op_df, model_name=model_name),
+                                "quality": StatsProcessor._est_quality(op_df, model_name=model_name),
                             }
                             estimates[model.value] = model_estimates
                     op_filters_to_estimates[op_filter] = estimates
