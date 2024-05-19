@@ -498,10 +498,8 @@ def run_sentinel_plans(workload, num_samples, policy_str: str=None):
     num_sentinel_plans = len(sentinel_plans)
 
     total_sentinel_cost, all_cost_estimate_data, return_records = 0.0, [], []
-    # with Pool(processes=num_sentinel_plans) as pool:
-    #     results = pool.starmap(run_sentinel_plan, [(plan_idx, workload, num_samples) for plan_idx in range(num_sentinel_plans)])
-    for plan_idx in range(num_sentinel_plans):
-        _ = run_sentinel_plan(plan_idx, workload, num_samples)
+    with Pool(processes=num_sentinel_plans) as pool:
+        results = pool.starmap(run_sentinel_plan, [(plan_idx, workload, num_samples) for plan_idx in range(num_sentinel_plans)])
 
         # write out result dict and samples collected for each sentinel
         for idx, (records, result_dict, cost_est_sample_data) in enumerate(results):
@@ -513,8 +511,6 @@ def run_sentinel_plans(workload, num_samples, policy_str: str=None):
             with open(fp, 'w') as f:
                 json.dump(result_dict, f)
 
-            # TODO: pick back up here:
-            # 4. re-write create-final plots to print w/new folder outputs from evaluate_pz_plans
             csv_fp = fp.replace(".json", ".csv")
             sample_df = pd.DataFrame(cost_est_sample_data)
             sample_df.to_csv(csv_fp, index=False)
