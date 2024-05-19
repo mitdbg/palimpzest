@@ -225,228 +225,59 @@ def plot_runtime_cost_vs_quality(results):
     fig_clean_mc.savefig(f"final-eval-results/plots/all-clean-mc.png", dpi=500, bbox_inches="tight")
 
 
-def plot_reopt(results, policy):
-    fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(15,6))
+def plot_reopt(results, workload):
+    fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(16,6))
 
     # parse results into fields
     results_df = pd.DataFrame(results)
-
-    plan_to_ord = {"Best": 0, "PZ": 1, "Naive": 2}
-    policy_df = results_df[results_df.policy==policy]
-    policy_df['ord'] = policy_df.plan.apply(lambda plan: plan_to_ord[plan])
-    policy_df.sort_values(by='ord', inplace=True)
-
-    g = sns.barplot(
-        data=policy_df, # kind="bar",
-        x="workload", y="cost", hue="plan",
-        palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[0], # order=["Best", "PZ", "Naive"],
-    )
-    g.legend_.set_title(None)
-    g.set_xlabel(None)
-    g.set_ylabel(None)
-
-    g = sns.barplot(
-        data=policy_df, # kind="bar",
-        x="workload", y="runtime", hue="plan",
-        palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[1], # order=["Best", "PZ", "Naive"],
-    )
-    g.legend_.remove()
-    g.set_xlabel(None)
-    g.set_ylabel(None)
-
-    g = sns.barplot(
-        data=policy_df, # kind="bar",
-        x="workload", y="f1_score", hue="plan",
-        palette=["#87bc45", "#27aeef", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[2], # order=["Best", "PZ", "Naive"],
-    )
-    g.legend_.remove()
-    g.set_xlabel(None)
-    g.set_ylabel(None)
-    axs[0].set_title("Cost (USD)", fontsize=15)
-    axs[1].set_title("Runtime (Seconds)", fontsize=15)
-    axs[2].set_title("F1-Score", fontsize=15)
-    if policy == "max-quality-at-fixed-cost":
-        fig.suptitle("Max Quality @ Fixed Cost")
-        axs[0].axhline(y=20.0, xmin=0.0, xmax=0.5, color='#ef9b20', linestyle='--')
-        axs[0].axhline(y=3.0, xmin=0.5, xmax=1, color='#ef9b20', linestyle='--')
-    elif policy == "max-quality-at-fixed-runtime":
-        fig.suptitle("Max Quality @ Fixed Rutnime")
-    elif policy == "min-cost-at-fixed-quality":
-        fig.suptitle("Min Cost @ Fixed Quality")
-    elif policy == "min-runtime-at-fixed-quality":
-        fig.suptitle("Min Runtime @ Fixed Quality")
-    fig.supxlabel('Workload')
-    # fig.supylabel('Percent Error')
-    fig.savefig(f"final-eval-results/plots/reopt-{policy}.png", dpi=500, bbox_inches="tight")
-
-
-def plot_reopt2(results, workload):
-    fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(15,6))
-
-    # parse results into fields
-    results_df = pd.DataFrame(results)
-
-    plan_to_ord = {"Best": 0, "PZ": 1, "Naive": 2}
-    # policy_df = results_df[results_df.policy==policy]
-    results_df['ord'] = results_df.plan.apply(lambda plan: plan_to_ord[plan])
-    results_df.sort_values(by='ord', inplace=True)
-
-    g = sns.barplot(
-        data=results_df, # kind="bar",
-        x="policy", y="cost", hue="plan",
-        palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[0], # order=["Best", "PZ", "Naive"],
-    )
-    g.legend_.set_title(None)
-    g.set_xlabel(None)
-    g.set_ylabel(None)
-
-    g = sns.barplot(
-        data=results_df, # kind="bar",
-        x="policy", y="runtime", hue="plan",
-        palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[1], # order=["Best", "PZ", "Naive"],
-    )
-    g.legend_.remove()
-    g.set_xlabel(None)
-    g.set_ylabel(None)
-
-    g = sns.barplot(
-        data=results_df, # kind="bar",
-        x="policy", y="f1_score", hue="plan",
-        palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
-        ax=axs[2], # order=["Best", "PZ", "Naive"],
-    )
-    g.legend_.remove()
-    g.set_xlabel(None)
-    g.set_ylabel(None)
-    axs[0].tick_params(axis='x', rotation=45)
-    axs[1].tick_params(axis='x', rotation=45)
-    axs[2].tick_params(axis='x', rotation=45)
-    axs[0].set_title("Cost (USD)", fontsize=15)
-    axs[1].set_title("Runtime (Seconds)", fontsize=15)
-    axs[2].set_title("F1-Score", fontsize=15)
-    workload_to_title = {
-        "real-estate": "Real Estate Search",
-        "enron": "Legal Discovery",
-    }
-    fig.suptitle(f"Re-Optimization on {workload_to_title[workload]} by Policy")
-    # if policy == "max-quality-at-fixed-cost":
-    #     fig.suptitle("Max Quality @ Fixed Cost")
-    #     axs[0].axhline(y=20.0, xmin=0.0, xmax=0.5, color='#ef9b20', linestyle='--')
-    #     axs[0].axhline(y=3.0, xmin=0.5, xmax=1, color='#ef9b20', linestyle='--')
-    # elif policy == "max-quality-at-fixed-runtime":
-    #     fig.suptitle("Max Quality @ Fixed Rutnime")
-    # elif policy == "min-cost-at-fixed-quality":
-    #     fig.suptitle("Min Cost @ Fixed Quality")
-    # elif policy == "min-runtime-at-fixed-quality":
-    #     fig.suptitle("Min Runtime @ Fixed Quality")
-    # fig.supxlabel('Policy')
-    # fig.supylabel('Percent Error')
-    fig.savefig(f"final-eval-results/plots/reopt2-{workload}.png", dpi=500, bbox_inches="tight")
-
-
-def plot_reopt3(results, workload):
-    fig, axs = plt.subplots(nrows=2, ncols=4, figsize=(15,6))
-
-    # parse results into fields
-    results_df = pd.DataFrame(results)
-
-    plan_to_ord = {"Best": 0, "PZ": 1, "Naive": 2}
-    # policy_df = results_df[results_df.policy==policy]
-    results_df['ord'] = results_df.plan.apply(lambda plan: plan_to_ord[plan])
-    results_df.sort_values(by='ord', inplace=True)
+    plan_to_ord = {"Baseline": 0, "PZ": 1, "Best": 2}    
+    results_df['plan_ord'] = results_df.plan.apply(lambda plan: plan_to_ord[plan])
 
     plots = [
-        ("max-quality-at-fixed-cost", "enron", 0, 0),
-        ("max-quality-at-fixed-runtime", "enron", 0, 1),
-        ("min-cost-at-fixed-quality", "enron", 0, 2),
-        ("min-runtime-at-fixed-quality", "enron", 0, 3),
-        ("max-quality-at-fixed-cost", "real-estate", 1, 0),
-        ("max-quality-at-fixed-runtime", "real-estate", 1, 1),
-        ("min-cost-at-fixed-quality", "real-estate", 1, 2),
-        ("min-runtime-at-fixed-quality", "real-estate", 1, 3),
+        ("enron", "cost", 0, 0),
+        ("enron", "runtime", 0, 1),
+        ("enron", "f1_score", 0, 2),
+        ("real-estate", "cost", 1, 0),
+        ("real-estate", "runtime", 1, 1),
+        ("real-estate", "f1_score", 1, 2),
     ]
 
-    workload_metric_to_max = {
-        "enron": {
-            "cost": 53,
-            "runtime": 17500,
-            "f1_score": 1.0,
-        },
-        "real-estate": {
-            "cost": 3.0,
-            "runtime": 1200,
-            "f1_score": 1.0,
-        },
-    }
+    for workload, metric, row, col in plots:
+        data_df = results_df[(results_df.workload==workload) & (results_df.metric==metric)]
 
-    for policy, workload, row, col in plots:
-        data_df = results_df[(results_df.policy==policy) & (results_df.workload==workload)]
-        data_df['scaled_value'] = data_df.apply(lambda row: row["value"]/workload_metric_to_max[workload][row['metric']], axis=1)
+        policy_to_label_col = {
+            "max-quality-at-fixed-cost": "Policy A",
+            "max-quality-at-fixed-runtime": "Policy B",
+            "min-cost-at-fixed-quality": "Policy C",
+        }
+        data_df['label_col'] = data_df.apply(lambda row: policy_to_label_col[row['policy']] if row['plan'] == 'PZ' else 'Baseline', axis=1)
+        label_col_to_ord = {"Baseline": 0, "Policy A": 1, "Policy B": 2, "Policy C": 3}
+        data_df['label_col_ord'] = data_df.label_col.apply(lambda label: label_col_to_ord[label])
+
+        # drop duplicates for baseline, which is replicated across policies
+        data_df.drop_duplicates(subset=['label_col'], inplace=True)
+        data_df.sort_values(by=['plan_ord', 'label_col_ord'], inplace=True)
+
         g = sns.barplot(
             data=data_df, # kind="bar",
-            x="metric", y="scaled_value", hue="plan",
-            palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
-            ax=axs[row][col], # order=["Best", "PZ", "Naive"],
+            x="value", y="label_col", hue="label_col",
+            alpha=.6, # palette=, height=6,
+            ax=axs[row][col],
         )
-        if col == 0:
-            g.legend_.set_title(None)
-        else:
-            g.legend_.remove()
+        # if col == 0 and row == 0:
+        #     g.legend_.set_title(None)
+        # else:
+        #     g.legend_.remove()
         g.set_xlabel(None)
         g.set_ylabel(None)
 
-        # g = sns.barplot(
-        #     data=results_df, # kind="bar",
-        #     x="policy", y="runtime", hue="plan",
-        #     palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
-        #     ax=axs[1], # order=["Best", "PZ", "Naive"],
-        # )
-        # g.legend_.remove()
-        # g.set_xlabel(None)
-        # g.set_ylabel(None)
-
-        # g = sns.barplot(
-        #     data=results_df, # kind="bar",
-        #     x="policy", y="f1_score", hue="plan",
-        #     palette=["#87bc45", "#b33dc6"], alpha=.6, # height=6,
-        #     ax=axs[2], # order=["Best", "PZ", "Naive"],
-        # )
-        # g.legend_.remove()
-        # g.set_xlabel(None)
-        # g.set_ylabel(None)
-
-    # axs[0].tick_params(axis='x', rotation=45)
-    # axs[1].tick_params(axis='x', rotation=45)
-    # axs[2].tick_params(axis='x', rotation=45)
-    axs[0][0].set_title("Max F1 @ Fixed Cost", fontsize=10)
-    axs[0][1].set_title("Max F1 @ Fixed Runtime", fontsize=10)
-    axs[0][2].set_title("Min Cost @ Fixed F1", fontsize=10)
-    axs[0][3].set_title("Min Runtime @ Fixed F1", fontsize=10)
+    axs[0][0].set_title("Cost (USD)", fontsize=10)
+    axs[0][1].set_title("Runtime (s)", fontsize=10)
+    axs[0][2].set_title("F1 Score", fontsize=10)
     axs[0][0].set_ylabel("Legal Discovery", fontsize=10)
     axs[1][0].set_ylabel("Real Estate Search", fontsize=10)
-    # workload_to_title = {
-    #     "real-estate": "Real Estate Search",
-    #     "enron": "Legal Discovery",
-    # }
-    # fig.suptitle(f"Re-Optimization on {workload_to_title[workload]} by Policy")
-    # if policy == "max-quality-at-fixed-cost":
-    #     fig.suptitle("Max Quality @ Fixed Cost")
-    #     axs[0].axhline(y=20.0, xmin=0.0, xmax=0.5, color='#ef9b20', linestyle='--')
-    #     axs[0].axhline(y=3.0, xmin=0.5, xmax=1, color='#ef9b20', linestyle='--')
-    # elif policy == "max-quality-at-fixed-runtime":
-    #     fig.suptitle("Max Quality @ Fixed Rutnime")
-    # elif policy == "min-cost-at-fixed-quality":
-    #     fig.suptitle("Min Cost @ Fixed Quality")
-    # elif policy == "min-runtime-at-fixed-quality":
-    #     fig.suptitle("Min Runtime @ Fixed Quality")
-    # fig.supxlabel('Policy')
-    # fig.supylabel('Percent Error')
-    fig.savefig(f"final-eval-results/plots/reopt3.png", dpi=500, bbox_inches="tight")
+
+    fig.savefig(f"final-eval-results/plots/reopt.png", dpi=500, bbox_inches="tight")
 
 
 if __name__ == "__main__":
@@ -569,7 +400,7 @@ if __name__ == "__main__":
         }
         results = []
         for workload in ["enron", "real-estate"]:
-            for policy in ["max-quality-at-fixed-cost", "max-quality-at-fixed-runtime", "min-cost-at-fixed-quality", "min-runtime-at-fixed-quality"]:
+            for policy in ["max-quality-at-fixed-cost", "max-quality-at-fixed-runtime", "min-cost-at-fixed-quality"]: #, "min-runtime-at-fixed-quality"]:
             # for workload in ["enron", "real-estate", "biofabric"]:
             
                 with open(f'final-eval-results/reoptimization/{workload}/{policy}.json', 'r') as f:
@@ -587,10 +418,10 @@ if __name__ == "__main__":
                 naive_plan_opt, naive_plan_idx = policy_to_naive_plan[policy][workload]
                 with open(f'final-eval-results/{naive_plan_opt}/{workload}/results-{naive_plan_idx}.json', 'r') as f:
                     result_dict = json.load(f)
-                    # results.append({"plan": "Naive", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
-                    results.append({"plan": "PZ", "policy": policy, "workload": workload, "metric": "f1_score", "value": result_dict["f1_score"]})
-                    results.append({"plan": "PZ", "policy": policy, "workload": workload, "metric": "cost", "value": result_dict["cost"]})
-                    results.append({"plan": "PZ", "policy": policy, "workload": workload, "metric": "runtime", "value": result_dict["runtime"]})
+                    # results.append({"plan": "Baseline", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
+                    results.append({"plan": "Baseline", "policy": policy, "workload": workload, "metric": "f1_score", "value": result_dict["f1_score"]})
+                    results.append({"plan": "Baseline", "policy": policy, "workload": workload, "metric": "cost", "value": result_dict["cost"]})
+                    results.append({"plan": "Baseline", "policy": policy, "workload": workload, "metric": "runtime", "value": result_dict["runtime"]})
 
         # plot_reopt(results, policy)
-        plot_reopt3(results, workload)
+        plot_reopt(results, workload)

@@ -43,6 +43,9 @@ class PhysicalOp:
         #       has initialized all of its member fields
         self.profiler = None
 
+    def __eq__(self, other: PhysicalOp) -> bool:
+        raise NotImplementedError("Abstract method")
+
     def opId(self) -> str:
         raise NotImplementedError("Abstract method")
     
@@ -102,6 +105,15 @@ class MarshalAndScanDataOp(PhysicalOp):
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
+
+    def __eq__(self, other: PhysicalOp):
+        return (
+            isinstance(other, MarshalAndScanDataOp)
+            and self.datasetIdentifier == other.datasetIdentifier
+            and self.num_samples == other.num_samples
+            and self.scan_start_idx == other.scan_start_idx
+            and self.outputSchema == other.outputSchema
+        )
 
     def __str__(self):
         return "MarshalAndScanDataOp(" + str(self.outputSchema) + ", " + self.datasetIdentifier + ")"
@@ -189,6 +201,15 @@ class CacheScanDataOp(PhysicalOp):
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
+
+    def __eq__(self, other: PhysicalOp):
+        return (
+            isinstance(other, CacheScanDataOp)
+            and self.cacheIdentifier == other.cacheIdentifier
+            and self.num_samples == other.num_samples
+            and self.scan_start_idx == other.scan_start_idx
+            and self.outputSchema == other.outputSchema
+        )
 
     def __str__(self):
         return "CacheScanDataOp(" + str(self.outputSchema) + ", " + self.cacheIdentifier + ")"
@@ -326,6 +347,19 @@ class InduceFromCandidateOp(PhysicalOp):
         # # synthesize task function
         # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
         #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+
+    def __eq__(self, other: PhysicalOp):
+        return (
+            isinstance(other, InduceFromCandidateOp)
+            and self.model == other.model
+            and self.cardinality == other.cardinality
+            and self.image_conversion == other.image_conversion
+            and self.prompt_strategy == other.prompt_strategy
+            and self.query_strategy == other.query_strategy
+            and self.token_budget == other.token_budget
+            and self.outputSchema == other.outputSchema
+            and self.source == other.source
+        )
 
     def __str__(self):
         return "InduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value if self.model is not None else None) + ", Query Strategy: " + str(self.query_strategy.value if self.query_strategy is not None else None) + ", Token Budget: " + str(self.token_budget) + ")"
@@ -612,6 +646,19 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
         #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
+    def __eq__(self, other: PhysicalOp):
+        return (
+            isinstance(other, ParallelInduceFromCandidateOp)
+            and self.model == other.model
+            and self.cardinality == other.cardinality
+            and self.image_conversion == other.image_conversion
+            and self.prompt_strategy == other.prompt_strategy
+            and self.query_strategy == other.query_strategy
+            and self.token_budget == other.token_budget
+            and self.outputSchema == other.outputSchema
+            and self.source == other.source
+        )
+
     def __str__(self):
         return "ParallelInduceFromCandidateOp(" + f"{str(self.outputSchema):10s}" + ", Model: " + str(self.model.value if self.model is not None else None) + ", Query Strategy: " + str(self.query_strategy.value if self.query_strategy is not None else None) + ", Token Budget: " + str(self.token_budget) + ")"
 
@@ -876,6 +923,16 @@ class FilterCandidateOp(PhysicalOp):
         # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
         #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
+    def __eq__(self, other: PhysicalOp):
+        return (
+            isinstance(other, FilterCandidateOp)
+            and self.model == other.model
+            and self.filter == other.filter
+            and self.prompt_strategy == other.prompt_strategy
+            and self.outputSchema == other.outputSchema
+            and self.source == other.source
+        )
+
     def __str__(self):
         model_str = self.model.value if self.model is not None else str(None)
         return "FilterCandidateOp(" + str(self.outputSchema) + ", " + "Filter: " + str(self.filter) + ", Model: " + model_str + ", Prompt Strategy: " + str(self.prompt_strategy.value) + ")"
@@ -1101,6 +1158,16 @@ class ParallelFilterCandidateOp(PhysicalOp):
         # # synthesize task function
         # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
         #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+
+    def __eq__(self, other: PhysicalOp):
+        return (
+            isinstance(other, ParallelFilterCandidateOp)
+            and self.model == other.model
+            and self.filter == other.filter
+            and self.prompt_strategy == other.prompt_strategy
+            and self.outputSchema == other.outputSchema
+            and self.source == other.source
+        )
 
     def __str__(self):
         model_str = self.model.value if self.model is not None else str(None)
@@ -1344,48 +1411,56 @@ def agg_final(func, state):
 
 
 class ApplyGroupByOp(PhysicalOp):
-        def __init__(self, source: PhysicalOp, gbySig: GroupBySig,  targetCacheId: str=None, shouldProfile=False):
-            super().__init__(outputSchema=gbySig.outputSchema(), shouldProfile=shouldProfile)
-            self.source = source
-            self.gbySig = gbySig
-            self.targetCacheId=targetCacheId
-            self.shouldProfile=shouldProfile
+    def __init__(self, source: PhysicalOp, gbySig: GroupBySig,  targetCacheId: str=None, shouldProfile=False):
+        super().__init__(outputSchema=gbySig.outputSchema(), shouldProfile=shouldProfile)
+        self.source = source
+        self.gbySig = gbySig
+        self.targetCacheId=targetCacheId
+        self.shouldProfile=shouldProfile
 
-        def __str__(self):
-            return str(self.gbySig)
-        
-        def copy(self):
-            return ApplyGroupByOp(self.source, self.gbySig, self.targetCacheId, self.shouldProfile)
+    def __eq__(self, other: PhysicalOp):
+        return (
+            isinstance(other, ApplyGroupByOp)
+            and self.gbySig == other.gbySig
+            and self.outputSchema == other.outputSchema
+            and self.source == other.source
+        )
 
-        def opId(self):
-            d = {
-                "operator": "ApplyGroupByOp",
-                "source": self.source.opId(),
-                "gbySig": str(GroupBySig.serialize(self.gbySig)),
-                "targetCacheId": self.targetCacheId,
-            }
-            ordered = json.dumps(d, sort_keys=True)
-            return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-        def dumpPhysicalTree(self):
-            """Return the physical tree of operators."""
-            return (self, self.source.dumpPhysicalTree())
-        
-        def estimateCost(self):
-            inputEstimates, subPlanCostEst = self.source.estimateCost()
+    def __str__(self):
+        return str(self.gbySig)
+    
+    def copy(self):
+        return ApplyGroupByOp(self.source, self.gbySig, self.targetCacheId, self.shouldProfile)
 
-            outputEstimates = {**inputEstimates}
-            outputEstimates['cardinality'] = 1
+    def opId(self):
+        d = {
+            "operator": "ApplyGroupByOp",
+            "source": self.source.opId(),
+            "gbySig": str(GroupBySig.serialize(self.gbySig)),
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+    def dumpPhysicalTree(self):
+        """Return the physical tree of operators."""
+        return (self, self.source.dumpPhysicalTree())
+    
+    def estimateCost(self):
+        inputEstimates, subPlanCostEst = self.source.estimateCost()
 
-            # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
-            outputEstimates['timePerElement'] = 0
-            outputEstimates['usdPerElement'] = 0
-            outputEstimates['estOutputTokensPerElement'] = 0
+        outputEstimates = {**inputEstimates}
+        outputEstimates['cardinality'] = 1
 
-            return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {}, "subPlan": subPlanCostEst}
+        # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
+        outputEstimates['timePerElement'] = 0
+        outputEstimates['usdPerElement'] = 0
+        outputEstimates['estOutputTokensPerElement'] = 0
+
+        return outputEstimates, {"cumulative": outputEstimates, "thisPlan": {}, "subPlan": subPlanCostEst}
 
 
 
-        def __iter__(self):
+    def __iter__(self):
             datadir = DataDirectory()
             shouldCache = datadir.openCache(self.targetCacheId)
             aggState = {}
@@ -1445,6 +1520,14 @@ class ApplyCountAggregateOp(PhysicalOp):
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
+
+    def __eq__(self, other: PhysicalOp):
+        return (
+            isinstance(other, ApplyCountAggregateOp)
+            and self.aggFunction == other.aggFunction
+            and self.outputSchema == other.outputSchema
+            and self.source == other.source
+        )
 
     def __str__(self):
         return "ApplyCountAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
@@ -1534,6 +1617,14 @@ class ApplyUserFunctionOp(PhysicalOp):
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
 
+    def __eq__(self, other: PhysicalOp):
+        return (
+            isinstance(other, ApplyUserFunctionOp)
+            and self.fn == other.fn
+            and self.outputSchema == other.outputSchema
+            and self.source == other.source
+        )
+
     def __str__(self):
         return "ApplyUserFunctionOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.fn.udfid) + ")"
 
@@ -1616,6 +1707,14 @@ class ApplyAverageAggregateOp(PhysicalOp):
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
+
+    def __eq__(self, other: PhysicalOp):
+        return (
+            isinstance(other, ApplyAverageAggregateOp)
+            and self.aggFunction == other.aggFunction
+            and self.outputSchema == other.outputSchema
+            and self.source == other.source
+        )
 
     def __str__(self):
         return "ApplyAverageAggregateOp(" + str(self.outputSchema) + ", " + "Function: " + str(self.aggFunction) + ")"
@@ -1706,6 +1805,14 @@ class LimitScanOp(PhysicalOp):
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
+
+    def __eq__(self, other: PhysicalOp):
+        return (
+            isinstance(other, LimitScanOp)
+            and self.limit == other.limit
+            and self.outputSchema == other.outputSchema
+            and self.source == other.source
+        )
 
     def __str__(self):
         return "LimitScanOp(" + str(self.outputSchema) + ", " + "Limit: " + str(self.limit) + ")"

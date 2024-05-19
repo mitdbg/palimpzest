@@ -183,6 +183,35 @@ class LogicalOperator:
             # return roots of opPermutations
             return list(map(lambda ops: ops[0], opPermutations))
 
+    def _createBaselinePlan(self, model: Model):
+        """A simple wrapper around _createSentinelPlan as right now these are one and the same."""
+        return self._createSentinelPlan(model)
+
+    def _createSentinelPlan(self, model: Model):
+        """
+        Create the sentinel plans, which -- at least for now --- are single model plans
+        which follow the structure of the user-specified program.
+        """
+        # base case: this is a root op
+        if self.inputOp is None:
+            return self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, shouldProfile=True)
+
+        # recursive case: get list of possible input physical plans
+        subTreePhysicalPlan = self.inputOp._createSentinelPlan(model)
+        subTreePhysicalPlan = subTreePhysicalPlan.copy()
+
+        physicalPlan = None
+        if isinstance(self, ConvertScan):
+            physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, query_strategy=QueryStrategy.BONDED_WITH_FALLBACK, token_budget=1.0, shouldProfile=True)
+
+        elif isinstance(self, FilteredScan):
+            physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, shouldProfile=True)
+
+        else:
+            physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, shouldProfile=True)
+
+        return physicalPlan
+
 
     def _createPhysicalPlans(self, allow_model_selection: bool=False, allow_codegen: bool=False, allow_token_reduction: bool=False, shouldProfile: bool=False) -> List[PhysicalOp]:
         """
@@ -282,8 +311,19 @@ class LogicalOperator:
 
         return physicalPlans
 
-    def createPhysicalPlanCandidates(self, max: int=None, cost_estimate_sample_data: List[Dict[str, Any]]=None, allow_model_selection: bool=False, allow_codegen: bool=False, allow_token_reduction: bool=False, pareto_optimal: bool=True, shouldProfile: bool=False) -> List[PhysicalPlan]:
+    def createPhysicalPlanCandidates(
+        self, max: int=None, sentinels: bool=False, cost_estimate_sample_data: List[Dict[str, Any]]=None,
+        allow_model_selection: bool=False, allow_codegen: bool=False, allow_token_reduction: bool=False,
+        pareto_optimal: bool=True, include_baselines: bool=False, shouldProfile: bool=False,
+    ) -> List[PhysicalPlan]:
         """Return a set of physical trees of operators."""
+        # only fetch sentinel plans if specified
+        if sentinels:
+            models = self._getModels()
+            assert len(models) > 0, "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
+            sentinel_plans = [self._createSentinelPlan(model) for model in models]
+            return sentinel_plans
+
         # create set of logical plans (e.g. consider different filter/join orderings)
         logicalPlans = LogicalOperator._createLogicalPlans(self)
         print(f"LOGICAL PLANS: {len(logicalPlans)}")
@@ -468,6 +508,18 @@ class LogicalOperator:
         if max is not None:
             paretoFrontierPlans = paretoFrontierPlans[:max]
             print(f"LIMIT PARETO PLANS: {len(paretoFrontierPlans)}")
+
+        # ensure that all baseline plans are included
+        for model in self._getModels():
+            baselinePlan = self._createBaselinePlan(model)
+            add_baseline = True
+            for paretoPlan in paretoFrontierPlans:
+                if baselinePlan == paretoPlan:
+                    add_baseline = False
+                    break
+
+            if add_baseline:
+                paretoFrontierPlans.append(baselinePlan)
 
         return paretoFrontierPlans
 
