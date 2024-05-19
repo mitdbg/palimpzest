@@ -440,12 +440,13 @@ class InduceFromCandidateOp(PhysicalOp):
         op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'induce' | op_name == 'p_induce')"
         if cost_est_data is not None and cost_est_data[op_filter] is not None:
             # get estimate data for this physical op's model
-            time_per_record = cost_est_data[op_filter][self.model.value]["time_per_record"]
-            usd_per_record = cost_est_data[op_filter][self.model.value]["cost_per_record"]
-            est_num_input_tokens = cost_est_data[op_filter][self.model.value]["est_num_input_tokens"]
-            est_num_output_tokens = cost_est_data[op_filter][self.model.value]["est_num_output_tokens"]
-            selectivity = cost_est_data[op_filter][self.model.value]["selectivity"]
-            quality = cost_est_data[op_filter][self.model.value]["quality"]
+            model_name = None if self.model is None else self.model.value
+            time_per_record = cost_est_data[op_filter][model_name]["time_per_record"]
+            usd_per_record = cost_est_data[op_filter][model_name]["cost_per_record"]
+            est_num_input_tokens = cost_est_data[op_filter][model_name]["est_num_input_tokens"]
+            est_num_output_tokens = cost_est_data[op_filter][model_name]["est_num_output_tokens"]
+            selectivity = cost_est_data[op_filter][model_name]["selectivity"]
+            quality = cost_est_data[op_filter][model_name]["quality"]
 
             # do code synthesis adjustment
             if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:

@@ -386,7 +386,8 @@ class LogicalOperator:
                     op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'induce' | op_name == 'p_induce')"
                     op_df = df.query(op_filter)
                     if not op_df.empty:
-                        models = self._getModels(include_vision=True)
+                        # compute estimates per-model, and add None which forces computation of avg. across all models
+                        models = self._getModels(include_vision=True) + [None]
                         estimates = {model: None for model in models}
                         for model in models:
                             est_tokens = StatsProcessor._est_num_input_output_tokens(op_df, model_name=model.value)
