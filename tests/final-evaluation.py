@@ -498,8 +498,10 @@ def run_sentinel_plans(workload, num_samples, policy_str: str=None):
     num_sentinel_plans = len(sentinel_plans)
 
     total_sentinel_cost, all_cost_estimate_data, return_records = 0.0, [], []
-    with Pool(processes=num_sentinel_plans) as pool:
-        results = pool.starmap(run_sentinel_plan, [(plan_idx, workload, num_samples) for plan_idx in range(num_sentinel_plans)])
+    # with Pool(processes=num_sentinel_plans) as pool:
+    #     results = pool.starmap(run_sentinel_plan, [(plan_idx, workload, num_samples) for plan_idx in range(num_sentinel_plans)])
+    for plan_idx in range(num_sentinel_plans):
+        _ = run_sentinel_plan(plan_idx, workload, num_samples)
 
         # write out result dict and samples collected for each sentinel
         for idx, (records, result_dict, cost_est_sample_data) in enumerate(results):
