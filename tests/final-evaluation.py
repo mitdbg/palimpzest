@@ -603,13 +603,13 @@ def evaluate_pz_plans(workload, dry_run=False):
 
     Make sure to set DSP_CACHEBOOL=false.
     """
-    # create query for dataset
-    logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
-
     workload_to_dataset_size = {"enron": 1000, "real-estate": 100, "biofabric": 11}
     dataset_size = workload_to_dataset_size[workload]
     # num_samples = min(10, int(0.05 * dataset_size)) if workload != "biofabric" else 0
     num_samples = int(0.05 * dataset_size) if workload != "biofabric" else 1
+
+    # create query for dataset
+    logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
 
     # run sentinels
     output = run_sentinel_plans(workload, num_samples)
