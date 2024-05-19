@@ -161,64 +161,64 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
 
     # generate LLM response and capture statistics
     answer, new_heatmap_json_obj, bonded_query_stats = None, None, None
-    # try:
-    if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-        # invoke LLM to generate output JSON
-        generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-        answer, new_heatmap_json_obj, gen_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx, heatmap_json_obj=td.heatmap_json_obj)
+    try:
+        if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+            # invoke LLM to generate output JSON
+            generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
+            answer, new_heatmap_json_obj, gen_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx, heatmap_json_obj=td.heatmap_json_obj)
 
-        # construct BondedQueryStats object
-        bonded_query_stats = BondedQueryStats(
-            gen_stats=gen_stats,
-            input_fields=td.inputSchema.fieldNames(),
-            generated_fields=generate_field_names,
-        )
+            # construct BondedQueryStats object
+            bonded_query_stats = BondedQueryStats(
+                gen_stats=gen_stats,
+                input_fields=td.inputSchema.fieldNames(),
+                generated_fields=generate_field_names,
+            )
 
-    elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
-        # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
-        # b64 decode of candidate.contents or candidate.image_contents
-        base64_images = []
-        if hasattr(candidate, "contents"):
-            base64_images = [base64.b64encode(candidate.contents).decode('utf-8')]
+        elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
+            # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
+            # b64 decode of candidate.contents or candidate.image_contents
+            base64_images = []
+            if hasattr(candidate, "contents"):
+                base64_images = [base64.b64encode(candidate.contents).decode('utf-8')]
+            else:
+                base64_images = [base64.b64encode(image).decode('utf-8') for image in candidate.image_contents]
+
+            # invoke LLM to generate output JSON
+            generator = ImageTextGenerator(td.model.value)
+            answer, gen_stats = generator.generate(base64_images, promptQuestion)
+
+            # construct BondedQueryStats object
+            bonded_query_stats = BondedQueryStats(
+                gen_stats=gen_stats,
+                input_fields=td.inputSchema.fieldNames(),
+                generated_fields=generate_field_names,
+            )
+
+        # TODO
+        elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:
+            raise Exception("not implemented yet")
+
+        # TODO
+        elif td.prompt_strategy == PromptStrategy.FEW_SHOT:
+            raise Exception("not implemented yet")
+
+        # parse JSON object from the answer
+        jsonObj = _get_JSON_from_answer(answer)
+
+        # parse JSON output and construct data records
+        if td.cardinality == "oneToMany":
+            if len(jsonObj["items"]) == 0:
+                raise Exception("No output objects were generated with bonded query - trying with conventional query...")
+            for elt in jsonObj["items"]:
+                dr = _create_data_record_from_json(elt, td, candidate)
+                drs.append(dr)
         else:
-            base64_images = [base64.b64encode(image).decode('utf-8') for image in candidate.image_contents]
+            dr = _create_data_record_from_json(jsonObj, td, candidate)
+            drs = [dr]
 
-        # invoke LLM to generate output JSON
-        generator = ImageTextGenerator(td.model.value)
-        answer, gen_stats = generator.generate(base64_images, promptQuestion)
-
-        # construct BondedQueryStats object
-        bonded_query_stats = BondedQueryStats(
-            gen_stats=gen_stats,
-            input_fields=td.inputSchema.fieldNames(),
-            generated_fields=generate_field_names,
-        )
-
-    # TODO
-    elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:
-        raise Exception("not implemented yet")
-
-    # TODO
-    elif td.prompt_strategy == PromptStrategy.FEW_SHOT:
-        raise Exception("not implemented yet")
-
-    # parse JSON object from the answer
-    jsonObj = _get_JSON_from_answer(answer)
-
-    # parse JSON output and construct data records
-    if td.cardinality == "oneToMany":
-        if len(jsonObj["items"]) == 0:
-            raise Exception("No output objects were generated with bonded query - trying with conventional query...")
-        for elt in jsonObj["items"]:
-            dr = _create_data_record_from_json(elt, td, candidate)
-            drs.append(dr)
-    else:
-        dr = _create_data_record_from_json(jsonObj, td, candidate)
-        drs = [dr]
-
-    # except Exception as e:
-    #     print(f"Bonded query processing error: {e}")
-    #     return None, new_heatmap_json_obj, bonded_query_stats, str(e)
+    except Exception as e:
+        print(f"Bonded query processing error: {e}")
+        return None, new_heatmap_json_obj, bonded_query_stats, str(e)
 
     return drs, new_heatmap_json_obj, bonded_query_stats, None
 
