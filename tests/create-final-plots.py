@@ -133,7 +133,7 @@ def plot_runtime_cost_vs_quality(results):
         left, right = -0.05, 1.05
         if workload == "real-estate":
             left = -0.05
-            right = 0.85
+            right = 1.05
         elif workload == "biofabric":
             left = 0.3
             right = 0.6

@@ -187,13 +187,13 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
     Computes the results of all biofabric plans
     """
     # parse records
-    exclude_keys = ["filename", "op_id", "uuid", "parent_uuid", "stats"]
+    # exclude_keys = ["filename", "op_id", "uuid", "parent_uuid", "stats"]
     output_rows = []
     for rec in records:
-        dct = {k:v for k,v in rec._asDict().items() if k not in exclude_keys}
-        filename = os.path.basename(rec._asDict()["filename"])
-        dct["study"] = filename.split("_")[0]
-        output_rows.append(dct)
+        # dct = {k:v for k,v in rec._asDict().items() if k not in exclude_keys}
+        # filename = os.path.basename(rec._asDict()["filename"])
+        rec["study"] = rec['filename'].split("_")[0]
+        output_rows.append(rec)
 
     records_df = pd.DataFrame(output_rows)
     if not reopt:
@@ -264,14 +264,14 @@ def score_plan(workload, records, plan_idx, policy_str=None, reopt=False) -> flo
         return score_biofabric_plans(workload, records, plan_idx, policy_str, reopt)
 
     # parse records
-    records = [
-        {
-            key: record.__dict__[key]
-            for key in record.__dict__
-            if not key.startswith('_') and key not in ["image_contents"]
-        }
-        for record in records
-    ]
+    # records = [
+    #     {
+    #         key: record.__dict__[key]
+    #         for key in record.__dict__
+    #         if not key.startswith('_') and key not in ["image_contents"]
+    #     }
+    #     for record in records
+    # ]
     records_df = pd.DataFrame(records)
 
     # save predictions for this plan
@@ -333,6 +333,16 @@ def run_pz_plan(workload, plan, plan_idx, total_sentinel_cost, total_sentinel_ti
     start_time = time.time()
     new_records = [r for r in plan]
     runtime = total_sentinel_time + (time.time() - start_time)
+
+    # parse new_records
+    new_records = [
+        {
+            key: record.__dict__[key]
+            for key in record.__dict__
+            if not key.startswith('_') and key not in ["image_contents"]
+        }
+        for record in new_records
+    ]
     all_records = sentinel_records + new_records
 
     # get profiling data for plan and compute its cost
@@ -450,6 +460,16 @@ def run_sentinel_plan(plan_idx, workload, num_samples):
 
     # run the plan
     records = [r for r in plan]
+
+    # parse records
+    records = [
+        {
+            key: record.__dict__[key]
+            for key in record.__dict__
+            if not key.startswith('_') and key not in ["image_contents"]
+        }
+        for record in records
+    ]
 
     # get profiling data for plan and compute its cost
     profileData = plan.getProfilingData()
@@ -650,7 +670,7 @@ def evaluate_pz_plans(workload, dry_run=False):
 
     with Pool(processes=num_plans) as pool:
         sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
-        results = pool.starmap(evaluate_pz_plan, [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)])
+        _ = pool.starmap(evaluate_pz_plan, [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)])
     # with Pool(processes=2) as pool:
     #     results = pool.starmap(evaluate_pz_plan, [(opt, workload, idx) for idx in [0,3]])
 
