@@ -672,7 +672,7 @@ def evaluate_pz_plans(workload, dry_run=False):
     #     sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
     #     _ = pool.starmap(evaluate_pz_plan, [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)])
 
-    for plan_idx in [1]:
+    for plan_idx in [21]:
         sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
         evaluate_pz_plan(sentinel_data, workload, plan_idx)
 

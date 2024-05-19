@@ -513,7 +513,7 @@ class LogicalOperator:
                 paretoFrontierPlans.append((totalTime_i, totalCost_i, quality_i, plan, fullPlanCostEst))
 
         print(f"PARETO PLANS: {len(paretoFrontierPlans)}")
-        print(f"BASELIINE PLANS: {len(baselinePlans)}")
+        print(f"BASELINE PLANS: {len(baselinePlans)}")
 
         # if specified, grab up to `min` total plans, and choose the remaining plans
         # based on their smallest agg. distance to the pareto frontier; distance is computed
