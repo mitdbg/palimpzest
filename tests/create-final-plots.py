@@ -24,7 +24,10 @@ import pdb
 
 def get_color(workload, result_dict):
     color = "black"
-    if len(set(filter(None, result_dict['plan_info']['models']))) > 1:
+    if workload != "real-estate" and len(set(filter(None, result_dict['plan_info']['models']))) > 1:
+        color = "green"
+    
+    elif workload != "real-estate" and len(set(filter(None, result_dict['plan_info']['models']))) > 2:
         color = "green"
 
     elif "codegen-with-fallback" in result_dict['plan_info']['query_strategies']:
@@ -129,8 +132,8 @@ def plot_runtime_cost_vs_quality(results):
         # set x,y-lim for each workload
         left, right = -0.05, 1.05
         if workload == "real-estate":
-            left = 0.0
-            right = 0.8
+            left = -0.05
+            right = 0.85
         elif workload == "biofabric":
             left = 0.3
             right = 0.6
