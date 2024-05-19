@@ -628,6 +628,8 @@ def evaluate_pz_plans(workload, dry_run=False):
         shouldProfile=True,
     )
     num_plans = len(plans)
+    import pdb
+    pdb.set_trace()
 
     if dry_run:
         for plan_idx, (_, _, _, plan, _) in enumerate(plans):
