@@ -129,8 +129,8 @@ def plot_runtime_cost_vs_quality(results):
         # set x,y-lim for each workload
         left, right = -0.05, 1.05
         if workload == "real-estate":
-            left = 0.65
-            right = 0.9
+            left = 0.0
+            right = 0.8
         elif workload == "biofabric":
             left = 0.3
             right = 0.6
