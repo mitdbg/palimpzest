@@ -313,7 +313,8 @@ if __name__ == "__main__":
             "real-estate": [],
             "biofabric": [],
         }
-        for workload in ["enron", "real-estate", "biofabric"]:
+        # for workload in ["enron", "real-estate", "biofabric"]:
+        for workload in ["real-estate"]: # TODO
             num_plans = workload_to_num_plans[workload]
             for plan_idx in range(num_plans):
                 with open(f"final-eval-results/{workload}/results-{plan_idx}.json", 'r') as f:
