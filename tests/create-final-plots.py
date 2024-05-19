@@ -43,12 +43,12 @@ def get_color(workload, result_dict):
 
 def get_pareto_indices(result_dicts, col):
     pareto_indices = []
-    for idx, (_, result_dict) in enumerate(result_dicts):
+    for idx, result_dict in enumerate(result_dicts):
         col_i, quality_i = result_dict[col], result_dict["f1_score"]
         paretoFrontier = True
 
         # check if any other plan dominates plan i
-        for j, (_, _result_dict) in enumerate(result_dicts):
+        for j, _result_dict in enumerate(result_dicts):
             col_j, quality_j = _result_dict[col], _result_dict["f1_score"]
             if idx == j:
                 continue
