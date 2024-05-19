@@ -336,6 +336,12 @@ class InduceFromCandidateOp(PhysicalOp):
             self.model = None
             self.prompt_strategy = None
             self.query_strategy = None
+            self.token_budget = 1.0
+
+        if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
+            self.model = None
+            self.prompt_strategy = None
+            self.token_budget = 1.0
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())
@@ -634,6 +640,12 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             self.model = None
             self.prompt_strategy = None
             self.query_strategy = None
+            self.token_budget = 1.0
+
+        if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
+            self.model = None
+            self.prompt_strategy = None
+            self.token_budget = 1.0
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
         self.profiler = Profiler(op_id=self.opId())

@@ -569,7 +569,7 @@ def evaluate_pz_plan(sentinel_data, workload, plan_idx):
 
     # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
     plans = logicalTree.createPhysicalPlanCandidates(
-        min=30,
+        min=20,
         cost_estimate_sample_data=all_cost_estimate_data,
         allow_model_selection=True,
         allow_codegen=True,
@@ -608,10 +608,6 @@ def evaluate_pz_plan(sentinel_data, workload, plan_idx):
     with open(f'final-eval-results/{workload}/results-{plan_idx}.json', 'w') as f:
         json.dump(result_dict, f)
 
-    # workaround to disabling cache: delete all cached generations after each plan
-    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
-    if os.path.exists(dspy_cache_dir):
-        shutil.rmtree(dspy_cache_dir)
 
 def evaluate_pz_plans(workload, dry_run=False):
     """
@@ -639,7 +635,7 @@ def evaluate_pz_plans(workload, dry_run=False):
 
     # get total number of plans
     plans = logicalTree.createPhysicalPlanCandidates(
-        min=30,
+        min=20,
         cost_estimate_sample_data=all_cost_estimate_data,
         allow_model_selection=True,
         allow_codegen=True,
@@ -668,80 +664,20 @@ def evaluate_pz_plans(workload, dry_run=False):
         cache.rmCachedData(f"codeEnsemble{plan_idx}")
         cache.rmCachedData(f"codeSamples{plan_idx}")
 
-    # with Pool(processes=num_plans) as pool:
-    #     sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
-    #     _ = pool.starmap(evaluate_pz_plan, [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)])
-
-    for plan_idx in range(num_plans):
+    with Pool(processes=num_plans) as pool:
         sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
-        evaluate_pz_plan(sentinel_data, workload, plan_idx)
+        _ = pool.starmap(evaluate_pz_plan, [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)])
+
+    # for plan_idx in range(num_plans):
+    #     sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
+    #     evaluate_pz_plan(sentinel_data, workload, plan_idx)
+
+    # workaround to disabling cache: delete all cached generations after each plan
+    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+    if os.path.exists(dspy_cache_dir):
+        shutil.rmtree(dspy_cache_dir)
 
     return num_plans
-
-
-def plot_runtime_cost_vs_quality(results, opt, workload):
-    # create figure
-    fig_text, axs_text = plt.subplots(nrows=2, ncols=1, sharex=True)
-    fig_clean, axs_clean = plt.subplots(nrows=2, ncols=1, sharex=True)
-
-    # parse results into fields
-    for plan_idx, result_dict in results:
-        runtime = result_dict["runtime"]
-        cost = result_dict["cost"]
-        f1_score = result_dict["f1_score"]
-        text = plan_idx
-
-        # set label and color
-        color = None
-        marker = None
-
-        # plot runtime vs. f1_score and cost vs. f1_score
-        axs_text[0].scatter(f1_score, runtime, alpha=0.4, color=color, marker=marker) 
-        axs_text[1].scatter(f1_score, cost, alpha=0.4, color=color, marker=marker)
-        axs_clean[0].scatter(f1_score, runtime, alpha=0.4, color=color, marker=marker) 
-        axs_clean[1].scatter(f1_score, cost, alpha=0.4, color=color, marker=marker)
-
-        # add annotations
-        axs_text[0].annotate(text, (f1_score, runtime))
-        axs_text[1].annotate(text, (f1_score, cost))
-
-    # TODO:
-    # set x,y-lim for each workload
-    left, right = -0.05, 1.05
-    if workload == "real-estate":
-        left = 0.5
-        right = 0.85
-    elif workload == "biofabric":
-        left = 0.3
-        right = 0.6
-    axs_text[0].set_xlim(left, right)
-    axs_text[1].set_xlim(left, right)
-    axs_clean[0].set_xlim(left, right)
-    axs_clean[1].set_xlim(left, right)
-
-    # turn on grid lines
-    axs_text[0].grid(True)
-    axs_text[1].grid(True)
-    axs_clean[0].grid(True)
-    axs_clean[1].grid(True)
-
-    # savefigs
-    workload_to_title = {
-        "enron": "Legal Discovery",
-        "real-estate": "Real Estate Search",
-        "biofabric": "Biofabric Integration"
-    }
-    axs_text[0].set_title(f"{workload_to_title[workload]}")
-    axs_text[0].set_ylabel("Runtime (seconds)")
-    axs_text[1].set_ylabel("Cost (USD)")
-    axs_text[1].set_xlabel("F1 Score")
-    fig_text.savefig(f"final-eval-results/{opt}/{workload}/{opt}-{workload}-text.png", dpi=500, bbox_inches="tight")
-
-    axs_clean[0].set_title(f"{workload_to_title[workload]}")
-    axs_clean[0].set_ylabel("Runtime (seconds)")
-    axs_clean[1].set_ylabel("Cost (USD)")
-    axs_clean[1].set_xlabel("F1 Score")
-    fig_clean.savefig(f"final-eval-results/{opt}/{workload}/{opt}-{workload}-clean.png", dpi=500, bbox_inches="tight")
 
 
 def run_reoptimize_eval(workload, policy_str):

@@ -267,22 +267,29 @@ class LogicalOperator:
         if isinstance(self, ConvertScan):
             for subTreePhysicalPlan in subTreePhysicalPlans:
                 for qs in query_strategies:
-                    for token_budget in token_budgets:
-                        for model in models:
-                            # if model selection is disallowed; skip any plans which would use a different model in this operator
-                            subtree_models = [m for m in get_models_from_subtree(subTreePhysicalPlan) if m is not None and m != Model.GPT_4V]
-                            if not allow_model_selection and len(subtree_models) > 0 and subtree_models[0] != model:
-                                continue
+                    if qs not in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
+                        for token_budget in token_budgets:
+                            for model in models:
+                                # if model selection is disallowed; skip any plans which would use a different model in this operator
+                                subtree_models = [m for m in get_models_from_subtree(subTreePhysicalPlan) if m is not None and m != Model.GPT_4V]
+                                if not allow_model_selection and len(subtree_models) > 0 and subtree_models[0] != model:
+                                    continue
 
-                            # NOTE: failing to make a copy will lead to duplicate profile information being captured
-                            # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
-                            subTreePhysicalPlan = subTreePhysicalPlan.copy()
-                            physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, query_strategy=qs, token_budget=token_budget, shouldProfile=shouldProfile)
-                            physicalPlans.append(physicalPlan)
-                            # GV Checking if there is an hardcoded function exposes that we need to refactor the solver/physical function generation
-                            td = physicalPlan._makeTaskDescriptor()
-                            if td.model == None:
-                                break
+                                # NOTE: failing to make a copy will lead to duplicate profile information being captured
+                                # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
+                                subTreePhysicalPlan = subTreePhysicalPlan.copy()
+                                physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=model, query_strategy=qs, token_budget=token_budget, shouldProfile=shouldProfile)
+                                physicalPlans.append(physicalPlan)
+                                # GV Checking if there is an hardcoded function exposes that we need to refactor the solver/physical function generation
+                                td = physicalPlan._makeTaskDescriptor()
+                                if td.model == None:
+                                    break
+                    else:
+                        # NOTE: failing to make a copy will lead to duplicate profile information being captured
+                        # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
+                        subTreePhysicalPlan = subTreePhysicalPlan.copy()
+                        physicalPlan = self._getPhysicalTree(strategy=PhysicalOp.LOCAL_PLAN, source=subTreePhysicalPlan, model=Model.GPT_4, query_strategy=qs, token_budget=1.0, shouldProfile=shouldProfile)
+                        physicalPlans.append(physicalPlan)
 
         elif isinstance(self, FilteredScan):
             for subTreePhysicalPlan in subTreePhysicalPlans:
