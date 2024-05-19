@@ -42,15 +42,15 @@ class DataRecord:
         return super().__getattr__(key)
 
     @property
-    def schema(self):
+    def _schema(self):
         return self._schema
 
-    def asJSON(self, include_bytes: bool=True, *args, **kwargs):
+    def _asJSON(self, include_bytes: bool=True, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
-        value_dict = self.asDict(include_bytes)
-        return self.schema().asJSON(value_dict, *args, **kwargs) # TODO: need to rethink record's relationship to schema
+        value_dict = self._asDict(include_bytes)
+        return self._schema().asJSON(value_dict, *args, **kwargs) # TODO: need to rethink record's relationship to schema
 
-    def asDict(self, include_bytes: bool=True):
+    def _asDict(self, include_bytes: bool=True):
         """Return a dictionary representation of this DataRecord"""
         dct = {
             k: self.__dict__[k]

@@ -190,8 +190,8 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
     exclude_keys = ["filename", "op_id", "uuid", "parent_uuid", "stats"]
     output_rows = []
     for rec in records:
-        dct = {k:v for k,v in rec.asDict().items() if k not in exclude_keys}
-        filename = os.path.basename(rec.asDict()["filename"])
+        dct = {k:v for k,v in rec._asDict().items() if k not in exclude_keys}
+        filename = os.path.basename(rec._asDict()["filename"])
         dct["study"] = filename.split("_")[0]
         output_rows.append(dct)
 

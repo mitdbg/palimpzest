@@ -41,7 +41,7 @@ class OperatorStats:
     source_op_stats: OperatorStats=None
     # [computed in Profiler.iter_profiler]
     # a list of record dictionaries processed by the operation; each record dictionary
-    # has the format: {"op_id": str, "uuid": str "parent_uuid": str, "stats": Stats, **record.asDict()}
+    # has the format: {"op_id": str, "uuid": str "parent_uuid": str, "stats": Stats, **record._asDict()}
     records: List[Dict[str, Any]]=field(default_factory=list)
     # [computed in Profiler.iter_profiler]
     # total number of records returned by the iterator for this operator
@@ -564,7 +564,7 @@ class StatsProcessor:
         The OperatorStats object has a `records` field which is a a list of record dictionaries processed
         by the operation. Each record dictionary has the format:
         
-        {"op_id": str, "uuid": str "parent_uuid": str, "stats": Stats, **record.asDict()}
+        {"op_id": str, "uuid": str "parent_uuid": str, "stats": Stats, **record._asDict()}
 
         A record dictionary's "stats" field must be one of:
         - Stats

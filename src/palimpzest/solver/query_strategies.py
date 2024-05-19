@@ -152,7 +152,7 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
             generate_field_names.append(field_name)
 
     # fetch input information
-    text_content = candidate.asJSON(include_bytes=False)
+    text_content = candidate._asJSON(include_bytes=False)
     doc_schema = str(td.outputSchema)
     doc_type = td.outputSchema.className()
 
@@ -244,7 +244,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
             generate_field_names.append(field_name)
 
     # fetch input information
-    text_content = candidate.asJSON(include_bytes=False)
+    text_content = candidate._asJSON(include_bytes=False)
     doc_schema = str(td.outputSchema)
     doc_type = td.outputSchema.className()
 
@@ -390,7 +390,7 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
         # TODO here the problem is: which is the 1:N field that we are splitting the output into?
         # do we need to know this to construct the prompt question ?
         # for now, we will just assume there is only one list in the JSON.
-        dct = candidate.asJSON(include_bytes=False, include_data_cols=False)
+        dct = candidate._asJSON(include_bytes=False, include_data_cols=False)
         dct = json.loads(dct)
         split_attribute = [att for att in dct.keys() if type(dct[att]) == list][0]
         n_splits = len(dct[split_attribute])
@@ -509,7 +509,7 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                 code_ensemble, gen_stats, examples = dict(), None, list()
 
             # remove bytes data from candidate
-            candidate_dict = candidate.asJSON(include_bytes=False, include_data_cols=False)
+            candidate_dict = candidate._asJSON(include_bytes=False, include_data_cols=False)
             candidate_dict = json.loads(candidate_dict)
             candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
 
