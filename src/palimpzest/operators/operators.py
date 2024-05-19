@@ -400,7 +400,7 @@ class LogicalOperator:
                                 "selectivity": StatsProcessor._est_selectivity(df, op_df, model_name=model_name),
                                 "quality": StatsProcessor._est_quality(op_df, model_name=model_name),
                             }
-                            estimates[model.value] = model_estimates
+                            estimates[model_name] = model_estimates
                     op_filters_to_estimates[op_filter] = estimates
 
                 elif isinstance(logical_op, FilteredScan):
