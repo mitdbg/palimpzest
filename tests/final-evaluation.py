@@ -321,7 +321,7 @@ def score_plan(workload, records, plan_idx, policy_str=None, reopt=False) -> flo
     return f1_score
 
 
-def run_pz_plan(workload, plan, plan_idx, total_sentinel_cost, sentinel_records):
+def run_pz_plan(workload, plan, plan_idx, total_sentinel_cost, total_sentinel_time, sentinel_records):
     """
     I'm placing this in a separate file from evaluate_pz_plans to see if this prevents
     an error where the DSPy calls to Gemini (and other models?) opens too many files.
@@ -333,7 +333,7 @@ def run_pz_plan(workload, plan, plan_idx, total_sentinel_cost, sentinel_records)
     start_time = time.time()
     new_records = [r for r in plan]
     records = sentinel_records.extend(new_records)
-    runtime = time.time() - start_time
+    runtime = total_sentinel_time + (time.time() - start_time)
 
     # get profiling data for plan and compute its cost
     profileData = plan.getProfilingData()
@@ -488,6 +488,8 @@ def run_sentinel_plan(plan_idx, workload, num_samples):
 
 
 def run_sentinel_plans(workload, num_samples, policy_str: str=None):
+    start_time = time.time()
+
     # create query for dataset
     logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
 
@@ -525,12 +527,14 @@ def run_sentinel_plans(workload, num_samples, policy_str: str=None):
             # update total cost of running sentinels
             total_sentinel_cost += result_dict['cost']
 
+    total_sentinel_time = time.time() - start_time
+
     # workaround to disabling cache: delete all cached generations after each plan
     dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
     if os.path.exists(dspy_cache_dir):
         shutil.rmtree(dspy_cache_dir)
 
-    return total_sentinel_cost, all_cost_estimate_data, return_records
+    return total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, return_records
 
 
 def evaluate_pz_plan(sentinel_data, workload, plan_idx):
@@ -540,7 +544,7 @@ def evaluate_pz_plan(sentinel_data, workload, plan_idx):
         return
 
     # unpack sentinel data
-    total_sentinel_cost, all_cost_estimate_data, sentinel_records, num_samples = sentinel_data
+    total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples = sentinel_data
 
     # get logicalTree
     logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
@@ -575,7 +579,7 @@ def evaluate_pz_plan(sentinel_data, workload, plan_idx):
     print("---")
 
     # run the plan
-    result_dict = run_pz_plan(workload, plan, plan_idx, total_sentinel_cost, sentinel_records)
+    result_dict = run_pz_plan(workload, plan, plan_idx, total_sentinel_cost, total_sentinel_time, sentinel_records)
     print(f"Plan: {result_dict['plan_info']['plan_label']}")
     print(f"  F1: {result_dict['f1_score']}")
     print(f"  rt: {result_dict['runtime']}")
@@ -610,7 +614,7 @@ def evaluate_pz_plans(workload, dry_run=False):
 
     # run sentinels
     output = run_sentinel_plans(workload, num_samples)
-    total_sentinel_cost, all_cost_estimate_data, sentinel_records = output
+    total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records = output
 
     # create query for dataset
     logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
@@ -647,7 +651,7 @@ def evaluate_pz_plans(workload, dry_run=False):
         cache.rmCachedData(f"codeSamples{plan_idx}")
 
     with Pool(processes=num_plans) as pool:
-        sentinel_data = (total_sentinel_cost, all_cost_estimate_data, sentinel_records, num_samples)
+        sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
         results = pool.starmap(evaluate_pz_plan, [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)])
     # with Pool(processes=2) as pool:
     #     results = pool.starmap(evaluate_pz_plan, [(opt, workload, idx) for idx in [0,3]])
