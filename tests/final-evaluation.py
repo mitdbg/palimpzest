@@ -433,6 +433,60 @@ def get_logical_tree(workload, nocache: bool=True, num_samples: int=None, scan_s
 
     return None
 
+# function to run sentinel
+def run_sentinel_plan(plan_idx, workload, num_samples):
+    # get specified sentinel plan
+    logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
+    sentinel_plans = logicalTree.createPhysicalPlanCandidates(sentinels=True)
+    plan = sentinel_plans[plan_idx]
+
+    # display the plan output
+    print("----------------------")
+    ops = plan.dumpPhysicalTree()
+    flatten_ops = flatten_nested_tuples(ops)
+    print(f"Sentinel Plan {plan_idx}:")
+    graphicEmit(flatten_ops)
+    print("---")
+
+    # run the plan
+    records = [r for r in plan]
+
+    # get profiling data for plan and compute its cost
+    profileData = plan.getProfilingData()
+    sp = StatsProcessor(profileData)
+    cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
+
+    plan_info = {
+        "plan_idx": plan_idx,
+        "plan_label": compute_label(plan, f"s{plan_idx}"),
+        "models": [],
+        "op_names": [],
+        "generated_fields": [],
+        "query_strategies": [],
+        "token_budgets": []
+    }
+    cost = 0.0
+    stats = sp.profiling_data
+    while stats is not None:
+        cost += stats.total_usd
+        plan_info["models"].append(stats.model_name)
+        plan_info["op_names"].append(stats.op_name)
+        plan_info["generated_fields"].append(stats.generated_fields)
+        plan_info["query_strategies"].append(stats.query_strategy)
+        plan_info["token_budgets"].append(stats.token_budget)
+        stats = stats.source_op_stats
+
+    # construct and return result_dict
+    result_dict = {
+        "runtime": None,
+        "cost": cost,
+        "f1_score": None,
+        "plan_info": plan_info,
+    }
+
+    return records, result_dict, cost_estimate_sample_data
+
+
 def run_sentinel_plans(workload, num_samples, policy_str: str=None):
     # create query for dataset
     logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
@@ -440,59 +494,6 @@ def run_sentinel_plans(workload, num_samples, policy_str: str=None):
     # compute number of plans
     sentinel_plans = logicalTree.createPhysicalPlanCandidates(sentinels=True)
     num_sentinel_plans = len(sentinel_plans)
-
-    # function to run sentinel
-    def run_sentinel_plan(plan_idx, workload, num_samples):
-        # get specified sentinel plan
-        logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
-        sentinel_plans = logicalTree.createPhysicalPlanCandidates(sentinels=True)
-        plan = sentinel_plans[plan_idx]
-
-        # display the plan output
-        print("----------------------")
-        ops = plan.dumpPhysicalTree()
-        flatten_ops = flatten_nested_tuples(ops)
-        print(f"Sentinel Plan {plan_idx}:")
-        graphicEmit(flatten_ops)
-        print("---")
-
-        # run the plan
-        records = [r for r in plan]
-
-        # get profiling data for plan and compute its cost
-        profileData = plan.getProfilingData()
-        sp = StatsProcessor(profileData)
-        cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
-
-        plan_info = {
-            "plan_idx": plan_idx,
-            "plan_label": compute_label(plan, f"s{plan_idx}"),
-            "models": [],
-            "op_names": [],
-            "generated_fields": [],
-            "query_strategies": [],
-            "token_budgets": []
-        }
-        cost = 0.0
-        stats = sp.profiling_data
-        while stats is not None:
-            cost += stats.total_usd
-            plan_info["models"].append(stats.model_name)
-            plan_info["op_names"].append(stats.op_name)
-            plan_info["generated_fields"].append(stats.generated_fields)
-            plan_info["query_strategies"].append(stats.query_strategy)
-            plan_info["token_budgets"].append(stats.token_budget)
-            stats = stats.source_op_stats
-
-        # construct and return result_dict
-        result_dict = {
-            "runtime": None,
-            "cost": cost,
-            "f1_score": None,
-            "plan_info": plan_info,
-        }
-
-        return records, result_dict, cost_estimate_sample_data
 
     total_sentinel_cost, all_cost_estimate_data, return_records = 0.0, [], []
     with Pool(processes=num_sentinel_plans) as pool:
