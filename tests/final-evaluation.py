@@ -618,6 +618,7 @@ def evaluate_pz_plans(workload, dry_run=False):
 
     # get total number of plans
     plans = logicalTree.createPhysicalPlanCandidates(
+        min=30,
         cost_estimate_sample_data=all_cost_estimate_data,
         allow_model_selection=True,
         allow_codegen=True,
@@ -628,8 +629,6 @@ def evaluate_pz_plans(workload, dry_run=False):
         shouldProfile=True,
     )
     num_plans = len(plans)
-    import pdb
-    pdb.set_trace()
 
     if dry_run:
         for plan_idx, (_, _, _, plan, _) in enumerate(plans):
@@ -794,7 +793,7 @@ def run_reoptimize_eval(workload, policy_str):
     )
 
     # choose best plan and execute it
-    _, _, _, plan, _ = policy.choose(candidatePlans)
+    (_, _, _, plan, _), plan_idx = policy.choose(candidatePlans, return_idx=True)
 
     # display the plan output
     print("----------------------")

@@ -23,6 +23,7 @@ from copy import deepcopy
 from itertools import permutations
 from typing import List, Tuple
 
+import numpy as np
 import pandas as pd
 
 import os
@@ -312,7 +313,7 @@ class LogicalOperator:
         return physicalPlans
 
     def createPhysicalPlanCandidates(
-        self, max: int=None, sentinels: bool=False, cost_estimate_sample_data: List[Dict[str, Any]]=None,
+        self, max: int=None, min: int=None, sentinels: bool=False, cost_estimate_sample_data: List[Dict[str, Any]]=None,
         allow_model_selection: bool=False, allow_codegen: bool=False, allow_token_reduction: bool=False,
         pareto_optimal: bool=True, include_baselines: bool=False, shouldProfile: bool=False,
     ) -> List[PhysicalPlan]:
@@ -486,9 +487,16 @@ class LogicalOperator:
         # more efficient algo.'s exist, but they are non-trivial to implement, so for now I'm using
         # brute force; it may ultimately be best to compute a cheap approx. of the pareto front:
         # - e.g.: https://link.springer.com/chapter/10.1007/978-3-642-12002-2_6
-        paretoFrontierPlans = []
+        paretoFrontierPlans, baselinePlans = [], []
         for i, (totalTime_i, totalCost_i, quality_i, plan, fullPlanCostEst) in enumerate(dedup_plans):
             paretoFrontier = True
+
+            # ensure that all baseline plans are included if specified
+            if include_baselines:
+                for baselinePlan in [self._createBaselinePlan(model) for model in self._getModels()]:
+                    if baselinePlan == plan:
+                        baselinePlans.append((totalTime_i, totalCost_i, quality_i, plan, fullPlanCostEst))
+                        continue
 
             # check if any other plan dominates plan i
             for j, (totalTime_j, totalCost_j, quality_j, _, _) in enumerate(dedup_plans):
@@ -505,23 +513,50 @@ class LogicalOperator:
                 paretoFrontierPlans.append((totalTime_i, totalCost_i, quality_i, plan, fullPlanCostEst))
 
         print(f"PARETO PLANS: {len(paretoFrontierPlans)}")
-        if max is not None:
-            paretoFrontierPlans = paretoFrontierPlans[:max]
-            print(f"LIMIT PARETO PLANS: {len(paretoFrontierPlans)}")
+        print(f"BASELIINE PLANS: {len(baselinePlans)}")
 
-        # ensure that all baseline plans are included
-        for model in self._getModels():
-            baselinePlan = self._createBaselinePlan(model)
-            add_baseline = True
-            for paretoPlan in paretoFrontierPlans:
-                if baselinePlan == paretoPlan:
-                    add_baseline = False
-                    break
+        # if specified, grab up to `min` total plans, and choose the remaining plans
+        # based on their smallest agg. distance to the pareto frontier; distance is computed
+        # by summing the pct. difference to the pareto frontier across each dimension
+        finalPlans = paretoFrontierPlans + baselinePlans
+        if min is not None and len(finalPlans) < min:
+            min_distances = []
+            for i, (totalTime, totalCost, quality, plan, fullPlanCostEst) in enumerate(dedup_plans):
+                # determine if this plan is already in the final set of plans
+                is_in_final_set = False
+                for _, _, _, finalPlan, _ in finalPlans:
+                    if plan == finalPlan:
+                        is_in_final_set = True
+                        break
 
-            if add_baseline:
-                paretoFrontierPlans.append(baselinePlan)
+                if is_in_final_set:
+                    continue
 
-        return paretoFrontierPlans
+                # otherwise compute min distance to plans on pareto frontier
+                min_dist, min_dist_idx = np.inf, -1
+                for paretoTime, paretoCost, paretoQuality, _, _ in paretoFrontierPlans:
+                    time_dist = (totalTime - paretoTime) / paretoTime
+                    cost_dist = (totalCost - paretoCost) / paretoCost
+                    quality_dist = (paretoQuality - quality) / quality
+                    dist = time_dist + cost_dist + quality_dist
+                    if dist < min_dist:
+                        min_dist = dist
+                        min_dist_idx = i
+                
+                min_distances.append((min_dist, min_dist_idx))
+            
+            # sort based on distance
+            min_distances = sorted(min_distances, key=lambda tup: tup[0])
+            print("MIN DISTANCES:")
+            print(min_distances[:min - len(finalPlans)])
+
+            # add closest plans to finalPlans
+            k = min - len(finalPlans)
+            k_indices = list(map(lambda tup: tup[1], min_distances[:k]))
+            for idx in k_indices:
+                finalPlans.append(dedup_plans[idx])
+
+        return finalPlans
 
 
 class ConvertScan(LogicalOperator):
