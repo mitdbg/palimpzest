@@ -105,16 +105,16 @@ def plot_runtime_cost_vs_quality(results):
             runtime_pareto_lst_indices = get_pareto_indices(all_result_dicts, "runtime")
 
             # plot line for pareto frontiers
-            cost_pareto_qualities = [all_result_dicts[idx][1]['f1_score'] for idx in cost_pareto_lst_indices]
-            pareto_costs = [all_result_dicts[idx][1]['cost'] for idx in cost_pareto_lst_indices]
+            cost_pareto_qualities = [all_result_dicts[idx]['f1_score'] for idx in cost_pareto_lst_indices]
+            pareto_costs = [all_result_dicts[idx]['cost'] for idx in cost_pareto_lst_indices]
             cost_pareto_curve = zip(cost_pareto_qualities, pareto_costs)
             cost_pareto_curve = sorted(cost_pareto_curve, key=lambda tup: tup[0])
             if workload == "biofabric":
                 cost_pareto_curve = list(filter(lambda tup: tup[0] > 0.3, cost_pareto_curve))
             pareto_cost_xs, pareto_cost_ys = zip(*cost_pareto_curve)
 
-            runtime_pareto_qualities = [all_result_dicts[idx][1]['f1_score'] for idx in runtime_pareto_lst_indices]
-            pareto_runtimes = [all_result_dicts[idx][1]['runtime'] for idx in runtime_pareto_lst_indices]
+            runtime_pareto_qualities = [all_result_dicts[idx]['f1_score'] for idx in runtime_pareto_lst_indices]
+            pareto_runtimes = [all_result_dicts[idx]['runtime'] for idx in runtime_pareto_lst_indices]
             runtime_pareto_curve = zip(runtime_pareto_qualities, pareto_runtimes)
             runtime_pareto_curve = sorted(runtime_pareto_curve, key=lambda tup: tup[0])
             if workload == "biofabric":
