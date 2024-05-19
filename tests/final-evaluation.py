@@ -332,8 +332,8 @@ def run_pz_plan(workload, plan, plan_idx, total_sentinel_cost, total_sentinel_ti
     # execute plan to get records and runtime;
     start_time = time.time()
     new_records = [r for r in plan]
-    records = sentinel_records.extend(new_records)
     runtime = total_sentinel_time + (time.time() - start_time)
+    all_records = sentinel_records + new_records
 
     # get profiling data for plan and compute its cost
     profileData = plan.getProfilingData()
@@ -344,7 +344,7 @@ def run_pz_plan(workload, plan, plan_idx, total_sentinel_cost, total_sentinel_ti
     #     json.dump(sp.profiling_data.to_dict(), f)
 
     # score plan based on its output records
-    f1_score = score_plan(workload, records, plan_idx)
+    f1_score = score_plan(workload, all_records, plan_idx)
 
     plan_info = {
         "plan_idx": plan_idx,
