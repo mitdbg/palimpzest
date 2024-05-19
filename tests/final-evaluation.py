@@ -510,8 +510,6 @@ def run_sentinel_plans(workload, num_samples, policy_str: str=None):
                 json.dump(result_dict, f)
 
             # TODO: pick back up here:
-            # 2. finish using it in evaluate_pz_plans
-            # 3. run per-workload experiments
             # 4. re-write create-final plots to print w/new folder outputs from evaluate_pz_plans
             csv_fp = fp.replace(".json", ".csv")
             sample_df = pd.DataFrame(cost_est_sample_data)
@@ -549,6 +547,7 @@ def evaluate_pz_plan(sentinel_data, workload, plan_idx):
 
     # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
     plans = logicalTree.createPhysicalPlanCandidates(
+        min=30,
         cost_estimate_sample_data=all_cost_estimate_data,
         allow_model_selection=True,
         allow_codegen=True,
@@ -609,12 +608,12 @@ def evaluate_pz_plans(workload, dry_run=False):
     # num_samples = min(10, int(0.05 * dataset_size)) if workload != "biofabric" else 0
     num_samples = int(0.05 * dataset_size) if workload != "biofabric" else 1
 
-    # create query for dataset
-    logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
-
     # run sentinels
     output = run_sentinel_plans(workload, num_samples)
     total_sentinel_cost, all_cost_estimate_data, sentinel_records = output
+
+    # create query for dataset
+    logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
 
     # get total number of plans
     plans = logicalTree.createPhysicalPlanCandidates(
