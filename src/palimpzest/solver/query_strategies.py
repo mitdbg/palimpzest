@@ -113,12 +113,13 @@ def _create_data_record_from_json(jsonObj: Any, td: TaskDescriptor, candidate: D
     # initialize data record
     dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
 
-    # copy fields from the candidate (input) record if they already exist,
-    # otherwise parse them from the generated jsonObj
+    # first, copy all fields from input schema
+    for field_name in td.inputSchema.fieldNames():
+        setattr(dr, field_name, getattr(candidate, field_name))
+
+    # parse newly generated fields from the generated jsonObj
     for field_name in td.outputSchema.fieldNames():
-        if field_name in td.inputSchema.fieldNames():
-            setattr(dr, field_name, getattr(candidate, field_name))
-        else:
+        if field_name not in td.inputSchema.fieldNames():
             # parse the json object and set the DataRecord's fields with their generated values 
             setattr(dr, field_name, jsonObj.get(field_name, None)) # the use of get prevents a KeyError if an individual field is missing. TODO: is this behavior desired?
 

@@ -277,8 +277,6 @@ class Solver:
                             bonded_query_stats=bonded_query_stats,
                             conventional_query_stats=conventional_query_stats,
                         )
-                import pdb
-                pdb.set_trace()
 
                 return drs, new_heatmap_obj
 
