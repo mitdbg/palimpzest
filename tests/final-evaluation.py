@@ -198,7 +198,7 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
         dct = {k: v for k, v in rec.items() if k in include_keys}
         # dct = {k:v for k,v in rec._asDict().items() if k not in exclude_keys}
         # filename = os.path.basename(rec._asDict()["filename"])
-        dct["study"] = rec['filename'].split("_")[0]
+        dct["study"] = os.path.basename(rec['filename'])
         output_rows.append(dct)
 
     records_df = pd.DataFrame(output_rows)
@@ -224,9 +224,8 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
 
     for study in studies:
         output_study = output[output["study"] == study]
-        study = study.split(".xlsx")[0]
         try:
-            input_df = pd.read_excel(os.path.join("testdata/biofabric-matching/", f"{study}.xlsx"))
+            input_df = pd.read_excel(os.path.join("testdata/biofabric-matching/", f"{study}"))
         except:
             print("Cannot find the study", study)
             targets += [study]*5 
