@@ -716,9 +716,9 @@ def run_reoptimize_eval(workload, policy_str):
     num_samples = int(0.05 * dataset_size)
 
     # run sentinels
-    true_start_time = time.time()
+    start_time = time.time()
     output = run_sentinel_plans(workload, num_samples, policy_str=policy_str)
-    total_sentinel_cost, all_cost_estimate_data, all_records = output
+    total_sentinel_cost, _, all_cost_estimate_data, sentinel_records = output
 
     # # get cost estimates given current candidate plans
     # for plan_idx in range(num_plans):
@@ -763,9 +763,19 @@ def run_reoptimize_eval(workload, policy_str):
     print("---")
 
     # run the plan
-    records = [r for r in plan]
-    true_runtime = time.time() - true_start_time
-    all_records.extend(records)
+    new_records = [r for r in plan]
+    runtime = time.time() - start_time
+
+    # parse new_records
+    new_records = [
+        {
+            key: record.__dict__[key]
+            for key in record.__dict__
+            if not key.startswith('_') and key not in ["image_contents"]
+        }
+        for record in new_records
+    ]
+    all_records = sentinel_records + new_records
 
     # get profiling data for plan and compute its cost
     profileData = plan.getProfilingData()
@@ -801,7 +811,7 @@ def run_reoptimize_eval(workload, policy_str):
 
     # construct and return result_dict
     result_dict = {
-        "runtime": true_runtime,
+        "runtime": runtime,
         "cost": cost,
         "f1_score": f1_score,
         "plan_info": plan_info,
