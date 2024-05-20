@@ -220,6 +220,11 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
         print(f"Bonded query processing error: {e}")
         return None, new_heatmap_json_obj, bonded_query_stats, str(e)
 
+    # TODO: debug root cause
+    for dr in drs:
+        if not hasattr(dr, 'filename'):
+            setattr(dr, 'filename', candidate.filename)
+
     return drs, new_heatmap_json_obj, bonded_query_stats, None
 
 
@@ -305,6 +310,11 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
                 generated_fields=generate_field_names,
             )
 
+            # TODO: debug root cause
+            for dr in drs:
+                if not hasattr(dr, 'filename'):
+                    setattr(dr, 'filename', candidate.filename)
+
             return drs, conventional_query_stats
 
         else:
@@ -365,6 +375,10 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
         input_fields=td.inputSchema.fieldNames(),
         generated_fields=generate_field_names,
     )
+
+    # TODO: debug root cause
+    if not hasattr(dr, 'filename'):
+        setattr(dr, 'filename', candidate.filename)
 
     return dr, conventional_query_stats
 
@@ -493,6 +507,11 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
             generated_fields=generate_field_names,
         )
 
+        # TODO: debug root cause
+        for dr in drs:
+            if not hasattr(dr, 'filename'):
+                setattr(dr, 'filename', candidate.filename)
+
         return drs, full_code_gen_stats, conventional_query_stats
 
     else:
@@ -573,5 +592,9 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
             input_fields=td.inputSchema.fieldNames(),
             generated_fields=generate_field_names,
         )
+
+        # TODO: debug root cause
+        if not hasattr(dr, 'filename'):
+            setattr(dr, 'filename', candidate.filename)
 
         return dr, full_code_gen_stats, conventional_query_stats

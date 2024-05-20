@@ -391,14 +391,14 @@ class DSPyGenerator(BaseGenerator):
             stats.answer_log_probs = answer_log_probs
             stats.answer = pred.answer
 
-        print("----------------")
-        print(f"PROMPT")
-        print("----------------")
-        print(dspy_lm.history[-1]['prompt'])
+        # print("----------------")
+        # print(f"PROMPT")
+        # print("----------------")
+        # print(dspy_lm.history[-1]['prompt'])
 
-        print("----------------")
-        print(f"ANSWER")
-        print("----------------")
+        # print("----------------")
+        # print(f"ANSWER")
+        # print("----------------")
         print(pred.answer)
 
         # taken reduction post processing if enabled
