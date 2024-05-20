@@ -546,7 +546,7 @@ class LogicalOperator:
                 for paretoTime, paretoCost, paretoQuality, _, _ in paretoFrontierPlans:
                     time_dist = (totalTime - paretoTime) / paretoTime
                     cost_dist = (totalCost - paretoCost) / paretoCost
-                    quality_dist = (paretoQuality - quality) / quality
+                    quality_dist = (paretoQuality - quality) / quality if quality > 0 else 10.0
                     dist = time_dist + cost_dist + quality_dist
                     if dist < min_dist:
                         min_dist = dist
