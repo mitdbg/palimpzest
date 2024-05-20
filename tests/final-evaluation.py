@@ -684,7 +684,7 @@ def run_reoptimize_eval(workload, policy_str):
     workload_to_fixed_cost = {
         "enron": 20.0,
         "real-estate": 3.0,
-        "biofabric": 2.0,
+        "biofabric": 3.0,
     }
     workload_to_fixed_runtime = {
         "enron": 10000,
