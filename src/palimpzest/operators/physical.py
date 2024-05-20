@@ -448,6 +448,8 @@ class InduceFromCandidateOp(PhysicalOp):
             selectivity = cost_est_data[op_filter][model_name]["selectivity"]
             quality = cost_est_data[op_filter][model_name]["quality"]
 
+            # TODO: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
+            #       which would wildly mess up estimate of time and cost per-record
             # do code synthesis adjustment
             if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
                 time_per_record = 1e-5

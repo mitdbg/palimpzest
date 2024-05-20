@@ -1,5 +1,5 @@
 from palimpzest.datamanager import DataDirectory
-from palimpzest.constants import PromptStrategy, CodeGenStrategy
+from palimpzest.constants import PromptStrategy, CodeGenStrategy, Model
 from palimpzest.elements import DataRecord
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
 from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats, CodeGenEnsembleStats, FullCodeGenStats, GenerationStats
@@ -456,7 +456,7 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                         # print("---------------")
                         # invoke LLM to generate output JSON
                         text_content = json.dumps(new_json)
-                        generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
+                        generator = DSPyGenerator(Model.GPT_3_5.value, td.prompt_strategy, doc_schema, doc_type, verbose)
                         answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx)
 
                         # update conv_query_stats
@@ -541,7 +541,7 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                     # print("---------------")
                     # invoke LLM to generate output JSON
                     text_content = json.loads(candidate_dict)
-                    generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
+                    generator = DSPyGenerator(Model.GPT_3_5.value, td.prompt_strategy, doc_schema, doc_type, verbose)
                     answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx)
 
                     # update stats
