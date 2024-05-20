@@ -527,18 +527,25 @@ class LogicalOperator:
         # if specified, grab up to `min` total plans, and choose the remaining plans
         # based on their smallest agg. distance to the pareto frontier; distance is computed
         # by summing the pct. difference to the pareto frontier across each dimension
-        finalPlans = paretoFrontierPlans + baselinePlans
+        def is_in_final_plans(plan, finalPlans):
+            # determine if this plan is already in the final set of plans
+            for _, _, _, finalPlan, _ in finalPlans:
+                if plan == finalPlan:
+                    return True
+            return False
+
+        finalPlans = paretoFrontierPlans
+        for planInfo in baselinePlans:
+            if is_in_final_plans(planInfo[3], finalPlans):
+                continue
+            else:
+                finalPlans.append(planInfo)
+
         if min is not None and len(finalPlans) < min:
             min_distances = []
             for i, (totalTime, totalCost, quality, plan, fullPlanCostEst) in enumerate(dedup_plans):
                 # determine if this plan is already in the final set of plans
-                is_in_final_set = False
-                for _, _, _, finalPlan, _ in finalPlans:
-                    if plan == finalPlan:
-                        is_in_final_set = True
-                        break
-
-                if is_in_final_set:
+                if is_in_final_plans(plan, finalPlans):
                     continue
 
                 # otherwise compute min distance to plans on pareto frontier
