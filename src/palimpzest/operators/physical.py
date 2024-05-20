@@ -516,12 +516,14 @@ class InduceFromCandidateOp(PhysicalOp):
             est_num_input_tokens *= FEW_SHOT_PROMPT_INFLATION
 
         # get est. of conversion time per record from model card;
-        model_conversion_time_per_record = MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+        # NOTE: model will only be None for code generation, which uses GPT-3.5 as fallback
+        model_name = self.model.value if self.model is not None else Model.GPT_3_5.value
+        model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            MODEL_CARDS[model_name]["usd_per_input_token"] * est_num_input_tokens
+            + MODEL_CARDS[model_name]["usd_per_output_token"] * est_num_output_tokens
         )
 
         # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
@@ -553,7 +555,7 @@ class InduceFromCandidateOp(PhysicalOp):
         totalUSD = model_conversion_usd_per_record * inputEstimates["cardinality"] + inputEstimates["totalUSD"]
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * inputEstimates["quality"]
+        quality = (MODEL_CARDS[model_name]["MMLU"] / 100.0) * inputEstimates["quality"]
 
         # TODO: make this better after arxiv; right now codegen is hard-coded to use GPT-4
         # if we're using code generation, assume that quality goes down (or view it as E[Quality] = (p=gpt4[code])*1.0 + (p=0.25)*0.0))
@@ -813,12 +815,13 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             est_num_input_tokens *= FEW_SHOT_PROMPT_INFLATION
 
         # get est. of conversion time per record from model card;
-        model_conversion_time_per_record = MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+        model_name = self.model.value if self.model is not None else Model.GPT_3_5.value
+        model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            MODEL_CARDS[model_name]["usd_per_input_token"] * est_num_input_tokens
+            + MODEL_CARDS[model_name]["usd_per_output_token"] * est_num_output_tokens
         )
 
         # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
@@ -846,7 +849,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         totalUSD = model_conversion_usd_per_record * inputEstimates["cardinality"] + inputEstimates["totalUSD"]
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * inputEstimates["quality"]
+        quality = (MODEL_CARDS[model_name]["MMLU"] / 100.0) * inputEstimates["quality"]
 
         # TODO: make this better after arxiv; right now codegen is hard-coded to use GPT-4
         # if we're using code generation, assume that quality goes down (or view it as E[Quality] = (p=gpt4[code])*1.0 + (p=0.25)*0.0))
