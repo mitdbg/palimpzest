@@ -274,7 +274,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
                 generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
                 answer, record_stats = None, None
                 try:
-                    answer, record_stats = generator.generate(text_content, promptQuestion, plan_idx=td.plan_idx)
+                    answer, _, record_stats = generator.generate(text_content, promptQuestion, plan_idx=td.plan_idx)
                     jsonObj = _get_JSON_from_answer(answer)["items"][0]
                     query_stats[f"all_fields_one_to_many_conventional_{idx}"] = record_stats
                 except IndexError as e:
