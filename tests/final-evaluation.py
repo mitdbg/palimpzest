@@ -188,12 +188,18 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
     """
     # parse records
     # exclude_keys = ["filename", "op_id", "uuid", "parent_uuid", "stats"]
+    include_keys = ['age_at_diagnosis', 'ajcc_pathologic_n', 'ajcc_pathologic_stage',
+       'ajcc_pathologic_t', 'case_submitter_id', 'ethnicity', 'gender',
+       'morphology', 'primary_diagnosis', 'race',
+       'tissue_or_organ_of_origin', 'tumor_focality', 'tumor_grade',
+       'tumor_largest_dimension_diameter', 'vital_status']
     output_rows = []
     for rec in records:
+        dct = {k: v for k, v in rec.items() if k in include_keys}
         # dct = {k:v for k,v in rec._asDict().items() if k not in exclude_keys}
         # filename = os.path.basename(rec._asDict()["filename"])
-        rec["study"] = rec['filename'].split("_")[0]
-        output_rows.append(rec)
+        dct["study"] = rec['filename'].split("_")[0]
+        output_rows.append(dct)
 
     records_df = pd.DataFrame(output_rows)
     if not reopt:
@@ -234,8 +240,7 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
             max_col = "missing"
             for input_col in input_df.columns:
                 try:
-                    matches = sum([1 for idx,x in enumerate(output_study[col]) if x == input_df[input_col]
-                    [idx]])
+                    matches = sum([1 for idx,x in enumerate(output_study[col]) if x == input_df[input_col][idx]])
                 except:
                     pdb.set_trace()
                 if matches > max_matches:
@@ -664,10 +669,12 @@ def evaluate_pz_plans(workload, dry_run=False):
         cache.rmCachedData(f"codeEnsemble{plan_idx}")
         cache.rmCachedData(f"codeSamples{plan_idx}")
 
-    with Pool(processes=num_plans) as pool:
-        sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
-        _ = pool.starmap(evaluate_pz_plan, [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)])
-
+    # with Pool(processes=num_plans) as pool:
+    #     sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
+    #     _ = pool.starmap(evaluate_pz_plan, [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)])
+    sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
+    for plan_idx in [0]:
+        evaluate_pz_plan(sentinel_data, workload, plan_idx)
     # for plan_idx in range(num_plans):
     #     sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
     #     evaluate_pz_plan(sentinel_data, workload, plan_idx)
