@@ -189,7 +189,7 @@ def plot_runtime_cost_vs_quality(results):
 
 
 def plot_reopt(results, workload):
-    fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(16,6))
+    fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(16,6))
 
     # parse results into fields
     results_df = pd.DataFrame(results)
@@ -203,10 +203,16 @@ def plot_reopt(results, workload):
         ("real-estate", "cost", 1, 0),
         ("real-estate", "runtime", 1, 1),
         ("real-estate", "f1_score", 1, 2),
+        ("biofabric", "cost", 2, 0),
+        ("biofabric", "runtime", 2, 1),
+        ("biofabric", "f1_score", 2, 2),
     ]
 
     for workload, metric, row, col in plots:
         data_df = results_df[(results_df.workload==workload) & (results_df.metric==metric)]
+
+        if metric == "runtime":
+            data_df['value'] = data_df.value / 60.0
 
         policy_to_label_col = {
             "max-quality-at-fixed-cost": "Policy A",
@@ -223,7 +229,7 @@ def plot_reopt(results, workload):
 
         g = sns.barplot(
             data=data_df, # kind="bar",
-            x="value", y="label_col", hue="label_col",
+            x="value", y="label_col", hue="plan",
             alpha=.6, # palette=, height=6,
             ax=axs[row][col],
         )
@@ -231,14 +237,23 @@ def plot_reopt(results, workload):
         #     g.legend_.set_title(None)
         # else:
         #     g.legend_.remove()
-        g.set_xlabel(None)
+        xlabel = "Cost (USD)"
+        if metric == "runtime":
+            xlabel = "Single-Threaded Runtime (minutes)"
+        elif metric == "quality":
+            xlabel = "F1-Score"
+        g.set_xlabel(xlabel)
         g.set_ylabel(None)
+        if col > 0:
+            g.set_yticklabels([])
 
-    axs[0][0].set_title("Cost (USD)", fontsize=10)
-    axs[0][1].set_title("Single-Threaded Runtime (s)", fontsize=10)
-    axs[0][2].set_title("F1 Score", fontsize=10)
+    # axs[0][0].set_title("Cost (USD)", fontsize=10)
+    # axs[0][1].set_title("Single-Threaded Runtime (minutes)", fontsize=10)
+    # axs[0][2].set_title("F1 Score", fontsize=10)
     axs[0][0].set_ylabel("Legal Discovery", fontsize=10)
     axs[1][0].set_ylabel("Real Estate Search", fontsize=10)
+    axs[2][0].set_ylabel("Medical Schema Matching", fontsize=10)
+    fig.suptitle("Palimpzest Selected Plans vs. GPT-4 Baseline")
 
     fig.savefig(f"final-eval-results/plots/reopt.png", dpi=500, bbox_inches="tight")
 
@@ -333,21 +348,21 @@ if __name__ == "__main__":
             "max-quality-at-fixed-cost": {
                 "enron": "final-eval-results/enron/results-1.json",
                 "real-estate": "final-eval-results/reoptimization/real-estate/max-quality-at-fixed-cost.json",
-                "biofabric": None,
+                "biofabric": "final-eval-results/reoptimization/biofabric/max-quality-at-fixed-cost.json",
             },
             ### max quality
             "max-quality-at-fixed-runtime": {
                 "enron": "",
                 # NOTE: if reopt. picked plan which we already had results for from scatter, we simply used those
                 "real-estate": "final-eval-results/real-estate/results-0.json",
-                "biofabric": None,
+                "biofabric": "final-eval-results/reoptimization/biofabric/max-quality-at-fixed-runtime.json",
             },
             ### min cost
             "min-cost-at-fixed-quality": {
                 "enron": "",
                 # NOTE: if reopt. picked plan which we already had results for from scatter, we simply used those
                 "real-estate": "final-eval-results/real-estate/results-3.json",
-                "biofabric": None,
+                "biofabric": "final-eval-results/reoptimization/biofabric/min-cost-at-fixed-quality.json",
             },
         }
         policy_to_naive_plan = {  # TODO: change to GPT-4 baseline everywhere
@@ -355,27 +370,27 @@ if __name__ == "__main__":
             "max-quality-at-fixed-cost": {
                 "enron": 18,
                 "real-estate": 8,
-                "biofabric": None,
+                "biofabric": 2,
             },
             ### max quality
             "max-quality-at-fixed-runtime": {
                 "enron": 18,
                 "real-estate": 8,
-                "biofabric": None,
+                "biofabric": 2,
             },
             ### min cost
             "min-cost-at-fixed-quality": {
                 "enron": 18,
                 "real-estate": 8,
-                "biofabric": None,
+                "biofabric": 2,
             },
         }
         results = []
-        for workload in ["enron", "real-estate"]:
+        for workload in ["enron", "real-estate", "biofabric"]:
             for policy in ["max-quality-at-fixed-cost", "max-quality-at-fixed-runtime", "min-cost-at-fixed-quality"]: #, "min-runtime-at-fixed-quality"]:
             # for workload in ["enron", "real-estate", "biofabric"]:
-            
-                with open(f'final-eval-results/reoptimization/{workload}/{policy}.json', 'r') as f:
+                fp = policy_to_plan[policy][workload]
+                with open(fp, 'r') as f:
                     result_dict = json.load(f)
                     # results.append({"plan": "PZ", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
                     results.append({"plan": "PZ", "policy": policy, "workload": workload, "metric": "f1_score", "value": result_dict["f1_score"]})

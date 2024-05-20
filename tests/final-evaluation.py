@@ -684,17 +684,17 @@ def run_reoptimize_eval(workload, policy_str):
     workload_to_fixed_cost = {
         "enron": 20.0,
         "real-estate": 3.0,
-        "biofabric": 4.0,
+        "biofabric": 2.0,
     }
     workload_to_fixed_runtime = {
         "enron": 10000,
-        "real-estate": 750,
+        "real-estate": 600,
         "biofabric": 1000,
     }
     workload_to_fixed_quality = {
         "enron": 0.8,
         "real-estate": 0.8,
-        "biofabric": 0.45,
+        "biofabric": 0.40,
     }
 
     policy = pz.MaxHarmonicMean()
