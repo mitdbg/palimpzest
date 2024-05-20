@@ -137,8 +137,8 @@ def plot_runtime_cost_vs_quality(results):
             left = 0.7
             right = 0.85
         elif workload == "biofabric":
-            left = -0.05
-            right = 0.6
+            left = 0.15
+            right = 0.55
 
         axs_text[0][col].set_xlim(left, right)
         axs_text[0][col].set_ylim(ymin=0)
