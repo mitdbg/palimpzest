@@ -317,7 +317,7 @@ if __name__ == "__main__":
             "biofabric": [],
         }
         # for workload in ["enron", "real-estate", "biofabric"]:
-        for workload in ["real-estate"]: # TODO
+        for workload in ["enron", "real-estate"]:
             num_plans = workload_to_num_plans[workload]
             for plan_idx in range(num_plans):
                 with open(f"final-eval-results/{workload}/results-{plan_idx}.json", 'r') as f:
@@ -349,7 +349,7 @@ if __name__ == "__main__":
                 "biofabric": ("model", 3),
             },
         }
-        policy_to_naive_plan = {
+        policy_to_naive_plan = {  # TODO: change to GPT-4 baseline everywhere
             ### max quality
             "max-quality-at-fixed-cost": {
                 "enron": ("token-reduction", 1),
