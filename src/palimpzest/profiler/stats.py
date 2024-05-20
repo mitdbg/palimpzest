@@ -778,15 +778,8 @@ class StatsProcessor:
             # otherwise, check equality on a per-key basis
             try:
                 # we'll measure recal on accepted_answer, as extraneous info is often not an issue
-                answer = ast.literal_eval(row['answer'])
-                accepted_answer = ast.literal_eval(row['accepted_answer'])
-
-                # parse items if it is top-level item
-                if len(answer.keys()) == 1 and "items" in answer:
-                    answer = answer['items'][0]
-
-                if len(accepted_answer.keys()) == 1 and "items" in accepted_answer:
-                    accepted_answer = accepted_answer['items'][0]
+                answer = row['answer']
+                accepted_answer = row['accepted_answer']
                 
                 tp = 0
                 for key, value in accepted_answer.items():
