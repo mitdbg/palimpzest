@@ -102,7 +102,7 @@ def plot_runtime_cost_vs_quality(results):
             axs_text[1][col].annotate(text, (f1_score, cost))
 
         # compute pareto frontiers across all optimizations
-        if workload == "real-estate": # TODO: remove
+        if workload in ["enron", "real-estate"]:
             all_result_dicts = list(map(lambda tup: tup[1], result_tuples))
             cost_pareto_lst_indices = get_pareto_indices(all_result_dicts, "cost")
             runtime_pareto_lst_indices = get_pareto_indices(all_result_dicts, "runtime")
