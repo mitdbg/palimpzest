@@ -109,9 +109,9 @@ def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
     return json.loads(answer)
 
 
-def _create_data_record_from_json(jsonObj: Any, td: TaskDescriptor, candidate: DataRecord) -> DataRecord:
+def _create_data_record_from_json(jsonObj: Any, td: TaskDescriptor, candidate: DataRecord, cardinality_idx: int=None) -> DataRecord:
     # initialize data record
-    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
+    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid, cardinality_idx=cardinality_idx)
 
     # get input field names and output field names
     input_fields = td.inputSchema.fieldNames()
@@ -209,8 +209,8 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
         if td.cardinality == "oneToMany":
             if len(jsonObj["items"]) == 0:
                 raise Exception("No output objects were generated with bonded query - trying with conventional query...")
-            for elt in jsonObj["items"]:
-                dr = _create_data_record_from_json(elt, td, candidate)
+            for idx, elt in enumerate(jsonObj["items"]):
+                dr = _create_data_record_from_json(elt, td, candidate, cardinality_idx=idx)
                 drs.append(dr)
         else:
             dr = _create_data_record_from_json(jsonObj, td, candidate)
@@ -292,7 +292,7 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
                     print(answer)
                     continue
 
-                dr = _create_data_record_from_json(jsonObj, td, candidate)
+                dr = _create_data_record_from_json(jsonObj, td, candidate, cardinality_idx=idx)
                 drs.append(dr)
 
             # TODO how to stat this? I feel that we need a new Stats class for this type of query
@@ -401,7 +401,7 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
         full_code_gen_stats, conv_query_stats = FullCodeGenStats(), {}
         for idx in range(n_splits):
             # initialize output data record
-            dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
+            dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid, cardinality_idx=idx)
 
             cache = DataDirectory().getCacheService()
             for field_name in generate_field_names:

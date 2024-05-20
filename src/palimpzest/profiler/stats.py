@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Tuple, Union
 import numpy as np
 import pandas as pd
 
+import ast
 import json
 import re
 
@@ -770,7 +771,33 @@ class StatsProcessor:
                 record_uuid_to_answer[record_uuid] = record_df.answer.mode().iloc[0]
 
         def _is_correct(row):
-            return row['answer'] == row['accepted_answer']
+            # simple equality check suffices for filter
+            if "filter" in row["op_name"]:
+                return row['answer'] == row['accepted_answer']
+
+            # otherwise, check equality on a per-key basis
+            try:
+                # we'll measure recal on accepted_answer, as extraneous info is often not an issue
+                answer = ast.literal_eval(row['answer'])
+                accepted_answer = ast.literal_eval(row['accepted_answer'])
+
+                # parse items if it is top-level item
+                if len(answer.keys()) == 1 and "items" in answer:
+                    answer = answer['items'][0]
+
+                if len(accepted_answer.keys()) == 1 and "items" in accepted_answer:
+                    accepted_answer = accepted_answer['items'][0]
+                
+                tp = 0
+                for key, value in accepted_answer.items():
+                    if key in answer and answer[key] == value:
+                        tp += 1
+                
+                return tp / len(accepted_answer)
+
+            except Exception as e:
+                print(f"WARNING: error decoding answer or accepted_answer: {str(e)}")
+                return False
 
         # compute accepted answers and clean all answers
         op_df.loc[:, 'accepted_answer'] = op_df.record_uuid.apply(lambda uuid: record_uuid_to_answer[uuid])
@@ -784,10 +811,10 @@ class StatsProcessor:
         )
 
         est_quality = (
-            model_df[model_df.correct].shape[0] / model_df.shape[0]
+            model_df.correct.sum() / model_df.shape[0]
             if not model_df.empty
             else (
-                op_df[op_df.correct].shape[0] / op_df.shape[0]
+                op_df.correct.sum() / op_df.shape[0]
                 if not op_df.empty
                 else MODEL_CARDS[model_name]["MMLU"] / 100.0
             )
@@ -818,6 +845,18 @@ class StatsProcessor:
             else:
                 return answer
 
+        def _get_answer(op_name, record_dict, generated_fields):
+            # return T/F for filter
+            if "filter" in op_name:
+                return record_dict["_passed_filter"]
+
+            # return key->value mapping for generated fields for induce
+            answer = {}
+            for field in generated_fields:
+                answer[field] = record_dict[field]
+            
+            return answer
+
         # get values needed to compute observation metrics
         additional_fields_dict = {
             "model_name": op_stats.model_name,
@@ -828,7 +867,8 @@ class StatsProcessor:
             "num_output_tokens": op_stats.total_output_tokens,
             "input_usd": op_stats.total_input_usd,
             "output_usd": op_stats.total_output_usd,
-            "answer": _clean_answer(op_stats.answers[0], op_name) if len(op_stats.answers) > 0 else None,
+            # "answer": _clean_answer(op_stats.answers[0], op_name) if len(op_stats.answers) > 0 else None,
+            "answer": _get_answer(op_name, record_dict, op_stats.generated_fields),
             "answer_log_probs": op_stats.answer_log_probs[0] if len(op_stats.answer_log_probs) > 0 else None,
         }
 

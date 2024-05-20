@@ -9,7 +9,7 @@ MAX_UUID_CHARS = 10
 
 class DataRecord:
     """A DataRecord is a single record of data matching some Schema."""
-    def __init__(self, schema: Schema, parent_uuid: str=None, scan_idx: int=None):
+    def __init__(self, schema: Schema, parent_uuid: str=None, scan_idx: int=None, cardinality_idx: int=None):
         # schema for the data record
         self._schema = schema
 
@@ -18,7 +18,11 @@ class DataRecord:
         #       samples from plans in parallel)
         # unique identifier for the record
         # self._uuid = str(uuid.uuid4())[:MAX_UUID_CHARS]
-        uuid_str = str(schema) + (parent_uuid if parent_uuid is not None else str(scan_idx))
+        uuid_str = (
+            str(schema) + (parent_uuid if parent_uuid is not None else str(scan_idx))
+            if cardinality_idx is None
+            else str(schema) + str(cardinality_idx) + (parent_uuid if parent_uuid is not None else str(scan_idx))
+        )
         self._uuid = hashlib.sha256(uuid_str.encode('utf-8')).hexdigest()[:MAX_UUID_CHARS]
         self._parent_uuid = parent_uuid
 
