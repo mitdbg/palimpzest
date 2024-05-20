@@ -22,7 +22,7 @@ import os
 import pdb
 
 
-def get_color(workload, result_dict):
+def get_color(workload, result_dict, plan_idx):
     color = "black"
     if workload != "real-estate" and len(set(filter(None, result_dict['plan_info']['models']))) > 1:
         color = "green"
@@ -40,6 +40,9 @@ def get_color(workload, result_dict):
         # give color to logical re-orderings on real-estate
         if result_dict['plan_info']['models'][1] == "gpt-4-vision-preview":
             color = "green"
+    
+    elif workload == "enron" and plan_idx == 0:
+        color = "green"
 
     return color
 
@@ -87,7 +90,7 @@ def plot_runtime_cost_vs_quality(results):
             text = f"{plan_idx}"
 
             # set label and color
-            color = get_color(workload, result_dict)
+            color = get_color(workload, result_dict, plan_idx)
             marker = 'D' if color == "black" else None
             # mcolor = "black" if color == "black" else "#87bc45"
 
@@ -135,7 +138,7 @@ def plot_runtime_cost_vs_quality(results):
             left = 0.7
             right = 0.85
         elif workload == "biofabric":
-            left = 0.3
+            left = -0.05
             right = 0.6
 
         axs_text[0][col].set_xlim(left, right)
@@ -233,7 +236,7 @@ def plot_reopt(results, workload):
         g.set_ylabel(None)
 
     axs[0][0].set_title("Cost (USD)", fontsize=10)
-    axs[0][1].set_title("Runtime (s)", fontsize=10)
+    axs[0][1].set_title("Single-Threaded Runtime (s)", fontsize=10)
     axs[0][2].set_title("F1 Score", fontsize=10)
     axs[0][0].set_ylabel("Legal Discovery", fontsize=10)
     axs[1][0].set_ylabel("Real Estate Search", fontsize=10)
@@ -316,8 +319,7 @@ if __name__ == "__main__":
             "real-estate": [],
             "biofabric": [],
         }
-        # for workload in ["enron", "real-estate", "biofabric"]:
-        for workload in ["enron", "real-estate"]:
+        for workload in ["enron", "real-estate", "biofabric"]:
             num_plans = workload_to_num_plans[workload]
             for plan_idx in range(num_plans):
                 with open(f"final-eval-results/{workload}/results-{plan_idx}.json", 'r') as f:
@@ -327,56 +329,46 @@ if __name__ == "__main__":
         plot_runtime_cost_vs_quality(results)
 
     if args.reopt:
-        policy_to_best_plan = {
+        policy_to_plan = {
+            ### max quality
             "max-quality-at-fixed-cost": {
-                "enron": ("model", 5),
-                "real-estate": ("token-reduction", 8),
-                "biofabric": ("token-reduction", 11),
+                "enron": "final-eval-results/enron/results-1.json",
+                "real-estate": "final-eval-results/reoptimization/real-estate/max-quality-at-fixed-cost.json",
+                "biofabric": None,
             },
+            ### max quality
             "max-quality-at-fixed-runtime": {
-                "enron": ("model", 6),
-                "real-estate": ("token-reduction", 8),
-                "biofabric": ("token-reduction", 8),
+                "enron": "",
+                # NOTE: if reopt. picked plan which we already had results for from scatter, we simply used those
+                "real-estate": "final-eval-results/real-estate/results-0.json",
+                "biofabric": None,
             },
+            ### min cost
             "min-cost-at-fixed-quality": {
-                "enron": ("model", 6),
-                "real-estate": ("codegen", 6),
-                "biofabric": ("token-reduction", 11),
-            },
-            "min-runtime-at-fixed-quality": {
-                "enron": ("model", 6),
-                "real-estate": ("codegen", 6),
-                "biofabric": ("model", 3),
+                "enron": "",
+                # NOTE: if reopt. picked plan which we already had results for from scatter, we simply used those
+                "real-estate": "final-eval-results/real-estate/results-3.json",
+                "biofabric": None,
             },
         }
         policy_to_naive_plan = {  # TODO: change to GPT-4 baseline everywhere
             ### max quality
             "max-quality-at-fixed-cost": {
-                "enron": ("token-reduction", 1),
-                "real-estate": ("token-reduction", 9),
-                "biofabric": ("token-reduction", 4),
+                "enron": 18,
+                "real-estate": 8,
+                "biofabric": None,
             },
             ### max quality
             "max-quality-at-fixed-runtime": {
-                "enron": ("token-reduction", 1),
-                "real-estate": ("token-reduction", 9),
-                "biofabric": ("token-reduction", 4),
+                "enron": 18,
+                "real-estate": 8,
+                "biofabric": None,
             },
             ### min cost
             "min-cost-at-fixed-quality": {
-                # "enron": ("token-reduction", 0), # ("model", 10),
-                "enron": ("token-reduction", 1),
-                # "real-estate": ("codegen", 0),
-                "real-estate": ("token-reduction", 9),
-                "biofabric": ("token-reduction", 8),
-            },
-            ### min runtime
-            "min-runtime-at-fixed-quality": {
-                # "enron": ("token-reduction", 0), # ("model", 10),
-                "enron": ("token-reduction", 1),
-                # "real-estate": ("codegen", 0),
-                "real-estate": ("token-reduction", 9),
-                "biofabric": ("model", 0),
+                "enron": 18,
+                "real-estate": 8,
+                "biofabric": None,
             },
         }
         results = []
@@ -396,8 +388,8 @@ if __name__ == "__main__":
                 #     result_dict = json.load(f)
                 #     results.append({"plan": "Best", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
                 
-                naive_plan_opt, naive_plan_idx = policy_to_naive_plan[policy][workload]
-                with open(f'final-eval-results/{naive_plan_opt}/{workload}/results-{naive_plan_idx}.json', 'r') as f:
+                naive_plan_idx = policy_to_naive_plan[policy][workload]
+                with open(f'final-eval-results/{workload}/results-{naive_plan_idx}.json', 'r') as f:
                     result_dict = json.load(f)
                     # results.append({"plan": "Baseline", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
                     results.append({"plan": "Baseline", "policy": policy, "workload": workload, "metric": "f1_score", "value": result_dict["f1_score"]})
