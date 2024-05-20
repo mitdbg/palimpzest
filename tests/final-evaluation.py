@@ -198,7 +198,7 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
         dct = {k: v for k, v in rec.items() if k in include_keys}
         # dct = {k:v for k,v in rec._asDict().items() if k not in exclude_keys}
         # filename = os.path.basename(rec._asDict()["filename"])
-        dct["study"] = os.path.basename(rec['filename'])
+        dct["study"] = os.path.basename(rec['filename']).split("_")[0]
         output_rows.append(dct)
 
     records_df = pd.DataFrame(output_rows)
@@ -225,7 +225,7 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
     for study in studies:
         output_study = output[output["study"] == study]
         try:
-            input_df = pd.read_excel(os.path.join("testdata/biofabric-matching/", f"{study}"))
+            input_df = pd.read_excel(os.path.join("testdata/biofabric-matching/", f"{study}.xlsx"))
         except:
             print("Cannot find the study", study)
             targets += [study]*5 
@@ -668,15 +668,9 @@ def evaluate_pz_plans(workload, dry_run=False):
         cache.rmCachedData(f"codeEnsemble{plan_idx}")
         cache.rmCachedData(f"codeSamples{plan_idx}")
 
-    # with Pool(processes=num_plans) as pool:
-    #     sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
-    #     _ = pool.starmap(evaluate_pz_plan, [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)])
-    sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
-    for plan_idx in [0]:
-        evaluate_pz_plan(sentinel_data, workload, plan_idx)
-    # for plan_idx in range(num_plans):
-    #     sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
-    #     evaluate_pz_plan(sentinel_data, workload, plan_idx)
+    with Pool(processes=num_plans) as pool:
+        sentinel_data = (total_sentinel_cost, total_sentinel_time, all_cost_estimate_data, sentinel_records, num_samples)
+        _ = pool.starmap(evaluate_pz_plan, [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)])
 
     # workaround to disabling cache: delete all cached generations after each plan
     dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
