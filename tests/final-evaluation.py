@@ -762,63 +762,63 @@ def run_reoptimize_eval(workload, policy_str):
     graphicEmit(flatten_ops)
     print("---")
 
-    # run the plan
-    new_records = [r for r in plan]
-    runtime = time.time() - start_time
+    # # run the plan
+    # new_records = [r for r in plan]
+    # runtime = time.time() - start_time
 
-    # parse new_records
-    new_records = [
-        {
-            key: record.__dict__[key]
-            for key in record.__dict__
-            if not key.startswith('_') and key not in ["image_contents"]
-        }
-        for record in new_records
-    ]
-    all_records = sentinel_records + new_records
+    # # parse new_records
+    # new_records = [
+    #     {
+    #         key: record.__dict__[key]
+    #         for key in record.__dict__
+    #         if not key.startswith('_') and key not in ["image_contents"]
+    #     }
+    #     for record in new_records
+    # ]
+    # all_records = sentinel_records + new_records
 
-    # get profiling data for plan and compute its cost
-    profileData = plan.getProfilingData()
-    sp = StatsProcessor(profileData)
+    # # get profiling data for plan and compute its cost
+    # profileData = plan.getProfilingData()
+    # sp = StatsProcessor(profileData)
 
-    # workaround to disabling cache: delete all cached generations after each plan
-    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
-    if os.path.exists(dspy_cache_dir):
-        shutil.rmtree(dspy_cache_dir)
+    # # workaround to disabling cache: delete all cached generations after each plan
+    # dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+    # if os.path.exists(dspy_cache_dir):
+    #     shutil.rmtree(dspy_cache_dir)
 
-    plan_info = {
-        "plan_idx": None,
-        "plan_label": compute_label(plan, plan_idx),
-        "models": [],
-        "op_names": [],
-        "generated_fields": [],
-        "query_strategies": [],
-        "token_budgets": []
-    }
-    cost = total_sentinel_cost
-    stats = sp.profiling_data
-    while stats is not None:
-        cost += stats.total_usd
-        plan_info["models"].append(stats.model_name)
-        plan_info["op_names"].append(stats.op_name)
-        plan_info["generated_fields"].append(stats.generated_fields)
-        plan_info["query_strategies"].append(stats.query_strategy)
-        plan_info["token_budgets"].append(stats.token_budget)
-        stats = stats.source_op_stats
+    # plan_info = {
+    #     "plan_idx": None,
+    #     "plan_label": compute_label(plan, plan_idx),
+    #     "models": [],
+    #     "op_names": [],
+    #     "generated_fields": [],
+    #     "query_strategies": [],
+    #     "token_budgets": []
+    # }
+    # cost = total_sentinel_cost
+    # stats = sp.profiling_data
+    # while stats is not None:
+    #     cost += stats.total_usd
+    #     plan_info["models"].append(stats.model_name)
+    #     plan_info["op_names"].append(stats.op_name)
+    #     plan_info["generated_fields"].append(stats.generated_fields)
+    #     plan_info["query_strategies"].append(stats.query_strategy)
+    #     plan_info["token_budgets"].append(stats.token_budget)
+    #     stats = stats.source_op_stats
 
-    # score plan
-    f1_score = score_plan(workload, all_records, None, policy_str=policy_str, reopt=True)
+    # # score plan
+    # f1_score = score_plan(workload, all_records, None, policy_str=policy_str, reopt=True)
 
-    # construct and return result_dict
-    result_dict = {
-        "runtime": runtime,
-        "cost": cost,
-        "f1_score": f1_score,
-        "plan_info": plan_info,
-    }
+    # # construct and return result_dict
+    # result_dict = {
+    #     "runtime": runtime,
+    #     "cost": cost,
+    #     "f1_score": f1_score,
+    #     "plan_info": plan_info,
+    # }
 
-    with open(f"final-eval-results/reoptimization/{workload}/{policy_str}.json", 'w') as f:
-        json.dump(result_dict, f)
+    # with open(f"final-eval-results/reoptimization/{workload}/{policy_str}.json", 'w') as f:
+    #     json.dump(result_dict, f)
 
 
 if __name__ == "__main__":
