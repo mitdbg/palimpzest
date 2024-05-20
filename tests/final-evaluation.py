@@ -807,7 +807,7 @@ def run_reoptimize_eval(workload, policy_str):
         stats = stats.source_op_stats
 
     # score plan
-    f1_score = score_plan(None, workload, all_records, None, policy_str=policy_str, reopt=True)
+    f1_score = score_plan(workload, all_records, None, policy_str=policy_str, reopt=True)
 
     # construct and return result_dict
     result_dict = {
