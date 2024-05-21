@@ -253,6 +253,9 @@ def plot_reopt(results, workload):
             g.set_yticklabels([])
         if col > 0 or row > 0:
             g.legend_.remove()
+        
+        if col == 2:
+            axs[row][col].set_xlim(0, 1.05)
 
     # axs[0][0].set_title("Cost (USD)", fontsize=10)
     # axs[0][1].set_title("Single-Threaded Runtime (minutes)", fontsize=10)
