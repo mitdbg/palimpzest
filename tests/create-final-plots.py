@@ -267,16 +267,16 @@ def plot_reopt(results, workload):
             [2, 16.7, 0.4],
         ]
         ys = [
-            [(0.5, 0.75), (0.25, 0.5), (0, 0.25)],
-            [(0.5, 0.75), (0.25, 0.5), (0, 0.25)],
-            [(0.5, 0.75), (0.25, 0.5), (0, 0.25)],
+            [(0.55, 0.7), (0.3, 0.45), (0.05, 0.2)],
+            [(0.55, 0.7), (0.3, 0.45), (0.05, 0.2)],
+            [(0.55, 0.7), (0.3, 0.45), (0.05, 0.2)],
         ]
         colors = [
             ["green", "green", "green"],
             ["green", "green", "red"],
             ["red", "green", "green"]
         ]
-        axs[row][col].axvline(x=xs[row][col], ymin=ys[row][col][0], ymax=ys[row][col][1], color="black")
+        axs[row][col].axvline(x=xs[row][col], ymin=ys[row][col][0], ymax=ys[row][col][1], color=colors[row][col])
 
     # axs[0][0].set_title("Cost (USD)", fontsize=10)
     # axs[0][1].set_title("Single-Threaded Runtime (minutes)", fontsize=10)
