@@ -256,7 +256,7 @@ def plot_reopt(results, workload):
     axs[0][0].set_ylabel("Legal Discovery", fontsize=10)
     axs[1][0].set_ylabel("Real Estate Search", fontsize=10)
     axs[2][0].set_ylabel("Medical Schema Matching", fontsize=10)
-    axs[0][1].suptitle("Palimpzest Selected Plans vs. GPT-4 Baseline")
+    axs[0][1].set_title("Palimpzest Selected Plans vs. GPT-4 Baseline")
 
     fig.savefig(f"final-eval-results/plots/reopt.png", dpi=500, bbox_inches="tight")
 
