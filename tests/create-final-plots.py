@@ -243,7 +243,7 @@ def plot_reopt(results, workload):
             xlabel = "Cost (USD)"
             if metric == "runtime":
                 xlabel = "Single-Threaded Runtime (minutes)"
-            elif metric == "quality":
+            elif metric == "f1_score":
                 xlabel = "F1-Score"
             g.set_xlabel(xlabel, fontsize=12)
         else:
