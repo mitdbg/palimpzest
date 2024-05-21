@@ -237,13 +237,14 @@ def plot_reopt(results, workload):
         #     g.legend_.set_title(None)
         # else:
         #     g.legend_.remove()
-        xlabel = "Cost (USD)"
-        if metric == "runtime":
-            xlabel = "Single-Threaded Runtime (minutes)"
-        elif metric == "quality":
-            xlabel = "F1-Score"
-        g.set_xlabel(xlabel)
         g.set_ylabel(None)
+        if row == 2:
+            xlabel = "Cost (USD)"
+            if metric == "runtime":
+                xlabel = "Single-Threaded Runtime (minutes)"
+            elif metric == "quality":
+                xlabel = "F1-Score"
+            g.set_xlabel(xlabel)
         if col > 0:
             g.set_yticklabels([])
         if col > 0 or row > 0:
@@ -255,7 +256,7 @@ def plot_reopt(results, workload):
     axs[0][0].set_ylabel("Legal Discovery", fontsize=10)
     axs[1][0].set_ylabel("Real Estate Search", fontsize=10)
     axs[2][0].set_ylabel("Medical Schema Matching", fontsize=10)
-    fig.suptitle("Palimpzest Selected Plans vs. GPT-4 Baseline")
+    axs[0][1].suptitle("Palimpzest Selected Plans vs. GPT-4 Baseline")
 
     fig.savefig(f"final-eval-results/plots/reopt.png", dpi=500, bbox_inches="tight")
 
