@@ -220,10 +220,10 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
         print(f"Bonded query processing error: {e}")
         return None, new_heatmap_json_obj, bonded_query_stats, str(e)
 
-    # TODO: debug root cause
-    for dr in drs:
-        if not hasattr(dr, 'filename'):
-            setattr(dr, 'filename', candidate.filename)
+    # # TODO: debug root cause
+    # for dr in drs:
+    #     if not hasattr(dr, 'filename'):
+    #         setattr(dr, 'filename', candidate.filename)
 
     return drs, new_heatmap_json_obj, bonded_query_stats, None
 
