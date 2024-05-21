@@ -239,6 +239,7 @@ def plot_reopt(results, workload):
         #     g.legend_.remove()
         g.set_ylabel(None)
 
+        # set x-labels
         if row == 2:
             xlabel = "Cost (USD)"
             if metric == "runtime":
@@ -249,13 +250,28 @@ def plot_reopt(results, workload):
         else:
             g.set_xlabel(None)
 
+        # remove legends and tick labels
         if col > 0:
             g.set_yticklabels([])
         if col > 0 or row > 0:
             g.legend_.remove()
-        
+
+        # set x-limits for F1 score
         if col == 2:
             axs[row][col].set_xlim(0, 1.05)
+
+        # add constraints
+        xs = [
+            [20, 166.7, 0.8],
+            [3, 10, 0.8],
+            [2, 16.7, 0.4],
+        ]
+        ys = [
+            [(0.5, 0.75), (0.25, 0.5), (0, 0.25)],
+            [(0.5, 0.75), (0.25, 0.5), (0, 0.25)],
+            [(0.5, 0.75), (0.25, 0.5), (0, 0.25)],
+        ]
+        axs[row][col].axvline(x=xs[row][col], ymin=ys[row][col][0], ymax=ys[row][col][1], linestyle="--", color="black")
 
     # axs[0][0].set_title("Cost (USD)", fontsize=10)
     # axs[0][1].set_title("Single-Threaded Runtime (minutes)", fontsize=10)
