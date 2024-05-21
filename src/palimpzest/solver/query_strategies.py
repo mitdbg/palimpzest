@@ -376,9 +376,9 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
         generated_fields=generate_field_names,
     )
 
-    # TODO: debug root cause
-    if not hasattr(dr, 'filename'):
-        setattr(dr, 'filename', candidate.filename)
+    # # TODO: debug root cause
+    # if not hasattr(dr, 'filename'):
+    #     setattr(dr, 'filename', candidate.filename)
 
     return dr, conventional_query_stats
 
