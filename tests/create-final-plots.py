@@ -245,7 +245,7 @@ def plot_reopt(results, workload):
                 xlabel = "Single-Threaded Runtime (minutes)"
             elif metric == "quality":
                 xlabel = "F1-Score"
-            g.set_xlabel(xlabel)
+            g.set_xlabel(xlabel, fontsize=12)
         else:
             g.set_xlabel(None)
 
@@ -257,10 +257,10 @@ def plot_reopt(results, workload):
     # axs[0][0].set_title("Cost (USD)", fontsize=10)
     # axs[0][1].set_title("Single-Threaded Runtime (minutes)", fontsize=10)
     # axs[0][2].set_title("F1 Score", fontsize=10)
-    axs[0][0].set_ylabel("Legal Discovery", fontsize=10)
-    axs[1][0].set_ylabel("Real Estate Search", fontsize=10)
-    axs[2][0].set_ylabel("Medical Schema Matching", fontsize=10)
-    axs[0][1].set_title("Palimpzest Selected Plans vs. GPT-4 Baseline")
+    axs[0][0].set_ylabel("Legal Discovery", fontsize=12)
+    axs[1][0].set_ylabel("Real Estate Search", fontsize=12)
+    axs[2][0].set_ylabel("Medical Schema Matching", fontsize=12)
+    axs[0][1].set_title("Palimpzest Selected Plans vs. GPT-4 Baseline", fontsize=15)
 
     fig.savefig(f"final-eval-results/plots/reopt.png", dpi=500, bbox_inches="tight")
 
