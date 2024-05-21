@@ -611,8 +611,7 @@ class InduceFromCandidateOp(PhysicalOp):
 
 class ParallelInduceFromCandidateOp(PhysicalOp):
     def __init__(self, outputSchema: Schema, source: PhysicalOp, model: Model, cardinality: str, image_conversion: bool=False, prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA, query_strategy: QueryStrategy=QueryStrategy.BONDED_WITH_FALLBACK, token_budget: float=1.0, desc: str=None, targetCacheId: str=None, streaming=False, shouldProfile=False):
-        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
-        self.source = source
+        super().__init__(outputSchema=outputSchema, source=source, shouldProfile=shouldProfile)
         self.model = model
         self.cardinality = cardinality
         self.image_conversion = image_conversion
@@ -621,8 +620,9 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         self.token_budget = token_budget
         self.desc = desc
         self.targetCacheId = targetCacheId
-        self.max_workers = 20
+        self.max_workers = 32
         self.streaming = streaming
+        self.heatmap_json_obj = None
 
         # use image model if this is an image conversion
         if outputSchema == ImageFile and source.outputSchema == File or self.image_conversion:
@@ -639,6 +639,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             # TODO: remove; for evaluations just use GPT_4V
             self.model = Model.GPT_4V
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
+            self.query_strategy = QueryStrategy.BONDED_WITH_FALLBACK
+            self.token_budget = 1.0
 
         # set model to None if this is a simple conversion
         if self._is_quick_conversion() or self.is_hardcoded():
@@ -693,6 +695,8 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
             token_budget=self.token_budget,
             conversionDesc=self.desc,
             pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
+            plan_idx=self.plan_idx,
+            heatmap_json_obj=self.heatmap_json_obj,
         )
 
     def _is_quick_conversion(self):
@@ -743,12 +747,13 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'induce' | op_name == 'p_induce')"
         if cost_est_data is not None and cost_est_data[op_filter] is not None:
             # get estimate data for this physical op's model
-            time_per_record = cost_est_data[op_filter][self.model.value]["time_per_record"]
-            usd_per_record = cost_est_data[op_filter][self.model.value]["cost_per_record"]
-            est_num_input_tokens = cost_est_data[op_filter][self.model.value]["est_num_input_tokens"]
-            est_num_output_tokens = cost_est_data[op_filter][self.model.value]["est_num_output_tokens"]
-            selectivity = cost_est_data[op_filter][self.model.value]["selectivity"]
-            quality = cost_est_data[op_filter][self.model.value]["quality"]
+            model_name = None if self.model is None else self.model.value
+            time_per_record = cost_est_data[op_filter][model_name]["time_per_record"]
+            usd_per_record = cost_est_data[op_filter][model_name]["cost_per_record"]
+            est_num_input_tokens = cost_est_data[op_filter][model_name]["est_num_input_tokens"]
+            est_num_output_tokens = cost_est_data[op_filter][model_name]["est_num_output_tokens"]
+            selectivity = cost_est_data[op_filter][model_name]["selectivity"]
+            quality = cost_est_data[op_filter][model_name]["quality"]
 
             # do code synthesis adjustment
             if self.query_strategy in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
@@ -805,7 +810,7 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         # override for GPT-4V image conversion
         if self.model == Model.GPT_4V:
             # 1024x1024 image is 765 tokens
-            est_num_input_tokens = 765
+            est_num_input_tokens = 765/10
             est_num_output_tokens = inputEstimates["estOutputTokensPerElement"]
 
         # if we're using a few-shot prompt strategy, the est_num_input_tokens will increase
@@ -918,7 +923,9 @@ class ParallelInduceFromCandidateOp(PhysicalOp):
         # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
         #     raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
         # return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
-        return taskFn(candidate)
+        drs, new_heatmap_json_obj = taskFn(candidate)
+        self.heatmap_json_obj = new_heatmap_json_obj
+        return drs
 
 
 class FilterCandidateOp(PhysicalOp):
@@ -1163,7 +1170,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
         self.model = model if filter.filterFn is None else None
         self.prompt_strategy = prompt_strategy
         self.targetCacheId = targetCacheId
-        self.max_workers = 20
+        self.max_workers = 32
         self.streaming = streaming
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
@@ -1199,6 +1206,7 @@ class ParallelFilterCandidateOp(PhysicalOp):
             filter=self.filter,
             model=self.model,
             prompt_strategy=self.prompt_strategy,
+            plan_idx=self.plan_idx,
         )
 
     def copy(self):
