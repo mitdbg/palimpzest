@@ -352,14 +352,14 @@ if __name__ == "__main__":
             },
             ### max quality
             "max-quality-at-fixed-runtime": {
-                "enron": "",
+                "enron": "final-eval-results/enron/results-2.json",
                 # NOTE: if reopt. picked plan which we already had results for from scatter, we simply used those
                 "real-estate": "final-eval-results/real-estate/results-0.json",
                 "biofabric": "final-eval-results/reoptimization/biofabric/max-quality-at-fixed-runtime.json",
             },
             ### min cost
             "min-cost-at-fixed-quality": {
-                "enron": "",
+                "enron": "final-eval-results/enron/results-9.json",
                 # NOTE: if reopt. picked plan which we already had results for from scatter, we simply used those
                 "real-estate": "final-eval-results/real-estate/results-3.json",
                 "biofabric": "final-eval-results/reoptimization/biofabric/min-cost-at-fixed-quality.json",
