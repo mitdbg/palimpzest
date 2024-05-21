@@ -238,6 +238,7 @@ def plot_reopt(results, workload):
         # else:
         #     g.legend_.remove()
         g.set_ylabel(None)
+
         if row == 2:
             xlabel = "Cost (USD)"
             if metric == "runtime":
@@ -245,6 +246,9 @@ def plot_reopt(results, workload):
             elif metric == "quality":
                 xlabel = "F1-Score"
             g.set_xlabel(xlabel)
+        else:
+            g.set_xlabel(None)
+
         if col > 0:
             g.set_yticklabels([])
         if col > 0 or row > 0:
