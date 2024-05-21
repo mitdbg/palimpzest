@@ -189,7 +189,7 @@ def plot_runtime_cost_vs_quality(results):
 
 
 def plot_reopt(results, workload):
-    fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(16,6))
+    fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(16,8))
 
     # parse results into fields
     results_df = pd.DataFrame(results)
@@ -246,6 +246,8 @@ def plot_reopt(results, workload):
         g.set_ylabel(None)
         if col > 0:
             g.set_yticklabels([])
+        if col > 0 or row > 0:
+            g.legend_.remove()
 
     # axs[0][0].set_title("Cost (USD)", fontsize=10)
     # axs[0][1].set_title("Single-Threaded Runtime (minutes)", fontsize=10)
