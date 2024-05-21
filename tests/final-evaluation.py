@@ -511,7 +511,7 @@ def run_sentinel_plan(plan_idx, workload, num_samples):
     return records, result_dict, cost_estimate_sample_data
 
 
-def run_sentinel_plans(workload, num_samples, policy_str: str=None):
+def run_sentinel_plans(workload, num_samples, policy_str: str=None, parallel: bool=False):
     start_time = time.time()
 
     # create query for dataset
@@ -532,6 +532,9 @@ def run_sentinel_plans(workload, num_samples, policy_str: str=None):
                 if policy_str is not None
                 else f"final-eval-results/{workload}/sentinel-{idx}-results.json"
             )
+            if parallel:
+                fp.replace("sentinel", "parallel-sentinel")
+
             with open(fp, 'w') as f:
                 json.dump(result_dict, f)
 
@@ -680,7 +683,7 @@ def evaluate_pz_plans(workload, dry_run=False):
     return num_plans
 
 
-def run_reoptimize_eval(workload, policy_str):
+def run_reoptimize_eval(workload, policy_str, parallel: bool=False):
     workload_to_fixed_cost = {
         "enron": 20.0,
         "real-estate": 3.0,
@@ -717,7 +720,7 @@ def run_reoptimize_eval(workload, policy_str):
 
     # run sentinels
     start_time = time.time()
-    output = run_sentinel_plans(workload, num_samples, policy_str=policy_str)
+    output = run_sentinel_plans(workload, num_samples, policy_str=policy_str, parallel=parallel)
     total_sentinel_cost, _, all_cost_estimate_data, sentinel_records = output
 
     # # get cost estimates given current candidate plans
@@ -762,63 +765,69 @@ def run_reoptimize_eval(workload, policy_str):
     graphicEmit(flatten_ops)
     print("---")
 
-    # # run the plan
-    # new_records = [r for r in plan]
-    # runtime = time.time() - start_time
+    # run the plan
+    new_records = [r for r in plan]
+    runtime = time.time() - start_time
 
-    # # parse new_records
-    # new_records = [
-    #     {
-    #         key: record.__dict__[key]
-    #         for key in record.__dict__
-    #         if not key.startswith('_') and key not in ["image_contents"]
-    #     }
-    #     for record in new_records
-    # ]
-    # all_records = sentinel_records + new_records
+    # parse new_records
+    new_records = [
+        {
+            key: record.__dict__[key]
+            for key in record.__dict__
+            if not key.startswith('_') and key not in ["image_contents"]
+        }
+        for record in new_records
+    ]
+    all_records = sentinel_records + new_records
 
-    # # get profiling data for plan and compute its cost
-    # profileData = plan.getProfilingData()
-    # sp = StatsProcessor(profileData)
+    # get profiling data for plan and compute its cost
+    profileData = plan.getProfilingData()
+    sp = StatsProcessor(profileData)
 
-    # # workaround to disabling cache: delete all cached generations after each plan
-    # dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
-    # if os.path.exists(dspy_cache_dir):
-    #     shutil.rmtree(dspy_cache_dir)
+    # workaround to disabling cache: delete all cached generations after each plan
+    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+    if os.path.exists(dspy_cache_dir):
+        shutil.rmtree(dspy_cache_dir)
 
-    # plan_info = {
-    #     "plan_idx": None,
-    #     "plan_label": compute_label(plan, plan_idx),
-    #     "models": [],
-    #     "op_names": [],
-    #     "generated_fields": [],
-    #     "query_strategies": [],
-    #     "token_budgets": []
-    # }
-    # cost = total_sentinel_cost
-    # stats = sp.profiling_data
-    # while stats is not None:
-    #     cost += stats.total_usd
-    #     plan_info["models"].append(stats.model_name)
-    #     plan_info["op_names"].append(stats.op_name)
-    #     plan_info["generated_fields"].append(stats.generated_fields)
-    #     plan_info["query_strategies"].append(stats.query_strategy)
-    #     plan_info["token_budgets"].append(stats.token_budget)
-    #     stats = stats.source_op_stats
+    plan_info = {
+        "plan_idx": None,
+        "plan_label": compute_label(plan, plan_idx),
+        "models": [],
+        "op_names": [],
+        "generated_fields": [],
+        "query_strategies": [],
+        "token_budgets": []
+    }
+    cost = total_sentinel_cost
+    stats = sp.profiling_data
+    while stats is not None:
+        cost += stats.total_usd
+        plan_info["models"].append(stats.model_name)
+        plan_info["op_names"].append(stats.op_name)
+        plan_info["generated_fields"].append(stats.generated_fields)
+        plan_info["query_strategies"].append(stats.query_strategy)
+        plan_info["token_budgets"].append(stats.token_budget)
+        stats = stats.source_op_stats
 
-    # # score plan
-    # f1_score = score_plan(workload, all_records, None, policy_str=policy_str, reopt=True)
+    # score plan
+    f1_score = score_plan(workload, all_records, None, policy_str=policy_str, reopt=True)
 
-    # # construct and return result_dict
-    # result_dict = {
-    #     "runtime": runtime,
-    #     "cost": cost,
-    #     "f1_score": f1_score,
-    #     "plan_info": plan_info,
-    # }
+    # construct and return result_dict
+    result_dict = {
+        "runtime": runtime,
+        "cost": cost,
+        "f1_score": f1_score,
+        "plan_info": plan_info,
+    }
 
-    # with open(f"final-eval-results/reoptimization/{workload}/{policy_str}.json", 'w') as f:
-    #     json.dump(result_dict, f)
+    fp = (
+        f"final-eval-results/reoptimization/{workload}/{policy_str}.json"
+        if not parallel
+        else f"final-eval-results/reoptimization/{workload}/parallel-{policy_str}.json"
+    )
+
+    with open(fp, 'w') as f:
+        json.dump(result_dict, f)
 
 
 if __name__ == "__main__":
@@ -831,6 +840,7 @@ if __name__ == "__main__":
     parser.add_argument('--reoptimize', default=False, action='store_true', help='Run reoptimization')
     parser.add_argument('--policy', type=str, help="One of 'user', 'mincost', 'mintime', 'maxquality', 'harmonicmean'")
     parser.add_argument('--dry-run', default=False, action='store_true', help='Just print plans w/out actually running any')
+    parser.add_argument('--parallel', default=False, action='store_true', help='DOES NOT TURN ON PARALLELISM; simply a way for user to route output files to diff. name')
 
     args = parser.parse_args()
 
@@ -842,7 +852,7 @@ if __name__ == "__main__":
     # re-optimization is unique enough to warrant its own code path
     if args.reoptimize:
         os.makedirs(f"final-eval-results/reoptimization/{args.workload}", exist_ok=True)
-        run_reoptimize_eval(args.workload, args.policy)
+        run_reoptimize_eval(args.workload, args.policy, args.parallel)
         exit(1)
 
     # create directory for intermediate results
