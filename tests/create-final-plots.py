@@ -174,7 +174,7 @@ def plot_runtime_cost_vs_quality(results):
         axs_text[0][idx].set_title(f"{title}", fontsize=12)
         axs_clean_mc[0][idx].set_title(f"{title}", fontsize=12)
 
-    axs_text[0][0].set_ylabel("Runtime (seconds)", fontsize=12)
+    axs_text[0][0].set_ylabel("Single-Threaded Runtime (seconds)", fontsize=12)
     axs_text[1][0].set_ylabel("Cost (USD)", fontsize=12)
     for idx in range(3):
         axs_text[1][idx].set_xlabel("F1 Score", fontsize=12)
