@@ -197,14 +197,14 @@ def plot_reopt(results, workload):
     results_df['plan_ord'] = results_df.plan.apply(lambda plan: plan_to_ord[plan])
 
     plots = [
-        ("enron", "cost", 0, 0),
-        ("enron", "runtime", 0, 1),
+        ("enron", "runtime", 0, 0),
+        ("enron", "cost", 0, 1),
         ("enron", "f1_score", 0, 2),
-        ("real-estate", "cost", 1, 0),
-        ("real-estate", "runtime", 1, 1),
+        ("real-estate", "runtime", 1, 0),
+        ("real-estate", "cost", 1, 1),
         ("real-estate", "f1_score", 1, 2),
-        ("biofabric", "cost", 2, 0),
-        ("biofabric", "runtime", 2, 1),
+        ("biofabric", "runtime", 2, 0),
+        ("biofabric", "cost", 2, 1),
         ("biofabric", "f1_score", 2, 2),
     ]
 
