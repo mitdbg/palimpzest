@@ -227,6 +227,9 @@ def plot_reopt(results, workload):
         data_df.drop_duplicates(subset=['label_col'], inplace=True)
         data_df.sort_values(by=['plan_ord', 'label_col_ord'], inplace=True)
 
+        # rename Baseline --> GPT-4 for plot
+        data_df['label_col'] = data_df.label_col.apply(lambda label_col: "GPT-4" if label_col == "Baseline" else label_col)
+
         g = sns.barplot(
             data=data_df, # kind="bar",
             x="value", y="label_col", hue="plan",
