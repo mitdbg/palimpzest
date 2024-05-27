@@ -641,6 +641,7 @@ def evaluate_pz_plans(workload, dry_run=False):
     logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
 
     # get total number of plans
+    compilation_start = time.time()
     plans = logicalTree.createPhysicalPlanCandidates(
         min=20,
         cost_estimate_sample_data=all_cost_estimate_data,
@@ -653,6 +654,7 @@ def evaluate_pz_plans(workload, dry_run=False):
         shouldProfile=True,
     )
     num_plans = len(plans)
+    compilation_end = time.time()
 
     if dry_run:
         for plan_idx, (_, _, _, plan, _) in enumerate(plans):
@@ -663,6 +665,7 @@ def evaluate_pz_plans(workload, dry_run=False):
             print(f"Plan {plan_idx}:")
             graphicEmit(flatten_ops)
             print("---")
+        print(f"COMPILATION TIME: {compilation_end - compilation_start:.2f}")
         return
 
     # remove codegen samples from previous dataset from cache
