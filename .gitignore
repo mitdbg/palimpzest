@@ -1,5 +1,6 @@
 .env
 build/*
+dist/*
 .vscode/*
 
 # python artifacts
