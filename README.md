@@ -2,6 +2,7 @@
 
 # Palimpzest (PZ)
 - Read our (pre-print) paper: [read the paper](https://arxiv.org/pdf/2405.14696)
+- Read our short blog post: [read the blog post](https://dsg.csail.mit.edu/projects/palimpzest/)
 - Check out our Colab Demo: [colab demo](https://colab.research.google.com/drive/1zqOxnh_G6eZ8_xax6PvDr-EjMt7hp4R5?usp=sharing)
 
 # Getting started
