@@ -2,7 +2,12 @@ import hashlib
 import json
 
 from palimpzest.constants import *
-from palimpzest.generators import dspyCOT, gen_filter_signature_class, gen_qa_signature_class, TogetherHFAdaptor
+from palimpzest.generators import (
+    dspyCOT,
+    gen_filter_signature_class,
+    gen_qa_signature_class,
+    TogetherHFAdaptor,
+)
 from palimpzest.profiler import GenerationStats
 from palimpzest.datamanager import DataDirectory
 
@@ -20,10 +25,16 @@ import io
 import os
 import time
 
-from palimpzest.profiler.attentive_trim import find_best_range, get_trimed, best_substring_match, update_heatmap_json
+from palimpzest.profiler.attentive_trim import (
+    find_best_range,
+    get_trimed,
+    best_substring_match,
+    update_heatmap_json,
+)
 
 # DEFINITIONS
 GenerationOutput = Tuple[str, GenerationStats]
+
 
 def get_api_key(key: str) -> str:
     # get API key from environment or throw an exception if it's not set
@@ -37,6 +48,7 @@ class BaseGenerator:
     """
     Abstract base class for Generators.
     """
+
     def __init__(self):
         pass
 
@@ -48,7 +60,8 @@ class CustomGenerator(BaseGenerator):
     """
     Class for generating outputs with a given model using a custom prompt.
     """
-    def __init__(self, model_name: str, verbose: bool=False):
+
+    def __init__(self, model_name: str, verbose: bool = False):
         super().__init__()
         self.model_name = model_name
         self.verbose = verbose
@@ -56,20 +69,28 @@ class CustomGenerator(BaseGenerator):
     def _get_model(self) -> dsp.LM:
         model = None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
-            openai_key = get_api_key('OPENAI_API_KEY')
+            openai_key = get_api_key("OPENAI_API_KEY")
             max_tokens = 4096
-            model = dspy.OpenAI(model=self.model_name, api_key=openai_key, temperature=0.0, max_tokens=max_tokens, logprobs=True)
+            model = dspy.OpenAI(
+                model=self.model_name,
+                api_key=openai_key,
+                temperature=0.0,
+                max_tokens=max_tokens,
+                logprobs=True,
+            )
 
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
-            together_key = get_api_key('TOGETHER_API_KEY')
+            together_key = get_api_key("TOGETHER_API_KEY")
             model = TogetherHFAdaptor(self.model_name, together_key, logprobs=1)
 
         elif self.model_name in [Model.GEMINI_1.value]:
-            google_key = get_api_key('GOOGLE_API_KEY')
+            google_key = get_api_key("GOOGLE_API_KEY")
             model = dspy.Google(model=self.model_name, api_key=google_key)
 
         else:
-            raise ValueError("Model must be one of the language models specified in palimpzest.constants.Model")
+            raise ValueError(
+                "Model must be one of the language models specified in palimpzest.constants.Model"
+            )
 
         return model
 
@@ -79,14 +100,18 @@ class CustomGenerator(BaseGenerator):
         """
         usage, finish_reason = None, None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
-            usage = dspy_lm.history[-1]['response']['usage']
-            finish_reason = dspy_lm.history[-1]['response']['choices'][-1]['finish_reason']
+            usage = dspy_lm.history[-1]["response"]["usage"]
+            finish_reason = dspy_lm.history[-1]["response"]["choices"][-1][
+                "finish_reason"
+            ]
         elif self.model_name in [Model.GEMINI_1.value]:
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
-            finish_reason = dspy_lm.history[-1]['response'][0]._result.candidates[0].finish_reason
+            finish_reason = (
+                dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
+            )
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
-            usage = dspy_lm.history[-1]['response']['usage']
-            finish_reason = dspy_lm.history[-1]['response']['finish_reason']
+            usage = dspy_lm.history[-1]["response"]["usage"]
+            finish_reason = dspy_lm.history[-1]["response"]["finish_reason"]
 
         return usage, finish_reason
 
@@ -108,31 +133,35 @@ class CustomGenerator(BaseGenerator):
 
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
-            log_probs = dspy_lm.history[-1]['response']['choices'][-1]['logprobs']['content']
-            tokens = list(map(lambda elt: elt['token'], log_probs))
-            token_logprobs = list(map(lambda elt: elt['logprob'], log_probs))
+            log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"][
+                "content"
+            ]
+            tokens = list(map(lambda elt: elt["token"], log_probs))
+            token_logprobs = list(map(lambda elt: elt["logprob"], log_probs))
         elif self.model_name in [Model.GEMINI_1.value]:
             return None
-            # TODO Google gemini does not provide log probabilities! 
+            # TODO Google gemini does not provide log probabilities!
             # https://github.com/google/generative-ai-python/issues/238
             # tok_count = dspy_lm.llm.count_tokens(answer).total_tokens
             # tokens = [""] * tok_count
             # token_logprobs = [0] * len(tokens)
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             # reponse: dict_keys(['prompt', 'choices', 'usage', 'finish_reason', 'tokens', 'token_logprobs'])
-            tokens = dspy_lm.history[-1]['response']['tokens']
-            token_logprobs = dspy_lm.history[-1]['response']['token_logprobs']
+            tokens = dspy_lm.history[-1]["response"]["tokens"]
+            token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
         else:
-            raise ValueError("Model must be one of the language models specified in palimpzest.constants.Model")
+            raise ValueError(
+                "Model must be one of the language models specified in palimpzest.constants.Model"
+            )
 
         # get indices of the start and end token for the answer
         # start_idx, end_idx = 0, 0
         # while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
-            # if answer.startswith(tokens[start_idx]):
-                # end_idx += 1
-            # else:
-                # start_idx += 1
-                # end_idx = start_idx
+        # if answer.startswith(tokens[start_idx]):
+        # end_idx += 1
+        # else:
+        # start_idx += 1
+        # end_idx = start_idx
         # filter for log probs of tokens which appear in answer
         # answer_log_probs = token_logprobs[start_idx:end_idx+1]
         answer_log_probs = token_logprobs
@@ -150,21 +179,21 @@ class CustomGenerator(BaseGenerator):
         dspy_lm = self._get_model()
 
         start_time = time.time()
-        
+
         response = dspy_lm.request(prompt)
-        
+
         end_time = time.time()
-        
-        answer = response['choices'][0]['message']['content']
-        answer_log_probs = response['choices'][0]['logprobs']
-        finish_reason = response['choices'][0]['finish_reason']
-        usage = response['usage']
+
+        answer = response["choices"][0]["message"]["content"]
+        answer_log_probs = response["choices"][0]["logprobs"]
+        finish_reason = response["choices"][0]["finish_reason"]
+        usage = response["usage"]
 
         # collect statistics on prompt, usage, and timing
         stats = GenerationStats(
             model_name=self.model_name,
             llm_call_duration_secs=end_time - start_time,
-            prompt=dspy_lm.history[-1]['prompt'],
+            prompt=dspy_lm.history[-1]["prompt"],
             usage=usage,
             finish_reason=finish_reason,
             answer_log_probs=answer_log_probs,
@@ -182,7 +211,15 @@ class DSPyGenerator(BaseGenerator):
     """
     Class for generating outputs with a given model using DSPy for prompting optimization(s).
     """
-    def __init__(self, model_name: str, prompt_strategy: PromptStrategy, doc_schema: str, doc_type: str, verbose: bool=False):
+
+    def __init__(
+        self,
+        model_name: str,
+        prompt_strategy: PromptStrategy,
+        doc_schema: str,
+        doc_type: str,
+        verbose: bool = False,
+    ):
         super().__init__()
         self.model_name = model_name
         self.prompt_strategy = prompt_strategy
@@ -194,25 +231,37 @@ class DSPyGenerator(BaseGenerator):
         elif prompt_strategy == PromptStrategy.DSPY_COT_QA:
             self.promptSignature = gen_qa_signature_class(doc_schema, doc_type)
         else:
-            raise ValueError(f"DSPyGenerator does not support prompt_strategy: {prompt_strategy.value}")
+            raise ValueError(
+                f"DSPyGenerator does not support prompt_strategy: {prompt_strategy.value}"
+            )
 
     def _get_model(self, plan_idx) -> dsp.LM:
         model = None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
-            openai_key = get_api_key('OPENAI_API_KEY')
-            max_tokens = 4096 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 150
-            model = dspy.OpenAI(model=self.model_name, api_key=openai_key, temperature=0.0, max_tokens=max_tokens, logprobs=True)
+            openai_key = get_api_key("OPENAI_API_KEY")
+            max_tokens = (
+                4096 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 150
+            )
+            model = dspy.OpenAI(
+                model=self.model_name,
+                api_key=openai_key,
+                temperature=0.0,
+                max_tokens=max_tokens,
+                logprobs=True,
+            )
 
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
-            together_key = get_api_key('TOGETHER_API_KEY')
+            together_key = get_api_key("TOGETHER_API_KEY")
             model = TogetherHFAdaptor(self.model_name, together_key, logprobs=1)
 
         elif self.model_name in [Model.GEMINI_1.value]:
-            google_key = get_api_key(f'GOOGLE_API_KEY_{plan_idx}')
+            google_key = get_api_key(f"GOOGLE_API_KEY")
             model = dspy.Google(model=self.model_name, api_key=google_key)
 
         else:
-            raise ValueError("Model must be one of the language models specified in palimpzest.constants.Model")
+            raise ValueError(
+                "Model must be one of the language models specified in palimpzest.constants.Model"
+            )
 
         return model
 
@@ -222,14 +271,18 @@ class DSPyGenerator(BaseGenerator):
         """
         usage, finish_reason = None, None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
-            usage = dspy_lm.history[-1]['response']['usage']
-            finish_reason = dspy_lm.history[-1]['response']['choices'][-1]['finish_reason']
+            usage = dspy_lm.history[-1]["response"]["usage"]
+            finish_reason = dspy_lm.history[-1]["response"]["choices"][-1][
+                "finish_reason"
+            ]
         elif self.model_name in [Model.GEMINI_1.value]:
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
-            finish_reason = dspy_lm.history[-1]['response'][0]._result.candidates[0].finish_reason
+            finish_reason = (
+                dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
+            )
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
-            usage = dspy_lm.history[-1]['response']['usage']
-            finish_reason = dspy_lm.history[-1]['response']['finish_reason']
+            usage = dspy_lm.history[-1]["response"]["usage"]
+            finish_reason = dspy_lm.history[-1]["response"]["finish_reason"]
 
         return usage, finish_reason
 
@@ -251,31 +304,35 @@ class DSPyGenerator(BaseGenerator):
 
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
-            log_probs = dspy_lm.history[-1]['response']['choices'][-1]['logprobs']['content']
-            tokens = list(map(lambda elt: elt['token'], log_probs))
-            token_logprobs = list(map(lambda elt: elt['logprob'], log_probs))
+            log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"][
+                "content"
+            ]
+            tokens = list(map(lambda elt: elt["token"], log_probs))
+            token_logprobs = list(map(lambda elt: elt["logprob"], log_probs))
         elif self.model_name in [Model.GEMINI_1.value]:
             return None
-            # TODO Google gemini does not provide log probabilities! 
+            # TODO Google gemini does not provide log probabilities!
             # https://github.com/google/generative-ai-python/issues/238
             # tok_count = dspy_lm.llm.count_tokens(answer).total_tokens
             # tokens = [""] * tok_count
             # token_logprobs = [0] * len(tokens)
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             # reponse: dict_keys(['prompt', 'choices', 'usage', 'finish_reason', 'tokens', 'token_logprobs'])
-            tokens = dspy_lm.history[-1]['response']['tokens']
-            token_logprobs = dspy_lm.history[-1]['response']['token_logprobs']
+            tokens = dspy_lm.history[-1]["response"]["tokens"]
+            token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
         else:
-            raise ValueError("Model must be one of the language models specified in palimpzest.constants.Model")
+            raise ValueError(
+                "Model must be one of the language models specified in palimpzest.constants.Model"
+            )
 
         # get indices of the start and end token for the answer
         # start_idx, end_idx = 0, 0
         # while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
-            # if answer.startswith(tokens[start_idx]):
-                # end_idx += 1
-            # else:
-                # start_idx += 1
-                # end_idx = start_idx
+        # if answer.startswith(tokens[start_idx]):
+        # end_idx += 1
+        # else:
+        # start_idx += 1
+        # end_idx = start_idx
         # filter for log probs of tokens which appear in answer
         # answer_log_probs = token_logprobs[start_idx:end_idx+1]
         answer_log_probs = token_logprobs
@@ -289,7 +346,14 @@ class DSPyGenerator(BaseGenerator):
         reraise=True,
     )
     # the generate method requires a user-provided budget parameter to specify te token budget. Default is 1.0, meaning the full context will be used.
-    def generate(self, context: str, question: str, budget: float = 1.0, plan_idx: int=0, heatmap_json_obj: dict=None) -> GenerationOutput:
+    def generate(
+        self,
+        context: str,
+        question: str,
+        budget: float = 1.0,
+        plan_idx: int = 0,
+        heatmap_json_obj: dict = None,
+    ) -> GenerationOutput:
         # initialize variables around token reduction
         reduction, full_context = False, context
 
@@ -301,7 +365,7 @@ class DSPyGenerator(BaseGenerator):
         cot = dspyCOT(self.promptSignature)
 
         json_object = {}
-        heatmap_file = ''
+        heatmap_file = ""
         # check if the promptSignature is a QA signature, so we can match the answer to get heatmap
         if budget < 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # file_cache = DataDirectory().getFileCacheDir()
@@ -317,11 +381,13 @@ class DSPyGenerator(BaseGenerator):
                 # create the heatmap structure with default resolution of 0.001 and count of 0
                 buckets = int(1.0 / TOKEN_REDUCTION_GRANULARITY)
                 hist = [0] * buckets
-                heatmap_json_obj = {'prompt_schema': f'{prompt_schema}',
-                               'question': question,
-                               'resolution': TOKEN_REDUCTION_GRANULARITY,
-                               'count': 0,
-                               'heatmap': hist}
+                heatmap_json_obj = {
+                    "prompt_schema": f"{prompt_schema}",
+                    "question": question,
+                    "resolution": TOKEN_REDUCTION_GRANULARITY,
+                    "count": 0,
+                    "heatmap": hist,
+                }
 
             else:
                 # only parse the heatmap file if token reduction is enabled (budget is less than 1.0)
@@ -330,18 +396,24 @@ class DSPyGenerator(BaseGenerator):
                 #     heatmap = json_object['heatmap']
                 #     count = json_object['count']
                 #     print("count:", count)
-                heatmap = heatmap_json_obj['heatmap']
-                count = heatmap_json_obj['count']
+                heatmap = heatmap_json_obj["heatmap"]
+                count = heatmap_json_obj["count"]
                 print("count:", count)
                 # only refer to the heatmap if the count is greater than a enough sample size
                 # TODO: only trim the context if the attention is clustered in a small region
                 if count >= TOKEN_REDUCTION_SAMPLE:
-                    si, ei = find_best_range(heatmap, int(budget/TOKEN_REDUCTION_GRANULARITY), trim_zeros=False)
-                    sr, er = si * TOKEN_REDUCTION_GRANULARITY, ei * TOKEN_REDUCTION_GRANULARITY
+                    si, ei = find_best_range(
+                        heatmap,
+                        int(budget / TOKEN_REDUCTION_GRANULARITY),
+                        trim_zeros=False,
+                    )
+                    sr, er = (
+                        si * TOKEN_REDUCTION_GRANULARITY,
+                        ei * TOKEN_REDUCTION_GRANULARITY,
+                    )
                     print("start ratio:", sr, "end ratio:", er)
                     context = get_trimed(context, sr, er)
                     reduction = True
-
 
         # execute LLM generation
         start_time = time.time()
@@ -363,7 +435,7 @@ class DSPyGenerator(BaseGenerator):
         stats = GenerationStats(
             model_name=self.model_name,
             llm_call_duration_secs=end_time - start_time,
-            prompt=dspy_lm.history[-1]['prompt'],
+            prompt=dspy_lm.history[-1]["prompt"],
             usage=usage,
             finish_reason=finish_reason,
             answer_log_probs=answer_log_probs,
@@ -371,8 +443,8 @@ class DSPyGenerator(BaseGenerator):
         )
 
         # if reduction is enabled but the answer is None, fallback to the full context
-        if reduction and pred.answer==None:
-            # run query on full context 
+        if reduction and pred.answer == None:
+            # run query on full context
             pred = cot(question, full_context)
 
             # NOTE: in the future, we should capture each of these^ calls in two separate
@@ -384,7 +456,7 @@ class DSPyGenerator(BaseGenerator):
             usage, finish_reason = self._get_usage_and_finish_reason(dspy_lm)
 
             stats.llm_call_duration_secs = end_time - start_time
-            stats.prompt = dspy_lm.history[-1]['prompt']
+            stats.prompt = dspy_lm.history[-1]["prompt"]
             for k, _ in stats.usage.items():
                 stats.usage[k] += usage[k]
             stats.finish_reason = finish_reason
@@ -402,7 +474,11 @@ class DSPyGenerator(BaseGenerator):
         print(pred.answer)
 
         # taken reduction post processing if enabled
-        if budget < 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA and heatmap_json_obj['count'] < MAX_HEATMAP_UPDATES:
+        if (
+            budget < 1.0
+            and self.prompt_strategy == PromptStrategy.DSPY_COT_QA
+            and heatmap_json_obj["count"] < MAX_HEATMAP_UPDATES
+        ):
             print("Reduction enabled")
             print("answer:", pred.answer)
             try:
@@ -411,8 +487,10 @@ class DSPyGenerator(BaseGenerator):
                 print("Error in substring match:", e)
                 gsi, gei = 0, len(full_context)
             context_len = len(full_context)
-            gsr, ger = gsi/context_len, gei/context_len
-            norm_si, norm_ei = int(gsr/TOKEN_REDUCTION_GRANULARITY), int(ger/TOKEN_REDUCTION_GRANULARITY)
+            gsr, ger = gsi / context_len, gei / context_len
+            norm_si, norm_ei = int(gsr / TOKEN_REDUCTION_GRANULARITY), int(
+                ger / TOKEN_REDUCTION_GRANULARITY
+            )
             print("best_start:", gsi, "best_end:", gei)
             heatmap_json_obj = update_heatmap_json(heatmap_json_obj, norm_si, norm_ei)
             # with open(heatmap_file, 'w') as f:
@@ -429,10 +507,11 @@ class ImageTextGenerator(BaseGenerator):
     """
     Class for generating field descriptions for an image with a given image model.
     """
+
     def __init__(self, model_name: str):
         super().__init__()
         self.model_name = model_name
-        
+
     def _decode_image(self, base64_string: str) -> bytes:
         return base64.b64decode(base64_string)
 
@@ -445,10 +524,12 @@ class ImageTextGenerator(BaseGenerator):
         elif self.model_name == Model.GEMINI_1V.value:
             api_key = get_api_key("GOOGLE_API_KEY")
             genai.configure(api_key=api_key)
-            client = genai.GenerativeModel('gemini-pro-vision')
+            client = genai.GenerativeModel("gemini-pro-vision")
 
         else:
-            raise ValueError(f"Model must be one of the image models specified in palimpzest.constants.Model")
+            raise ValueError(
+                f"Model must be one of the image models specified in palimpzest.constants.Model"
+            )
 
         return client
 
@@ -458,26 +539,28 @@ class ImageTextGenerator(BaseGenerator):
             # create content list
             content = [{"type": "text", "text": prompt}]
             for base64_image in base64_images:
-                content.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{base64_image}"
-                    },
-                })
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                    }
+                )
 
             # create payload
-            payloads = [{
-                "model": "gpt-4-vision-preview",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": content,
-                    }
-                ],
-                "max_tokens": 4000,
-                "temperature": 0.0,
-                "logprobs": True,
-            }]
+            payloads = [
+                {
+                    "model": "gpt-4-vision-preview",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": content,
+                        }
+                    ],
+                    "max_tokens": 4000,
+                    "temperature": 0.0,
+                    "logprobs": True,
+                }
+            ]
 
         elif self.model_name == Model.GEMINI_1V.value:
             payloads = [
@@ -486,11 +569,15 @@ class ImageTextGenerator(BaseGenerator):
             ]
 
         else:
-            raise ValueError(f"Model must be one of the image models specified in palimpzest.constants.Model")
+            raise ValueError(
+                f"Model must be one of the image models specified in palimpzest.constants.Model"
+            )
 
         return payloads
 
-    def _generate_response(self, client: Union[OpenAI, genai.GenerativeModel], payloads: List[Any]) -> Tuple[str, str, dict]:
+    def _generate_response(
+        self, client: Union[OpenAI, genai.GenerativeModel], payloads: List[Any]
+    ) -> Tuple[str, str, dict]:
         answer, finish_reason, usage = None, None, None
 
         if self.model_name == Model.GPT_4V.value:
@@ -500,8 +587,12 @@ class ImageTextGenerator(BaseGenerator):
             answer = candidate.message.content
             finish_reason = candidate.finish_reason
             usage = dict(completion.usage)
-            tokens = list(map(lambda elt: elt.token, completion.choices[-1].logprobs.content))
-            token_logprobs = list(map(lambda elt: elt.logprob, completion.choices[-1].logprobs.content))
+            tokens = list(
+                map(lambda elt: elt.token, completion.choices[-1].logprobs.content)
+            )
+            token_logprobs = list(
+                map(lambda elt: elt.logprob, completion.choices[-1].logprobs.content)
+            )
 
         elif self.model_name == Model.GEMINI_1V.value:
             # iterate through images to generate multiple responses
@@ -524,11 +615,15 @@ class ImageTextGenerator(BaseGenerator):
             token_logprobs = []
 
         else:
-            raise ValueError(f"Model must be one of the image models specified in palimpzest.constants.Model")
+            raise ValueError(
+                f"Model must be one of the image models specified in palimpzest.constants.Model"
+            )
 
         return answer, finish_reason, usage, tokens, token_logprobs
 
-    def _get_answer_log_probs(self, tokens: List[str], token_logprobs: List[float], answer: str) -> List[float]:
+    def _get_answer_log_probs(
+        self, tokens: List[str], token_logprobs: List[float], answer: str
+    ) -> List[float]:
         """
         Filter and return the list of log probabilities for the tokens which appear in `answer`.
         """
@@ -536,16 +631,16 @@ class ImageTextGenerator(BaseGenerator):
 
         # start_idx, end_idx = 0, 0
         # while not answer.strip() == "".join(tokens[start_idx:end_idx+1]).strip():
-            # if answer.startswith(tokens[start_idx]):
-                # end_idx += 1
-            # else:
-                # start_idx += 1
-                # end_idx = start_idx
+        # if answer.startswith(tokens[start_idx]):
+        # end_idx += 1
+        # else:
+        # start_idx += 1
+        # end_idx = start_idx
 
         # filter for log probs of tokens which appear in answer
         # answer_log_probs = token_logprobs[start_idx:end_idx+1]
         answer_log_probs = token_logprobs
-        
+
         # return those tokens log probabilities
         return answer_log_probs
 
@@ -564,7 +659,9 @@ class ImageTextGenerator(BaseGenerator):
         # generate response
         print(f"Generating")
         start_time = time.time()
-        answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(client, payloads)
+        answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(
+            client, payloads
+        )
         end_time = time.time()
         print(answer)
 
