@@ -171,10 +171,15 @@ class Set:
 
         return (self, self._source.dumpSyntacticTree())
 
-    def _deprecated_getLogicalTree(self) -> LogicalOperator:
+    def _deprecated_getLogicalTree(self, *args, **kwargs) -> LogicalOperator:
         """
         DEPRECATION: Use a LogicalPlanner() and create a LogicalPlan()
         Return the logical tree of operators on Sets."""
+        # set _num_samples, _scan_start_idx, and _nocache if specified
+        self._num_samples = kwargs.get('num_samples', None)
+        self._scan_start_idx = kwargs.get('scan_start_idx', 0)
+        self._nocache = kwargs.get('nocache', False)
+
         # first, check to see if this set has previously been cached
         uid = self.universalIdentifier()
         if not self._nocache and DataDirectory().hasCachedAnswer(uid):
@@ -192,19 +197,19 @@ class Set:
 
         # if the Set's source is another Set, apply the appropriate scan to the Set
         if self._filter is not None:
-            return FilteredScan(self._schema, self._source.getLogicalTree(), self._filter, self._depends_on, targetCacheId=uid)
+            return FilteredScan(self._schema, self._source._deprecated_getLogicalTree(*args, **kwargs), self._filter, self._depends_on, targetCacheId=uid)
         elif self._groupBy is not None:
-            return GroupByAggregate(self._schema, self._source.getLogicalTree(), self._groupBy, targetCacheId=uid)
+            return GroupByAggregate(self._schema, self._source._deprecated_getLogicalTree(*args, **kwargs), self._groupBy, targetCacheId=uid)
         elif self._aggFunc is not None:
-            return ApplyAggregateFunction(self._schema, self._source.getLogicalTree(), self._aggFunc, targetCacheId=uid)
+            return ApplyAggregateFunction(self._schema, self._source._deprecated_getLogicalTree(*args, **kwargs), self._aggFunc, targetCacheId=uid)
         elif self._limit is not None:
-            return LimitScan(self._schema, self._source.getLogicalTree(), self._limit, targetCacheId=uid)
+            return LimitScan(self._schema, self._source._deprecated_getLogicalTree(*args, **kwargs), self._limit, targetCacheId=uid)
         elif self._fnid is not None:
-            return ApplyUserFunction(self._schema, self._source.getLogicalTree(), self._fnid, targetCacheId=uid)
+            return ApplyUserFunction(self._schema, self._source._deprecated_getLogicalTree(*args, **kwargs), self._fnid, targetCacheId=uid)
         elif not self._schema == self._source._schema:
-            return ConvertScan(self._schema, self._source.getLogicalTree(), self._cardinality, self._image_conversion, self._depends_on, targetCacheId=uid)
+            return ConvertScan(self._schema, self._source._deprecated_getLogicalTree(*args, **kwargs), self._cardinality, self._image_conversion, self._depends_on, targetCacheId=uid)
         else:
-            return self._source.getLogicalTree()
+            return self._source._deprecated_getLogicalTree(*args, **kwargs)
 
 
 class Dataset(Set):

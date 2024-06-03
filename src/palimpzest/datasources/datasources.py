@@ -69,7 +69,7 @@ class DirectorySource(DataSource):
 
     def __iter__(self) -> Callable[[], DataRecord]:
         def filteredIterator():
-            for filename in os.listdir(self.path):
+            for filename in sorted(os.listdir(self.path)):
                 file_path = os.path.join(self.path, filename)
                 if os.path.isfile(file_path):
                     dr = DataRecord(self.schema, scan_idx=self.idx)

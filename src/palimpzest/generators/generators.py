@@ -39,6 +39,8 @@ GenerationOutput = Tuple[str, GenerationStats]
 def get_api_key(key: str) -> str:
     # get API key from environment or throw an exception if it's not set
     if key not in os.environ:
+        print(f"KEY: {key}")
+        print(f"{os.environ.keys()}")
         raise ValueError(f"key not found in environment variables")
 
     return os.environ[key]

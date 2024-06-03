@@ -31,8 +31,8 @@ class MaxQuality(Policy):
 
 
 class MaxQualityAtFixedCost(Policy):
-    def __init__(self, fixed_cost: float):
-        self.fixed_cost = fixed_cost
+    def __init__(self, max_cost: float):
+        self.max_cost = max_cost
 
     def __str__(self):
         return "MaxQuality@MinCost"
@@ -41,7 +41,7 @@ class MaxQualityAtFixedCost(Policy):
         best_plan, best_plan_idx, max_quality, max_quality_runtime = None, -1, 0, np.inf
         for idx, plan in enumerate(candidatePlans):
             # if plan is too expensive, skip
-            if plan[1] > self.fixed_cost:
+            if plan[1] > self.max_cost:
                 continue
 
             # if plan is above best current max quality, this is new best plan
@@ -72,8 +72,8 @@ class MaxQualityAtFixedCost(Policy):
 
 
 class MaxQualityAtFixedRuntime(Policy):
-    def __init__(self, fixed_runtime: float):
-        self.fixed_runtime = fixed_runtime
+    def __init__(self, max_runtime: float):
+        self.max_runtime = max_runtime
 
     def __str__(self):
         return "MaxQuality@MinRuntime"
@@ -82,7 +82,7 @@ class MaxQualityAtFixedRuntime(Policy):
         best_plan, best_plan_idx, max_quality, max_quality_cost = None, -1, 0, np.inf
         for idx, plan in enumerate(candidatePlans):
             # if plan is too long, skip
-            if plan[0] > self.fixed_runtime:
+            if plan[0] > self.max_runtime:
                 continue
 
             # if plan is above best current max quality, this is new best plan
@@ -113,8 +113,8 @@ class MaxQualityAtFixedRuntime(Policy):
 
 
 class MinCostAtFixedQuality(Policy):
-    def __init__(self, fixed_quality: float):
-        self.fixed_quality = fixed_quality
+    def __init__(self, min_quality: float):
+        self.min_quality = min_quality
 
     def __str__(self):
         return "MinCost@FixedQuality"
@@ -123,7 +123,7 @@ class MinCostAtFixedQuality(Policy):
         best_plan, best_plan_idx, min_cost, min_cost_runtime = None, -1, np.inf, np.inf
         for idx, plan in enumerate(candidatePlans):
             # if plan is too low quality, skip
-            if plan[2] < self.fixed_quality:
+            if plan[2] < self.min_quality:
                 continue
 
             # if plan is below best current min cost, this is new best plan
@@ -154,8 +154,8 @@ class MinCostAtFixedQuality(Policy):
 
 
 class MinRuntimeAtFixedQuality(Policy):
-    def __init__(self, fixed_quality: float):
-        self.fixed_quality = fixed_quality
+    def __init__(self, min_quality: float):
+        self.min_quality = min_quality
 
     def __str__(self):
         return "MinRuntime@FixedQuality"
@@ -164,7 +164,7 @@ class MinRuntimeAtFixedQuality(Policy):
         best_plan, best_plan_idx, min_runtime, min_runtime_cost = None, -1, np.inf, np.inf
         for idx, plan in enumerate(candidatePlans):
             # if plan is too low quality, skip
-            if plan[2] < self.fixed_quality:
+            if plan[2] < self.min_quality:
                 continue
 
             # if plan is below best current min cost, this is new best plan

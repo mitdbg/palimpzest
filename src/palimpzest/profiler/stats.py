@@ -793,6 +793,7 @@ class StatsProcessor:
                 return False
 
         # compute accepted answers and clean all answers
+        pd.options.mode.chained_assignment = None  # turn off copy warnings
         op_df.loc[:, 'accepted_answer'] = op_df.record_uuid.apply(lambda uuid: record_uuid_to_answer[uuid])
         op_df.loc[:, 'correct'] = op_df.apply(lambda row: _is_correct(row), axis=1)
 

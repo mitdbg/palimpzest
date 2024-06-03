@@ -1,6 +1,6 @@
 import modal
 
-stub = modal.Stub("palimpzest.tools")
+app = modal.App("palimpzest.tools")
 pipPacks = ["papermage", 
             "tqdm", 
             "transformers", 
@@ -25,7 +25,7 @@ pdfProcessingImage = modal.Image.debian_slim(python_version="3.11").apt_install(
     ["ffmpeg", "pkg-config", "libpoppler-cpp-dev", "poppler-utils"]).pip_install(
     ["torch==2.1.1", "pkgconfig", "python-poppler"] + pipPacks)
 
-@stub.function(image=pdfProcessingImage)
+@app.function(image=pdfProcessingImage)
 def processPapermagePdf(pdfBytesDocs: list[bytes]):
     """Process a PDF file and return the text contents."""
     import papermage
@@ -51,7 +51,7 @@ def processPapermagePdf(pdfBytesDocs: list[bytes]):
 
 
 
-@stub.local_entrypoint()
+@app.local_entrypoint()
 def main():
     import json
     from papermage import Document

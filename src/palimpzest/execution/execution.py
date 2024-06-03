@@ -1,7 +1,9 @@
-from palimpzest.sets import Set
+from palimpzest.constants import Model
+from palimpzest.datamanager import DataDirectory
+from palimpzest.operators import InduceFromCandidateOp
 from palimpzest.policy import Policy, MaxQuality, UserChoice
 from palimpzest.profiler import StatsProcessor
-from palimpzest.datamanager import DataDirectory
+from palimpzest.sets import Set
 
 # for those of us who resist change and are still on Python 3.9
 try:
@@ -14,6 +16,10 @@ def emitNestedTuple(node, indent=0):
     print(" " * indent, elt)
     if child is not None:
         emitNestedTuple(child, indent=indent+2)
+
+import os
+import concurrent
+import shutil
 
 
 def flatten_nested_tuples(nested_tuples):
@@ -212,3 +218,166 @@ class SimpleExecution(Execution):
 
         return physicalTree
 
+
+class Execute:
+    """
+    Class for executing plans w/sentinels as described in the paper. Will refactor in PZ 1.0.
+    """
+    @staticmethod
+    def compute_label(physicalTree, label_idx):
+        """
+        Map integer to physical plan.
+        """
+        physicalOps = physicalTree.dumpPhysicalTree()
+        flat = flatten_nested_tuples(physicalOps)
+        ops = [op for op in flat if not op.is_hardcoded()]
+        label = "-".join([
+            f"{repr(op.model)}_{op.query_strategy if isinstance(op, InduceFromCandidateOp) else None}_{op.token_budget if isinstance(op, InduceFromCandidateOp) else None}"
+            for op in ops
+        ])
+        return f"PZ-{label_idx}-{label}"
+
+    @staticmethod
+    def run_sentinel_plan(args_tuple):
+        # parse input tuple
+        dataset, plan_idx, num_samples, verbose = args_tuple
+
+        # create logical plan from dataset
+        logicalTree = dataset.getLogicalTree(num_samples=num_samples, nocache=True)
+
+        # compute number of plans
+        sentinel_plans = logicalTree.createPhysicalPlanCandidates(sentinels=True)
+        plan = sentinel_plans[plan_idx]
+
+        # display the plan output
+        if verbose:
+            print("----------------------")
+            ops = plan.dumpPhysicalTree()
+            flatten_ops = flatten_nested_tuples(ops)
+            print(f"Sentinel Plan {plan_idx}:")
+            graphicEmit(flatten_ops)
+            print("---")
+
+        # run the plan
+        records = [r for r in plan]
+
+        # get profiling data for plan and compute its cost
+        profileData = plan.getProfilingData()
+        sp = StatsProcessor(profileData)
+        cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
+
+        plan_info = {
+            "plan_idx": plan_idx,
+            "plan_label": Execute.compute_label(plan, f"s{plan_idx}"),
+            "models": [],
+            "op_names": [],
+            "generated_fields": [],
+            "query_strategies": [],
+            "token_budgets": []
+        }
+        cost = 0.0
+        stats = sp.profiling_data
+        while stats is not None:
+            cost += stats.total_usd
+            plan_info["models"].append(stats.model_name)
+            plan_info["op_names"].append(stats.op_name)
+            plan_info["generated_fields"].append(stats.generated_fields)
+            plan_info["query_strategies"].append(stats.query_strategy)
+            plan_info["token_budgets"].append(stats.token_budget)
+            stats = stats.source_op_stats
+
+        # construct and return result_dict
+        result_dict = {
+            "runtime": None,
+            "cost": cost,
+            "f1_score": None,
+            "plan_info": plan_info,
+        }
+
+        return records, result_dict, cost_estimate_sample_data
+
+    @classmethod
+    def run_sentinel_plans(cls, dataset: Set, num_samples: int, verbose: bool=False):
+        # create logical plan from dataset
+        logicalTree = dataset.getLogicalTree(num_samples=num_samples, nocache=True)
+
+        # compute number of plans
+        sentinel_plans = logicalTree.createPhysicalPlanCandidates(sentinels=True)
+        num_sentinel_plans = len(sentinel_plans)
+
+        all_cost_estimate_data, return_records = [], []
+        # with Pool(processes=num_sentinel_plans) as pool:
+        #     results = pool.starmap(Execute.run_sentinel_plan, [(dataset, plan_idx, num_samples, verbose) for plan_idx in range(num_sentinel_plans)])
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
+            results = list(executor.map(Execute.run_sentinel_plan, [(dataset, plan_idx, num_samples, verbose) for plan_idx in range(num_sentinel_plans)]))
+
+            # write out result dict and samples collected for each sentinel
+            for records, result_dict, cost_est_sample_data in results:
+                # aggregate sentinel est. data
+                all_cost_estimate_data.extend(cost_est_sample_data)
+
+                # TODO: turn into utility function in proper utils file
+                # set return_records to be records from champion model
+                champion_model = None
+                if os.environ.get("OPENAI_API_KEY", None) is not None:
+                    champion_model = Model.GPT_4.value
+                elif os.environ.get("TOGETHER_API_KEY", None) is not None:
+                    champion_model = Model.MIXTRAL.value
+                elif os.environ.get("GOOGLE_API_KEY", None) is not None:
+                    champion_model = Model.GEMINI_1.value
+                else:
+                    raise Exception("No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]")
+
+                # find champion model plan records and add those to all_records
+                if (
+                    all([model is None or model in [champion_model, "gpt-4-vision-preview"] for model in result_dict['plan_info']['models']])
+                    and any([model == champion_model for model in result_dict['plan_info']['models']])
+                ):
+                    return_records = records
+
+        return all_cost_estimate_data, return_records
+
+
+    def __new__(cls, dataset: Set, policy: Policy, num_samples: int=20, nocache: bool=False, verbose: bool=False):
+        # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
+        if nocache:
+            dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+            if os.path.exists(dspy_cache_dir):
+                shutil.rmtree(dspy_cache_dir)
+            
+            # remove codegen samples from previous dataset from cache
+            cache = DataDirectory().getCacheService()
+            cache.rmCache()
+
+        # TODO: if nocache=False and there is a cached result; don't run sentinels
+        # run sentinel plans
+        all_cost_estimate_data, sentinel_records = cls.run_sentinel_plans(dataset, num_samples, verbose)
+
+        # create new plan candidates based on current estimate data
+        logicalTree = dataset.getLogicalTree(nocache=nocache, scan_start_idx=num_samples)
+        candidatePlans = logicalTree.createPhysicalPlanCandidates(
+            cost_estimate_sample_data=all_cost_estimate_data,
+            allow_model_selection=True,
+            allow_codegen=True,
+            allow_token_reduction=True,
+            pareto_optimal=True,
+            shouldProfile=True,
+        )
+
+        # choose best plan and execute it
+        (_, _, _, plan, _) = policy.choose(candidatePlans)
+
+        # display the plan output
+        if verbose:
+            print("----------------------")
+            ops = plan.dumpPhysicalTree()
+            flatten_ops = flatten_nested_tuples(ops)
+            print(f"Final Plan:")
+            graphicEmit(flatten_ops)
+            print("---")
+
+        # run the plan
+        new_records = [r for r in plan]
+        all_records = sentinel_records + new_records
+
+        return all_records, plan

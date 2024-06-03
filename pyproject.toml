@@ -1,6 +1,6 @@
 [project]
 name = "palimpzest"
-version = "0.1.0"
+version = "0.2.0"
 description = "Palimpzest is a system which enables anyone to process AI-powered analytical queries simply by defining them in a declarative language"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -76,6 +76,6 @@ build-backend = "setuptools.build_meta"
 
 [project.urls]
 homepage = "https://github.com/mitdbg/palimpzest/"
-repository = "https://https://github.com/mitdbg/palimpzest/"
+repository = "https://github.com/mitdbg/palimpzest/"
 # documentation = "https://readthedocs.org"
 # changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"

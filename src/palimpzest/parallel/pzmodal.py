@@ -1,6 +1,6 @@
 import modal
 
-stub = modal.Stub()
+app = modal.App()
 
 #    Image.from_registry(
 #        "nvidia/cuda:12.1.0-base-ubuntu22.04", add_python="3.10"
