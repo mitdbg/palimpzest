@@ -171,8 +171,10 @@ class Set:
 
         return (self, self._source.dumpSyntacticTree())
 
-    def getLogicalTree(self) -> LogicalOperator:
-        """Return the logical tree of operators on Sets."""
+    def _deprecated_getLogicalTree(self) -> LogicalOperator:
+        """
+        DEPRECATION: Use a LogicalPlanner() and create a LogicalPlan()
+        Return the logical tree of operators on Sets."""
         # first, check to see if this set has previously been cached
         uid = self.universalIdentifier()
         if not self._nocache and DataDirectory().hasCachedAnswer(uid):

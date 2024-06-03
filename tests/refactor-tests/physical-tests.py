@@ -12,6 +12,7 @@ import context
 
 import unittest
 import palimpzest as pz
+from palimpzest.planner import SimplePlanner
 
 from utils import remove_cache, buildNestedStr
 
@@ -51,26 +52,30 @@ def EnronTiny():
 
 class TestPhysicalOperators(unittest.TestCase):
 
-    def test_no_keys(self, limit=1):
-        """Buggy behavior: if OPEN API keys are not set but only GOOGLE, the physical plan generation fails instead of skipping the model
-        For some reason, the generator is still passed OPENAI models even though the keys are not set
-        That leads to a crash.
-        Steps to reproduce this bug: delete the keys from the environment and run the enron emails test
+    def test_no_print(self, limit=1):
+        """Disable the print statement from each record
         """
-        del os.environ["OPENAI_API_KEY"]
-        del os.environ["TOGETHER_API_KEY"]
-        del os.environ["GOOGLE_API_KEY"]
-        print(os.environ["GOOGLE_API_KEY"])
         remove_cache()
 
         dataset = EnronTiny()
+        planner = SimplePlanner()
+
+        logical_plan = planner.plan_logical(dataset)
+        physical = planner.plan_physical(logical_plan, max=limit, shouldProfile=True)
+
         logicalTree = dataset.getLogicalTree()
 
         candidatePlans = logicalTree.createPhysicalPlanCandidates(
             max=limit, shouldProfile=True
         )
+
         # TODO: candidatePlans should not return a TUPLE
         # A PLAN SHOULD BE A CLASS
+
+        # TODO: Refactor name of PhysicalOp into PhysicalOperator
+        # TODO: Create Operator class on top of Phyiscal and Logical
+
+        raise NotImplementedError
         for idx, plan_tuple in enumerate(candidatePlans):
             plan = plan_tuple[3]
             print("----------------------")
