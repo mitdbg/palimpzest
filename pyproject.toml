@@ -20,7 +20,7 @@ dependencies = [
     "grobid-client-python==0.0.5",
     "layoutparser>=0.3.4",
     "lxml-html-clean>=0.1.1",
-    "modal>=0.57.39",
+    "modal>=0.62.198",
     "ncls==0.0.68",
     "necessary>=0.3.2",
     "numpy>=1.23.2",
