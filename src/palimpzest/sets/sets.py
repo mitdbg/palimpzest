@@ -226,7 +226,9 @@ class Dataset(Set):
     provide a Schema for the Dataset. This Schema will be enforced when the Dataset iterates
     over the source in its __iter__ method and constructs DataRecords.
     """
-    def __init__(self, source: Union[str, Set], schema: Schema=File, cardinality: str = None, desc: str=None, filter: Filter=None, groupBy: GroupBySig=None, aggFunc: AggregateFunction=None, limit: int=None, fnid: str=None, image_conversion: bool=None, depends_on: Union[str, List[str]]=None, num_samples: int=None, scan_start_idx: int=0, nocache: bool=False):
+    def __init__(self,
+                 source: Union[str, DataSource],
+                 *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
         self.source = (
             DataDirectory().getRegisteredDataset(source)
@@ -236,7 +238,7 @@ class Dataset(Set):
         if type(depends_on) == str:
             depends_on = [depends_on]
 
-        super().__init__(schema, self.source, cardinality=cardinality, desc=desc, filter=filter, aggFunc=aggFunc, groupBy=groupBy, limit=limit, fnid=fnid, image_conversion=image_conversion, depends_on=depends_on, num_samples=num_samples, scan_start_idx=scan_start_idx, nocache=nocache)
+        super().__init__(source=self.source, *args, **kwargs)
 
     def deserialize(inputObj):
         # TODO: this deserialize operation will not work; I need to finish the deserialize impl. for Schema

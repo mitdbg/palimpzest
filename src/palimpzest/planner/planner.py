@@ -17,6 +17,7 @@ class SimplePlanner():
     def __init__(self, 
                  no_cache=False):
         self.no_cache = no_cache
+        # TODO planner should know num_samples, scan_start_idx,
 
     def plan_logical(self, dataset):
         """Return the logical tree of operators on Sets."""
