@@ -1,5 +1,4 @@
-
-from palimpzest.operators import PhysicalPlan
+from palimpzest.planner import legacy_PhysicalPlan as PhysicalPlan
 
 from typing import List, Tuple, Union
 
@@ -11,6 +10,7 @@ class Policy:
     Base class for policies that can choose a best plan from a set of
     candidate plans based on some selection criteria.
     """
+
     def __init__(self):
         pass
 
@@ -23,6 +23,7 @@ class MaxQuality(Policy):
     This policy selects the plan with the maximum quality along the
     pareto-optimal curve of candidate plans.
     """
+
     def __str__(self):
         return "Maximum Quality"
 
@@ -37,7 +38,9 @@ class MaxQualityAtFixedCost(Policy):
     def __str__(self):
         return "MaxQuality@MinCost"
 
-    def choose(self, candidatePlans: List[PhysicalPlan], return_idx: bool=False) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
+    def choose(
+        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
+    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
         best_plan, best_plan_idx, max_quality, max_quality_runtime = None, -1, 0, np.inf
         for idx, plan in enumerate(candidatePlans):
             # if plan is too expensive, skip
@@ -57,7 +60,7 @@ class MaxQualityAtFixedCost(Policy):
                 best_plan_idx = idx
                 max_quality = plan[2]
                 max_quality_runtime = plan[0]
-        
+
         # if no plan was below fixed cost; return cheapest plan
         if best_plan is None:
             print("NO PLAN FOUND BELOW FIXED COST; PICKING MIN. COST PLAN INSTEAD")
@@ -78,7 +81,9 @@ class MaxQualityAtFixedRuntime(Policy):
     def __str__(self):
         return "MaxQuality@MinRuntime"
 
-    def choose(self, candidatePlans: List[PhysicalPlan], return_idx: bool=False) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
+    def choose(
+        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
+    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
         best_plan, best_plan_idx, max_quality, max_quality_cost = None, -1, 0, np.inf
         for idx, plan in enumerate(candidatePlans):
             # if plan is too long, skip
@@ -98,7 +103,7 @@ class MaxQualityAtFixedRuntime(Policy):
                 best_plan_idx = idx
                 max_quality = plan[2]
                 max_quality_cost = plan[1]
-        
+
         # if no plan was below fixed runtime; return shortest plan
         if best_plan is None:
             print("NO PLAN FOUND BELOW FIXED COST; PICKING MIN. RUNTIME PLAN INSTEAD")
@@ -119,7 +124,9 @@ class MinCostAtFixedQuality(Policy):
     def __str__(self):
         return "MinCost@FixedQuality"
 
-    def choose(self, candidatePlans: List[PhysicalPlan], return_idx: bool=False) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
+    def choose(
+        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
+    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
         best_plan, best_plan_idx, min_cost, min_cost_runtime = None, -1, np.inf, np.inf
         for idx, plan in enumerate(candidatePlans):
             # if plan is too low quality, skip
@@ -142,7 +149,9 @@ class MinCostAtFixedQuality(Policy):
 
         # if no plan was above fixed quality; return best plan
         if best_plan is None:
-            print("NO PLAN FOUND ABOVE FIXED QUALITY; PICKING MAX. QUALITY PLAN INSTEAD")
+            print(
+                "NO PLAN FOUND ABOVE FIXED QUALITY; PICKING MAX. QUALITY PLAN INSTEAD"
+            )
             max_quality = 0
             for idx, plan in enumerate(candidatePlans):
                 if plan[2] > max_quality:
@@ -160,8 +169,15 @@ class MinRuntimeAtFixedQuality(Policy):
     def __str__(self):
         return "MinRuntime@FixedQuality"
 
-    def choose(self, candidatePlans: List[PhysicalPlan], return_idx: bool=False) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
-        best_plan, best_plan_idx, min_runtime, min_runtime_cost = None, -1, np.inf, np.inf
+    def choose(
+        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
+    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
+        best_plan, best_plan_idx, min_runtime, min_runtime_cost = (
+            None,
+            -1,
+            np.inf,
+            np.inf,
+        )
         for idx, plan in enumerate(candidatePlans):
             # if plan is too low quality, skip
             if plan[2] < self.min_quality:
@@ -183,7 +199,9 @@ class MinRuntimeAtFixedQuality(Policy):
 
         # if no plan was above fixed quality; return best plan
         if best_plan is None:
-            print("NO PLAN FOUND ABOVE FIXED QUALITY; PICKING MAX. QUALITY PLAN INSTEAD")
+            print(
+                "NO PLAN FOUND ABOVE FIXED QUALITY; PICKING MAX. QUALITY PLAN INSTEAD"
+            )
             max_quality = 0
             for idx, plan in enumerate(candidatePlans):
                 if plan[2] > max_quality:
@@ -200,10 +218,13 @@ class MaxQualityMinRuntime(Policy):
     pareto-optimal curve of candidate plans. It then breaks ties by
     selecting the plan with the minimum runtime.
     """
+
     def __str__(self):
         return "(Maximum Quality, Minimum Runtime)"
 
-    def choose(self, candidatePlans: List[PhysicalPlan], return_idx: bool=False) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
+    def choose(
+        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
+    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
         best_plan, best_plan_idx, max_quality, max_quality_runtime = None, -1, 0, np.inf
         for idx, plan in enumerate(candidatePlans):
             if plan[2] > max_quality:
@@ -225,6 +246,7 @@ class MinTime(Policy):
     This policy selects the plan with the minimal execution time along the
     pareto-optimal curve of candidate plans.
     """
+
     def __str__(self):
         return "Minimum Time"
 
@@ -237,6 +259,7 @@ class MinCost(Policy):
     This policy selects the plan with the minimal cost along the pareto-optimal
     curve of candidate plans.
     """
+
     def __str__(self):
         return "Minimum Cost"
 
@@ -249,7 +272,10 @@ class MaxHarmonicMean(Policy):
     This policy selects the plan with the maximum harmonic mean of cost, time, and quality
     along the pareto-optimal curve of candidate plans.
     """
-    def __init__(self, max_time: float=600.0, max_cost: float=1.0, max_quality: float=1.0):
+
+    def __init__(
+        self, max_time: float = 600.0, max_cost: float = 1.0, max_quality: float = 1.0
+    ):
         self.max_cost = max_cost
         self.max_time = max_time
         self.max_quality = max_quality
@@ -257,7 +283,9 @@ class MaxHarmonicMean(Policy):
     def __str__(self):
         return "Maximum Harmonic Mean"
 
-    def choose(self, candidatePlans: List[PhysicalPlan], return_idx: bool=False) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
+    def choose(
+        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
+    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
         epsilon = 1e-3
         bestPlan, bestHarmonicMean, bestPlanIdx = None, 0.0, -1
         for idx, plan in enumerate(candidatePlans):
@@ -272,7 +300,11 @@ class MaxHarmonicMean(Policy):
             print(f"scaled_cost: {scaled_cost}")
             print(f"scaled_quality: {scaled_quality}")
 
-            harmonicMean = 3.0 / ((1.0 / (scaled_time + epsilon)) + (1.0 / (scaled_cost + epsilon)) + (1.0 / (scaled_quality + epsilon)))
+            harmonicMean = 3.0 / (
+                (1.0 / (scaled_time + epsilon))
+                + (1.0 / (scaled_cost + epsilon))
+                + (1.0 / (scaled_quality + epsilon))
+            )
 
             if harmonicMean > bestHarmonicMean:
                 bestHarmonicMean = harmonicMean
@@ -287,6 +319,7 @@ class UserChoice(Policy):
     This policy asks the user to decide which of the pareto-optimal
     candidate plans to execute.
     """
+
     def __str__(self):
         return "User Choice"
 
@@ -294,7 +327,9 @@ class UserChoice(Policy):
         user_choice = input(f"Please select a plan in [0-{len(candidatePlans) - 1}]: ")
         user_choice = int(user_choice)
         if user_choice not in range(len(candidatePlans)):
-            print(f"Error: user choice {user_choice} was not a number in the specified range. Please try again.")
+            print(
+                f"Error: user choice {user_choice} was not a number in the specified range. Please try again."
+            )
             return self.choose(candidatePlans)
 
         return candidatePlans[user_choice]

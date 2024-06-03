@@ -14,6 +14,7 @@ import json
 #   for each field in the Schema
 #####################################################
 
+
 class Field:
     """
     A Field is defined by its description and a boolean flag indicating if it is required (for a given Schema).
@@ -21,7 +22,7 @@ class Field:
 
     For example, if you wanted to define Fields relevant to indexing research papers, you could define a field
     representing the title of a paper, the year it was published, and the journal it was published in:
-    
+
     ```python
     paper_title = Field(desc="The title of a scientific paper", required=True)
     paper_year = Field(desc="The year the paper was published", required=True)
@@ -30,30 +31,36 @@ class Field:
 
     Note that because not all papers are published in journals, this field might be optional (`required=False`).
     """
-    def __init__(self, desc: str, required: bool=False) -> None:
+
+    def __init__(self, desc: str = "", required: bool = False) -> None:
         self._desc = desc
         self.required = required
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
-    
+
     def __hash__(self) -> int:
         return hash(self._desc + str(self.required) + self.__class__.__name__)
-    
+
     def __eq__(self, other: Field) -> bool:
-        return self._desc == other._desc and self.required == other.required and self.__class__ == other.__class__
-    
+        return (
+            self._desc == other._desc
+            and self.required == other.required
+            and self.__class__ == other.__class__
+        )
+
     @property
     def desc(self) -> str:
         return self._desc
-    
+
     def jsonSchema(self) -> Dict[str, str]:
         return {"description": self._desc, "type": "undefined"}
 
 
 class BooleanField(Field):
     """A BooleanField is a Field that is True or False."""
-    def __init__(self, desc: str, required: bool=False):
+
+    def __init__(self, desc: str, required: bool = False):
         super().__init__(desc=desc, required=required)
 
     def jsonSchema(self) -> Dict[str, str]:
@@ -62,7 +69,8 @@ class BooleanField(Field):
 
 class StringField(Field):
     """A StringField is a Field that is definitely a string of text."""
-    def __init__(self, desc: str, required: bool=False):
+
+    def __init__(self, desc: str, required: bool = False):
         super().__init__(desc=desc, required=required)
 
     def jsonSchema(self) -> Dict[str, str]:
@@ -71,7 +79,8 @@ class StringField(Field):
 
 class NumericField(Field):
     """A NumericField is a Field that is definitely an integer or a float."""
-    def __init__(self, desc: str, required: bool=False):
+
+    def __init__(self, desc: str, required: bool = False):
         super().__init__(desc=desc, required=required)
 
     def jsonSchema(self) -> Dict[str, str]:
@@ -80,20 +89,24 @@ class NumericField(Field):
 
 class BytesField(Field):
     """A BytesField is a Field that is definitely an array of bytes."""
-    def __init__(self, desc: str, required: bool=False):
+
+    def __init__(self, desc: str, required: bool = False):
         super().__init__(desc=desc, required=required)
 
     def jsonSchema(self) -> Dict[str, str]:
-        return {"description": self._desc, 
-                "type": "string",
-                "contentEncoding": "base64",
-                "contentMediaType": "application/octet-stream"}
+        return {
+            "description": self._desc,
+            "type": "string",
+            "contentEncoding": "base64",
+            "contentMediaType": "application/octet-stream",
+        }
 
 
 class SchemaMetaclass(type):
     """
     This is a metaclass for our Schema class.
     """
+
     def __str__(cls) -> str:
         """
         Emit a string that contains the names of all the class members that are Fields.
@@ -121,11 +134,11 @@ class SchemaMetaclass(type):
     def fieldNames(cls) -> List[Any]:
         """Return a list of the fields in this Schema"""
         attributes = dir(cls)
-        attributes = [attr for attr in attributes if not attr.startswith('__')]
+        attributes = [attr for attr in attributes if not attr.startswith("__")]
         fields = [attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
 
         return fields
-    
+
     def getDesc(cls) -> str:
         """Return a description of the schema"""
         fields = SchemaMetaclass.fieldNames(cls)
@@ -151,7 +164,12 @@ class SchemaMetaclass(type):
         """The JSON representation of the Schema"""
         fields = SchemaMetaclass.fieldNames(cls)
 
-        schema = {"properties": {}, "required": [], "type": "object", "description": cls.__doc__}
+        schema = {
+            "properties": {},
+            "required": [],
+            "type": "object",
+            "description": cls.__doc__,
+        }
         for k in fields:
             if k.startswith("_"):
                 continue
@@ -164,6 +182,7 @@ class SchemaMetaclass(type):
             if v.required:
                 schema["required"].append(k)
         return schema
+
 
 # TODO: how does deserialize actually work with Schema (formerly Element)
 # TODO: should we put the SchemaMetaclass functionality into Schema and make it a @dataclass?
@@ -185,10 +204,11 @@ class Schema(metaclass=SchemaMetaclass):
 
     Note that because not all papers are published in journals, this field might be optional (`required=False`).
     """
+
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
 
-    def asJSON(self, value_dict: Dict[str, Any], include_data_cols: bool=True) -> str:
+    def asJSON(self, value_dict: Dict[str, Any], include_data_cols: bool = True) -> str:
         """Return a JSON representation of an instantiated object of this Schema"""
         # TODO: rethink relationship between records and schemas
         # fields = self.__class__.fieldNames()
@@ -199,7 +219,7 @@ class Schema(metaclass=SchemaMetaclass):
         # d = {k: value_dict[k] for k in fields}
         if include_data_cols:
             d["data type"] = str(self.__class__.__name__)
-            d["data type description"]  = str(self.__class__.__doc__)
+            d["data type description"] = str(self.__class__.__doc__)
 
         return json.dumps(d, indent=2)
 
@@ -220,6 +240,7 @@ class Any(Schema):
     This represents ANY of the specified Schemas. For example, you may not know if a document
     is a PDF or a Word document, but you know it's one of those two.
     """
+
     def __init__(self, possibleSchemas: List[Schema], desc: str):
         super().__init__(desc=desc)
         self._possibleSchemas = possibleSchemas
@@ -227,6 +248,7 @@ class Any(Schema):
     @property
     def children(self) -> List[Schema]:
         return self._possibleSchemas
+
 
 class OperatorDerivedSchema(Schema):
     """Schema defined by an operator, e.g., a join or a group by"""
@@ -238,16 +260,22 @@ class File(Schema):
     - the filename (string)
     - the contents of the file (bytes)
     """
+
     filename = StringField(desc="The UNIX-style name of the file", required=True)
     contents = BytesField(desc="The contents of the file", required=True)
 
+
 class Number(Schema):
     """Just a number. Often used for aggregates"""
+
     value = NumericField(desc="A single number", required=True)
+
 
 class TextFile(File):
     """A text file is a File that contains only text. No binary data."""
 
+
 class RawJSONObject(Schema):
     """A JSON object, which is a dictionary of key-value pairs."""
+
     json = StringField(desc="String representation of a JSON object", required=True)

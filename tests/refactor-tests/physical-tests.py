@@ -53,13 +53,12 @@ def EnronTiny():
 class TestPhysicalOperators(unittest.TestCase):
 
     def test_no_print(self, limit=1):
-        """Disable the print statement from each record
-        """
+        """Disable the print statement from each record"""
         remove_cache()
 
         dataset = EnronTiny()
         planner = SimplePlanner()
-
+        #
         logical_plan = planner.plan_logical(dataset)
         physical = planner.plan_physical(logical_plan, max=limit, shouldProfile=True)
 
@@ -69,23 +68,35 @@ class TestPhysicalOperators(unittest.TestCase):
             max=limit, shouldProfile=True
         )
 
-        # TODO: candidatePlans should not return a TUPLE
-        # A PLAN SHOULD BE A CLASS
+    def test_physOp(
+        self,
+    ):
+        """Test the physical operators equality sign"""
+        remove_cache()
 
-        # TODO: Refactor name of PhysicalOp into PhysicalOperator
-        # TODO: Create Operator class on top of Phyiscal and Logical
+        params = {
+            "outputSchema": Email,
+            "source": pz.CacheScanDataOp(outputSchema=Email, cacheIdentifier=""),
+            "model": pz.Model.GPT_3_5,
+            "cardinality": "oneToOne",
+        }
 
-        raise NotImplementedError
-        for idx, plan_tuple in enumerate(candidatePlans):
-            plan = plan_tuple[3]
-            print("----------------------")
-            print(f"Plan: {buildNestedStr(plan.dumpPhysicalTree())}")
-            print("---")
+        # simpleInduce = pz.Induce(**params)
+        parallelInduce = pz.ParallelInduceFromCandidateOp(**params, streaming="")
+        monolityhInduce = pz.InduceFromCandidateOp(**params)
 
-            # TODO do not print the record every single time
-            records = [r for r in plan]
+        assert parallelInduce == parallelInduce
+        assert monolityhInduce == monolityhInduce
+        assert parallelInduce != monolityhInduce
 
-            assert len(records) > 0
+        print(str(parallelInduce))
+        print(str(monolityhInduce))
+
+        a = parallelInduce.copy()
+        b = monolityhInduce.copy()
+        assert a == parallelInduce
+        assert b == monolityhInduce
+        assert a != b
 
     def test_duplicate_plans(self):
         "We want this test to understand why some physical plans share the same copy of some operators"
