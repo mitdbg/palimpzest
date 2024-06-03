@@ -12,7 +12,7 @@ import context
 
 import unittest
 import palimpzest as pz
-from palimpzest.planner import SimplePlanner
+from palimpzest.planner import LogicalPlanner, PhysicalPlanner
 
 from utils import remove_cache, buildNestedStr
 
@@ -52,21 +52,22 @@ def EnronTiny():
 
 class TestPhysicalOperators(unittest.TestCase):
 
-    def test_no_print(self, limit=1):
-        """Disable the print statement from each record"""
+    def test_end_to_end(self):
+        """Test the end-to-end physical planner"""
         remove_cache()
 
         dataset = EnronTiny()
-        planner = SimplePlanner()
-        #
-        logical_plan = planner.plan_logical(dataset)
-        physical = planner.plan_physical(logical_plan, max=limit, shouldProfile=True)
+        # Todo add execution class
 
-        logicalTree = dataset.getLogicalTree()
+    def test_logical(self, limit=1):
+        """Test whether logical plans work"""
+        remove_cache()
 
-        candidatePlans = logicalTree.createPhysicalPlanCandidates(
-            max=limit, shouldProfile=True
-        )
+        dataset = EnronTiny()
+        logical = LogicalPlanner()
+        logical.generate_plans(dataset)
+        logical_plan = next(logical)
+        print(logical_plan)
 
     def test_induce(
         self,

@@ -14,6 +14,8 @@ import pandas as pd
 import os
 import random
 
+from typing import List, Tuple
+
 # DEFINITIONS
 # PhysicalPlan = Tuple[float, float, float, PhysicalOp]
 
@@ -30,15 +32,16 @@ class LogicalOperator:
     """
 
     def __init__(
-        self, outputSchema: Schema, inputSchema: Schema, inputOp: LogicalOperator = None
+        self,
+        outputSchema: Schema,
+        inputSchema: Schema,
     ):
         self.outputSchema = outputSchema
         self.inputSchema = inputSchema
-        self.inputOp = inputOp
 
-    def dumpLogicalTree(self) -> Tuple[LogicalOperator, LogicalOperator]:
-        """Return the logical subtree rooted at this operator"""
-        return (self, self.inputOp.dumpLogicalTree())
+        # def dumpLogicalTree(self) -> Tuple[LogicalOperator, LogicalOperator]:
+        # """Return the logical subtree rooted at this operator"""
+        # return (self, self.inputOp.dumpLogicalTree())
         # return (self, None)
         # raise NotImplementedError("Abstract method")
 
@@ -58,6 +61,7 @@ class LogicalOperator:
 
         return models
 
+    # TODO check what happens in refactoring out the inputOp pointer
     @staticmethod
     def _compute_legal_permutations(
         filterAndConvertOps: List[LogicalOperator],
@@ -184,16 +188,15 @@ class ConvertScan(LogicalOperator):
 
     def __init__(
         self,
-        outputSchema: Schema,
-        inputOp: LogicalOperator,
         cardinality: str = None,
         image_conversion: bool = False,
         depends_on: List[str] = None,
         desc: str = None,
         targetCacheId: str = None,
+        *args,
+        **kwargs,
     ):
-        super().__init__(outputSchema, inputOp.outputSchema)
-        self.inputOp = inputOp
+        super().__init__(*args, **kwargs)
         self.cardinality = cardinality
         self.image_conversion = image_conversion
         self.depends_on = depends_on
@@ -216,111 +219,109 @@ class ConvertScan(LogicalOperator):
         """Return the logical tree of this LogicalOperator."""
         return (self, self.inputOp.dumpLogicalTree())
 
-    def _getPhysicalTree(
+        # def _getPhysicalTree(
         self,
-        strategy: str = None,
-        source: PhysicalOp = None,
-        model: Model = None,
-        query_strategy: QueryStrategy = None,
-        token_budget: float = None,
-        shouldProfile: bool = False,
-    ):
-        # TODO: dont set input op here
-        # If the input is in core, and the output is NOT in core but its superclass is, then we should do a
-        # 2-stage conversion. This will maximize chances that there is a pre-existing conversion to the superclass
-        # in the known set of functions
-        intermediateSchema = self.outputSchema
-        while (
-            not intermediateSchema == Schema
-            and not PhysicalOp.solver.easyConversionAvailable(
-                intermediateSchema, self.inputSchema
-            )
-        ):
-            intermediateSchema = intermediateSchema.__bases__[0]
+        strategy: str = (None,)
+        source: PhysicalOp = (None,)
+        model: Model = (None,)
+        query_strategy: QueryStrategy = (None,)
+        token_budget: float = (None,)
+        shouldProfile: bool = (False,)
 
-        if intermediateSchema == Schema or intermediateSchema == self.outputSchema:
-            if DataDirectory().current_config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(
-                    self.outputSchema,
-                    source,
-                    model,
-                    self.cardinality,
-                    self.image_conversion,
-                    query_strategy=query_strategy,
-                    token_budget=token_budget,
-                    desc=self.desc,
-                    targetCacheId=self.targetCacheId,
-                    shouldProfile=shouldProfile,
-                )
-            else:
-                return InduceFromCandidateOp(
-                    self.outputSchema,
-                    source,
-                    model,
-                    self.cardinality,
-                    self.image_conversion,
-                    query_strategy=query_strategy,
-                    token_budget=token_budget,
-                    desc=self.desc,
-                    targetCacheId=self.targetCacheId,
-                    shouldProfile=shouldProfile,
-                )
-        else:
-            if DataDirectory().current_config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(
-                    self.outputSchema,
-                    ParallelInduceFromCandidateOp(
-                        intermediateSchema,
-                        source,
-                        model,
-                        self.cardinality,
-                        self.image_conversion,  # TODO: only one of these should have image_conversion
-                        query_strategy=query_strategy,
-                        token_budget=token_budget,
-                        shouldProfile=shouldProfile,
-                    ),
-                    model,
-                    "oneToOne",
-                    image_conversion=self.image_conversion,  # TODO: only one of these should have image_conversion
-                    query_strategy=query_strategy,
-                    token_budget=token_budget,
-                    desc=self.desc,
-                    targetCacheId=self.targetCacheId,
-                    shouldProfile=shouldProfile,
-                )
-            else:
-                return InduceFromCandidateOp(
-                    self.outputSchema,
-                    InduceFromCandidateOp(
-                        intermediateSchema,
-                        source,
-                        model,
-                        self.cardinality,
-                        self.image_conversion,  # TODO: only one of these should have image_conversion
-                        query_strategy=query_strategy,
-                        token_budget=token_budget,
-                        shouldProfile=shouldProfile,
-                    ),
-                    model,
-                    "oneToOne",
-                    image_conversion=self.image_conversion,  # TODO: only one of these should have image_conversion
-                    query_strategy=query_strategy,
-                    token_budget=token_budget,
-                    desc=self.desc,
-                    targetCacheId=self.targetCacheId,
-                    shouldProfile=shouldProfile,
-                )
+    # ):
+    # TODO: dont set input op here
+    # If the input is in core, and the output is NOT in core but its superclass is, then we should do a
+    # 2-stage conversion. This will maximize chances that there is a pre-existing conversion to the superclass
+    # in the known set of functions
+    # intermediateSchema = self.outputSchema
+    # while (
+    #     not intermediateSchema == Schema
+    #     and not PhysicalOp.solver.easyConversionAvailable(
+    #         intermediateSchema, self.inputSchema
+    #     )
+    # ):
+    #     intermediateSchema = intermediateSchema.__bases__[0]
+
+    # if intermediateSchema == Schema or intermediateSchema == self.outputSchema:
+    #     if DataDirectory().current_config.get("parallel") == True:
+    #         return ParallelInduceFromCandidateOp(
+    #             self.outputSchema,
+    #             source,
+    #             model,
+    #             self.cardinality,
+    #             self.image_conversion,
+    #             query_strategy=query_strategy,
+    #             token_budget=token_budget,
+    #             desc=self.desc,
+    #             targetCacheId=self.targetCacheId,
+    #             shouldProfile=shouldProfile,
+    #         )
+    #     else:
+    #         return InduceFromCandidateOp(
+    #             self.outputSchema,
+    #             source,
+    #             model,
+    #             self.cardinality,
+    #             self.image_conversion,
+    #             query_strategy=query_strategy,
+    #             token_budget=token_budget,
+    #             desc=self.desc,
+    #             targetCacheId=self.targetCacheId,
+    #             shouldProfile=shouldProfile,
+    #         )
+    # else:
+    #     if DataDirectory().current_config.get("parallel") == True:
+    #         return ParallelInduceFromCandidateOp(
+    #             self.outputSchema,
+    #             ParallelInduceFromCandidateOp(
+    #                 intermediateSchema,
+    #                 source,
+    #                 model,
+    #                 self.cardinality,
+    #                 self.image_conversion,  # TODO: only one of these should have image_conversion
+    #                 query_strategy=query_strategy,
+    #                 token_budget=token_budget,
+    #                 shouldProfile=shouldProfile,
+    #             ),
+    #             model,
+    #             "oneToOne",
+    #             image_conversion=self.image_conversion,  # TODO: only one of these should have image_conversion
+    #             query_strategy=query_strategy,
+    #             token_budget=token_budget,
+    #             desc=self.desc,
+    #             targetCacheId=self.targetCacheId,
+    #             shouldProfile=shouldProfile,
+    #         )
+    #     else:
+    #         return InduceFromCandidateOp(
+    #             self.outputSchema,
+    #             InduceFromCandidateOp(
+    #                 intermediateSchema,
+    #                 source,
+    #                 model,
+    #                 self.cardinality,
+    #                 self.image_conversion,  # TODO: only one of these should have image_conversion
+    #                 query_strategy=query_strategy,
+    #                 token_budget=token_budget,
+    #                 shouldProfile=shouldProfile,
+    #             ),
+    #             model,
+    #             "oneToOne",
+    #             image_conversion=self.image_conversion,  # TODO: only one of these should have image_conversion
+    #             query_strategy=query_strategy,
+    #             token_budget=token_budget,
+    #             desc=self.desc,
+    #             targetCacheId=self.targetCacheId,
+    #             shouldProfile=shouldProfile,
+    #         )
 
 
 class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached Set."""
 
-    def __init__(
-        self,
-        outputSchema: Schema,
-        cachedDataIdentifier: str,
-    ):
-        super().__init__(outputSchema, None)
+    def __init__(self, cachedDataIdentifier: str, *args, **kwargs):
+        kwargs["inputSchema"] = None
+        super().__init__(None, *args, **kwargs)
         self.cachedDataIdentifier = cachedDataIdentifier
 
     def dumpLogicalTree(self):
@@ -333,12 +334,10 @@ class CacheScan(LogicalOperator):
 class BaseScan(LogicalOperator):
     """A BaseScan is a logical operator that represents a scan of a particular data source."""
 
-    def __init__(
-        self,
-        outputSchema: Schema,
-        datasetIdentifier: str,
-    ):
-        super().__init__(outputSchema, None)
+    def __init__(self, datasetIdentifier: str, *args, **kwargs):
+        kwargs["inputSchema"] = None
+
+        super().__init__(*args, **kwargs)
         self.datasetIdentifier = datasetIdentifier
 
     def __str__(self):
@@ -349,15 +348,8 @@ class BaseScan(LogicalOperator):
 
 
 class LimitScan(LogicalOperator):
-    def __init__(
-        self,
-        outputSchema: Schema,
-        inputOp: LogicalOperator,
-        limit: int,
-        targetCacheId: str = None,
-    ):
-        super().__init__(outputSchema, inputOp.outputSchema)
-        self.inputOp = inputOp
+    def __init__(self, limit: int, targetCacheId: str = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.targetCacheId = targetCacheId
         self.limit = limit
 
@@ -370,14 +362,14 @@ class FilteredScan(LogicalOperator):
 
     def __init__(
         self,
-        outputSchema: Schema,
         inputOp: LogicalOperator,
         filter: Filter,
         depends_on: List[str] = None,
         targetCacheId: str = None,
+        *args,
+        **kwargs,
     ):
-        super().__init__(outputSchema, inputOp.outputSchema)
-        self.inputOp = inputOp
+        super().__init__(*args, **kwargs)
         self.filter = filter
         self.depends_on = depends_on
         self.targetCacheId = targetCacheId
@@ -389,16 +381,15 @@ class FilteredScan(LogicalOperator):
 class GroupByAggregate(LogicalOperator):
     def __init__(
         self,
-        outputSchema: Schema,
-        inputOp: LogicalOperator,
         gbySig: elements.GroupBySig,
         targetCacheId: str = None,
+        *args,
+        **kwargs,
     ):
-        super().__init__(outputSchema, inputOp.outputSchema)
-        (valid, error) = gbySig.validateSchema(inputOp.outputSchema)
+        super().__init__(*args, **kwargs)
+        (valid, error) = gbySig.validateSchema(self.inputSchema)
         if not valid:
             raise TypeError(error)
-        self.inputOp = inputOp
         self.gbySig = gbySig
         self.targetCacheId = targetCacheId
 
@@ -412,13 +403,12 @@ class ApplyAggregateFunction(LogicalOperator):
 
     def __init__(
         self,
-        outputSchema: Schema,
-        inputOp: LogicalOperator,
         aggregationFunction: AggregateFunction,
         targetCacheId: str = None,
+        *args,
+        **kwargs,
     ):
-        super().__init__(outputSchema, inputOp.outputSchema)
-        self.inputOp = inputOp
+        super().__init__(*args, **kwargs)
         self.aggregationFunction = aggregationFunction
         self.targetCacheId = targetCacheId
 
@@ -431,13 +421,12 @@ class ApplyUserFunction(LogicalOperator):
 
     def __init__(
         self,
-        outputSchema: Schema,
-        inputOp: LogicalOperator,
         fnid: str,
         targetCacheId: str = None,
+        *args,
+        **kwargs,
     ):
-        super().__init__(outputSchema, inputOp.outputSchema)
-        self.inputOp = inputOp
+        super().__init__(*args, **kwargs)
         self.fnid = fnid
         self.fn = DataDirectory().getUserFunction(fnid)
         self.targetCacheId = targetCacheId

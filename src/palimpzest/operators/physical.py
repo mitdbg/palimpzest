@@ -66,9 +66,6 @@ class PhysicalOp:
     def copy(self) -> PhysicalOp:
         raise NotImplementedError
 
-    def copy(self) -> PhysicalOp:
-        raise NotImplementedError
-
     def dumpPhysicalTree(self) -> Tuple[PhysicalOp, Union[PhysicalOp, None]]:
         """Return the physical tree of operators."""
         if self.source is None:

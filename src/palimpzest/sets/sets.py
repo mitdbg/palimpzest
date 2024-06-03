@@ -190,7 +190,7 @@ class Set:
 
         return (self, self._source.dumpSyntacticTree())
 
-    def _deprecated_getLogicalTree(self, *args, **kwargs) -> LogicalOperator:
+        # def _deprecated_getLogicalTree(self, *args, **kwargs) -> LogicalOperator:
         """
         DEPRECATION: Use a LogicalPlanner() and create a LogicalPlan()
         Return the logical tree of operators on Sets."""
@@ -299,7 +299,7 @@ class Dataset(Set):
         # convert source (str) -> source (DataSource) if need be
         super().__init__(source=source, *args, **kwargs)
 
-        self.source = (
+        self._source = (
             DataDirectory().getRegisteredDataset(source)
             if isinstance(source, str)
             else source

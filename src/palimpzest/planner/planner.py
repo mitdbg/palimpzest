@@ -2,40 +2,61 @@ import palimpzest as pz
 from palimpzest import operators as ops
 from .plan import LogicalPlan, PhysicalPlan
 import pdb
+from typing import List, Tuple
 
 
 class Planner:
+    """
+    A Planner is responsible for generating a set of possible plans.
+    The fundamental abstraction is, given an input of a graph (of datasets, or logical operators), it generates a set of possible graphs which correspond to the plan.
+    These plans can be consumed from the planner using the __iter__ method.
+    """
+
     def __init__(self):
-        raise NotImplementedError
+        self.plans = []
 
-    def plan_logical(self):
+    def generate_plans(self):
         return NotImplementedError
 
-    def plan_physical(self):
-        return NotImplementedError
+    def __iter__(self):
+        return iter(self.plans)
+
+    def __next__(self):
+        return next(iter(self.plans))
+
+    def __len__(self):
+        return len(self.plans)
 
 
-class SimplePlanner:
-    def __init__(self, no_cache=False):
+class LogicalPlanner(Planner):
+    def __init__(self, no_cache=False, *args, **kwargs):
+        """A given planner should not have a dataset when it's being generated, since it could be used for multiple datasets.
+        However, we currently cannot support this since the plans are stored within a single planner object.
+        To support this, we can use a dictionary in the form [dataset -> [Plan, Plan, ...]].
+        To discuss for future versions.
+        """
+
+        super().__init__(*args, **kwargs)
         self.no_cache = no_cache
-        # TODO planner should know num_samples, scan_start_idx,
+        # TODO planner should know num_samples, scan_start_idx ?
 
-    def plan_logical(self, dataset):
-        """Return the logical tree of operators on Sets."""
+    def generate_plans(self, dataset) -> None:
+        """Return a set of possible logical trees of operators on Sets."""
         # first, check to see if this set has previously been cached
 
         # Obtain ordered list of datasets
-        datasets = []
+        dataset_nodes = []
         node = dataset
-        while isinstance(node, pz.datasources.DataSource):
-            datasets.append(node)
-            node = dataset._source
-        datasets.apppend(node)
-        datasets = reversed(datasets)
 
+        while isinstance(node, pz.sets.Dataset):
+            dataset_nodes.append(node)
+            node = node._source
+        dataset_nodes.append(node)
+        dataset_nodes = list(reversed(dataset_nodes))
+
+        print(dataset_nodes)
         operators = []
-
-        for idx, node in enumerate(datasets):
+        for idx, node in enumerate(dataset_nodes):
             uid = node.universalIdentifier()
 
             # Use cache if allowed
@@ -47,7 +68,7 @@ class SimplePlanner:
 
             # First node is DataSource
             if idx == 0:
-                assert isinstance(node, pz.datasources.DataSource)
+                assert isinstance(node._source, pz.datasources.DataSource)
                 dataset_id = node._source.universalIdentifier()
                 sourceSchema = node._source.schema
 
@@ -55,8 +76,6 @@ class SimplePlanner:
                     return ops.BaseScan(
                         node._schema,
                         dataset_id,
-                        node._num_samples,
-                        node._scan_start_idx,
                     )
                 else:
                     return ops.ConvertScan(
@@ -64,8 +83,6 @@ class SimplePlanner:
                         ops.BaseScan(
                             sourceSchema,
                             dataset_id,
-                            node._num_samples,
-                            node._scan_start_idx,
                         ),
                         targetCacheId=uid,
                     )
@@ -121,8 +138,13 @@ class SimplePlanner:
 
             operators.append(op)
 
-        plan = LogicalPlan(datasets=datasets, operators=operators)
-        return plan
+        plan = LogicalPlan(datasets=dataset_nodes, operators=operators)
+        self.plans.append(plan)
 
-    def plan_physical(self):
-        return NotImplementedError
+
+class PhysicalPlanner(Planner):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def generate_plans(self, logical_plan: LogicalPlan) -> List[PhysicalPlan]:
+        """Return a set of possible physical plans."""
