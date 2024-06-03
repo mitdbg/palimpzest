@@ -68,73 +68,76 @@ class LogicalPlanner(Planner):
 
             # First node is DataSource
             if idx == 0:
-                assert isinstance(node._source, pz.datasources.DataSource)
-                dataset_id = node._source.universalIdentifier()
-                sourceSchema = node._source.schema
+                assert isinstance(node, pz.datasources.DataSource)
+                dataset_id = node.universalIdentifier()
+                sourceSchema = node.schema
+                node._schema = node.schema
 
-                if node._schema == sourceSchema:
-                    return ops.BaseScan(
-                        node._schema,
-                        dataset_id,
+                if dataset_nodes[idx + 1]._schema == sourceSchema:
+                    op = ops.BaseScan(
+                        outputSchema=sourceSchema,
+                        datasetIdentifier=dataset_id,
                     )
                 else:
-                    return ops.ConvertScan(
-                        node._schema,
-                        ops.BaseScan(
-                            sourceSchema,
-                            dataset_id,
-                        ),
+                    op = ops.ConvertScan(
+                        outputSchema=dataset_nodes[idx + 1]._schema,
+                        inputSchema=sourceSchema,
                         targetCacheId=uid,
                     )
 
             # if the Set's source is another Set, apply the appropriate scan to the Set
-            elif self._filter is not None:
-                op = ops.FilteredScan(
-                    self._schema,
-                    self._source.getLogicalTree(),
-                    self._filter,
-                    self._depends_on,
-                    targetCacheId=uid,
-                )
-            elif self._groupBy is not None:
-                op = ops.GroupByAggregate(
-                    self._schema,
-                    self._source.getLogicalTree(),
-                    self._groupBy,
-                    targetCacheId=uid,
-                )
-            elif self._aggFunc is not None:
-                op = ops.ApplyAggregateFunction(
-                    self._schema,
-                    self._source.getLogicalTree(),
-                    self._aggFunc,
-                    targetCacheId=uid,
-                )
-            elif self._limit is not None:
-                op = ops.LimitScan(
-                    self._schema,
-                    self._source.getLogicalTree(),
-                    self._limit,
-                    targetCacheId=uid,
-                )
-            elif self._fnid is not None:
-                op = ops.ApplyUserFunction(
-                    self._schema,
-                    self._source.getLogicalTree(),
-                    self._fnid,
-                    targetCacheId=uid,
-                )
-            elif not self._schema == self._source._schema:
-                op = ops.ConvertScan(
-                    self._schema,
-                    self._source.getLogicalTree(),
-                    self._cardinality,
-                    self._image_conversion,
-                    self._depends_on,
-                    targetCacheId=uid,
-                )
             else:
-                op = self._source.getLogicalTree()
+                inputSchema = dataset_nodes[idx - 1]._schema
+                outputSchema = node._schema
+
+                if node._filter is not None:
+                    op = ops.FilteredScan(
+                        outputSchema=outputSchema,
+                        inputSchema=inputSchema,
+                        filter=node._filter,
+                        depends_on=node._depends_on,
+                        targetCacheId=uid,
+                    )
+                elif node._groupBy is not None:
+                    op = ops.GroupByAggregate(
+                        outputSchema=outputSchema,
+                        inputSchema=inputSchema,
+                        gbySig=node._groupBy,
+                        targetCacheId=uid,
+                    )
+                elif node._aggFunc is not None:
+                    op = ops.ApplyAggregateFunction(
+                        outputSchema=outputSchema,
+                        inputSchema=inputSchema,
+                        aggregationFunction=node._aggFunc,
+                        targetCacheId=uid,
+                    )
+                elif node._limit is not None:
+                    op = ops.LimitScan(
+                        outputSchema=outputSchema,
+                        inputSchema=inputSchema,
+                        limit=node._limit,
+                        targetCacheId=uid,
+                    )
+                elif node._fnid is not None:
+                    op = ops.ApplyUserFunction(
+                        outputSchema=outputSchema,
+                        inputSchema=inputSchema,
+                        fnid=node._fnid,
+                        targetCacheId=uid,
+                    )
+                elif not outputSchema == inputSchema:
+                    op = ops.ConvertScan(
+                        outputSchema=outputSchema,
+                        inputSchema=inputSchema,
+                        cardinality=node._cardinality,
+                        image_conversion=node._image_conversion,
+                        depends_on=node._depends_on,
+                        targetCacheId=uid,
+                    )
+                else:
+                    assert NotImplementedError("TODO what happens in this case?")
+                    # op = self._source.getLogicalTree()
 
             operators.append(op)
 

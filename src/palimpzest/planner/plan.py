@@ -19,7 +19,9 @@ class Plan:
         return len(self.operators)
 
     def __repr__(self):
-        return f"{self.__class__.__name__}: {'-'.join(map(str,self.operators))}"
+        return f"{self.__class__.__name__}:\n" + "\n".join(
+            map(str, [f"{idx}. {str(op)}" for idx, op in enumerate(self.operators)])
+        )
 
 
 class LogicalPlan(Plan):

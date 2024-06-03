@@ -211,9 +211,7 @@ class ConvertScan(LogicalOperator):
         ]
 
     def __str__(self):
-        return (
-            f"ConvertScan({self.inputSchema},{str(self.outputSchema)},{str(self.desc)})"
-        )
+        return f"ConvertScan({self.inputSchema} -> {str(self.outputSchema)},{str(self.desc)})"
 
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
@@ -362,7 +360,6 @@ class FilteredScan(LogicalOperator):
 
     def __init__(
         self,
-        inputOp: LogicalOperator,
         filter: Filter,
         depends_on: List[str] = None,
         targetCacheId: str = None,
@@ -375,7 +372,7 @@ class FilteredScan(LogicalOperator):
         self.targetCacheId = targetCacheId
 
     def __str__(self):
-        return f"FilteredScan({str(self.outputSchema)}, Filters: {str(self.filter)})"
+        return f"FilteredScan({str(self.outputSchema)}, {str(self.filter)})"
 
 
 class GroupByAggregate(LogicalOperator):
