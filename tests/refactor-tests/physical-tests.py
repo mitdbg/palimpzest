@@ -68,7 +68,7 @@ class TestPhysicalOperators(unittest.TestCase):
             max=limit, shouldProfile=True
         )
 
-    def test_physOp(
+    def test_induce(
         self,
     ):
         """Test the physical operators equality sign"""
@@ -96,6 +96,36 @@ class TestPhysicalOperators(unittest.TestCase):
         b = monolityhInduce.copy()
         assert a == parallelInduce
         assert b == monolityhInduce
+        assert a != b
+
+    def test_filter(
+        self,
+    ):
+        """Test the physical operators filter"""
+        remove_cache()
+
+        params = {
+            "outputSchema": Email,
+            "source": pz.CacheScanDataOp(outputSchema=Email, cacheIdentifier=""),
+            "model": pz.Model.GPT_3_5,
+            "filter": pz.Filter("This is a sample filter"),
+        }
+
+        # simpleInduce = pz.Induce(**params)
+        parallelFilter = pz.ParallelFilterCandidateOp(**params, streaming="")
+        monoFilter = pz.FilterCandidateOp(**params)
+
+        assert parallelFilter == parallelFilter
+        assert monoFilter == monoFilter
+        assert parallelFilter != monoFilter
+
+        print(str(parallelFilter))
+        print(str(monoFilter))
+
+        a = parallelFilter.copy()
+        b = monoFilter.copy()
+        assert a == parallelFilter
+        assert b == monoFilter
         assert a != b
 
     def test_duplicate_plans(self):
