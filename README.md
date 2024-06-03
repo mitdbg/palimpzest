@@ -9,7 +9,7 @@
 # Getting started
 You can install the Palimpzest package and CLI on your machine by cloning this repository and running:
 ```bash
-$ git clone git@github.com:mikecafarella/palimpzest.git
+$ git clone git@github.com:mitdbg/palimpzest.git
 $ cd palimpzest
 $ pip install .
 ```
