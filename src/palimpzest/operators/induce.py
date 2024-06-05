@@ -6,6 +6,7 @@ from __future__ import annotations
 from io import BytesIO
 
 from palimpzest.profiler.stats import Stats
+from palimpzest.solver.query_strategies import runConventionalQuery
 from palimpzest.tools.skema_tools import equations_to_latex
 import pandas as pd
 from .physical import PhysicalOp, MAX_ID_CHARS, IteratorFn
@@ -507,3 +508,126 @@ class SimpleTypeConvert(InduceOp):
         # candidate._stats[td.op_id] = InduceNonLLMStats()
 
         return [dr], None
+
+
+class LLMTypeConversion(InduceOp):
+
+    # TODO need to refactor query strategies to not use task descriptors
+
+    def __call__(self, candidate: DataRecord) -> Tuple[DataRecord, Optional[Stats]]:
+        # initialize stats objects
+        bonded_query_stats, conventional_query_stats = None, None
+
+        if self.query_strategy == QueryStrategy.CONVENTIONAL:
+            # NOTE: runConventionalQuery does exception handling internally
+            dr, conventional_query_stats = runConventionalQuery(
+                candidate, td, self._verbose
+            )
+
+            # if profiling, set record's stats for the given op_id
+            # if shouldProfile:
+            # dr._stats[td.op_id] = InduceLLMStats(
+            # query_strategy=td.query_strategy.value,
+            # token_budget=td.token_budget,
+            # conventional_query_stats=conventional_query_stats,
+            # )
+            return [dr], None
+
+        elif self.query_strategy == QueryStrategy.BONDED:
+            drs, new_heatmap_obj, bonded_query_stats, err_msg = runBondedQuery(
+                candidate, td, self._verbose
+            )
+
+            # if bonded query failed, manually set fields to None
+            if err_msg is not None:
+                print(f"BondedQuery Error: {err_msg}")
+                dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
+                for field_name in td.outputSchema.fieldNames():
+                    setattr(dr, field_name, None)
+                drs = [dr]
+
+            # if profiling, set record's stats for the given op_id
+            if shouldProfile:
+                for dr in drs:
+                    dr._stats[td.op_id] = InduceLLMStats(
+                        query_strategy=td.query_strategy.value,
+                        token_budget=td.token_budget,
+                        bonded_query_stats=bonded_query_stats,
+                    )
+
+            return drs, new_heatmap_obj
+
+        elif td.query_strategy == QueryStrategy.BONDED_WITH_FALLBACK:
+            drs, new_heatmap_obj, bonded_query_stats, err_msg = runBondedQuery(
+                candidate, td, self._verbose
+            )
+
+            # if bonded query failed, run conventional query
+            if err_msg is not None:
+                print(f"BondedQuery Error: {err_msg}")
+                print("Falling back to conventional query")
+                dr, conventional_query_stats = runConventionalQuery(
+                    candidate, td, self._verbose
+                )
+                drs = [dr] if type(dr) is not list else dr
+            # if profiling, set record's stats for the given op_id
+            if shouldProfile:
+                for dr in drs:
+                    # TODO: divide bonded query_stats time, cost, and input/output tokens by len(drs)
+                    dr._stats[td.op_id] = InduceLLMStats(
+                        query_strategy=td.query_strategy.value,
+                        token_budget=td.token_budget,
+                        bonded_query_stats=bonded_query_stats,
+                        conventional_query_stats=conventional_query_stats,
+                    )
+
+            return drs, new_heatmap_obj
+
+        elif td.query_strategy == QueryStrategy.CODE_GEN:
+            dr, full_code_gen_stats = runCodeGenQuery(candidate, td, self._verbose)
+            drs = [dr]
+
+            # if profiling, set record's stats for the given op_id
+            if shouldProfile:
+                for dr in drs:
+                    dr._stats[td.op_id] = InduceLLMStats(
+                        query_strategy=td.query_strategy.value,
+                        token_budget=td.token_budget,
+                        full_code_gen_stats=full_code_gen_stats,
+                    )
+
+            return drs, None
+
+        elif td.query_strategy == QueryStrategy.CODE_GEN_WITH_FALLBACK:
+            # similar to in _makeLLMTypeConversionFn; maybe we can have one strategy in which we try
+            # to use code generation, but if it fails then we fall back to a conventional query strategy?
+            dr, full_code_gen_stats, conventional_query_stats = runCodeGenQuery(
+                candidate, td, self._verbose
+            )
+            drs = [dr] if type(dr) is not list else dr
+            # # Deleting all failure fields
+            # for field_name in td.outputSchema.fieldNames():
+            #     if hasattr(new_candidate, field_name) and (getattr(new_candidate, field_name) is None):
+            #         delattr(new_candidate, field_name)
+            # if td.cardinality == 'oneToMany':
+            #     td.cardinality = 'oneToOne'
+            # dr, conventional_query_stats = runConventionalQuery(new_candidate, td, self._verbose)
+            # drs = [dr] if type(dr) is not list else dr
+            for dr in drs:
+                dr._parent_uuid = candidate._uuid
+
+            # if profiling, set record's stats for the given op_id
+            # if shouldProfile:
+            # for dr in drs:
+            # TODO: divide bonded query_stats time, cost, and input/output tokens by len(drs)
+            # dr._stats[td.op_id] = InduceLLMStats(
+            # query_strategy=td.query_strategy.value,
+            # token_budget=td.token_budget,
+            # full_code_gen_stats=full_code_gen_stats,
+            # conventional_query_stats=conventional_query_stats,
+            # )
+
+            return drs, None
+
+        else:
+            raise ValueError(f"Unrecognized QueryStrategy: {td.query_strategy.value}")

@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from palimpzest.generators.generators import DSPyGenerator
 from .physical import PhysicalOp, MAX_ID_CHARS
 
 from palimpzest.constants import *
@@ -379,3 +381,81 @@ class ParallelFilterCandidateOp(FilterOp):
                 self.datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
+
+
+class NonLLMFilter(FilterOp):
+
+    # TODO this should be in the Planner to decide if to use this class or not
+    # if self.filter.filterFn is not None:
+
+    def __call__(self, candidate: DataRecord):
+        # start_time = time.time()
+        result = self.filter.filterFn(candidate)
+        # fn_call_duration_secs = time.time() - start_time
+        # if profiling, set record's stats for the given op_id
+        # if shouldProfile:
+        # candidate._stats[td.op_id] = FilterNonLLMStats(
+        # fn_call_duration_secs=fn_call_duration_secs,
+        # filter=str(td.filter.filterFn),
+        # )
+        # set _passed_filter attribute and return record
+        setattr(candidate, "_passed_filter", result)
+        print(f"ran filter function on {candidate}")
+
+        return candidate
+
+
+class LLMFilter(FilterOp):
+
+    def __call__(self, candidate: DataRecord):
+        # compute record schema and type
+        doc_schema = str(self.inputSchema)
+        doc_type = self.inputSchema.className()
+
+        # do not filter candidate if it doesn't match inputSchema
+        if not candidate.schema == td.inputSchema:
+            return False
+
+        # create generator
+        generator = None
+        if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
+            generator = DSPyGenerator(
+                self.model.value,
+                self.prompt_strategy,
+                doc_schema,
+                doc_type,
+                self._verbose,
+            )
+        # TODO
+        elif self.prompt_strategy == PromptStrategy.ZERO_SHOT:
+            raise Exception("not implemented yet")
+        # TODO
+        elif self.prompt_strategy == PromptStrategy.FEW_SHOT:
+            raise Exception("not implemented yet")
+        # TODO
+        elif self.prompt_strategy == PromptStrategy.CODE_GEN_BOOL:
+            raise Exception("not implemented yet")
+
+        # invoke LLM to generate filter decision (True or False)
+        text_content = candidate._asJSON(include_bytes=False)
+        try:
+            response, _, gen_stats = generator.generate(
+                context=text_content,
+                question=td.filter.filterCondition,
+                plan_idx=td.plan_idx,
+            )
+
+            # if profiling, set record's stats for the given op_id
+            # if shouldProfile:
+            # candidate._stats[td.op_id] = FilterLLMStats(
+            # gen_stats=gen_stats, filter=td.filter.filterCondition
+            # )
+
+            # set _passed_filter attribute and return record
+            setattr(candidate, "_passed_filter", "true" in response.lower())
+        except Exception as e:
+            # If there is an exception consider the record as not passing the filter
+            print(f"Error invoking LLM for filter: {e}")
+            setattr(candidate, "_passed_filter", False)
+
+        return candidate

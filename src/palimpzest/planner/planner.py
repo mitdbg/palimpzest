@@ -1,5 +1,12 @@
 import palimpzest as pz
-from palimpzest import operators as ops
+import palimpzest.operators as ops
+
+# import palimpzest.operators.physical as physical
+# import palimpzest.operators.logical as logical
+# import palimpzest.operators.induce as induce
+# import palimpzest.operators.filter as filter
+# import palimpzest.operators.hardcoded_converts as hardcoded_converts
+
 from .plan import LogicalPlan, PhysicalPlan
 import pdb
 from typing import List, Tuple
@@ -149,16 +156,19 @@ class PhysicalPlanner(Planner):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        physical_ops = ops.PHYSICAL_OPERATORS
+
     def generate_plans(self, logical_plan: LogicalPlan) -> List[PhysicalPlan]:
         """Return a set of possible physical plans."""
 
-
-# # Stub of physical planning code
-# for plan in logical_plans:
-#     for logical_op in plan:
-#         applicable_ops = [phy for phy in physical_ops
-#                           if phy.inputSchema == logical_op.inputSchema
-#                           and phy.outputSchema == logical_op.outputSchema]
+        # Stub of physical planning code
+        for logical_op in logical_plan:
+            applicable_ops = [
+                phy
+                for phy in physical_ops
+                if phy.inputSchema == logical_op.inputSchema
+                and phy.outputSchema == logical_op.outputSchema
+            ]  # Here this should be double checked
 
 
 # # Stub of execution code

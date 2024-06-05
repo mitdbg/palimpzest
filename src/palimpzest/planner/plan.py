@@ -15,6 +15,12 @@ class Plan:
     def __init__(self):
         raise NotImplementedError
 
+    def __iter__(self):
+        return iter(self.operators)
+
+    def __next__(self):
+        return next(iter(self.operators))
+    
     def __len__(self):
         return len(self.operators)
 

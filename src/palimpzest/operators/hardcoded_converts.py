@@ -9,9 +9,12 @@ from palimpzest.elements import DataRecord
 
 from typing import Any, Dict, Optional, Tuple
 
+import json
+import modal
 import pandas as pd
 from palimpzest.tools.pdfparser import get_text_from_pdf
 from palimpzest.tools.skema_tools import equations_to_latex
+from papermage import Document
 
 
 class HardcodedConvert(InduceOp):

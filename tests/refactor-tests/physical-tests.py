@@ -54,6 +54,10 @@ def EnronTiny():
 
 class TestPhysicalOperators(unittest.TestCase):
 
+    def test_physical_planner(self):
+        """Test the physical planner"""
+        physical = PhysicalPlanner()
+
     def test_class_attributes(self):
         generic_induce = pz.InduceOp
         conv_file_text = pz.ConvertFileToText
