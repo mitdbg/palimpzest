@@ -6,6 +6,8 @@ import sys
 import time
 import pdb
 
+from palimpzest.elements.elements import File, TextFile
+
 sys.path.append("./tests/")
 sys.path.append("./tests/refactor-tests/")
 import context
@@ -13,7 +15,7 @@ import context
 import unittest
 import palimpzest as pz
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner
-
+from palimpzest.operators import InduceOp, ConvertFileToText
 from utils import remove_cache, buildNestedStr
 
 
@@ -51,6 +53,32 @@ def EnronTiny():
 
 
 class TestPhysicalOperators(unittest.TestCase):
+
+    def test_class_attributes(self):
+        generic_induce = pz.InduceOp
+        conv_file_text = pz.ConvertFileToText
+
+        print("Input schema of InduceOp: ", generic_induce.inputSchema)
+        print("Output schema of InduceOp: ", generic_induce.outputSchema)
+        print("Input schema of ConvertFileToText: ", conv_file_text.inputSchema)
+        print("Output schema of ConvertFileToText: ", conv_file_text.outputSchema)
+
+        assert generic_induce.inputSchema != conv_file_text.inputSchema
+        assert generic_induce.outputSchema != conv_file_text.outputSchema
+
+        conv_implementations = pz.ConvertFileToText(
+            inputSchema=File,
+            outputSchema=TextFile,
+            model=pz.Model.GPT_3_5,
+            cardinality="oneToOne",
+        )
+
+        conv_implementations = pz.ConvertFileToText(
+            inputSchema=Email,
+            outputSchema=Email,
+            model=pz.Model.GPT_3_5,
+            cardinality="oneToOne",
+        )
 
     def test_end_to_end(self):
         """Test the end-to-end physical planner"""

@@ -1,13 +1,22 @@
+"""GV: In my view this whole function should be called Convert. 
+And so should all of the methods - ConvertFromCandidate, ParallelConvertFromCandidate, etc.
+Keeping it as Induce for legacy compatibility (for now)"""
+
 from __future__ import annotations
+from io import BytesIO
+
+from palimpzest.profiler.stats import Stats
+from palimpzest.tools.skema_tools import equations_to_latex
+import pandas as pd
 from .physical import PhysicalOp, MAX_ID_CHARS, IteratorFn
 
 from palimpzest.constants import *
-from palimpzest.corelib.schemas import ImageFile
+import palimpzest.corelib.schemas as schemas
 from palimpzest.elements import *
 from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.profiler import Profiler
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 
 import math
 import concurrent
@@ -16,22 +25,27 @@ import hashlib
 
 class InduceOp(PhysicalOp):
 
+    inputSchema = Schema
+    outputSchema = Schema
+
     def __init__(
         self,
+        inputSchema: Schema,
         outputSchema: Schema,
-        source: PhysicalOp,
         model: Model,
         cardinality: str,
         image_conversion: bool = False,
         prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_QA,
         query_strategy: QueryStrategy = QueryStrategy.BONDED_WITH_FALLBACK,
         token_budget: float = 1.0,
-        desc: str = None,
-        targetCacheId: str = None,
+        desc: Optional[str] = None,
+        targetCacheId: Optional[str] = None,
         shouldProfile=False,
     ):
         super().__init__(
-            outputSchema=outputSchema, source=source, shouldProfile=shouldProfile
+            inputSchema=inputSchema,
+            outputSchema=outputSchema,
+            shouldProfile=shouldProfile,
         )
         self.model = model
         self.cardinality = cardinality
@@ -43,11 +57,7 @@ class InduceOp(PhysicalOp):
         self.targetCacheId = targetCacheId
         self.heatmap_json_obj = None
         # use image model if this is an image conversion
-        if (
-            outputSchema == ImageFile
-            and source.outputSchema == File
-            or self.image_conversion
-        ):
+        if outputSchema == ImageFile and inputSchema == File or self.image_conversion:
             # TODO : find a more general way by llm provider
             # TODO : which module is responsible of setting PromptStrategy.IMAGE_TO_TEXT?
             if self.model in [Model.GPT_3_5, Model.GPT_4]:
@@ -67,11 +77,11 @@ class InduceOp(PhysicalOp):
 
         # TODO: combine these functions
         # set model to None if this is a simple conversion
-        if self._is_quick_conversion() or self.is_hardcoded():
-            self.model = None
-            self.prompt_strategy = None
-            self.query_strategy = None
-            self.token_budget = 1.0
+        # if self._is_quick_conversion() or self.is_hardcoded():
+        # self.model = None
+        # self.prompt_strategy = None
+        # self.query_strategy = None
+        # self.token_budget = 1.0
 
         if self.query_strategy in [
             QueryStrategy.CODE_GEN_WITH_FALLBACK,
@@ -82,8 +92,8 @@ class InduceOp(PhysicalOp):
             self.token_budget = 1.0
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
-        self.profiler = Profiler(op_id=self.opId())
-        self.profile = self.profiler.iter_profiler
+        # self.profiler = Profiler(op_id=self.opId())
+        # self.profile = self.profiler.iter_profiler
 
         # # construct TaskDescriptor
         # taskDescriptor = self._makeTaskDescriptor()
@@ -92,16 +102,10 @@ class InduceOp(PhysicalOp):
         # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
         #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
-    def _is_quick_conversion(self):
-        td = self._makeTaskDescriptor()
-        is_file_to_text_file = td.outputSchema == TextFile and td.inputSchema == File
-
-        return PhysicalOp.solver.isSimpleConversion(td) or is_file_to_text_file
-
     def copy(self, *args, **kwargs):
         return self.__class__(
             outputSchema=self.outputSchema,
-            source=self.source,
+            inputSchema=self.inputSchema,
             model=self.model,
             cardinality=self.cardinality,
             image_conversion=self.image_conversion,
@@ -125,7 +129,7 @@ class InduceOp(PhysicalOp):
             and self.query_strategy == other.query_strategy
             and self.token_budget == other.token_budget
             and self.outputSchema == other.outputSchema
-            and self.source == other.source
+            and self.inputSchema == other.inputSchema
             and self.max_workers == other.max_workers
         )
 
@@ -135,61 +139,59 @@ class InduceOp(PhysicalOp):
 
         return f"{self.__class__.__name__}({str(self.outputSchema):10s}, Model: {model}, Query Strategy: {qs}, Token Budget: {str(self.token_budget)})"
 
-    def _makeTaskDescriptor(self):
-        td = TaskDescriptor(
-            physical_op=self.__class__.__name__,
-            inputSchema=self.source.outputSchema,
-            outputSchema=self.outputSchema,
-            op_id=self.opId(),
-            model=self.model,
-            cardinality=self.cardinality,
-            image_conversion=self.image_conversion,
-            prompt_strategy=self.prompt_strategy,
-            query_strategy=self.query_strategy,
-            token_budget=self.token_budget,
-            conversionDesc=self.desc,
-            pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
-            plan_idx=self.plan_idx,
-            heatmap_json_obj=self.heatmap_json_obj,
-        )
-        # # This code checks if the function has been synthesized before, and if so, whether it is hardcoded. If so, set model and prompt_strategy to None.
-        # if td.op_id in PhysicalOp.synthesizedFns:
-        #     if self.is_hardcoded():
-        #         td.model = None
-        #         td.prompt_strategy = None
+    def __call__(self, candidate: DataRecord) -> Tuple[DataRecord, Optional[Stats]]:
+        raise NotImplementedError("This is an abstract class. Use a subclass instead.")
 
-        return td
+    # def _makeTaskDescriptor(self):
+    #     td = TaskDescriptor(
+    #         physical_op=self.__class__.__name__,
+    #         inputSchema=self.inputSchema,
+    #         outputSchema=self.outputSchema,
+    #         op_id=self.opId(),
+    #         model=self.model,
+    #         cardinality=self.cardinality,
+    #         image_conversion=self.image_conversion,
+    #         prompt_strategy=self.prompt_strategy,
+    #         query_strategy=self.query_strategy,
+    #         token_budget=self.token_budget,
+    #         conversionDesc=self.desc,
+    #         pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
+    #         plan_idx=self.plan_idx,
+    #         heatmap_json_obj=self.heatmap_json_obj,
+    #     )
+    #     # # This code checks if the function has been synthesized before, and if so, whether it is hardcoded. If so, set model and prompt_strategy to None.
+    #     # if td.op_id in PhysicalOp.synthesizedFns:
+    #     #     if self.is_hardcoded():
+    #     #         td.model = None
+    #     #         td.prompt_strategy = None
 
-    def opId(self):
-        d = {
-            "operator": self.__class__.__name__,
-            "outputSchema": str(self.outputSchema),
-            "source": self.source.opId(),
-            "model": self.model.value if self.model is not None else None,
-            "prompt_strategy": (
-                self.prompt_strategy.value if self.prompt_strategy is not None else None
-            ),
-            "desc": self.desc,
-            "targetCacheId": self.targetCacheId,
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+    #     return td
 
-    def _attemptMapping(self, candidate: DataRecord):
-        """Attempt to map the candidate to the outputSchema. Return None if it fails."""
-        taskDescriptor = self._makeTaskDescriptor()
-        taskFn = PhysicalOp.solver.synthesize(
-            taskDescriptor, shouldProfile=self.shouldProfile
-        )
-        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
-        #     raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
-        # return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
-        drs, new_heatmap_json_obj = taskFn(candidate)
-        self.heatmap_json_obj = new_heatmap_json_obj
-        return drs
+    # def opId(self):
+    #     d = {
+    #         "operator": self.__class__.__name__,
+    #         "outputSchema": str(self.outputSchema),
+    #         "source": self.source.opId(),
+    #         "model": self.model.value if self.model is not None else None,
+    #         "prompt_strategy": (
+    #             self.prompt_strategy.value if self.prompt_strategy is not None else None
+    #         ),
+    #         "desc": self.desc,
+    #         "targetCacheId": self.targetCacheId,
+    #     }
+    #     ordered = json.dumps(d, sort_keys=True)
+    #     return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    # TODO this method shouldn't be here in the first place
-    # TODO only difference between this and the parallel is the max_workers. So for now we would have parallel call this method with max_workers = self.max_workers
+    # def _attemptMapping(self, candidate: DataRecord):
+    # """Attempt to map the candidate to the outputSchema. Return None if it fails."""
+    # taskDescriptor = self._makeTaskDescriptor()
+    # taskFn = PhysicalOp.solver.synthesize(
+    # taskDescriptor, shouldProfile=self.shouldProfile
+    # )
+    # drs, new_heatmap_json_obj = taskFn(candidate)
+    # self.heatmap_json_obj = new_heatmap_json_obj
+    # return drs
+
     def estimateCost(self, cost_est_data: Dict[str, Any] = None):
         # fetch cost estimates from source operation
         inputEstimates, subPlanCostEst = self.source.estimateCost(cost_est_data)
@@ -477,3 +479,31 @@ class ParallelInduceFromCandidateOp(InduceOp):
                 self.datadir.closeCache(self.targetCacheId)
 
         return iteratorFn()
+
+
+class SimpleTypeConvert(InduceOp):
+    """This is a very simple function that converts a DataRecord from one Schema to another, when we know they have identical fields."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert (
+            self.inputSchema == self.outputSchema
+        ), "This convert has to be instantiated to convert an input to the same output Schema!"
+
+    def __call__(self, candidate: DataRecord):
+        if not candidate.schema == self.inputSchema:
+            return None
+
+        dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
+        for field in self.outputSchema.fieldNames():  # type: ignore
+            if hasattr(candidate, field):
+                setattr(dr, field, getattr(candidate, field))
+            elif field.required:
+                return None
+
+        # TODO profiling should be done somewhere else
+        # if profiling, set record's stats for the given op_id to be an empty Stats object
+        # if self.shouldProfile:
+        # candidate._stats[td.op_id] = InduceNonLLMStats()
+
+        return [dr], None

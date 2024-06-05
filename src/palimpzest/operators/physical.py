@@ -10,7 +10,7 @@ from palimpzest.solver.solver import Solver
 from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.profiler import OperatorStats, Profiler, StatsProcessor
 
-from typing import Any, Callable, Dict, Tuple, Union
+from typing import Any, Callable, Dict, Tuple, Union, Optional
 
 import pandas as pd
 
@@ -33,12 +33,12 @@ class PhysicalOp:
     def __init__(
         self,
         outputSchema: Schema,
-        source: PhysicalOp = None,
+        inputSchema: Optional[Schema] = None,
         shouldProfile=False,
         max_workers: int = 1,
     ) -> None:
         self.outputSchema = outputSchema
-        self.source = source
+        self.inputSchema = inputSchema
         self.datadir = DataDirectory()
         self.shouldProfile = shouldProfile
         self.plan_idx = None
@@ -57,23 +57,22 @@ class PhysicalOp:
         raise NotImplementedError("Abstract method")
 
     def is_hardcoded(self) -> bool:
-        if self.source is None:
+        if self.inputSchema is None:
             return True
-        in_schema = self.source.outputSchema
-        out_schema = self.outputSchema
-        return (out_schema, in_schema) in self.solver._hardcodedFns
+        return (self.outputSchema, self.inputSchema) in self.solver._hardcodedFns
 
     def copy(self) -> PhysicalOp:
         raise NotImplementedError
 
     def dumpPhysicalTree(self) -> Tuple[PhysicalOp, Union[PhysicalOp, None]]:
+        raise NotImplementedError("Legacy method")
         """Return the physical tree of operators."""
-        if self.source is None:
+        if self.inputSchema is None:
             return (self, None)
-
         return (self, self.source.dumpPhysicalTree())
 
     def setPlanIdx(self, idx) -> None:
+        raise NotImplementedError("Legacy method")
         self.plan_idx = idx
         if self.source is not None:
             self.source.setPlanIdx(idx)
@@ -386,15 +385,17 @@ def agg_final(func, state):
 class ApplyGroupByOp(PhysicalOp):
     def __init__(
         self,
-        source: PhysicalOp,
+        inputSchema: Schema,
         gbySig: GroupBySig,
         targetCacheId: str = None,
         shouldProfile=False,
     ):
         super().__init__(
-            outputSchema=gbySig.outputSchema(), shouldProfile=shouldProfile
+            inputSchema=inputSchema,
+            outputSchema=gbySig.outputSchema(),
+            shouldProfile=shouldProfile,
         )
-        self.source = source
+        self.inputSchema = inputSchema
         self.gbySig = gbySig
         self.targetCacheId = targetCacheId
         self.shouldProfile = shouldProfile
@@ -404,7 +405,7 @@ class ApplyGroupByOp(PhysicalOp):
             isinstance(other, ApplyGroupByOp)
             and self.gbySig == other.gbySig
             and self.outputSchema == other.outputSchema
-            and self.source == other.source
+            and self.inputSchema == other.inputSchema
         )
 
     def __str__(self):
@@ -504,13 +505,14 @@ class ApplyGroupByOp(PhysicalOp):
 class ApplyCountAggregateOp(PhysicalOp):
     def __init__(
         self,
-        source: PhysicalOp,
+        inputSchema: Schema,
         aggFunction: AggregateFunction,
         targetCacheId: str = None,
         shouldProfile=False,
     ):
-        super().__init__(outputSchema=Number, shouldProfile=shouldProfile)
-        self.source = source
+        super().__init__(
+            inputSchema=inputSchema, outputSchema=Number, shouldProfile=shouldProfile
+        )
         self.aggFunction = aggFunction
         self.targetCacheId = targetCacheId
 
@@ -523,7 +525,7 @@ class ApplyCountAggregateOp(PhysicalOp):
             isinstance(other, ApplyCountAggregateOp)
             and self.aggFunction == other.aggFunction
             and self.outputSchema == other.outputSchema
-            and self.source == other.source
+            and self.inputSchema == other.inputSchema
         )
 
     def __str__(self):
@@ -538,10 +540,14 @@ class ApplyCountAggregateOp(PhysicalOp):
 
     def copy(self):
         return ApplyCountAggregateOp(
-            self.source, self.aggFunction, self.targetCacheId, self.shouldProfile
+            inputSchema=self.inputSchema,
+            aggFunction=self.aggFunction,
+            targetCacheId=self.targetCacheId,
+            shouldProfile=self.shouldProfile,
         )
 
     def opId(self):
+        raise NotImplementedError("Legacy method")
         d = {
             "operator": "ApplyCountAggregateOp",
             "source": self.source.opId(),
@@ -597,6 +603,7 @@ class ApplyCountAggregateOp(PhysicalOp):
         }
 
     def __iter__(self):
+        raise NotImplementedError("TODO method")
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
 
@@ -625,18 +632,22 @@ class ApplyCountAggregateOp(PhysicalOp):
 class ApplyUserFunctionOp(PhysicalOp):
     def __init__(
         self,
-        source: PhysicalOp,
+        inputSchema: Schema,
         fn: UserFunction,
         targetCacheId: str = None,
         shouldProfile=False,
     ):
-        super().__init__(outputSchema=fn.outputSchema, shouldProfile=shouldProfile)
-        self.source = source
+        super().__init__(
+            inputSchema=inputSchema,
+            outputSchema=fn.outputSchema,
+            shouldProfile=shouldProfile,
+        )
+        self.inputSchema = inputSchema
         self.fn = fn
         self.targetCacheId = targetCacheId
-        if not source.outputSchema == fn.inputSchema:
+        if not inputSchema == fn.inputSchema:
             raise Exception(
-                "Supplied UserFunction input schema does not match output schema of input source"
+                "Supplied UserFunction input schema does not match input schema"
             )
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
@@ -648,7 +659,7 @@ class ApplyUserFunctionOp(PhysicalOp):
             isinstance(other, ApplyUserFunctionOp)
             and self.fn == other.fn
             and self.outputSchema == other.outputSchema
-            and self.source == other.source
+            and self.inputSchema == other.inputSchema
         )
 
     def __str__(self):
@@ -663,10 +674,14 @@ class ApplyUserFunctionOp(PhysicalOp):
 
     def copy(self):
         return ApplyUserFunctionOp(
-            self.source, self.fn, self.targetCacheId, self.shouldProfile
+            inputSchema=self.inputSchema,
+            fn=self.fn,
+            targetCacheId=self.targetCacheId,
+            shouldProfile=self.shouldProfile,
         )
 
     def opId(self):
+        raise NotImplementedError("Legacy method")
         d = {
             "operator": "ApplyUserFunctionOp",
             "source": self.source.opId(),
@@ -753,17 +768,18 @@ class ApplyUserFunctionOp(PhysicalOp):
 class ApplyAverageAggregateOp(PhysicalOp):
     def __init__(
         self,
-        source: PhysicalOp,
+        inputSchema: Schema,
         aggFunction: AggregateFunction,
         targetCacheId: str = None,
         shouldProfile=False,
     ):
-        super().__init__(outputSchema=Number, shouldProfile=shouldProfile)
-        self.source = source
+        super().__init__(
+            inputSchema=inputSchema, outputSchema=Number, shouldProfile=shouldProfile
+        )
         self.aggFunction = aggFunction
         self.targetCacheId = targetCacheId
 
-        if not source.outputSchema == Number:
+        if not inputSchema == Number:
             raise Exception("Aggregate function AVERAGE is only defined over Numbers")
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
@@ -775,7 +791,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
             isinstance(other, ApplyAverageAggregateOp)
             and self.aggFunction == other.aggFunction
             and self.outputSchema == other.outputSchema
-            and self.source == other.source
+            and self.inputSchema == other.inputSchema
         )
 
     def __str__(self):
@@ -790,10 +806,14 @@ class ApplyAverageAggregateOp(PhysicalOp):
 
     def copy(self):
         return ApplyAverageAggregateOp(
-            self.source, self.aggFunction, self.targetCacheId, self.shouldProfile
+            inputSchema=self.inputSchema,
+            aggFunction=self.aggFunction,
+            targetCacheId=self.targetCacheId,
+            shouldProfile=self.shouldProfile,
         )
 
     def opId(self):
+        raise NotImplementedError("Legacy method")
         d = {
             "operator": "ApplyAverageAggregateOp",
             "source": self.source.opId(),
@@ -882,13 +902,16 @@ class LimitScanOp(PhysicalOp):
     def __init__(
         self,
         outputSchema: Schema,
-        source: PhysicalOp,
+        inputSchema: Schema,
         limit: int,
         targetCacheId: str = None,
         shouldProfile=False,
     ):
-        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
-        self.source = source
+        super().__init__(
+            inputSchema=inputSchema,
+            outputSchema=outputSchema,
+            shouldProfile=shouldProfile,
+        )
         self.limit = limit
         self.targetCacheId = targetCacheId
 
@@ -901,7 +924,7 @@ class LimitScanOp(PhysicalOp):
             isinstance(other, LimitScanOp)
             and self.limit == other.limit
             and self.outputSchema == other.outputSchema
-            and self.source == other.source
+            and self.inputSchema == other.inputSchema
         )
 
     def __str__(self):
@@ -916,14 +939,15 @@ class LimitScanOp(PhysicalOp):
 
     def copy(self):
         return LimitScanOp(
-            self.outputSchema,
-            self.source,
-            self.limit,
-            self.targetCacheId,
-            self.shouldProfile,
+            outputSchema=self.outputSchema,
+            inputSchema=self.inputSchema,
+            limit=self.limit,
+            targetCacheId=self.targetCacheId,
+            shouldProfile=self.shouldProfile,
         )
 
     def opId(self):
+        raise NotImplementedError("Legacy method")
         d = {
             "operator": "LimitScanOp",
             "outputSchema": str(self.outputSchema),

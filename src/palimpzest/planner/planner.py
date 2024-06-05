@@ -151,3 +151,20 @@ class PhysicalPlanner(Planner):
 
     def generate_plans(self, logical_plan: LogicalPlan) -> List[PhysicalPlan]:
         """Return a set of possible physical plans."""
+
+
+# # Stub of physical planning code
+# for plan in logical_plans:
+#     for logical_op in plan:
+#         applicable_ops = [phy for phy in physical_ops
+#                           if phy.inputSchema == logical_op.inputSchema
+#                           and phy.outputSchema == logical_op.outputSchema]
+
+
+# # Stub of execution code
+# for plan in physical_plan:
+#     for phy_op in plan:
+#             instantiated_op = phy_op()
+#             for record in dataset:
+#                 with Profiler: # or however the Stat collection works:
+#                     result = instantiated_op(record)
