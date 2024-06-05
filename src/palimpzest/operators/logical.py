@@ -1,3 +1,5 @@
+"""This module required refactoring the name because there were conflicts when importing pz.operators about what is the content"""
+
 from __future__ import annotations
 
 from palimpzest.constants import Model, QueryStrategy
