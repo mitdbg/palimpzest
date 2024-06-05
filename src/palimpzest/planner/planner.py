@@ -182,11 +182,12 @@ class PhysicalPlanner(Planner):
 
         return models
 
-    def _createSentinelPlan(self, model: pz.Model):
+    def _createSentinelPlan(logical_plan: LogicalPlan, model: pz.Model):
         """
         Create the sentinel plans, which -- at least for now --- are single model plans
         which follow the structure of the user-specified program.
         """
+        # for 
         # base case: this is a root op
         if self.inputOp is None:
             return self._getPhysicalTree(

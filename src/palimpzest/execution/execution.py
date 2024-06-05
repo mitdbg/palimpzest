@@ -394,7 +394,7 @@ class NewExecute:
         records = [r for r in plan]
 
         # get profiling data for plan and compute its cost
-        profileData = plan.getProfilingData()
+        profileData = plan.getStats()
         sp = StatsProcessor(profileData)
         cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
 
@@ -411,14 +411,14 @@ class NewExecute:
         # get sentinel plans
         sentinelPlans = []
         logicalPlanner = LogicalPlanner(nocache, num_samples, scan_start_idx=0, sentinels=True)
-        for logicalPlan in logicalPlanner.generate_plans(dataset):
-            sentinelPlan = PhysicalPlanner().generate_plans(logicalPlan, sentinel=True)
+        logicalPlan = logicalPlanner.generate_plans(dataset):
+        for sentinelPlan in PhysicalPlanner().generate_plans(logicalPlan, sentinel=True):
             sentinelPlans.append(sentinelPlan)
 
         # run sentinel plans
         all_cost_estimate_data, sentinel_records = [], []
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(sentinelPlans)) as executor:
-            results = list(executor.map(Execute.run_sentinel_plan, sentinelPlans))
+            results = list(executor.map(NewExecute.run_sentinel_plan, sentinelPlans))
 
             # write out result dict and samples collected for each sentinel
             for records, cost_est_sample_data in results:

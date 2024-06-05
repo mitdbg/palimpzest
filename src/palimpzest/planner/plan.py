@@ -46,3 +46,17 @@ class PhysicalPlan(Plan):
         self.dataset = dataset
         self.operators = []
         self.num_samples = num_samples
+
+        self.stats = PlanStats()
+
+    # NOTE: would we need something like the following?:
+    def getStats():
+        # compute and return agg. stats
+        return
+
+    def __iter__(self):
+        base_operator = self.operators[-1]
+        for record, stats in base_operator:
+            self.stats.append(stats)
+            yield record
+        

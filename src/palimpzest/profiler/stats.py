@@ -34,24 +34,29 @@ class PlanStats:
     total_cost: float=0.0
 
 
+
 @dataclass
 class OperatorStats:
     """
     Dataclass for storing statistics captured within a given operator.
     """
-    # the ID of the operation in which these stats were collected
+    # the ID of the logical operation in which these stats were collected
     op_id: str=None
-    # the name of the operation in which these stats were collected
+    # the name of the logical operation in which these stats were collected
     op_name: str=None
+    # the name of the operation in which these stats were collected
+    source_op_stats: OperatorStats=None
     # a list of record dictionaries processed by the operation; each record dictionary
     # has the format: {"op_id": str, "uuid": str "parent_uuid": str, "stats": Stats, **record._asDict()}
     records: List[Dict[str, Any]]=field(default_factory=list)
     # total number of records returned by the iterator for this operator
     total_records: int=0
     # total time spent in this iterator; this will include time spent in input operators
-    total_time: float=0.0
+    total_cumulative_iter_time: float=0.0
+    # keep track of the total time spent inside of the profiler
+    total_time_in_profiler: float=0.0
     # total time spent in this operation; does not include time spent waiting on parent/source operators
-    total_cost: float=0.0
+    total_op_time: float=0.0
 
     ##############################################
     ##### Universal Induce and Filter Fields #####
@@ -130,11 +135,12 @@ class OperatorStats:
 
 
 @dataclass
-class Stats:
+class OptimizationStats:
     """
-    Base dataclass for storing statistics captured during the execution of an induce / filter
-    operation on a single input record.
+    Base dataclass for storing statistics captured during the execution of an optimization on a single input record.
     """
+    # optimization name
+    opt_name
     # (set in profiler.py) this is the total time spent waiting for the iterator
     # to yield the data record associated with this Stats object; note that this
     # will capture the total time spent in this operation and all source operations
