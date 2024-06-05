@@ -22,7 +22,7 @@ class DogImage(pz.ImageFile):
 
 def buildImagePlan(datasetId):
     images = pz.Dataset(datasetId, schema=pz.ImageFile)
-    filteredImages = images.filterByStr("The image contains one or more dogs")
+    filteredImages = images.filter("The image contains one or more dogs")
     dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
     return dogImages
 

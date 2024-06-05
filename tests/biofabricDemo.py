@@ -51,11 +51,11 @@ class CaseData(pz.Schema):
 
 def filtering(input_dataset, policy):
     patient_tables = input_dataset.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
-    patient_tables = patient_tables.filterByStr("The rows of the table contain the patient age")
-    # patient_tables = patient_tables.filterByStr("The table explains the meaning of attributes")
-    # patient_tables = patient_tables.filterByStr("The table contains patient biometric data")
-    # patient_tables = patient_tables.filterByStr("The table contains proteomic data")
-    # patient_tables = patient_tables.filterByStr("The table records if the patient is excluded from the study")
+    patient_tables = patient_tables.filter("The rows of the table contain the patient age")
+    # patient_tables = patient_tables.filter("The table explains the meaning of attributes")
+    # patient_tables = patient_tables.filter("The table contains patient biometric data")
+    # patient_tables = patient_tables.filter("The table contains proteomic data")
+    # patient_tables = patient_tables.filter("The table records if the patient is excluded from the study")
     output = pz.SimpleExecution(patient_tables, policy)
     output = output.executeAndOptimize(args.verbose)
 
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     elif experiment == "endtoend":
         xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)
         patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
-        patient_tables = patient_tables.filterByStr("The rows of the table contain the patient age")
+        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
         
         output_1 = pz.SimpleExecution(patient_tables, policy)

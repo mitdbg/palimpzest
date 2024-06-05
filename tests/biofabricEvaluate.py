@@ -219,7 +219,7 @@ def execute_biofabric_pz(datasetid, result_dir, reoptimize=False, limit=None):
     # xls = pz.Dataset('biofabric-matching-tiny', schema=pz.XLSFile)
     xls = pz.Dataset(datasetid, schema=pz.XLSFile)
     patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
-    patient_tables = patient_tables.filterByStr("The rows of the table contain the patient age")
+    patient_tables = patient_tables.filter("The rows of the table contain the patient age")
     case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
 
     logicalTree = case_data.getLogicalTree()

@@ -41,7 +41,7 @@ def buildEquationPlan(datasetId):
     """Fetches equations from pandemic papers in a dataset"""
     pandemicPapers = buildPandemicPaperPlan(datasetId)
     equations = pandemicPapers.oneToManySet(Equation, desc="Equations in the papers")
-    stockAndFlowEquations = equations.filterByStr("The equation describes a stock and flow model")
+    stockAndFlowEquations = equations.filter("The equation describes a stock and flow model")
     return stockAndFlowEquations
 
 def testEmit(datasetId = "askem-testset-02072024"):
@@ -59,7 +59,7 @@ def testEmit(datasetId = "askem-testset-02072024"):
 
 def buildEquationImagePlan(datasetId):
     images = pz.Dataset(datasetId, schema=pz.ImageFile)
-    filteredImages = images.filterByStr("The image contains an equation")
+    filteredImages = images.filter("The image contains an equation")
     equationImages = filteredImages.convert(pz.EquationImage, desc = "Image that contains an equation")
     return equationImages
 

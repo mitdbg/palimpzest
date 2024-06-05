@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from palimpzest.datamanager import DataDirectory
+from palimpzest.corelib import File, Number, Schema
 from palimpzest.elements import (
     AggregateFunction,
-    File,
     Filter,
-    Number,
-    Schema,
     UserFunction,
     GroupBySig,
 )
@@ -281,7 +279,7 @@ class Dataset(Set):
 
     Users instantiate a Dataset by specifying a `source` that either points to a
     DataSource or an existing cached Set. Users can then perform computations on
-    the Dataset in an imperative fashion by leveraging functions such as `filterByStr`,
+    the Dataset in an imperative fashion by leveraging functions such as `filter`,
     `convert`, `aggregate`, etc. Underneath the hood, each of these operations creates
     a new Set which is cached by the DataManager. As a result, the Sets define the
     lineage of computation on a Dataset, and this enables programmers to re-use
@@ -327,14 +325,19 @@ class Dataset(Set):
 
     def filter(
         self,
-        f: Filter,
+        _filter: Filter,
         depends_on: Union[str, List[str]] = None,
         desc: str = "Apply filter(s)",
     ) -> Dataset:
-        """
-        This function creates and returns a new Set. The newly created Set uses this Set
-        as its source and applies the provided filter to it.
-        """
+        """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
+        f = None
+        if type(_filter) == str:
+            f = Filter(_filter)
+        elif type(_filter) == callable:
+            f = Filter(filterFn=_filter)
+        else:
+            raise Exception("Filter type not supported.")
+
         return Dataset(
             source=self,
             schema=self.schema(),
@@ -343,28 +346,6 @@ class Dataset(Set):
             depends_on=depends_on,
             nocache=self._nocache,
         )
-
-    def filterByStr(
-        self,
-        filterCondition: str,
-        depends_on: Union[str, List[str]] = None,
-        desc: str = "Apply filter(s)",
-    ) -> Dataset:
-        """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
-        f = Filter(filterCondition)
-
-        return self.filter(f, depends_on, desc)
-
-    def filterByFn(
-        self,
-        filterFn: callable,
-        depends_on: Union[str, List[str]] = None,
-        desc: str = "Apply filter(s)",
-    ) -> Dataset:
-        """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
-        f = Filter(filterFn=filterFn)
-
-        return self.filter(f, depends_on, desc)
 
     def convert(
         self,

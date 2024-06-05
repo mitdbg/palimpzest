@@ -42,8 +42,8 @@ def buildTestPDFPlan(datasetId):
 def buildMITBatteryPaperPlan(datasetId):
     """A dataset-independent declarative description of authors of good papers"""
     sciPapers = pz.Dataset(datasetId, schema=ScientificPaper)
-    batteryPapers = sciPapers.filterByStr("The paper is about batteries")
-    mitPapers = batteryPapers.filterByStr("The paper is from MIT")
+    batteryPapers = sciPapers.filter("The paper is about batteries")
+    mitPapers = batteryPapers.filter("The paper is from MIT")
 
     return mitPapers
 
@@ -187,13 +187,13 @@ class DogImage(pz.ImageFile):
 
 def buildImagePlan(datasetId):
     images = pz.Dataset(datasetId, schema=pz.ImageFile)
-    filteredImages = images.filterByStr("The image contains one or more dogs")
+    filteredImages = images.filter("The image contains one or more dogs")
     dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
     return dogImages
 
 def buildImageAggPlan(datasetId):
     images = pz.Dataset(datasetId, schema=pz.ImageFile)
-    filteredImages = images.filterByStr("The image contains one or more dogs")
+    filteredImages = images.filter("The image contains one or more dogs")
     dogImages = filteredImages.convert(DogImage, desc = "Images of dogs")
     ops = ["count"]
     fields = ["breed"]

@@ -400,9 +400,9 @@ def get_logical_tree(workload, nocache: bool=True, num_samples: int=None, scan_s
     """
     if workload == "enron":
         emails = pz.Dataset("enron-eval", schema=Email, nocache=nocache, num_samples=num_samples, scan_start_idx=scan_start_idx)
-        emails = emails.filterByStr("The email is not quoting from a news article or an article written by someone outside of Enron")
-        emails = emails.filterByStr("The email refers to a fraudulent scheme (i.e., \"Raptor\", \"Deathstar\", \"Chewco\", and/or \"Fat Boy\")")
-        # emails = emails.filterByStr("The email chain (including metadata) refers to Jeffrey Skilling (Jeff) and/or Andy Fastow (Andy)")
+        emails = emails.filter("The email is not quoting from a news article or an article written by someone outside of Enron")
+        emails = emails.filter("The email refers to a fraudulent scheme (i.e., \"Raptor\", \"Deathstar\", \"Chewco\", and/or \"Fat Boy\")")
+        # emails = emails.filter("The email chain (including metadata) refers to Jeffrey Skilling (Jeff) and/or Andy Fastow (Andy)")
         return emails.getLogicalTree()
 
     if workload == "real-estate":
@@ -429,18 +429,18 @@ def get_logical_tree(workload, nocache: bool=True, num_samples: int=None, scan_s
         listings = pz.Dataset(workload, schema=RealEstateListingFiles, nocache=nocache, num_samples=num_samples, scan_start_idx=scan_start_idx)
         listings = listings.convert(TextRealEstateListing, depends_on="text_content")
         listings = listings.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_contents")
-        listings = listings.filterByStr(
+        listings = listings.filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"]
         )
-        listings = listings.filterByFn(within_two_miles_of_mit, depends_on="address")
-        listings = listings.filterByFn(in_price_range, depends_on="price")
+        listings = listings.filter(within_two_miles_of_mit, depends_on="address")
+        listings = listings.filter(in_price_range, depends_on="price")
         return listings.getLogicalTree()
 
     if workload == "biofabric":
         xls = pz.Dataset("biofabric-medium", schema=pz.XLSFile, nocache=nocache, num_samples=num_samples, scan_start_idx=scan_start_idx)
         patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
-        patient_tables = patient_tables.filterByStr("The rows of the table contain the patient age")
+        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
 
         return case_data.getLogicalTree()
