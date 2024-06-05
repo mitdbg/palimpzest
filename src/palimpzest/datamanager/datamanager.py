@@ -1,7 +1,7 @@
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
 from palimpzest.datasources import DirectorySource, FileSource, MemorySource, UserSource
-from palimpzest.elements import UserFunction
+from palimpzest.elements import DownloadBinaryFunction, DownloadHTMLFunction, UserFunction
 
 import os
 import pickle
@@ -283,3 +283,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
         entry, path = self._registry[dataset_id]
         return path
+
+# TODO: can we remove this?
+DataDirectory().registerUserFunction(DownloadHTMLFunction())
+DataDirectory().registerUserFunction(DownloadBinaryFunction())

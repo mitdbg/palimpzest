@@ -1,5 +1,6 @@
 from palimpzest.constants import Model, PromptStrategy, QueryStrategy
-from palimpzest.elements import Filter, Schema
+from palimpzest.corelib import Schema
+from palimpzest.elements import Filter
 
 from dataclasses import dataclass
 

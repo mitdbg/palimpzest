@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from palimpzest.constants import Model, QueryStrategy
+from palimpzest.corelib import Schema
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.operators import (

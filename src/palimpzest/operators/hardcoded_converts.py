@@ -16,6 +16,12 @@ from palimpzest.tools.pdfparser import get_text_from_pdf
 from palimpzest.tools.skema_tools import equations_to_latex
 from papermage import Document
 
+# TODO:
+# 0. rename InduceOp --> ConvertOp
+# 1. ensure that __init__(self, *args, **kwargs) is also in ConvertOp to allow e.g. self.pdfprocessor to be set
+# 2. rewrite .schema in records.py to return dynamic set of fields
+# 3. 
+
 
 class HardcodedConvert(InduceOp):
 
@@ -57,10 +63,10 @@ class ConvertImageToEquation(HardcodedConvert):
 
     def __call__(self, candidate: DataRecord):
         print("handling image to equation through skema")
-        if not candidate.element == self.inputSchema:
+        if not candidate.schema == self.inputSchema:
             return None
 
-        dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
+        dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
         dr.filename = candidate.filename
         dr.contents = candidate.contents
         dr.equation_text, api_stats = equations_to_latex(candidate.contents)
@@ -130,12 +136,11 @@ class ConvertXLSToTable(HardcodedConvert):
             )
             # api_stats = ApiStats(api_call_duration_secs=time.time() - start_time)
 
+            # TODO extend number of rows with dynamic sizing of context length
             # construct data record
             dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
             rows = []
-            for row in dataframe.values[
-                :100
-            ]:  # TODO Extend this with dynamic sizing of context length
+            for row in dataframe.values[:100]:
                 row_record = [str(x) for x in row]
                 rows += [row_record]
             dr.rows = rows
@@ -167,7 +172,7 @@ class ConvertFileToPDF(HardcodedConvert):
         pdf_filename = candidate.filename
 
         # generate text_content from PDF
-        start_time = time.time()
+        # start_time = time.time()
         if remoteFunc is not None:
             docJsonStr = remoteFunc.remote([pdf_bytes])
             docdict = json.loads(docJsonStr[0])

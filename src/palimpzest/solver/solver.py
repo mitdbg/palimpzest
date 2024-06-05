@@ -1,14 +1,17 @@
 from io import BytesIO
 import numpy as np
 from palimpzest.constants import PromptStrategy, QueryStrategy
-from palimpzest.elements import DataRecord, File, TextFile, Schema
+from palimpzest.elements import DataRecord
 from palimpzest.corelib import (
+    Download,
     EquationImage,
+    File,
     ImageFile,
     PDFFile,
-    Download,
-    XLSFile,
+    Schema,
     Table,
+    TextFile,
+    XLSFile,
 )
 from palimpzest.generators import DSPyGenerator
 from palimpzest.profiler import (

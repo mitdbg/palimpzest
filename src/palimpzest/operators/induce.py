@@ -12,7 +12,7 @@ import pandas as pd
 from .physical import PhysicalOp, MAX_ID_CHARS, IteratorFn
 
 from palimpzest.constants import *
-import palimpzest.corelib.schemas as schemas
+from palimpzest.corelib import *
 from palimpzest.elements import *
 from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.profiler import Profiler
@@ -487,6 +487,7 @@ class SimpleTypeConvert(InduceOp):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # TODO: does schema equality only check fields?
         assert (
             self.inputSchema == self.outputSchema
         ), "This convert has to be instantiated to convert an input to the same output Schema!"
@@ -497,6 +498,8 @@ class SimpleTypeConvert(InduceOp):
 
         dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
         for field in self.outputSchema.fieldNames():  # type: ignore
+
+            # TODO: I think we can drop the if/elif since we check candidate.schema == self.inputSchema above?
             if hasattr(candidate, field):
                 setattr(dr, field, getattr(candidate, field))
             elif field.required:

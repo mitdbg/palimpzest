@@ -1,10 +1,8 @@
-from palimpzest.elements import DataRecord, File, Number, Schema, RawJSONObject
+from palimpzest.corelib import File, Number, Schema
+from palimpzest.elements import DataRecord
 from typing import Any, Callable, Dict, List, Union
 
 import os
-import time
-import requests
-import json
 
 
 class AbstractDataSource:

@@ -1,8 +1,6 @@
-from palimpzest.elements import Schema
+from palimpzest.corelib import Schema
 
 import hashlib
-import json
-import uuid
 
 # DEFINITIONS
 MAX_UUID_CHARS = 10
@@ -51,22 +49,15 @@ class DataRecord:
 
     def _asJSON(self, include_bytes: bool=True, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
-        value_dict = self._asDict(include_bytes)
-        return self.schema().asJSON(value_dict, *args, **kwargs) # TODO: need to rethink record's relationship to schema
+        record_dict = self._asDict(include_bytes)
+        return self.schema().asJSON(record_dict, *args, **kwargs)
 
     def _asDict(self, include_bytes: bool=True):
         """Return a dictionary representation of this DataRecord"""
         dct = {
             k: self.__dict__[k]
             for k in self.__dict__.keys()
-            # for k in self.schema.fieldNames() # TODO: need to rethink record's relationship to schema
-
-            # adding this back out of an abundance of paranoia; technically schema.fieldNames()
-            # only filters .startswith("__") (two '__' instead of one '_'), but this shouldn't matter
-            # b/c the schema doesn't contain fields like `_stats` or `_uuid` which are stored at the DataRecord level
-            # 
-            # so TL;DR this next line probably does nothing but help me sleep better at night
-            if not k.startswith("_") and not k.startswith("__") and k != "schema" # TODO: need to rethink record's relationship to schema
+            if not k.startswith("_") and k != "schema"
         }
         if not include_bytes:
             for k in dct:

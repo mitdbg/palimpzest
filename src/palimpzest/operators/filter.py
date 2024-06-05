@@ -4,15 +4,16 @@ from palimpzest.generators.generators import DSPyGenerator
 from .physical import PhysicalOp, MAX_ID_CHARS
 
 from palimpzest.constants import *
+from palimpzest.corelib import Schema
 from palimpzest.elements import *
 from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.profiler import Profiler
 
 from typing import Any, Dict
 
-
 import concurrent
 import hashlib
+import json
 
 
 class FilterOp(PhysicalOp):
@@ -412,8 +413,9 @@ class LLMFilter(FilterOp):
         doc_schema = str(self.inputSchema)
         doc_type = self.inputSchema.className()
 
+        # TODO: is this needed anymore?
         # do not filter candidate if it doesn't match inputSchema
-        if not candidate.schema == td.inputSchema:
+        if not candidate.schema == self.inputSchema:
             return False
 
         # create generator

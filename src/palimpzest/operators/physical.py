@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 from palimpzest.constants import *
-from palimpzest.corelib.schemas import ImageFile
+from palimpzest.corelib import ImageFile, Schema
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.solver.solver import Solver
