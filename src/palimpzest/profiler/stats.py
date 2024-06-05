@@ -14,48 +14,44 @@ import ast
 import json
 import re
 
+# Let's simplify this with the following high-level design goal:
+# 1. there is an operator-level OperatorStats object which contains a list of the per-record OptimizationStats
+# 2. there is an OptimizationStats object which keeps track of the cost and runtime of each Optimization (akin to a GenerationStats object)
+#    a. OptimizationStats may optionally store additional fields and define custom logic for aggregating these fields, but this is not required
+
+@dataclass
+class PlanStats:
+    """
+    Dataclass for storing statistics captured for an entire plan.
+    """
+    # label string identifying the physical plan
+    plan_label: str=None
+    # list of OperatorStats objects (one for each operator)
+    operator_stats: List[OperatorStats]=None
+    # total runtime for plan
+    total_runtime: float=0.0
+    # total cost for plan
+    total_cost: float=0.0
+
+
 @dataclass
 class OperatorStats:
     """
     Dataclass for storing statistics captured within a given operator.
-
-    Note that not every field will be computed for a given operation. This class
-    represents the union of all statistics computed across all types of operators.
-
-    The other Stats classes (below) are concerned with the statistics computed for a
-    single induce / filter operation executed on a single input record. This dataclass
-    aggregates across all of those statistics (e.g. by capturing the total number
-    of output tokens generated across all generations, the total number of records
-    processed, etc.)
     """
-    ############################
-    ##### Universal Fields #####
-    ############################
-    # [set in Profiler.__init__]
     # the ID of the operation in which these stats were collected
     op_id: str=None
-    # [set in Profiler.iter_profiler]
     # the name of the operation in which these stats were collected
     op_name: str=None
-    # [set in PhysicalOp.getProfilingData]
-    # the name of the operation in which these stats were collected
-    source_op_stats: OperatorStats=None
-    # [computed in Profiler.iter_profiler]
     # a list of record dictionaries processed by the operation; each record dictionary
     # has the format: {"op_id": str, "uuid": str "parent_uuid": str, "stats": Stats, **record._asDict()}
     records: List[Dict[str, Any]]=field(default_factory=list)
-    # [computed in Profiler.iter_profiler]
     # total number of records returned by the iterator for this operator
     total_records: int=0
-    # [computed in Profiler.iter_profiler]
     # total time spent in this iterator; this will include time spent in input operators
-    total_cumulative_iter_time: float=0.0
-    # [computed in Profiler.iter_profiler]
-    # keep track of the total time spent inside of the profiler
-    total_time_in_profiler: float=0.0
-    # [computed in StatsProcessor]
+    total_time: float=0.0
     # total time spent in this operation; does not include time spent waiting on parent/source operators
-    total_op_time: float=0.0
+    total_cost: float=0.0
 
     ##############################################
     ##### Universal Induce and Filter Fields #####

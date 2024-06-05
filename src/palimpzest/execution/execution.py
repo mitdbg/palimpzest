@@ -381,3 +381,66 @@ class Execute:
         all_records = sentinel_records + new_records
 
         return all_records, plan
+
+
+
+
+
+
+class NewExecute:
+    @staticmethod
+    def run_sentinel_plan(plan):
+        # run the plan
+        records = [r for r in plan]
+
+        # get profiling data for plan and compute its cost
+        profileData = plan.getProfilingData()
+        sp = StatsProcessor(profileData)
+        cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
+
+        return records, cost_estimate_sample_data
+
+
+    def __new__(cls, dataset: Set, policy: Policy, num_samples: int=20, nocache: bool=False, verbose: bool=False):
+        # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
+        if nocache:
+            # delete/disable DSPy cachedir
+            # remove codegen samples from previous dataset from cache
+            pass
+
+        # get sentinel plans
+        sentinelPlans = []
+        logicalPlanner = LogicalPlanner(nocache, num_samples, scan_start_idx=0, sentinels=True)
+        for logicalPlan in logicalPlanner.generate_plans(dataset):
+            sentinelPlan = PhysicalPlanner().generate_plans(logicalPlan, sentinel=True)
+            sentinelPlans.append(sentinelPlan)
+
+        # run sentinel plans
+        all_cost_estimate_data, sentinel_records = [], []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(sentinelPlans)) as executor:
+            results = list(executor.map(Execute.run_sentinel_plan, sentinelPlans))
+
+            # write out result dict and samples collected for each sentinel
+            for records, cost_est_sample_data in results:
+                # aggregate sentinel est. data
+                all_cost_estimate_data.extend(cost_est_sample_data)
+
+                champion_model = None # compute champion model
+                if champion_model:
+                    sentinel_records = records
+
+        # create new plan candidates based on current estimate data
+        physicalPlanCandidates = []
+        logicalPlanner = LogicalPlanner(nocache, scan_start_idx=num_samples)
+        for logicalPlan in logicalPlanner.generate_plans(dataset):
+            for physicalPlan in PhysicalPlanner().generate_plans(logicalPlan, cost_estimate_sample_data=all_cost_estimate_data):
+                physicalPlanCandidates.append(physicalPlan)
+    
+        # choose best plan and execute it
+        (_, _, _, plan, _) = policy.choose(physicalPlanCandidates)
+
+        # run the plan
+        new_records = [r for r in plan]
+        all_records = sentinel_records + new_records
+
+        return all_records
