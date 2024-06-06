@@ -157,7 +157,7 @@ class Solver:
         The shouldProfile parameter also determines whether or not PZ should compute
         profiling statistics for LLM invocations and attach them to each record.
         """
-        # synthesize a function to induce from inputType to outputType
+        # synthesize a function to convert from inputType to outputType
         if "ConvertFromCandidateOp" in td.physical_op:
             typeConversionDescriptor = (td.outputSchema, td.inputSchema)
             if typeConversionDescriptor in self._simpleTypeConversions:

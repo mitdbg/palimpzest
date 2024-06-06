@@ -59,16 +59,16 @@ class TestPhysicalOperators(unittest.TestCase):
         physical = PhysicalPlanner()
 
     def test_class_attributes(self):
-        generic_induce = pz.ConvertOp
+        generic_convert = pz.ConvertOp
         conv_file_text = pz.ConvertFileToText
 
-        print("Input schema of ConvertOp: ", generic_induce.inputSchema)
-        print("Output schema of ConvertOp: ", generic_induce.outputSchema)
+        print("Input schema of ConvertOp: ", generic_convert.inputSchema)
+        print("Output schema of ConvertOp: ", generic_convert.outputSchema)
         print("Input schema of ConvertFileToText: ", conv_file_text.inputSchema)
         print("Output schema of ConvertFileToText: ", conv_file_text.outputSchema)
 
-        assert generic_induce.inputSchema != conv_file_text.inputSchema
-        assert generic_induce.outputSchema != conv_file_text.outputSchema
+        assert generic_convert.inputSchema != conv_file_text.inputSchema
+        assert generic_convert.outputSchema != conv_file_text.outputSchema
 
         conv_implementations = pz.ConvertFileToText(
             inputSchema=File,
@@ -101,7 +101,7 @@ class TestPhysicalOperators(unittest.TestCase):
         logical_plan = next(logical)
         print(logical_plan)
 
-    def test_induce(
+    def test_convert(
         self,
     ):
         """Test the physical operators equality sign"""
@@ -114,21 +114,21 @@ class TestPhysicalOperators(unittest.TestCase):
             "cardinality": "oneToOne",
         }
 
-        # simpleInduce = pz.Induce(**params)
-        parallelInduce = pz.ParallelInduceFromCandidateOp(**params, streaming="")
-        monolityhInduce = pz.InduceFromCandidateOp(**params)
+        # simpleConvert = pz.Convert(**params)
+        parallelConvert = pz.ParallelConvertFromCandidateOp(**params, streaming="")
+        monolityhConvert = pz.ConvertFromCandidateOp(**params)
 
-        assert parallelInduce == parallelInduce
-        assert monolityhInduce == monolityhInduce
-        assert parallelInduce != monolityhInduce
+        assert parallelConvert == parallelConvert
+        assert monolityhConvert == monolityhConvert
+        assert parallelConvert != monolityhConvert
 
-        print(str(parallelInduce))
-        print(str(monolityhInduce))
+        print(str(parallelConvert))
+        print(str(monolityhConvert))
 
-        a = parallelInduce.copy()
-        b = monolityhInduce.copy()
-        assert a == parallelInduce
-        assert b == monolityhInduce
+        a = parallelConvert.copy()
+        b = monolityhConvert.copy()
+        assert a == parallelConvert
+        assert b == monolityhConvert
         assert a != b
 
     def test_filter(
@@ -144,7 +144,7 @@ class TestPhysicalOperators(unittest.TestCase):
             "filter": pz.Filter("This is a sample filter"),
         }
 
-        # simpleInduce = pz.Induce(**params)
+        # simpleConvert = pz.Convert(**params)
         parallelFilter = pz.ParallelFilterCandidateOp(**params, streaming="")
         monoFilter = pz.FilterCandidateOp(**params)
 

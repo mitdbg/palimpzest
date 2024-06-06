@@ -224,12 +224,10 @@ def compute_label(physicalTree, label_idx):
 
     flat = flatten_nested_tuples(physicalOps)
     ops = [op for op in flat if not op.is_hardcoded()]
-    label = "-".join(
-        [
-            f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
-            for op in ops
-        ]
-    )
+    label = "-".join([
+        f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
+        for op in ops
+    ])
     return f"PZ-{label_idx}-{label}"
 
 

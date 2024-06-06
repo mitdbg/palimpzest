@@ -10,11 +10,11 @@ from palimpzest.operators import (
     ApplyUserFunctionOp,
     CacheScanDataOp,
     FilterCandidateOp,
-    InduceFromCandidateOp,
+    ConvertFromCandidateOp,
     LimitScanOp,
     MarshalAndScanDataOp,
     ParallelFilterCandidateOp,
-    ParallelInduceFromCandidateOp,
+    ParallelConvertFromCandidateOp,
     PhysicalOp,
     ApplyGroupByOp,
 )
@@ -455,7 +455,7 @@ class LogicalOperator:
             # get unique set of operator filters:
             # - for base/cache scans this is very simple
             # - for filters, this is based on the unique filter string or function (per-model)
-            # - for induce, this is based on the generated field(s) (per-model)
+            # - for convert, this is based on the generated field(s) (per-model)
             op_filters_to_estimates = {}
             logical_op = logicalPlans[0]
             while logical_op is not None:
@@ -484,7 +484,7 @@ class LogicalOperator:
 
                 elif isinstance(logical_op, ConvertScan):
                     generated_fields_str = "-".join(sorted(logical_op.generated_fields))
-                    op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'induce' | op_name == 'p_induce')"
+                    op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'convert' | op_name == 'p_convert')"
                     op_df = df.query(op_filter)
                     if not op_df.empty:
                         # compute estimates per-model, and add None which forces computation of avg. across all models
@@ -803,7 +803,7 @@ class ConvertScan(LogicalOperator):
 
         if intermediateSchema == Schema or intermediateSchema == self.outputSchema:
             if DataDirectory().current_config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(
+                return ParallelConvertFromCandidateOp(
                     self.outputSchema,
                     source,
                     model,
@@ -816,7 +816,7 @@ class ConvertScan(LogicalOperator):
                     shouldProfile=shouldProfile,
                 )
             else:
-                return InduceFromCandidateOp(
+                return ConvertFromCandidateOp(
                     self.outputSchema,
                     source,
                     model,
@@ -830,9 +830,9 @@ class ConvertScan(LogicalOperator):
                 )
         else:
             if DataDirectory().current_config.get("parallel") == True:
-                return ParallelInduceFromCandidateOp(
+                return ParallelConvertFromCandidateOp(
                     self.outputSchema,
-                    ParallelInduceFromCandidateOp(
+                    ParallelConvertFromCandidateOp(
                         intermediateSchema,
                         source,
                         model,
@@ -852,9 +852,9 @@ class ConvertScan(LogicalOperator):
                     shouldProfile=shouldProfile,
                 )
             else:
-                return InduceFromCandidateOp(
+                return ConvertFromCandidateOp(
                     self.outputSchema,
-                    InduceFromCandidateOp(
+                    ConvertFromCandidateOp(
                         intermediateSchema,
                         source,
                         model,

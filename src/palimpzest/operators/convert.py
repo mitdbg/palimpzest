@@ -1,7 +1,3 @@
-"""GV: In my view this whole function should be called Convert. 
-And so should all of the methods - ConvertFromCandidate, ParallelConvertFromCandidate, etc.
-Keeping it as Convert for legacy compatibility (for now)"""
-
 from __future__ import annotations
 from io import BytesIO
 
@@ -195,7 +191,7 @@ class ConvertOp(PhysicalOp):
         # fetch cost estimates from source operation
         inputEstimates, subPlanCostEst = self.source.estimateCost(cost_est_data)
 
-        # if induce has a quick conversion; set "no-op" cost estimates
+        # if convert has a quick conversion; set "no-op" cost estimates
         if self._is_quick_conversion() or self.is_hardcoded():
             # we assume time cost of these conversions is negligible
             outputEstimates = {**inputEstimates}
@@ -215,7 +211,7 @@ class ConvertOp(PhysicalOp):
             if field not in input_fields
         ]
         generated_fields_str = "-".join(sorted(generated_fields))
-        op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'induce' | op_name == 'p_induce')"
+        op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'convert' | op_name == 'p_convert')"
         if cost_est_data is not None and cost_est_data[op_filter] is not None:
             # get estimate data for this physical op's model
             model_name = None if self.model is None else self.model.value
@@ -406,7 +402,7 @@ class ConvertFromCandidateOp(ConvertOp):
     def __iter__(self) -> IteratorFn:
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="induce", shouldProfile=self.shouldProfile)
+        @self.profile(name="convert", shouldProfile=self.shouldProfile)
         def iteratorFn():
             for nextCandidate in self.source:
                 resultRecordList = self._attemptMapping(nextCandidate)
@@ -440,7 +436,7 @@ class ParallelConvertFromCandidateOp(ConvertOp):
         # This is very crudely implemented right now, since we materialize everything
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="p_induce", shouldProfile=self.shouldProfile)
+        @self.profile(name="p_convert", shouldProfile=self.shouldProfile)
         def iteratorFn():
             inputs = []
             results = []

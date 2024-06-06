@@ -3,7 +3,6 @@ from palimpzest.profiler import Profiler, StatsProcessor
 import palimpzest as pz
 
 from palimpzest.execution import graphicEmit, flatten_nested_tuples
-from palimpzest.operators import ConvertFromCandidateOp
 
 from PIL import Image
 from sklearn.metrics import precision_recall_fscore_support
