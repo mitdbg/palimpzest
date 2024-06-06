@@ -1,6 +1,6 @@
 from .physical import *
 from .logical import *
-from .induce import *
+from .convert import *
 from .filter import *
 from .hardcoded_converts import *
 
@@ -17,7 +17,7 @@ def classesinmodule(module):
 
 PHYSICAL_OPERATORS = (
     classesinmodule(physical)
-    + classesinmodule(induce)
+    + classesinmodule(convert)
     + classesinmodule(filter)
     + classesinmodule(hardcoded_converts)
 )

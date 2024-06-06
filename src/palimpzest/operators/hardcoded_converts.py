@@ -1,7 +1,7 @@
 from __future__ import annotations
 from io import BytesIO
 
-from palimpzest.operators.induce import InduceOp
+from src.palimpzest.operators.convert import ConvertOp
 import palimpzest.corelib.schemas as schemas
 
 # from palimpzest.constants import *
@@ -17,13 +17,12 @@ from palimpzest.tools.skema_tools import equations_to_latex
 from papermage import Document
 
 # TODO:
-# 0. rename InduceOp --> ConvertOp
 # 1. ensure that __init__(self, *args, **kwargs) is also in ConvertOp to allow e.g. self.pdfprocessor to be set
 # 2. rewrite .schema in records.py to return dynamic set of fields
-# 3. 
+# 3.
 
 
-class HardcodedConvert(InduceOp):
+class HardcodedConvert(ConvertOp):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

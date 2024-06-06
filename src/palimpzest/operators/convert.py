@@ -24,7 +24,7 @@ import concurrent
 import hashlib
 
 
-class InduceOp(PhysicalOp):
+class ConvertOp(PhysicalOp):
 
     inputSchema = Schema
     outputSchema = Schema
@@ -401,7 +401,7 @@ class InduceOp(PhysicalOp):
         return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
 
 
-class InduceFromCandidateOp(InduceOp):
+class InduceFromCandidateOp(ConvertOp):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -426,7 +426,7 @@ class InduceFromCandidateOp(InduceOp):
         return iteratorFn()
 
 
-class ParallelInduceFromCandidateOp(InduceOp):
+class ParallelInduceFromCandidateOp(ConvertOp):
     def __init__(self, streaming, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.max_workers = 32  # TODO hardcoded for now
@@ -482,7 +482,7 @@ class ParallelInduceFromCandidateOp(InduceOp):
         return iteratorFn()
 
 
-class SimpleTypeConvert(InduceOp):
+class SimpleTypeConvert(ConvertOp):
     """This is a very simple function that converts a DataRecord from one Schema to another, when we know they have identical fields."""
 
     def __init__(self, *args, **kwargs):
@@ -513,7 +513,7 @@ class SimpleTypeConvert(InduceOp):
         return [dr], None
 
 
-class LLMTypeConversion(InduceOp):
+class LLMTypeConversion(ConvertOp):
 
     # TODO need to refactor query strategies to not use task descriptors
 
