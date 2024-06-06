@@ -61,13 +61,13 @@ class SchemaMetaclass(type):
         #     d["__class__"] = o.__name__
         # AttributeError: '_SpecialForm' object has no attribute '__name__'
         #
-        d["__class__"] = cls.__name__
+        d["__class__"] = cls.__class__.__name__
 
         return json.dumps(d, sort_keys=True)
 
     def className(cls) -> str:
         """Return the name of this class"""
-        return cls.__name__
+        return cls.__class__.__name__
 
     def jsonSchema(cls) -> Dict[str, Any]:
         """The JSON representation of the Schema"""
@@ -117,13 +117,16 @@ class Schema(metaclass=SchemaMetaclass):
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
 
-    def asJSON(self, record_dict: Dict[str, Any], include_data_cols: bool = True) -> str:
+    def asJSON(
+        self, record_dict: Dict[str, Any], include_data_cols: bool = True
+    ) -> str:
         """Return a JSON representation of a data record with this Schema"""
         if include_data_cols:
             record_dict["data type"] = str(self.__class__.__name__)
             record_dict["data type description"] = str(self.__class__.__doc__)
 
         return json.dumps(record_dict, indent=2)
+
 
 # TODO: Under the definition of __eq__ in SchemaMetaclass, I think that an equality check like
 #       Any([TextFile, PDFFile]) == TextFile will return `False`. I believe this is the behavior
@@ -153,6 +156,7 @@ class Any(Schema):
 
 class OperatorDerivedSchema(Schema):
     """Schema defined by an operator, e.g., a join or a group by"""
+
 
 ###################################################################################
 # "Core" useful Schemas. These are Schemas that almost everyone will need.

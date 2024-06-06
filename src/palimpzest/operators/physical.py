@@ -70,11 +70,8 @@ class PhysicalOp:
             return (self, None)
         return (self, self.source.dumpPhysicalTree())
 
-    def setPlanIdx(self, idx) -> None:
-        raise NotImplementedError("Legacy method")
-        self.plan_idx = idx
-        if self.source is not None:
-            self.source.setPlanIdx(idx)
+    def __call__(self, candidate: Any) -> IteratorFn:
+        raise NotImplementedError("Abstract method")
 
     def getProfilingData(self) -> OperatorStats:
         # simply return stats for this operator if there is no source
@@ -107,26 +104,26 @@ class MarshalAndScanDataOp(PhysicalOp):
         self,
         outputSchema: Schema,
         datasetIdentifier: str,
-        num_samples: int = None,
-        scan_start_idx: int = 0,
+        #        num_samples: int = None,
+        #        scan_start_idx: int = 0,
         shouldProfile=False,
     ):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.datasetIdentifier = datasetIdentifier
-        self.num_samples = num_samples
-        self.scan_start_idx = scan_start_idx
+        # self.num_samples = num_samples
+        # self.scan_start_idx = scan_start_idx
 
         # NOTE: need to construct profiler after all fields used by self.opId() are set
-        self.profiler = Profiler(op_id=self.opId())
-        self.profile = self.profiler.iter_profiler
+        # self.profiler = Profiler(op_id=self.opId())
+        # self.profile = self.profiler.iter_profiler
 
     def __eq__(self, other: PhysicalOp):
         return (
             isinstance(other, MarshalAndScanDataOp)
             and self.datasetIdentifier == other.datasetIdentifier
-            and self.num_samples == other.num_samples
-            and self.scan_start_idx == other.scan_start_idx
             and self.outputSchema == other.outputSchema
+            # and self.num_samples == other.num_samples
+            # and self.scan_start_idx == other.scan_start_idx
         )
 
     def __str__(self):
@@ -142,9 +139,9 @@ class MarshalAndScanDataOp(PhysicalOp):
         return MarshalAndScanDataOp(
             self.outputSchema,
             self.datasetIdentifier,
-            self.num_samples,
-            self.scan_start_idx,
-            self.shouldProfile,
+            # self.num_samples,
+            # self.scan_start_idx,
+            # self.shouldProfile,
         )
 
     def opId(self):
@@ -200,24 +197,11 @@ class MarshalAndScanDataOp(PhysicalOp):
 
         return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
 
-    def __iter__(self) -> IteratorFn:
-        @self.profile(name="base_scan", shouldProfile=self.shouldProfile)
-        def iteratorFn():
-            counter = 0
-            for idx, nextCandidate in enumerate(
-                self.datadir.getRegisteredDataset(self.datasetIdentifier)
-            ):
-                if idx < self.scan_start_idx:
-                    continue
-
-                yield nextCandidate
-
-                if self.num_samples:
-                    counter += 1
-                    if counter >= self.num_samples:
-                        break
-
-        return iteratorFn()
+    # @self.profile(name="base_scan", shouldProfile=self.shouldProfile)
+    def __call__(self) -> IteratorFn:
+        dataset_iter = self.datadir.getDatasetIterator(self.datasetIdentifier)
+        drs = [DataRecord(self.outputSchema, **record) for record in dataset_iter]
+        return drs
 
 
 class CacheScanDataOp(PhysicalOp):

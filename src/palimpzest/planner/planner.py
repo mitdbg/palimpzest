@@ -1,7 +1,7 @@
-from palimpzest.planner import LogicalPlan, PhysicalPlan
-
 import palimpzest as pz
 import palimpzest.operators as ops
+from .plan import LogicalPlan, PhysicalPlan
+from palimpzest.operators import PhysicalOp, QueryStrategy, Model
 
 from itertools import permutations
 from typing import Any, Dict, List, Optional
@@ -324,7 +324,7 @@ class PhysicalPlanner(Planner):
         # base case: this is a root op
         if self.inputOp is None:
             return self._getPhysicalTree(
-                strategy=PhysicalOp.LOCAL_PLAN, shouldProfile=True
+                strategy=ops.PhysicalOp.LOCAL_PLAN, shouldProfile=True
             )
 
         # recursive case: get list of possible input physical plans

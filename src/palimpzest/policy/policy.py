@@ -1,5 +1,5 @@
-from palimpzest.planner import legacy_PhysicalPlan as PhysicalPlan
-
+# from palimpzest.planner import legacy_PhysicalPlan as PhysicalPlan
+from palimpzest.planner import PhysicalPlan
 from typing import List, Tuple, Union
 
 import numpy as np

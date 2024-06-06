@@ -1,13 +1,18 @@
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
 from palimpzest.datasources import DirectorySource, FileSource, MemorySource, UserSource
-from palimpzest.elements import DownloadBinaryFunction, DownloadHTMLFunction, UserFunction
+from palimpzest.elements import (
+    DownloadBinaryFunction,
+    DownloadHTMLFunction,
+    UserFunction,
+)
 
 import os
 import pickle
 import sys
 import yaml
 from threading import Lock
+
 
 class DataDirectorySingletonMeta(type):
     _instances = {}
@@ -16,14 +21,17 @@ class DataDirectorySingletonMeta(type):
     def __call__(cls, *args, **kwargs):
         with cls._lock:
             if cls not in cls._instances:
-                instance = super(DataDirectorySingletonMeta, cls).__call__(*args, **kwargs)
+                instance = super(DataDirectorySingletonMeta, cls).__call__(
+                    *args, **kwargs
+                )
                 cls._instances[cls] = instance
-        return cls._instances[cls]    
+        return cls._instances[cls]
 
 
 class CacheService:
     """This class manages the cache for the DataDirectory and other misc PZ components.
-       Eventually modify this to be durable and to have expiration policies."""
+    Eventually modify this to be durable and to have expiration policies."""
+
     def __init__(self):
         self.allCaches = {}
 
@@ -68,9 +76,9 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         # read current config (and dict. of configs) from disk
         self.current_config = None
         if os.path.exists(current_config_path):
-            with open(current_config_path, 'r') as f:
+            with open(current_config_path, "r") as f:
                 current_config_dict = yaml.safe_load(f)
-                self.current_config = Config(current_config_dict['current_config_name'])
+                self.current_config = Config(current_config_dict["current_config_name"])
 
         # initialize the file cache directory, defaulting to the system's temporary directory "tmp/pz"
         pz_file_cache_dir = self.current_config.get("filecachedir")
@@ -122,12 +130,13 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
                 pickle.dump(self._registry, f)
 
-    def registerUserSource(self, src:UserSource, dataset_id:str):
+    def registerUserSource(self, src: UserSource, dataset_id: str):
         """Register a user source as a data source."""
         self._registry[dataset_id] = ("user", src)
-#        # user sources are always ephemeral
-        
-    def registerUserFunction(self, udf:UserFunction):
+
+    #        # user sources are always ephemeral
+
+    def registerUserFunction(self, udf: UserFunction):
         """Register a user function as a data source."""
         self._registry[udf.udfid] = ("udf", udf)
         # user functions are always ephemeral
@@ -136,7 +145,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         """Return a user function from the registry."""
         if not udfid in self._registry:
             raise Exception("Cannot find user function", udfid, "in the registry.")
-        
+
         entry, rock = self._registry[udfid]
         if entry == "udf":
             return rock
@@ -147,7 +156,6 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         """Return a dataset from the registry."""
         if not dataset_id in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
-        
         entry, rock = self._registry[dataset_id]
         if entry == "dir":
             return DirectorySource(rock, dataset_id)
@@ -174,12 +182,18 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         """Return the size (in bytes) of a dataset."""
         if not dataset_id in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
-        
+
         entry, rock = self._registry[dataset_id]
         if entry == "dir":
             # Sum the size in bytes of every file in the directory
             path = rock
-            return sum([os.path.getsize(os.path.join(path, name)) for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
+            return sum(
+                [
+                    os.path.getsize(os.path.join(path, name))
+                    for name in os.listdir(path)
+                    if os.path.isfile(os.path.join(path, name))
+                ]
+            )
         elif entry == "file":
             # Get the size of the file in bytes
             path = rock
@@ -196,12 +210,18 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         """Return the number of records in a dataset."""
         if not dataset_id in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
-        
+
         entry, rock = self._registry[dataset_id]
         if entry == "dir":
             # Return the number of files in the directory
             path = rock
-            return len([name for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
+            return len(
+                [
+                    name
+                    for name in os.listdir(path)
+                    if os.path.isfile(os.path.join(path, name))
+                ]
+            )
         elif entry == "file":
             # Return 1
             return 1
@@ -233,9 +253,11 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             return None
         with open(self._cache[cacheId], "rb") as f:
             cachedResult = pickle.load(f)
+
         def iterateOverCachedResult():
             for x in cachedResult:
                 yield x
+
         return iterateOverCachedResult()
 
     def clearCache(self, keep_registry=False):
@@ -254,7 +276,11 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         return cacheId in self._cache
 
     def openCache(self, cacheId):
-        if not cacheId is None and not cacheId in self._cache and not cacheId in self._tempCache:
+        if (
+            not cacheId is None
+            and not cacheId in self._cache
+            and not cacheId in self._tempCache
+        ):
             self._tempCache[cacheId] = []
             return True
         return False
@@ -283,6 +309,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
         entry, path = self._registry[dataset_id]
         return path
+
 
 # TODO: can we remove this?
 DataDirectory().registerUserFunction(DownloadHTMLFunction())

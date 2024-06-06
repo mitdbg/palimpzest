@@ -1,7 +1,7 @@
 from __future__ import annotations
 from io import BytesIO
 
-from src.palimpzest.operators.convert import ConvertOp
+from palimpzest.operators.convert import ConvertOp
 import palimpzest.corelib.schemas as schemas
 
 # from palimpzest.constants import *
