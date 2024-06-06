@@ -6,8 +6,6 @@ from palimpzest.constants import *
 from palimpzest.corelib import ImageFile, Number, Schema
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
-from palimpzest.solver.solver import Solver
-from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.profiler import OperatorStats, Profiler, StatsProcessor
 
 from typing import Any, Callable, Dict, List, Tuple, Union, Optional
@@ -29,7 +27,7 @@ class PhysicalOp:
     REMOTE_PLAN = "REMOTE"
 
     # synthesizedFns = {}
-    solver = Solver(verbose=LOG_LLM_OUTPUT)
+    # solver = Solver(verbose=LOG_LLM_OUTPUT)
 
     def __init__(
         self,

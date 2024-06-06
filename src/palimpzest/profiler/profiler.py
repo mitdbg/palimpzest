@@ -25,21 +25,21 @@ class Profiler:
         # object which maintains the set of records and stats processed by this operator
         self.operator_stats = OperatorStats(op_id=self.op_id)
 
-
     @staticmethod
     def profiling_on() -> bool:
         """
         Returns a boolean indicating whether user has turned on profiling.
         """
-        return os.getenv(PZ_PROFILING_ENV_VAR) is not None and os.getenv(PZ_PROFILING_ENV_VAR).lower() == "true"
-
+        return (
+            os.getenv(PZ_PROFILING_ENV_VAR) is not None
+            and os.getenv(PZ_PROFILING_ENV_VAR).lower() == "true"
+        )
 
     def get_data(self) -> Dict[str, Any]:
         """
         Return the operator statistics.
         """
         return self.operator_stats
-
 
     def iter_profiler(self, name: str, shouldProfile: bool = False):
         """
@@ -56,6 +56,7 @@ class Profiler:
             # do normal iterator things
             yield dr
         """
+
         def profile_decorator(iterator):
             # return iterator if profiling is not set to True
             if not shouldProfile:
@@ -72,15 +73,19 @@ class Profiler:
                     t_record_end = time.time()
                     self.operator_stats.total_records += 1
 
-                    # for non-induce/filter operators, we need to create an empty Stats object for the op_id
+                    # for non-Convert/filter operators, we need to create an empty Stats object for the op_id
                     if self.op_id not in record._stats:
                         record._stats[self.op_id] = Stats()
 
                     # add time spent waiting for iterator to yield record to record's Stats object
                     # and the total maintained by the OperatorStats object; this measures the time
                     # spent by the record in this operator and all source operators
-                    record._stats[self.op_id].cumulative_iter_time = t_record_end - t_record_start
-                    self.operator_stats.total_cumulative_iter_time += t_record_end - t_record_start
+                    record._stats[self.op_id].cumulative_iter_time = (
+                        t_record_end - t_record_start
+                    )
+                    self.operator_stats.total_cumulative_iter_time += (
+                        t_record_end - t_record_start
+                    )
 
                     # update state of record for complete history of computation
                     record_state = record._asDict(include_bytes=False)
@@ -88,7 +93,7 @@ class Profiler:
                     record_state["uuid"] = record._uuid
                     record_state["parent_uuid"] = record._parent_uuid
                     record_state["stats"] = record._stats[self.op_id]
-                    if hasattr(record, '_passed_filter') and "filter" in name:
+                    if hasattr(record, "_passed_filter") and "filter" in name:
                         record_state["_passed_filter"] = record._passed_filter
 
                     # add record state to set of records computed by this operator
@@ -98,7 +103,9 @@ class Profiler:
                     # self._update_agg_stats(record._stats[self.op_id])
 
                     # track time spent in profiler
-                    self.operator_stats.total_time_in_profiler += time.time() - t_record_end
+                    self.operator_stats.total_time_in_profiler += (
+                        time.time() - t_record_end
+                    )
 
                     # if this is a filter operation and the record did not pass the filter,
                     # then this record is meant to be filtered out, so do not yield it
@@ -112,4 +119,5 @@ class Profiler:
                     t_record_start = time.time()
 
             return timed_iterator
+
         return profile_decorator

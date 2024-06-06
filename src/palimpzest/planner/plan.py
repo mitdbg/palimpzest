@@ -23,7 +23,7 @@ class Plan:
 
     def __next__(self):
         return next(iter(self.operators))
-    
+
     def __len__(self):
         return len(self.operators)
 
@@ -79,10 +79,12 @@ class PhysicalPlan(Plan):
         physicalOps = physicalTree.dumpPhysicalTree()
         flat = flatten_nested_tuples(physicalOps)
         ops = [op for op in flat if not op.is_hardcoded()]
-        label = "-".join([
-            f"{repr(op.model)}_{op.query_strategy if isinstance(op, InduceFromCandidateOp) else None}_{op.token_budget if isinstance(op, InduceFromCandidateOp) else None}"
-            for op in ops
-        ])
+        label = "-".join(
+            [
+                f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
+                for op in ops
+            ]
+        )
         return f"PZ-{label_idx}-{label}"
 
     def getModels() -> List[Optional[str]]:
@@ -101,4 +103,3 @@ class PhysicalPlan(Plan):
         for record, stats in base_operator:
             self.stats.append(stats)
             yield record
-        

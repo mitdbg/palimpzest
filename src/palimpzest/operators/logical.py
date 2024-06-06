@@ -46,6 +46,7 @@ class LogicalOperator:
         # return (self, self.inputOp.dumpLogicalTree())
         # return (self, None)
         # raise NotImplementedError("Abstract method")
+
     def __str__(self):
         raise NotImplementedError("Abstract method")
 
@@ -216,11 +217,11 @@ class ConvertScan(LogicalOperator):
         # - Schema C inherits from TextFile
         # - convert A -> B happens first
         # - convert B -> C happens second <-- issue is here
-        # 
+        #
         # the diff. in fieldNames between C and B will include things like "contents"
         # which come from pz.TextFile, and it will cause the second convert to try to
         # (re)compute the "contents" field.
-        # 
+        #
         # compute generated fields as set of fields in outputSchema that are not in inputSchema
         self.generated_fields = [
             field
@@ -270,8 +271,8 @@ class ConvertScan(LogicalOperator):
     #     intermediateSchema = intermediateSchema.__bases__[0]
 
     # if intermediateSchema == Schema or intermediateSchema == self.outputSchema:
-    #     if DataDirectory().current_config.get("parallel") == True:
-    #         return ParallelInduceFromCandidateOp(
+    #     if DataDirectory().Convertt_config.get("parallel") == True:
+    #         return ParallelConvertFromCandidateOp(
     #             self.outputSchema,
     #             source,
     #             model,
@@ -284,7 +285,7 @@ class ConvertScan(LogicalOperator):
     #             shouldProfile=shouldProfile,
     #         )
     #     else:
-    #         return InduceFromCandidateOp(
+    #         return ConvertFromCandidateOp(
     #             self.outputSchema,
     #             source,
     #             model,
@@ -298,9 +299,9 @@ class ConvertScan(LogicalOperator):
     #         )
     # else:
     #     if DataDirectory().current_config.get("parallel") == True:
-    #         return ParallelInduceFromCandidateOp(
+    #         return ParallelConvertFromCandidateOp(
     #             self.outputSchema,
-    #             ParallelInduceFromCandidateOp(
+    #             ParallelConvertFromCandidateOp(
     #                 intermediateSchema,
     #                 source,
     #                 model,
@@ -320,9 +321,9 @@ class ConvertScan(LogicalOperator):
     #             shouldProfile=shouldProfile,
     #         )
     #     else:
-    #         return InduceFromCandidateOp(
+    #         return ConvertFromCandidateOp(
     #             self.outputSchema,
-    #             InduceFromCandidateOp(
+    #             ConvertFromCandidateOp(
     #                 intermediateSchema,
     #                 source,
     #                 model,

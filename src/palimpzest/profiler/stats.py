@@ -19,20 +19,21 @@ import re
 # 2. there is an OptimizationStats object which keeps track of the cost and runtime of each Optimization (akin to a GenerationStats object)
 #    a. OptimizationStats may optionally store additional fields and define custom logic for aggregating these fields, but this is not required
 
+
 @dataclass
 class PlanStats:
     """
     Dataclass for storing statistics captured for an entire plan.
     """
-    # label string identifying the physical plan
-    plan_label: str=None
-    # list of OperatorStats objects (one for each operator)
-    operator_stats: List[OperatorStats]=None
-    # total runtime for plan
-    total_runtime: float=0.0
-    # total cost for plan
-    total_cost: float=0.0
 
+    # label string identifying the physical plan
+    plan_label: str = None
+    # list of OperatorStats objects (one for each operator)
+    operator_stats: List[OperatorStats] = None
+    # total runtime for plan
+    total_runtime: float = 0.0
+    # total cost for plan
+    total_cost: float = 0.0
 
 
 @dataclass
@@ -40,84 +41,87 @@ class OperatorStats:
     """
     Dataclass for storing statistics captured within a given operator.
     """
+
     # the ID of the logical operation in which these stats were collected
-    op_id: str=None
+    op_id: str = None
     # the name of the logical operation in which these stats were collected
-    op_name: str=None
+    op_name: str = None
     # the name of the operation in which these stats were collected
-    source_op_stats: OperatorStats=None
+    source_op_stats: OperatorStats = None
     # a list of record dictionaries processed by the operation; each record dictionary
     # has the format: {"op_id": str, "uuid": str "parent_uuid": str, "stats": Stats, **record._asDict()}
-    records: List[Dict[str, Any]]=field(default_factory=list)
+    records: List[Dict[str, Any]] = field(default_factory=list)
     # total number of records returned by the iterator for this operator
-    total_records: int=0
+    total_records: int = 0
     # total time spent in this iterator; this will include time spent in input operators
-    total_cumulative_iter_time: float=0.0
+    total_cumulative_iter_time: float = 0.0
     # keep track of the total time spent inside of the profiler
-    total_time_in_profiler: float=0.0
+    total_time_in_profiler: float = 0.0
     # total time spent in this operation; does not include time spent waiting on parent/source operators
-    total_op_time: float=0.0
+    total_op_time: float = 0.0
 
     ##############################################
-    ##### Universal Induce and Filter Fields #####
+    ##### Universal Convert and Filter Fields #####
     #####    [computed in StatsProcessor]    #####
     ##############################################
     # usage statistics computed for induce and filter operations
-    total_input_tokens: int=0
-    total_output_tokens: int=0
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
     # dollar cost associated with usage statistics
-    total_input_usd: float=0.0
-    total_output_usd: float=0.0
-    total_usd: float=0.0
+    total_input_usd: float = 0.0
+    total_output_usd: float = 0.0
+    total_usd: float = 0.0
     # time spent waiting for LLM calls to return (in seconds)
-    total_llm_call_duration: float=0.0
+    total_llm_call_duration: float = 0.0
     # name of the model used for generation
-    model_name: str=None
+    model_name: str = None
     # the string associated with the filter
-    filter: str=None
+    filter: str = None
     # keep track of finish reasons
-    finish_reasons: defaultdict[int]=field(default_factory=lambda: defaultdict(int))
+    finish_reasons: defaultdict[int] = field(default_factory=lambda: defaultdict(int))
     # record input fields and the output fields generated in an induce operation
-    input_fields: List[str]=field(default_factory=list)
-    generated_fields: List[str]=field(default_factory=list)
+    input_fields: List[str] = field(default_factory=list)
+    generated_fields: List[str] = field(default_factory=list)
     # list of answers
-    answers: List[str]=field(default_factory=list)
+    answers: List[str] = field(default_factory=list)
     # list of lists of token log probabilities for the subset of tokens that comprise the answer
-    answer_log_probs: List[List[float]]=field(default_factory=list)
+    answer_log_probs: List[List[float]] = field(default_factory=list)
     # the query strategy used
-    query_strategy: str=None
+    query_strategy: str = None
     # the token budget used during generation
     token_budget: float = None
 
     #################################################
-    ##### Field for Induce w/Conventional Query #####
+    ##### Field for Convert w/Conventional Query #####
     #####     [computed in StatsProcessor]      #####
     #################################################
     # record aggregated stats on a per-field basis for conventional induce queries
-    per_field_op_stats: defaultdict[OperatorStats]=field(default_factory=lambda: defaultdict(lambda: OperatorStats()))
+    per_field_op_stats: defaultdict[OperatorStats] = field(
+        default_factory=lambda: defaultdict(lambda: OperatorStats())
+    )
 
     #########################################
-    #####  Fields for Induce w/CodeGen  #####
+    #####  Fields for Convert w/CodeGen  #####
     #####  [computed in StatsProcessor] #####
     #########################################
     # record aggregated stats on a per-step basis for codegen queries
     # # (here the steps are: initial code generation, advice generation, advised code generation)
     # # code_gen_op_stats: defaultdict[OperatorStats]=field(default_factory=lambda: defaultdict(lambda: OperatorStats()))
-    total_code_exec_duration_secs: float=0.0
+    total_code_exec_duration_secs: float = 0.0
 
     ##########################################
-    ##### Optional Non-LLM Induce Fields #####
+    ##### Optional Non-LLM Convert Fields #####
     #####  [computed in StatsProcessor]  #####
     ##########################################
     # time spent waiting for API calls to return (in seconds)
-    total_api_call_duration: float=0.0
+    total_api_call_duration: float = 0.0
 
     ##########################################
     ##### Optional Non-LLM Filter Fields #####
     #####  [computed in StatsProcessor]  #####
     ##########################################
     # time spent waiting for API calls to return (in seconds)
-    total_fn_call_duration: float=0.0
+    total_fn_call_duration: float = 0.0
 
     def to_dict(self):
         # create copy of self
@@ -135,142 +139,171 @@ class OperatorStats:
 
 
 @dataclass
-class Stats: # OptimizationStats:
+class Stats:  # OptimizationStats:
     """
     Base dataclass for storing statistics captured during the execution of an optimization on a single input record.
     """
+
     # optimization name
-    opt_name: str=None
+    opt_name: str = None
     # (set in profiler.py) this is the total time spent waiting for the iterator
     # to yield the data record associated with this Stats object; note that this
     # will capture the total time spent in this operation and all source operations
     # due to the way in which we set timers in profiler.py rather than in the
     # physical operator code
-    cumulative_iter_time: float=None
+    cumulative_iter_time: float = None
     # the time spent by the data record just in this operation; this is computed
     # in the StatsProcessor as (the cumulative_iter_time of this data record in
     # this operation) minus (the cumulative_iter_time of this data record in the
     # source operation)
-    op_time: float=None
+    op_time: float = None
 
     def to_dict(self):
         return asdict(self)
 
+
 @dataclass
 class ApiStats(Stats):
     """Staistics captured from a (non-LLM) API call."""
+
     # total time spent waiting for the API to return a response
-    api_call_duration_secs: float=0.0
+    api_call_duration_secs: float = 0.0
+
 
 @dataclass
 class GenerationStats(Stats):
     """Statistics captured from LLM calls (i.e. the Generator's .generate() functions)."""
+
     # name of the LLM used to generate the output; should be a key in the MODEL_CARDS
-    model_name: str=None
+    model_name: str = None
     # total time spent from sending input to LLM to receiving output string
-    llm_call_duration_secs: float=0.0
+    llm_call_duration_secs: float = 0.0
     # the prompt used to generate the output
-    prompt: str=None
+    prompt: str = None
     # the usage dictionary for the LLM call
-    usage: Dict[str, int]=field(default_factory=dict)
+    usage: Dict[str, int] = field(default_factory=dict)
     # the reason the LLM stopped generating tokens
-    finish_reason: str=None
+    finish_reason: str = None
     # the answer extracted from the generated output
-    answer: str=None
+    answer: str = None
     # the log probabilities for the subset of tokens that comprise the answer
-    answer_log_probs: List[float]=None
+    answer_log_probs: List[float] = None
+
 
 @dataclass
 class BondedQueryStats(Stats):
     """Statistics captured from bonded queries."""
+
     # the generation statistics from the call to a generator
-    gen_stats: GenerationStats=None
+    gen_stats: GenerationStats = None
     # the set of input fields passed into the generation
-    input_fields: List[str]=None
+    input_fields: List[str] = None
     # the set of fields the bonded query was supposed to generate values for
-    generated_fields: List[str]=None
+    generated_fields: List[str] = None
+
 
 @dataclass
 class FieldQueryStats(Stats):
     """Statistics captured from generating the value for a single field in a conventional query."""
+
     # the generation statistics from the call to a generator
-    gen_stats: GenerationStats=None
+    gen_stats: GenerationStats = None
     # the field the statistics were generated for
-    field_name: str=None
+    field_name: str = None
+
 
 @dataclass
 class ConventionalQueryStats(Stats):
     """Statistics captured from conventional queries."""
+
     # the list of FieldQueryStats for each field in the generated_fields
-    field_query_stats_lst: List[FieldQueryStats]=field(default_factory=list)
+    field_query_stats_lst: List[FieldQueryStats] = field(default_factory=list)
     # the set of input fields passed into the generation
-    input_fields: List[str]=field(default_factory=list)
+    input_fields: List[str] = field(default_factory=list)
     # the set of fields the conventional query was supposed to generate values for
-    generated_fields: List[str]=field(default_factory=list)
+    generated_fields: List[str] = field(default_factory=list)
+
 
 @dataclass
 class CodeGenSingleStats(Stats):
-    prompt_template: str=None
-    context: Dict[str, Any]=field(default_factory=dict)
-    code: str=None
-    gen_stats: GenerationStats=field(default_factory=GenerationStats)
+    prompt_template: str = None
+    context: Dict[str, Any] = field(default_factory=dict)
+    code: str = None
+    gen_stats: GenerationStats = field(default_factory=GenerationStats)
+
 
 @dataclass
 class CodeGenEnsembleStats(Stats):
-    advice_gen_stats: GenerationStats=None
-    code_versions_stats: Dict[str, CodeGenSingleStats]=field(default_factory=dict)
+    advice_gen_stats: GenerationStats = None
+    code_versions_stats: Dict[str, CodeGenSingleStats] = field(default_factory=dict)
+
 
 @dataclass
 class CodeExecutionSingleStats(Stats):
-    code_response: Any=None
-    code_exec_duration_secs: float=0.0
+    code_response: Any = None
+    code_exec_duration_secs: float = 0.0
+
 
 @dataclass
 class CodeExecutionEnsembleStats(Stats):
-    majority_response: Any=None
-    code_versions_stats: Dict[str, CodeExecutionSingleStats]=field(default_factory=dict)
+    majority_response: Any = None
+    code_versions_stats: Dict[str, CodeExecutionSingleStats] = field(
+        default_factory=dict
+    )
+
 
 @dataclass
 class FullCodeGenStats(Stats):
-    code_gen_stats: Dict[str, CodeGenEnsembleStats]=field(default_factory=dict)
-    code_exec_stats: Dict[str, CodeExecutionEnsembleStats]=field(default_factory=dict)
+    code_gen_stats: Dict[str, CodeGenEnsembleStats] = field(default_factory=dict)
+    code_exec_stats: Dict[str, CodeExecutionEnsembleStats] = field(default_factory=dict)
+
+
 # TODO: aggregate other information about codegen (majority_response, code, etc.)
 
+
 @dataclass
-class InduceLLMStats(Stats):
+class ConvertLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from an induce w/LLM operation."""
+
     # query strategy used
-    query_strategy: str=None
+    query_strategy: str = None
     # the token budget used during generation
     token_budget: float = None
     # stats from bonded query
-    bonded_query_stats: BondedQueryStats=None
+    bonded_query_stats: BondedQueryStats = None
     # stats from conventional query
-    conventional_query_stats: ConventionalQueryStats=None
+    conventional_query_stats: ConventionalQueryStats = None
     # stats from code generation
-    full_code_gen_stats: FullCodeGenStats=None
+    full_code_gen_stats: FullCodeGenStats = None
+
 
 @dataclass
-class InduceNonLLMStats(Stats):
+class ConvertNonLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from a hard-coded induce operation."""
+
     # stats containing time spent calling some external API
-    api_stats: ApiStats=None
+    api_stats: ApiStats = None
+
 
 @dataclass
 class FilterLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from a filter operation."""
+
     # the generation statistics from the call to the filter LLM
-    gen_stats: GenerationStats=None
+    gen_stats: GenerationStats = None
     # the filter condition for this filter
-    filter: str=None
+    filter: str = None
+
 
 @dataclass
 class FilterNonLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from a filter operation."""
+
     # the time it takes to execute the filter function
-    fn_call_duration_secs: float=None
+    fn_call_duration_secs: float = None
     # the filter condition for this filter
-    filter: str=None
+    filter: str = None
+
 
 # TODO: move to utils
 def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
@@ -278,28 +311,28 @@ def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
     This function parses an LLM response which is supposed to output a JSON object
     and optimistically searches for the substring containing the JSON object.
     """
-    if not answer.strip().startswith('{'):
+    if not answer.strip().startswith("{"):
         # Find the start index of the actual JSON string
         # assuming the prefix is followed by the JSON object/array
-        start_index = answer.find('{') if '{' in answer else answer.find('[')
+        start_index = answer.find("{") if "{" in answer else answer.find("[")
         if start_index != -1:
             # Remove the prefix and any leading characters before the JSON starts
             answer = answer[start_index:]
 
-    if not answer.strip().endswith('}'):
+    if not answer.strip().endswith("}"):
         # Find the end index of the actual JSON string
         # assuming the suffix is preceded by the JSON object/array
-        end_index = answer.rfind('}') if '}' in answer else answer.rfind(']')
+        end_index = answer.rfind("}") if "}" in answer else answer.rfind("]")
         if end_index != -1:
             # Remove the suffix and any trailing characters after the JSON ends
-            answer = answer[:end_index + 1]
+            answer = answer[: end_index + 1]
 
     # Handle weird escaped values. I am not sure why the model
     # is returning these, but the JSON parser can't take them
     answer = answer.replace("\_", "_")
 
-    # Handle comments in the JSON response. Use regex from // until end of line 
-    answer = re.sub(r'\/\/.*$', '', answer, flags=re.MULTILINE)
+    # Handle comments in the JSON response. Use regex from // until end of line
+    answer = re.sub(r"\/\/.*$", "", answer, flags=re.MULTILINE)
     return json.loads(answer)
 
 
@@ -310,6 +343,7 @@ class StatsProcessor:
 
     TODO: implement other methods here to help with understanding profile data
     """
+
     def __init__(self, profiling_data: OperatorStats) -> None:
         """
         The profiling data is an OperatorStats object, which, when converted into a dict,
@@ -364,7 +398,7 @@ class StatsProcessor:
                     "uuid": str,
                     #### unique identifier for the parent/source of this record
                     "parent_uuid": str,
-                    #### 
+                    ####
                     "stats": {
                         #### Total time in seconds spent waiting for operator to yield this record; includes time spent in source operators
                         "cumulative_iter_time": float,
@@ -404,8 +438,12 @@ class StatsProcessor:
         # compute op_time for each record and the total_op_time for each operator
         self.profiling_data = self._compute_op_time(self.profiling_data)
 
-
-    def _update_gen_stats(self, profiling_data: OperatorStats, gen_stats: GenerationStats, field_name: str=None) -> OperatorStats:
+    def _update_gen_stats(
+        self,
+        profiling_data: OperatorStats,
+        gen_stats: GenerationStats,
+        field_name: str = None,
+    ) -> OperatorStats:
         """
         This helper function takes in profiling data and a GenerationStats object and updates
         the profiling data's aggregate stats fields with the data from gen_stats.
@@ -437,7 +475,10 @@ class StatsProcessor:
         per-field aggregates in `per_field_op_stats`, except instead of breaking down
         the statistics per-field we break them down per code generation step.
         """
-        def _update_aggregates(agg_op_stats: OperatorStats, gen_stats: GenerationStats) -> OperatorStats:
+
+        def _update_aggregates(
+            agg_op_stats: OperatorStats, gen_stats: GenerationStats
+        ) -> OperatorStats:
             if gen_stats is not None:
                 # update timing and token stats
                 agg_op_stats.total_llm_call_duration += gen_stats.llm_call_duration_secs
@@ -445,11 +486,21 @@ class StatsProcessor:
                 agg_op_stats.total_output_tokens += gen_stats.usage["completion_tokens"]
 
                 # compute and update USD cost of generation
-                usd_per_input_token = MODEL_CARDS[gen_stats.model_name]["usd_per_input_token"]
-                usd_per_output_token = MODEL_CARDS[gen_stats.model_name]["usd_per_output_token"]
-                agg_op_stats.total_input_usd += gen_stats.usage["prompt_tokens"] * usd_per_input_token
-                agg_op_stats.total_output_usd += gen_stats.usage["completion_tokens"] * usd_per_output_token
-                agg_op_stats.total_usd = agg_op_stats.total_input_usd + agg_op_stats.total_output_usd
+                usd_per_input_token = MODEL_CARDS[gen_stats.model_name][
+                    "usd_per_input_token"
+                ]
+                usd_per_output_token = MODEL_CARDS[gen_stats.model_name][
+                    "usd_per_output_token"
+                ]
+                agg_op_stats.total_input_usd += (
+                    gen_stats.usage["prompt_tokens"] * usd_per_input_token
+                )
+                agg_op_stats.total_output_usd += (
+                    gen_stats.usage["completion_tokens"] * usd_per_output_token
+                )
+                agg_op_stats.total_usd = (
+                    agg_op_stats.total_input_usd + agg_op_stats.total_output_usd
+                )
 
                 # update distribution of finish reasons
                 agg_op_stats.finish_reasons[gen_stats.finish_reason] += 1
@@ -474,25 +525,41 @@ class StatsProcessor:
 
         # If the method is invoked with a field_name, then we update the `per_field_op_stats` for that field
         if field_name is not None:
-            profiling_data.per_field_op_stats[field_name] = _update_aggregates(profiling_data.per_field_op_stats[field_name], gen_stats)
+            profiling_data.per_field_op_stats[field_name] = _update_aggregates(
+                profiling_data.per_field_op_stats[field_name], gen_stats
+            )
 
         return profiling_data
 
+    def _update_code_gen_stats(
+        self, profiling_data: OperatorStats, full_code_gen_stats: FullCodeGenStats
+    ) -> OperatorStats:
 
-    def _update_code_gen_stats(self, profiling_data: OperatorStats, full_code_gen_stats: FullCodeGenStats) -> OperatorStats:
-        
-        code_gen_stats = [ens_stats for field, ens_stats in full_code_gen_stats.code_gen_stats.items()]
+        code_gen_stats = [
+            ens_stats for field, ens_stats in full_code_gen_stats.code_gen_stats.items()
+        ]
         advice_gen_stats = [ens_stats.advice_gen_stats for ens_stats in code_gen_stats]
-        code_ensemble_gen_stats = [[s.gen_stats for _, s in ens_stats.code_versions_stats.items()] for ens_stats in code_gen_stats]
-        
+        code_ensemble_gen_stats = [
+            [s.gen_stats for _, s in ens_stats.code_versions_stats.items()]
+            for ens_stats in code_gen_stats
+        ]
+
         for s in advice_gen_stats:
             profiling_data = self._update_gen_stats(profiling_data, s)
         for s in code_ensemble_gen_stats:
             for s_ in s:
                 profiling_data = self._update_gen_stats(profiling_data, s_)
-        
-        exec_stats = [[s.code_exec_duration_secs for _, s in ens_stats.code_versions_stats.items()] for field, ens_stats in full_code_gen_stats.code_exec_stats.items()]
-        profiling_data.total_code_exec_duration_secs += sum([sum(t, 0.0) for t in exec_stats], 0.0)
+
+        exec_stats = [
+            [
+                s.code_exec_duration_secs
+                for _, s in ens_stats.code_versions_stats.items()
+            ]
+            for field, ens_stats in full_code_gen_stats.code_exec_stats.items()
+        ]
+        profiling_data.total_code_exec_duration_secs += sum(
+            [sum(t, 0.0) for t in exec_stats], 0.0
+        )
 
         return profiling_data
 
@@ -505,16 +572,18 @@ class StatsProcessor:
             stats = record_dict["stats"]
 
             # non-LLM induce objects will have no stats or a single ApiStats object
-            if isinstance(stats, InduceNonLLMStats):
+            if isinstance(stats, ConvertNonLLMStats):
                 api_stats = stats.api_stats
                 if api_stats is not None:
-                    profiling_data.total_api_call_duration += api_stats.api_call_duration_secs
+                    profiling_data.total_api_call_duration += (
+                        api_stats.api_call_duration_secs
+                    )
 
             # LLM induce objects are the most complex; they may have one or more of:
             # - BondedQueryStats
             # - ConventionalQueryStats
             # - FullCodeGenStats
-            elif isinstance(stats, InduceLLMStats):
+            elif isinstance(stats, ConvertLLMStats):
                 # set query strategy
                 profiling_data.query_strategy = stats.query_strategy
                 profiling_data.token_budget = stats.token_budget
@@ -524,29 +593,43 @@ class StatsProcessor:
                 if bonded_query_stats is not None:
                     # set input fields and output fields generated by induce operation
                     profiling_data.input_fields = bonded_query_stats.input_fields
-                    profiling_data.generated_fields = bonded_query_stats.generated_fields
+                    profiling_data.generated_fields = (
+                        bonded_query_stats.generated_fields
+                    )
 
                     # update the aggregate operator stats associated with LLM generation
-                    profiling_data = self._update_gen_stats(profiling_data, bonded_query_stats.gen_stats)
+                    profiling_data = self._update_gen_stats(
+                        profiling_data, bonded_query_stats.gen_stats
+                    )
 
                 # process conventional query stats
                 conventional_query_stats = stats.conventional_query_stats
                 if conventional_query_stats is not None:
                     # set input fields and output fields generated by induce operation
                     profiling_data.input_fields = conventional_query_stats.input_fields
-                    profiling_data.generated_fields = conventional_query_stats.generated_fields
+                    profiling_data.generated_fields = (
+                        conventional_query_stats.generated_fields
+                    )
 
                     # update the aggregate (and per-field aggregate) operator stats associated with LLM generation
-                    for field_query_stats in conventional_query_stats.field_query_stats_lst:
+                    for (
+                        field_query_stats
+                    ) in conventional_query_stats.field_query_stats_lst:
                         field_name = field_query_stats.field_name
                         field_gen_stats = field_query_stats.gen_stats
-                        profiling_data = self._update_gen_stats(profiling_data, field_gen_stats)
-                        profiling_data = self._update_gen_stats(profiling_data, field_gen_stats, field_name=field_name)
+                        profiling_data = self._update_gen_stats(
+                            profiling_data, field_gen_stats
+                        )
+                        profiling_data = self._update_gen_stats(
+                            profiling_data, field_gen_stats, field_name=field_name
+                        )
 
                 # process codegen stats
                 full_code_gen_stats = stats.full_code_gen_stats
                 if full_code_gen_stats is not None:
-                    profiling_data = self._update_code_gen_stats(profiling_data, full_code_gen_stats)
+                    profiling_data = self._update_code_gen_stats(
+                        profiling_data, full_code_gen_stats
+                    )
 
             # non-LLM induce objects will have no stats or a single ApiStats object
             elif isinstance(stats, FilterNonLLMStats):
@@ -566,22 +649,22 @@ class StatsProcessor:
         This function computes the aggregate fields for the given OperatorStats object (`profiling_data`).
         The OperatorStats object has a `records` field which is a a list of record dictionaries processed
         by the operation. Each record dictionary has the format:
-        
+
         {"op_id": str, "uuid": str "parent_uuid": str, "stats": Stats, **record._asDict()}
 
         A record dictionary's "stats" field must be one of:
         - Stats
-        - InduceNonLLMStats
-        - InduceLLMStats
+        - ConvertNonLLMStats
+        - ConvertLLMStats
         - FilterNonLLMStats
         - FilterLLMStats
 
         Stats is only present for non-induce/filter operations, and its only field will
         be the cumulative_iter_time for the record.
 
-        InduceNonLLMStats is either empty or has a single field (api_stats).
+        ConvertNonLLMStats is either empty or has a single field (api_stats).
 
-        InduceLLMStats is the most complex Stats object, it can contain one or more of
+        ConvertLLMStats is the most complex Stats object, it can contain one or more of
         the following sub-fields:
         - bonded_query_stats
         - conventional_query_stats
@@ -599,7 +682,9 @@ class StatsProcessor:
         profiling_data = self._aggregate_record_stats(profiling_data)
 
         # recurse
-        profiling_data.source_op_stats = self._compute_agg_op_stats(profiling_data.source_op_stats)
+        profiling_data.source_op_stats = self._compute_agg_op_stats(
+            profiling_data.source_op_stats
+        )
 
         return profiling_data
 
@@ -625,10 +710,17 @@ class StatsProcessor:
         if profiling_data.source_op_stats is None:
             # in this case: op_time == cumulative_iter_time
             for record_dict in profiling_data.records:
-                record_dict['stats'].op_time = record_dict['stats'].cumulative_iter_time
+                record_dict["stats"].op_time = record_dict["stats"].cumulative_iter_time
 
             # compute total_op_time
-            profiling_data.total_op_time = sum(list(map(lambda record_dict: record_dict['stats'].op_time, profiling_data.records)))
+            profiling_data.total_op_time = sum(
+                list(
+                    map(
+                        lambda record_dict: record_dict["stats"].op_time,
+                        profiling_data.records,
+                    )
+                )
+            )
 
             return profiling_data
 
@@ -636,27 +728,44 @@ class StatsProcessor:
         # for each record we need to identify its parent to compute the op_time
         # NOTE: source_op_stats will be a dictionary b/c profiling_data
         for record_dict in profiling_data.records:
-            uuid = record_dict['uuid']
-            parent_uuid = record_dict['parent_uuid']
+            uuid = record_dict["uuid"]
+            parent_uuid = record_dict["parent_uuid"]
             for source_record_dict in profiling_data.source_op_stats.records:
                 # NOTE: right now, because some operations create new DataRecord objects (e.g. induce, agg.)
                 #       while other operations pass through the same record (e.g. filter, limit), there are
                 #       two possible scenarios:
                 #         1. the record's parent_uuid will equal the source_record's uuid (in the induce/agg case)
                 #         2. the record's uuid will equal the source_record's uuid (in the filter/limit case)
-                if parent_uuid == source_record_dict['uuid'] or uuid == source_record_dict['uuid']:
-                    record_dict['stats'].op_time = record_dict['stats'].cumulative_iter_time - source_record_dict['stats'].cumulative_iter_time
+                if (
+                    parent_uuid == source_record_dict["uuid"]
+                    or uuid == source_record_dict["uuid"]
+                ):
+                    record_dict["stats"].op_time = (
+                        record_dict["stats"].cumulative_iter_time
+                        - source_record_dict["stats"].cumulative_iter_time
+                    )
 
         # compute total_op_time
-        profiling_data.total_op_time = sum(list(map(lambda record_dict: record_dict['stats'].op_time, profiling_data.records)))
+        profiling_data.total_op_time = sum(
+            list(
+                map(
+                    lambda record_dict: record_dict["stats"].op_time,
+                    profiling_data.records,
+                )
+            )
+        )
 
         # recurse
-        profiling_data.source_op_stats = self._compute_op_time(profiling_data.source_op_stats)
+        profiling_data.source_op_stats = self._compute_op_time(
+            profiling_data.source_op_stats
+        )
 
         return profiling_data
 
     @staticmethod
-    def _est_time_per_record(op_df: pd.DataFrame, model_name: str=None, agg: str="mean") -> float:
+    def _est_time_per_record(
+        op_df: pd.DataFrame, model_name: str = None, agg: str = "mean"
+    ) -> float:
         """
         Given sample cost data observations for a specific operation, compute the aggregate over
         the `op_time` column.
@@ -665,13 +774,15 @@ class StatsProcessor:
         if model_name is not None:
             model_df = op_df[op_df.model_name == model_name]
             if not model_df.empty:
-                return model_df['op_time'].agg(agg=agg).iloc[0]
+                return model_df["op_time"].agg(agg=agg).iloc[0]
 
         # compute aggregate
-        return op_df['op_time'].agg(agg=agg).iloc[0]
+        return op_df["op_time"].agg(agg=agg).iloc[0]
 
     @staticmethod
-    def _est_num_input_output_tokens(op_df: pd.DataFrame, model_name: str=None, agg: str="mean") -> Tuple[float, float]:
+    def _est_num_input_output_tokens(
+        op_df: pd.DataFrame, model_name: str = None, agg: str = "mean"
+    ) -> Tuple[float, float]:
         """
         Given sample cost data observations for a specific operation, compute the aggregate over
         the `num_input_tokens` and `num_output_tokens` columns.
@@ -680,13 +791,21 @@ class StatsProcessor:
         if model_name is not None:
             model_df = op_df[op_df.model_name == model_name]
             if not model_df.empty:
-                return model_df['num_input_tokens'].agg(agg=agg).iloc[0], model_df['num_output_tokens'].agg(agg=agg).iloc[0]
+                return (
+                    model_df["num_input_tokens"].agg(agg=agg).iloc[0],
+                    model_df["num_output_tokens"].agg(agg=agg).iloc[0],
+                )
 
         # compute aggregate
-        return op_df['num_input_tokens'].agg(agg=agg).iloc[0], op_df['num_output_tokens'].agg(agg=agg).iloc[0]
+        return (
+            op_df["num_input_tokens"].agg(agg=agg).iloc[0],
+            op_df["num_output_tokens"].agg(agg=agg).iloc[0],
+        )
 
     @staticmethod
-    def _est_usd_per_record(op_df: pd.DataFrame, model_name: str=None, agg: str="mean") -> float:
+    def _est_usd_per_record(
+        op_df: pd.DataFrame, model_name: str = None, agg: str = "mean"
+    ) -> float:
         """
         Given sample cost data observations for a specific operation, compute the aggregate over
         the sum of the `input_usd` and `output_usd` columns.
@@ -695,7 +814,11 @@ class StatsProcessor:
         if model_name is not None:
             model_df = op_df[op_df.model_name == model_name]
             if not model_df.empty:
-                return (model_df['input_usd'] + model_df['output_usd']).agg(agg=agg).iloc[0]
+                return (
+                    (model_df["input_usd"] + model_df["output_usd"])
+                    .agg(agg=agg)
+                    .iloc[0]
+                )
 
         # # adjust cost from sample model to this model
         # this_model_usd_per_input_token = MODEL_CARDS[model_name]['usd_per_input_token']
@@ -713,10 +836,12 @@ class StatsProcessor:
 
         # # compute average combined input/output usd spent
         # return (df['adj_input_usd'] + df['adj_output_usd']).agg(agg=agg).iloc[0]
-        return (op_df['input_usd'] + op_df['output_usd']).agg(agg=agg).iloc[0]
+        return (op_df["input_usd"] + op_df["output_usd"]).agg(agg=agg).iloc[0]
 
     @staticmethod
-    def _est_selectivity(df: pd.DataFrame, op_df: pd.DataFrame, model_name: str=None) -> float:
+    def _est_selectivity(
+        df: pd.DataFrame, op_df: pd.DataFrame, model_name: str = None
+    ) -> float:
         """
         Given sample cost data observations for the plan and a specific operation, compute
         the ratio of records between this operator and its source operator.
@@ -753,7 +878,7 @@ class StatsProcessor:
         return num_output_records / num_input_records
 
     @staticmethod
-    def _est_quality(op_df: pd.DataFrame, model_name: str=None) -> float:
+    def _est_quality(op_df: pd.DataFrame, model_name: str = None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the an estimate
         of the quality of its outputs by using GPT-4 as a champion model.
@@ -765,7 +890,9 @@ class StatsProcessor:
         record_uuid_to_answer = {}
         for record_uuid in record_uuids:
             record_df = op_df[op_df.record_uuid == record_uuid]
-            gpt4_most_common_answer = record_df[record_df.model_name == Model.GPT_4.value].answer.mode()
+            gpt4_most_common_answer = record_df[
+                record_df.model_name == Model.GPT_4.value
+            ].answer.mode()
 
             if not gpt4_most_common_answer.empty:
                 record_uuid_to_answer[record_uuid] = gpt4_most_common_answer.iloc[0]
@@ -775,19 +902,19 @@ class StatsProcessor:
         def _is_correct(row):
             # simple equality check suffices for filter
             if "filter" in row["op_name"]:
-                return row['answer'] == row['accepted_answer']
+                return row["answer"] == row["accepted_answer"]
 
             # otherwise, check equality on a per-key basis
             try:
                 # we'll measure recal on accepted_answer, as extraneous info is often not an issue
-                answer = row['answer']
-                accepted_answer = row['accepted_answer']
-                
+                answer = row["answer"]
+                accepted_answer = row["accepted_answer"]
+
                 tp = 0
                 for key, value in accepted_answer.items():
                     if key in answer and answer[key] == value:
                         tp += 1
-                
+
                 return tp / len(accepted_answer)
 
             except Exception as e:
@@ -796,8 +923,10 @@ class StatsProcessor:
 
         # compute accepted answers and clean all answers
         pd.options.mode.chained_assignment = None  # turn off copy warnings
-        op_df.loc[:, 'accepted_answer'] = op_df.record_uuid.apply(lambda uuid: record_uuid_to_answer[uuid])
-        op_df.loc[:, 'correct'] = op_df.apply(lambda row: _is_correct(row), axis=1)
+        op_df.loc[:, "accepted_answer"] = op_df.record_uuid.apply(
+            lambda uuid: record_uuid_to_answer[uuid]
+        )
+        op_df.loc[:, "correct"] = op_df.apply(lambda row: _is_correct(row), axis=1)
 
         # get subset of observations for model_name and estimate quality w/fraction of answers that match accepted answer
         model_df = (
@@ -818,7 +947,9 @@ class StatsProcessor:
 
         return est_quality
 
-    def _parse_record_llm_stats(self, record_dict: Dict[str, Any], op_name: str) -> Dict[str, Any]:
+    def _parse_record_llm_stats(
+        self, record_dict: Dict[str, Any], op_name: str
+    ) -> Dict[str, Any]:
         """
         Extract gen_stats fields for get_cost_estimate_sample_data.
         """
@@ -850,7 +981,7 @@ class StatsProcessor:
             answer = {}
             for field in generated_fields:
                 answer[field] = record_dict[field]
-            
+
             return answer
 
         # get values needed to compute observation metrics
@@ -865,11 +996,14 @@ class StatsProcessor:
             "output_usd": op_stats.total_output_usd,
             # "answer": _clean_answer(op_stats.answers[0], op_name) if len(op_stats.answers) > 0 else None,
             "answer": _get_answer(op_name, record_dict, op_stats.generated_fields),
-            "answer_log_probs": op_stats.answer_log_probs[0] if len(op_stats.answer_log_probs) > 0 else None,
+            "answer_log_probs": (
+                op_stats.answer_log_probs[0]
+                if len(op_stats.answer_log_probs) > 0
+                else None
+            ),
         }
 
         return additional_fields_dict
-
 
     def get_cost_estimate_sample_data(self) -> List[Dict[str, Any]]:
         """
@@ -892,13 +1026,23 @@ class StatsProcessor:
                     "record_parent_uuid": record_dict["parent_uuid"],
                     "op_id": op_data.op_id,
                     "op_name": op_data.op_name,
-                    "source_op_id": op_data.source_op_stats.op_id if op_data.source_op_stats is not None else None,
+                    "source_op_id": (
+                        op_data.source_op_stats.op_id
+                        if op_data.source_op_stats is not None
+                        else None
+                    ),
                     "op_time": record_dict["stats"].op_time,
-                    "passed_filter": record_dict["_passed_filter"] if "_passed_filter" in record_dict else None,
+                    "passed_filter": (
+                        record_dict["_passed_filter"]
+                        if "_passed_filter" in record_dict
+                        else None
+                    ),
                 }
 
                 # add additional fields for induce or filter w/LLM
-                additional_fields_dict = self._parse_record_llm_stats(record_dict, op_data.op_name)
+                additional_fields_dict = self._parse_record_llm_stats(
+                    record_dict, op_data.op_name
+                )
                 observation = dict(observation, **additional_fields_dict)
 
                 # add observation to list of observations
@@ -908,7 +1052,6 @@ class StatsProcessor:
             op_data = op_data.source_op_stats
 
         return cost_est_sample_data
-
 
     def get_avg_record_stats(self):
         """

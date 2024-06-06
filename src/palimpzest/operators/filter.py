@@ -6,7 +6,6 @@ from .physical import PhysicalOp, MAX_ID_CHARS
 from palimpzest.constants import *
 from palimpzest.corelib import Schema
 from palimpzest.elements import *
-from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.profiler import Profiler
 
 from typing import Any, Dict
@@ -104,7 +103,7 @@ class FilterOp(PhysicalOp):
 
     def estimateCost(self, cost_est_data: Dict[str, Any] = None):
         """
-        See InduceFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
+        See ConvertFromCandidateOp.estimateCost() for NOTEs and TODOs on how to improve this method.
         """
         # fetch cost estimates from source operation
         inputEstimates, subPlanCostEst = self.source.estimateCost(cost_est_data)

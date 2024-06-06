@@ -1,12 +1,11 @@
 """GV: In my view this whole function should be called Convert. 
 And so should all of the methods - ConvertFromCandidate, ParallelConvertFromCandidate, etc.
-Keeping it as Induce for legacy compatibility (for now)"""
+Keeping it as Convert for legacy compatibility (for now)"""
 
 from __future__ import annotations
 from io import BytesIO
 
 from palimpzest.profiler.stats import Stats
-from palimpzest.solver.query_strategies import runConventionalQuery
 from palimpzest.tools.skema_tools import equations_to_latex
 import pandas as pd
 from .physical import PhysicalOp, MAX_ID_CHARS, IteratorFn
@@ -14,7 +13,6 @@ from .physical import PhysicalOp, MAX_ID_CHARS, IteratorFn
 from palimpzest.constants import *
 from palimpzest.corelib import *
 from palimpzest.elements import *
-from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.profiler import Profiler
 
 from typing import Any, Dict, Optional, Tuple
@@ -401,7 +399,7 @@ class ConvertOp(PhysicalOp):
         return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
 
 
-class InduceFromCandidateOp(ConvertOp):
+class ConvertFromCandidateOp(ConvertOp):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -426,7 +424,7 @@ class InduceFromCandidateOp(ConvertOp):
         return iteratorFn()
 
 
-class ParallelInduceFromCandidateOp(ConvertOp):
+class ParallelConvertFromCandidateOp(ConvertOp):
     def __init__(self, streaming, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.max_workers = 32  # TODO hardcoded for now
@@ -508,7 +506,7 @@ class SimpleTypeConvert(ConvertOp):
         # TODO profiling should be done somewhere else
         # if profiling, set record's stats for the given op_id to be an empty Stats object
         # if self.shouldProfile:
-        # candidate._stats[td.op_id] = InduceNonLLMStats()
+        # candidate._stats[td.op_id] = ConvertNonLLMStats()
 
         return [dr], None
 
@@ -529,7 +527,7 @@ class LLMTypeConversion(ConvertOp):
 
             # if profiling, set record's stats for the given op_id
             # if shouldProfile:
-            # dr._stats[td.op_id] = InduceLLMStats(
+            # dr._stats[td.op_id] = ConvertLLMStats(
             # query_strategy=td.query_strategy.value,
             # token_budget=td.token_budget,
             # conventional_query_stats=conventional_query_stats,
@@ -552,7 +550,7 @@ class LLMTypeConversion(ConvertOp):
             # if profiling, set record's stats for the given op_id
             if shouldProfile:
                 for dr in drs:
-                    dr._stats[td.op_id] = InduceLLMStats(
+                    dr._stats[td.op_id] = ConvertLLMStats(
                         query_strategy=td.query_strategy.value,
                         token_budget=td.token_budget,
                         bonded_query_stats=bonded_query_stats,
@@ -577,7 +575,7 @@ class LLMTypeConversion(ConvertOp):
             if shouldProfile:
                 for dr in drs:
                     # TODO: divide bonded query_stats time, cost, and input/output tokens by len(drs)
-                    dr._stats[td.op_id] = InduceLLMStats(
+                    dr._stats[td.op_id] = ConvertLLMStats(
                         query_strategy=td.query_strategy.value,
                         token_budget=td.token_budget,
                         bonded_query_stats=bonded_query_stats,
@@ -593,7 +591,7 @@ class LLMTypeConversion(ConvertOp):
             # if profiling, set record's stats for the given op_id
             if shouldProfile:
                 for dr in drs:
-                    dr._stats[td.op_id] = InduceLLMStats(
+                    dr._stats[td.op_id] = ConvertLLMStats(
                         query_strategy=td.query_strategy.value,
                         token_budget=td.token_budget,
                         full_code_gen_stats=full_code_gen_stats,
@@ -623,7 +621,7 @@ class LLMTypeConversion(ConvertOp):
             # if shouldProfile:
             # for dr in drs:
             # TODO: divide bonded query_stats time, cost, and input/output tokens by len(drs)
-            # dr._stats[td.op_id] = InduceLLMStats(
+            # dr._stats[td.op_id] = ConvertLLMStats(
             # query_strategy=td.query_strategy.value,
             # token_budget=td.token_budget,
             # full_code_gen_stats=full_code_gen_stats,

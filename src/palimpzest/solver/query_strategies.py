@@ -11,7 +11,6 @@ from palimpzest.profiler import (
     FullCodeGenStats,
     GenerationStats,
 )
-from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.utils import (
     API,
     codeEnsembleGeneration,

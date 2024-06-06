@@ -50,7 +50,7 @@ class ConvertFileToText(HardcodedConvert):
         dr.contents = text_content
         # if profiling, set record's stats for the given op_id to be an empty Stats object
         # if shouldProfile:
-        # candidate._stats[td.op_id] = InduceNonLLMStats()
+        # candidate._stats[td.op_id] = ConvertNonLLMStats()
 
         return [dr], None
 
@@ -72,7 +72,7 @@ class ConvertImageToEquation(HardcodedConvert):
         print("Running equations_to_latex_base64: ", dr.equation_text)
         # if profiling, set record's stats for the given op_id
         # if shouldProfile:
-        # dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
+        # dr._stats[td.op_id] = ConvertNonLLMStats(api_stats=api_stats)
         return [dr], None
 
 
@@ -89,7 +89,7 @@ class ConvertDownloadToFile(HardcodedConvert):
         dr.filename = candidate.url.split("/")[-1]
         dr.contents = candidate.content
         # if shouldProfile:
-        # candidate._stats[td.op_id] = InduceNonLLMStats()
+        # candidate._stats[td.op_id] = ConvertNonLLMStats()
         return [dr], None
 
 
@@ -110,7 +110,7 @@ class ConvertFileToXLS(HardcodedConvert):
         dr.number_sheets = len(xls.sheet_names)
         dr.sheet_names = xls.sheet_names
         # if shouldProfile:
-        # candidate._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
+        # candidate._stats[td.op_id] = ConvertNonLLMStats(api_stats=api_stats)
 
 
 class ConvertXLSToTable(HardcodedConvert):
@@ -148,7 +148,7 @@ class ConvertXLSToTable(HardcodedConvert):
             dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
 
             # if shouldProfile:
-            # dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
+            # dr._stats[td.op_id] = ConvertNonLLMStats(api_stats=api_stats)
             records.append(dr)
         return records, None
 
@@ -192,5 +192,5 @@ class ConvertFileToPDF(HardcodedConvert):
         dr.text_contents = text_content[:10000]  # TODO Very hacky
         # if profiling, set record's stats for the given op_id
         # if shouldProfile:
-        # dr._stats[td.op_id] = InduceNonLLMStats(api_stats=api_stats)
+        # dr._stats[td.op_id] = ConvertNonLLMStats(api_stats=api_stats)
         return [dr], None

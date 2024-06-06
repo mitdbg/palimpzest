@@ -18,15 +18,9 @@ from palimpzest.profiler import (
     ApiStats,
     FilterLLMStats,
     FilterNonLLMStats,
-    InduceLLMStats,
-    InduceNonLLMStats,
+    ConvertLLMStats,
+    ConvertNonLLMStats,
 )
-from palimpzest.solver.query_strategies import (
-    runBondedQuery,
-    runConventionalQuery,
-    runCodeGenQuery,
-)
-from palimpzest.solver.task_descriptors import TaskDescriptor
 
 
 class Solver:
@@ -77,14 +71,14 @@ class Solver:
         Return a function that implements the desired task as specified by some PhysicalOp.
         Right now, the two primary tasks that the Solver provides solutions for are:
 
-        1. Induce operations
+        1. Convert operations
         2. Filter operations
 
         The shouldProfile parameter also determines whether or not PZ should compute
         profiling statistics for LLM invocations and attach them to each record.
         """
         # synthesize a function to induce from inputType to outputType
-        if "InduceFromCandidateOp" in td.physical_op:
+        if "ConvertFromCandidateOp" in td.physical_op:
             typeConversionDescriptor = (td.outputSchema, td.inputSchema)
             if typeConversionDescriptor in self._simpleTypeConversions:
                 return self._makeSimpleTypeConversionFn(td, shouldProfile)
