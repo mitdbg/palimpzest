@@ -28,10 +28,10 @@ class Email(pz.TextFile):
 
 def EnronEval():
     emails = pz.Dataset("enron-eval", schema=Email)
-    emails = emails.filterByStr(
+    emails = emails.filter(
         'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
     )
-    emails = emails.filterByStr(
+    emails = emails.filter(
         "The email is not quoting from a news article or an article written by someone outside of Enron"
     )
     return emails
@@ -39,7 +39,7 @@ def EnronEval():
 
 def EnronTiny():
     emails = pz.Dataset("enron-tiny", schema=Email)
-    emails = emails.filterByStr("The email is about someone taking a vacation")
+    emails = emails.filter("The email is about someone taking a vacation")
     return emails
 
 

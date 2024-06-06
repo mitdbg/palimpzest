@@ -135,12 +135,12 @@ class OperatorStats:
 
 
 @dataclass
-class OptimizationStats:
+class Stats: # OptimizationStats:
     """
     Base dataclass for storing statistics captured during the execution of an optimization on a single input record.
     """
     # optimization name
-    opt_name
+    opt_name: str=None
     # (set in profiler.py) this is the total time spent waiting for the iterator
     # to yield the data record associated with this Stats object; note that this
     # will capture the total time spent in this operation and all source operations

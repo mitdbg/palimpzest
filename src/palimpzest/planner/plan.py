@@ -1,7 +1,10 @@
-from typing import List, Tuple
-from palimpzest.sets import Set
-from palimpzest.operators import LogicalOperator
+from __future__ import annotations
+
+from palimpzest.operators import LogicalOperator, FilteredScan
 from palimpzest.operators.physical import PhysicalOp
+from palimpzest.sets import Set
+
+from typing import Any, Dict, List, Optional
 
 
 class Plan:
@@ -32,29 +35,68 @@ class Plan:
 
 class LogicalPlan(Plan):
 
-    def __init__(self, datasets: List[Set] = [], operators: List[LogicalOperator] = []):
-        self.dataset = datasets
+    def __init__(self, operators: List[LogicalOperator] = []):
         self.operators = operators
 
+    @staticmethod
+    def fromOpsAndSubPlan(ops, subPlan) -> LogicalPlan:
+        # create copies of all logical operators
+        copySubPlan = [op.copy() for op in subPlan]
+        copyOps = [op.copy() for op in ops]
 
-legacy_PhysicalPlan = Tuple[float, float, float, PhysicalOp]
+        # set input schema of first new op to match output schema of last op in subplan
+        copyOps[0].inputSchema = copySubPlan[-1].outputSchema
+
+        # construct full set of operators
+        fullOperators = copySubPlan.extend(copyOps)
+
+        # make input and output schemas internally consistent
+        for idx, op in enumerate(fullOperators):
+            # if this op is a filter, set its outputSchema equal to its inputSchema
+            if isinstance(op, FilteredScan):
+                op.outputSchema = op.inputSchema
+
+            # set next op's inputSchema to be this op's outputSchema
+            if idx + 1 < len(fullOperators):
+                nextOp = fullOperators[idx + 1]
+                nextOp.inputSchema = op.outputSchema
+
+        # return the LogicalPlan
+        return LogicalPlan(fullOperators)
 
 
 class PhysicalPlan(Plan):
 
-    def __init__(self, dataset, num_samples):
-        self.dataset = dataset
+    def __init__(self, num_samples):
         self.operators = []
         self.num_samples = num_samples
 
         self.stats = PlanStats()
 
-    # NOTE: would we need something like the following?:
-    def getStats():
-        # compute and return agg. stats
-        return
+    def __str__(self) -> str:
+        """Computes a string representation for this plan."""
+        # TODO
+        physicalOps = physicalTree.dumpPhysicalTree()
+        flat = flatten_nested_tuples(physicalOps)
+        ops = [op for op in flat if not op.is_hardcoded()]
+        label = "-".join([
+            f"{repr(op.model)}_{op.query_strategy if isinstance(op, InduceFromCandidateOp) else None}_{op.token_budget if isinstance(op, InduceFromCandidateOp) else None}"
+            for op in ops
+        ])
+        return f"PZ-{label_idx}-{label}"
+
+    def getModels() -> List[Optional[str]]:
+        """Return the list of models for each operator."""
+        return []
+
+    def getExecutionData() -> List[Dict[str, Any]]:
+        """Compute and return all sample execution data collected by this plan so far."""
+        # TODO
+        return []
 
     def __iter__(self):
+        """Iterate over source records from datasource."""
+        # TODO
         base_operator = self.operators[-1]
         for record, stats in base_operator:
             self.stats.append(stats)

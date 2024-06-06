@@ -1,7 +1,8 @@
 from palimpzest.constants import Model
 from palimpzest.datamanager import DataDirectory
 from palimpzest.operators import InduceFromCandidateOp
-from palimpzest.policy import Policy, MaxQuality, UserChoice
+from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
+from palimpzest.policy import Policy
 from palimpzest.profiler import StatsProcessor
 from palimpzest.sets import Set
 
@@ -11,14 +12,10 @@ try:
 except:
     from more_itertools import pairwise
 
-def emitNestedTuple(node, indent=0):
-    elt, child = node
-    print(" " * indent, elt)
-    if child is not None:
-        emitNestedTuple(child, indent=indent+2)
+from concurrent.futures import ThreadPoolExecutor
+from typing import List
 
 import os
-import concurrent
 import shutil
 
 
@@ -65,158 +62,6 @@ def graphicEmit(flatten_ops):
         print()
         print(f"    ({','.join(in_schema.fieldNames())[:15]}...) -> ({','.join(out_schema.fieldNames())[:15]}...)")
         print()
-
-class Execution:
-    """An Execution is responsible for completing a query on a given Set.
-    Right now we assume the query is always SELECT * FROM set."""
-    def __init__(self, rootset: Set, policy: Policy) -> None:
-        self.rootset = rootset
-        self.policy = policy
-
-    def executeAndOptimize(self, verbose: bool=False, shouldProfile: bool=False):
-        """An execution of the rootset, subject to user-given policy."""
-        logicalTree = self.rootset.getLogicalTree()
-
-        # Crude algorithm:
-        # 1. Generate a logical plan
-        # 2. If there's no previously-created reliable data, then get some via sampling on a high-quality plan
-        # 3. Once the sample is available, either (1) declare victory because the work is done, or (2) 
-        #    use the sample to reoptimize according to user preferences
-
-        cache = DataDirectory().getCacheService()
-        cachedInfo = cache.getCachedData("querySamples", self.rootset.universalIdentifier())
-        if cachedInfo is not None:
-            sampleOutputs, profileData = cachedInfo
-        else:
-            # Obtain a sample of the first 'sampleSize' records.
-            # We need the output examples as well as the performance data.
-            sampleSize = 4
-            limitSet = self.rootset.limit(sampleSize)
-            logicalTree = limitSet.getLogicalTree()
-            candidatePlans = logicalTree.createPhysicalPlanCandidates(shouldProfile=True)
-            if verbose:
-                print("----- PRE-SAMPLE PLANS -----")
-                for idx, cp in enumerate(candidatePlans):
-                    print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
-                    print("Physical operator tree")
-                    physicalOps = cp[3].dumpPhysicalTree()
-                    emitNestedTuple(physicalOps)
-                    print("----------")
-
-            planTime, planCost, quality, physicalTree, _ = MaxQuality().choose(candidatePlans)
-
-            if verbose:
-                print("----------")
-                print(f"Policy is: Maximum Quality")
-                print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")
-                emitNestedTuple(physicalTree.dumpPhysicalTree())
-
-            # Execute the physical plan and cache the results
-            sampleOutputs = [r for r in physicalTree]
-            profileData = physicalTree.getProfilingData()
-
-            # We put this into an ephemeral cache
-            cache.putCachedData("querySamples", self.rootset.universalIdentifier(), (sampleOutputs, profileData))
-
-        # TODO: remove
-        if verbose:
-            import json
-            import os
-            if not os.path.exists('profiling-data'):
-                os.makedirs('profiling-data')
-            with open('profiling-data/eo-raw_profiling.json', 'w') as f:
-                sp = StatsProcessor(profileData)
-                json.dump(sp.profiling_data.to_dict(), f)
-
-        # process profileData with StatsProcessor
-        sp = StatsProcessor(profileData)
-        cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
-
-        # TODO: remove
-        if verbose:
-            import json
-            with open('profiling-data/eo-cost-estimate.json', 'w') as f:
-                json.dump(cost_estimate_sample_data, f)
-
-        # Ok now reoptimize the logical plan, this time with the sample data.
-        # (The data is not currently being used; let's see if this method can work first)
-        logicalTree = self.rootset.getLogicalTree()
-        candidatePlans = logicalTree.createPhysicalPlanCandidates(cost_estimate_sample_data=cost_estimate_sample_data, shouldProfile=shouldProfile)
-        if type(self.policy) == UserChoice or verbose:
-            print("----- POST-SAMPLE PLANS -----")
-            for idx, cp in enumerate(candidatePlans):
-                print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
-                print("Physical operator tree")
-                physicalOps = cp[3].dumpPhysicalTree()
-                emitNestedTuple(physicalOps)
-                print("----------")
-
-        planTime, planCost, quality, physicalTree, _ = self.policy.choose(candidatePlans)
-
-        if verbose:
-            print("----------")
-            print(f"Policy is: {self.policy}")
-            print(f"Chose plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")
-            emitNestedTuple(physicalTree.dumpPhysicalTree())
-
-        return physicalTree
-
-
-class SamplePlansExecution(Execution):
-
-    def __init__(self, rootset: Set, policy: Policy, n_plans: int) -> None:
-        self.rootset = rootset
-        self.policy = policy
-        self.n_plans = n_plans
-
-    def executeAndOptimize(self, verbose: bool=False, shouldProfile: bool=False):
-        """An execution of the rootset, subject to user-given policy."""
-        logicalTree = self.rootset.getLogicalTree()
-
-        # TODO:
-        # 1. enumerate plans
-        # 2. select N to run for k samples
-        # 3. gather execution data
-        # 4. provide all cost estimates to physical operators
-
-class SimpleExecution(Execution):
-    """
-    This simple execution does not pre-sample the data and does not use cache nor profiling.
-    It just runs the query and returns the results.
-    """
-
-    def executeAndOptimize(self, verbose: bool=False, shouldProfile: bool=False):
-        """An execution of the rootset, subject to user-given policy."""
-        logicalTree = self.rootset.getLogicalTree()
-
-        # Ok now reoptimize the logical plan, this time with the sample data.
-        # (The data is not currently being used; let's see if this method can work first)
-        logicalTree = self.rootset.getLogicalTree()
-        candidatePlans = logicalTree.createPhysicalPlanCandidates(shouldProfile=shouldProfile)
-        if type(self.policy) == UserChoice:
-            print("-----AVAILABLE PLANS -----")
-            for idx, cp in enumerate(candidatePlans):
-                print(f"Plan {idx}: Time est: {cp[0]:.3f} -- Cost est: {cp[1]:.3f} -- Quality est: {cp[2]:.3f}")
-                print("Physical operator tree")
-                physicalOps = cp[3].dumpPhysicalTree()
-                emitNestedTuple(physicalOps)
-                print("----------")
-                # flatten_ops = flatten_nested_tuples(physicalOps)               
-                # graphicEmit(flatten_ops)
-                # print("----------")
-
-        planTime, planCost, quality, physicalTree, _ = self.policy.choose(candidatePlans)
-
-        if verbose:
-            print("----------")
-            print(f"Policy is: {self.policy}")
-            print(f"Chosen plan: Time est: {planTime:.3f} -- Cost est: {planCost:.3f} -- Quality est: {quality:.3f}")
-            ops = physicalTree.dumpPhysicalTree()
-            flatten_ops = flatten_nested_tuples(ops)
-            graphicEmit(flatten_ops)
-            # emitNestedTuple(ops)
-
-        return physicalTree
 
 
 class Execute:
@@ -308,7 +153,7 @@ class Execute:
         all_cost_estimate_data, return_records = [], []
         # with Pool(processes=num_sentinel_plans) as pool:
         #     results = pool.starmap(Execute.run_sentinel_plan, [(dataset, plan_idx, num_samples, verbose) for plan_idx in range(num_sentinel_plans)])
-        with concurrent.futures.ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
+        with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
             results = list(executor.map(Execute.run_sentinel_plan, [(dataset, plan_idx, num_samples, verbose) for plan_idx in range(num_sentinel_plans)]))
 
             # write out result dict and samples collected for each sentinel
@@ -383,64 +228,131 @@ class Execute:
         return all_records, plan
 
 
-
-
-
-
 class NewExecute:
     @staticmethod
-    def run_sentinel_plan(plan):
+    def get_champion_model():
+        # TODO:? turn into utility function in proper utils file
+        champion_model = None
+        if os.environ.get("OPENAI_API_KEY", None) is not None:
+            champion_model = Model.GPT_4.value
+        elif os.environ.get("TOGETHER_API_KEY", None) is not None:
+            champion_model = Model.MIXTRAL.value
+        elif os.environ.get("GOOGLE_API_KEY", None) is not None:
+            champion_model = Model.GEMINI_1.value
+        else:
+            raise Exception("No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]")
+
+        return champion_model
+
+    @staticmethod
+    def run_sentinel_plan(args):
+        # parse args
+        plan, plan_idx, verbose = args
+
+        # display the plan output
+        if verbose:
+            print("----------------------")
+            ops = plan.dumpPhysicalTree()
+            flatten_ops = flatten_nested_tuples(ops)
+            print(f"Sentinel Plan {plan_idx}:")
+            graphicEmit(flatten_ops)
+            print("---")
+
         # run the plan
-        records = [r for r in plan]
+        records = plan.execute()
 
-        # get profiling data for plan and compute its cost
-        profileData = plan.getStats()
-        sp = StatsProcessor(profileData)
-        cost_estimate_sample_data = sp.get_cost_estimate_sample_data()
+        return records
 
-        return records, cost_estimate_sample_data
+    @classmethod
+    def run_sentinel_plans(cls, sentinel_plans: List[PhysicalPlan], verbose: bool=False):
+        # compute number of plans
+        num_sentinel_plans = len(sentinel_plans)
+
+        all_sample_execution_data, return_records = [], []
+        with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
+            results = list(executor.map(NewExecute.run_sentinel_plan, [(plan, idx, verbose) for idx, plan in enumerate(sentinel_plans)]))
+
+            # write out result dict and samples collected for each sentinel
+            for records, plan in zip(results, sentinel_plans):
+                # aggregate sentinel est. data
+                sample_execution_data = plan.getExecutionData()
+                all_sample_execution_data.extend(sample_execution_data)
+
+                # set return_records to be records from champion model
+                champion_model = NewExecute.get_champion_model()
+
+                # find champion model plan records and add those to all_records
+                if champion_model in plan.getModels():
+                    return_records = records
+
+        return all_sample_execution_data, return_records
 
 
     def __new__(cls, dataset: Set, policy: Policy, num_samples: int=20, nocache: bool=False, verbose: bool=False):
         # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
         if nocache:
-            # delete/disable DSPy cachedir
+            dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+            if os.path.exists(dspy_cache_dir):
+                shutil.rmtree(dspy_cache_dir)
+
             # remove codegen samples from previous dataset from cache
-            pass
+            cache = DataDirectory().getCacheService()
+            cache.rmCache()
 
-        # get sentinel plans
-        sentinelPlans = []
-        logicalPlanner = LogicalPlanner(nocache, num_samples, scan_start_idx=0, sentinels=True)
-        logicalPlan = logicalPlanner.generate_plans(dataset):
-        for sentinelPlan in PhysicalPlanner().generate_plans(logicalPlan, sentinel=True):
-            sentinelPlans.append(sentinelPlan)
+        # only run sentinels if there isn't a cached result already
+        uid = dataset.universalIdentifier() # TODO: I think we may need to get uid from source?
+        run_sentinels = nocache or not DataDirectory().hasCachedAnswer(uid)
 
-        # run sentinel plans
-        all_cost_estimate_data, sentinel_records = [], []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(sentinelPlans)) as executor:
-            results = list(executor.map(NewExecute.run_sentinel_plan, sentinelPlans))
+        all_sample_execution_data, sentinel_records = None, None
+        if run_sentinels:
+            # initialize logical and physical planner
+            logical_planner = LogicalPlanner(nocache)
+            physical_planner = PhysicalPlanner(num_samples, scan_start_idx=0)
 
-            # write out result dict and samples collected for each sentinel
-            for records, cost_est_sample_data in results:
-                # aggregate sentinel est. data
-                all_cost_estimate_data.extend(cost_est_sample_data)
+            # get sentinel plans
+            sentinel_plans = []
+            for logical_plan in logical_planner.generate_plans(dataset, sentinels=True):
+                for sentinel_plan in physical_planner.generate_plans(logical_plan, sentinels=True):
+                    sentinel_plans.append(sentinel_plan)
 
-                champion_model = None # compute champion model
-                if champion_model:
-                    sentinel_records = records
+            # run sentinel plans
+            all_sample_execution_data, sentinel_records = cls.run_sentinel_plans(sentinel_plans, verbose)
 
-        # create new plan candidates based on current estimate data
-        physicalPlanCandidates = []
-        logicalPlanner = LogicalPlanner(nocache, scan_start_idx=num_samples)
+        # (re-)initialize logical and physical planner
+        scan_start_idx = num_samples if run_sentinels else 0
+        logicalPlanner = LogicalPlanner(nocache)
+        physicalPlanner = PhysicalPlanner(scan_start_idx=scan_start_idx, sample_execution_data=all_sample_execution_data)
+
+        # create all possible physical plans
+        allPhysicalPlans = []
         for logicalPlan in logicalPlanner.generate_plans(dataset):
-            for physicalPlan in PhysicalPlanner().generate_plans(logicalPlan, cost_estimate_sample_data=all_cost_estimate_data):
-                physicalPlanCandidates.append(physicalPlan)
-    
+            for physicalPlan in physicalPlanner.generate_plans(logicalPlan):
+                allPhysicalPlans.append(physicalPlan)
+
+        # compute 
+
         # choose best plan and execute it
         (_, _, _, plan, _) = policy.choose(physicalPlanCandidates)
 
+        # display the plan output
+        if verbose:
+            print("----------------------")
+            ops = plan.dumpPhysicalTree()
+            flatten_ops = flatten_nested_tuples(ops)
+            print(f"Final Plan:")
+            graphicEmit(flatten_ops)
+            print("---")
+
         # run the plan
-        new_records = [r for r in plan]
+        new_records = []
+        source, phys_operators = plan[0], plan[1:] # TODO: maybe add __iter__ to plan to iterate over source records
+        for record in source:
+            for phy_op in phys_operators:
+                instantiated_op = phy_op()
+                with Profiler: # or however the Stat collection works:
+                    record = instantiated_op(record)
+            new_records.append(record)
+
         all_records = sentinel_records + new_records
 
         return all_records
