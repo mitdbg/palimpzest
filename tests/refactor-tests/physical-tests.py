@@ -15,7 +15,7 @@ import context
 import unittest
 import palimpzest as pz
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner
-from palimpzest.operators import InduceOp, ConvertFileToText
+from palimpzest.operators import ConvertOp, ConvertFileToText
 from utils import remove_cache, buildNestedStr
 
 
@@ -59,11 +59,11 @@ class TestPhysicalOperators(unittest.TestCase):
         physical = PhysicalPlanner()
 
     def test_class_attributes(self):
-        generic_induce = pz.InduceOp
+        generic_induce = pz.ConvertOp
         conv_file_text = pz.ConvertFileToText
 
-        print("Input schema of InduceOp: ", generic_induce.inputSchema)
-        print("Output schema of InduceOp: ", generic_induce.outputSchema)
+        print("Input schema of ConvertOp: ", generic_induce.inputSchema)
+        print("Output schema of ConvertOp: ", generic_induce.outputSchema)
         print("Input schema of ConvertFileToText: ", conv_file_text.inputSchema)
         print("Output schema of ConvertFileToText: ", conv_file_text.outputSchema)
 

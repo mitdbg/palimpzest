@@ -47,7 +47,7 @@ class LogicalPlanner(Planner):
         super().__init__(*args, **kwargs)
         self.no_cache = no_cache
         # TODO planner should know num_samples, scan_start_idx ?
-        
+
         # NOTE: ^yes, if this is where the logical operators are created, then we need num_samples and scan_start_idx
         #       when creating the BaseScan or CacheScan
 
@@ -187,7 +187,7 @@ class PhysicalPlanner(Planner):
         Create the sentinel plans, which -- at least for now --- are single model plans
         which follow the structure of the user-specified program.
         """
-        # for 
+        # for
         # base case: this is a root op
         if self.inputOp is None:
             return self._getPhysicalTree(
@@ -555,7 +555,9 @@ class PhysicalPlanner(Planner):
 
         return finalPlans
 
-    def generate_plans(self, logical_plan: LogicalPlan, sentinels: bool=False) -> List[PhysicalPlan]:
+    def generate_plans(
+        self, logical_plan: LogicalPlan, sentinels: bool = False
+    ) -> List[PhysicalPlan]:
         """Return a set of possible physical plans."""
         # only fetch sentinel plans if specified
         if sentinels:
@@ -563,7 +565,9 @@ class PhysicalPlanner(Planner):
             assert (
                 len(models) > 0
             ), "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
-            sentinel_plans = [self._createSentinelPlan(logical_plan, model) for model in models]
+            sentinel_plans = [
+                self._createSentinelPlan(logical_plan, model) for model in models
+            ]
             return sentinel_plans
 
         # NOTE: more questions:
@@ -588,7 +592,6 @@ class PhysicalPlanner(Planner):
 # for plan in physical_plan:
 #     for phy_op in plan:
 #             instantiated_op = phy_op()
-#             for record in dataset:
-#                 with Profiler: # or however the Stat collection works:
-#                     result = instantiated_op(record)
-
+# for record in dataset:
+#     with Profiler: # or however the Stat collection works:
+#         result = instantiated_op(record)
