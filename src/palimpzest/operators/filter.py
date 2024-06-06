@@ -443,8 +443,7 @@ class LLMFilter(FilterOp):
         try:
             response, _, gen_stats = generator.generate(
                 context=text_content,
-                question=td.filter.filterCondition,
-                plan_idx=td.plan_idx,
+                question=self.filter.filterCondition,
             )
 
             # if profiling, set record's stats for the given op_id

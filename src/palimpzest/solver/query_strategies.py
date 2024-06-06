@@ -2,9 +2,23 @@ from palimpzest.datamanager import DataDirectory
 from palimpzest.constants import PromptStrategy, CodeGenStrategy, Model
 from palimpzest.elements import DataRecord
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-from palimpzest.profiler import Stats, BondedQueryStats, ConventionalQueryStats, FieldQueryStats, CodeGenEnsembleStats, FullCodeGenStats, GenerationStats
+from palimpzest.profiler import (
+    Stats,
+    BondedQueryStats,
+    ConventionalQueryStats,
+    FieldQueryStats,
+    CodeGenEnsembleStats,
+    FullCodeGenStats,
+    GenerationStats,
+)
 from palimpzest.solver.task_descriptors import TaskDescriptor
-from palimpzest.utils import API, codeEnsembleGeneration, codeEnsembleExecution, reGenerationCondition, CodeGenSingleStats
+from palimpzest.utils import (
+    API,
+    codeEnsembleGeneration,
+    codeEnsembleExecution,
+    reGenerationCondition,
+    CodeGenSingleStats,
+)
 
 from typing import Any, Dict, List, Tuple
 
@@ -13,7 +27,12 @@ import json
 import re
 
 
-def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_names: List[str], is_conventional: bool=False) -> str:
+def _construct_query_prompt(
+    td: TaskDescriptor,
+    doc_type: str,
+    generate_field_names: List[str],
+    is_conventional: bool = False,
+) -> str:
     """
     This function constructs the prompt for a bonded query.
     """
@@ -30,11 +49,21 @@ def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_na
         multilineOutputFieldDescription += f"OUTPUT FIELD {field_name}: {f.desc}\n"
 
     # add input/output schema descriptions (if they have a docstring)
-    optionalInputDesc = "" if td.inputSchema.__doc__ is None else f"Here is a description of the input object: {td.inputSchema.__doc__}."
-    optionalOutputDesc = "" if td.outputSchema.__doc__ is None else f"Here is a description of the output object: {td.outputSchema.__doc__}."
+    optionalInputDesc = (
+        ""
+        if td.inputSchema.__doc__ is None
+        else f"Here is a description of the input object: {td.inputSchema.__doc__}."
+    )
+    optionalOutputDesc = (
+        ""
+        if td.outputSchema.__doc__ is None
+        else f"Here is a description of the output object: {td.outputSchema.__doc__}."
+    )
 
     # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
-    targetOutputDescriptor = f"an output JSON object that describes an object of type {doc_type}."
+    targetOutputDescriptor = (
+        f"an output JSON object that describes an object of type {doc_type}."
+    )
     outputSingleOrPlural = "the output object"
     appendixInstruction = "Be sure to emit a JSON object only"
     if td.cardinality == "oneToMany":
@@ -44,12 +73,13 @@ def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_na
 
     # if this is a conventional query, focus only on generating output field
     if is_conventional:
-        targetOutputDescriptor = f"an output JSON object with a single key \"{generate_field_names[0]}\" whose value is specified in the input object."
+        targetOutputDescriptor = f'an output JSON object with a single key "{generate_field_names[0]}" whose value is specified in the input object.'
 
     # construct promptQuestion
     promptQuestion = None
     if td.prompt_strategy != PromptStrategy.IMAGE_TO_TEXT:
-        promptQuestion = f"""I would like you to create {targetOutputDescriptor}. 
+        promptQuestion = (
+            f"""I would like you to create {targetOutputDescriptor}. 
         You will use the information in an input JSON object that I will provide. The input object has type {td.inputSchema.className()}.
         All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
         {optionalInputDesc}
@@ -59,10 +89,15 @@ def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_na
         Here is every output field name and a description:
         {multilineOutputFieldDescription}
         {appendixInstruction}
-        """ + "" if td.conversionDesc is None else f" Keep in mind that this process is described by this text: {td.conversionDesc}."                
+        """
+            + ""
+            if td.conversionDesc is None
+            else f" Keep in mind that this process is described by this text: {td.conversionDesc}."
+        )
 
     else:
-        promptQuestion = f"""You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor} {doc_type}.
+        promptQuestion = (
+            f"""You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor} {doc_type}.
         You will use the information in the image that I will provide. The input image(s) has type {td.inputSchema.className()}.
         All of the fields in {outputSingleOrPlural} can be derived using information from the input image(s).
         {optionalInputDesc}
@@ -70,7 +105,11 @@ def _construct_query_prompt(td: TaskDescriptor, doc_type: str, generate_field_na
         Here is every output field name and a description:
         {multilineOutputFieldDescription}
         {appendixInstruction}
-        """ + "" if td.conversionDesc is None else f" Keep in mind that this process is described by this text: {td.conversionDesc}."
+        """
+            + ""
+            if td.conversionDesc is None
+            else f" Keep in mind that this process is described by this text: {td.conversionDesc}."
+        )
 
     # TODO: add this for boolean questions?
     # if td.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
@@ -84,34 +123,38 @@ def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
     This function parses an LLM response which is supposed to output a JSON object
     and optimistically searches for the substring containing the JSON object.
     """
-    if not answer.strip().startswith('{'):
+    if not answer.strip().startswith("{"):
         # Find the start index of the actual JSON string
         # assuming the prefix is followed by the JSON object/array
-        start_index = answer.find('{') if '{' in answer else answer.find('[')
+        start_index = answer.find("{") if "{" in answer else answer.find("[")
         if start_index != -1:
             # Remove the prefix and any leading characters before the JSON starts
             answer = answer[start_index:]
 
-    if not answer.strip().endswith('}'):
+    if not answer.strip().endswith("}"):
         # Find the end index of the actual JSON string
         # assuming the suffix is preceded by the JSON object/array
-        end_index = answer.rfind('}') if '}' in answer else answer.rfind(']')
+        end_index = answer.rfind("}") if "}" in answer else answer.rfind("]")
         if end_index != -1:
             # Remove the suffix and any trailing characters after the JSON ends
-            answer = answer[:end_index + 1]
+            answer = answer[: end_index + 1]
 
     # Handle weird escaped values. I am not sure why the model
     # is returning these, but the JSON parser can't take them
     answer = answer.replace("\_", "_")
 
-    # Handle comments in the JSON response. Use regex from // until end of line 
-    answer = re.sub(r'\/\/.*$', '', answer, flags=re.MULTILINE)
+    # Handle comments in the JSON response. Use regex from // until end of line
+    answer = re.sub(r"\/\/.*$", "", answer, flags=re.MULTILINE)
     return json.loads(answer)
 
 
-def _create_data_record_from_json(jsonObj: Any, td: TaskDescriptor, candidate: DataRecord, cardinality_idx: int=None) -> DataRecord:
+def _create_data_record_from_json(
+    jsonObj: Any, td: TaskDescriptor, candidate: DataRecord, cardinality_idx: int = None
+) -> DataRecord:
     # initialize data record
-    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid, cardinality_idx=cardinality_idx)
+    dr = DataRecord(
+        td.outputSchema, parent_uuid=candidate._uuid, cardinality_idx=cardinality_idx
+    )
 
     # get input field names and output field names
     input_fields = td.inputSchema.fieldNames()
@@ -124,13 +167,17 @@ def _create_data_record_from_json(jsonObj: Any, td: TaskDescriptor, candidate: D
     # parse newly generated fields from the generated jsonObj
     for field_name in output_fields:
         if field_name not in input_fields:
-            # parse the json object and set the DataRecord's fields with their generated values 
-            setattr(dr, field_name, jsonObj.get(field_name, None)) # the use of get prevents a KeyError if an individual field is missing. TODO: is this behavior desired?
+            # parse the json object and set the DataRecord's fields with their generated values
+            setattr(
+                dr, field_name, jsonObj.get(field_name, None)
+            )  # the use of get prevents a KeyError if an individual field is missing. TODO: is this behavior desired?
 
     return dr
 
 
-def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[List[DataRecord], Stats, str]:
+def runBondedQuery(
+    candidate: DataRecord, td: TaskDescriptor, verbose: bool = False
+) -> Tuple[List[DataRecord], Stats, str]:
     """
     Run a bonded query, in which all new fields in the outputSchema are generated simultaneously
     in a single LLM call. This is in contrast to a conventional query, in which each output field
@@ -164,8 +211,15 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
     try:
         if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # invoke LLM to generate output JSON
-            generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-            answer, new_heatmap_json_obj, gen_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx, heatmap_json_obj=td.heatmap_json_obj)
+            generator = DSPyGenerator(
+                td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose
+            )
+            answer, new_heatmap_json_obj, gen_stats = generator.generate(
+                text_content,
+                promptQuestion,
+                budget=td.token_budget,
+                heatmap_json_obj=td.heatmap_json_obj,
+            )
 
             # construct BondedQueryStats object
             bonded_query_stats = BondedQueryStats(
@@ -179,9 +233,12 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
             # b64 decode of candidate.contents or candidate.image_contents
             base64_images = []
             if hasattr(candidate, "contents"):
-                base64_images = [base64.b64encode(candidate.contents).decode('utf-8')]
+                base64_images = [base64.b64encode(candidate.contents).decode("utf-8")]
             else:
-                base64_images = [base64.b64encode(image).decode('utf-8') for image in candidate.image_contents]
+                base64_images = [
+                    base64.b64encode(image).decode("utf-8")
+                    for image in candidate.image_contents
+                ]
 
             # invoke LLM to generate output JSON
             generator = ImageTextGenerator(td.model.value)
@@ -208,9 +265,13 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
         # parse JSON output and construct data records
         if td.cardinality == "oneToMany":
             if len(jsonObj["items"]) == 0:
-                raise Exception("No output objects were generated with bonded query - trying with conventional query...")
+                raise Exception(
+                    "No output objects were generated with bonded query - trying with conventional query..."
+                )
             for idx, elt in enumerate(jsonObj["items"]):
-                dr = _create_data_record_from_json(elt, td, candidate, cardinality_idx=idx)
+                dr = _create_data_record_from_json(
+                    elt, td, candidate, cardinality_idx=idx
+                )
                 drs.append(dr)
         else:
             dr = _create_data_record_from_json(jsonObj, td, candidate)
@@ -228,7 +289,9 @@ def runBondedQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fals
     return drs, new_heatmap_json_obj, bonded_query_stats, None
 
 
-def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[DataRecord, Stats]:
+def runConventionalQuery(
+    candidate: DataRecord, td: TaskDescriptor, verbose: bool = False
+) -> Tuple[DataRecord, Stats]:
     """
     Run a conventional query, in which each output field is generated using its own LLM call.
 
@@ -243,7 +306,9 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
     for field_name in td.outputSchema.fieldNames():
         if field_name in td.inputSchema.fieldNames():
             setattr(dr, field_name, getattr(candidate, field_name))
-        elif hasattr(candidate, field_name) and (getattr(candidate, field_name) is not None):
+        elif hasattr(candidate, field_name) and (
+            getattr(candidate, field_name) is not None
+        ):
             setattr(dr, field_name, getattr(candidate, field_name))
         else:
             generate_field_names.append(field_name)
@@ -265,45 +330,62 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
             # TODO Hacky to nest return and not disrupt the rest of method!!!
             # NOTE: this is a bonded query, but we are treating it as a conventional query
             query_stats = {}
-            drs = [] 
+            drs = []
             promptQuestion = _construct_query_prompt(td, doc_type, generate_field_names)
 
             # iterate over the length of the split attribute, and generate a new JSON for each split
             for idx in range(n_splits):
-                if verbose: 
+                if verbose:
                     print(f"Processing {split_attribute} with index {idx}")
-                new_json = {k:v for k,v in dct.items() if k != split_attribute}
+                new_json = {k: v for k, v in dct.items() if k != split_attribute}
                 new_json[split_attribute] = dct[split_attribute][idx]
 
                 text_content = json.dumps(new_json)
-                generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
+                generator = DSPyGenerator(
+                    td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose
+                )
                 answer, record_stats = None, None
                 try:
-                    answer, _, record_stats = generator.generate(text_content, promptQuestion, plan_idx=td.plan_idx)
+                    answer, _, record_stats = generator.generate(
+                        text_content,
+                        promptQuestion,
+                    )
                     jsonObj = _get_JSON_from_answer(answer)["items"][0]
-                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = record_stats
+                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = (
+                        record_stats
+                    )
                 except IndexError as e:
-                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = record_stats
+                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = (
+                        record_stats
+                    )
                     print("Could not find any items in the JSON response")
                     continue
                 except json.JSONDecodeError as e:
-                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = record_stats
+                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = (
+                        record_stats
+                    )
                     print(f"Could not decode JSON response: {e}")
                     print(answer)
                     continue
                 except Exception as e:
-                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = record_stats
+                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = (
+                        record_stats
+                    )
                     print(f"Could not decode JSON response: {e}")
                     print(answer)
                     continue
 
-                dr = _create_data_record_from_json(jsonObj, td, candidate, cardinality_idx=idx)
+                dr = _create_data_record_from_json(
+                    jsonObj, td, candidate, cardinality_idx=idx
+                )
                 drs.append(dr)
 
             # TODO how to stat this? I feel that we need a new Stats class for this type of query
             # construct ConventionalQueryStats object
-            field_query_stats_lst = [FieldQueryStats(gen_stats=gen_stats, field_name=field_name) for
-                                     field_name, gen_stats in query_stats.items()]
+            field_query_stats_lst = [
+                FieldQueryStats(gen_stats=gen_stats, field_name=field_name)
+                for field_name, gen_stats in query_stats.items()
+            ]
             conventional_query_stats = ConventionalQueryStats(
                 field_query_stats_lst=field_query_stats_lst,
                 input_fields=td.inputSchema.fieldNames(),
@@ -312,13 +394,15 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
 
             # TODO: debug root cause
             for dr in drs:
-                if not hasattr(dr, 'filename'):
-                    setattr(dr, 'filename', candidate.filename)
+                if not hasattr(dr, "filename"):
+                    setattr(dr, "filename", candidate.filename)
 
             return drs, conventional_query_stats
 
         else:
-            raise Exception("Conventional queries cannot execute tasks with cardinality == 'oneToMany'")
+            raise Exception(
+                "Conventional queries cannot execute tasks with cardinality == 'oneToMany'"
+            )
 
     # iterate over fields and generate their values using an LLM
     query_stats = {}
@@ -332,17 +416,28 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
                 # print(f"FALL BACK FIELD: {field_name}")
                 # print("---------------")
                 # invoke LLM to generate output JSON
-                generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-                answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx)
+                generator = DSPyGenerator(
+                    td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose
+                )
+                answer, field_stats = generator.generate(
+                    text_content,
+                    promptQuestion,
+                    budget=td.token_budget,
+                )
 
-            elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:                               
+            elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
                 # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
                 # b64 decode of candidate.contents or candidate.image_contents
                 base64_images = []
                 if hasattr(candidate, "contents"):
-                    base64_images = [base64.b64encode(candidate.contents).decode('utf-8')]
+                    base64_images = [
+                        base64.b64encode(candidate.contents).decode("utf-8")
+                    ]
                 else:
-                    base64_images = [base64.b64encode(image).decode('utf-8') for image in candidate.image_contents]
+                    base64_images = [
+                        base64.b64encode(image).decode("utf-8")
+                        for image in candidate.image_contents
+                    ]
 
                 # invoke LLM to generate output JSON
                 generator = ImageTextGenerator(td.model.value)
@@ -369,7 +464,10 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
             query_stats[f"{field_name}"] = field_stats
 
     # construct ConventionalQueryStats object
-    field_query_stats_lst = [FieldQueryStats(gen_stats=gen_stats, field_name=field_name) for field_name, gen_stats in query_stats.items()]
+    field_query_stats_lst = [
+        FieldQueryStats(gen_stats=gen_stats, field_name=field_name)
+        for field_name, gen_stats in query_stats.items()
+    ]
     conventional_query_stats = ConventionalQueryStats(
         field_query_stats_lst=field_query_stats_lst,
         input_fields=td.inputSchema.fieldNames(),
@@ -383,7 +481,9 @@ def runConventionalQuery(candidate: DataRecord, td: TaskDescriptor, verbose: boo
     return dr, conventional_query_stats
 
 
-def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=False) -> Tuple[DataRecord, Stats]:
+def runCodeGenQuery(
+    candidate: DataRecord, td: TaskDescriptor, verbose: bool = False
+) -> Tuple[DataRecord, Stats]:
     """
     I think this would roughly map to the internals of _makeCodeGenTypeConversionFn() in your branch.
     Similar to the functions above, I moved most of the details of generating responses
@@ -399,7 +499,7 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
             setattr(dr, field_name, getattr(candidate, field_name))
         else:
             generate_field_names.append(field_name)
-    
+
     if td.cardinality == "oneToMany":
         # TODO here the problem is: which is the 1:N field that we are splitting the output into?
         # do we need to know this to construct the prompt question ?
@@ -415,22 +515,28 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
         full_code_gen_stats, conv_query_stats = FullCodeGenStats(), {}
         for idx in range(n_splits):
             # initialize output data record
-            dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid, cardinality_idx=idx)
+            dr = DataRecord(
+                td.outputSchema, parent_uuid=candidate._uuid, cardinality_idx=idx
+            )
 
             cache = DataDirectory().getCacheService()
             for field_name in generate_field_names:
                 code_ensemble_id = "_".join([td.op_id, field_name])
-                cached_code_ensemble_info = cache.getCachedData(f"codeEnsemble{td.plan_idx}", code_ensemble_id)
+                cached_code_ensemble_info = cache.getCachedData(
+                    f"codeEnsemble{td.plan_idx}", code_ensemble_id
+                )
                 if cached_code_ensemble_info is not None:
                     code_ensemble, _ = cached_code_ensemble_info
                     gen_stats = CodeGenEnsembleStats()
-                    examples = cache.getCachedData(f"codeSamples{td.plan_idx}", code_ensemble_id)
+                    examples = cache.getCachedData(
+                        f"codeSamples{td.plan_idx}", code_ensemble_id
+                    )
                 else:
                     code_ensemble, gen_stats, examples = dict(), None, list()
 
-                if verbose: 
+                if verbose:
                     print(f"Processing {split_attribute} with index {idx}")
-                new_json = {k:v for k,v in dct.items() if k != split_attribute}
+                new_json = {k: v for k, v in dct.items() if k != split_attribute}
                 new_json[split_attribute] = dct[split_attribute][idx]
 
                 # examples.append(new_json)
@@ -443,23 +549,37 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                 # print(type(candidate_dicts))
                 # print(candidate_dicts)
                 examples.extend(candidate_dicts)
-                cache.putCachedData(f"codeSamples{td.plan_idx}", code_ensemble_id, examples)
-                api = API.from_task_descriptor(td, field_name, input_fields=new_json.keys())
-                if len(code_ensemble)==0 or reGenerationCondition(api, examples=examples):
-                    code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples, code_num_examples=n_splits)
-                    cache.putCachedData(f"codeEnsemble{td.plan_idx}", code_ensemble_id, (code_ensemble, gen_stats))
+                cache.putCachedData(
+                    f"codeSamples{td.plan_idx}", code_ensemble_id, examples
+                )
+                api = API.from_task_descriptor(
+                    td, field_name, input_fields=new_json.keys()
+                )
+                if len(code_ensemble) == 0 or reGenerationCondition(
+                    api, examples=examples
+                ):
+                    code_ensemble, gen_stats = codeEnsembleGeneration(
+                        api, examples=examples, code_num_examples=n_splits
+                    )
+                    cache.putCachedData(
+                        f"codeEnsemble{td.plan_idx}",
+                        code_ensemble_id,
+                        (code_ensemble, gen_stats),
+                    )
 
                 for code_name, code in code_ensemble.items():
                     print(f"CODE NAME: {code_name}")
                     print("-----------------------")
                     print(code)
-                
+
                 answer, exec_stats = codeEnsembleExecution(api, code_ensemble, new_json)
                 full_code_gen_stats.code_gen_stats[f"{field_name}_{idx}"] = gen_stats
                 full_code_gen_stats.code_exec_stats[f"{field_name}_{idx}"] = exec_stats
-                
+
                 if answer is None:
-                    print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
+                    print(
+                        f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}"
+                    )
                     # construct prompt question
                     doc_schema = str(td.outputSchema)
                     doc_type = td.outputSchema.className()
@@ -470,8 +590,18 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                         # print("---------------")
                         # invoke LLM to generate output JSON
                         text_content = json.dumps(new_json)
-                        generator = DSPyGenerator(Model.GPT_3_5.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-                        answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx)
+                        generator = DSPyGenerator(
+                            Model.GPT_3_5.value,
+                            td.prompt_strategy,
+                            doc_schema,
+                            doc_type,
+                            verbose,
+                        )
+                        answer, field_stats = generator.generate(
+                            text_content,
+                            promptQuestion,
+                            budget=td.token_budget,
+                        )
 
                         # update conv_query_stats
                         conv_query_stats[f"{field_name}_{idx}_fallback"] = field_stats
@@ -484,18 +614,18 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                         conv_query_stats[f"{field_name}_{idx}_fallback"] = field_stats
                         answer = None
 
-                print(f'SETTING {field_name} to be {answer}')
+                print(f"SETTING {field_name} to be {answer}")
                 while type(answer) == type([]):
                     answer = answer[0]
                 setattr(dr, field_name, answer)
-                
+
             # # TODO: last minute hack for Biofabric; for some reason some records are not setting a filename
             # # I will need to debug this more thoroughly in the future, but for now this is an easy fix
             # if not hasattr(dr, 'filename'):
             #     setattr(dr, 'filename', candidate.filename)
 
             drs.append(dr)
-        
+
         # construct ConventionalQueryStats object
         field_query_stats_lst = [
             FieldQueryStats(gen_stats=gen_stats, field_name=field_name)
@@ -509,8 +639,8 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
 
         # TODO: debug root cause
         for dr in drs:
-            if not hasattr(dr, 'filename'):
-                setattr(dr, 'filename', candidate.filename)
+            if not hasattr(dr, "filename"):
+                setattr(dr, "filename", candidate.filename)
 
         return drs, full_code_gen_stats, conventional_query_stats
 
@@ -519,32 +649,48 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
         cache = DataDirectory().getCacheService()
         for field_name in generate_field_names:
             code_ensemble_id = "_".join([td.op_id, field_name])
-            cached_code_ensemble_info = cache.getCachedData(f"codeEnsemble{td.plan_idx}", code_ensemble_id)
+            cached_code_ensemble_info = cache.getCachedData(
+                f"codeEnsemble{td.plan_idx}", code_ensemble_id
+            )
             if cached_code_ensemble_info is not None:
                 code_ensemble, _ = cached_code_ensemble_info
                 gen_stats = CodeGenEnsembleStats()
-                examples = cache.getCachedData(f"codeSamples{td.plan_idx}", code_ensemble_id)
+                examples = cache.getCachedData(
+                    f"codeSamples{td.plan_idx}", code_ensemble_id
+                )
             else:
                 code_ensemble, gen_stats, examples = dict(), None, list()
 
             # remove bytes data from candidate
-            candidate_dict = candidate._asJSON(include_bytes=False, include_data_cols=False)
+            candidate_dict = candidate._asJSON(
+                include_bytes=False, include_data_cols=False
+            )
             candidate_dict = json.loads(candidate_dict)
             candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
 
             examples.append(candidate_dict)
             cache.putCachedData(f"codeSamples{td.plan_idx}", code_ensemble_id, examples)
-            api = API.from_task_descriptor(td, field_name, input_fields=candidate_dict.keys())
-            if len(code_ensemble)==0 or reGenerationCondition(api, examples=examples):
-                code_ensemble, gen_stats = codeEnsembleGeneration(api, examples=examples)
-                cache.putCachedData(f"codeEnsemble{td.plan_idx}", code_ensemble_id, (code_ensemble, gen_stats))
+            api = API.from_task_descriptor(
+                td, field_name, input_fields=candidate_dict.keys()
+            )
+            if len(code_ensemble) == 0 or reGenerationCondition(api, examples=examples):
+                code_ensemble, gen_stats = codeEnsembleGeneration(
+                    api, examples=examples
+                )
+                cache.putCachedData(
+                    f"codeEnsemble{td.plan_idx}",
+                    code_ensemble_id,
+                    (code_ensemble, gen_stats),
+                )
 
             for code_name, code in code_ensemble.items():
                 print(f"CODE NAME: {code_name}")
                 print("-----------------------")
                 print(code)
-        
-            answer, exec_stats = codeEnsembleExecution(api, code_ensemble, candidate_dict)
+
+            answer, exec_stats = codeEnsembleExecution(
+                api, code_ensemble, candidate_dict
+            )
             full_code_gen_stats.code_gen_stats[field_name] = gen_stats
             full_code_gen_stats.code_exec_stats[field_name] = exec_stats
 
@@ -560,8 +706,18 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                     # print("---------------")
                     # invoke LLM to generate output JSON
                     text_content = json.loads(candidate_dict)
-                    generator = DSPyGenerator(Model.GPT_3_5.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-                    answer, field_stats = generator.generate(text_content, promptQuestion, budget=td.token_budget, plan_idx=td.plan_idx)
+                    generator = DSPyGenerator(
+                        Model.GPT_3_5.value,
+                        td.prompt_strategy,
+                        doc_schema,
+                        doc_type,
+                        verbose,
+                    )
+                    answer, field_stats = generator.generate(
+                        text_content,
+                        promptQuestion,
+                        budget=td.token_budget,
+                    )
 
                     # update stats
                     conv_query_stats[f"{field_name}_fallback"] = field_stats
@@ -574,14 +730,14 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
                     conv_query_stats[f"{field_name}_fallback"] = field_stats
                     answer = None
 
-            print(f'SETTING {field_name} to be {answer}')
+            print(f"SETTING {field_name} to be {answer}")
             setattr(dr, field_name, answer)
 
         # # TODO: last minute hack for Biofabric; for some reason some records are not setting a filename
         # # I will need to debug this more thoroughly in the future, but for now this is an easy fix
         # if not hasattr(dr, 'filename'):
         #     setattr(dr, 'filename', candidate.filename)
-        
+
         # construct ConventionalQueryStats object
         field_query_stats_lst = [
             FieldQueryStats(gen_stats=gen_stats, field_name=field_name)
@@ -594,7 +750,7 @@ def runCodeGenQuery(candidate: DataRecord, td: TaskDescriptor, verbose: bool=Fal
         )
 
         # TODO: debug root cause
-        if not hasattr(dr, 'filename'):
-            setattr(dr, 'filename', candidate.filename)
+        if not hasattr(dr, "filename"):
+            setattr(dr, "filename", candidate.filename)
 
         return dr, full_code_gen_stats, conventional_query_stats

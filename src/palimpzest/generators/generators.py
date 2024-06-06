@@ -1,3 +1,8 @@
+"""GV: This class is about LLM wrappers. 
+My suggestion is to rename at least the base generator into LLMGenerator.
+See llm_wrapper.py for a proposed refactoring of generators.py using the class factory pattern.
+"""
+
 import hashlib
 import json
 
@@ -237,7 +242,7 @@ class DSPyGenerator(BaseGenerator):
                 f"DSPyGenerator does not support prompt_strategy: {prompt_strategy.value}"
             )
 
-    def _get_model(self, plan_idx) -> dsp.LM:
+    def _get_model(self) -> dsp.LM:
         model = None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             openai_key = get_api_key("OPENAI_API_KEY")
@@ -353,14 +358,13 @@ class DSPyGenerator(BaseGenerator):
         context: str,
         question: str,
         budget: float = 1.0,
-        plan_idx: int = 0,
         heatmap_json_obj: dict = None,
     ) -> GenerationOutput:
         # initialize variables around token reduction
         reduction, full_context = False, context
 
         # fetch model
-        dspy_lm = self._get_model(plan_idx)
+        dspy_lm = self._get_model()
 
         # configure DSPy to use this model; both DSPy prompt strategies currently use COT
         dspy.settings.configure(lm=dspy_lm)
