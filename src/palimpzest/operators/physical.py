@@ -3,19 +3,20 @@ from __future__ import annotations
 import math
 
 from palimpzest.constants import *
-from palimpzest.corelib import ImageFile, Schema
+from palimpzest.corelib import ImageFile, Number, Schema
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.solver.solver import Solver
 from palimpzest.solver.task_descriptors import TaskDescriptor
 from palimpzest.profiler import OperatorStats, Profiler, StatsProcessor
 
-from typing import Any, Callable, Dict, Tuple, Union, Optional
+from typing import Any, Callable, Dict, List, Tuple, Union, Optional
 
 import pandas as pd
 
 import concurrent
 import hashlib
+import json
 import sys
 
 # DEFINITIONS

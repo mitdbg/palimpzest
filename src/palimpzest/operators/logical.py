@@ -9,7 +9,6 @@ from palimpzest.elements import *
 
 from copy import deepcopy
 from itertools import permutations
-from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -17,7 +16,7 @@ import pandas as pd
 import os
 import random
 
-from typing import List, Tuple
+from typing import List
 
 # DEFINITIONS
 # PhysicalPlan = Tuple[float, float, float, PhysicalOp]
@@ -36,17 +35,22 @@ class LogicalOperator:
 
     def __init__(
         self,
-        outputSchema: Schema,
         inputSchema: Schema,
+        outputSchema: Schema,
     ):
-        self.outputSchema = outputSchema
         self.inputSchema = inputSchema
+        self.outputSchema = outputSchema
 
         # def dumpLogicalTree(self) -> Tuple[LogicalOperator, LogicalOperator]:
         # """Return the logical subtree rooted at this operator"""
         # return (self, self.inputOp.dumpLogicalTree())
         # return (self, None)
         # raise NotImplementedError("Abstract method")
+    def __str__(self):
+        raise NotImplementedError("Abstract method")
+
+    def copy(self):
+        raise NotImplementedError("Abstract method")
 
     def _getModels(self, include_vision: bool = False):
         models = []
@@ -206,6 +210,17 @@ class ConvertScan(LogicalOperator):
         self.desc = desc
         self.targetCacheId = targetCacheId
 
+        # TODO: we will run into trouble here in a scenario like the following:
+        # - Schema A inherits from TextFile
+        # - Schema B inherits from pz.Schema
+        # - Schema C inherits from TextFile
+        # - convert A -> B happens first
+        # - convert B -> C happens second <-- issue is here
+        # 
+        # the diff. in fieldNames between C and B will include things like "contents"
+        # which come from pz.TextFile, and it will cause the second convert to try to
+        # (re)compute the "contents" field.
+        # 
         # compute generated fields as set of fields in outputSchema that are not in inputSchema
         self.generated_fields = [
             field
@@ -215,6 +230,17 @@ class ConvertScan(LogicalOperator):
 
     def __str__(self):
         return f"ConvertScan({self.inputSchema} -> {str(self.outputSchema)},{str(self.desc)})"
+
+    def copy(self):
+        return ConvertScan(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            cardinality=self.cardinality,
+            image_conversion=self.image_conversion,
+            depends_on=self.depends_on,
+            desc=self.desc,
+            targetCacheId=self.targetCacheId,
+        )
 
     def dumpLogicalTree(self):
         """Return the logical tree of this LogicalOperator."""
@@ -322,14 +348,22 @@ class CacheScan(LogicalOperator):
 
     def __init__(self, cachedDataIdentifier: str, *args, **kwargs):
         kwargs["inputSchema"] = None
+
         super().__init__(None, *args, **kwargs)
         self.cachedDataIdentifier = cachedDataIdentifier
 
-    def dumpLogicalTree(self):
-        return (self, None)
-
     def __str__(self):
         return f"CacheScan({str(self.outputSchema)},{str(self.cachedDataIdentifier)})"
+
+    def copy(self):
+        return CacheScan(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            cachedDataIdentifier=self.cachedDataIdentifier,
+        )
+
+    def dumpLogicalTree(self):
+        return (self, None)
 
 
 class BaseScan(LogicalOperator):
@@ -344,6 +378,13 @@ class BaseScan(LogicalOperator):
     def __str__(self):
         return f"BaseScan({str(self.outputSchema)},{self.datasetIdentifier})"
 
+    def copy(self):
+        return BaseScan(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            datasetIdentifier=self.datasetIdentifier,
+        )
+
     def dumpLogicalTree(self):
         return (self, None)
 
@@ -351,11 +392,19 @@ class BaseScan(LogicalOperator):
 class LimitScan(LogicalOperator):
     def __init__(self, limit: int, targetCacheId: str = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.targetCacheId = targetCacheId
         self.limit = limit
+        self.targetCacheId = targetCacheId
 
     def __str__(self):
         return f"LimitScan({str(self.inputSchema)}, {str(self.outputSchema)})"
+
+    def copy(self):
+        return LimitScan(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            limit=self.limit,
+            targetCacheId=self.targetCacheId,
+        )
 
 
 class FilteredScan(LogicalOperator):
@@ -377,11 +426,20 @@ class FilteredScan(LogicalOperator):
     def __str__(self):
         return f"FilteredScan({str(self.outputSchema)}, {str(self.filter)})"
 
+    def copy(self):
+        return FilteredScan(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            filter=self.filter,
+            depends_on=self.depends_on,
+            targetCacheId=self.targetCacheId,
+        )
+
 
 class GroupByAggregate(LogicalOperator):
     def __init__(
         self,
-        gbySig: elements.GroupBySig,
+        gbySig: GroupBySig,
         targetCacheId: str = None,
         *args,
         **kwargs,
@@ -394,8 +452,15 @@ class GroupByAggregate(LogicalOperator):
         self.targetCacheId = targetCacheId
 
     def __str__(self):
-        descStr = "Grouping Fields:"
-        return f"GroupBy({elements.GroupBySig.serialize(self.gbySig)})"
+        return f"GroupBy({GroupBySig.serialize(self.gbySig)})"
+
+    def copy(self):
+        return GroupByAggregate(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            gbySig=self.gbySig,
+            targetCacheId=self.targetCacheId,
+        )
 
 
 class ApplyAggregateFunction(LogicalOperator):
@@ -415,6 +480,14 @@ class ApplyAggregateFunction(LogicalOperator):
     def __str__(self):
         return f"ApplyAggregateFunction(function: {str(self.aggregationFunction)})"
 
+    def copy(self):
+        return ApplyAggregateFunction(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            aggregationFunction=self.aggregationFunction,
+            targetCacheId=self.targetCacheId,
+        )
+
 
 class ApplyUserFunction(LogicalOperator):
     """ApplyUserFunction is a logical operator that applies a user-provided function to the input set and yields a result."""
@@ -433,3 +506,11 @@ class ApplyUserFunction(LogicalOperator):
 
     def __str__(self):
         return f"ApplyUserFunction(function: {str(self.fnid)})"
+
+    def copy(self):
+        return ApplyUserFunction(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            fnid=self.fnid,
+            targetCacheId=self.targetCacheId,
+        )

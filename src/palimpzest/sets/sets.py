@@ -347,6 +347,8 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
+    # TODO: here we should update the schema to be the incrementally-grown schema
+    #       NOTE we would need to change this if/when we do logical re-ordering
     def convert(
         self,
         newSchema: Schema,
