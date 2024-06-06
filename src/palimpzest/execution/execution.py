@@ -88,12 +88,10 @@ class Execute:
         physicalOps = physicalTree.dumpPhysicalTree()
         flat = flatten_nested_tuples(physicalOps)
         ops = [op for op in flat if not op.is_hardcoded()]
-        label = "-".join(
-            [
-                f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
-                for op in ops
-            ]
-        )
+        label = "-".join([
+            f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
+            for op in ops
+        ])
         return f"PZ-{label_idx}-{label}"
 
     @staticmethod
@@ -305,7 +303,7 @@ class NewExecute:
             print("---")
 
         # run the plan
-        records = plan.execute()
+        records, _ = plan.execute()
 
         return records
 
@@ -338,7 +336,7 @@ class NewExecute:
                 if champion_model in plan.getModels():
                     return_records = records
 
-        return all_sample_execution_data, return_records
+        return all_sample_execution_data, return_records # TODO: make sure you capture cost of sentinel plans.
 
     def __new__(
         cls,
@@ -394,15 +392,21 @@ class NewExecute:
         )
 
         # create all possible physical plans
-        allPhysicalPlans = []
-        for logicalPlan in logicalPlanner.generate_plans(dataset):
-            for physicalPlan in physicalPlanner.generate_plans(logicalPlan):
-                allPhysicalPlans.append(physicalPlan)
+        all_physical_plans = []
+        for logical_plan in logical_planner.generate_plans(dataset):
+            for physical_plan in physical_planner.generate_plans(logical_plan):
+                all_physical_plans.append(physical_plan)
 
-        # compute
+        # TODO
+        # compute per-operator estimates of runtime, cost, and quality
+        operator_estimates = physical_planner.compute_operator_estimates()
+
+        # TODO
+        # estimate the cost of each plan
+        plans = physical_planner.estimate_plan_costs(all_physical_plans, operator_estimates)
 
         # choose best plan and execute it
-        (_, _, _, plan, _) = policy.choose(physicalPlanCandidates)
+        (_, _, _, plan, _) = policy.choose(plans)
 
         # display the plan output
         if verbose:
@@ -414,17 +418,15 @@ class NewExecute:
             print("---")
 
         # run the plan
-        new_records = []
-        source, phys_operators = (
-            plan[0],
-            plan[1:],
-        )  # TODO: maybe add __iter__ to plan to iterate over source records
-        for record in source:
-            for phy_op in phys_operators:
-                instantiated_op = phy_op()
-                with Profiler:  # or however the Stat collection works:
-                    record = instantiated_op(record)
-            new_records.append(record)
+        new_records, stats = plan.execute()
+        # new_records = []
+        # source, phys_operators = plan[0], plan[1:] # TODO: maybe add __iter__ to plan to iterate over source records
+        # for record in source:
+        #     for phy_op in phys_operators:
+        #         instantiated_op = phy_op()
+        #         with Profiler: # or however the Stat collection works:
+        #             record = instantiated_op(record)
+        #     new_records.append(record)
 
         all_records = sentinel_records + new_records
 

@@ -314,6 +314,179 @@ class PhysicalPlanner(Planner):
 
         return models
 
+    def compute_operator_estimates(self):
+        """
+        Compute per-operator estimates of runtime, cost, and quality.
+        """
+        # compute estimates for every operator
+        op_filters_to_estimates = {}
+        if self.sample_execution_data is not None and self.sample_execution_data != []:
+            # construct full dataset of samples
+            df = pd.DataFrame(self.sample_execution_data)
+
+            # get unique set of operator filters:
+            # - for base/cache scans this is very simple
+            # - for filters, this is based on the unique filter string or function (per-model)
+            # - for induce, this is based on the generated field(s) (per-model)
+            op_filters_to_estimates = {}
+            logical_op = logicalPlans[0]
+            while logical_op is not None:
+                op_filter, estimates = None, None
+                if isinstance(logical_op, BaseScan):
+                    op_filter = "op_name == 'base_scan'"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        estimates = {
+                            "time_per_record": StatsProcessor._est_time_per_record(
+                                op_df
+                            )
+                        }
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif isinstance(logical_op, CacheScan):
+                    op_filter = "op_name == 'cache_scan'"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        estimates = {
+                            "time_per_record": StatsProcessor._est_time_per_record(
+                                op_df
+                            )
+                        }
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif isinstance(logical_op, ConvertScan):
+                    generated_fields_str = "-".join(sorted(logical_op.generated_fields))
+                    op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'induce' | op_name == 'p_induce')"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        # compute estimates per-model, and add None which forces computation of avg. across all models
+                        models = self._getModels(include_vision=True) + [None]
+                        estimates = {model: None for model in models}
+                        for model in models:
+                            model_name = model.value if model is not None else None
+                            est_tokens = StatsProcessor._est_num_input_output_tokens(
+                                op_df, model_name=model_name
+                            )
+                            model_estimates = {
+                                "time_per_record": StatsProcessor._est_time_per_record(
+                                    op_df, model_name=model_name
+                                ),
+                                "cost_per_record": StatsProcessor._est_usd_per_record(
+                                    op_df, model_name=model_name
+                                ),
+                                "est_num_input_tokens": est_tokens[0],
+                                "est_num_output_tokens": est_tokens[1],
+                                "selectivity": StatsProcessor._est_selectivity(
+                                    df, op_df, model_name=model_name
+                                ),
+                                "quality": StatsProcessor._est_quality(
+                                    op_df, model_name=model_name
+                                ),
+                            }
+                            estimates[model_name] = model_estimates
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif isinstance(logical_op, FilteredScan):
+                    filter_str = (
+                        logical_op.filter.filterCondition
+                        if logical_op.filter.filterCondition is not None
+                        else str(logical_op.filter.filterFn)
+                    )
+                    op_filter = f"(filter == '{str(filter_str)}') & (op_name == 'filter' | op_name == 'p_filter')"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        models = (
+                            self._getModels()
+                            if logical_op.filter.filterCondition is not None
+                            else [None]
+                        )
+                        estimates = {model: None for model in models}
+                        for model in models:
+                            model_name = model.value if model is not None else None
+                            est_tokens = StatsProcessor._est_num_input_output_tokens(
+                                op_df, model_name=model_name
+                            )
+                            model_estimates = {
+                                "time_per_record": StatsProcessor._est_time_per_record(
+                                    op_df, model_name=model_name
+                                ),
+                                "cost_per_record": StatsProcessor._est_usd_per_record(
+                                    op_df, model_name=model_name
+                                ),
+                                "est_num_input_tokens": est_tokens[0],
+                                "est_num_output_tokens": est_tokens[1],
+                                "selectivity": StatsProcessor._est_selectivity(
+                                    df, op_df, model_name=model_name
+                                ),
+                                "quality": StatsProcessor._est_quality(
+                                    op_df, model_name=model_name
+                                ),
+                            }
+                            estimates[model_name] = model_estimates
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif isinstance(logical_op, LimitScan):
+                    op_filter = "(op_name == 'limit')"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        estimates = {
+                            "time_per_record": StatsProcessor._est_time_per_record(
+                                op_df
+                            )
+                        }
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif (
+                    isinstance(logical_op, ApplyAggregateFunction)
+                    and logical_op.aggregationFunction.funcDesc == "COUNT"
+                ):
+                    op_filter = "(op_name == 'count')"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        estimates = {
+                            "time_per_record": StatsProcessor._est_time_per_record(
+                                op_df
+                            )
+                        }
+                    op_filters_to_estimates[op_filter] = estimates
+
+                elif (
+                    isinstance(logical_op, ApplyAggregateFunction)
+                    and logical_op.aggregationFunction.funcDesc == "AVERAGE"
+                ):
+                    op_filter = "(op_name == 'average')"
+                    op_df = df.query(op_filter)
+                    if not op_df.empty:
+                        estimates = {
+                            "time_per_record": StatsProcessor._est_time_per_record(
+                                op_df
+                            )
+                        }
+                    op_filters_to_estimates[op_filter] = estimates
+
+                logical_op = logical_op.inputOp
+
+        return op_filters_to_estimates
+
+    def estimate_plan_costs(self, physical_plans: List[PhysicalPlan], operator_estimates: Any):
+        """Estimate the cost (in terms of USD, latency, throughput, etc.) for each plan."""
+        plans = []
+        sample_execution_data = (
+            None if operator_estimates == {} else operator_estimates
+        )
+        for physical_plan in physical_plans:
+            planCost, fullPlanCostEst = physical_plan.estimateCost(
+                sample_execution_data=sample_execution_data
+            )
+
+            totalTime = planCost["totalTime"]
+            totalCost = planCost["totalUSD"]  # for now, cost == USD
+            quality = planCost["quality"]
+
+            plans.append((totalTime, totalCost, quality, physical_plan, fullPlanCostEst))
+        
+        return plans
+
     def _createBaselinePlan(self, model: pz.Model):
         """A simple wrapper around _createSentinelPlan as right now these are one and the same."""
         return self._createSentinelPlan(model)
@@ -853,9 +1026,7 @@ class PhysicalPlanner(Planner):
             assert (
                 len(models) > 0
             ), "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
-            sentinel_plans = [
-                self._createSentinelPlan(logical_plan, model) for model in models
-            ]
+            sentinel_plans = [self._createSentinelPlan(logical_plan, model) for model in models] # TODO
             return sentinel_plans
 
         # compute all physical plans for this logical plan
@@ -864,169 +1035,7 @@ class PhysicalPlanner(Planner):
         ]
         print(f"INITIAL PLANS: {len(physicalPlans)}")
 
-        # compute estimates for every operator
-        op_filters_to_estimates = {}
-        if self.sample_execution_data is not None and self.sample_execution_data != []:
-            # construct full dataset of samples
-            df = pd.DataFrame(self.sample_execution_data)
-
-            # get unique set of operator filters:
-            # - for base/cache scans this is very simple
-            # - for filters, this is based on the unique filter string or function (per-model)
-            # - for induce, this is based on the generated field(s) (per-model)
-            op_filters_to_estimates = {}
-            logical_op = logicalPlans[0]
-            while logical_op is not None:
-                op_filter, estimates = None, None
-                if isinstance(logical_op, BaseScan):
-                    op_filter = "op_name == 'base_scan'"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    op_filters_to_estimates[op_filter] = estimates
-
-                elif isinstance(logical_op, CacheScan):
-                    op_filter = "op_name == 'cache_scan'"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    op_filters_to_estimates[op_filter] = estimates
-
-                elif isinstance(logical_op, ConvertScan):
-                    generated_fields_str = "-".join(sorted(logical_op.generated_fields))
-                    op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'induce' | op_name == 'p_induce')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        # compute estimates per-model, and add None which forces computation of avg. across all models
-                        models = self._getModels(include_vision=True) + [None]
-                        estimates = {model: None for model in models}
-                        for model in models:
-                            model_name = model.value if model is not None else None
-                            est_tokens = StatsProcessor._est_num_input_output_tokens(
-                                op_df, model_name=model_name
-                            )
-                            model_estimates = {
-                                "time_per_record": StatsProcessor._est_time_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "cost_per_record": StatsProcessor._est_usd_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "est_num_input_tokens": est_tokens[0],
-                                "est_num_output_tokens": est_tokens[1],
-                                "selectivity": StatsProcessor._est_selectivity(
-                                    df, op_df, model_name=model_name
-                                ),
-                                "quality": StatsProcessor._est_quality(
-                                    op_df, model_name=model_name
-                                ),
-                            }
-                            estimates[model_name] = model_estimates
-                    op_filters_to_estimates[op_filter] = estimates
-
-                elif isinstance(logical_op, FilteredScan):
-                    filter_str = (
-                        logical_op.filter.filterCondition
-                        if logical_op.filter.filterCondition is not None
-                        else str(logical_op.filter.filterFn)
-                    )
-                    op_filter = f"(filter == '{str(filter_str)}') & (op_name == 'filter' | op_name == 'p_filter')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        models = (
-                            self._getModels()
-                            if logical_op.filter.filterCondition is not None
-                            else [None]
-                        )
-                        estimates = {model: None for model in models}
-                        for model in models:
-                            model_name = model.value if model is not None else None
-                            est_tokens = StatsProcessor._est_num_input_output_tokens(
-                                op_df, model_name=model_name
-                            )
-                            model_estimates = {
-                                "time_per_record": StatsProcessor._est_time_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "cost_per_record": StatsProcessor._est_usd_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "est_num_input_tokens": est_tokens[0],
-                                "est_num_output_tokens": est_tokens[1],
-                                "selectivity": StatsProcessor._est_selectivity(
-                                    df, op_df, model_name=model_name
-                                ),
-                                "quality": StatsProcessor._est_quality(
-                                    op_df, model_name=model_name
-                                ),
-                            }
-                            estimates[model_name] = model_estimates
-                    op_filters_to_estimates[op_filter] = estimates
-
-                elif isinstance(logical_op, LimitScan):
-                    op_filter = "(op_name == 'limit')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    op_filters_to_estimates[op_filter] = estimates
-
-                elif (
-                    isinstance(logical_op, ApplyAggregateFunction)
-                    and logical_op.aggregationFunction.funcDesc == "COUNT"
-                ):
-                    op_filter = "(op_name == 'count')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    op_filters_to_estimates[op_filter] = estimates
-
-                elif (
-                    isinstance(logical_op, ApplyAggregateFunction)
-                    and logical_op.aggregationFunction.funcDesc == "AVERAGE"
-                ):
-                    op_filter = "(op_name == 'average')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    op_filters_to_estimates[op_filter] = estimates
-
-                logical_op = logical_op.inputOp
-
-        # estimate the cost (in terms of USD, latency, throughput, etc.) for each plan
-        plans = []
-        cost_est_data = (
-            None if op_filters_to_estimates == {} else op_filters_to_estimates
-        )
-        for physicalPlan in physicalPlans:
-            planCost, fullPlanCostEst = physicalPlan.estimateCost(
-                cost_est_data=cost_est_data
-            )
-
-            totalTime = planCost["totalTime"]
-            totalCost = planCost["totalUSD"]  # for now, cost == USD
-            quality = planCost["quality"]
-
-            plans.append((totalTime, totalCost, quality, physicalPlan, fullPlanCostEst))
+        
 
         # drop duplicate plans in terms of time, cost, and quality, as these can cause
         # plans on the pareto frontier to be dropped if they are "dominated" by a duplicate

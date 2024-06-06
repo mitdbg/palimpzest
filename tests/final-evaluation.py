@@ -176,7 +176,7 @@ class RealEstateListingSource(pz.UserSource):
                     dr.text_content = bytes_data.decode("utf-8")
                     # dr.text_content = str(bytes_data)
                 elif file.endswith(".png"):
-                    dr.image_contents.append(bytes_data)Convert
+                    dr.image_contents.append(bytes_data)
             yield dr
 
             self.idx += 1

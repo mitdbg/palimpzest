@@ -79,12 +79,10 @@ class PhysicalPlan(Plan):
         physicalOps = physicalTree.dumpPhysicalTree()
         flat = flatten_nested_tuples(physicalOps)
         ops = [op for op in flat if not op.is_hardcoded()]
-        label = "-".join(
-            [
-                f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
-                for op in ops
-            ]
-        )
+        label = "-".join([
+            f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
+            for op in ops
+        ])
         return f"PZ-{label_idx}-{label}"
 
     def getModels() -> List[Optional[str]]:
@@ -95,6 +93,11 @@ class PhysicalPlan(Plan):
         """Compute and return all sample execution data collected by this plan so far."""
         # TODO
         return []
+
+    def execute(self):
+        """Execute the plan."""
+        # TODO
+        pass
 
     def __iter__(self):
         """Iterate over source records from datasource."""
