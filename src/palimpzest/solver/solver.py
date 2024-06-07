@@ -148,7 +148,7 @@ class Solver:
 
     def synthesize(self, td: TaskDescriptor, shouldProfile: bool = False):
         """
-        Return a function that implements the desired task as specified by some PhysicalOp.
+        Return a function that implements the desired task as specified by some PhysicalOperator.
         Right now, the two primary tasks that the Solver provides solutions for are:
 
         1. Convert operations

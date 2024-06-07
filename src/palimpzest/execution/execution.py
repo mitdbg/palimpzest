@@ -5,6 +5,7 @@ from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
 from palimpzest.profiler import StatsProcessor
 from palimpzest.sets import Set
+from palimpzest.utils import getChampionModel
 
 # for those of us who resist change and are still on Python 3.9
 try:
@@ -13,7 +14,7 @@ except:
     from more_itertools import pairwise
 
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
+from typing import List, Optional
 
 import os
 import shutil
@@ -272,23 +273,6 @@ class Execute:
 
 class NewExecute:
     @staticmethod
-    def get_champion_model():
-        # TODO:? turn into utility function in proper utils file
-        champion_model = None
-        if os.environ.get("OPENAI_API_KEY", None) is not None:
-            champion_model = Model.GPT_4.value
-        elif os.environ.get("TOGETHER_API_KEY", None) is not None:
-            champion_model = Model.MIXTRAL.value
-        elif os.environ.get("GOOGLE_API_KEY", None) is not None:
-            champion_model = Model.GEMINI_1.value
-        else:
-            raise Exception(
-                "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
-            )
-
-        return champion_model
-
-    @staticmethod
     def run_sentinel_plan(args):
         # parse args
         plan, plan_idx, verbose = args
@@ -296,14 +280,14 @@ class NewExecute:
         # display the plan output
         if verbose:
             print("----------------------")
-            ops = plan.dumpPhysicalTree()
+            ops = plan.dumpPhysicalTree() # TODO
             flatten_ops = flatten_nested_tuples(ops)
             print(f"Sentinel Plan {plan_idx}:")
             graphicEmit(flatten_ops)
             print("---")
 
         # run the plan
-        records, _ = plan.execute()
+        records, _ = plan.execute() # TODO
 
         return records
 
@@ -330,7 +314,7 @@ class NewExecute:
                 all_sample_execution_data.extend(sample_execution_data)
 
                 # set return_records to be records from champion model
-                champion_model = NewExecute.get_champion_model()
+                champion_model = getChampionModel()
 
                 # find champion model plan records and add those to all_records
                 if champion_model in plan.getModels():
@@ -338,12 +322,15 @@ class NewExecute:
 
         return all_sample_execution_data, return_records # TODO: make sure you capture cost of sentinel plans.
 
+
     def __new__(
         cls,
         dataset: Set,
         policy: Policy,
-        num_samples: int = 20,
-        nocache: bool = False,
+        num_samples: int=20,
+        nocache: bool=False,
+        include_baselines: bool=False,
+        min_plans: Optional[int] = None,
         verbose: bool = False,
     ):
         # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
@@ -364,7 +351,7 @@ class NewExecute:
         )  # TODO: I think we may need to get uid from source?
         run_sentinels = nocache or not DataDirectory().hasCachedAnswer(uid)
 
-        all_sample_execution_data, sentinel_records = None, None
+        all_sample_execution_data, sentinel_records, sentinel_logical_plans = None, None, []
         if run_sentinels:
             # initialize logical and physical planner
             logical_planner = LogicalPlanner(nocache)
@@ -373,9 +360,8 @@ class NewExecute:
             # get sentinel plans
             sentinel_plans = []
             for logical_plan in logical_planner.generate_plans(dataset, sentinels=True):
-                for sentinel_plan in physical_planner.generate_plans(
-                    logical_plan, sentinels=True
-                ):
+                sentinel_logical_plans.append(logical_plan)
+                for sentinel_plan in physical_planner.generate_plans(logical_plan, sentinels=True):
                     sentinel_plans.append(sentinel_plan)
 
             # run sentinel plans
@@ -385,8 +371,8 @@ class NewExecute:
 
         # (re-)initialize logical and physical planner
         scan_start_idx = num_samples if run_sentinels else 0
-        logicalPlanner = LogicalPlanner(nocache)
-        physicalPlanner = PhysicalPlanner(
+        logical_planner = LogicalPlanner(nocache)
+        physical_planner = PhysicalPlanner(
             scan_start_idx=scan_start_idx,
             sample_execution_data=all_sample_execution_data,
         )
@@ -397,28 +383,42 @@ class NewExecute:
             for physical_plan in physical_planner.generate_plans(logical_plan):
                 all_physical_plans.append(physical_plan)
 
-        # TODO
         # compute per-operator estimates of runtime, cost, and quality
-        operator_estimates = physical_planner.compute_operator_estimates()
+        operator_estimates = physical_planner.compute_operator_estimates(sentinel_logical_plans) # TODO
 
         # TODO
         # estimate the cost of each plan
         plans = physical_planner.estimate_plan_costs(all_physical_plans, operator_estimates)
 
+        # TODO
+        # deduplicate plans with identical cost estimates
+        plans = physical_planner.deduplicate_plans(plans)
+
+        # TODO
+        # select pareto frontier of plans
+        final_plans = physical_planner.select_pareto_optimal_plans(plans)
+
+        # for experimental evaluation, we may want to include baseline plans
+        if include_baselines:
+            final_plans = physical_planner.add_baseline_plans(final_plans)
+
+        if min_plans is not None and len(final_plans) < min_plans:
+            final_plans = physical_planner.add_plans_closest_to_frontier(final_plans, plans, min_plans)
+
         # choose best plan and execute it
-        (_, _, _, plan, _) = policy.choose(plans)
+        plan = policy.choose(plans) # TODO: have policies accept PhysicalPlan
 
         # display the plan output
         if verbose:
             print("----------------------")
-            ops = plan.dumpPhysicalTree()
+            ops = plan.dumpPhysicalTree() # TODO
             flatten_ops = flatten_nested_tuples(ops)
             print(f"Final Plan:")
             graphicEmit(flatten_ops)
             print("---")
 
         # run the plan
-        new_records, stats = plan.execute()
+        new_records, stats = plan.execute() # TODO
         # new_records = []
         # source, phys_operators = plan[0], plan[1:] # TODO: maybe add __iter__ to plan to iterate over source records
         # for record in source:
@@ -430,4 +430,4 @@ class NewExecute:
 
         all_records = sentinel_records + new_records
 
-        return all_records
+        return all_records, plan, stats

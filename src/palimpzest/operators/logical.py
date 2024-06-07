@@ -18,9 +18,6 @@ import random
 
 from typing import List
 
-# DEFINITIONS
-# PhysicalPlan = Tuple[float, float, float, PhysicalOp]
-
 
 class LogicalOperator:
     """
@@ -196,7 +193,7 @@ class ConvertScan(LogicalOperator):
 
     def __init__(
         self,
-        cardinality: str = None,
+        cardinality: str = "oneToOne",
         image_conversion: bool = False,
         depends_on: List[str] = None,
         desc: str = None,
@@ -250,7 +247,7 @@ class ConvertScan(LogicalOperator):
         # def _getPhysicalTree(
         self,
         strategy: str = (None,)
-        source: PhysicalOp = (None,)
+        source: PhysicalOperator = (None,)
         model: Model = (None,)
         query_strategy: QueryStrategy = (None,)
         token_budget: float = (None,)
@@ -264,7 +261,7 @@ class ConvertScan(LogicalOperator):
     # intermediateSchema = self.outputSchema
     # while (
     #     not intermediateSchema == Schema
-    #     and not PhysicalOp.solver.easyConversionAvailable(
+    #     and not PhysicalOperator.solver.easyConversionAvailable(
     #         intermediateSchema, self.inputSchema
     #     )
     # ):
@@ -486,32 +483,5 @@ class ApplyAggregateFunction(LogicalOperator):
             inputSchema=self.inputSchema,
             outputSchema=self.outputSchema,
             aggregationFunction=self.aggregationFunction,
-            targetCacheId=self.targetCacheId,
-        )
-
-
-class ApplyUserFunction(LogicalOperator):
-    """ApplyUserFunction is a logical operator that applies a user-provided function to the input set and yields a result."""
-
-    def __init__(
-        self,
-        fnid: str,
-        targetCacheId: str = None,
-        *args,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.fnid = fnid
-        self.fn = DataDirectory().getUserFunction(fnid)
-        self.targetCacheId = targetCacheId
-
-    def __str__(self):
-        return f"ApplyUserFunction(function: {str(self.fnid)})"
-
-    def copy(self):
-        return ApplyUserFunction(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
-            fnid=self.fnid,
             targetCacheId=self.targetCacheId,
         )

@@ -124,7 +124,7 @@ class ConvertXLSToTable(HardcodedConvert):
         xls_bytes = candidate.contents
         # dr.sheets = [xls.parse(name) for name in candidate.sheet_names]
         sheet_names = (
-            [candidate.sheet_names[0]] if cardinality is None else candidate.sheet_names
+            [candidate.sheet_names[0]] if cardinality == "oneToOne" else candidate.sheet_names
         )
 
         records = []
@@ -156,6 +156,10 @@ class ConvertXLSToTable(HardcodedConvert):
 class ConvertFileToPDF(HardcodedConvert):
     inputSchema = schemas.File
     outputSchema = schemas.PDFFile
+
+    def __init__(self, pdfprocessor: Optional[str] = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pdfprocessor = pdfprocessor
 
     def __call__(self, candidate: DataRecord):
         if self.pdfprocessor == "modal":

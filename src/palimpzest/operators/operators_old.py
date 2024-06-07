@@ -15,7 +15,7 @@ from palimpzest.operators import (
     MarshalAndScanDataOp,
     ParallelFilterCandidateOp,
     ParallelConvertFromCandidateOp,
-    PhysicalOp,
+    PhysicalOperator,
     ApplyGroupByOp,
 )
 from palimpzest.profiler import StatsProcessor
@@ -55,9 +55,9 @@ class LogicalOperator:
     def _getPhysicalTree(
         self,
         strategy: str = None,
-        source: PhysicalOp = None,
+        source: PhysicalOperator = None,
         shouldProfile: bool = False,
-    ) -> PhysicalOp:
+    ) -> PhysicalOperator:
         raise NotImplementedError("Abstract method")
 
     def _getModels(self, include_vision: bool = False):
@@ -210,7 +210,7 @@ class LogicalOperator:
         # base case: this is a root op
         if self.inputOp is None:
             return self._getPhysicalTree(
-                strategy=PhysicalOp.LOCAL_PLAN, shouldProfile=True
+                strategy=PhysicalOperator.LOCAL_PLAN, shouldProfile=True
             )
 
         # recursive case: get list of possible input physical plans
@@ -220,7 +220,7 @@ class LogicalOperator:
         physicalPlan = None
         if isinstance(self, ConvertScan):
             physicalPlan = self._getPhysicalTree(
-                strategy=PhysicalOp.LOCAL_PLAN,
+                strategy=PhysicalOperator.LOCAL_PLAN,
                 source=subTreePhysicalPlan,
                 model=model,
                 query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
@@ -230,7 +230,7 @@ class LogicalOperator:
 
         elif isinstance(self, FilteredScan):
             physicalPlan = self._getPhysicalTree(
-                strategy=PhysicalOp.LOCAL_PLAN,
+                strategy=PhysicalOperator.LOCAL_PLAN,
                 source=subTreePhysicalPlan,
                 model=model,
                 shouldProfile=True,
@@ -238,7 +238,7 @@ class LogicalOperator:
 
         else:
             physicalPlan = self._getPhysicalTree(
-                strategy=PhysicalOp.LOCAL_PLAN,
+                strategy=PhysicalOperator.LOCAL_PLAN,
                 source=subTreePhysicalPlan,
                 shouldProfile=True,
             )
@@ -251,7 +251,7 @@ class LogicalOperator:
         allow_codegen: bool = False,
         allow_token_reduction: bool = False,
         shouldProfile: bool = False,
-    ) -> List[PhysicalOp]:
+    ) -> List[PhysicalOperator]:
         """
         Given the logical plan implied by this LogicalOperator, enumerate up to `max`
         possible physical plans and return them as a list.
@@ -285,7 +285,7 @@ class LogicalOperator:
             #       if this ever changes we may need to return a list of physical ops here
             return [
                 self._getPhysicalTree(
-                    strategy=PhysicalOp.LOCAL_PLAN, shouldProfile=shouldProfile
+                    strategy=PhysicalOperator.LOCAL_PLAN, shouldProfile=shouldProfile
                 )
             ]
 
@@ -335,7 +335,7 @@ class LogicalOperator:
                                 # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
                                 subTreePhysicalPlan = subTreePhysicalPlan.copy()
                                 physicalPlan = self._getPhysicalTree(
-                                    strategy=PhysicalOp.LOCAL_PLAN,
+                                    strategy=PhysicalOperator.LOCAL_PLAN,
                                     source=subTreePhysicalPlan,
                                     model=model,
                                     query_strategy=qs,
@@ -352,7 +352,7 @@ class LogicalOperator:
                         # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
                         subTreePhysicalPlan = subTreePhysicalPlan.copy()
                         physicalPlan = self._getPhysicalTree(
-                            strategy=PhysicalOp.LOCAL_PLAN,
+                            strategy=PhysicalOperator.LOCAL_PLAN,
                             source=subTreePhysicalPlan,
                             model=Model.GPT_4,
                             query_strategy=qs,
@@ -381,7 +381,7 @@ class LogicalOperator:
                     # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
                     subTreePhysicalPlan = subTreePhysicalPlan.copy()
                     physicalPlan = self._getPhysicalTree(
-                        strategy=PhysicalOp.LOCAL_PLAN,
+                        strategy=PhysicalOperator.LOCAL_PLAN,
                         source=subTreePhysicalPlan,
                         model=model,
                         shouldProfile=shouldProfile,
@@ -398,7 +398,7 @@ class LogicalOperator:
                 # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
                 subTreePhysicalPlan = subTreePhysicalPlan.copy()
                 physicalPlan = self._getPhysicalTree(
-                    strategy=PhysicalOp.LOCAL_PLAN,
+                    strategy=PhysicalOperator.LOCAL_PLAN,
                     source=subTreePhysicalPlan,
                     shouldProfile=shouldProfile,
                 )
@@ -782,7 +782,7 @@ class ConvertScan(LogicalOperator):
     def _getPhysicalTree(
         self,
         strategy: str = None,
-        source: PhysicalOp = None,
+        source: PhysicalOperator = None,
         model: Model = None,
         query_strategy: QueryStrategy = None,
         token_budget: float = None,
@@ -795,7 +795,7 @@ class ConvertScan(LogicalOperator):
         intermediateSchema = self.outputSchema
         while (
             not intermediateSchema == Schema
-            and not PhysicalOp.solver.easyConversionAvailable(
+            and not PhysicalOperator.solver.easyConversionAvailable(
                 intermediateSchema, self.inputSchema
             )
         ):
@@ -906,7 +906,7 @@ class CacheScan(LogicalOperator):
     def _getPhysicalTree(
         self,
         strategy: str = None,
-        source: PhysicalOp = None,
+        source: PhysicalOperator = None,
         shouldProfile: bool = False,
     ):
         return CacheScanDataOp(
@@ -945,7 +945,7 @@ class BaseScan(LogicalOperator):
     def _getPhysicalTree(
         self,
         strategy: str = None,
-        source: PhysicalOp = None,
+        source: PhysicalOperator = None,
         shouldProfile: bool = False,
     ):
         return MarshalAndScanDataOp(
@@ -982,7 +982,7 @@ class LimitScan(LogicalOperator):
     def _getPhysicalTree(
         self,
         strategy: str = None,
-        source: PhysicalOp = None,
+        source: PhysicalOperator = None,
         shouldProfile: bool = False,
     ):
         return LimitScanOp(
@@ -1028,7 +1028,7 @@ class FilteredScan(LogicalOperator):
     def _getPhysicalTree(
         self,
         strategy: str = None,
-        source: PhysicalOp = None,
+        source: PhysicalOperator = None,
         model: Model = None,
         shouldProfile: bool = False,
     ):
@@ -1079,7 +1079,7 @@ class GroupByAggregate(LogicalOperator):
     def _getPhysicalTree(
         self,
         strategy: str = None,
-        source: PhysicalOp = None,
+        source: PhysicalOperator = None,
         model: Model = None,
         shouldProfile: bool = False,
     ):
@@ -1116,7 +1116,7 @@ class ApplyAggregateFunction(LogicalOperator):
     def _getPhysicalTree(
         self,
         strategy: str = None,
-        source: PhysicalOp = None,
+        source: PhysicalOperator = None,
         model: Model = None,
         shouldProfile: bool = False,
     ):
@@ -1166,7 +1166,7 @@ class ApplyUserFunction(LogicalOperator):
     def _getPhysicalTree(
         self,
         strategy: str = None,
-        source: PhysicalOp = None,
+        source: PhysicalOperator = None,
         model: Model = None,
         shouldProfile: bool = False,
     ):

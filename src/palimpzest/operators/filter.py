@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from palimpzest.generators.generators import DSPyGenerator
-from .physical import PhysicalOp, MAX_ID_CHARS
+from .physical import PhysicalOperator, MAX_ID_CHARS
 
 from palimpzest.constants import *
 from palimpzest.corelib import Schema
@@ -15,69 +15,53 @@ import hashlib
 import json
 
 
-class FilterOp(PhysicalOp):
+class FilterOp(PhysicalOperator):
 
     def __init__(
         self,
+        inputSchema: Schema,
         outputSchema: Schema,
-        source: PhysicalOp,
         filter: Filter,
-        model: Model,
-        prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_BOOL,
         targetCacheId: str = None,
         shouldProfile=False,
         max_workers=1,
         *args,
         **kwargs,
     ):
-        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
-        self.source = source
+        assert inputSchema == outputSchema, "Input and output schemas must match for FilterOp"
+        super().__init__(inputSchema=inputSchema, outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.filter = filter
-        self.model = model if filter.filterFn is None else None
-        self.prompt_strategy = prompt_strategy
         self.targetCacheId = targetCacheId
         self.max_workers = max_workers
 
-        # NOTE: need to construct profiler after all fields used by self.opId() are set
-        self.profiler = Profiler(op_id=self.opId())
-        self.profile = self.profiler.iter_profiler
+        # # NOTE: need to construct profiler after all fields used by self.opId() are set
+        # self.profiler = Profiler(op_id=self.opId())
+        # self.profile = self.profiler.iter_profiler
 
         # # construct TaskDescriptor
         # taskDescriptor = self._makeTaskDescriptor()
 
         # # synthesize task function
-        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
-        #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
+        # if not taskDescriptor.op_id in PhysicalOperator.synthesizedFns:
+        #     PhysicalOperator.synthesizedFns[taskDescriptor.op_id] = PhysicalOperator.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
 
-    def __eq__(self, other: PhysicalOp):
+    def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
             and self.model == other.model
             and self.filter == other.filter
             and self.prompt_strategy == other.prompt_strategy
             and self.outputSchema == other.outputSchema
-            and self.source == other.source
         )
 
     def __str__(self):
         model_str = self.model.value if self.model is not None else str(None)
         return f"{self.__class__.__name__}({str(self.outputSchema)}, Filter: {str(self.filter)}, Model: {model_str}, Prompt Strategy: {str(self.prompt_strategy.value)})"
 
-    def _makeTaskDescriptor(self):
-        return TaskDescriptor(
-            physical_op=self.__class__.__name__,
-            inputSchema=self.source.outputSchema,
-            op_id=self.opId(),
-            filter=self.filter,
-            model=self.model,
-            prompt_strategy=self.prompt_strategy,
-            plan_idx=self.plan_idx,
-        )
-
     def copy(self, *args, **kwargs):
         return self.__class__(
+            inputSchema=self.inputSchema,
             outputSchema=self.outputSchema,
-            source=self.source,
             model=self.model,
             filter=self.filter,
             prompt_strategy=self.prompt_strategy,
@@ -92,7 +76,6 @@ class FilterOp(PhysicalOp):
         d = {
             "operator": self.__class__.__name__,
             "outputSchema": str(self.outputSchema),
-            "source": self.source.opId(),
             "filter": str(self.filter),
             "model": self.model.value if self.model is not None else None,
             "prompt_strategy": self.prompt_strategy.value,
@@ -290,12 +273,12 @@ class FilterOp(PhysicalOp):
     def _passesFilter(self, candidate):
         """Return True if the candidate passes all filters, False otherwise."""
         taskDescriptor = self._makeTaskDescriptor()
-        taskFn = PhysicalOp.solver.synthesize(
+        taskFn = PhysicalOperator.solver.synthesize(
             taskDescriptor, shouldProfile=self.shouldProfile
         )
-        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
+        # if not taskDescriptor.op_id in PhysicalOperator.synthesizedFns:
         #     raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
-        # return PhysicalOp.synthesizedFns[taskDescriptor.op_id](candidate)
+        # return PhysicalOperator.synthesizedFns[taskDescriptor.op_id](candidate)
         return taskFn(candidate)
 
     def __iter__(self):
@@ -385,9 +368,6 @@ class ParallelFilterCandidateOp(FilterOp):
 
 class NonLLMFilter(FilterOp):
 
-    # TODO this should be in the Planner to decide if to use this class or not
-    # if self.filter.filterFn is not None:
-
     def __call__(self, candidate: DataRecord):
         # start_time = time.time()
         result = self.filter.filterFn(candidate)
@@ -406,6 +386,11 @@ class NonLLMFilter(FilterOp):
 
 
 class LLMFilter(FilterOp):
+
+    def __init__(self, model: Model, prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_BOOL, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.model = model
+        self.prompt_strategy = prompt_strategy
 
     def __call__(self, candidate: DataRecord):
         # compute record schema and type

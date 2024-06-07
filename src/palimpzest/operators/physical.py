@@ -22,7 +22,7 @@ MAX_ID_CHARS = 10
 IteratorFn = Callable[[], DataRecord]
 
 
-class PhysicalOp:
+class PhysicalOperator:
     LOCAL_PLAN = "LOCAL"
     REMOTE_PLAN = "REMOTE"
 
@@ -51,7 +51,7 @@ class PhysicalOp:
         #       has initialized all of its member fields
         self.profiler = None
 
-    def __eq__(self, other: PhysicalOp) -> bool:
+    def __eq__(self, other: PhysicalOperator) -> bool:
         raise NotImplementedError("Abstract method")
 
     def opId(self) -> str:
@@ -62,10 +62,10 @@ class PhysicalOp:
             return True
         return (self.outputSchema, self.inputSchema) in self.solver._hardcodedFns
 
-    def copy(self) -> PhysicalOp:
+    def copy(self) -> PhysicalOperator:
         raise NotImplementedError
 
-    def dumpPhysicalTree(self) -> Tuple[PhysicalOp, Union[PhysicalOp, None]]:
+    def dumpPhysicalTree(self) -> Tuple[PhysicalOperator, Union[PhysicalOperator, None]]:
         raise NotImplementedError("Legacy method")
         """Return the physical tree of operators."""
         if self.inputSchema is None:
@@ -101,7 +101,7 @@ class PhysicalOp:
         raise NotImplementedError("Abstract method")
 
 
-class MarshalAndScanDataOp(PhysicalOp):
+class MarshalAndScanDataOp(PhysicalOperator):
     def __init__(
         self,
         outputSchema: Schema,
@@ -119,7 +119,7 @@ class MarshalAndScanDataOp(PhysicalOp):
         # self.profiler = Profiler(op_id=self.opId())
         # self.profile = self.profiler.iter_profiler
 
-    def __eq__(self, other: PhysicalOp):
+    def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, MarshalAndScanDataOp)
             and self.datasetIdentifier == other.datasetIdentifier
@@ -206,7 +206,7 @@ class MarshalAndScanDataOp(PhysicalOp):
         return drs
 
 
-class CacheScanDataOp(PhysicalOp):
+class CacheScanDataOp(PhysicalOperator):
     def __init__(
         self,
         outputSchema: Schema,
@@ -224,7 +224,7 @@ class CacheScanDataOp(PhysicalOp):
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
 
-    def __eq__(self, other: PhysicalOp):
+    def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, CacheScanDataOp)
             and self.cacheIdentifier == other.cacheIdentifier
@@ -367,7 +367,7 @@ def agg_final(func, state):
         raise Exception("Unknown agg function " + func)
 
 
-class ApplyGroupByOp(PhysicalOp):
+class ApplyGroupByOp(PhysicalOperator):
     def __init__(
         self,
         inputSchema: Schema,
@@ -385,7 +385,7 @@ class ApplyGroupByOp(PhysicalOp):
         self.targetCacheId = targetCacheId
         self.shouldProfile = shouldProfile
 
-    def __eq__(self, other: PhysicalOp):
+    def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, ApplyGroupByOp)
             and self.gbySig == other.gbySig
@@ -487,7 +487,7 @@ class ApplyGroupByOp(PhysicalOp):
         return iteratorFn()
 
 
-class ApplyCountAggregateOp(PhysicalOp):
+class ApplyCountAggregateOp(PhysicalOperator):
     def __init__(
         self,
         inputSchema: Schema,
@@ -505,7 +505,7 @@ class ApplyCountAggregateOp(PhysicalOp):
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
 
-    def __eq__(self, other: PhysicalOp):
+    def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, ApplyCountAggregateOp)
             and self.aggFunction == other.aggFunction
@@ -613,144 +613,7 @@ class ApplyCountAggregateOp(PhysicalOp):
         return iteratorFn()
 
 
-# TODO: remove in favor of users in-lining lambdas
-class ApplyUserFunctionOp(PhysicalOp):
-    def __init__(
-        self,
-        inputSchema: Schema,
-        fn: UserFunction,
-        targetCacheId: str = None,
-        shouldProfile=False,
-    ):
-        super().__init__(
-            inputSchema=inputSchema,
-            outputSchema=fn.outputSchema,
-            shouldProfile=shouldProfile,
-        )
-        self.inputSchema = inputSchema
-        self.fn = fn
-        self.targetCacheId = targetCacheId
-        if not inputSchema == fn.inputSchema:
-            raise Exception(
-                "Supplied UserFunction input schema does not match input schema"
-            )
-
-        # NOTE: need to construct profiler after all fields used by self.opId() are set
-        self.profiler = Profiler(op_id=self.opId())
-        self.profile = self.profiler.iter_profiler
-
-    def __eq__(self, other: PhysicalOp):
-        return (
-            isinstance(other, ApplyUserFunctionOp)
-            and self.fn == other.fn
-            and self.outputSchema == other.outputSchema
-            and self.inputSchema == other.inputSchema
-        )
-
-    def __str__(self):
-        return (
-            "ApplyUserFunctionOp("
-            + str(self.outputSchema)
-            + ", "
-            + "Function: "
-            + str(self.fn.udfid)
-            + ")"
-        )
-
-    def copy(self):
-        return ApplyUserFunctionOp(
-            inputSchema=self.inputSchema,
-            fn=self.fn,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-        )
-
-    def opId(self):
-        raise NotImplementedError("Legacy method")
-        d = {
-            "operator": "ApplyUserFunctionOp",
-            "source": self.source.opId(),
-            "fn": str(self.fn.udfid),
-            "targetCacheId": self.targetCacheId,
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
-    def estimateCost(self, cost_estimate_sample_data: List[Dict[str, Any]] = None):
-        # get input estimates and pass through to output
-        inputEstimates, subPlanCostEst = self.source.estimateCost(
-            cost_estimate_sample_data
-        )
-        outputEstimates = {**inputEstimates}
-
-        # the profiler will record selectivity and timing info for this operator,
-        # which can be used to improve timing related estimates
-        if cost_estimate_sample_data is not None:
-            # compute estimates
-            filter = f"(filter == '{str(self.filter)}') & (op_name == 'p_filter')"
-            time_per_record = StatsProcessor._est_time_per_record(
-                cost_estimate_sample_data, filter=filter
-            )
-            selectivity = StatsProcessor._est_selectivity(
-                cost_estimate_sample_data, filter=filter, model_name=self.model.value
-            )
-
-            # estimate cardinality using sample selectivity and input cardinality est.
-            cardinality = inputEstimates["cardinality"] * selectivity
-
-            # update cardinality, timePerElement and related stats
-            outputEstimates["cardinality"] = cardinality
-            outputEstimates["timePerElement"] = time_per_record
-            outputEstimates["cumulativeTimePerElement"] = (
-                inputEstimates["cumulativeTimePerElement"] + time_per_record
-            )
-            outputEstimates["totalTime"] = (
-                cardinality * time_per_record + inputEstimates["totalTime"]
-            )
-
-            return outputEstimates, {
-                "cumulative": outputEstimates,
-                "thisPlan": {
-                    "time_per_record": time_per_record,
-                    "selectivity": selectivity,
-                },
-                "subPlan": subPlanCostEst,
-            }
-
-        # for now, assume applying the user function takes negligible additional time (and no cost in USD)
-        outputEstimates["timePerElement"] = 0
-        outputEstimates["usdPerElement"] = 0
-        outputEstimates["estOutputTokensPerElement"] = 0
-
-        return outputEstimates, {
-            "cumulative": outputEstimates,
-            "thisPlan": {},
-            "subPlan": subPlanCostEst,
-        }
-
-    def __iter__(self):
-        datadir = DataDirectory()
-        shouldCache = datadir.openCache(self.targetCacheId)
-
-        @self.profile(name="applyfn", shouldProfile=self.shouldProfile)
-        def iteratorFn():
-            for nextCandidate in self.source:
-                try:
-                    dr = self.fn.map(nextCandidate)
-                    if shouldCache:
-                        datadir.appendCache(self.targetCacheId, dr)
-                    yield dr
-                except Exception as e:
-                    print("Error in applying function", e)
-                    pass
-
-            if shouldCache:
-                datadir.closeCache(self.targetCacheId)
-
-        return iteratorFn()
-
-
-class ApplyAverageAggregateOp(PhysicalOp):
+class ApplyAverageAggregateOp(PhysicalOperator):
     def __init__(
         self,
         inputSchema: Schema,
@@ -771,7 +634,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
 
-    def __eq__(self, other: PhysicalOp):
+    def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, ApplyAverageAggregateOp)
             and self.aggFunction == other.aggFunction
@@ -883,7 +746,7 @@ class ApplyAverageAggregateOp(PhysicalOp):
         return iteratorFn()
 
 
-class LimitScanOp(PhysicalOp):
+class LimitScanOp(PhysicalOperator):
     def __init__(
         self,
         outputSchema: Schema,
@@ -904,7 +767,7 @@ class LimitScanOp(PhysicalOp):
         self.profiler = Profiler(op_id=self.opId())
         self.profile = self.profiler.iter_profiler
 
-    def __eq__(self, other: PhysicalOp):
+    def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, LimitScanOp)
             and self.limit == other.limit

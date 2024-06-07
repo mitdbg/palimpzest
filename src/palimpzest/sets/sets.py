@@ -280,13 +280,6 @@ class Dataset(Set):
     a new Set which is cached by the DataManager. As a result, the Sets define the
     lineage of computation on a Dataset, and this enables programmers to re-use
     previously cached computation by providing it as a `source` to some future Dataset.
-
-    To construct a Dataset, users must provide three pieces of information. First, they must
-    give the Dataset a unique name using the dataset_id. Second, they need to provide a source
-    or source_id, depending on whether the Dataset takes its input from a raw source (e.g. a
-    directory, an S3 prefix, etc.) or from another Dataset, respectively. Third, users must
-    provide a Schema for the Dataset. This Schema will be enforced when the Dataset iterates
-    over the source in its __iter__ method and constructs DataRecords.
     """
 
     def __init__(self, source: Union[str, DataSource], *args, **kwargs):

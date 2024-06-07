@@ -4,7 +4,7 @@ from io import BytesIO
 from palimpzest.profiler.stats import Stats
 from palimpzest.tools.skema_tools import equations_to_latex
 import pandas as pd
-from .physical import PhysicalOp, MAX_ID_CHARS, IteratorFn
+from .physical import PhysicalOperator, MAX_ID_CHARS, IteratorFn
 
 from palimpzest.constants import *
 from palimpzest.corelib import *
@@ -18,7 +18,7 @@ import concurrent
 import hashlib
 
 
-class ConvertOp(PhysicalOp):
+class ConvertOp(PhysicalOperator):
 
     inputSchema = Schema
     outputSchema = Schema
@@ -27,15 +27,15 @@ class ConvertOp(PhysicalOp):
         self,
         inputSchema: Schema,
         outputSchema: Schema,
-        model: Model,
-        cardinality: str,
-        image_conversion: bool = False,
-        prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_QA,
-        query_strategy: QueryStrategy = QueryStrategy.BONDED_WITH_FALLBACK,
-        token_budget: float = 1.0,
+        model: Optional[Model] = None,
+        prompt_strategy: Optional[PromptStrategy] = None,
+        query_strategy: Optional[QueryStrategy] = None,
+        token_budget: Optional[float] = None,
+        cardinality: Optional[str] = "oneToOne",
+        image_conversion: Optional[bool] = False,
         desc: Optional[str] = None,
         targetCacheId: Optional[str] = None,
-        shouldProfile=False,
+        shouldProfile: Optional[bool] = False,
     ):
         super().__init__(
             inputSchema=inputSchema,
@@ -86,35 +86,7 @@ class ConvertOp(PhysicalOp):
             self.prompt_strategy = None
             self.token_budget = 1.0
 
-        # NOTE: need to construct profiler after all fields used by self.opId() are set
-        # self.profiler = Profiler(op_id=self.opId())
-        # self.profile = self.profiler.iter_profiler
-
-        # # construct TaskDescriptor
-        # taskDescriptor = self._makeTaskDescriptor()
-
-        # # synthesize task function
-        # if not taskDescriptor.op_id in PhysicalOp.synthesizedFns:
-        #     PhysicalOp.synthesizedFns[taskDescriptor.op_id] = PhysicalOp.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
-
-    def copy(self, *args, **kwargs):
-        return self.__class__(
-            outputSchema=self.outputSchema,
-            inputSchema=self.inputSchema,
-            model=self.model,
-            cardinality=self.cardinality,
-            image_conversion=self.image_conversion,
-            prompt_strategy=self.prompt_strategy,
-            query_strategy=self.query_strategy,
-            token_budget=self.token_budget,
-            desc=self.desc,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-            *args,
-            **kwargs,
-        )
-
-    def __eq__(self, other: PhysicalOp):
+    def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
             and self.model == other.model
@@ -133,6 +105,38 @@ class ConvertOp(PhysicalOp):
         qs = self.query_strategy.value if self.query_strategy is not None else ""
 
         return f"{self.__class__.__name__}({str(self.outputSchema):10s}, Model: {model}, Query Strategy: {qs}, Token Budget: {str(self.token_budget)})"
+
+    def copy(self, *args, **kwargs):
+        return self.__class__(
+            outputSchema=self.outputSchema,
+            inputSchema=self.inputSchema,
+            model=self.model,
+            cardinality=self.cardinality,
+            image_conversion=self.image_conversion,
+            prompt_strategy=self.prompt_strategy,
+            query_strategy=self.query_strategy,
+            token_budget=self.token_budget,
+            desc=self.desc,
+            targetCacheId=self.targetCacheId,
+            shouldProfile=self.shouldProfile,
+            *args,
+            **kwargs,
+        )
+
+    def opId(self):
+        d = {
+            "operator": self.__class__.__name__,
+            "outputSchema": str(self.outputSchema),
+            "source": self.source.opId(),
+            "model": self.model.value if self.model is not None else None,
+            "prompt_strategy": (
+                self.prompt_strategy.value if self.prompt_strategy is not None else None
+            ),
+            "desc": self.desc,
+            "targetCacheId": self.targetCacheId,
+        }
+        ordered = json.dumps(d, sort_keys=True)
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
     def __call__(self, candidate: DataRecord) -> Tuple[DataRecord, Optional[Stats]]:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
@@ -155,32 +159,17 @@ class ConvertOp(PhysicalOp):
     #         heatmap_json_obj=self.heatmap_json_obj,
     #     )
     #     # # This code checks if the function has been synthesized before, and if so, whether it is hardcoded. If so, set model and prompt_strategy to None.
-    #     # if td.op_id in PhysicalOp.synthesizedFns:
+    #     # if td.op_id in PhysicalOperator.synthesizedFns:
     #     #     if self.is_hardcoded():
     #     #         td.model = None
     #     #         td.prompt_strategy = None
 
     #     return td
 
-    # def opId(self):
-    #     d = {
-    #         "operator": self.__class__.__name__,
-    #         "outputSchema": str(self.outputSchema),
-    #         "source": self.source.opId(),
-    #         "model": self.model.value if self.model is not None else None,
-    #         "prompt_strategy": (
-    #             self.prompt_strategy.value if self.prompt_strategy is not None else None
-    #         ),
-    #         "desc": self.desc,
-    #         "targetCacheId": self.targetCacheId,
-    #     }
-    #     ordered = json.dumps(d, sort_keys=True)
-    #     return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
     # def _attemptMapping(self, candidate: DataRecord):
     # """Attempt to map the candidate to the outputSchema. Return None if it fails."""
     # taskDescriptor = self._makeTaskDescriptor()
-    # taskFn = PhysicalOp.solver.synthesize(
+    # taskFn = PhysicalOperator.solver.synthesize(
     # taskDescriptor, shouldProfile=self.shouldProfile
     # )
     # drs, new_heatmap_json_obj = taskFn(candidate)
@@ -426,7 +415,7 @@ class ParallelConvertFromCandidateOp(ConvertOp):
         self.max_workers = 32  # TODO hardcoded for now
         self.streaming = streaming
 
-    def __eq__(self, other: PhysicalOp):
+    def __eq__(self, other: PhysicalOperator):
         return super().__eq__(other) and self.streaming == other.streaming
 
     def copy(self):
@@ -508,9 +497,6 @@ class SimpleTypeConvert(ConvertOp):
 
 
 class LLMTypeConversion(ConvertOp):
-
-    # TODO need to refactor query strategies to not use task descriptors
-
     def __call__(self, candidate: DataRecord) -> Tuple[DataRecord, Optional[Stats]]:
         # initialize stats objects
         bonded_query_stats, conventional_query_stats = None, None

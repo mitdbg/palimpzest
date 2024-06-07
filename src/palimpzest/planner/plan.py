@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from palimpzest.operators import LogicalOperator, FilteredScan
-from palimpzest.operators.physical import PhysicalOp
+from palimpzest.operators.physical import PhysicalOperator
 from palimpzest.sets import Set
 
 from typing import Any, Dict, List, Optional
@@ -39,13 +39,10 @@ class LogicalPlan(Plan):
         self.operators = operators
 
     @staticmethod
-    def fromOpsAndSubPlan(ops, subPlan) -> LogicalPlan:
+    def fromOpsAndSubPlan(ops: List[LogicalOperator], subPlan: LogicalPlan) -> LogicalPlan:
         # create copies of all logical operators
-        copySubPlan = [op.copy() for op in subPlan]
+        copySubPlan = [op.copy() for op in subPlan.operators]
         copyOps = [op.copy() for op in ops]
-
-        # set input schema of first new op to match output schema of last op in subplan
-        copyOps[0].inputSchema = copySubPlan[-1].outputSchema
 
         # construct full set of operators
         copySubPlan.extend(copyOps)
@@ -67,11 +64,27 @@ class LogicalPlan(Plan):
 
 class PhysicalPlan(Plan):
 
-    def __init__(self, num_samples):
-        self.operators = []
-        self.num_samples = num_samples
+    def __init__(self, operators: List[PhysicalOperator]):
+        self.operators = operators
+        self.estimates = {
+            "total_time": None,
+            "total_cost": None,
+            "quality": None,
+        }
 
         self.stats = PlanStats()
+
+    @staticmethod
+    def fromOpsAndSubPlan(ops: List[PhysicalOperator], subPlan: PhysicalPlan) -> PhysicalPlan:
+        # create copies of all logical operators
+        copySubPlan = [op.copy() for op in subPlan.operators]
+        copyOps = [op.copy() for op in ops]
+
+        # construct full set of operators
+        fullOperators = copySubPlan.extend(copyOps)
+
+        # return the PhysicalPlan
+        return PhysicalPlan(fullOperators)
 
     def __str__(self) -> str:
         """Computes a string representation for this plan."""
@@ -98,6 +111,14 @@ class PhysicalPlan(Plan):
         """Execute the plan."""
         # TODO
         pass
+
+    def estimateCost(self, sample_execution_data: Optional[Dict[str, Dict[str, Any]]]):
+        """Estimate the runtime, cost, and quality of the plan."""
+        totalTime = planCost["totalTime"]
+        totalCost = planCost["totalUSD"]  # for now, cost == USD
+        quality = planCost["quality"]
+
+        plans.append((totalTime, totalCost, quality, physical_plan, fullPlanCostEst))
 
     def __iter__(self):
         """Iterate over source records from datasource."""

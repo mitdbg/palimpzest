@@ -1,11 +1,19 @@
+from palimpzest.constants import Model, PromptStrategy, QueryStrategy
+from palimpzest.operators import LogicalOperator, PhysicalOperator
+from palimpzest.planner import LogicalPlan, PhysicalPlan
+from palimpzest.utils import getModels, getVisionModels
+
 import palimpzest as pz
 import palimpzest.operators as ops
-from .plan import LogicalPlan, PhysicalPlan
-from palimpzest.operators import PhysicalOp, QueryStrategy, Model
+import palimpzest.corelib.schemas as schemas
 
 from itertools import permutations
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
+import pandas as pd
+
+import multiprocessing
 import os
 
 
@@ -33,7 +41,7 @@ class Planner:
 
 
 class LogicalPlanner(Planner):
-    def __init__(self, no_cache: bool = False, *args, **kwargs):
+    def __init__(self, no_cache: bool=False, *args, **kwargs):
         """A given planner should not have a dataset when it's being generated, since it could be used for multiple datasets.
         However, we currently cannot support this since the plans are stored within a single planner object.
         To support this, we can use a dictionary in the form [dataset -> [Plan, Plan, ...]].
@@ -42,7 +50,7 @@ class LogicalPlanner(Planner):
 
         super().__init__(*args, **kwargs)
         self.no_cache = no_cache
-
+    
     @staticmethod
     def _compute_legal_permutations(
         filterAndConvertOps: List[ops.LogicalOperator],
@@ -67,7 +75,7 @@ class LogicalPlanner(Planner):
         opPermutations = permutations(filterAndConvertOps)
 
         # iterate over permutations and determine if they are legal;
-        # keep in mind that operations closer to the start of the list are executed first TODO
+        # keep in mind that operations closer to the start of the list are executed first
         legalOpPermutations = []
         for opPermutation in opPermutations:
             is_valid = True
@@ -94,75 +102,65 @@ class LogicalPlanner(Planner):
         return legalOpPermutations
 
     @staticmethod
-    def _compute_logical_plan_reorderings(
-        logicalPlan: LogicalPlan,
-    ) -> List[LogicalPlan]:
+    def _compute_logical_plan_reorderings(logical_plan: LogicalPlan) -> List[LogicalPlan]:
         """
         Given the naive logical plan, compute all possible equivalent plans with filter
         and convert operations re-ordered.
         """
-        operators = logicalPlan.operators
+        operators = logical_plan.operators
 
-        plans, op_idx = [], 0
+        all_plans, op_idx = [], 0
         while op_idx < len(operators):
             op = operators[op_idx]
 
-            # base case, if this operator is a BaseScan or CacheScan set plans to be the
-            # logical plan with just this operator
-            if isinstance(op, pz.operators.BaseScan) or isinstance(
-                op, pz.operators.CacheScan
-            ):
-                plans = [LogicalPlan(operators=[op])]
+            # base case, if this is the first operator (currently must be a BaseScan or CacheScan)
+            # then set all_plans to be the logical plan with just this operator
+            if (isinstance(op, pz.operators.BaseScan) or isinstance(op, pz.operators.CacheScan)) and all_plans == []:
+                all_plans = [LogicalPlan(operators=[op])]
                 op_idx += 1
 
             # if this operator is not a FilteredScan or a ConvertScan: join op with each of the
             # re-orderings for its source operations
-            elif not isinstance(op, pz.operators.FilteredScan) and not isinstance(
-                op, pz.operators.ConvertScan
-            ):
-                all_plans = []
-                for subplan in plans:
+            elif not isinstance(op, pz.operators.FilteredScan) and not isinstance(op, pz.operators.ConvertScan):
+                plans = []
+                for subplan in all_plans:
                     new_logical_plan = LogicalPlan.fromOpsAndSubPlan([op], subplan)
-                    all_plans.append(new_logical_plan)
+                    plans.append(new_logical_plan)
 
-                # update plans and op_idx
-                plans = all_plans
+                # update all_plans and op_idx
+                all_plans = plans
                 op_idx += 1
 
             # otherwise, if this operator is a FilteredScan or ConvertScan, make one plan per (legal)
             # permutation of consecutive converts and filters and recurse
-            else:
+            elif isinstance(op, ops.FilteredScan) or isinstance(op, ops.ConvertScan):
                 # get list of consecutive converts and filters
                 filterAndConvertOps = []
                 nextOp, next_idx = op, op_idx
-                while isinstance(nextOp, pz.operators.FilteredScan) or isinstance(
-                    nextOp, pz.operators.ConvertScan
-                ):
+                while isinstance(nextOp, pz.operators.FilteredScan) or isinstance(nextOp, pz.operators.ConvertScan):
                     filterAndConvertOps.append(nextOp)
-                    nextOp = (
-                        operators[next_idx + 1]
-                        if next_idx + 1 < len(operators)
-                        else None
-                    )
+                    nextOp = operators[next_idx + 1] if next_idx + 1 < len(operators) else None
                     next_idx = next_idx + 1
 
                 # compute set of legal permutations
-                op_permutations = LogicalPlanner._compute_legal_permutations(
-                    filterAndConvertOps
-                )
+                op_permutations = LogicalPlanner._compute_legal_permutations(filterAndConvertOps)
 
                 # compute cross-product of op_permutations and subTrees by linking final op w/first op in subTree
-                all_plans = []
+                plans = []
                 for ops in op_permutations:
-                    for subplan in plans:
+                    for subplan in all_plans:
                         new_logical_plan = LogicalPlan.fromOpsAndSubPlan(ops, subplan)
-                        all_plans.append(new_logical_plan)
+                        plans.append(new_logical_plan)
 
                 # update plans and operators (so that we skip over all operators in the re-ordering)
-                plans = all_plans
+                all_plans = plans
                 op_idx = next_idx
 
-        return plans
+            else:
+                raise Exception("PZ does not support the structure of this logical plan")
+
+        return all_plans
+
 
     def _construct_logical_plan(self, dataset_nodes: List[pz.Set]) -> LogicalPlan:
         operators = []
@@ -170,12 +168,10 @@ class LogicalPlanner(Planner):
             uid = node.universalIdentifier()
 
             # Use cache if allowed
-            if not self.no_cache and pz.datamanager.DataDirectory().hasCachedAnswer(
-                uid
-            ):
+            if not self.no_cache and pz.datamanager.DataDirectory().hasCachedAnswer(uid):
                 op = pz.operators.CacheScan(node.schema, datasetIdentifier=uid)
                 operators.append(op)
-                # return LogicalPlan(operators=operators)
+                #return LogicalPlan(operators=operators)
                 continue
 
             # First node is DataSource
@@ -193,61 +189,51 @@ class LogicalPlanner(Planner):
 
                 if node._filter is not None:
                     op = pz.operators.FilteredScan(
-                        outputSchema=outputSchema,
                         inputSchema=inputSchema,
+                        outputSchema=outputSchema,
                         filter=node._filter,
                         depends_on=node._depends_on,
                         targetCacheId=uid,
                     )
                 elif node._groupBy is not None:
                     op = pz.operators.GroupByAggregate(
-                        outputSchema=outputSchema,
                         inputSchema=inputSchema,
+                        outputSchema=outputSchema,
                         gbySig=node._groupBy,
                         targetCacheId=uid,
                     )
                 elif node._aggFunc is not None:
                     op = pz.operators.ApplyAggregateFunction(
-                        outputSchema=outputSchema,
                         inputSchema=inputSchema,
+                        outputSchema=outputSchema,
                         aggregationFunction=node._aggFunc,
                         targetCacheId=uid,
                     )
                 elif node._limit is not None:
                     op = pz.operators.LimitScan(
-                        outputSchema=outputSchema,
                         inputSchema=inputSchema,
+                        outputSchema=outputSchema,
                         limit=node._limit,
-                        targetCacheId=uid,
-                    )
-                elif node._fnid is not None:
-                    op = pz.operators.ApplyUserFunction(
-                        outputSchema=outputSchema,
-                        inputSchema=inputSchema,
-                        fnid=node._fnid,
                         targetCacheId=uid,
                     )
                 elif not outputSchema == inputSchema:
                     op = pz.operators.ConvertScan(
-                        outputSchema=outputSchema,
                         inputSchema=inputSchema,
+                        outputSchema=outputSchema,
                         cardinality=node._cardinality,
                         image_conversion=node._image_conversion,
                         depends_on=node._depends_on,
                         targetCacheId=uid,
                     )
                 else:
-                    raise NotImplementedError(
-                        "No logical operator exists for the specified dataset construction."
-                    )
+                    raise NotImplementedError("No logical operator exists for the specified dataset construction.")
 
             operators.append(op)
 
         return LogicalPlan(operators=operators)
 
-    def generate_plans(
-        self, dataset: pz.Dataset, sentinels: bool = False
-    ) -> List[LogicalPlan]:
+
+    def generate_plans(self, dataset: pz.Dataset, sentinels: bool=False) -> List[LogicalPlan]:
         """Return a set of possible logical trees of operators on Sets."""
         # Obtain ordered list of datasets
         dataset_nodes = []
@@ -276,17 +262,18 @@ class LogicalPlanner(Planner):
 
 class PhysicalPlanner(Planner):
     def __init__(
-        self,
-        num_samples: Optional[int] = 10,
-        scan_start_idx: Optional[int] = 0,
-        sample_execution_data: Optional[List[Dict[str, Any]]] = None,
-        allow_model_selection: Optional[bool] = True,
-        allow_code_synth: Optional[bool] = True,
-        allow_token_reduction: Optional[bool] = True,
-        shouldProfile: Optional[bool] = True,
-        *args,
-        **kwargs,
-    ):
+            self,
+            num_samples: Optional[int]=10,
+            scan_start_idx: Optional[int]=0,
+            sample_execution_data: Optional[List[Dict[str, Any]]]=None,
+            allow_model_selection: Optional[bool]=True,
+            allow_code_synth: Optional[bool]=True,
+            allow_token_reduction: Optional[bool]=True,
+            shouldProfile: Optional[bool]=True,
+            useParallelOps: Optional[bool]=False,
+            *args,
+            **kwargs,
+        ):
         super().__init__(*args, **kwargs)
         self.num_samples = num_samples
         self.scan_start_idx = scan_start_idx
@@ -295,265 +282,358 @@ class PhysicalPlanner(Planner):
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.shouldProfile = shouldProfile
+        self.useParallelOps = useParallelOps
 
         self.physical_ops = pz.operators.PHYSICAL_OPERATORS
 
-    def _getModels(self, include_vision: bool = False):
-        models = []
-        if os.getenv("OPENAI_API_KEY") is not None:
-            models.extend([pz.Model.GPT_3_5, pz.Model.GPT_4])
-
-        if os.getenv("TOGETHER_API_KEY") is not None:
-            models.extend([pz.Model.MIXTRAL])
-
-        if os.getenv("GOOGLE_API_KEY") is not None:
-            models.extend([pz.Model.GEMINI_1])
-
-        if include_vision:
-            models.append(pz.Model.GPT_4V)
-
-        return models
-
-    def compute_operator_estimates(self):
+    def _getAllowedModels(self, subplan: PhysicalPlan) -> List[Model]:
         """
-        Compute per-operator estimates of runtime, cost, and quality.
+        This function handles the logic of determining which model(s) can be used for a Convert or Filter
+        operation during physical plan construction.
+
+        The logic for determining which models can be used is as follows:
+        - If model selection is allowed --> then all models may be used
+        - If the subplan does not yet have an operator which uses a (non-vision) model --> then all models may be used
+        - If the subplan has an operator which uses a (non-vision) model --> only the subplan's model may be used
         """
-        # compute estimates for every operator
-        op_filters_to_estimates = {}
-        if self.sample_execution_data is not None and self.sample_execution_data != []:
-            # construct full dataset of samples
-            df = pd.DataFrame(self.sample_execution_data)
+        # return all models if model selection is allowed
+        if self.allow_model_selection:
+            return getModels()
 
-            # get unique set of operator filters:
-            # - for base/cache scans this is very simple
-            # - for filters, this is based on the unique filter string or function (per-model)
-            # - for induce, this is based on the generated field(s) (per-model)
-            op_filters_to_estimates = {}
-            logical_op = logicalPlans[0]
-            while logical_op is not None:
-                op_filter, estimates = None, None
-                if isinstance(logical_op, BaseScan):
-                    op_filter = "op_name == 'base_scan'"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    op_filters_to_estimates[op_filter] = estimates
+        # otherwise, get models used by subplan
+        subplan_model, vision_models = None, getVisionModels()
+        for phys_op in subplan.operators:
+            model = getattr(phys_op, "model", None)
+            if model is not None and model not in vision_models:
+                subplan_model = model
+                break
 
-                elif isinstance(logical_op, CacheScan):
-                    op_filter = "op_name == 'cache_scan'"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    op_filters_to_estimates[op_filter] = estimates
+        # return all models if subplan does not have any models yet
+        if subplan_model is None:
+            return getModels()
 
-                elif isinstance(logical_op, ConvertScan):
-                    generated_fields_str = "-".join(sorted(logical_op.generated_fields))
-                    op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'induce' | op_name == 'p_induce')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        # compute estimates per-model, and add None which forces computation of avg. across all models
-                        models = self._getModels(include_vision=True) + [None]
-                        estimates = {model: None for model in models}
-                        for model in models:
-                            model_name = model.value if model is not None else None
-                            est_tokens = StatsProcessor._est_num_input_output_tokens(
-                                op_df, model_name=model_name
-                            )
-                            model_estimates = {
-                                "time_per_record": StatsProcessor._est_time_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "cost_per_record": StatsProcessor._est_usd_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "est_num_input_tokens": est_tokens[0],
-                                "est_num_output_tokens": est_tokens[1],
-                                "selectivity": StatsProcessor._est_selectivity(
-                                    df, op_df, model_name=model_name
-                                ),
-                                "quality": StatsProcessor._est_quality(
-                                    op_df, model_name=model_name
-                                ),
-                            }
-                            estimates[model_name] = model_estimates
-                    op_filters_to_estimates[op_filter] = estimates
+        # otherwise return the subplan model
+        return [subplan_model]
 
-                elif isinstance(logical_op, FilteredScan):
-                    filter_str = (
-                        logical_op.filter.filterCondition
-                        if logical_op.filter.filterCondition is not None
-                        else str(logical_op.filter.filterFn)
-                    )
-                    op_filter = f"(filter == '{str(filter_str)}') & (op_name == 'filter' | op_name == 'p_filter')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        models = (
-                            self._getModels()
-                            if logical_op.filter.filterCondition is not None
-                            else [None]
-                        )
-                        estimates = {model: None for model in models}
-                        for model in models:
-                            model_name = model.value if model is not None else None
-                            est_tokens = StatsProcessor._est_num_input_output_tokens(
-                                op_df, model_name=model_name
-                            )
-                            model_estimates = {
-                                "time_per_record": StatsProcessor._est_time_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "cost_per_record": StatsProcessor._est_usd_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "est_num_input_tokens": est_tokens[0],
-                                "est_num_output_tokens": est_tokens[1],
-                                "selectivity": StatsProcessor._est_selectivity(
-                                    df, op_df, model_name=model_name
-                                ),
-                                "quality": StatsProcessor._est_quality(
-                                    op_df, model_name=model_name
-                                ),
-                            }
-                            estimates[model_name] = model_estimates
-                    op_filters_to_estimates[op_filter] = estimates
+    def _resolveLogicalBaseScanOp(
+            self,
+            logical_base_scan_op: ops.BaseScan,
+            shouldProfile: bool = False,
+            sentinel: bool = False,
+        ) -> PhysicalOperator:
+        """
+        Given the logical operator for a base scan, determine which (set of) physical operation(s)
+        the PhysicalPlanner can use to implement that logical operation.
+        """
+        if sentinel:
+            shouldProfile = True
 
-                elif isinstance(logical_op, LimitScan):
-                    op_filter = "(op_name == 'limit')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    op_filters_to_estimates[op_filter] = estimates
-
-                elif (
-                    isinstance(logical_op, ApplyAggregateFunction)
-                    and logical_op.aggregationFunction.funcDesc == "COUNT"
-                ):
-                    op_filter = "(op_name == 'count')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    op_filters_to_estimates[op_filter] = estimates
-
-                elif (
-                    isinstance(logical_op, ApplyAggregateFunction)
-                    and logical_op.aggregationFunction.funcDesc == "AVERAGE"
-                ):
-                    op_filter = "(op_name == 'average')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    op_filters_to_estimates[op_filter] = estimates
-
-                logical_op = logical_op.inputOp
-
-        return op_filters_to_estimates
-
-    def estimate_plan_costs(self, physical_plans: List[PhysicalPlan], operator_estimates: Any):
-        """Estimate the cost (in terms of USD, latency, throughput, etc.) for each plan."""
-        plans = []
-        sample_execution_data = (
-            None if operator_estimates == {} else operator_estimates
+        op = ops.MarshalAndScanDataOp(
+            logical_base_scan_op.outputSchema,
+            logical_base_scan_op.datasetIdentifier,
+            num_samples=self.num_samples,
+            scan_start_idx=self.scan_start_idx,
+            shouldProfile=shouldProfile,
         )
-        for physical_plan in physical_plans:
-            planCost, fullPlanCostEst = physical_plan.estimateCost(
-                sample_execution_data=sample_execution_data
-            )
 
-            totalTime = planCost["totalTime"]
-            totalCost = planCost["totalUSD"]  # for now, cost == USD
-            quality = planCost["quality"]
+        return op
 
-            plans.append((totalTime, totalCost, quality, physical_plan, fullPlanCostEst))
-        
-        return plans
-
-    def _createBaselinePlan(self, model: pz.Model):
-        """A simple wrapper around _createSentinelPlan as right now these are one and the same."""
-        return self._createSentinelPlan(model)
-
-    def _createSentinelPlan(self, model: pz.Model):
+    def _resolveLogicalCacheScanOp(
+            self,
+            logical_cache_scan_op: ops.CacheScan,
+            shouldProfile: bool = False,
+            sentinel: bool = False,
+        ) -> PhysicalOperator:
         """
-        Create the sentinel plans, which -- at least for now --- are single model plans
-        which follow the structure of the user-specified program.
+        Given the logical operator for a cache scan, determine which (set of) physical operation(s)
+        the PhysicalPlanner can use to implement that logical operation.
         """
-        # base case: this is a root op
-        if self.inputOp is None:
-            return self._getPhysicalTree(
-                strategy=pz.operators.PhysicalOp.LOCAL_PLAN, shouldProfile=True
+        if sentinel:
+            shouldProfile = True
+
+        op = ops.CacheScanDataOp(
+            logical_cache_scan_op.outputSchema,
+            logical_cache_scan_op.cachedDataIdentifier,
+            num_samples=self.num_samples,
+            scan_start_idx=self.scan_start_idx,
+            shouldProfile=shouldProfile,
+        )
+
+        return op
+
+    def _resolveLogicalConvertOp(
+            self,
+            logical_convert_op: ops.ConvertScan,
+            model: Optional[Model] = None,
+            prompt_strategy: Optional[PromptStrategy] = None,
+            query_strategy: Optional[QueryStrategy] = None,
+            token_budget: Optional[float] = 1.0,
+            shouldProfile: bool = False,
+            sentinel: bool = False,
+        ) -> PhysicalOperator:
+        """
+        Given the logical operator for a convert, determine which (set of) physical operation(s)
+        the PhysicalPlanner can use to implement that logical operation.
+        """
+        if sentinel:
+            shouldProfile = True
+
+        # get input and output schemas for convert
+        inputSchema = logical_convert_op.inputSchema
+        outputSchema = logical_convert_op.outputSchema
+
+        # TODO: test schema equality
+        # use simple convert if the input and output schemas are the same
+        if inputSchema == outputSchema:
+            op = ops.SimpleTypeConvert(
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                targetCacheId=logical_convert_op.targetCacheId,
+                shouldProfile=shouldProfile,
             )
 
-        # recursive case: get list of possible input physical plans
-        subTreePhysicalPlan = self.inputOp._createSentinelPlan(model)
-        subTreePhysicalPlan = subTreePhysicalPlan.copy()
-
-        physicalPlan = None
-        if isinstance(self, ConvertScan):
-            physicalPlan = self._getPhysicalTree(
-                strategy=PhysicalOp.LOCAL_PLAN,
-                source=subTreePhysicalPlan,
-                model=model,
-                query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
-                token_budget=1.0,
-                shouldProfile=True,
+        # if input and output schema are covered by a hard-coded convert; use that
+        elif isinstance(inputSchema, schemas.File) and isinstance(outputSchema, schemas.TextFile):
+            op = ops.ConvertFileToText(
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                targetCacheId=logical_convert_op.targetCacheId,
+                shouldProfile=shouldProfile,
             )
 
-        elif isinstance(self, FilteredScan):
-            physicalPlan = self._getPhysicalTree(
-                strategy=PhysicalOp.LOCAL_PLAN,
-                source=subTreePhysicalPlan,
-                model=model,
-                shouldProfile=True,
+        elif isinstance(inputSchema, schemas.ImageFile) and isinstance(outputSchema, schemas.EquationImage):
+            op = ops.ConvertImageToEquation(
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                targetCacheId=logical_convert_op.targetCacheId,
+                shouldProfile=shouldProfile,
             )
 
+        elif isinstance(inputSchema, schemas.Download) and isinstance(outputSchema, schemas.File):
+            op = ops.ConvertDownloadToFile(
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                targetCacheId=logical_convert_op.targetCacheId,
+                shouldProfile=shouldProfile,
+            )
+
+        elif isinstance(inputSchema, schemas.File) and isinstance(outputSchema, schemas.XLSFile):
+            op = ops.ConvertFileToXLS(
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                targetCacheId=logical_convert_op.targetCacheId,
+                shouldProfile=shouldProfile,
+            )
+
+        elif isinstance(inputSchema, schemas.XLSFile) and isinstance(outputSchema, schemas.Table):
+            op = ops.ConvertXLSToTable(
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                cardinality=logical_convert_op.cardinality,
+                targetCacheId=logical_convert_op.targetCacheId,
+                shouldProfile=shouldProfile,
+            )
+
+        elif isinstance(inputSchema, schemas.File) and isinstance(outputSchema, schemas.PDFFile):
+            op = ops.ConvertFileToPDF(
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                pdfprocessor=pz.DataDirectory().current_config.get("pdfprocessing"),
+                targetCacheId=logical_convert_op.targetCacheId,
+                shouldProfile=shouldProfile,
+            )
+
+        # otherwise, create convert op for the given set of hyper-parameters
         else:
-            physicalPlan = self._getPhysicalTree(
-                strategy=PhysicalOp.LOCAL_PLAN,
-                source=subTreePhysicalPlan,
-                shouldProfile=True,
+            op = ops.LLMTypeConversion(
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                shouldProfile=shouldProfile,
+                model=model,
+                prompt_strategy=prompt_strategy,
+                query_strategy=query_strategy,
+                token_budget=token_budget,
+                cardinality=logical_convert_op.cardinality,
+                image_conversion=logical_convert_op.image_conversion,
+                desc=logical_convert_op.desc,
+                targetCacheId=logical_convert_op.targetCacheId,
+                shouldProfile=shouldProfile,
             )
 
-        return physicalPlan
+        return op
 
-    def _createPhysicalPlans(
-        self,
-        logical_plan: LogicalPlan,
-    ) -> List[PhysicalOp]:
+    def _resolveLogicalFilterOp(
+            self,
+            logical_filter_op: ops.FilteredScan,
+            model: Optional[Model] = None,
+            prompt_strategy: Optional[PromptStrategy] = None,
+            shouldProfile: bool = False,
+            sentinel: bool = False,
+        ) -> PhysicalOperator:
+        """
+        Given the logical operator for a filter, determine which (set of) physical operation(s)
+        the PhysicalPlanner can use to implement that logical operation.
+        """
+        if sentinel:
+            shouldProfile = True
+
+        use_llm_filter = logical_filter_op.filter.filterFn is None
+        op = (
+            ops.LLMFilter(
+                inputSchema=logical_filter_op.inputSchema,
+                outputSchema=logical_filter_op.outputSchema,
+                filter=logical_filter_op.filter,
+                model=model,
+                prompt_strategy=prompt_strategy,
+                targetCacheId=logical_filter_op.targetCacheId,
+                shouldProfile=shouldProfile,
+                max_workers=multiprocessing.cpu_count() if self.useParallelOps else 1,
+            )
+            if use_llm_filter
+            else ops.NonLLMFilter(
+                inputSchema=logical_filter_op.inputSchema,
+                outputSchema=logical_filter_op.outputSchema,
+                filter=logical_filter_op.filter,
+                targetCacheId=logical_filter_op.targetCacheId,
+                shouldProfile=shouldProfile,
+                max_workers=multiprocessing.cpu_count() if self.useParallelOps else 1,
+            )
+        )
+
+        return op
+
+    def _resolveLogicalLimitScanOp(
+            self,
+            logical_limit_scan_op: ops.LimitScan,
+            shouldProfile: bool = False,
+            sentinel: bool = False,
+        ) -> PhysicalOperator:
+        """
+        Given the logical operator for a limit scan, determine which (set of) physical operation(s)
+        the PhysicalPlanner can use to implement that logical operation.
+        """
+        if sentinel:
+            shouldProfile = True
+
+        op = ops.LimitScanOp(
+            inputSchema=logical_limit_scan_op.inputSchema,
+            outputSchema=logical_limit_scan_op.outputSchema,
+            limit=logical_limit_scan_op.limit,
+            targetCacheId=logical_limit_scan_op.targetCacheId,
+            shouldProfile=shouldProfile,
+        )
+
+        return op
+
+    def _resolveLogicalGroupByAggOp(
+            self,
+            logical_gby_agg_op: ops.GroupByAggregate,
+            shouldProfile: bool = False,
+            sentinel: bool = False,
+        ) -> PhysicalOperator:
+        """
+        Given the logical operator for a group by, determine which (set of) physical operation(s)
+        the PhysicalPlanner can use to implement that logical operation.
+        """
+        if sentinel:
+            shouldProfile = True
+
+        op = ops.ApplyGroupByOp(
+            inputSchema=logical_gby_agg_op.inputSchema,
+            gbySig=logical_gby_agg_op.gbySig,
+            targetCacheId=logical_gby_agg_op.targetCacheId,
+            shouldProfile=shouldProfile,
+        )
+
+        return op
+
+    def _resolveLogicalApplyAggFuncOp(
+            self,
+            logical_apply_agg_fn_op: ops.ApplyAggregateFunction,
+            shouldProfile: bool = False,
+            sentinel: bool = False,
+        ) -> PhysicalOperator:
+        """
+        Given the logical operator for a group by, determine which (set of) physical operation(s)
+        the PhysicalPlanner can use to implement that logical operation.
+        """
+        if sentinel:
+            shouldProfile = True
+
+        # TODO: use an Enum to list possible funcDesc(s)
+        physicalOp = None
+        if logical_apply_agg_fn_op.aggregationFunction.funcDesc == "COUNT":
+            physicalOp = ops.ApplyCountAggregateOp
+        elif logical_apply_agg_fn_op.aggregationFunction.funcDesc == "AVERAGE":
+            physicalOp = ops.ApplyAverageAggregateOp
+
+        op = physicalOp(
+            inputSchema=logical_apply_agg_fn_op.inputSchema,
+            aggFunction=logical_apply_agg_fn_op.aggregationFunction,
+            targetCacheId=logical_apply_agg_fn_op.targetCacheId,
+            shouldProfile=shouldProfile,
+        )
+
+        return op
+
+    def _createBaselinePlan(self, logical_plan: LogicalPlan, model: Model) -> PhysicalPlan:
+        """A simple wrapper around _createSentinelPlan as right now these are one and the same."""
+        return self._createSentinelPlan(logical_plan, model)
+
+    def _createSentinelPlan(self, logical_plan: LogicalPlan, model: Model) -> PhysicalPlan:
+        """
+        Create the sentinel plan for the given model. At least for now --- each
+        sentinel plan is a plan with a single model which follows the naive logical
+        plan implied by the user's program.
+        """
+        physical_operators = []
+        for logical_op in logical_plan.operators:
+            op = None
+            if isinstance(logical_op, ops.BaseScan):
+                op = self._resolveLogicalBaseScanOp(logical_op, sentinel=True)
+
+            elif isinstance(logical_op, ops.CacheScan):
+                op = self._resolveLogicalCacheScanOp(logical_op, sentinel=True)
+
+            elif isinstance(logical_op, ops.ConvertScan):
+                op = self._resolveLogicalConvertOp(
+                    logical_op,
+                    model=model,
+                    prompt_strategy=PromptStrategy.DSPY_COT_QA,
+                    query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
+                    token_budget=1.0,
+                    sentinel=True,
+                )
+
+            elif isinstance(logical_op, ops.FilteredScan):
+                op = self._resolveLogicalFilterOp(
+                    logical_op,
+                    model=model,
+                    prompt_strategy=PromptStrategy.DSPY_COT_BOOL,
+                    sentinel=True,
+                )
+
+            elif isinstance(logical_op, ops.LimitScan):
+                op = self._resolveLogicalLimitScanOp(logical_op, sentinel=True)
+
+            elif isinstance(logical_op, ops.GroupByAggregate):
+                op = self._resolveLogicalGroupByAggOp(logical_op, sentinel=True)
+
+            elif isinstance(logical_op, ops.ApplyAggregateFunction):
+                op = self._resolveLogicalApplyAggFuncOp(logical_op, sentinel=True)
+
+            physical_operators.append(op)
+
+        return PhysicalPlan(operators=physical_operators)
+
+    def _createPhysicalPlans(self, logical_plan: LogicalPlan) -> List[PhysicalPlan]:
         """
         Given the logical plan implied by this LogicalOperator, enumerate up to `max`
         possible physical plans and return them as a list.
         """
-        # TODO: for each FilteredScan & ConvertScan try:
-        # 1. swapping different models
-        #    a. different model hyperparams?
-        # 2. different prompt strategies
-        #    a. Zero-Shot vs. Few-Shot vs. COT vs. DSPy
-        # 3. input sub-selection
-        #    a. vector DB, LLM attention, ask-the-LLM
-
-        # choose set of acceptable models based on possible llmservices
-        models = self._getModels()
+        # check that at least one llm service has been provided
         assert (
-            len(models) > 0
+            len(getModels()) > 0
         ), "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
 
         # determine which query strategies may be used
@@ -565,183 +645,140 @@ class PhysicalPlanner(Planner):
         if self.allow_token_reduction:
             token_budgets.extend([0.1, 0.5, 0.9])
 
-        # base case: this is a root op
-        if self.inputOp is None:
-            # NOTE: right now, the root op must be a CacheScan or BaseScan which does not require an LLM;
-            #       if this ever changes we may need to return a list of physical ops here
-            return [
-                self._getPhysicalTree(
-                    strategy=PhysicalOp.LOCAL_PLAN, shouldProfile=self.shouldProfile
-                )
-            ]
+        # get logical operators
+        operators = logical_plan.operators
 
-        # recursive case: get list of possible input physical plans
-        subTreePhysicalPlans = self._createPhysicalPlans(self.inputOp)
+        all_plans = []
+        for logical_op in operators:
 
-        def get_models_from_subtree(phys_op):
-            phys_op_models = []
-            while phys_op is not None:
-                phys_op_models.append(getattr(phys_op, "model", None))
-                phys_op = phys_op.source
+            # base case, if this operator is a BaseScan set all_plans to be the physical plan with just this operator
+            if isinstance(logical_op, ops.BaseScan):
+                physical_op = self._resolveLogicalBaseScanOp(logical_op, shouldProfile=self.shouldProfile)
+                all_plans = [PhysicalPlan(operators=[physical_op])]
 
-            return phys_op_models
+            # base case (possibly), if this operator is a CacheScan and all_plans is empty, set all_plans to be
+            # the physical plan with just this operator; if all_plans is NOT empty, then merge w/all_plans
+            elif isinstance(logical_op, ops.CacheScan):
+                physical_op = self._resolveLogicalCacheScanOp(logical_op, shouldProfile=self.shouldProfile)
+                if all_plans == []:
+                    all_plans = [PhysicalPlan(operators=[physical_op])]
+                else:
+                    plans = []
+                    for subplan in all_plans:
+                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                        plans.append(new_physical_plan)
 
-        # compute (list of) physical plans for this op
-        physicalPlans = []
-        if isinstance(self, ConvertScan):
-            for subTreePhysicalPlan in subTreePhysicalPlans:
-                for qs in query_strategies:
-                    if qs not in [
-                        QueryStrategy.CODE_GEN_WITH_FALLBACK,
-                        QueryStrategy.CODE_GEN,
-                    ]:
-                        for token_budget in token_budgets:
-                            for model in models:
-                                # if model selection is disallowed; skip any plans which would use a different model in this operator
-                                subtree_models = [
-                                    m
-                                    for m in get_models_from_subtree(
-                                        subTreePhysicalPlan
-                                    )
-                                    if m is not None and m != Model.GPT_4V
-                                ]
-                                if (
-                                    not self.allow_model_selection
-                                    and len(subtree_models) > 0
-                                    and subtree_models[0] != model
-                                ):
-                                    continue
+                    # update all_plans
+                    all_plans = plans
 
-                                # NOTE: failing to make a copy will lead to duplicate profile information being captured
-                                # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
-                                subTreePhysicalPlan = subTreePhysicalPlan.copy()
-                                physicalPlan = self._getPhysicalTree(
-                                    strategy=PhysicalOp.LOCAL_PLAN,
-                                    source=subTreePhysicalPlan,
+            elif isinstance(logical_op, ops.ConvertScan):                    
+                plans = []
+                for subplan in all_plans:
+                    # TODO: if hard-coded conversion, don't iterate over all plan possibilities
+                    for qs in query_strategies:
+                        # for code generation: we do not need to iterate over models and token budgets
+                        if qs in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
+                            physical_op = self._resolveLogicalConvertOp(
+                                logical_op,
+                                query_strategy=qs,
+                                shouldProfile=self.shouldProfile,
+                            )
+                            new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                            plans.append(new_physical_plan)
+                            continue
+
+                        # for non-code generation query strategies, consider models and token budgets
+                        models = self._getAllowedModels(subplan=subplan)
+                        for model in models:
+                            for token_budget in token_budgets:
+                                physical_op = self._resolveLogicalConvertOp(
+                                    logical_op,
                                     model=model,
                                     query_strategy=qs,
                                     token_budget=token_budget,
                                     shouldProfile=self.shouldProfile,
                                 )
-                                physicalPlans.append(physicalPlan)
-                                # GV Checking if there is an hardcoded function exposes that we need to refactor the solver/physical function generation
-                                td = physicalPlan._makeTaskDescriptor()
-                                if td.model == None:
-                                    break
-                    else:
-                        # NOTE: failing to make a copy will lead to duplicate profile information being captured
-                        # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
-                        subTreePhysicalPlan = subTreePhysicalPlan.copy()
-                        physicalPlan = self._getPhysicalTree(
-                            strategy=PhysicalOp.LOCAL_PLAN,
-                            source=subTreePhysicalPlan,
-                            model=Model.GPT_4,
-                            query_strategy=qs,
-                            token_budget=1.0,
+                                new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                                plans.append(new_physical_plan)
+
+                # update all_plans
+                all_plans = plans
+
+            elif isinstance(logical_op, ops.FilteredScan):
+                plans = []
+                for subplan in all_plans:
+                    # TODO: if non-llm filter, don't iterate over all plan possibilities
+                    models = self._getAllowedModels(subplan=subplan)
+                    for model in models:
+                        physical_op = self._resolveLogicalFilterOp(
+                            logical_op,
+                            model=model,
+                            prompt_strategy=PromptStrategy.DSPY_COT_BOOL,
                             shouldProfile=self.shouldProfile,
                         )
-                        physicalPlans.append(physicalPlan)
+                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                        plans.append(new_physical_plan)
 
-        elif isinstance(self, FilteredScan):
-            for subTreePhysicalPlan in subTreePhysicalPlans:
-                for model in models:
-                    # if model selection is disallowed; skip any plans which would use a different model in this operator
-                    subtree_models = [
-                        m
-                        for m in get_models_from_subtree(subTreePhysicalPlan)
-                        if m is not None and m != Model.GPT_4V
-                    ]
-                    if (
-                        not self.allow_model_selection
-                        and len(subtree_models) > 0
-                        and subtree_models[0] != model
-                    ):
-                        continue
+                # update all_plans
+                all_plans = plans
 
-                    # NOTE: failing to make a copy will lead to duplicate profile information being captured
-                    # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
-                    subTreePhysicalPlan = subTreePhysicalPlan.copy()
-                    physicalPlan = self._getPhysicalTree(
-                        strategy=PhysicalOp.LOCAL_PLAN,
-                        source=subTreePhysicalPlan,
-                        model=model,
-                        shouldProfile=self.shouldProfile,
-                    )
-                    physicalPlans.append(physicalPlan)
-                    # GV Checking if there is an hardcoded function exposes that we need to refactor the solver/physical function generation
-                    td = physicalPlan._makeTaskDescriptor()
-                    if td.model == None:
-                        break
+            elif isinstance(logical_op, ops.LimitScan):
+                physical_op = self._resolveLogicalLimitScanOp(logical_op, shouldProfile=self.shouldProfile)
 
-        else:
-            for subTreePhysicalPlan in subTreePhysicalPlans:
-                # NOTE: failing to make a copy will lead to duplicate profile information being captured
-                # create a copy of subTreePhysicalPlan and use it as source for this physicalPlan
-                subTreePhysicalPlan = subTreePhysicalPlan.copy()
-                physicalPlan = self._getPhysicalTree(
-                    strategy=PhysicalOp.LOCAL_PLAN,
-                    source=subTreePhysicalPlan,
-                    shouldProfile=self.shouldProfile,
-                )
-                physicalPlans.append(physicalPlan)
+                plans = []
+                for subplan in all_plans:
+                    new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                    plans.append(new_physical_plan)
 
-        return physicalPlans
+                # update all_plans
+                all_plans = plans
 
-    def createPhysicalPlanCandidates(
-        self,
-        max: int = None,
-        min: int = None,
-        sentinels: bool = False,
-        sample_execution_data: List[Dict[str, Any]] = None,
-        allow_model_selection: bool = False,
-        allow_codegen: bool = False,
-        allow_token_reduction: bool = False,
-        pareto_optimal: bool = True,
-        include_baselines: bool = False,
-        shouldProfile: bool = False,
-    ) -> List[PhysicalPlan]:
-        """Return a set of physical trees of operators."""
-        # only fetch sentinel plans if specified
-        if sentinels:
-            models = self._getModels()
-            assert (
-                len(models) > 0
-            ), "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
-            sentinel_plans = [self._createSentinelPlan(model) for model in models]
-            return sentinel_plans
+            elif isinstance(logical_op, ops.GroupByAggregate):
+                physical_op = self._resolveLogicalGroupByAggOp(logical_op, shouldProfile=self.shouldProfile)
 
-        # create set of logical plans (e.g. consider different filter/join orderings)
-        logicalPlans = LogicalOperator._createLogicalPlans(self)
-        print(f"LOGICAL PLANS: {len(logicalPlans)}")
+                plans = []
+                for subplan in all_plans:
+                    new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                    plans.append(new_physical_plan)
 
-        # iterate through logical plans and evaluate multiple physical plans
-        physicalPlans = [
-            physicalPlan
-            for logicalPlan in logicalPlans
-            for physicalPlan in logicalPlan._createPhysicalPlans(
-                allow_model_selection=allow_model_selection,
-                allow_codegen=allow_codegen,
-                allow_token_reduction=allow_token_reduction,
-                shouldProfile=shouldProfile,
-            )
-        ]
-        print(f"INITIAL PLANS: {len(physicalPlans)}")
+                # update all_plans
+                all_plans = plans
+
+            elif isinstance(logical_op, ops.ApplyAggregateFunction):
+                physical_op = self._resolveLogicalApplyAggFuncOp(logical_op, shouldProfile=self.shouldProfile)
+
+                plans = []
+                for subplan in all_plans:
+                    new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                    plans.append(new_physical_plan)
+
+                # update all_plans
+                all_plans = plans
+
+        return all_plans
+
+    # TODO
+    def compute_operator_estimates(self, sentinel_logical_plans: List[LogicalPlan]) -> Dict[str, Dict[str, Any]]:
+        """
+        Compute per-operator estimates of runtime, cost, and quality.
+        """
+        # for now, each sentinel uses the same logical plan, so we can simply use the first one
+        logical_plan = sentinel_logical_plans[0]
 
         # compute estimates for every operator
-        op_filters_to_estimates = {}
-        if sample_execution_data is not None and sample_execution_data != []:
+        operator_estimates = {}
+        if self.sample_execution_data is not None and self.sample_execution_data != []:
             # construct full dataset of samples
-            df = pd.DataFrame(sample_execution_data)
+            df = pd.DataFrame(self.sample_execution_data)
 
             # get unique set of operator filters:
             # - for base/cache scans this is very simple
             # - for filters, this is based on the unique filter string or function (per-model)
             # - for induce, this is based on the generated field(s) (per-model)
-            op_filters_to_estimates = {}
-            logical_op = logicalPlans[0]
-            while logical_op is not None:
+            operator_estimates = {}
+            for logical_op in logical_plan.operators:
                 op_filter, estimates = None, None
-                if isinstance(logical_op, BaseScan):
+                if isinstance(logical_op, ops.BaseScan):
                     op_filter = "op_name == 'base_scan'"
                     op_df = df.query(op_filter)
                     if not op_df.empty:
@@ -750,9 +787,9 @@ class PhysicalPlanner(Planner):
                                 op_df
                             )
                         }
-                    op_filters_to_estimates[op_filter] = estimates
+                    operator_estimates[op_filter] = estimates
 
-                elif isinstance(logical_op, CacheScan):
+                elif isinstance(logical_op, ops.CacheScan):
                     op_filter = "op_name == 'cache_scan'"
                     op_df = df.query(op_filter)
                     if not op_df.empty:
@@ -761,15 +798,15 @@ class PhysicalPlanner(Planner):
                                 op_df
                             )
                         }
-                    op_filters_to_estimates[op_filter] = estimates
+                    operator_estimates[op_filter] = estimates
 
-                elif isinstance(logical_op, ConvertScan):
+                elif isinstance(logical_op, ops.ConvertScan):
                     generated_fields_str = "-".join(sorted(logical_op.generated_fields))
                     op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'induce' | op_name == 'p_induce')"
                     op_df = df.query(op_filter)
                     if not op_df.empty:
                         # compute estimates per-model, and add None which forces computation of avg. across all models
-                        models = self._getModels(include_vision=True) + [None]
+                        models = getModels(include_vision=True) + [None]
                         estimates = {model: None for model in models}
                         for model in models:
                             model_name = model.value if model is not None else None
@@ -793,9 +830,9 @@ class PhysicalPlanner(Planner):
                                 ),
                             }
                             estimates[model_name] = model_estimates
-                    op_filters_to_estimates[op_filter] = estimates
+                    operator_estimates[op_filter] = estimates
 
-                elif isinstance(logical_op, FilteredScan):
+                elif isinstance(logical_op, ops.FilteredScan):
                     filter_str = (
                         logical_op.filter.filterCondition
                         if logical_op.filter.filterCondition is not None
@@ -805,7 +842,7 @@ class PhysicalPlanner(Planner):
                     op_df = df.query(op_filter)
                     if not op_df.empty:
                         models = (
-                            self._getModels()
+                            getModels()
                             if logical_op.filter.filterCondition is not None
                             else [None]
                         )
@@ -832,9 +869,9 @@ class PhysicalPlanner(Planner):
                                 ),
                             }
                             estimates[model_name] = model_estimates
-                    op_filters_to_estimates[op_filter] = estimates
+                    operator_estimates[op_filter] = estimates
 
-                elif isinstance(logical_op, LimitScan):
+                elif isinstance(logical_op, ops.LimitScan):
                     op_filter = "(op_name == 'limit')"
                     op_df = df.query(op_filter)
                     if not op_df.empty:
@@ -843,10 +880,10 @@ class PhysicalPlanner(Planner):
                                 op_df
                             )
                         }
-                    op_filters_to_estimates[op_filter] = estimates
+                    operator_estimates[op_filter] = estimates
 
                 elif (
-                    isinstance(logical_op, ApplyAggregateFunction)
+                    isinstance(logical_op, ops.ApplyAggregateFunction)
                     and logical_op.aggregationFunction.funcDesc == "COUNT"
                 ):
                     op_filter = "(op_name == 'count')"
@@ -857,10 +894,10 @@ class PhysicalPlanner(Planner):
                                 op_df
                             )
                         }
-                    op_filters_to_estimates[op_filter] = estimates
+                    operator_estimates[op_filter] = estimates
 
                 elif (
-                    isinstance(logical_op, ApplyAggregateFunction)
+                    isinstance(logical_op, ops.ApplyAggregateFunction)
                     and logical_op.aggregationFunction.funcDesc == "AVERAGE"
                 ):
                     op_filter = "(op_name == 'average')"
@@ -871,45 +908,37 @@ class PhysicalPlanner(Planner):
                                 op_df
                             )
                         }
-                    op_filters_to_estimates[op_filter] = estimates
+                    operator_estimates[op_filter] = estimates
 
-                logical_op = logical_op.inputOp
+        return operator_estimates
 
-        # estimate the cost (in terms of USD, latency, throughput, etc.) for each plan
-        plans = []
-        cost_est_data = (
-            None if op_filters_to_estimates == {} else op_filters_to_estimates
+    # TODO
+    def estimate_plan_costs(self, physical_plans: List[PhysicalPlan], operator_estimates: Dict[str, Dict[str, Any]]) -> List[PhysicalPlan]:
+        """Estimate the cost (in terms of USD, latency, throughput, etc.) for each plan."""
+        sample_execution_data = (
+            None if operator_estimates == {} else operator_estimates
         )
-        for physicalPlan in physicalPlans:
-            planCost, fullPlanCostEst = physicalPlan.estimateCost(
-                cost_est_data=cost_est_data
-            )
+        for physical_plan in physical_plans:
+            physical_plan.estimateCost(sample_execution_data=sample_execution_data)
 
-            totalTime = planCost["totalTime"]
-            totalCost = planCost["totalUSD"]  # for now, cost == USD
-            quality = planCost["quality"]
+        return physical_plans
 
-            plans.append((totalTime, totalCost, quality, physicalPlan, fullPlanCostEst))
-
+    def deduplicate_plans(self, physical_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
+        """De-duplicate plans with identical estimates for runtime, cost, and quality."""
         # drop duplicate plans in terms of time, cost, and quality, as these can cause
         # plans on the pareto frontier to be dropped if they are "dominated" by a duplicate
-        dedup_plans, dedup_desc_set = [], set()
-        for plan in plans:
-            planDesc = (plan[0], plan[1], plan[2])
-            if planDesc not in dedup_desc_set:
-                dedup_desc_set.add(planDesc)
+        dedup_plans, dedup_tuple_set = [], set()
+        for plan in physical_plans:
+            plan_tuple = (plan.estimates['total_time'], plan.estimates['total_cost'], plan.estimates['quality'])
+            if plan_tuple not in dedup_tuple_set:
+                dedup_tuple_set.add(plan_tuple)
                 dedup_plans.append(plan)
 
         print(f"DEDUP PLANS: {len(dedup_plans)}")
+        return dedup_plans
 
-        # return de-duplicated set of plans if we don't want to compute the pareto frontier
-        if not pareto_optimal:
-            if max is not None:
-                dedup_plans = dedup_plans[:max]
-                print(f"LIMIT DEDUP PLANS: {len(dedup_plans)}")
-
-            return dedup_plans
-
+    def select_pareto_optimal_plans(self, physical_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
+        """Select the subset of physical plans which lie on the pareto frontier of our runtime, cost, and quality estimates."""
         # compute the pareto frontier of candidate physical plans and return the list of such plans
         # - brute force: O(d*n^2);
         #   - for every tuple, check if it is dominated by any other tuple;
@@ -918,258 +947,125 @@ class PhysicalPlanner(Planner):
         # more efficient algo.'s exist, but they are non-trivial to implement, so for now I'm using
         # brute force; it may ultimately be best to compute a cheap approx. of the pareto front:
         # - e.g.: https://link.springer.com/chapter/10.1007/978-3-642-12002-2_6
-        paretoFrontierPlans, baselinePlans = [], []
-        for i, (
-            totalTime_i,
-            totalCost_i,
-            quality_i,
-            plan,
-            fullPlanCostEst,
-        ) in enumerate(dedup_plans):
+        pareto_frontier_plans = []
+        for i, plan_i in enumerate(physical_plans):
             paretoFrontier = True
 
-            # ensure that all baseline plans are included if specified
-            if include_baselines:
-                for baselinePlan in [
-                    self._createBaselinePlan(model) for model in self._getModels()
-                ]:
-                    if baselinePlan == plan:
-                        baselinePlans.append(
-                            (totalTime_i, totalCost_i, quality_i, plan, fullPlanCostEst)
-                        )
-                        continue
-
             # check if any other plan dominates plan i
-            for j, (totalTime_j, totalCost_j, quality_j, _, _) in enumerate(
-                dedup_plans
-            ):
+            for j, plan_j in enumerate(physical_plans):
                 if i == j:
                     continue
 
                 # if plan i is dominated by plan j, set paretoFrontier = False and break
                 if (
-                    totalTime_j <= totalTime_i
-                    and totalCost_j <= totalCost_i
-                    and quality_j >= quality_i
+                    plan_j.estimates['total_time'] <= plan_i.estimates['total_time']
+                    and plan_j.estimates['total_cost'] <= plan_i.estimates['total_cost']
+                    and plan_j.estimates['quality'] >= plan_i.estimates['quality']
                 ):
                     paretoFrontier = False
                     break
 
             # add plan i to pareto frontier if it's not dominated
             if paretoFrontier:
-                paretoFrontierPlans.append(
-                    (totalTime_i, totalCost_i, quality_i, plan, fullPlanCostEst)
-                )
+                pareto_frontier_plans.append(plan_i)
 
-        print(f"PARETO PLANS: {len(paretoFrontierPlans)}")
-        print(f"BASELINE PLANS: {len(baselinePlans)}")
+        print(f"PARETO PLANS: {len(pareto_frontier_plans)}")
+
+        # return the set of plans on the estimated pareto frontier
+        return pareto_frontier_plans
+
+    def add_baseline_plans(self, final_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
+        # helper function to determine if this plan is already in the final set of plans
+        def is_in_final_plans(plan, final_plans):
+            for final_plan in final_plans:
+                if plan == final_plan:
+                    return True
+            return False
+
+        # if specified, include all baseline plans in the final set of plans
+        for plan in [self._createBaselinePlan(model) for model in getModels()]:
+            if is_in_final_plans(plan, final_plans):
+                continue
+            else:
+                final_plans.append(plan)
+        
+        return final_plans
+
+    def add_plans_closest_to_frontier(
+        self,
+        final_plans: List[PhysicalPlan],
+        physical_plans: List[PhysicalPlan],
+        min_plans: int,
+    ) -> List[PhysicalPlan]:
+        # helper function to determine if this plan is already in the final set of plans
+        def is_in_final_plans(plan, final_plans):
+            for final_plan in final_plans:
+                if plan == final_plan:
+                    return True
+            return False
 
         # if specified, grab up to `min` total plans, and choose the remaining plans
         # based on their smallest agg. distance to the pareto frontier; distance is computed
         # by summing the pct. difference to the pareto frontier across each dimension
-        def is_in_final_plans(plan, finalPlans):
+        min_distances = []
+        for idx, plan in enumerate(physical_plans):
             # determine if this plan is already in the final set of plans
-            for _, _, _, finalPlan, _ in finalPlans:
-                if plan == finalPlan:
-                    return True
-            return False
-
-        finalPlans = paretoFrontierPlans
-        for planInfo in baselinePlans:
-            if is_in_final_plans(planInfo[3], finalPlans):
+            if is_in_final_plans(plan, final_plans):
                 continue
-            else:
-                finalPlans.append(planInfo)
 
-        if min is not None and len(finalPlans) < min:
-            min_distances = []
-            for i, (totalTime, totalCost, quality, plan, fullPlanCostEst) in enumerate(
-                dedup_plans
-            ):
-                # determine if this plan is already in the final set of plans
-                if is_in_final_plans(plan, finalPlans):
-                    continue
+            # otherwise compute min distance to plans on pareto frontier
+            min_dist, min_dist_idx = np.inf, -1
+            for pareto_plan in final_plans:
+                time_dist = (plan.estimates['total_time'] - pareto_plan.estimates['total_time']) / pareto_plan.estimates['total_time']
+                cost_dist = (plan.estimates['total_cost'] - pareto_plan.estimates['total_cost']) / pareto_plan.estimates['total_cost']
+                quality_dist = (
+                    (pareto_plan.estimates['quality'] - plan.estimates['quality']) / plan.estimates['quality'] if plan.estimates['quality'] > 0 else 10.0
+                )
+                dist = time_dist + cost_dist + quality_dist
+                if dist < min_dist:
+                    min_dist = dist
+                    min_dist_idx = idx
 
-                # otherwise compute min distance to plans on pareto frontier
-                min_dist, min_dist_idx = np.inf, -1
-                for paretoTime, paretoCost, paretoQuality, _, _ in paretoFrontierPlans:
-                    time_dist = (totalTime - paretoTime) / paretoTime
-                    cost_dist = (totalCost - paretoCost) / paretoCost
-                    quality_dist = (
-                        (paretoQuality - quality) / quality if quality > 0 else 10.0
-                    )
-                    dist = time_dist + cost_dist + quality_dist
-                    if dist < min_dist:
-                        min_dist = dist
-                        min_dist_idx = i
+            min_distances.append((min_dist, min_dist_idx))
 
-                min_distances.append((min_dist, min_dist_idx))
+        # sort based on distance
+        min_distances = sorted(min_distances, key=lambda tup: tup[0])
 
-            # sort based on distance
-            min_distances = sorted(min_distances, key=lambda tup: tup[0])
+        # add k closest plans to final_plans
+        k = min_plans - len(final_plans)
+        k_indices = list(map(lambda tup: tup[1], min_distances[:k]))
+        for idx in k_indices:
+            final_plans.append(physical_plans[idx])
 
-            # add closest plans to finalPlans
-            k = min - len(finalPlans)
-            k_indices = list(map(lambda tup: tup[1], min_distances[:k]))
-            for idx in k_indices:
-                finalPlans.append(dedup_plans[idx])
+        return final_plans
 
-        return finalPlans
-
-    def generate_plans(
-        self, logical_plan: LogicalPlan, sentinels: bool = False
-    ) -> List[PhysicalPlan]:
+    def generate_plans(self, logical_plan: LogicalPlan, sentinels: bool=False) -> List[PhysicalPlan]:
         """Return a set of possible physical plans."""
         # only fetch sentinel plans if specified
         if sentinels:
-            models = self._getModels()
+            models = getModels()
             assert (
                 len(models) > 0
             ), "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
-            sentinel_plans = [self._createSentinelPlan(logical_plan, model) for model in models] # TODO
+            sentinel_plans = [self._createSentinelPlan(logical_plan, model) for model in models]
             return sentinel_plans
 
         # compute all physical plans for this logical plan
         physicalPlans = [
-            physicalPlan for physicalPlan in self._createPhysicalPlans(logical_plan)
+            physicalPlan
+            for physicalPlan in self._createPhysicalPlans(logical_plan)
         ]
         print(f"INITIAL PLANS: {len(physicalPlans)}")
+        return physicalPlans
 
-        
+    # def generate_plans(self, logical_plan: LogicalPlan) -> List[PhysicalPlan]:
+    #     """Return a set of possible physical plans."""
 
-        # drop duplicate plans in terms of time, cost, and quality, as these can cause
-        # plans on the pareto frontier to be dropped if they are "dominated" by a duplicate
-        dedup_plans, dedup_desc_set = [], set()
-        for plan in plans:
-            planDesc = (plan[0], plan[1], plan[2])
-            if planDesc not in dedup_desc_set:
-                dedup_desc_set.add(planDesc)
-                dedup_plans.append(plan)
-
-        print(f"DEDUP PLANS: {len(dedup_plans)}")
-
-        # return de-duplicated set of plans if we don't want to compute the pareto frontier
-        if not pareto_optimal:
-            if max is not None:
-                dedup_plans = dedup_plans[:max]
-                print(f"LIMIT DEDUP PLANS: {len(dedup_plans)}")
-
-            return dedup_plans
-
-        # compute the pareto frontier of candidate physical plans and return the list of such plans
-        # - brute force: O(d*n^2);
-        #   - for every tuple, check if it is dominated by any other tuple;
-        #   - if it is, throw it out; otherwise, add it to pareto frontier
-        #
-        # more efficient algo.'s exist, but they are non-trivial to implement, so for now I'm using
-        # brute force; it may ultimately be best to compute a cheap approx. of the pareto front:
-        # - e.g.: https://link.springer.com/chapter/10.1007/978-3-642-12002-2_6
-        paretoFrontierPlans, baselinePlans = [], []
-        for i, (
-            totalTime_i,
-            totalCost_i,
-            quality_i,
-            plan,
-            fullPlanCostEst,
-        ) in enumerate(dedup_plans):
-            paretoFrontier = True
-
-            # ensure that all baseline plans are included if specified
-            if include_baselines:
-                for baselinePlan in [
-                    self._createBaselinePlan(model) for model in self._getModels()
-                ]:
-                    if baselinePlan == plan:
-                        baselinePlans.append(
-                            (totalTime_i, totalCost_i, quality_i, plan, fullPlanCostEst)
-                        )
-                        continue
-
-            # check if any other plan dominates plan i
-            for j, (totalTime_j, totalCost_j, quality_j, _, _) in enumerate(
-                dedup_plans
-            ):
-                if i == j:
-                    continue
-
-                # if plan i is dominated by plan j, set paretoFrontier = False and break
-                if (
-                    totalTime_j <= totalTime_i
-                    and totalCost_j <= totalCost_i
-                    and quality_j >= quality_i
-                ):
-                    paretoFrontier = False
-                    break
-
-            # add plan i to pareto frontier if it's not dominated
-            if paretoFrontier:
-                paretoFrontierPlans.append(
-                    (totalTime_i, totalCost_i, quality_i, plan, fullPlanCostEst)
-                )
-
-        print(f"PARETO PLANS: {len(paretoFrontierPlans)}")
-        print(f"BASELINE PLANS: {len(baselinePlans)}")
-
-        # if specified, grab up to `min` total plans, and choose the remaining plans
-        # based on their smallest agg. distance to the pareto frontier; distance is computed
-        # by summing the pct. difference to the pareto frontier across each dimension
-        def is_in_final_plans(plan, finalPlans):
-            # determine if this plan is already in the final set of plans
-            for _, _, _, finalPlan, _ in finalPlans:
-                if plan == finalPlan:
-                    return True
-            return False
-
-        finalPlans = paretoFrontierPlans
-        for planInfo in baselinePlans:
-            if is_in_final_plans(planInfo[3], finalPlans):
-                continue
-            else:
-                finalPlans.append(planInfo)
-
-        if min is not None and len(finalPlans) < min:
-            min_distances = []
-            for i, (totalTime, totalCost, quality, plan, fullPlanCostEst) in enumerate(
-                dedup_plans
-            ):
-                # determine if this plan is already in the final set of plans
-                if is_in_final_plans(plan, finalPlans):
-                    continue
-
-                # otherwise compute min distance to plans on pareto frontier
-                min_dist, min_dist_idx = np.inf, -1
-                for paretoTime, paretoCost, paretoQuality, _, _ in paretoFrontierPlans:
-                    time_dist = (totalTime - paretoTime) / paretoTime
-                    cost_dist = (totalCost - paretoCost) / paretoCost
-                    quality_dist = (
-                        (paretoQuality - quality) / quality if quality > 0 else 10.0
-                    )
-                    dist = time_dist + cost_dist + quality_dist
-                    if dist < min_dist:
-                        min_dist = dist
-                        min_dist_idx = i
-
-                min_distances.append((min_dist, min_dist_idx))
-
-            # sort based on distance
-            min_distances = sorted(min_distances, key=lambda tup: tup[0])
-
-            # add closest plans to finalPlans
-            k = min - len(finalPlans)
-            k_indices = list(map(lambda tup: tup[1], min_distances[:k]))
-            for idx in k_indices:
-                finalPlans.append(dedup_plans[idx])
-
-        return finalPlans
-
-    def generate_plans(self, logical_plan: LogicalPlan) -> List[PhysicalPlan]:
-        """Return a set of possible physical plans."""
-
-        # Stub of physical planning code
-        for logical_op in logical_plan:
-            applicable_ops = [
-                phy
-                for phy in self.physical_ops
-                if phy.inputSchema == logical_op.inputSchema
-                and phy.outputSchema == logical_op.outputSchema
-            ]  # Here this should be double checked
+    #     # Stub of physical planning code
+    #     for logical_op in logical_plan:
+    #         applicable_ops = [
+    #             phy
+    #             for phy in self.physical_ops
+    #             if phy.inputSchema == logical_op.inputSchema
+    #             and phy.outputSchema == logical_op.outputSchema
+    #         ]  # Here this should be double checked
