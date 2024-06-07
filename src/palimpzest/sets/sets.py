@@ -67,7 +67,7 @@ class Set:
         scan_start_idx: int = 0,
         nocache: bool = False,
     ):
-        self._schema = schema
+        self.schema = schema
         self._source = source
         self._desc = desc
         self._filter = filter
@@ -83,12 +83,12 @@ class Set:
         self._nocache = nocache
 
     def __str__(self):
-        return f"{self.__class__.__name__}(schema={self._schema}, desc={self._desc}, filter={str(self._filter)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
+        return f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, filter={str(self._filter)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
 
     def serialize(self):
         d = {
             "version": Set.SET_VERSION,
-            "schema": self._schema.jsonSchema(),
+            "schema": self.schema.jsonSchema(),
             "source": self._source.serialize(),
             "desc": repr(self._desc),
             "filter": None if self._filter is None else self._filter.serialize(),
@@ -173,13 +173,9 @@ class Set:
         result = hashlib.sha256(ordered.encode()).hexdigest()
         return result
 
-    def schema(self):
-        """The Set's schema"""
-        return self._schema
-
     def jsonSchema(self):
         """Return the JSON schema for this Set."""
-        return self._schema.jsonSchema()
+        return self.schema.jsonSchema()
 
     def dumpSyntacticTree(self):
         """Return the syntactic tree of this Set."""
@@ -200,20 +196,20 @@ class Set:
         # first, check to see if this set has previously been cached
         uid = self.universalIdentifier()
         if not self._nocache and DataDirectory().hasCachedAnswer(uid):
-            return CacheScan(self._schema, uid, self._num_samples, self._scan_start_idx)
+            return CacheScan(self.schema, uid, self._num_samples, self._scan_start_idx)
 
         # otherwise, if this Set's source is a DataSource
         if isinstance(self._source, DataSource):
             dataset_id = self._source.universalIdentifier()
             sourceSchema = self._source.schema
 
-            if self._schema == sourceSchema:
+            if self.schema == sourceSchema:
                 return BaseScan(
-                    self._schema, dataset_id, self._num_samples, self._scan_start_idx
+                    self.schema, dataset_id, self._num_samples, self._scan_start_idx
                 )
             else:
                 return ConvertScan(
-                    self._schema,
+                    self.schema,
                     BaseScan(
                         sourceSchema,
                         dataset_id,
@@ -226,7 +222,7 @@ class Set:
         # if the Set's source is another Set, apply the appropriate scan to the Set
         if self._filter is not None:
             return FilteredScan(
-                self._schema,
+                self.schema,
                 self._source._deprecated_getLogicalTree(*args, **kwargs),
                 self._filter,
                 self._depends_on,
@@ -234,35 +230,35 @@ class Set:
             )
         elif self._groupBy is not None:
             return GroupByAggregate(
-                self._schema,
+                self.schema,
                 self._source._deprecated_getLogicalTree(*args, **kwargs),
                 self._groupBy,
                 targetCacheId=uid,
             )
         elif self._aggFunc is not None:
             return ApplyAggregateFunction(
-                self._schema,
+                self.schema,
                 self._source._deprecated_getLogicalTree(*args, **kwargs),
                 self._aggFunc,
                 targetCacheId=uid,
             )
         elif self._limit is not None:
             return LimitScan(
-                self._schema,
+                self.schema,
                 self._source._deprecated_getLogicalTree(*args, **kwargs),
                 self._limit,
                 targetCacheId=uid,
             )
         elif self._fnid is not None:
             return ApplyUserFunction(
-                self._schema,
+                self.schema,
                 self._source._deprecated_getLogicalTree(*args, **kwargs),
                 self._fnid,
                 targetCacheId=uid,
             )
-        elif not self._schema == self._source._schema:
+        elif not self.schema == self._source.schema:
             return ConvertScan(
-                self._schema,
+                self.schema,
                 self._source._deprecated_getLogicalTree(*args, **kwargs),
                 self._cardinality,
                 self._image_conversion,
@@ -340,7 +336,7 @@ class Dataset(Set):
 
         return Dataset(
             source=self,
-            schema=self.schema(),
+            schema=self.schema,
             desc=desc,
             filter=f,
             depends_on=depends_on,
@@ -370,12 +366,12 @@ class Dataset(Set):
 
     def map(self, fn: UserFunction) -> Dataset:
         """Convert the Set to a new schema."""
-        if not fn.inputSchema == self.schema():
+        if not fn.inputSchema == self.schema:
             raise Exception(
                 "Input schema of function ("
                 + str(fn.inputSchema.getDesc())
                 + ") does not match schema of input Set ("
-                + str(self.schema().getDesc())
+                + str(self.schema.getDesc())
                 + ")"
             )
         return Dataset(
@@ -405,7 +401,7 @@ class Dataset(Set):
         """Limit the set size to no more than n rows"""
         return Dataset(
             source=self,
-            schema=self.schema(),
+            schema=self.schema,
             desc="LIMIT " + str(n),
             limit=n,
             nocache=self._nocache,

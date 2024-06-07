@@ -109,14 +109,16 @@ class LogicalPlanner(Planner):
 
             # base case, if this operator is a BaseScan or CacheScan set plans to be the
             # logical plan with just this operator
-            if isinstance(op, ops.BaseScan) or isinstance(op, ops.CacheScan):
+            if isinstance(op, pz.operators.BaseScan) or isinstance(
+                op, pz.operators.CacheScan
+            ):
                 plans = [LogicalPlan(operators=[op])]
                 op_idx += 1
 
             # if this operator is not a FilteredScan or a ConvertScan: join op with each of the
             # re-orderings for its source operations
-            elif not isinstance(op, ops.FilteredScan) and not isinstance(
-                op, ops.ConvertScan
+            elif not isinstance(op, pz.operators.FilteredScan) and not isinstance(
+                op, pz.operators.ConvertScan
             ):
                 all_plans = []
                 for subplan in plans:
@@ -133,8 +135,8 @@ class LogicalPlanner(Planner):
                 # get list of consecutive converts and filters
                 filterAndConvertOps = []
                 nextOp, next_idx = op, op_idx
-                while isinstance(nextOp, ops.FilteredScan) or isinstance(
-                    nextOp, ops.ConvertScan
+                while isinstance(nextOp, pz.operators.FilteredScan) or isinstance(
+                    nextOp, pz.operators.ConvertScan
                 ):
                     filterAndConvertOps.append(nextOp)
                     nextOp = (
@@ -171,7 +173,7 @@ class LogicalPlanner(Planner):
             if not self.no_cache and pz.datamanager.DataDirectory().hasCachedAnswer(
                 uid
             ):
-                op = ops.CacheScan(node.schema(), datasetIdentifier=uid)
+                op = pz.operators.CacheScan(node.schema, datasetIdentifier=uid)
                 operators.append(op)
                 # return LogicalPlan(operators=operators)
                 continue
@@ -179,18 +181,18 @@ class LogicalPlanner(Planner):
             # First node is DataSource
             if idx == 0:
                 assert isinstance(node, pz.datasources.DataSource)
-                op = ops.BaseScan(
-                    outputSchema=node.schema(),
+                op = pz.operators.BaseScan(
+                    outputSchema=node.schema,
                     datasetIdentifier=uid,
                 )
 
             # if the Set's source is another Set, apply the appropriate scan to the Set
             else:
-                inputSchema = dataset_nodes[idx - 1].schema()
-                outputSchema = node.schema()
+                inputSchema = dataset_nodes[idx - 1].schema
+                outputSchema = node.schema
 
                 if node._filter is not None:
-                    op = ops.FilteredScan(
+                    op = pz.operators.FilteredScan(
                         outputSchema=outputSchema,
                         inputSchema=inputSchema,
                         filter=node._filter,
@@ -198,35 +200,35 @@ class LogicalPlanner(Planner):
                         targetCacheId=uid,
                     )
                 elif node._groupBy is not None:
-                    op = ops.GroupByAggregate(
+                    op = pz.operators.GroupByAggregate(
                         outputSchema=outputSchema,
                         inputSchema=inputSchema,
                         gbySig=node._groupBy,
                         targetCacheId=uid,
                     )
                 elif node._aggFunc is not None:
-                    op = ops.ApplyAggregateFunction(
+                    op = pz.operators.ApplyAggregateFunction(
                         outputSchema=outputSchema,
                         inputSchema=inputSchema,
                         aggregationFunction=node._aggFunc,
                         targetCacheId=uid,
                     )
                 elif node._limit is not None:
-                    op = ops.LimitScan(
+                    op = pz.operators.LimitScan(
                         outputSchema=outputSchema,
                         inputSchema=inputSchema,
                         limit=node._limit,
                         targetCacheId=uid,
                     )
                 elif node._fnid is not None:
-                    op = ops.ApplyUserFunction(
+                    op = pz.operators.ApplyUserFunction(
                         outputSchema=outputSchema,
                         inputSchema=inputSchema,
                         fnid=node._fnid,
                         targetCacheId=uid,
                     )
                 elif not outputSchema == inputSchema:
-                    op = ops.ConvertScan(
+                    op = pz.operators.ConvertScan(
                         outputSchema=outputSchema,
                         inputSchema=inputSchema,
                         cardinality=node._cardinality,
@@ -294,7 +296,7 @@ class PhysicalPlanner(Planner):
         self.allow_token_reduction = allow_token_reduction
         self.shouldProfile = shouldProfile
 
-        self.physical_ops = ops.PHYSICAL_OPERATORS
+        self.physical_ops = pz.operators.PHYSICAL_OPERATORS
 
     def _getModels(self, include_vision: bool = False):
         models = []
@@ -324,7 +326,7 @@ class PhysicalPlanner(Planner):
         # base case: this is a root op
         if self.inputOp is None:
             return self._getPhysicalTree(
-                strategy=ops.PhysicalOp.LOCAL_PLAN, shouldProfile=True
+                strategy=pz.operators.PhysicalOp.LOCAL_PLAN, shouldProfile=True
             )
 
         # recursive case: get list of possible input physical plans

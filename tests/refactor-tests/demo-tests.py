@@ -27,10 +27,6 @@ class Email(pz.TextFile):
 
 
 def EnronEvalTiny():
-    import pdb
-
-    pdb.set_trace()
-
     emails = pz.Dataset("enron-eval-tiny", schema=Email)
     emails = emails.filter(
         'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
@@ -57,10 +53,9 @@ class TestDemo(unittest.TestCase):
 
         plans = logical.generate_plans(dataset)
         lp = plans[0]
-        physicalPlans = physical.generate_plans(lp)
-        pp = physicalPlans[0]
-
-        print(pp)
+        print(lp)
+        # physicalPlans = physical.generate_plans(lp)
+        # pp = physicalPlans[0]
 
 
 if __name__ == "__main__":

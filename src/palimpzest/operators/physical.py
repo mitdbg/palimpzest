@@ -28,6 +28,8 @@ class PhysicalOp:
 
     # synthesizedFns = {}
     # solver = Solver(verbose=LOG_LLM_OUTPUT)
+    inputSchema = None
+    outputSchema = None
 
     def __init__(
         self,

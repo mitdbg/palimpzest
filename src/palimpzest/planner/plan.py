@@ -48,8 +48,8 @@ class LogicalPlan(Plan):
         copyOps[0].inputSchema = copySubPlan[-1].outputSchema
 
         # construct full set of operators
-        fullOperators = copySubPlan.extend(copyOps)
-
+        copySubPlan.extend(copyOps)
+        fullOperators = copySubPlan
         # make input and output schemas internally consistent
         for idx, op in enumerate(fullOperators):
             # if this op is a filter, set its outputSchema equal to its inputSchema
