@@ -1,6 +1,5 @@
 from palimpzest.constants import Model
 from palimpzest.datamanager import DataDirectory
-from palimpzest.operators import ConvertFromCandidateOp
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
 from palimpzest.profiler import StatsProcessor
@@ -89,10 +88,7 @@ class Execute:
         physicalOps = physicalTree.dumpPhysicalTree()
         flat = flatten_nested_tuples(physicalOps)
         ops = [op for op in flat if not op.is_hardcoded()]
-        label = "-".join([
-            f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
-            for op in ops
-        ])
+        label = "-".join([str(op) for op in ops])
         return f"PZ-{label_idx}-{label}"
 
     @staticmethod
@@ -273,10 +269,7 @@ class Execute:
 
 class NewExecute:
     @staticmethod
-    def run_sentinel_plan(args):
-        # parse args
-        plan, plan_idx, verbose = args
-
+    def run_sentinel_plan(plan: PhysicalPlan, plan_idx=0, verbose=False):
         # display the plan output
         if verbose:
             print("----------------------")

@@ -10,7 +10,6 @@ from palimpzest.elements import (
 )
 from palimpzest.operators import (
     ApplyAggregateFunction,
-    ApplyUserFunction,
     BaseScan,
     CacheScan,
     ConvertScan,

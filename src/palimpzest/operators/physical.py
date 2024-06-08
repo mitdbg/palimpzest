@@ -26,8 +26,6 @@ class PhysicalOperator:
     LOCAL_PLAN = "LOCAL"
     REMOTE_PLAN = "REMOTE"
 
-    # synthesizedFns = {}
-    # solver = Solver(verbose=LOG_LLM_OUTPUT)
     inputSchema = None
     outputSchema = None
 
@@ -57,7 +55,7 @@ class PhysicalOperator:
     def opId(self) -> str:
         raise NotImplementedError("Abstract method")
 
-    def is_hardcoded(self) -> bool:
+    def legacy_is_hardcoded(self) -> bool:
         if self.inputSchema is None:
             return True
         return (self.outputSchema, self.inputSchema) in self.solver._hardcodedFns

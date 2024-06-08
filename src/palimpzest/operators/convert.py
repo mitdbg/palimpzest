@@ -138,43 +138,11 @@ class ConvertOp(PhysicalOperator):
         ordered = json.dumps(d, sort_keys=True)
         return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
+    def __str__(self):
+        return f"{self.model}_{self.query_strategy}_{self.token_budget}"
+
     def __call__(self, candidate: DataRecord) -> Tuple[DataRecord, Optional[Stats]]:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
-
-    # def _makeTaskDescriptor(self):
-    #     td = TaskDescriptor(
-    #         physical_op=self.__class__.__name__,
-    #         inputSchema=self.inputSchema,
-    #         outputSchema=self.outputSchema,
-    #         op_id=self.opId(),
-    #         model=self.model,
-    #         cardinality=self.cardinality,
-    #         image_conversion=self.image_conversion,
-    #         prompt_strategy=self.prompt_strategy,
-    #         query_strategy=self.query_strategy,
-    #         token_budget=self.token_budget,
-    #         conversionDesc=self.desc,
-    #         pdfprocessor=self.datadir.current_config.get("pdfprocessing"),
-    #         plan_idx=self.plan_idx,
-    #         heatmap_json_obj=self.heatmap_json_obj,
-    #     )
-    #     # # This code checks if the function has been synthesized before, and if so, whether it is hardcoded. If so, set model and prompt_strategy to None.
-    #     # if td.op_id in PhysicalOperator.synthesizedFns:
-    #     #     if self.is_hardcoded():
-    #     #         td.model = None
-    #     #         td.prompt_strategy = None
-
-    #     return td
-
-    # def _attemptMapping(self, candidate: DataRecord):
-    # """Attempt to map the candidate to the outputSchema. Return None if it fails."""
-    # taskDescriptor = self._makeTaskDescriptor()
-    # taskFn = PhysicalOperator.solver.synthesize(
-    # taskDescriptor, shouldProfile=self.shouldProfile
-    # )
-    # drs, new_heatmap_json_obj = taskFn(candidate)
-    # self.heatmap_json_obj = new_heatmap_json_obj
-    # return drs
 
     def estimateCost(self, cost_est_data: Dict[str, Any] = None):
         # fetch cost estimates from source operation
@@ -383,18 +351,13 @@ class ConvertOp(PhysicalOperator):
 
         return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
 
-
-class ConvertFromCandidateOp(ConvertOp):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def __iter__(self) -> IteratorFn:
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
         @self.profile(name="convert", shouldProfile=self.shouldProfile)
         def iteratorFn():
             for nextCandidate in self.source:
-                resultRecordList = self._attemptMapping(nextCandidate)
+                resultRecordList = self.__call__(nextCandidate)
                 if resultRecordList is not None:
                     for resultRecord in resultRecordList:
                         if resultRecord is not None:
@@ -447,7 +410,7 @@ class ParallelConvertFromCandidateOp(ConvertOp):
                     max_workers=self.max_workers
                 ) as executor:
                     results = list(
-                        executor.map(self._attemptMapping, inputs[i : i + chunksize])
+                        executor.map(self.__call__, inputs[i : i + chunksize])
                     )
 
                     for resultRecordList in results:

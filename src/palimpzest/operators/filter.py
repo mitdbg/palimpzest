@@ -41,10 +41,6 @@ class FilterOp(PhysicalOperator):
         # # construct TaskDescriptor
         # taskDescriptor = self._makeTaskDescriptor()
 
-        # # synthesize task function
-        # if not taskDescriptor.op_id in PhysicalOperator.synthesizedFns:
-        #     PhysicalOperator.synthesizedFns[taskDescriptor.op_id] = PhysicalOperator.solver.synthesize(taskDescriptor, shouldProfile=self.shouldProfile)
-
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
@@ -270,33 +266,17 @@ class FilterOp(PhysicalOperator):
 
         return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
 
-    def _passesFilter(self, candidate):
-        """Return True if the candidate passes all filters, False otherwise."""
-        taskDescriptor = self._makeTaskDescriptor()
-        taskFn = PhysicalOperator.solver.synthesize(
-            taskDescriptor, shouldProfile=self.shouldProfile
-        )
-        # if not taskDescriptor.op_id in PhysicalOperator.synthesizedFns:
-        #     raise Exception("This function should have been synthesized during init():", taskDescriptor.op_id)
-        # return PhysicalOperator.synthesizedFns[taskDescriptor.op_id](candidate)
-        return taskFn(candidate)
-
-    def __iter__(self):
+    def __call__(self, candidate) -> bool:
         raise NotImplementedError("You are calling a method from the abstract class!")
 
-
-class FilterCandidateOp(FilterOp):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def __iter__(self):
+        # TODO GV Why is this logic in the __iter__ method and not in execution?
         shouldCache = self.datadir.openCache(self.targetCacheId)
 
         @self.profile(name="filter", shouldProfile=self.shouldProfile)
         def iteratorFn():
             for nextCandidate in self.source:
-                resultRecord = self._passesFilter(nextCandidate)
+                resultRecord = self.__call__(nextCandidate)
                 if resultRecord._passed_filter:
                     if shouldCache:
                         self.datadir.appendCache(self.targetCacheId, resultRecord)
@@ -370,7 +350,7 @@ class NonLLMFilter(FilterOp):
 
     def __call__(self, candidate: DataRecord):
         # start_time = time.time()
-        result = self.filter.filterFn(candidate)
+        result = self.filter(candidate)
         # fn_call_duration_secs = time.time() - start_time
         # if profiling, set record's stats for the given op_id
         # if shouldProfile:

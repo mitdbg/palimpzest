@@ -3,6 +3,7 @@ from __future__ import annotations
 from palimpzest.operators import LogicalOperator, FilteredScan
 from palimpzest.operators.physical import PhysicalOperator
 from palimpzest.sets import Set
+from palimpzest.profiler import PlanStats
 
 from typing import Any, Dict, List, Optional
 
@@ -28,9 +29,12 @@ class Plan:
         return len(self.operators)
 
     def __repr__(self):
-        return f"{self.__class__.__name__}:\n" + "\n".join(
-            map(str, [f"{idx}. {str(op)}" for idx, op in enumerate(self.operators)])
-        )
+        if self.operators:
+            return f"{self.__class__.__name__}:\n" + "\n".join(
+                map(str, [f"{idx}. {str(op)}" for idx, op in enumerate(self.operators)])
+            )
+        else:
+            return f"{self.__class__.__name__}: No operator tree."
 
 
 class LogicalPlan(Plan):
@@ -81,22 +85,20 @@ class PhysicalPlan(Plan):
         copyOps = [op.copy() for op in ops]
 
         # construct full set of operators
-        fullOperators = copySubPlan.extend(copyOps)
+        copySubPlan.extend(copyOps)
 
         # return the PhysicalPlan
-        return PhysicalPlan(fullOperators)
+        return PhysicalPlan(operators=copySubPlan)
 
-    def __str__(self) -> str:
-        """Computes a string representation for this plan."""
-        # TODO
-        physicalOps = physicalTree.dumpPhysicalTree()
-        flat = flatten_nested_tuples(physicalOps)
-        ops = [op for op in flat if not op.is_hardcoded()]
-        label = "-".join([
-            f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
-            for op in ops
-        ])
-        return f"PZ-{label_idx}-{label}"
+    # def __repr__(self) -> str:
+    #     pdb.set_trace()
+    #     """Computes a string representation for this plan."""
+    #     # TODO
+    #     # physicalOps = physicalTree.dumpPhysicalTree()
+    #     # flat = flatten_nested_tuples(physicalOps)
+    #     # ops = [op for op in flat if not op.is_hardcoded()]
+    #     label = "-".join([str(op) for op in self.operators])
+    #     return f"PZ-{label}"
 
     def getModels() -> List[Optional[str]]:
         """Return the list of models for each operator."""

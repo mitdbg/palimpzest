@@ -16,6 +16,7 @@ import unittest
 import palimpzest as pz
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner
 from palimpzest.operators import ConvertOp, ConvertFileToText
+from palimpzest.execution import NewExecute
 from utils import remove_cache, buildNestedStr
 
 
@@ -54,8 +55,12 @@ class TestDemo(unittest.TestCase):
         plans = logical.generate_plans(dataset)
         lp = plans[0]
         print(lp)
-        # physicalPlans = physical.generate_plans(lp)
-        # pp = physicalPlans[0]
+        physicalPlans = physical.generate_plans(lp)
+        pp = physicalPlans[0]
+        print(pp)
+
+        execution = NewExecute(dataset, policy=pz.MinCost())
+        execution.execute(pp)
 
 
 if __name__ == "__main__":
