@@ -1,39 +1,69 @@
 from __future__ import annotations
 
 from palimpzest.constants import Model, MODEL_CARDS
+from palimpzest.planner import PhysicalPlan
+from palimpzest.utils import getJsonFromAnswer
+
+import palimpzest as pz
 
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, asdict, field
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
-import ast
-import json
-import re
 
 # Let's simplify this with the following high-level design goal:
-# 1. there is an operator-level OperatorStats object which contains a list of the per-record OptimizationStats
-# 2. there is an OptimizationStats object which keeps track of the cost and runtime of each Optimization (akin to a GenerationStats object)
+# 1. there is an operator-level OperatorStats object which contains a list of the RecordOpStats
+# 2. there is a RecordOpStats object which keeps track of the cost and runtime of each Optimization (akin to a GenerationStats object)
 #    a. OptimizationStats may optionally store additional fields and define custom logic for aggregating these fields, but this is not required
 
 
 @dataclass
-class PlanStats:
+class RecordOpStats:
     """
-    Dataclass for storing statistics captured for an entire plan.
+    Dataclass for storing statistics about the execution of an operator on a single record.
     """
+    # operation id; a unique identifier for this operation
+    op_id: str
 
-    # label string identifying the physical plan
-    plan_label: str = None
-    # list of OperatorStats objects (one for each operator)
-    operator_stats: List[OperatorStats] = None
-    # total runtime for plan
-    total_runtime: float = 0.0
-    # total cost for plan
-    total_cost: float = 0.0
+    # operation name
+    op_name: str
+
+    # the time spent by the data record just in this operation; this is computed
+    # in the StatsProcessor as (the cumulative_iter_time of this data record in
+    # this operation) minus (the cumulative_iter_time of this data record in the
+    # source operation)
+    op_time: float
+
+    # the cost (in dollars) to generate this record at this operation
+    op_cost: float
+
+    # an OPTIONAL dictionary with more detailed information about this operation;
+    # when RecordOpStats are aggregated these will be coalesced into a list
+    op_details: Union[dict, list] = field(default_factory=lambda: {})
+
+    def to_dict(self):
+        return asdict(self)
+
+    def __add__(self, other: RecordOpStats):
+        assert self.op_id == other.op_id
+        # merge op_details
+        merged_details = (
+            [self.op_details, other.op_details]
+            if type(self.op_details) == dict
+            else self.op_details + [other.op_details]
+        )
+
+        return RecordOpStats(
+            op_id=self.op_id,
+            op_name=self.op_name,
+            op_time=self.op_time + other.op_time,
+            op_cost=self.op_cost + other.op_cost,
+            op_details=merged_details,
+        )
 
 
 @dataclass
@@ -139,201 +169,333 @@ class OperatorStats:
 
 
 @dataclass
-class Stats:  # OptimizationStats:
+class PlanStats:
     """
-    Base dataclass for storing statistics captured during the execution of an optimization on a single input record.
+    Dataclass for storing statistics captured for an entire plan.
     """
 
-    # optimization name
-    opt_name: str = None
+    # label string identifying the physical plan
+    plan_label: str = None
+    # list of OperatorStats objects (one for each operator)
+    operator_stats: List[OperatorStats] = None
+    # total runtime for plan
+    total_runtime: float = 0.0
+    # total cost for plan
+    total_cost: float = 0.0
+
+@dataclass
+class ExecutionStats:
+    """
+    Dataclass for storing statistics captured for an entire execution.
+    """
+    # total runtime for plan
+    total_runtime: float = 0.0
+
+    # total cost for plan
+    total_cost: float = 0.0
+
+@dataclass
+class OperatorCostEstimates:
+    """
+    Dataclass for storing estimates of key metrics of interest for each operator.
+    """
+    # (estimated) number of records output by this operator
+    cardinality: float
+    # (estimated) avg. time spent in this operator per-record
+    time_per_record: float
+    # (estimated) dollars spent per-record by this operator
+    cost_per_record: float
+    # (estimated) quality of the output from this operator
+    quality: float
+
+
+# TODO: remove everything in between the following lines of comments
+#####################
+@dataclass
+class Stats:
+    """
+    Base dataclass for storing statistics captured during the execution of an induce / filter
+    operation on a single input record.
+    """
     # (set in profiler.py) this is the total time spent waiting for the iterator
     # to yield the data record associated with this Stats object; note that this
     # will capture the total time spent in this operation and all source operations
     # due to the way in which we set timers in profiler.py rather than in the
     # physical operator code
-    cumulative_iter_time: float = None
+    cumulative_iter_time: float=None
     # the time spent by the data record just in this operation; this is computed
     # in the StatsProcessor as (the cumulative_iter_time of this data record in
     # this operation) minus (the cumulative_iter_time of this data record in the
     # source operation)
-    op_time: float = None
+    op_time: float=None
 
     def to_dict(self):
         return asdict(self)
 
-
 @dataclass
 class ApiStats(Stats):
     """Staistics captured from a (non-LLM) API call."""
-
     # total time spent waiting for the API to return a response
-    api_call_duration_secs: float = 0.0
-
+    api_call_duration_secs: float=0.0
 
 @dataclass
 class GenerationStats(Stats):
     """Statistics captured from LLM calls (i.e. the Generator's .generate() functions)."""
-
     # name of the LLM used to generate the output; should be a key in the MODEL_CARDS
-    model_name: str = None
+    model_name: str=None
     # total time spent from sending input to LLM to receiving output string
-    llm_call_duration_secs: float = 0.0
+    llm_call_duration_secs: float=0.0
     # the prompt used to generate the output
-    prompt: str = None
+    prompt: str=None
     # the usage dictionary for the LLM call
-    usage: Dict[str, int] = field(default_factory=dict)
+    usage: Dict[str, int]=field(default_factory=dict)
     # the reason the LLM stopped generating tokens
-    finish_reason: str = None
+    finish_reason: str=None
     # the answer extracted from the generated output
-    answer: str = None
+    answer: str=None
     # the log probabilities for the subset of tokens that comprise the answer
-    answer_log_probs: List[float] = None
-
+    answer_log_probs: List[float]=None
 
 @dataclass
 class BondedQueryStats(Stats):
     """Statistics captured from bonded queries."""
-
     # the generation statistics from the call to a generator
-    gen_stats: GenerationStats = None
+    gen_stats: GenerationStats=None
     # the set of input fields passed into the generation
-    input_fields: List[str] = None
+    input_fields: List[str]=None
     # the set of fields the bonded query was supposed to generate values for
-    generated_fields: List[str] = None
-
+    generated_fields: List[str]=None
 
 @dataclass
 class FieldQueryStats(Stats):
     """Statistics captured from generating the value for a single field in a conventional query."""
-
     # the generation statistics from the call to a generator
-    gen_stats: GenerationStats = None
+    gen_stats: GenerationStats=None
     # the field the statistics were generated for
-    field_name: str = None
-
+    field_name: str=None
 
 @dataclass
 class ConventionalQueryStats(Stats):
     """Statistics captured from conventional queries."""
-
     # the list of FieldQueryStats for each field in the generated_fields
-    field_query_stats_lst: List[FieldQueryStats] = field(default_factory=list)
+    field_query_stats_lst: List[FieldQueryStats]=field(default_factory=list)
     # the set of input fields passed into the generation
-    input_fields: List[str] = field(default_factory=list)
+    input_fields: List[str]=field(default_factory=list)
     # the set of fields the conventional query was supposed to generate values for
-    generated_fields: List[str] = field(default_factory=list)
-
+    generated_fields: List[str]=field(default_factory=list)
 
 @dataclass
 class CodeGenSingleStats(Stats):
-    prompt_template: str = None
-    context: Dict[str, Any] = field(default_factory=dict)
-    code: str = None
-    gen_stats: GenerationStats = field(default_factory=GenerationStats)
-
+    prompt_template: str=None
+    context: Dict[str, Any]=field(default_factory=dict)
+    code: str=None
+    gen_stats: GenerationStats=field(default_factory=GenerationStats)
 
 @dataclass
 class CodeGenEnsembleStats(Stats):
-    advice_gen_stats: GenerationStats = None
-    code_versions_stats: Dict[str, CodeGenSingleStats] = field(default_factory=dict)
-
+    advice_gen_stats: GenerationStats=None
+    code_versions_stats: Dict[str, CodeGenSingleStats]=field(default_factory=dict)
 
 @dataclass
 class CodeExecutionSingleStats(Stats):
-    code_response: Any = None
-    code_exec_duration_secs: float = 0.0
-
+    code_response: Any=None
+    code_exec_duration_secs: float=0.0
 
 @dataclass
 class CodeExecutionEnsembleStats(Stats):
-    majority_response: Any = None
-    code_versions_stats: Dict[str, CodeExecutionSingleStats] = field(
-        default_factory=dict
-    )
-
+    majority_response: Any=None
+    code_versions_stats: Dict[str, CodeExecutionSingleStats]=field(default_factory=dict)
 
 @dataclass
 class FullCodeGenStats(Stats):
-    code_gen_stats: Dict[str, CodeGenEnsembleStats] = field(default_factory=dict)
-    code_exec_stats: Dict[str, CodeExecutionEnsembleStats] = field(default_factory=dict)
-
-
+    code_gen_stats: Dict[str, CodeGenEnsembleStats]=field(default_factory=dict)
+    code_exec_stats: Dict[str, CodeExecutionEnsembleStats]=field(default_factory=dict)
 # TODO: aggregate other information about codegen (majority_response, code, etc.)
 
-
 @dataclass
-class ConvertLLMStats(Stats):
+class InduceLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from an induce w/LLM operation."""
-
     # query strategy used
-    query_strategy: str = None
+    query_strategy: str=None
     # the token budget used during generation
     token_budget: float = None
     # stats from bonded query
-    bonded_query_stats: BondedQueryStats = None
+    bonded_query_stats: BondedQueryStats=None
     # stats from conventional query
-    conventional_query_stats: ConventionalQueryStats = None
+    conventional_query_stats: ConventionalQueryStats=None
     # stats from code generation
-    full_code_gen_stats: FullCodeGenStats = None
-
+    full_code_gen_stats: FullCodeGenStats=None
 
 @dataclass
-class ConvertNonLLMStats(Stats):
+class InduceNonLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from a hard-coded induce operation."""
-
     # stats containing time spent calling some external API
-    api_stats: ApiStats = None
-
+    api_stats: ApiStats=None
 
 @dataclass
 class FilterLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from a filter operation."""
-
     # the generation statistics from the call to the filter LLM
-    gen_stats: GenerationStats = None
+    gen_stats: GenerationStats=None
     # the filter condition for this filter
-    filter: str = None
-
+    filter: str=None
 
 @dataclass
 class FilterNonLLMStats(Stats):
     """Dataclass containing all possible statistics which could be returned from a filter operation."""
-
     # the time it takes to execute the filter function
-    fn_call_duration_secs: float = None
+    fn_call_duration_secs: float=None
     # the filter condition for this filter
-    filter: str = None
+    filter: str=None
+#####################
 
+# TYPE DEFINITIONS
+SampleExecutionData = Dict[str, Any] # TODO: dataclass?
 
-# TODO: move to utils
-def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
+class CostOptimizer:
     """
-    This function parses an LLM response which is supposed to output a JSON object
-    and optimistically searches for the substring containing the JSON object.
+    This class takes in a list of SampleExecutionData and exposes a function which uses this data
+    to perform cost estimation on a list of physical plans.
     """
-    if not answer.strip().startswith("{"):
-        # Find the start index of the actual JSON string
-        # assuming the prefix is followed by the JSON object/array
-        start_index = answer.find("{") if "{" in answer else answer.find("[")
-        if start_index != -1:
-            # Remove the prefix and any leading characters before the JSON starts
-            answer = answer[start_index:]
+    def __init__(self, sample_execution_data: List[SampleExecutionData] = []):
+        # construct full dataset of samples
+        self.sample_execution_data_df = (
+            pd.DataFrame(sample_execution_data)
+            if len(sample_execution_data) > 0
+            else pd.DataFrame()
+        )
 
-    if not answer.strip().endswith("}"):
-        # Find the end index of the actual JSON string
-        # assuming the suffix is preceded by the JSON object/array
-        end_index = answer.rfind("}") if "}" in answer else answer.rfind("]")
-        if end_index != -1:
-            # Remove the suffix and any trailing characters after the JSON ends
-            answer = answer[: end_index + 1]
+    def _compute_operator_estimates(self) -> Optional[Dict[str, Any]]:
+        """
+        Compute per-operator estimates of runtime, cost, and quality.
+        """
+        # TODO:
+        # - switch to iterating over op_ids present in sample execution data
+        # - move StatsProcessor estimation fcn.'s into this class
+        # - produce identical operator_estimates dict. to the one we previously had
+        # for now, each sentinel uses the same logical plan, so we can simply use the first one
+        sentinel_plan = sentinel_plans[0]
 
-    # Handle weird escaped values. I am not sure why the model
-    # is returning these, but the JSON parser can't take them
-    answer = answer.replace("\_", "_")
+        # construct full dataset of samples
+        sample_exec_data_df = (
+            pd.DataFrame(self.sample_execution_data)
+            if self.sample_execution_data is not None and self.sample_execution_data != []
+            else pd.DataFrame()
+        )
 
-    # Handle comments in the JSON response. Use regex from // until end of line
-    answer = re.sub(r"\/\/.*$", "", answer, flags=re.MULTILINE)
-    return json.loads(answer)
+        # compute estimates of runtime, cost, and quality (and intermediates like cardinality) for every operator
+        operator_estimates = {}
+        for op in sentinel_plan.operators:
+            # get unique identifier for operator
+            op_id = op.op_id()
+            # - base / cache scan: dataset identifier
+            # - convert: output schema (generated fields)
+            # - filter: filter condition
+            # - limit: <doesn't matter; just pass through and set output cardinality>
+            # - count / avg: <doesn't matter; just pass through and set output cardinality>
+            # - gby: <doesn't matter; just pass through and set output cardinality>
+
+            # filter for subset of sample execution data related to this operation
+            op_df = (
+                sample_exec_data_df.query(op_id)
+                if not sample_exec_data_df.empty
+                else pd.DataFrame()
+            )
+
+            estimates = {}
+            if op_df.empty:
+                estimates = op.naiveCostEstimates() # TODO
+            else:
+                # get model name for this operation (if applicable)
+                model_name = repr(getattr(op, "model", None))
+
+                estimates = StatsProcessor.compute_operator_estimates(sample_exec_data_df)
+
+                est_input_tokens, est_output_tokens = StatsProcessor.est_tokens_per_record(op_df, model_name)
+                estimates = {
+                    "time_per_record": StatsProcessor.est_time_per_record(op_df, model_name),
+                    "cost_per_record": StatsProcessor.est_cost_per_record(op_df, model_name),
+                    "input_tokens_per_record": est_input_tokens,
+                    "output_tokens_per_record": est_output_tokens,
+                    "selectivity": StatsProcessor.est_selectivity(op_df, model_name),
+                    "quality": StatsProcessor.est_quality(sample_exec_data_df, op_df, model_name),
+                }
+
+            operator_estimates[op_id] = estimates
+
+    def _estimate_plan_cost(physical_plan: PhysicalPlan, sample_op_estimates: Optional[Dict[str, Any]]) -> None:
+        # initialize dictionary w/estimates for entire plan
+        plan_estimates = {"total_time": 0.0, "total_cost": 0.0, "quality": 0.0}
+
+        op_estimates, source_op_estimates = None, None
+        for op in physical_plan:
+            # get identifier for operation which is unique within sentinel plan but consistent across sentinels
+            op_id = op.physical_op_id()
+
+            # initialize estimates of operator metrics based on naive (but sometimes precise) logic
+            op_estimates = (
+                op.naiveCostEstimates()
+                if isinstance(op, pz.operators.MarshalAndScanDataOp) or isinstance(op, pz.operators.CacheScanDataOp)
+                else op.naiveCostEstimates(source_op_estimates)
+            )
+
+            # if we have sample execution data, update naive estimates with more informed ones
+            if sample_op_estimates is not None and op_id in sample_op_estimates:
+                if isinstance(op, pz.operators.MarshalAndScanDataOp) or isinstance(op, pz.operators.CacheScanDataOp):
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+
+                elif isinstance(op, pz.operators.ApplyGroupByOp):
+                    op_estimates.cardinality = sample_op_estimates[op_id]["cardinality"]
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+
+                elif isinstance(op, pz.operators.ApplyCountAggregateOp) or isinstance(op, pz.operators.ApplyAverageAggregateOp):
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+
+                elif isinstance(op, pz.operators.LimitScanOp):
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+            
+                elif isinstance(op, pz.operators.NonLLMFilter):
+                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                    op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
+
+                elif isinstance(op, pz.operators.LLMFilter):
+                    model_name = op.model.value
+                    # TODO: account for scenario where model_name does not have samples but another model does
+                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
+                    op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
+                    op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
+                    op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
+
+                # TODO: convert operators
+
+            # NOTE: a slightly more accurate thing to do would be to estimate the time_per_record based on the
+            #       *input* cardinality to the operator and multiply by the estimated input cardinality.
+            # update plan estimates
+            plan_estimates["total_time"] += op_estimates.time_per_record * op_estimates.cardinality
+            plan_estimates["total_cost"] += op_estimates.cost_per_record * op_estimates.cardinality
+            plan_estimates["quality"] *= op_estimates.quality
+
+            # update source_op_estimates
+            source_op_estimates = op_estimates
+
+        # set the plan's estimates
+        physical_plan.estimates = plan_estimates
+
+    def estimate_plan_costs(self, physical_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
+        """
+        Estimate the cost of each physical plan by making use of the sample execution data
+        provided to the CostOptimizer. The plan cost, runtime, and quality are set as attributes
+        on each physical plan and the updated set of physical plans is returned.
+        """
+        operator_estimates = self._compute_operator_estimates()
+
+        for physical_plan in physical_plans:
+            self._estimate_plan_cost(physical_plan, operator_estimates)
+
+        return physical_plans
+
+
 
 
 class StatsProcessor:
@@ -763,8 +925,8 @@ class StatsProcessor:
         return profiling_data
 
     @staticmethod
-    def _est_time_per_record(
-        op_df: pd.DataFrame, model_name: str = None, agg: str = "mean"
+    def est_time_per_record(
+        op_df: pd.DataFrame, model_name: Optional[str] = None, agg: str = "mean"
     ) -> float:
         """
         Given sample cost data observations for a specific operation, compute the aggregate over
@@ -780,31 +942,8 @@ class StatsProcessor:
         return op_df["op_time"].agg(agg=agg).iloc[0]
 
     @staticmethod
-    def _est_num_input_output_tokens(
-        op_df: pd.DataFrame, model_name: str = None, agg: str = "mean"
-    ) -> Tuple[float, float]:
-        """
-        Given sample cost data observations for a specific operation, compute the aggregate over
-        the `num_input_tokens` and `num_output_tokens` columns.
-        """
-        # use model-specific estimate if possible
-        if model_name is not None:
-            model_df = op_df[op_df.model_name == model_name]
-            if not model_df.empty:
-                return (
-                    model_df["num_input_tokens"].agg(agg=agg).iloc[0],
-                    model_df["num_output_tokens"].agg(agg=agg).iloc[0],
-                )
-
-        # compute aggregate
-        return (
-            op_df["num_input_tokens"].agg(agg=agg).iloc[0],
-            op_df["num_output_tokens"].agg(agg=agg).iloc[0],
-        )
-
-    @staticmethod
-    def _est_usd_per_record(
-        op_df: pd.DataFrame, model_name: str = None, agg: str = "mean"
+    def est_cost_per_record(
+        op_df: pd.DataFrame, model_name: Optional[str] = None, agg: str = "mean"
     ) -> float:
         """
         Given sample cost data observations for a specific operation, compute the aggregate over
@@ -839,8 +978,31 @@ class StatsProcessor:
         return (op_df["input_usd"] + op_df["output_usd"]).agg(agg=agg).iloc[0]
 
     @staticmethod
-    def _est_selectivity(
-        df: pd.DataFrame, op_df: pd.DataFrame, model_name: str = None
+    def est_tokens_per_record(
+        op_df: pd.DataFrame, model_name: Optional[str] = None, agg: str = "mean"
+    ) -> Tuple[float, float]:
+        """
+        Given sample cost data observations for a specific operation, compute the aggregate over
+        the `num_input_tokens` and `num_output_tokens` columns.
+        """
+        # use model-specific estimate if possible
+        if model_name is not None:
+            model_df = op_df[op_df.model_name == model_name]
+            if not model_df.empty:
+                return (
+                    model_df["num_input_tokens"].agg(agg=agg).iloc[0],
+                    model_df["num_output_tokens"].agg(agg=agg).iloc[0],
+                )
+
+        # compute aggregate
+        return (
+            op_df["num_input_tokens"].agg(agg=agg).iloc[0],
+            op_df["num_output_tokens"].agg(agg=agg).iloc[0],
+        )
+    
+    @staticmethod
+    def est_selectivity(
+        df: pd.DataFrame, op_df: pd.DataFrame, model_name: Optional[str] = None
     ) -> float:
         """
         Given sample cost data observations for the plan and a specific operation, compute
@@ -878,7 +1040,7 @@ class StatsProcessor:
         return num_output_records / num_input_records
 
     @staticmethod
-    def _est_quality(op_df: pd.DataFrame, model_name: str = None) -> float:
+    def est_quality(op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the an estimate
         of the quality of its outputs by using GPT-4 as a champion model.
@@ -963,7 +1125,7 @@ class StatsProcessor:
         def _clean_answer(answer, op_name):
             # extract JSON for induce
             if "induce" in op_name:
-                return _get_JSON_from_answer(answer)
+                return getJsonFromAnswer(answer)
 
             # extract T/F for filter
             elif "filter" in op_name:

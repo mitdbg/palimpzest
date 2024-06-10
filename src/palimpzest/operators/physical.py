@@ -1,25 +1,21 @@
 from __future__ import annotations
 
-import math
-
 from palimpzest.constants import *
-from palimpzest.corelib import ImageFile, Number, Schema
+from palimpzest.corelib import Number, Schema
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
-from palimpzest.profiler import OperatorStats, Profiler, StatsProcessor
+from palimpzest.profiler import RecordOpStats, OperatorCostEstimates
 
-from typing import Any, Callable, Dict, List, Tuple, Union, Optional
+from typing import Any, Callable, Dict, Tuple, Optional
 
-import pandas as pd
-
-import concurrent
 import hashlib
 import json
 import sys
+import time
 
-# DEFINITIONS
-MAX_ID_CHARS = 10
-IteratorFn = Callable[[], DataRecord]
+# TYPE DEFINITIONS
+DataRecordWithStats = Tuple[DataRecord, RecordOpStats]
+DataSourceIteratorFn = Callable[[], DataRecordWithStats]
 
 
 class PhysicalOperator:
@@ -40,21 +36,34 @@ class PhysicalOperator:
         self.inputSchema = inputSchema
         self.datadir = DataDirectory()
         self.shouldProfile = shouldProfile
-        self.plan_idx = None
         self.max_workers = max_workers
-
-        # NOTE: this must be overridden in each physical operator's __init__ method;
-        #       we have to do it their b/c the opId() (which is an argument to the
-        #       profiler's constructor) may not be valid until the physical operator
-        #       has initialized all of its member fields
-        self.profiler = None
 
     def __eq__(self, other: PhysicalOperator) -> bool:
         raise NotImplementedError("Abstract method")
 
-    def opId(self) -> str:
+    def op_name(self) -> str:
+        """Name of the physical operator."""
+        return self.__class__.__name__
+
+    def physical_op_id(self, plan_position: Optional[int] = None) -> str:
         raise NotImplementedError("Abstract method")
 
+    def _compute_op_id_from_dict(self, op_dict: Dict[str, Any], plan_position: Optional[int] = None) -> str:
+        if plan_position is not None:
+            op_dict["plan_position"] = plan_position
+
+        ordered = json.dumps(op_dict, sort_keys=True)
+        hash = hashlib.sha256(ordered.encode()).hexdigest()[:MAX_OP_ID_CHARS]
+
+        op_id = (
+            f"{self.op_name()}_{hash}"
+            if plan_position is None
+            else f"{self.op_name()}_{plan_position}_{hash}"
+        )
+
+        return op_id
+
+    # TODO
     def legacy_is_hardcoded(self) -> bool:
         if self.inputSchema is None:
             return True
@@ -63,72 +72,85 @@ class PhysicalOperator:
     def copy(self) -> PhysicalOperator:
         raise NotImplementedError
 
-    def dumpPhysicalTree(self) -> Tuple[PhysicalOperator, Union[PhysicalOperator, None]]:
-        raise NotImplementedError("Legacy method")
-        """Return the physical tree of operators."""
-        if self.inputSchema is None:
-            return (self, None)
-        return (self, self.source.dumpPhysicalTree())
-
-    def __call__(self, candidate: Any) -> IteratorFn:
+    def __call__(self, candidate: Any) -> DataRecordWithStats:
         raise NotImplementedError("Abstract method")
 
-    def getProfilingData(self) -> OperatorStats:
-        # simply return stats for this operator if there is no source
-        if self.shouldProfile and self.source is None:
-            return self.profiler.get_data()
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        """
+        This function returns a naive estimate of this operator's:
+        - cardinality
+        - time_per_record
+        - cost_per_record
+        - output_tokens_per_record
+        - quality
 
-        # otherwise, fetch the source operator's stats first, and then return
-        # the current operator's stats w/a copy of its sources' stats
-        elif self.shouldProfile:
-            source_operator_stats = self.source.getProfilingData()
-            operator_stats = self.profiler.get_data()
-            operator_stats.source_op_stats = source_operator_stats
-            return operator_stats
-
-        # raise an exception if this method is called w/out profiling turned on
-        else:
-            raise Exception(
-                "Profiling was not turned on; please ensure shouldProfile=True when executing plan."
-            )
-
-    def estimateCost(
-        self, cost_estimate_sample_data: List[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """Returns dict of time, cost, and quality metrics."""
+        The function takes an argument which contains the OperatorCostEstimates
+        of the physical operator whose output is the input to this operator.
+    
+        For the implemented operator. These will be used by the CostOptimizer
+        when PZ does not have sample execution data -- and it will be necessary
+        in some cases even when sample execution data is present. (For example,
+        the cardinality of each operator cannot be estimated based on sample
+        execution data alone -- thus DataSourcePhysicalOperators need to give
+        at least ballpark correct estimates of this quantity).
+        """
         raise NotImplementedError("Abstract method")
 
 
-class MarshalAndScanDataOp(PhysicalOperator):
+class DataSourcePhysicalOperator(PhysicalOperator):
+    """
+    By definition, physical operators which implement DataSources don't accept
+    a candidate DataRecord as input (because they produce them). Thus, we use
+    a slightly modified abstract base class for these operators.
+    """
+    def naiveCostEstimates(self) -> OperatorCostEstimates:
+        """
+        This function returns a naive estimate of this operator's:
+        - cardinality
+        - time_per_record
+        - cost_per_record
+        - output_tokens_per_record
+        - quality
+    
+        For the implemented operator. These will be used by the CostOptimizer
+        when PZ does not have sample execution data -- and it will be necessary
+        in some cases even when sample execution data is present. (For example,
+        the cardinality of each operator cannot be estimated based on sample
+        execution data alone -- thus DataSourcePhysicalOperators need to give
+        at least ballpark correct estimates of this quantity).
+        """
+        raise NotImplementedError("Abstract method")
+
+    def __call__(self) -> DataSourceIteratorFn:
+        raise NotImplementedError("Abstract method")
+
+
+class MarshalAndScanDataOp(DataSourcePhysicalOperator):
     def __init__(
         self,
         outputSchema: Schema,
         datasetIdentifier: str,
-        #        num_samples: int = None,
-        #        scan_start_idx: int = 0,
+        num_samples: int = None,
+        scan_start_idx: int = 0,
         shouldProfile=False,
     ):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.datasetIdentifier = datasetIdentifier
-        # self.num_samples = num_samples
-        # self.scan_start_idx = scan_start_idx
-
-        # NOTE: need to construct profiler after all fields used by self.opId() are set
-        # self.profiler = Profiler(op_id=self.opId())
-        # self.profile = self.profiler.iter_profiler
+        self.num_samples = num_samples
+        self.scan_start_idx = scan_start_idx
 
     def __eq__(self, other: PhysicalOperator):
         return (
-            isinstance(other, MarshalAndScanDataOp)
+            isinstance(other, self.__class__)
             and self.datasetIdentifier == other.datasetIdentifier
             and self.outputSchema == other.outputSchema
-            # and self.num_samples == other.num_samples
-            # and self.scan_start_idx == other.scan_start_idx
+            and self.num_samples == other.num_samples
+            and self.scan_start_idx == other.scan_start_idx
         )
 
     def __str__(self):
         return (
-            "MarshalAndScanDataOp("
+            f"{self.op_name()}("
             + str(self.outputSchema)
             + ", "
             + self.datasetIdentifier
@@ -139,72 +161,69 @@ class MarshalAndScanDataOp(PhysicalOperator):
         return MarshalAndScanDataOp(
             self.outputSchema,
             self.datasetIdentifier,
-            # self.num_samples,
-            # self.scan_start_idx,
-            # self.shouldProfile,
+            self.num_samples,
+            self.scan_start_idx,
+            self.shouldProfile,
         )
 
-    def opId(self):
-        d = {
-            "operator": "MarshalAndScanDataOp",
+    def physical_op_id(self, plan_position: Optional[int] = None):
+        op_dict = {
+            "operator": self.op_name(),
             "outputSchema": str(self.outputSchema),
             "datasetIdentifier": self.datasetIdentifier,
         }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def estimateCost(self, cost_est_data: Dict[str, Any] = None):
+        return self._compute_op_id_from_dict(op_dict, plan_position)
+
+    def naiveCostEstimates(self):
         cardinality = self.datadir.getCardinality(self.datasetIdentifier) + 1
         size = self.datadir.getSize(self.datasetIdentifier)
-        perElementSizeInKb = (size / float(cardinality)) / 1024.0
+        perRecordSizeInKb = (size / float(cardinality)) / 1024.0
 
-        # if we have sample data, use it to get a better estimate of the timePerElement
-        # and the output tokens per element
-        timePerElement, op_filter = None, "op_name == 'base_scan'"
-        if cost_est_data is not None and cost_est_data[op_filter] is not None:
-            timePerElement = cost_est_data[op_filter]["time_per_record"]
-        else:
-            # estimate time spent reading each record
-            datasetType = self.datadir.getRegisteredDatasetType(self.datasetIdentifier)
-            timePerElement = (
-                LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
-                if datasetType in ["dir", "file"]
-                else MEMORY_SCAN_TIME_PER_KB * perElementSizeInKb
-            )
-
-        # NOTE: downstream operators will ignore this estimate if they have a cost_estimate dict.
-        # estimate per-element number of tokens output by this operator
-        estOutputTokensPerElement = (
-            (size / float(cardinality))  # per-element size in bytes
-            * ELEMENT_FRAC_IN_CONTEXT  # fraction of the element which is provided in context
-            * BYTES_TO_TOKENS  # convert bytes to tokens
+        # estimate time spent reading each record
+        datasetType = self.datadir.getRegisteredDatasetType(self.datasetIdentifier)
+        timePerRecord = (
+            LOCAL_SCAN_TIME_PER_KB * perRecordSizeInKb
+            if datasetType in ["dir", "file"]
+            else MEMORY_SCAN_TIME_PER_KB * perRecordSizeInKb
         )
 
-        # assume no cost for reading data
-        usdPerElement = 0
+        # for now, assume no cost per record for reading data
+        return OperatorCostEstimates(
+            cardinality=cardinality,
+            time_per_record=timePerRecord,
+            cost_per_record=0,
+            quality=1.0,
+        )
 
-        costEst = {
-            "cardinality": cardinality,
-            "timePerElement": timePerElement,
-            "usdPerElement": usdPerElement,
-            "cumulativeTimePerElement": timePerElement,
-            "cumulativeUSDPerElement": usdPerElement,
-            "totalTime": timePerElement * cardinality,
-            "totalUSD": usdPerElement * cardinality,
-            "estOutputTokensPerElement": estOutputTokensPerElement,
-            "quality": 1.0,
-        }
+    def __call__(self) -> DataSourceIteratorFn:
+        def iteratorFn():
+            counter = 0
+            start_time = time.time()
+            for idx, nextCandidate in enumerate(self.datadir.getRegisteredDataset(self.datasetIdentifier)):
+                end_time = time.time()
+                if idx < self.scan_start_idx:
+                    start_time = time.time()
+                    continue
 
-        return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
+                record_op_stats = RecordOpStats(
+                    op_id=self.physical_op_id(),
+                    op_name=self.op_name(),
+                    op_time=(end_time - start_time),
+                    op_cost=0.0,
+                )
 
-    # @self.profile(name="base_scan", shouldProfile=self.shouldProfile)
-    def __call__(self) -> IteratorFn:
-        dataset_iter = self.datadir.getDatasetIterator(self.datasetIdentifier)
-        drs = [DataRecord(self.outputSchema, **record) for record in dataset_iter]
-        return drs
+                yield nextCandidate, record_op_stats
+
+                if self.num_samples:
+                    counter += 1
+                    if counter >= self.num_samples:
+                        break
+
+        return iteratorFn()
 
 
-class CacheScanDataOp(PhysicalOperator):
+class CacheScanDataOp(DataSourcePhysicalOperator):
     def __init__(
         self,
         outputSchema: Schema,
@@ -218,13 +237,9 @@ class CacheScanDataOp(PhysicalOperator):
         self.num_samples = num_samples
         self.scan_start_idx = scan_start_idx
 
-        # NOTE: need to construct profiler after all fields used by self.opId() are set
-        self.profiler = Profiler(op_id=self.opId())
-        self.profile = self.profiler.iter_profiler
-
     def __eq__(self, other: PhysicalOperator):
         return (
-            isinstance(other, CacheScanDataOp)
+            isinstance(other, self.__class__)
             and self.cacheIdentifier == other.cacheIdentifier
             and self.num_samples == other.num_samples
             and self.scan_start_idx == other.scan_start_idx
@@ -233,7 +248,7 @@ class CacheScanDataOp(PhysicalOperator):
 
     def __str__(self):
         return (
-            "CacheScanDataOp("
+            f"{self.op_name()}("
             + str(self.outputSchema)
             + ", "
             + self.cacheIdentifier
@@ -249,16 +264,16 @@ class CacheScanDataOp(PhysicalOperator):
             self.shouldProfile,
         )
 
-    def opId(self):
-        d = {
-            "operator": "CacheScanDataOp",
+    def physical_op_id(self, plan_position: Optional[int] = None):
+        op_dict = {
+            "operator": self.op_name(),
             "outputSchema": str(self.outputSchema),
-            "cacheIdentifier": self.cacheIdentifier,
+            "datasetIdentifier": self.cacheIdentifier,
         }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
 
-    def estimateCost(self, cost_est_data: Dict[str, Any] = None):
+        return self._compute_op_id_from_dict(op_dict, plan_position)
+
+    def naiveCostEstimates(self):
         # TODO: at the moment, getCachedResult() looks up a pickled file that stores
         #       the cached data specified by self.cacheIdentifier, opens the file,
         #       and then returns an iterator over records in the pickled file.
@@ -279,54 +294,40 @@ class CacheScanDataOp(PhysicalOperator):
         ]
         cardinality = sum(list(map(lambda tup: tup[0], cached_data_info))) + 1
         size = sum(list(map(lambda tup: tup[1], cached_data_info)))
-        perElementSizeInKb = (size / float(cardinality)) / 1024.0
+        perRecordSizeInKb = (size / float(cardinality)) / 1024.0
 
-        # if we have sample data, use it to get a better estimate of the timePerElement
-        # and the output tokens per element
-        timePerElement, op_filter = None, "op_name == 'cache_scan'"
-        if cost_est_data is not None and cost_est_data[op_filter] is not None:
-            timePerElement = cost_est_data[op_filter]["time_per_record"]
-        else:
-            # estimate time spent reading each record
-            timePerElement = LOCAL_SCAN_TIME_PER_KB * perElementSizeInKb
+        # estimate time spent reading each record
+        timePerRecord = LOCAL_SCAN_TIME_PER_KB * perRecordSizeInKb
 
-        # assume no cost for reading data
-        usdPerElement = 0
-
-        # NOTE: downstream operators will ignore this estimate if they have a cost_estimate dict.
-        # estimate per-element number of tokens output by this operator
-        estOutputTokensPerElement = (
-            (size / float(cardinality))  # per-element size in bytes
-            * ELEMENT_FRAC_IN_CONTEXT  # fraction of the element which is provided in context
-            * BYTES_TO_TOKENS  # convert bytes to tokens
+        # for now, assume no cost per record for reading from cache
+        return OperatorCostEstimates(
+            cardinality=cardinality,
+            time_per_record=timePerRecord,
+            cost_per_record=0,
+            quality=1.0,
         )
 
-        costEst = {
-            "cardinality": cardinality,
-            "timePerElement": timePerElement,
-            "usdPerElement": usdPerElement,
-            "cumulativeTimePerElement": timePerElement,
-            "cumulativeUSDPerElement": usdPerElement,
-            "totalTime": timePerElement * cardinality,
-            "totalUSD": usdPerElement * cardinality,
-            "estOutputTokensPerElement": estOutputTokensPerElement,
-            "quality": 1.0,
-        }
-
-        return costEst, {"cumulative": costEst, "thisPlan": costEst, "subPlan": None}
-
-    def __iter__(self) -> IteratorFn:
-        @self.profile(name="cache_scan", shouldProfile=self.shouldProfile)
+    def __call__(self) -> DataSourceIteratorFn:
         def iteratorFn():
             # NOTE: see comment in `estimateCost()`
             counter = 0
+            start_time = time.time()
             for idx, nextCandidate in enumerate(
                 self.datadir.getCachedResult(self.cacheIdentifier)
             ):
+                end_time = time.time()
                 if idx < self.scan_start_idx:
+                    start_time = time.time()
                     continue
 
-                yield nextCandidate
+                record_op_stats = RecordOpStats(
+                    op_id=self.physical_op_id(),
+                    op_name=self.op_name(),
+                    op_time=(end_time - start_time),
+                    op_cost=0.0,
+                )
+
+                yield nextCandidate, record_op_stats
 
                 if self.num_samples:
                     counter += 1
@@ -334,35 +335,6 @@ class CacheScanDataOp(PhysicalOperator):
                         break
 
         return iteratorFn()
-
-
-def agg_init(func):
-    if func.lower() == "count":
-        return 0
-    elif func.lower() == "average":
-        return (0, 0)
-    else:
-        raise Exception("Unknown agg function " + func)
-
-
-def agg_merge(func, state, val):
-    if func.lower() == "count":
-        return state + 1
-    elif func.lower() == "average":
-        sum, cnt = state
-        return (sum + val, cnt + 1)
-    else:
-        raise Exception("Unknown agg function " + func)
-
-
-def agg_final(func, state):
-    if func.lower() == "count":
-        return state
-    elif func.lower() == "average":
-        sum, cnt = state
-        return float(sum) / cnt
-    else:
-        raise Exception("Unknown agg function " + func)
 
 
 class ApplyGroupByOp(PhysicalOperator):
@@ -385,58 +357,74 @@ class ApplyGroupByOp(PhysicalOperator):
 
     def __eq__(self, other: PhysicalOperator):
         return (
-            isinstance(other, ApplyGroupByOp)
+            isinstance(other, self.__class__)
             and self.gbySig == other.gbySig
             and self.outputSchema == other.outputSchema
             and self.inputSchema == other.inputSchema
         )
 
     def __str__(self):
-        return str(self.gbySig)
+        return f"{self.op_name()}({str(self.gbySig)})"
 
     def copy(self):
         return ApplyGroupByOp(
-            self.source, self.gbySig, self.targetCacheId, self.shouldProfile
+            self.inputSchema, self.gbySig, self.targetCacheId, self.shouldProfile
         )
 
-    def opId(self):
-        d = {
-            "operator": "ApplyGroupByOp",
-            "source": self.source.opId(),
+    def physical_op_id(self, plan_position: Optional[int] = None):
+        op_dict = {
+            "operator": self.op_name(),
             "gbySig": str(GroupBySig.serialize(self.gbySig)),
-            "targetCacheId": self.targetCacheId,
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
-    def dumpPhysicalTree(self):
-        """Return the physical tree of operators."""
-        return (self, self.source.dumpPhysicalTree())
-
-    def estimateCost(self):
-        inputEstimates, subPlanCostEst = self.source.estimateCost()
-
-        outputEstimates = {**inputEstimates}
-        outputEstimates["cardinality"] = 1
-
-        # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
-        outputEstimates["timePerElement"] = 0
-        outputEstimates["usdPerElement"] = 0
-        outputEstimates["estOutputTokensPerElement"] = 0
-
-        return outputEstimates, {
-            "cumulative": outputEstimates,
-            "thisPlan": {},
-            "subPlan": subPlanCostEst,
         }
 
+        return self._compute_op_id_from_dict(op_dict, plan_position)
+
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        # for now, assume applying the groupby takes negligible additional time (and no cost in USD)
+        return OperatorCostEstimates(
+            cardinality=NAIVE_EST_NUM_GROUPS,
+            time_per_record=0,
+            cost_per_record=0,
+            quality=1.0,
+        )
+
+    @staticmethod
+    def agg_init(func):
+        if func.lower() == "count":
+            return 0
+        elif func.lower() == "average":
+            return (0, 0)
+        else:
+            raise Exception("Unknown agg function " + func)
+
+    @staticmethod
+    def agg_merge(func, state, val):
+        if func.lower() == "count":
+            return state + 1
+        elif func.lower() == "average":
+            sum, cnt = state
+            return (sum + val, cnt + 1)
+        else:
+            raise Exception("Unknown agg function " + func)
+
+    @staticmethod
+    def agg_final(func, state):
+        if func.lower() == "count":
+            return state
+        elif func.lower() == "average":
+            sum, cnt = state
+            return float(sum) / cnt
+        else:
+            raise Exception("Unknown agg function " + func)
+
+    # TODO: turn this into a __call__ and rely on storing state in class attrs not closure; also return RecordOpStats
     def __iter__(self):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
         aggState = {}
 
         @self.profile(
-            name="groupby", op_id=self.opId(), shouldProfile=self.shouldProfile
+            name="groupby", op_id=self.op_id(), shouldProfile=self.shouldProfile
         )
         def iteratorFn():
             for r in self.source:
@@ -453,7 +441,7 @@ class ApplyGroupByOp(PhysicalOperator):
                 else:
                     state = []
                     for fun in self.gbySig.aggFuncs:
-                        state.append(agg_init(fun))
+                        state.append(ApplyGroupByOp.agg_init(fun))
                 for i in range(0, len(self.gbySig.aggFuncs)):
                     fun = self.gbySig.aggFuncs[i]
                     if not hasattr(r, self.gbySig.aggFields[i]):
@@ -461,7 +449,7 @@ class ApplyGroupByOp(PhysicalOperator):
                             f"ApplyGroupOp record missing expected field {self.gbySig.aggFields[i]}"
                         )
                     field = getattr(r, self.gbySig.aggFields[i])
-                    state[i] = agg_merge(fun, state[i], field)
+                    state[i] = ApplyGroupByOp.agg_merge(fun, state[i], field)
                 aggState[group] = state
 
             gbyFields = self.gbySig.gbyFields
@@ -473,7 +461,7 @@ class ApplyGroupByOp(PhysicalOperator):
                     setattr(dr, gbyFields[i], k)
                 vals = aggState[g]
                 for i in range(0, len(vals)):
-                    v = agg_final(self.gbySig.aggFuncs[i], vals[i])
+                    v = ApplyGroupByOp.agg_final(self.gbySig.aggFuncs[i], vals[i])
                     setattr(dr, aggFields[i], v)
                 if shouldCache:
                     datadir.appendCache(self.targetCacheId, dr)
@@ -499,21 +487,16 @@ class ApplyCountAggregateOp(PhysicalOperator):
         self.aggFunction = aggFunction
         self.targetCacheId = targetCacheId
 
-        # NOTE: need to construct profiler after all fields used by self.opId() are set
-        self.profiler = Profiler(op_id=self.opId())
-        self.profile = self.profiler.iter_profiler
-
     def __eq__(self, other: PhysicalOperator):
         return (
-            isinstance(other, ApplyCountAggregateOp)
+            isinstance(other, self.__class__)
             and self.aggFunction == other.aggFunction
-            and self.outputSchema == other.outputSchema
             and self.inputSchema == other.inputSchema
         )
 
     def __str__(self):
         return (
-            "ApplyCountAggregateOp("
+            f"{self.op_name()}("
             + str(self.outputSchema)
             + ", "
             + "Function: "
@@ -529,62 +512,25 @@ class ApplyCountAggregateOp(PhysicalOperator):
             shouldProfile=self.shouldProfile,
         )
 
-    def opId(self):
-        raise NotImplementedError("Legacy method")
-        d = {
-            "operator": "ApplyCountAggregateOp",
-            "source": self.source.opId(),
-            "aggFunction": str(self.aggFunction),
-            "targetCacheId": self.targetCacheId,
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
-    def estimateCost(self, cost_est_data: Dict[str, Any] = None):
-        # get input estimates and pass through to output
-        inputEstimates, subPlanCostEst = self.source.estimateCost(cost_est_data)
-        outputEstimates = {**inputEstimates}
-
-        # the profiler will record timing info for this operator, which can be used
-        # to improve timing related estimates
-        op_filter = "(op_name == 'count')"
-        if cost_est_data is not None and cost_est_data[op_filter] is not None:
-            # compute estimates
-            time_per_record = cost_est_data[op_filter]["time_per_record"]
-
-            # output cardinality for an aggregate will be 1
-            cardinality = 1
-
-            # update cardinality, timePerElement and related stats
-            outputEstimates["cardinality"] = cardinality
-            outputEstimates["timePerElement"] = time_per_record
-            outputEstimates["cumulativeTimePerElement"] = (
-                inputEstimates["cumulativeTimePerElement"] + time_per_record
-            )
-            outputEstimates["totalTime"] = (
-                cardinality * time_per_record + inputEstimates["totalTime"]
-            )
-
-            return outputEstimates, {
-                "cumulative": outputEstimates,
-                "thisPlan": {"time_per_record": time_per_record},
-                "subPlan": subPlanCostEst,
-            }
-
-        # output cardinality for an aggregate will be 1
-        outputEstimates["cardinality"] = 1
-
-        # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
-        outputEstimates["timePerElement"] = 0
-        outputEstimates["usdPerElement"] = 0
-        outputEstimates["estOutputTokensPerElement"] = 0
-
-        return outputEstimates, {
-            "cumulative": outputEstimates,
-            "thisPlan": {},
-            "subPlan": subPlanCostEst,
+    def physical_op_id(self, plan_position: Optional[int] = None):
+        op_dict = {
+            "operator": self.op_name(),
+            "aggFunction": str(self.aggFunction)
         }
 
+        return self._compute_op_id_from_dict(op_dict, plan_position)
+
+
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
+        return OperatorCostEstimates(
+            cardinality=1,
+            time_per_record=0,
+            cost_per_record=0,
+            quality=1.0,
+        )
+
+    # TODO: turn this into a __call__ and rely on storing state in class attrs not closure; also return RecordOpStats
     def __iter__(self):
         raise NotImplementedError("TODO method")
         datadir = DataDirectory()
@@ -611,6 +557,7 @@ class ApplyCountAggregateOp(PhysicalOperator):
         return iteratorFn()
 
 
+# TODO: coalesce into base class w/ApplyCountAggregateOp and simply override __call__ methods in base classes
 class ApplyAverageAggregateOp(PhysicalOperator):
     def __init__(
         self,
@@ -628,13 +575,9 @@ class ApplyAverageAggregateOp(PhysicalOperator):
         if not inputSchema == Number:
             raise Exception("Aggregate function AVERAGE is only defined over Numbers")
 
-        # NOTE: need to construct profiler after all fields used by self.opId() are set
-        self.profiler = Profiler(op_id=self.opId())
-        self.profile = self.profiler.iter_profiler
-
     def __eq__(self, other: PhysicalOperator):
         return (
-            isinstance(other, ApplyAverageAggregateOp)
+            isinstance(other, self.__class__)
             and self.aggFunction == other.aggFunction
             and self.outputSchema == other.outputSchema
             and self.inputSchema == other.inputSchema
@@ -642,7 +585,7 @@ class ApplyAverageAggregateOp(PhysicalOperator):
 
     def __str__(self):
         return (
-            "ApplyAverageAggregateOp("
+            f"{self.op_name()}("
             + str(self.outputSchema)
             + ", "
             + "Function: "
@@ -658,62 +601,24 @@ class ApplyAverageAggregateOp(PhysicalOperator):
             shouldProfile=self.shouldProfile,
         )
 
-    def opId(self):
-        raise NotImplementedError("Legacy method")
-        d = {
-            "operator": "ApplyAverageAggregateOp",
-            "source": self.source.opId(),
-            "aggFunction": str(self.aggFunction),
-            "targetCacheId": self.targetCacheId,
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
-    def estimateCost(self, cost_est_data: Dict[str, Any] = None):
-        # get input estimates and pass through to output
-        inputEstimates, subPlanCostEst = self.source.estimateCost(cost_est_data)
-        outputEstimates = {**inputEstimates}
-
-        # the profiler will record timing info for this operator, which can be used
-        # to improve timing related estimates
-        op_filter = "(op_name == 'average')"
-        if cost_est_data is not None and cost_est_data[op_filter] is not None:
-            # compute estimates
-            time_per_record = cost_est_data[op_filter]["time_per_record"]
-
-            # output cardinality for an aggregate will be 1
-            cardinality = 1
-
-            # update cardinality, timePerElement and related stats
-            outputEstimates["cardinality"] = cardinality
-            outputEstimates["timePerElement"] = time_per_record
-            outputEstimates["cumulativeTimePerElement"] = (
-                inputEstimates["cumulativeTimePerElement"] + time_per_record
-            )
-            outputEstimates["totalTime"] = (
-                cardinality * time_per_record + inputEstimates["totalTime"]
-            )
-
-            return outputEstimates, {
-                "cumulative": outputEstimates,
-                "thisPlan": {"time_per_record": time_per_record},
-                "subPlan": subPlanCostEst,
-            }
-
-        # output cardinality for an aggregate will be 1
-        outputEstimates["cardinality"] = 1
-
-        # for now, assume applying the aggregate takes negligible additional time (and no cost in USD)
-        outputEstimates["timePerElement"] = 0
-        outputEstimates["usdPerElement"] = 0
-        outputEstimates["estOutputTokensPerElement"] = 0
-
-        return outputEstimates, {
-            "cumulative": outputEstimates,
-            "thisPlan": {},
-            "subPlan": subPlanCostEst,
+    def physical_op_id(self, plan_position: Optional[int] = None):
+        op_dict = {
+            "operator": self.op_name(),
+            "aggFunction": str(self.aggFunction)
         }
 
+        return self._compute_op_id_from_dict(op_dict, plan_position)
+
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
+        return OperatorCostEstimates(
+            cardinality=1,
+            time_per_record=0,
+            cost_per_record=0,
+            quality=1.0,
+        )
+
+    # TODO: turn this into a __call__ and rely on storing state in class attrs not closure; also return RecordOpStats
     def __iter__(self):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)
@@ -761,13 +666,9 @@ class LimitScanOp(PhysicalOperator):
         self.limit = limit
         self.targetCacheId = targetCacheId
 
-        # NOTE: need to construct profiler after all fields used by self.opId() are set
-        self.profiler = Profiler(op_id=self.opId())
-        self.profile = self.profiler.iter_profiler
-
     def __eq__(self, other: PhysicalOperator):
         return (
-            isinstance(other, LimitScanOp)
+            isinstance(other, self.__class__)
             and self.limit == other.limit
             and self.outputSchema == other.outputSchema
             and self.inputSchema == other.inputSchema
@@ -775,7 +676,7 @@ class LimitScanOp(PhysicalOperator):
 
     def __str__(self):
         return (
-            "LimitScanOp("
+            f"{self.op_name()}("
             + str(self.outputSchema)
             + ", "
             + "Limit: "
@@ -792,58 +693,25 @@ class LimitScanOp(PhysicalOperator):
             shouldProfile=self.shouldProfile,
         )
 
-    def opId(self):
-        raise NotImplementedError("Legacy method")
-        d = {
-            "operator": "LimitScanOp",
+    def physical_op_id(self, plan_position: Optional[int] = None):
+        op_dict = {
+            "operator": self.op_name(),
             "outputSchema": str(self.outputSchema),
-            "source": self.source.opId(),
             "limit": self.limit,
-            "targetCacheId": self.targetCacheId,
-        }
-        ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
-
-    def estimateCost(self, cost_est_data: Dict[str, Any] = None):
-        # get input estimates and pass through to output
-        inputEstimates, subPlanCostEst = self.source.estimateCost(cost_est_data)
-        outputEstimates = {**inputEstimates}
-
-        # the profiler will record selectivity and timing info for this operator,
-        # which can be used to improve timing related estimates
-        op_filter = "(op_name == 'limit')"
-        if cost_est_data is not None and cost_est_data[op_filter] is not None:
-            # compute estimates
-            time_per_record = cost_est_data[op_filter]["time_per_record"]
-
-            # output cardinality for limit can be at most self.limit
-            cardinality = min(self.limit, inputEstimates["cardinality"])
-
-            # update cardinality, timePerElement and related stats
-            outputEstimates["cardinality"] = cardinality
-            outputEstimates["timePerElement"] = time_per_record
-            outputEstimates["cumulativeTimePerElement"] = (
-                inputEstimates["cumulativeTimePerElement"] + time_per_record
-            )
-            outputEstimates["totalTime"] = (
-                cardinality * time_per_record + inputEstimates["totalTime"]
-            )
-
-            return outputEstimates, {
-                "cumulative": outputEstimates,
-                "thisPlan": {"time_per_record": time_per_record},
-                "subPlan": subPlanCostEst,
-            }
-
-        # output cardinality for limit can be at most self.limit
-        outputEstimates["cardinality"] = min(self.limit, inputEstimates["cardinality"])
-
-        return outputEstimates, {
-            "cumulative": outputEstimates,
-            "thisPlan": {},
-            "subPlan": subPlanCostEst,
         }
 
+        return self._compute_op_id_from_dict(op_dict, plan_position)
+
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        # for now, assume applying the limit takes negligible additional time (and no cost in USD)
+        return OperatorCostEstimates(
+            cardinality=min(self.limit, source_op_cost_estimates.cardinality),
+            time_per_record=0,
+            cost_per_record=0,
+            quality=1.0,
+        )
+
+    # TODO: turn this into a __call__ and rely on storing state in class attrs not closure; also return RecordOpStats
     def __iter__(self):
         datadir = DataDirectory()
         shouldCache = datadir.openCache(self.targetCacheId)

@@ -1,5 +1,7 @@
 from palimpzest.constants import Model, PromptStrategy, QueryStrategy
-from palimpzest.operators import LogicalOperator, PhysicalOperator
+from palimpzest.operators import PhysicalOperator
+from palimpzest.planner import LogicalPlan, PhysicalPlan
+from palimpzest.profiler import StatsProcessor
 from palimpzest.utils import getModels, getVisionModels
 from .plan import LogicalPlan, PhysicalPlan
 
@@ -168,7 +170,7 @@ class LogicalPlanner(Planner):
 
             # Use cache if allowed
             if not self.no_cache and pz.datamanager.DataDirectory().hasCachedAnswer(uid):
-                op = pz.operators.CacheScan(node.schema, datasetIdentifier=uid)
+                op = pz_ops.CacheScan(node.schema, datasetIdentifier=uid)
                 operators.append(op)
                 #return LogicalPlan(operators=operators)
                 continue
@@ -176,7 +178,7 @@ class LogicalPlanner(Planner):
             # First node is DataSource
             if idx == 0:
                 assert isinstance(node, pz.datasources.DataSource)
-                op = pz.operators.BaseScan(
+                op = pz_ops.BaseScan(
                     outputSchema=node.schema,
                     datasetIdentifier=uid,
                 )
@@ -216,7 +218,7 @@ class LogicalPlanner(Planner):
                         targetCacheId=uid,
                     )
                 elif not outputSchema == inputSchema:
-                    op = pz.operators.ConvertScan(
+                    op = pz_ops.ConvertScan(
                         inputSchema=inputSchema,
                         outputSchema=outputSchema,
                         cardinality=node._cardinality,
@@ -263,7 +265,6 @@ class PhysicalPlanner(Planner):
         self,
             num_samples: Optional[int]=10,
             scan_start_idx: Optional[int]=0,
-            sample_execution_data: Optional[List[Dict[str, Any]]]=None,
             allow_model_selection: Optional[bool]=True,
             allow_code_synth: Optional[bool]=True,
             allow_token_reduction: Optional[bool]=True,
@@ -275,14 +276,13 @@ class PhysicalPlanner(Planner):
         super().__init__(*args, **kwargs)
         self.num_samples = num_samples
         self.scan_start_idx = scan_start_idx
-        self.sample_execution_data = sample_execution_data
         self.allow_model_selection = allow_model_selection
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.shouldProfile = shouldProfile
         self.useParallelOps = useParallelOps
 
-        self.physical_ops = pz.operators.PHYSICAL_OPERATORS
+        self.physical_ops = pz_ops.PHYSICAL_OPERATORS
 
     def _getAllowedModels(self, subplan: PhysicalPlan) -> List[Model]:
         """
@@ -390,6 +390,9 @@ class PhysicalPlanner(Planner):
                 shouldProfile=shouldProfile,
             )
 
+        # TODO: replace all these elif's with iteration over self.physical_ops
+        #       - Q: what happens if we ever have two hard-coded conversions w/same input and output schema?
+        #            - e.g. imagine if we had ConvertDownloadToFileTypeA and ConvertDownloadToFileTypeB
         # if input and output schema are covered by a hard-coded convert; use that
         elif isinstance(inputSchema, schemas.File) and isinstance(outputSchema, schemas.TextFile):
             op = pz_ops.ConvertFileToText(
@@ -446,7 +449,6 @@ class PhysicalPlanner(Planner):
             op = pz_ops.LLMTypeConversion(
                 inputSchema=inputSchema,
                 outputSchema=outputSchema,
-                shouldProfile=shouldProfile,
                 model=model,
                 prompt_strategy=prompt_strategy,
                 query_strategy=query_strategy,
@@ -461,7 +463,7 @@ class PhysicalPlanner(Planner):
 
     def _resolveLogicalFilterOp(
         self,
-            logical_filter_op: ops.FilteredScan,
+        logical_filter_op: pz_ops.FilteredScan,
         model: Optional[Model] = None,
         prompt_strategy: Optional[PromptStrategy] = None,
         shouldProfile: bool = False,
@@ -752,172 +754,6 @@ class PhysicalPlanner(Planner):
                 all_plans = plans
 
         return all_plans
-
-    # TODO
-    def compute_operator_estimates(self, sentinel_logical_plans: List[LogicalPlan]) -> Dict[str, Dict[str, Any]]:
-        """
-        Compute per-operator estimates of runtime, cost, and quality.
-        """
-        # for now, each sentinel uses the same logical plan, so we can simply use the first one
-        logical_plan = sentinel_logical_plans[0]
-
-        # compute estimates for every operator
-        operator_estimates = {}
-        if self.sample_execution_data is not None and self.sample_execution_data != []:
-            # construct full dataset of samples
-            df = pd.DataFrame(self.sample_execution_data)
-
-            # get unique set of operator filters:
-            # - for base/cache scans this is very simple
-            # - for filters, this is based on the unique filter string or function (per-model)
-            # - for induce, this is based on the generated field(s) (per-model)
-            operator_estimates = {}
-            for logical_op in logical_plan.operators:
-                op_filter, estimates = None, None
-                if isinstance(logical_op, pz_ops.BaseScan):
-                    op_filter = "op_name == 'base_scan'"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    operator_estimates[op_filter] = estimates
-
-                elif isinstance(logical_op, ops.CacheScan):
-                    op_filter = "op_name == 'cache_scan'"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    operator_estimates[op_filter] = estimates
-
-                elif isinstance(logical_op, pz_ops.ConvertScan):
-                    generated_fields_str = "-".join(sorted(logical_op.generated_fields))
-                    op_filter = f"(generated_fields == '{generated_fields_str}') & (op_name == 'induce' | op_name == 'p_induce')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        # compute estimates per-model, and add None which forces computation of avg. across all models
-                        models = getModels(include_vision=True) + [None]
-                        estimates = {model: None for model in models}
-                        for model in models:
-                            model_name = model.value if model is not None else None
-                            est_tokens = StatsProcessor._est_num_input_output_tokens(
-                                op_df, model_name=model_name
-                            )
-                            model_estimates = {
-                                "time_per_record": StatsProcessor._est_time_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "cost_per_record": StatsProcessor._est_usd_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "est_num_input_tokens": est_tokens[0],
-                                "est_num_output_tokens": est_tokens[1],
-                                "selectivity": StatsProcessor._est_selectivity(
-                                    df, op_df, model_name=model_name
-                                ),
-                                "quality": StatsProcessor._est_quality(
-                                    op_df, model_name=model_name
-                                ),
-                            }
-                            estimates[model_name] = model_estimates
-                    operator_estimates[op_filter] = estimates
-
-                elif isinstance(logical_op, pz_ops.FilteredScan):
-                    filter_str = (
-                        logical_op.filter.filterCondition
-                        if logical_op.filter.filterCondition is not None
-                        else str(logical_op.filter.filterFn)
-                    )
-                    op_filter = f"(filter == '{str(filter_str)}') & (op_name == 'filter' | op_name == 'p_filter')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        models = (
-                            getModels()
-                            if logical_op.filter.filterCondition is not None
-                            else [None]
-                        )
-                        estimates = {model: None for model in models}
-                        for model in models:
-                            model_name = model.value if model is not None else None
-                            est_tokens = StatsProcessor._est_num_input_output_tokens(
-                                op_df, model_name=model_name
-                            )
-                            model_estimates = {
-                                "time_per_record": StatsProcessor._est_time_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "cost_per_record": StatsProcessor._est_usd_per_record(
-                                    op_df, model_name=model_name
-                                ),
-                                "est_num_input_tokens": est_tokens[0],
-                                "est_num_output_tokens": est_tokens[1],
-                                "selectivity": StatsProcessor._est_selectivity(
-                                    df, op_df, model_name=model_name
-                                ),
-                                "quality": StatsProcessor._est_quality(
-                                    op_df, model_name=model_name
-                                ),
-                            }
-                            estimates[model_name] = model_estimates
-                    operator_estimates[op_filter] = estimates
-
-                elif isinstance(logical_op, pz_ops.LimitScan):
-                    op_filter = "(op_name == 'limit')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    operator_estimates[op_filter] = estimates
-
-                elif (
-                    isinstance(logical_op, pz_ops.ApplyAggregateFunction)
-                    and logical_op.aggregationFunction.funcDesc == "COUNT"
-                ):
-                    op_filter = "(op_name == 'count')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    operator_estimates[op_filter] = estimates
-
-                elif (
-                    isinstance(logical_op, pz_ops.ApplyAggregateFunction)
-                    and logical_op.aggregationFunction.funcDesc == "AVERAGE"
-                ):
-                    op_filter = "(op_name == 'average')"
-                    op_df = df.query(op_filter)
-                    if not op_df.empty:
-                        estimates = {
-                            "time_per_record": StatsProcessor._est_time_per_record(
-                                op_df
-                            )
-                        }
-                    operator_estimates[op_filter] = estimates
-
-        return operator_estimates
-
-    # TODO
-    def estimate_plan_costs(self, physical_plans: List[PhysicalPlan], operator_estimates: Dict[str, Dict[str, Any]]) -> List[PhysicalPlan]:
-        """Estimate the cost (in terms of USD, latency, throughput, etc.) for each plan."""
-        sample_execution_data = (
-            None if operator_estimates == {} else operator_estimates
-        )
-        for physical_plan in physical_plans:
-            physical_plan.estimateCost(sample_execution_data=sample_execution_data)
-
-        return physical_plans
 
     def deduplicate_plans(self, physical_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
         """De-duplicate plans with identical estimates for runtime, cost, and quality."""

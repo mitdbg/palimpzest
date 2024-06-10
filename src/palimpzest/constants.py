@@ -3,6 +3,7 @@ from enum import Enum
 
 import os
 
+
 # ENUMS
 class Model(Enum):
     """
@@ -58,6 +59,9 @@ class CodeGenStrategy(Enum):
     ADVICE_ENSEMBLE = "advice-ensemble"
     ADVICE_ENSEMBLE_WITH_VALIDATION = "advice-ensemble-with-validation"
 
+# character limit(s) for different IDs
+MAX_OP_ID_CHARS = 6
+
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
 RETRY_MULTIPLIER = 2
 RETRY_MAX_SECS = 10
@@ -65,6 +69,8 @@ RETRY_MAX_ATTEMPTS = 1
 
 # maximum number of rows to display in a table
 MAX_ROWS = 5
+
+# maximum number of updates to the token-reduction heatmap
 MAX_HEATMAP_UPDATES = 5
 
 def log_attempt_number(retry_state):
@@ -83,9 +89,6 @@ MEMORY_SCAN_TIME_PER_KB = 1 / (float(30) * 1024 * 1024)
 # Assume number of output tokens is 0.25x the number of input tokens
 OUTPUT_TOKENS_MULTIPLE = 0.25
 
-# Guesstimate of the fraction of each input element which is fed into the LLM's as context 
-ELEMENT_FRAC_IN_CONTEXT = 1.0
-
 # Rough conversion from # of bytes --> # of tokens; assumes 1 token ~= 4 chars and 1 char == 1 byte
 BYTES_TO_TOKENS = 0.25
 
@@ -103,8 +106,14 @@ DSPY_TIME_INFLATION = 2.0
 # size of the input.
 FEW_SHOT_PROMPT_INFLATION = 1.25
 
-# A crude estimate for filter selectivity
-EST_FILTER_SELECTIVITY = 0.5
+# a naive estimate for filter selectivity
+NAIVE_EST_FILTER_SELECTIVITY = 0.5
+
+# a naive estimate for the number of input tokens processed per record
+NAIVE_EST_NUM_INPUT_TOKENS = 1000
+
+# a naive estimate for the number of groups returned by a group by
+NAIVE_EST_NUM_GROUPS = 3
 
 # Whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False

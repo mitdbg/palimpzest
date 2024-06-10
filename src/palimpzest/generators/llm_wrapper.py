@@ -578,7 +578,7 @@ class OpenAIVisionWrapper(ImageTextGenerator):
             {
                 "model": "gpt-4-vision-preview",
                 "messages": [
-                    ~~{
+                    {
                         "role": "user",
                         "content": content,
                     }

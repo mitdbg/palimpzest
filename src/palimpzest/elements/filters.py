@@ -24,6 +24,13 @@ class Filter():
             else "Filter(" + str(self.filterFn) + ")"
         )
 
+    def getFilterStr(self) -> str:
+        return (
+            self.filter.filterCondition
+            if self.filter.filterCondition is not None
+            else str(self.filter.filterFn)
+        )
+
     def __hash__(self) -> int:
         # custom hash function
         return (

@@ -45,8 +45,6 @@ class Email(pz.TextFile):
 
     sender = pz.Field(desc="The email address of the sender", required=True)
     subject = pz.Field(desc="The subject of the email", required=True)
-    # to = pz.ListField(element_type=pz.StringField, desc="The email address(es) of the recipient(s)", required=True)
-    # cced = pz.ListField(element_type=pz.StringField, desc="The email address(es) CC'ed on the email", required=True)
 
 
 class CaseData(pz.Schema):

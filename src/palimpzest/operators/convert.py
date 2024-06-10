@@ -4,7 +4,7 @@ from io import BytesIO
 from palimpzest.profiler.stats import Stats
 from palimpzest.tools.skema_tools import equations_to_latex
 import pandas as pd
-from .physical import PhysicalOperator, MAX_ID_CHARS, IteratorFn
+from .physical import PhysicalOperator, IteratorFn
 
 from palimpzest.constants import *
 from palimpzest.corelib import *
@@ -123,11 +123,11 @@ class ConvertOp(PhysicalOperator):
             **kwargs,
         )
 
-    def opId(self):
+    def op_id(self):
         d = {
             "operator": self.__class__.__name__,
             "outputSchema": str(self.outputSchema),
-            "source": self.source.opId(),
+            "source": self.source.op_id(),
             "model": self.model.value if self.model is not None else None,
             "prompt_strategy": (
                 self.prompt_strategy.value if self.prompt_strategy is not None else None
@@ -136,7 +136,7 @@ class ConvertOp(PhysicalOperator):
             "targetCacheId": self.targetCacheId,
         }
         ordered = json.dumps(d, sort_keys=True)
-        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_ID_CHARS]
+        return hashlib.sha256(ordered.encode()).hexdigest()[:MAX_OP_ID_CHARS]
 
     def __str__(self):
         return f"{self.model}_{self.query_strategy}_{self.token_budget}"

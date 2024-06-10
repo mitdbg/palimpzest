@@ -1,23 +1,24 @@
 from palimpzest.datamanager import DataDirectory
 from palimpzest.constants import PromptStrategy, CodeGenStrategy, Model
 from palimpzest.elements import DataRecord
-from palimpzest.generators import DSPyGenerator, ImageTextGenerator
+from palimpzest.generators import (
+    DSPyGenerator,
+    ImageTextGenerator,
+    codeEnsembleGeneration,
+    codeEnsembleExecution,
+    reGenerationCondition,
+)
 from palimpzest.profiler import (
     Stats,
     BondedQueryStats,
     ConventionalQueryStats,
     FieldQueryStats,
     CodeGenEnsembleStats,
+    CodeGenSingleStats,
     FullCodeGenStats,
     GenerationStats,
 )
-from palimpzest.utils import (
-    API,
-    codeEnsembleGeneration,
-    codeEnsembleExecution,
-    reGenerationCondition,
-    CodeGenSingleStats,
-)
+from palimpzest.utils import API, getJsonFromAnswer
 
 from typing import Any, Dict, List, Tuple
 
@@ -115,36 +116,6 @@ def _construct_query_prompt(
     #     promptQuestion += "\nRemember, your output MUST be one of TRUE or FALSE."
 
     return promptQuestion
-
-
-def _get_JSON_from_answer(answer: str) -> Dict[str, Any]:
-    """
-    This function parses an LLM response which is supposed to output a JSON object
-    and optimistically searches for the substring containing the JSON object.
-    """
-    if not answer.strip().startswith("{"):
-        # Find the start index of the actual JSON string
-        # assuming the prefix is followed by the JSON object/array
-        start_index = answer.find("{") if "{" in answer else answer.find("[")
-        if start_index != -1:
-            # Remove the prefix and any leading characters before the JSON starts
-            answer = answer[start_index:]
-
-    if not answer.strip().endswith("}"):
-        # Find the end index of the actual JSON string
-        # assuming the suffix is preceded by the JSON object/array
-        end_index = answer.rfind("}") if "}" in answer else answer.rfind("]")
-        if end_index != -1:
-            # Remove the suffix and any trailing characters after the JSON ends
-            answer = answer[: end_index + 1]
-
-    # Handle weird escaped values. I am not sure why the model
-    # is returning these, but the JSON parser can't take them
-    answer = answer.replace("\_", "_")
-
-    # Handle comments in the JSON response. Use regex from // until end of line
-    answer = re.sub(r"\/\/.*$", "", answer, flags=re.MULTILINE)
-    return json.loads(answer)
 
 
 def _create_data_record_from_json(
@@ -259,7 +230,7 @@ def runBondedQuery(
             raise Exception("not implemented yet")
 
         # parse JSON object from the answer
-        jsonObj = _get_JSON_from_answer(answer)
+        jsonObj = getJsonFromAnswer(answer)
 
         # parse JSON output and construct data records
         if td.cardinality == "oneToMany":
@@ -349,7 +320,7 @@ def runConventionalQuery(
                         text_content,
                         promptQuestion,
                     )
-                    jsonObj = _get_JSON_from_answer(answer)["items"][0]
+                    jsonObj = getJsonFromAnswer(answer)["items"][0]
                     query_stats[f"all_fields_one_to_many_conventional_{idx}"] = (
                         record_stats
                     )
@@ -454,7 +425,7 @@ def runConventionalQuery(
             query_stats[f"{field_name}"] = field_stats
 
             # extract result from JSON and set the DataRecord's field with its generated value
-            jsonObj = _get_JSON_from_answer(answer)
+            jsonObj = getJsonFromAnswer(answer)
             setattr(dr, field_name, jsonObj[field_name])
 
         except Exception as e:
@@ -606,7 +577,7 @@ def runCodeGenQuery(
                         conv_query_stats[f"{field_name}_{idx}_fallback"] = field_stats
 
                         # extract result from JSON and set the DataRecord's field with its generated value
-                        jsonObj = _get_JSON_from_answer(answer)
+                        jsonObj = getJsonFromAnswer(answer)
                         answer = jsonObj[field_name]
                     except:
                         # update conv_query_stats
@@ -722,7 +693,7 @@ def runCodeGenQuery(
                     conv_query_stats[f"{field_name}_fallback"] = field_stats
 
                     # extract result from JSON and set the DataRecord's field with its generated value
-                    jsonObj = _get_JSON_from_answer(answer)
+                    jsonObj = getJsonFromAnswer(answer)
                     answer = jsonObj[field_name]
                 except:
                     # update stats

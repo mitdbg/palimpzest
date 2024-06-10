@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from palimpzest.operators import LogicalOperator, FilteredScan
+from palimpzest.operators import FilteredScan, FilterOp, LogicalOperator, PhysicalOperator
 from palimpzest.operators.physical import PhysicalOperator
-from palimpzest.sets import Set
-from palimpzest.profiler import PlanStats
 
-from typing import Any, Dict, List, Optional
+# backwards compatability for users who are still on Python 3.9
+try:
+    from itertools import pairwise
+except:
+    from more_itertools import pairwise
+
+from typing import Any, Dict, List
 
 
 class Plan:
@@ -76,7 +80,7 @@ class PhysicalPlan(Plan):
             "quality": None,
         }
 
-        self.stats = PlanStats()
+        # self.stats = PlanStats()
 
     @staticmethod
     def fromOpsAndSubPlan(ops: List[PhysicalOperator], subPlan: PhysicalPlan) -> PhysicalPlan:
@@ -90,19 +94,57 @@ class PhysicalPlan(Plan):
         # return the PhysicalPlan
         return PhysicalPlan(operators=copySubPlan)
 
-    # def __repr__(self) -> str:
-    #     pdb.set_trace()
-    #     """Computes a string representation for this plan."""
-    #     # TODO
-    #     # physicalOps = physicalTree.dumpPhysicalTree()
-    #     # flat = flatten_nested_tuples(physicalOps)
-    #     # ops = [op for op in flat if not op.is_hardcoded()]
-    #     label = "-".join([str(op) for op in self.operators])
-    #     return f"PZ-{label}"
+    def __str__(self) -> str:
+        """Computes a string representation for this plan."""
+        ops = [op for op in self.operators if not op.is_hardcoded()]
+        label = "-".join([str(op) for op in self.operators])
+        return f"PZ-{label}"
 
-    def getModels() -> List[Optional[str]]:
-        """Return the list of models for each operator."""
-        return []
+    def getPlanModelNames(self) -> List[str]:
+        model_names = []
+        for op in self.operators:
+            model = getattr(op, "model", None)
+            if model is not None:
+                model_names.append(model.value)
+
+        return model_names
+
+    def printPlan(self) -> None:
+        """Print the physical plan."""
+        print_ops = self.operators[1:]
+        start = print_ops[0]
+        print(f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n")
+
+        for idx, (left, right) in enumerate(pairwise(print_ops)):
+            in_schema = left.outputSchema
+            out_schema = right.outputSchema
+            print(
+                f" {idx+1}. {in_schema.__name__} -> {type(right).__name__} -> {out_schema.__name__} ",
+                end="",
+            )
+            # if right.desc is not None:
+            #     print(f" ({right.desc})", end="")
+            # check if right has a model attribute
+            if right.is_hardcoded():
+                print(f"\n    Using hardcoded function", end="")
+            elif hasattr(right, "model"):
+                print(f"\n    Using {right.model}", end="")
+                if hasattr(right, "filter"):
+                    filter_str = (
+                        right.filter.filterCondition
+                        if right.filter.filterCondition is not None
+                        else str(right.filter.filterFn)
+                    )
+                    print(f'\n    Filter: "{filter_str}"', end="")
+                if hasattr(right, "token_budget"):
+                    print(f"\n    Token budget: {right.token_budget}", end="")
+                if hasattr(right, "query_strategy"):
+                    print(f"\n    Query strategy: {right.query_strategy}", end="")
+            print()
+            print(
+                f"    ({','.join(in_schema.fieldNames())[:15]}...) -> ({','.join(out_schema.fieldNames())[:15]}...)"
+            )
+            print()
 
     def getExecutionData() -> List[Dict[str, Any]]:
         """Compute and return all sample execution data collected by this plan so far."""
@@ -111,21 +153,39 @@ class PhysicalPlan(Plan):
 
     def execute(self):
         """Execute the plan."""
-        # TODO
-        pass
+        # initialize list of output records
+        output_records, plan_stats = [], {op.physical_op_id(): [] for op in self.operators}
 
-    def estimateCost(self, sample_execution_data: Optional[Dict[str, Dict[str, Any]]]):
-        """Estimate the runtime, cost, and quality of the plan."""
-        totalTime = planCost["totalTime"]
-        totalCost = planCost["totalUSD"]  # for now, cost == USD
-        quality = planCost["quality"]
+        # TODO: execution issues I still need to resolve:
+        #  - need to force upstream execution to complete for agg., groupby, and parallel operators
+        #    -  eventually we could allow for pipelining and not block on parallel operators, but pre-SIGMOD let's keep that behavior intact
+        # iterate over records from the datasource operator
+        datasource_operator = self.operators[0]
+        for record, record_op_stats in datasource_operator():
+            plan_stats[datasource_operator.physical_op_id()].append(record_op_stats)
 
-        plans.append((totalTime, totalCost, quality, physical_plan, fullPlanCostEst))
+            # apply sequence of subsequent operators
+            filtered = False
+            for operator in self.operators[1:]:
+                record, record_op_stats = operator(record)
 
-    def __iter__(self):
-        """Iterate over source records from datasource."""
-        # TODO
-        base_operator = self.operators[-1]
-        for record, stats in base_operator:
-            self.stats.append(stats)
-            yield record
+                # add record_op_stats to appropriate operator
+                plan_stats[datasource_operator.physical_op_id()].append(record_op_stats)
+
+                # TODO: confirm if this isinstance will work with sub-class operations
+                if isinstance(operator, FilterOp) and not record._passed_filter:
+                    filtered = True
+                    break
+
+            if not filtered:
+                output_records.append(record)
+
+        return output_records, plan_stats
+
+    # def __iter__(self):
+    #     """Iterate over source records from datasource."""
+    #     # TODO
+    #     base_operator = self.operators[-1]
+    #     for record, stats in base_operator:
+    #         self.stats.append(stats)
+    #         yield record

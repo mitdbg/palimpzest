@@ -49,7 +49,6 @@ class CacheService:
         self.allCaches = {}
 
 
-# TODO: possibly rename to the PZManager, as it also manages the current config
 class DataDirectory(metaclass=DataDirectorySingletonMeta):
     """The DataDirectory is a registry of data sources."""
 
