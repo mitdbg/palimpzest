@@ -30,6 +30,14 @@ class FilterOp(PhysicalOperator):
         self.targetCacheId = targetCacheId
         self.max_workers = max_workers
 
+    def __eq__(self, other: FilterOp):
+        return (
+            isinstance(other, self.__class__)
+            and self.filter == other.filter
+            and self.inputSchema == other.outputSchema
+            and self.outputSchema == other.outputSchema
+        )
+
     def copy(self):
         return self.__class__(
             inputSchema=self.inputSchema,
@@ -83,7 +91,9 @@ class ParallelFilterCandidateOp(FilterOp):
         self.streaming = streaming
 
     def copy(self):
-        return super().copy(streaming=self.streaming)
+        copy = super().copy()
+        copy.streaming = self.streaming
+        return copy
 
     def __iter__(self):
         shouldCache = self.datadir.openCache(self.targetCacheId)

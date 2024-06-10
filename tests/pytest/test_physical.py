@@ -51,12 +51,13 @@ def test_class_attributes(email_schema):
         cardinality="oneToOne",
     )
 
-    conv_implementations = pz.ConvertFileToText(
-        inputSchema=email_schema,
-        outputSchema=email_schema,
-        model=pz.Model.GPT_3_5,
-        cardinality="oneToOne",
-    )
+    with pytest.raises(Exception):
+        conv_implementations = pz.ConvertFileToText(
+            inputSchema=email_schema,
+            outputSchema=email_schema,
+            model=pz.Model.GPT_3_5,
+            cardinality="oneToOne",
+        )
 
 def test_logical(enron_eval):
     """Test whether logical plans work"""

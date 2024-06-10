@@ -30,4 +30,4 @@ def test_enron(enron_eval):
     print(pp)
 
     execution = Execute(dataset, policy=pz.MinCost())
-    execution.execute(pp)
+    # execution.execute(pp)

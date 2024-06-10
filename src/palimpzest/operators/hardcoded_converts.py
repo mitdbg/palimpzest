@@ -29,10 +29,13 @@ class HardcodedConvert(ConvertOp):
         assert (
             self.inputSchema == self.__class__.inputSchema
             and self.outputSchema == self.__class__.outputSchema
-        ), f"This convert has to be instantiated to convert a {self.__class__.inputSchema} to a {self.__class__.outputSchema}!"
+        ), f"This convert has to be instantiated to convert a {self.__class__.inputSchema} to a {self.__class__.outputSchema}! But it was instantiated to convert a {self.inputSchema} to a {self.outputSchema}!"
 
     def __call__(self, candidate: DataRecord):
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
+    
+    def is_hardcoded(self) -> bool:
+        return True
 
 
 class ConvertFileToText(HardcodedConvert):

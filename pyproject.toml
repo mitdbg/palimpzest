@@ -73,6 +73,13 @@ namespaces = false
 [tool.setuptools.package-data]
 "*" = ["*.txt", "*.rst", "*.md"]
 
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+]
+
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"

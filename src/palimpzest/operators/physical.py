@@ -39,14 +39,14 @@ class PhysicalOperator:
         self.max_workers = max_workers
 
     def __eq__(self, other: PhysicalOperator) -> bool:
-        raise NotImplementedError("Abstract method")
+        raise NotImplementedError("Calling __eq__ on abstract method")
 
     def op_name(self) -> str:
         """Name of the physical operator."""
         return self.__class__.__name__
 
     def physical_op_id(self, plan_position: Optional[int] = None) -> str:
-        raise NotImplementedError("Abstract method")
+        raise NotImplementedError("physical_op_id is an abstract method")
 
     def _compute_op_id_from_dict(self, op_dict: Dict[str, Any], plan_position: Optional[int] = None) -> str:
         if plan_position is not None:
@@ -63,17 +63,17 @@ class PhysicalOperator:
 
         return op_id
 
-    # TODO
-    def legacy_is_hardcoded(self) -> bool:
-        if self.inputSchema is None:
-            return True
-        return (self.outputSchema, self.inputSchema) in self.solver._hardcodedFns
+    def is_hardcoded(self) -> bool:
+        """ By default, operators are not hardcoded.
+        In those that implement HardcodedConvert or HardcodedFilter, this will return True."""
+        return False
+        
 
     def copy(self) -> PhysicalOperator:
-        raise NotImplementedError
+        raise NotImplementedError("__copy___ on abstract class")
 
     def __call__(self, candidate: Any) -> DataRecordWithStats:
-        raise NotImplementedError("Abstract method")
+        raise NotImplementedError("Using __call__ from abstract method")
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
@@ -94,7 +94,7 @@ class PhysicalOperator:
         execution data alone -- thus DataSourcePhysicalOperators need to give
         at least ballpark correct estimates of this quantity).
         """
-        raise NotImplementedError("Abstract method")
+        raise NotImplementedError("CostEstimates from abstract method")
 
 
 class DataSourcePhysicalOperator(PhysicalOperator):
