@@ -4,7 +4,7 @@ from palimpzest.constants import *
 from palimpzest.corelib import Number, Schema
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
-from palimpzest.profiler import RecordOpStats, OperatorCostEstimates
+from palimpzest.profiler.stats import RecordOpStats, OperatorCostEstimates
 
 from typing import Any, Callable, Dict, Tuple, Optional
 

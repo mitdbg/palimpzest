@@ -1,7 +1,7 @@
 from palimpzest.datamanager import DataDirectory
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
-from palimpzest.profiler import CostOptimizer
+from .cost_estimator import CostOptimizer
 from palimpzest.sets import Set
 from palimpzest.utils import getChampionModelName
 

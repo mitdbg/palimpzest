@@ -4,7 +4,7 @@ from io import BytesIO
 from palimpzest.profiler.stats import Stats
 from palimpzest.tools.skema_tools import equations_to_latex
 import pandas as pd
-from .physical import PhysicalOperator, IteratorFn
+from .physical import PhysicalOperator, DataSourceIteratorFn
 
 from palimpzest.constants import *
 from palimpzest.corelib import *

@@ -1,5 +1,4 @@
 import palimpzest as pz
-
 import pytest
 
 # DEFINITIONS
@@ -23,3 +22,16 @@ def emails_dataset():
     datadir.registerLocalDirectory(ENRON_EVAL_TINY_TEST_DATA, datasetIdentifier)
 
     return datasetIdentifier
+
+
+@pytest.fixture
+def enron_eval(email_schema):
+    emails = pz.Dataset("enron-eval-tiny", schema=email_schema)
+    emails = emails.filter(
+        'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
+    )
+    emails = emails.filter(
+        "The email is not quoting from a news article or an article written by someone outside of Enron"
+    )
+    return emails
+
