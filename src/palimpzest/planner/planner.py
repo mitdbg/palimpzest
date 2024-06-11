@@ -287,11 +287,11 @@ class PhysicalPlanner(Planner):
         # This is a dictionary where the physical planner will keep track for all the logical plan operators defined,
         # which physical operators are available to implement them.
         self.logical_physical_map = {}
-        for l_op in pz_ops.LOGICAL_OPERATORS:
-            self.logical_physical_map[l_op] = []
-            for p_op in self.physical_ops:
-                if p_op.implements(l_op):
-                    self.logical_physical_map[l_op].append(p_op)
+        for logical_op in pz_ops.LOGICAL_OPERATORS:
+            self.logical_physical_map[logical_op] = []
+            for physical_op in self.physical_ops:
+                if physical_op.implements(logical_op):
+                    self.logical_physical_map[logical_op].append(physical_op)
 
         print(f"LOGICAL PHYSICAL MAP: {self.logical_physical_map}")
 
