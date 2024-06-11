@@ -47,7 +47,7 @@ class Execute:
             sentinel_records, sentinel_stats = zip(*results)
             for records, stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
                 # aggregate sentinel est. data
-                sample_execution_data = plan.getExecutionData()
+                sample_execution_data = plan.getSampleExecutionData()
                 all_sample_execution_data.extend(sample_execution_data)
 
                 # set return_records to be records from champion model
@@ -120,7 +120,6 @@ class Execute:
             for physical_plan in physical_planner.generate_plans(logical_plan):
                 all_physical_plans.append(physical_plan)
 
-        # TODO: still WIP
         # construct the CostOptimizer with any sample execution data we've gathered
         cost_optimizer = CostOptimizer(sample_execution_data)
 
@@ -141,7 +140,7 @@ class Execute:
             final_plans = physical_planner.add_plans_closest_to_frontier(final_plans, plans, min_plans)
 
         # choose best plan and execute it
-        plan = policy.choose(plans) # TODO: have policies accept PhysicalPlan
+        plan = policy.choose(plans)
 
         # display the plan output
         if verbose:

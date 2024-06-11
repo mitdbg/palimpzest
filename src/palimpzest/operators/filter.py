@@ -5,8 +5,8 @@ from .physical import PhysicalOperator
 
 from palimpzest.constants import *
 from palimpzest.corelib import Schema
+from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.elements import *
-from palimpzest.profiler import RecordOpStats, OperatorCostEstimates
 
 from typing import Any, Dict, Optional
 
@@ -233,7 +233,7 @@ class LLMFilter(FilterOp):
         model_conversion_time_per_record = (
             MODEL_CARDS[self.model.value]["seconds_per_output_token"]
             * est_num_output_tokens
-        )
+        ) / self.max_workers
 
         # get est. of conversion cost (in USD) per record from model card
         model_conversion_usd_per_record = (

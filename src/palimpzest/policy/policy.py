@@ -28,7 +28,7 @@ class MaxQuality(Policy):
         return "Maximum Quality"
 
     def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
-        return sorted(candidatePlans, key=lambda cp: cp[2])[-1]
+        return sorted(candidatePlans, key=lambda plan: plan.quality)[-1]
 
 
 class MaxQualityAtFixedCost(Policy):
@@ -44,32 +44,32 @@ class MaxQualityAtFixedCost(Policy):
         best_plan, best_plan_idx, max_quality, max_quality_runtime = None, -1, 0, np.inf
         for idx, plan in enumerate(candidatePlans):
             # if plan is too expensive, skip
-            if plan[1] > self.max_cost:
+            if plan.total_cost > self.max_cost:
                 continue
 
             # if plan is above best current max quality, this is new best plan
-            if plan[2] > max_quality:
+            if plan.quality > max_quality:
                 best_plan = plan
                 best_plan_idx = idx
-                max_quality = plan[2]
-                max_quality_runtime = plan[0]
+                max_quality = plan.quality
+                max_quality_runtime = plan.total_time
 
             # if plan is tied w/current max quality -- and has lower runtime -- this is new best plan
-            elif plan[2] == max_quality and plan[0] < max_quality_runtime:
+            elif plan.quality == max_quality and plan.total_time < max_quality_runtime:
                 best_plan = plan
                 best_plan_idx = idx
-                max_quality = plan[2]
-                max_quality_runtime = plan[0]
+                max_quality = plan.quality
+                max_quality_runtime = plan.total_time
 
         # if no plan was below fixed cost; return cheapest plan
         if best_plan is None:
             print("NO PLAN FOUND BELOW FIXED COST; PICKING MIN. COST PLAN INSTEAD")
             min_cost = np.inf
             for idx, plan in enumerate(candidatePlans):
-                if plan[1] < min_cost:
+                if plan.total_cost < min_cost:
                     best_plan = plan
                     best_plan_idx = idx
-                    min_cost = plan[1]
+                    min_cost = plan.total_cost
 
         return best_plan if not return_idx else (best_plan, best_plan_idx)
 
@@ -87,32 +87,32 @@ class MaxQualityAtFixedRuntime(Policy):
         best_plan, best_plan_idx, max_quality, max_quality_cost = None, -1, 0, np.inf
         for idx, plan in enumerate(candidatePlans):
             # if plan is too long, skip
-            if plan[0] > self.max_runtime:
+            if plan.total_time > self.max_runtime:
                 continue
 
             # if plan is above best current max quality, this is new best plan
-            if plan[2] > max_quality:
+            if plan.quality > max_quality:
                 best_plan = plan
                 best_plan_idx = idx
-                max_quality = plan[2]
-                max_quality_cost = plan[1]
+                max_quality = plan.quality
+                max_quality_cost = plan.total_cost
 
             # if plan is tied w/current max quality -- and has lower cost -- this is new best plan
-            elif plan[2] == max_quality and plan[1] < max_quality_cost:
+            elif plan.quality == max_quality and plan.total_cost < max_quality_cost:
                 best_plan = plan
                 best_plan_idx = idx
-                max_quality = plan[2]
-                max_quality_cost = plan[1]
+                max_quality = plan.quality
+                max_quality_cost = plan.total_cost
 
         # if no plan was below fixed runtime; return shortest plan
         if best_plan is None:
             print("NO PLAN FOUND BELOW FIXED COST; PICKING MIN. RUNTIME PLAN INSTEAD")
             min_runtime = np.inf
             for idx, plan in enumerate(candidatePlans):
-                if plan[0] < min_runtime:
+                if plan.total_time < min_runtime:
                     best_plan = plan
                     best_plan_idx = idx
-                    min_runtime = plan[0]
+                    min_runtime = plan.total_time
 
         return best_plan if not return_idx else (best_plan, best_plan_idx)
 
@@ -130,22 +130,22 @@ class MinCostAtFixedQuality(Policy):
         best_plan, best_plan_idx, min_cost, min_cost_runtime = None, -1, np.inf, np.inf
         for idx, plan in enumerate(candidatePlans):
             # if plan is too low quality, skip
-            if plan[2] < self.min_quality:
+            if plan.quality < self.min_quality:
                 continue
 
             # if plan is below best current min cost, this is new best plan
-            if plan[1] < min_cost:
+            if plan.total_cost < min_cost:
                 best_plan = plan
                 best_plan_idx = idx
-                min_cost = plan[1]
-                min_cost_runtime = plan[0]
+                min_cost = plan.total_cost
+                min_cost_runtime = plan.total_time
 
             # if plan is tied w/current min cost -- and has lower runtime -- this is new best plan
-            elif plan[1] == min_cost and plan[0] < min_cost_runtime:
+            elif plan.total_cost == min_cost and plan.total_time < min_cost_runtime:
                 best_plan = plan
                 best_plan_idx = idx
-                min_cost = plan[1]
-                min_cost_runtime = plan[0]
+                min_cost = plan.total_cost
+                min_cost_runtime = plan.total_time
 
         # if no plan was above fixed quality; return best plan
         if best_plan is None:
@@ -154,10 +154,10 @@ class MinCostAtFixedQuality(Policy):
             )
             max_quality = 0
             for idx, plan in enumerate(candidatePlans):
-                if plan[2] > max_quality:
+                if plan.quality > max_quality:
                     best_plan = plan
                     best_plan_idx = idx
-                    max_quality = plan[2]
+                    max_quality = plan.quality
 
         return best_plan if not return_idx else (best_plan, best_plan_idx)
 
@@ -180,22 +180,22 @@ class MinRuntimeAtFixedQuality(Policy):
         )
         for idx, plan in enumerate(candidatePlans):
             # if plan is too low quality, skip
-            if plan[2] < self.min_quality:
+            if plan.quality < self.min_quality:
                 continue
 
             # if plan is below best current min cost, this is new best plan
-            if plan[0] < min_runtime:
+            if plan.total_time < min_runtime:
                 best_plan = plan
                 best_plan_idx = idx
-                min_runtime = plan[0]
-                min_runtime_cost = plan[1]
+                min_runtime = plan.total_time
+                min_runtime_cost = plan.total_cost
 
             # if plan is tied w/current min runtime -- and has lower cost -- this is new best plan
-            elif plan[0] == min_runtime and plan[1] < min_runtime_cost:
+            elif plan.total_time == min_runtime and plan.total_cost < min_runtime_cost:
                 best_plan = plan
                 best_plan_idx = idx
-                min_runtime = plan[0]
-                min_runtime_cost = plan[1]
+                min_runtime = plan.total_time
+                min_runtime_cost = plan.total_cost
 
         # if no plan was above fixed quality; return best plan
         if best_plan is None:
@@ -204,10 +204,10 @@ class MinRuntimeAtFixedQuality(Policy):
             )
             max_quality = 0
             for idx, plan in enumerate(candidatePlans):
-                if plan[2] > max_quality:
+                if plan.quality > max_quality:
                     best_plan = plan
                     best_plan_idx = idx
-                    max_quality = plan[2]
+                    max_quality = plan.quality
 
         return best_plan if not return_idx else (best_plan, best_plan_idx)
 
@@ -227,16 +227,16 @@ class MaxQualityMinRuntime(Policy):
     ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
         best_plan, best_plan_idx, max_quality, max_quality_runtime = None, -1, 0, np.inf
         for idx, plan in enumerate(candidatePlans):
-            if plan[2] > max_quality:
+            if plan.quality > max_quality:
                 best_plan = plan
                 best_plan_idx = idx
-                max_quality = plan[2]
-                max_quality_runtime = plan[0]
-            elif plan[2] == max_quality and plan[0] < max_quality_runtime:
+                max_quality = plan.quality
+                max_quality_runtime = plan.total_time
+            elif plan.quality == max_quality and plan.total_time < max_quality_runtime:
                 best_plan = plan
                 best_plan_idx = idx
-                max_quality = plan[2]
-                max_quality_runtime = plan[0]
+                max_quality = plan.quality
+                max_quality_runtime = plan.total_time
 
         return best_plan if not return_idx else (best_plan, best_plan_idx)
 
@@ -251,7 +251,7 @@ class MinTime(Policy):
         return "Minimum Time"
 
     def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
-        return sorted(candidatePlans, key=lambda cp: cp[0])[0]
+        return sorted(candidatePlans, key=lambda plan: plan.total_time)[0]
 
 
 class MinCost(Policy):
@@ -264,7 +264,7 @@ class MinCost(Policy):
         return "Minimum Cost"
 
     def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
-        return sorted(candidatePlans, key=lambda cp: cp[1])[0]
+        return sorted(candidatePlans, key=lambda plan: plan.total_cost)[0]
 
 
 class MaxHarmonicMean(Policy):
@@ -290,9 +290,9 @@ class MaxHarmonicMean(Policy):
         bestPlan, bestHarmonicMean, bestPlanIdx = None, 0.0, -1
         for idx, plan in enumerate(candidatePlans):
             # scale time and cost into [0, 1]
-            scaled_time = (self.max_time - plan[0]) / self.max_time
-            scaled_cost = (self.max_cost - plan[1]) / self.max_cost
-            scaled_quality = (plan[2]) / self.max_quality
+            scaled_time = (self.max_time - plan.total_time) / self.max_time
+            scaled_cost = (self.max_cost - plan.total_cost) / self.max_cost
+            scaled_quality = (plan.quality) / self.max_quality
             scaled_time = min(max(scaled_time, 0.0), 1.0)
             scaled_cost = min(max(scaled_cost, 0.0), 1.0)
             scaled_quality = min(max(scaled_quality, 0.0), 1.0)

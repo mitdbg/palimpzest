@@ -86,9 +86,6 @@ LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
 # Assume 30 GB/sec for sequential access of memory
 MEMORY_SCAN_TIME_PER_KB = 1 / (float(30) * 1024 * 1024)
 
-# Assume number of output tokens is 0.25x the number of input tokens
-OUTPUT_TOKENS_MULTIPLE = 0.25
-
 # Rough conversion from # of bytes --> # of tokens; assumes 1 token ~= 4 chars and 1 char == 1 byte
 BYTES_TO_TOKENS = 0.25
 
@@ -112,8 +109,20 @@ NAIVE_EST_FILTER_SELECTIVITY = 0.5
 # a naive estimate for the number of input tokens processed per record
 NAIVE_EST_NUM_INPUT_TOKENS = 1000
 
+# a naive estimate for the number of output tokens processed per record
+NAIVE_EST_NUM_OUTPUT_TOKENS = 100
+
 # a naive estimate for the number of groups returned by a group by
 NAIVE_EST_NUM_GROUPS = 3
+
+# a naive estimate for the factor of increase (loosely termed "selectivity") for one-to-many cardinality operations
+NAIVE_EST_ONE_TO_MANY_SELECTIVITY = 2
+
+# a naive estimate of the time it takes to extract the latex for an equation from an image file using Skema
+NAIVE_IMAGE_TO_EQUATION_LATEX_TIME_PER_RECORD = 10.0
+
+# a naive estimate of the time it takes to extract the text from a PDF using a PDF processor
+NAIVE_PDF_PROCESSOR_TIME_PER_RECORD = 10.0
 
 # Whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False

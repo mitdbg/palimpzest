@@ -1,7 +1,6 @@
 from palimpzest.constants import Model, PromptStrategy, QueryStrategy
 from palimpzest.operators import PhysicalOperator
 from palimpzest.planner import LogicalPlan, PhysicalPlan
-from palimpzest.profiler import StatsProcessor
 from palimpzest.utils import getModels, getVisionModels
 from .plan import LogicalPlan, PhysicalPlan
 
@@ -761,7 +760,7 @@ class PhysicalPlanner(Planner):
         # plans on the pareto frontier to be dropped if they are "dominated" by a duplicate
         dedup_plans, dedup_tuple_set = [], set()
         for plan in physical_plans:
-            plan_tuple = (plan.estimates['total_time'], plan.estimates['total_cost'], plan.estimates['quality'])
+            plan_tuple = (plan.total_time, plan.total_cost, plan.quality)
             if plan_tuple not in dedup_tuple_set:
                 dedup_tuple_set.add(plan_tuple)
                 dedup_plans.append(plan)
@@ -790,9 +789,9 @@ class PhysicalPlanner(Planner):
 
                 # if plan i is dominated by plan j, set paretoFrontier = False and break
                 if (
-                    plan_j.estimates['total_time'] <= plan_i.estimates['total_time']
-                    and plan_j.estimates['total_cost'] <= plan_i.estimates['total_cost']
-                    and plan_j.estimates['quality'] >= plan_i.estimates['quality']
+                    plan_j.total_time <= plan_i.total_time
+                    and plan_j.total_cost <= plan_i.total_cost
+                    and plan_j.quality >= plan_i.quality
                 ):
                     paretoFrontier = False
                     break
@@ -848,10 +847,10 @@ class PhysicalPlanner(Planner):
             # otherwise compute min distance to plans on pareto frontier
             min_dist, min_dist_idx = np.inf, -1
             for pareto_plan in final_plans:
-                time_dist = (plan.estimates['total_time'] - pareto_plan.estimates['total_time']) / pareto_plan.estimates['total_time']
-                cost_dist = (plan.estimates['total_cost'] - pareto_plan.estimates['total_cost']) / pareto_plan.estimates['total_cost']
+                time_dist = (plan.total_time - pareto_plan.total_time) / pareto_plan.total_time
+                cost_dist = (plan.total_cost - pareto_plan.total_cost) / pareto_plan.total_cost
                 quality_dist = (
-                    (pareto_plan.estimates['quality'] - plan.estimates['quality']) / plan.estimates['quality'] if plan.estimates['quality'] > 0 else 10.0
+                    (pareto_plan.quality - plan.quality) / plan.quality if plan.quality > 0 else 10.0
                 )
                 dist = time_dist + cost_dist + quality_dist
                 if dist < min_dist:

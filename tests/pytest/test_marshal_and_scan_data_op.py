@@ -13,6 +13,7 @@ class TestMarshalAndScanDataOp:
             datasetIdentifier=emails_dataset,
         )
 
-        iterator_fn = scanOp()
+        iterator_fn = scanOp
         for record, record_op_stats in iterator_fn:
+            print(record.filename)
             pass

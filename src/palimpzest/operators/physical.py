@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from palimpzest.constants import *
 from palimpzest.corelib import Number, Schema
+from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
-from palimpzest.profiler.stats import RecordOpStats, OperatorCostEstimates
 
 from typing import Any, Callable, Dict, Tuple, Optional
 
@@ -121,7 +121,10 @@ class DataSourcePhysicalOperator(PhysicalOperator):
         """
         raise NotImplementedError("Abstract method")
 
-    def __call__(self) -> DataSourceIteratorFn:
+    def __call__(self) -> DataRecordWithStats:
+        raise Exception(f"Use __iter__ to retrieve records from {self.op_name()}")
+
+    def __iter__(self) -> DataSourceIteratorFn:
         raise NotImplementedError("Abstract method")
 
 
@@ -196,7 +199,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
             quality=1.0,
         )
 
-    def __call__(self) -> DataSourceIteratorFn:
+    def __iter__(self) -> DataSourceIteratorFn:
         def iteratorFn():
             counter = 0
             start_time = time.time()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from palimpzest.dataclasses import OperatorStats, PlanStats, SampleExecutionData
 from palimpzest.operators import FilteredScan, FilterOp, LogicalOperator, PhysicalOperator
 from palimpzest.operators.physical import PhysicalOperator
 
@@ -10,6 +11,8 @@ except:
     from more_itertools import pairwise
 
 from typing import Any, Dict, List
+
+import time
 
 
 class Plan:
@@ -74,13 +77,10 @@ class PhysicalPlan(Plan):
 
     def __init__(self, operators: List[PhysicalOperator]):
         self.operators = operators
-        self.estimates = {
-            "total_time": None,
-            "total_cost": None,
-            "quality": None,
-        }
-
-        # self.stats = PlanStats()
+        self.total_time = None
+        self.total_cost = None
+        self.quality = None
+        self.plan_stats = None
 
     @staticmethod
     def fromOpsAndSubPlan(ops: List[PhysicalOperator], subPlan: PhysicalPlan) -> PhysicalPlan:
@@ -97,8 +97,11 @@ class PhysicalPlan(Plan):
     def __str__(self) -> str:
         """Computes a string representation for this plan."""
         ops = [op for op in self.operators if not op.is_hardcoded()]
-        label = "-".join([str(op) for op in self.operators])
+        label = "-".join([str(op) for op in ops])
         return f"PZ-{label}"
+
+    def plan_id(self) -> str:
+        return self.__str__()
 
     def getPlanModelNames(self) -> List[str]:
         model_names = []
@@ -146,23 +149,114 @@ class PhysicalPlan(Plan):
             )
             print()
 
-    def getExecutionData() -> List[Dict[str, Any]]:
+    def getSampleExecutionData(self) -> List[Dict[str, Any]]:
         """Compute and return all sample execution data collected by this plan so far."""
-        # TODO
-        return []
+        # define helper function to extract answer from filter and convert operations
+        def _get_answer(record_op_stats):
+            # return T/F for filter
+            if "_passed_filter" in record_op_stats.record_state:
+                return record_op_stats.record_state["_passed_filter"]
+
+            # return key->value mapping for generated fields for induce
+            answer = {}
+            if "generated_fields" in record_op_stats.op_details:
+                for field in record_op_stats.op_details["generated_fields"]:
+                    answer[field] = record_op_stats.record_state[field]
+
+            return answer
+
+        # construct table of observation data from sample batch of processed records
+        sample_execution_data, source_op_id = [], None
+        for op_id, operator_stats in self.plan_stats.operator_stats.items():
+            # append observation data for each record
+            for record_op_stats in operator_stats.record_op_stats_lst:
+                # compute minimal observation which is supported by all operators
+                # TODO: one issue with this setup is that cache_scans of previously computed queries
+                #       may not match w/these observations due to the diff. op_name
+                observation = SampleExecutionData(
+                    record_uuid=record_op_stats.record_uuid,
+                    record_parent_uuid=record_op_stats.record_parent_uuid,
+                    op_id=op_id,
+                    op_name=record_op_stats.op_name,
+                    source_op_id=source_op_id,
+                    op_time=record_op_stats.op_time,
+                    passed_filter=(
+                        record_op_stats.record_state["_passed_filter"]
+                        if "_passed_filter" in record_op_stats.record_state
+                        else None
+                    ),
+                    model_name=(
+                        record_op_stats.op_details["model_name"]
+                        if "model_name" in record_op_stats.op_details
+                        else None
+                    ),
+                    filter_str=(
+                        record_op_stats.op_details["filter_str"]
+                        if "filter_str" in record_op_stats.op_details
+                        else None
+                    ),
+                    input_fields_str=(
+                        "-".join(sorted(record_op_stats.op_details["input_fields"]))
+                        if "input_fields" in record_op_stats.op_details
+                        else None
+                    ),
+                    generated_fields_str=(
+                        "-".join(sorted(record_op_stats.op_details["generated_fields"]))
+                        if "generated_fields" in record_op_stats.op_details
+                        else None
+                    ),
+                    total_input_tokens=(
+                        record_op_stats.record_stats["total_input_tokens"]
+                        if "total_input_tokens" in record_op_stats.record_stats
+                        else None
+                    ),
+                    total_output_tokens=(
+                        record_op_stats.record_stats["total_output_tokens"]
+                        if "total_output_tokens" in record_op_stats.record_stats
+                        else None
+                    ),
+                    total_input_cost=(
+                        record_op_stats.record_stats["total_input_cost"]
+                        if "total_input_cost" in record_op_stats.record_stats
+                        else None
+                    ),
+                    total_output_cost=(
+                        record_op_stats.record_stats["total_output_cost"]
+                        if "total_output_cost" in record_op_stats.record_stats
+                        else None
+                    ),
+                    answer=_get_answer(record_op_stats)
+                )
+
+                # add observation to list of observations
+                sample_execution_data.append(observation)
+
+            # update source_op_id
+            source_op_id = op_id
+
+        return sample_execution_data
+
 
     def execute(self):
         """Execute the plan."""
+        plan_start_time = time.time()
+
+        # initialize plan and operator stats
+        self.plan_stats = PlanStats(plan_id=self.plan_id())
+        for op_idx, op in enumerate(self.operators):
+            op_id = op.physical_op_id()
+            self.plan_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
+
         # initialize list of output records
-        output_records, plan_stats = [], {op.physical_op_id(): [] for op in self.operators}
+        output_records = []
 
         # TODO: execution issues I still need to resolve:
         #  - need to force upstream execution to complete for agg., groupby, and parallel operators
         #    -  eventually we could allow for pipelining and not block on parallel operators, but pre-SIGMOD let's keep that behavior intact
         # iterate over records from the datasource operator
         datasource_operator = self.operators[0]
-        for record, record_op_stats in datasource_operator():
-            plan_stats[datasource_operator.physical_op_id()].append(record_op_stats)
+        for record, record_op_stats in datasource_operator:
+            self.plan_stats[datasource_operator.physical_op_id()] += record_op_stats
 
             # apply sequence of subsequent operators
             filtered = False
@@ -170,7 +264,7 @@ class PhysicalPlan(Plan):
                 record, record_op_stats = operator(record)
 
                 # add record_op_stats to appropriate operator
-                plan_stats[datasource_operator.physical_op_id()].append(record_op_stats)
+                self.plan_stats[datasource_operator.physical_op_id()] += record_op_stats
 
                 # TODO: confirm if this isinstance will work with sub-class operations
                 if isinstance(operator, FilterOp) and not record._passed_filter:
@@ -180,12 +274,8 @@ class PhysicalPlan(Plan):
             if not filtered:
                 output_records.append(record)
 
-        return output_records, plan_stats
+        # finalize plan stats
+        total_plan_time = time.time() - plan_start_time
+        self.plan_stats.finalize(total_plan_time)
 
-    # def __iter__(self):
-    #     """Iterate over source records from datasource."""
-    #     # TODO
-    #     base_operator = self.operators[-1]
-    #     for record, stats in base_operator:
-    #         self.stats.append(stats)
-    #         yield record
+        return output_records, self.plan_stats
