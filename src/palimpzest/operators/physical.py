@@ -87,7 +87,7 @@ class PhysicalOperator:
         The function takes an argument which contains the OperatorCostEstimates
         of the physical operator whose output is the input to this operator.
     
-        For the implemented operator. These will be used by the CostOptimizer
+        For the implemented operator. These will be used by the CostEstimator
         when PZ does not have sample execution data -- and it will be necessary
         in some cases even when sample execution data is present. (For example,
         the cardinality of each operator cannot be estimated based on sample
@@ -112,7 +112,7 @@ class DataSourcePhysicalOperator(PhysicalOperator):
         - output_tokens_per_record
         - quality
     
-        For the implemented operator. These will be used by the CostOptimizer
+        For the implemented operator. These will be used by the CostEstimator
         when PZ does not have sample execution data -- and it will be necessary
         in some cases even when sample execution data is present. (For example,
         the cardinality of each operator cannot be estimated based on sample

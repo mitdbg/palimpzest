@@ -1,6 +1,6 @@
 from __future__ import annotations
-from palimpzest.dataclasses import Stats, OperatorCostEstimates
-from palimpzest.operators import PhysicalOperator, IteratorFn
+from palimpzest.dataclasses import OperatorStats, OperatorCostEstimates
+from palimpzest.operators import PhysicalOperator
 
 from palimpzest.constants import *
 from palimpzest.corelib import *
@@ -49,28 +49,28 @@ class ConvertOp(PhysicalOperator):
     def __str__(self):
         return f"{self.model}_{self.query_strategy}_{self.token_budget}"
 
-    def __call__(self, candidate: DataRecord) -> Tuple[DataRecord, Optional[Stats]]:
+    def __call__(self, candidate: DataRecord) -> Tuple[DataRecord, Optional[OperatorStats]]:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
 
-    def __iter__(self) -> IteratorFn:
-        shouldCache = self.datadir.openCache(self.targetCacheId)
+    # def __iter__(self) -> IteratorFn:
+    #     shouldCache = self.datadir.openCache(self.targetCacheId)
 
-        @self.profile(name="convert", shouldProfile=self.shouldProfile)
-        def iteratorFn():
-            for nextCandidate in self.source:
-                resultRecordList = self.__call__(nextCandidate)
-                if resultRecordList is not None:
-                    for resultRecord in resultRecordList:
-                        if resultRecord is not None:
-                            if shouldCache:
-                                self.datadir.appendCache(
-                                    self.targetCacheId, resultRecord
-                                )
-                            yield resultRecord
-            if shouldCache:
-                self.datadir.closeCache(self.targetCacheId)
+    #     @self.profile(name="convert", shouldProfile=self.shouldProfile)
+    #     def iteratorFn():
+    #         for nextCandidate in self.source:
+    #             resultRecordList = self.__call__(nextCandidate)
+    #             if resultRecordList is not None:
+    #                 for resultRecord in resultRecordList:
+    #                     if resultRecord is not None:
+    #                         if shouldCache:
+    #                             self.datadir.appendCache(
+    #                                 self.targetCacheId, resultRecord
+    #                             )
+    #                         yield resultRecord
+    #         if shouldCache:
+    #             self.datadir.closeCache(self.targetCacheId)
 
-        return iteratorFn()
+    #     return iteratorFn()
 
 
 class ParallelConvertFromCandidateOp(ConvertOp):
@@ -312,7 +312,7 @@ class LLMConvert(ConvertOp):
         )
 
     # TODO
-    def __call__(self, candidate: DataRecord) -> Tuple[DataRecord, Optional[Stats]]:
+    def __call__(self, candidate: DataRecord) -> Tuple[DataRecord, Optional[OperatorStats]]:
         # initialize stats objects
         bonded_query_stats, conventional_query_stats = None, None
 

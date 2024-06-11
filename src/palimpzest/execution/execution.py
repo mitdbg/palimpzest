@@ -1,7 +1,7 @@
 from palimpzest.datamanager import DataDirectory
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
-from .cost_estimator import CostOptimizer
+from .cost_estimator import CostEstimator
 from palimpzest.sets import Set
 from palimpzest.utils import getChampionModelName
 
@@ -120,8 +120,8 @@ class Execute:
             for physical_plan in physical_planner.generate_plans(logical_plan):
                 all_physical_plans.append(physical_plan)
 
-        # construct the CostOptimizer with any sample execution data we've gathered
-        cost_optimizer = CostOptimizer(sample_execution_data)
+        # construct the CostEstimator with any sample execution data we've gathered
+        cost_optimizer = CostEstimator(sample_execution_data)
 
         # estimate the cost of each plan
         plans = cost_optimizer.estimate_plan_costs(all_physical_plans)

@@ -289,7 +289,7 @@ class ConvertFileToPDF(HardcodedConvert):
 
 
 # NOTE 1: My motivation for making this inherit from HardcodedConvert is that I have at least one place
-#         in the CostOptimizer where it would be nice to simply check if an operator is an instance of HardcodedConvert
+#         in the CostEstimator where it would be nice to simply check if an operator is an instance of HardcodedConvert
 # NOTE 2: I realize that this does not match the convention of having an inputSchema
 #         and outputSchema which can be checked against self.__class__.inputSchema
 #         and self.__class__.outputSchema. But, since it is a hard-coded convert operation,
