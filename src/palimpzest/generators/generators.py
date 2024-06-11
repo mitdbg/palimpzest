@@ -10,7 +10,7 @@ from palimpzest.generators import (
     gen_qa_signature_class,
     TogetherHFAdaptor,
 )
-from palimpzest.profiler import GenerationStats, CodeGenSingleStats, CodeGenEnsembleStats, CodeExecutionSingleStats, CodeExecutionEnsembleStats
+from palimpzest.dataclasses import RecordOpStats
 from palimpzest.utils import API
 
 from collections import Counter
@@ -37,7 +37,7 @@ from palimpzest.profiler.attentive_trim import (
 )
 
 # DEFINITIONS
-GenerationOutput = Tuple[str, GenerationStats]
+GenerationOutput = Tuple[str, RecordOpStats]
 
 
 def get_api_key(key: str) -> str:
@@ -195,15 +195,29 @@ class CustomGenerator(BaseGenerator):
         finish_reason = response["choices"][0]["finish_reason"]
         usage = response["usage"]
 
+        op_details = {
+            "model_name": self.model_name,
+            "llm_call_duration_secs": end_time - start_time,
+            "prompt": dspy_lm.history[-1]["prompt"],
+            "usage": usage,
+            "finish_reason": finish_reason,
+            "answer_log_probs": answer_log_probs,
+            "answer": answer,
+        }
+
         # collect statistics on prompt, usage, and timing
-        stats = GenerationStats(
-            model_name=self.model_name,
-            llm_call_duration_secs=end_time - start_time,
-            prompt=dspy_lm.history[-1]["prompt"],
-            usage=usage,
-            finish_reason=finish_reason,
-            answer_log_probs=answer_log_probs,
-            answer=answer,
+        # TODO the actual values cannot be filled here but have to filled by the execution
+        # GV My feeling is that we should only return the op_details object up to the exeuction
+        stats = RecordOpStats(
+            record_idx=0,
+            record_uuid="",
+            record_parent_uuid="",
+            op_id="",
+            op_name="",
+            op_time=0.0,
+            op_cost=0.0,
+            record_state = {},
+            op_details=op_details,
         )
 
         if self.verbose:

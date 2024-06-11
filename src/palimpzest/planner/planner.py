@@ -828,12 +828,6 @@ class PhysicalPlanner(Planner):
         physical_plans: List[PhysicalPlan],
         min_plans: int,
     ) -> List[PhysicalPlan]:
-        # helper function to determine if this plan is already in the final set of plans
-        def is_in_final_plans(plan, final_plans):
-            for final_plan in final_plans:
-                if plan == final_plan:
-                    return True
-            return False
 
         # if specified, grab up to `min` total plans, and choose the remaining plans
         # based on their smallest agg. distance to the pareto frontier; distance is computed
@@ -841,8 +835,9 @@ class PhysicalPlanner(Planner):
         min_distances = []
         for idx, plan in enumerate(physical_plans):
             # determine if this plan is already in the final set of plans
-            if is_in_final_plans(plan, final_plans):
-                continue
+            for final_plan in final_plans:
+                if plan == final_plan:
+                    continue
 
             # otherwise compute min distance to plans on pareto frontier
             min_dist, min_dist_idx = np.inf, -1
