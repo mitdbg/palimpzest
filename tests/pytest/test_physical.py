@@ -27,6 +27,12 @@ from utils import remove_cache, buildNestedStr
 #       dollars spent, time spent, etc. This workaround recreates the physical plans on each
 #       iteration to ensure that they are new.
 
+def test_implement(enron_eval):
+
+    l_op = pz.BaseScan
+    p_op = pz.MarshalAndScanDataOp
+
+    assert p_op.implements(l_op)
 
 def test_physical_planner():
     """Test the physical planner"""

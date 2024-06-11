@@ -29,5 +29,5 @@ def test_enron(enron_eval):
     pp = physicalPlans[0]
     print(pp)
 
-    execution = Execute(dataset, policy=pz.MinCost())
+    # execution = Execute(dataset, policy=pz.MinCost())
     # execution.execute(pp)

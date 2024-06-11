@@ -7,6 +7,7 @@ from palimpzest.constants import *
 from palimpzest.corelib import Schema
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.elements import *
+from palimpzest.operators import logical
 
 from typing import Any, Dict, Optional
 
@@ -139,6 +140,7 @@ class ParallelFilterCandidateOp(FilterOp):
 
 
 class NonLLMFilter(FilterOp):
+    implemented_op = logical.FilteredScan
 
     def __eq__(self, other: NonLLMFilter):
         return (
@@ -185,6 +187,7 @@ class NonLLMFilter(FilterOp):
 
 
 class LLMFilter(FilterOp):
+    implemented_op = logical.FilteredScan
 
     def __init__(self, model: Model, prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_BOOL, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

@@ -5,6 +5,7 @@ from palimpzest.corelib import Number, Schema
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
+from palimpzest.operators import logical
 
 from typing import Any, Callable, Dict, Tuple, Optional
 
@@ -18,10 +19,27 @@ DataRecordWithStats = Tuple[DataRecord, RecordOpStats]
 DataSourceIteratorFn = Callable[[], DataRecordWithStats]
 
 
-class PhysicalOperator:
+class ImplementationMeta(type):
+    """
+    This metaclass is necessary to have the logic: 
+    p_op = pz.PhysicalOperator.X
+    l_op = pz.logicalOperator.Y
+    p_op.implements(l_op) # True or False
+    """
+    def implements(cls, logical_operator_class):
+        return logical_operator_class == cls.implemented_op
+
+class PhysicalOperator(metaclass=ImplementationMeta):
+    """
+    All implemented physical operators should inherit from this class, and define in the implemented_op variable
+    exactly which logical operator they implement. This is necessary for the planner to be able to determine
+    which physical operators can be used to implement a given logical operator.
+    """
+
     LOCAL_PLAN = "LOCAL"
     REMOTE_PLAN = "REMOTE"
 
+    implemented_op = None
     inputSchema = None
     outputSchema = None
 
@@ -96,7 +114,6 @@ class PhysicalOperator:
         """
         raise NotImplementedError("CostEstimates from abstract method")
 
-
 class DataSourcePhysicalOperator(PhysicalOperator):
     """
     By definition, physical operators which implement DataSources don't accept
@@ -129,6 +146,9 @@ class DataSourcePhysicalOperator(PhysicalOperator):
 
 
 class MarshalAndScanDataOp(DataSourcePhysicalOperator):
+
+    implemented_op = logical.BaseScan
+
     def __init__(
         self,
         outputSchema: Schema,
@@ -227,6 +247,8 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
 
 
 class CacheScanDataOp(DataSourcePhysicalOperator):
+    implemented_op = logical.CacheScan
+
     def __init__(
         self,
         outputSchema: Schema,
@@ -341,6 +363,8 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
 
 
 class ApplyGroupByOp(PhysicalOperator):
+    implemented_op = logical.GroupByAggregate
+
     def __init__(
         self,
         inputSchema: Schema,
@@ -477,6 +501,8 @@ class ApplyGroupByOp(PhysicalOperator):
 
 
 class ApplyCountAggregateOp(PhysicalOperator):
+    implemented_op = logical.ApplyAggregateFunction
+
     def __init__(
         self,
         inputSchema: Schema,
@@ -561,7 +587,10 @@ class ApplyCountAggregateOp(PhysicalOperator):
 
 
 # TODO: coalesce into base class w/ApplyCountAggregateOp and simply override __call__ methods in base classes
+# GV: What if we keep the two separate and have two different logical operators? 
 class ApplyAverageAggregateOp(PhysicalOperator):
+    implemented_op = logical.ApplyAggregateFunction
+
     def __init__(
         self,
         inputSchema: Schema,
@@ -653,6 +682,8 @@ class ApplyAverageAggregateOp(PhysicalOperator):
 
 
 class LimitScanOp(PhysicalOperator):
+    implemented_op = logical.LimitScan
+
     def __init__(
         self,
         outputSchema: Schema,

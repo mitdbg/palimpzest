@@ -281,7 +281,19 @@ class PhysicalPlanner(Planner):
         self.shouldProfile = shouldProfile
         self.useParallelOps = useParallelOps
 
+        # Ideally this gets customized by model selection, code synth, etc. etc. using strategies
         self.physical_ops = pz_ops.PHYSICAL_OPERATORS
+
+        # This is a dictionary where the physical planner will keep track for all the logical plan operators defined,
+        # which physical operators are available to implement them.
+        self.logical_physical_map = {}
+        for l_op in pz_ops.LOGICAL_OPERATORS:
+            self.logical_physical_map[l_op] = []
+            for p_op in self.physical_ops:
+                if p_op.implements(l_op):
+                    self.logical_physical_map[l_op].append(p_op)
+
+        print(f"LOGICAL PHYSICAL MAP: {self.logical_physical_map}")
 
     def _getAllowedModels(self, subplan: PhysicalPlan) -> List[Model]:
         """
@@ -311,52 +323,6 @@ class PhysicalPlanner(Planner):
 
         # otherwise return the subplan model
         return [subplan_model]
-
-    def _resolveLogicalBaseScanOp(
-        self,
-        logical_base_scan_op: pz_ops.BaseScan,
-        shouldProfile: bool = False,
-        sentinel: bool = False,
-    ) -> PhysicalOperator:
-        """
-        Given the logical operator for a base scan, determine which (set of) physical operation(s)
-        the PhysicalPlanner can use to implement that logical operation.
-        """
-        if sentinel:
-            shouldProfile = True
-
-        op = pz_ops.MarshalAndScanDataOp(
-            logical_base_scan_op.outputSchema,
-            logical_base_scan_op.datasetIdentifier,
-            num_samples=self.num_samples,
-            scan_start_idx=self.scan_start_idx,
-            shouldProfile=shouldProfile,
-        )
-
-        return op
-
-    def _resolveLogicalCacheScanOp(
-        self,
-        logical_cache_scan_op: pz_ops.CacheScan,
-        shouldProfile: bool = False,
-        sentinel: bool = False,
-    ) -> PhysicalOperator:
-        """
-        Given the logical operator for a cache scan, determine which (set of) physical operation(s)
-        the PhysicalPlanner can use to implement that logical operation.
-        """
-        if sentinel:
-            shouldProfile = True
-
-        op = pz_ops.CacheScanDataOp(
-            logical_cache_scan_op.outputSchema,
-            logical_cache_scan_op.cachedDataIdentifier,
-            num_samples=self.num_samples,
-            scan_start_idx=self.scan_start_idx,
-            shouldProfile=shouldProfile,
-        )
-
-        return op
 
     def _resolveLogicalConvertOp(
         self,
@@ -445,7 +411,7 @@ class PhysicalPlanner(Planner):
 
         # otherwise, create convert op for the given set of hyper-parameters
         else:
-            op = pz_ops.LLMTypeConversion(
+            op = pz_ops.physical.LLMTypeConversion(
                 inputSchema=inputSchema,
                 outputSchema=outputSchema,
                 model=model,
@@ -500,51 +466,6 @@ class PhysicalPlanner(Planner):
 
         return op
 
-    def _resolveLogicalLimitScanOp(
-        self,
-        logical_limit_scan_op: pz_ops.LimitScan,
-        shouldProfile: bool = False,
-        sentinel: bool = False,
-    ) -> PhysicalOperator:
-        """
-        Given the logical operator for a limit scan, determine which (set of) physical operation(s)
-        the PhysicalPlanner can use to implement that logical operation.
-        """
-        if sentinel:
-            shouldProfile = True
-
-        op = pz_ops.LimitScanOp(
-            inputSchema=logical_limit_scan_op.inputSchema,
-            outputSchema=logical_limit_scan_op.outputSchema,
-            limit=logical_limit_scan_op.limit,
-            targetCacheId=logical_limit_scan_op.targetCacheId,
-            shouldProfile=shouldProfile,
-        )
-
-        return op
-
-    def _resolveLogicalGroupByAggOp(
-        self,
-        logical_gby_agg_op: pz_ops.GroupByAggregate,
-        shouldProfile: bool = False,
-        sentinel: bool = False,
-    ) -> PhysicalOperator:
-        """
-        Given the logical operator for a group by, determine which (set of) physical operation(s)
-        the PhysicalPlanner can use to implement that logical operation.
-        """
-        if sentinel:
-            shouldProfile = True
-
-        op = pz_ops.ApplyGroupByOp(
-            inputSchema=logical_gby_agg_op.inputSchema,
-            gbySig=logical_gby_agg_op.gbySig,
-            targetCacheId=logical_gby_agg_op.targetCacheId,
-            shouldProfile=shouldProfile,
-        )
-
-        return op
-
     def _resolveLogicalApplyAggFuncOp(
         self,
         logical_apply_agg_fn_op: pz_ops.ApplyAggregateFunction,
@@ -587,12 +508,26 @@ class PhysicalPlanner(Planner):
         physical_operators = []
         for logical_op in logical_plan.operators:
             op = None
+            shouldProfile = True
+
             if isinstance(logical_op, pz_ops.BaseScan):
-                op = self._resolveLogicalBaseScanOp(logical_op, sentinel=True)
+                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                op = op_class(outputSchema=logical_op.outputSchema,
+                              datasetIdentifier=logical_op.datasetIdentifier,
+                              num_samples=self.num_samples,
+                              scan_start_idx=self.scan_start_idx,
+                              shouldProfile=shouldProfile,)
 
             elif isinstance(logical_op, pz_ops.CacheScan):
-                op = self._resolveLogicalCacheScanOp(logical_op, sentinel=True)
+                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                op = op_class(outputSchema=logical_op.outputSchema,
+                                cacheIdentifier=logical_op.cachedDataIdentifier,
+                                num_samples=self.num_samples,
+                                scan_start_idx=self.scan_start_idx,
+                                shouldProfile=shouldProfile,
+                )
 
+                              
             elif isinstance(logical_op, pz_ops.ConvertScan):
                 op = self._resolveLogicalConvertOp(
                     logical_op,
@@ -612,13 +547,33 @@ class PhysicalPlanner(Planner):
                 )
 
             elif isinstance(logical_op, pz_ops.LimitScan):
-                op = self._resolveLogicalLimitScanOp(logical_op, sentinel=True)
+                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                op = op_class(
+                        inputSchema=logical_op.inputSchema,
+                        outputSchema=logical_op.outputSchema,
+                        limit=logical_op.limit,
+                        targetCacheId=logical_op.targetCacheId,
+                        shouldProfile=shouldProfile,
+                    )
 
             elif isinstance(logical_op, pz_ops.GroupByAggregate):
-                op = self._resolveLogicalGroupByAggOp(logical_op, sentinel=True)
+                op_class = self.logical_physical_map[logical_op][0]
+                op = op_class(
+                    inputSchema=logical_op.inputSchema,
+                    gbySig=logical_op.gbySig,
+                    targetCacheId=logical_op.targetCacheId,
+                    shouldProfile=shouldProfile,
+                    )
 
             elif isinstance(logical_op, pz_ops.ApplyAggregateFunction):
                 op = self._resolveLogicalApplyAggFuncOp(logical_op, sentinel=True)
+                # op_class = self.logical_physical_map[logical_op][0]
+                # op = op_class(
+                #     inputSchema=logical_op.inputSchema,
+                #     gbySig=logical_op.gbySig,
+                #     targetCacheId=logical_op.targetCacheId,
+                #     shouldProfile=shouldProfile,
+                #     )
 
             physical_operators.append(op)
 
@@ -650,19 +605,32 @@ class PhysicalPlanner(Planner):
         for logical_op in operators:
             # base case, if this operator is a BaseScan set all_plans to be the physical plan with just this operator
             if isinstance(logical_op, pz_ops.BaseScan):
-                physical_op = self._resolveLogicalBaseScanOp(logical_op, shouldProfile=self.shouldProfile)
-                all_plans = [PhysicalPlan(operators=[physical_op])]
+                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                physical_op = op_class(outputSchema = logical_op.outputSchema,
+                              datasetIdentifier=logical_op.datasetIdentifier,
+                              num_samples=self.num_samples,
+                              scan_start_idx=self.scan_start_idx,
+                              shouldProfile=self.shouldProfile,)
+                all_plans = [PhysicalPlan(operators=[op])]
 
             # base case (possibly), if this operator is a CacheScan and all_plans is empty, set all_plans to be
             # the physical plan with just this operator; if all_plans is NOT empty, then merge w/all_plans
             elif isinstance(logical_op, pz_ops.CacheScan):
-                physical_op = self._resolveLogicalCacheScanOp(logical_op, shouldProfile=self.shouldProfile)
+                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                physical_op = op_class(outputSchema=logical_op.outputSchema,
+                                cacheIdentifier=logical_op.cachedDataIdentifier,
+                                num_samples=self.num_samples,
+                                scan_start_idx=self.scan_start_idx,
+                                shouldProfile=self.shouldProfile,
+                )
+
+
                 if all_plans == []:
-                    all_plans = [PhysicalPlan(operators=[physical_op])]
+                    all_plans = [PhysicalPlan(operators=[op])]
                 else:
                     plans = []
                     for subplan in all_plans:
-                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([op], subplan)
                         plans.append(new_physical_plan)
 
                     # update all_plans
@@ -719,8 +687,15 @@ class PhysicalPlanner(Planner):
                 # update all_plans
                 all_plans = plans
 
-            elif isinstance(logical_op, ops.LimitScan):
-                physical_op = self._resolveLogicalLimitScanOp(logical_op, shouldProfile=self.shouldProfile)
+            elif isinstance(logical_op, pz_ops.LimitScan):
+                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                physical_op = op_class(
+                        inputSchema=logical_op.inputSchema,
+                        outputSchema=logical_op.outputSchema,
+                        limit=logical_op.limit,
+                        targetCacheId=logical_op.targetCacheId,
+                        shouldProfile=self.shouldProfile,
+                    )
 
                 plans = []
                 for subplan in all_plans:
@@ -731,7 +706,14 @@ class PhysicalPlanner(Planner):
                 all_plans = plans
 
             elif isinstance(logical_op, pz_ops.GroupByAggregate):
-                physical_op = self._resolveLogicalGroupByAggOp(logical_op, shouldProfile=self.shouldProfile)
+                op_class = self.logical_physical_map[logical_op][0]
+                physical_op = op_class(
+                    inputSchema=logical_op.inputSchema,
+                    gbySig=logical_op.gbySig,
+                    targetCacheId=logical_op.targetCacheId,
+                    shouldProfile=self.shouldProfile,
+                    )
+
 
                 plans = []
                 for subplan in all_plans:

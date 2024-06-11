@@ -5,6 +5,7 @@ from palimpzest.operators import PhysicalOperator
 from palimpzest.constants import *
 from palimpzest.corelib import *
 from palimpzest.elements import *
+from palimpzest.operators import logical
 
 from typing import Any, Dict, Optional, Tuple
 
@@ -130,6 +131,8 @@ class ParallelConvertFromCandidateOp(ConvertOp):
 
 
 class LLMConvert(ConvertOp):
+    implemented_op = logical.ConvertScan
+
     def __init__(
         self,
         model: Optional[Model] = None,

@@ -29,6 +29,12 @@ import json
 import os
 import time
 
+class CodeGenEnsembleStats:
+    pass
+
+class GenerationStats:
+    pass
+
 from palimpzest.profiler.attentive_trim import (
     find_best_range,
     get_trimed,

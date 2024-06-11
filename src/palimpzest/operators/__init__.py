@@ -11,7 +11,10 @@ def classesinmodule(module):
     return [
         md[c]
         for c in md
-        if (isinstance(md[c], type) and md[c].__module__ == module.__name__)
+        if (isinstance(md[c], type) 
+            and md[c].__module__ == module.__name__
+            and not issubclass(md[c], type)
+            )
     ]
 
 
