@@ -187,6 +187,8 @@ class Execute:
             for idx, operator in enumerate(plan.operators):
                 op_id = operator.physical_op_id()
 
+                # TODO: need to modify DataSourcePhysicalOperators to use __call__ again (instead of __iter__)
+                #       and return (None, None) once they've finished processing their source input
                 # if the operator is a data source, execute __call__ to get the output record(s)
                 records, record_op_stats_lst = None, None
                 if isinstance(operator, DataSourcePhysicalOperator):
@@ -227,7 +229,7 @@ class Execute:
 
             # update finished_executing based on limit
             if isinstance(operator, LimitScanOp):
-                finished_executing = len(output_records) >= operator.limit
+                finished_executing = (len(output_records) == operator.limit)
 
         return output_records, plan_stats
 
@@ -237,7 +239,7 @@ class Execute:
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id()) # TODO move into PhysicalPlan.__init__
+        plan_stats = PlanStats(plan_id=plan.plan_id()) # TODO move into PhysicalPlan.__init__?
         for op_idx, op in enumerate(plan.operators):
             op_id = op.physical_op_id()
             plan_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
@@ -255,23 +257,11 @@ class Execute:
 
         return output_records, plan_stats
 
+    # MR: per my limited understanding of staticmethods vs. classmethods, since this fcn.
+    #     accepts cls as an argument I think it's supposed to be a classmethod?
     @classmethod
     def getSampleExecutionData(cls, plan_stats: PlanStats) -> List[SampleExecutionData]:
         """Compute and return all sample execution data collected by this plan so far."""
-        # define helper function to extract answer from filter and convert operations
-        def _get_answer(record_op_stats):
-            # return T/F for filter
-            if "_passed_filter" in record_op_stats.record_state:
-                return record_op_stats.record_state["_passed_filter"]
-
-            # return key->value mapping for generated fields for induce
-            answer = {}
-            if "generated_fields" in record_op_stats.op_details:
-                for field in record_op_stats.op_details["generated_fields"]:
-                    answer[field] = record_op_stats.record_state[field]
-
-            return answer
-
         # construct table of observation data from sample batch of processed records
         sample_execution_data, source_op_id = [], None
         for op_id, operator_stats in plan_stats.operator_stats.items():

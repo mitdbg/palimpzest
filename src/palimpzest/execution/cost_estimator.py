@@ -19,9 +19,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import math
 
-import math
-
-
 # TYPE DEFINITIONS
 SampleExecutionData = Dict[str, Any] # TODO: dataclass?
 
@@ -256,9 +253,6 @@ class CostEstimator:
         # if we don't have sample execution data, we cannot compute per-operator estimates
         if self.sample_execution_data_df is None:
             return None
-
-        # get the set of operator ids for which we have sample data
-        op_ids = self.sample_execution_data_df.op_id.unique()
 
         # get the set of operator ids for which we have sample data
         op_ids = self.sample_execution_data_df.op_id.unique()
