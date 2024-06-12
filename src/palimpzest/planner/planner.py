@@ -611,7 +611,7 @@ class PhysicalPlanner(Planner):
                               num_samples=self.num_samples,
                               scan_start_idx=self.scan_start_idx,
                               shouldProfile=self.shouldProfile,)
-                all_plans = [PhysicalPlan(operators=[op])]
+                all_plans = [PhysicalPlan(operators=[physical_op])]
 
             # base case (possibly), if this operator is a CacheScan and all_plans is empty, set all_plans to be
             # the physical plan with just this operator; if all_plans is NOT empty, then merge w/all_plans
@@ -626,11 +626,11 @@ class PhysicalPlanner(Planner):
 
 
                 if all_plans == []:
-                    all_plans = [PhysicalPlan(operators=[op])]
+                    all_plans = [PhysicalPlan(operators=[physical_op])]
                 else:
                     plans = []
                     for subplan in all_plans:
-                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([op], subplan)
+                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
                         plans.append(new_physical_plan)
 
                     # update all_plans
@@ -714,7 +714,6 @@ class PhysicalPlanner(Planner):
                     shouldProfile=self.shouldProfile,
                     )
 
-
                 plans = []
                 for subplan in all_plans:
                     new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
@@ -788,19 +787,13 @@ class PhysicalPlanner(Planner):
         return pareto_frontier_plans
 
     def add_baseline_plans(self, final_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
-        # helper function to determine if this plan is already in the final set of plans
-        def is_in_final_plans(plan, final_plans):
-            for final_plan in final_plans:
-                if plan == final_plan:
-                    return True
-            return False
-
         # if specified, include all baseline plans in the final set of plans
         for plan in [self._createBaselinePlan(model) for model in getModels()]:
-            if is_in_final_plans(plan, final_plans):
-                continue
-            else:
-                final_plans.append(plan)
+            for final_plan in final_plans:
+                if plan == final_plan:
+                    continue
+
+            final_plans.append(plan)
 
         return final_plans
 
@@ -865,15 +858,3 @@ class PhysicalPlanner(Planner):
         ]
         print(f"INITIAL PLANS: {len(physicalPlans)}")
         return physicalPlans
-
-    # def generate_plans(self, logical_plan: LogicalPlan) -> List[PhysicalPlan]:
-    #     """Return a set of possible physical plans."""
-
-    #     # Stub of physical planning code
-    #     for logical_op in logical_plan:
-    #         applicable_ops = [
-    #             phy
-    #             for phy in self.physical_ops
-    #             if phy.inputSchema == logical_op.inputSchema
-    #             and phy.outputSchema == logical_op.outputSchema
-    #         ]  # Here this should be double checked

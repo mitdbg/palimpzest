@@ -9,15 +9,10 @@ from .cost_estimator import CostEstimator
 from palimpzest.sets import Set
 from palimpzest.utils import getChampionModelName
 
-# backwards compatability for users who are still on Python 3.9
-try:
-    from itertools import pairwise
-except:
-    from more_itertools import pairwise
 from palimpzest.dataclasses import OperatorStats, PlanStats, SampleExecutionData
 
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import os
 import shutil
@@ -285,61 +280,72 @@ class Execute:
                 # compute minimal observation which is supported by all operators
                 # TODO: one issue with this setup is that cache_scans of previously computed queries
                 #       may not match w/these observations due to the diff. op_name
-                observation = SampleExecutionData(
-                    record_uuid=record_op_stats.record_uuid,
-                    record_parent_uuid=record_op_stats.record_parent_uuid,
-                    op_id=op_id,
-                    op_name=record_op_stats.op_name,
-                    source_op_id=source_op_id,
-                    op_time=record_op_stats.op_time,
-                    passed_filter=(
+                observation_arguments = {
+                    "record_uuid": record_op_stats.record_uuid,
+                    "record_parent_uuid": record_op_stats.record_parent_uuid,
+                    "op_id": op_id,
+                    "op_name": record_op_stats.op_name,
+                    "source_op_id": source_op_id,
+                    "op_time": record_op_stats.op_time,
+                    "passed_filter": (
                         record_op_stats.record_state["_passed_filter"]
                         if "_passed_filter" in record_op_stats.record_state
                         else None
                     ),
-                    model_name=(
+                    "model_name": (
                         record_op_stats.op_details["model_name"]
                         if "model_name" in record_op_stats.op_details
                         else None
                     ),
-                    filter_str=(
+                    "filter_str": (
                         record_op_stats.op_details["filter_str"]
                         if "filter_str" in record_op_stats.op_details
                         else None
                     ),
-                    input_fields_str=(
+                    "input_fields_str": (
                         "-".join(sorted(record_op_stats.op_details["input_fields"]))
                         if "input_fields" in record_op_stats.op_details
                         else None
                     ),
-                    generated_fields_str=(
+                    "generated_fields_str": (
                         "-".join(sorted(record_op_stats.op_details["generated_fields"]))
                         if "generated_fields" in record_op_stats.op_details
                         else None
                     ),
-                    total_input_tokens=(
+                    "total_input_tokens": (
                         record_op_stats.record_stats["total_input_tokens"]
                         if "total_input_tokens" in record_op_stats.record_stats
                         else None
                     ),
-                    total_output_tokens=(
+                    "total_output_tokens": (
                         record_op_stats.record_stats["total_output_tokens"]
                         if "total_output_tokens" in record_op_stats.record_stats
                         else None
                     ),
-                    total_input_cost=(
+                    "total_input_cost": (
                         record_op_stats.record_stats["total_input_cost"]
                         if "total_input_cost" in record_op_stats.record_stats
                         else None
                     ),
-                    total_output_cost=(
+                    "total_output_cost": (
                         record_op_stats.record_stats["total_output_cost"]
                         if "total_output_cost" in record_op_stats.record_stats
                         else None
                     ),
-                    answer=_get_answer(record_op_stats)
-                )
+                }
 
+                # return T/F for filter
+                if "_passed_filter" in record_op_stats.record_state:
+                    observation_arguments["answer"] = record_op_stats.record_state["_passed_filter"]
+                else:
+                    answer = {}
+                    # return key->value mapping for generated fields for induce
+                    if "generated_fields" in record_op_stats.op_details:
+                        for field in record_op_stats.op_details["generated_fields"]:
+                            answer[field] = record_op_stats.record_state[field]
+                    observation_arguments["answer"] = answer
+
+                observation = SampleExecutionData(**observation_arguments)
                 # add observation to list of observations
                 sample_execution_data.append(observation)
 

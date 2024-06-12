@@ -80,7 +80,7 @@ class OperatorStats:
     # an OPTIONAL dictionary with more detailed information about this operation;
     op_details: Dict[str, Any] = field(default_factory=dict)
 
-    def __iadd__(self, record_op_stats_lst: RecordOpStats):
+    def __iadd__(self, record_op_stats: RecordOpStats):
         self.total_op_time += record_op_stats.op_time
         self.total_op_cost += record_op_stats.op_cost
         self.record_op_stats_lst.append(record_op_stats)

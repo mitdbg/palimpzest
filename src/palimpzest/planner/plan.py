@@ -1,15 +1,16 @@
-""" GV: Can you hear how wrong it sounds to have an Execution class call plan.execute()? :)
-    I think plans objects should not hold any execution logic.
-"""
 from __future__ import annotations
 
-from palimpzest.operators import FilteredScan, FilterOp, LogicalOperator, PhysicalOperator
-from palimpzest.operators.physical import DataSourcePhysicalOperator, LimitScanOp, PhysicalOperator
+from palimpzest.operators import FilteredScan, LogicalOperator, PhysicalOperator
+from palimpzest.operators.physical import PhysicalOperator
 
+# backwards compatability for users who are still on Python 3.9
+try:
+    from itertools import pairwise
+except:
+    from more_itertools import pairwise
 
-from typing import Any, Dict, List
+from typing import List
 
-import time
 
 
 class Plan:
@@ -77,7 +78,12 @@ class PhysicalPlan(Plan):
         self.total_time = None
         self.total_cost = None
         self.quality = None
-        # self.plan_stats = None 
+        # MR: Maybe we should keep the plan stats tied to the plan object for easy reference?
+        #     Even if it's just by adding a setter method which pz.Execute can call after it's
+        #     finished doing it's thing? I'm not sure what the use-case will be, but I imagine
+        #     some day in the future when people are doing crazy things w/PZ, folks may want to
+        #     just reference the plan.plan_stats (or just plan.stats) in their program.
+        # self.plan_stats = PlanStats(plan_id=self.plan_id())
 
     @staticmethod
     def fromOpsAndSubPlan(ops: List[PhysicalOperator], subPlan: PhysicalPlan) -> PhysicalPlan:
@@ -98,6 +104,7 @@ class PhysicalPlan(Plan):
         return f"PZ-{label}"
 
     # GV: Should we generate a unique ID for each plan in the __init__ ?
+    # MR: I think that's a good idea (also in fromOpsAndSubPlan)
     def plan_id(self) -> str:
         return self.__str__()
 
