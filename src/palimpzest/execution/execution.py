@@ -1,6 +1,7 @@
 import time
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.datamanager import DataDirectory
+from palimpzest.operators.physical import DataSourcePhysicalOperator, LimitScanOp
 from palimpzest.operators.filter import FilterOp
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
@@ -23,53 +24,6 @@ import shutil
 
 
 class Execute:
-    @staticmethod
-    def run_sentinel_plan(cls, plan: PhysicalPlan, plan_idx=0, verbose=False): # TODO: does ThreadPoolExecutor support tuple unpacking for arguments?
-        # display the plan output
-        if verbose:
-            print("----------------------")
-            print(f"Sentinel Plan {plan_idx}:")
-            plan.printPlan()
-            print("---")
-
-        # run the plan
-        records, stats = cls.execute(plan)
-
-        return records, stats
-
-    @classmethod
-    def run_sentinel_plans(
-        cls, sentinel_plans: List[PhysicalPlan], verbose: bool = False
-    ):
-        # compute number of plans
-        num_sentinel_plans = len(sentinel_plans)
-
-        all_sample_execution_data, return_records = [], []
-        with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
-            results = list(
-                executor.map(
-                    Execute.run_sentinel_plan,
-                    [(plan, idx, verbose) for idx, plan in enumerate(sentinel_plans)],
-                )
-            )
-
-            # write out result dict and samples collected for each sentinel
-            sentinel_records, sentinel_stats = zip(*results)
-            for records, stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
-                # aggregate sentinel est. data
-                sample_execution_data = cls.getSampleExecutionData(plan, stats)
-                all_sample_execution_data.extend(sample_execution_data)
-
-                # set return_records to be records from champion model
-                champion_model_name = getChampionModelName()
-
-                # find champion model plan records and add those to all_records
-                if champion_model_name in plan.getPlanModelNames():
-                    return_records = records
-
-        return all_sample_execution_data, return_records # TODO: make sure you capture cost of sentinel plans.
-
-
     def __new__(
         cls,
         dataset: Set,
@@ -131,10 +85,10 @@ class Execute:
                 all_physical_plans.append(physical_plan)
 
         # construct the CostEstimator with any sample execution data we've gathered
-        cost_optimizer = CostEstimator(sample_execution_data)
+        cost_estimator = CostEstimator(sample_execution_data)
 
         # estimate the cost of each plan
-        plans = cost_optimizer.estimate_plan_costs(all_physical_plans)
+        plans = cost_estimator.estimate_plan_costs(all_physical_plans)
 
         # deduplicate plans with identical cost estimates
         plans = physical_planner.deduplicate_plans(plans)
@@ -166,46 +120,139 @@ class Execute:
 
         return all_records, plan, stats
 
+    @classmethod
+    def run_sentinel_plan(cls, plan: PhysicalPlan, plan_idx=0, verbose=False): # TODO: does ThreadPoolExecutor support tuple unpacking for arguments?
+        # display the plan output
+        if verbose:
+            print("----------------------")
+            print(f"Sentinel Plan {plan_idx}:")
+            plan.printPlan()
+            print("---")
 
-    
-    # GV I am open to making it a private function if need be
-    @staticmethod
-    def execute(cls, plan: PhysicalPlan, stats: PlanStats=None):
-        """Execute the plan."""
+        # run the plan
+        records, plan_stats = cls.execute(plan)
+
+        return records, plan_stats
+
+    @classmethod
+    def run_sentinel_plans(
+        cls, sentinel_plans: List[PhysicalPlan], verbose: bool = False
+    ):
+        # compute number of plans
+        num_sentinel_plans = len(sentinel_plans)
+
+        all_sample_execution_data, return_records = [], []
+        with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
+            results = list(
+                executor.map(
+                    cls.run_sentinel_plan,
+                    [(plan, idx, verbose) for idx, plan in enumerate(sentinel_plans)],
+                )
+            )
+
+            # write out result dict and samples collected for each sentinel
+            sentinel_records, sentinel_stats = zip(*results)
+            for records, plan_stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
+                # aggregate sentinel est. data
+                sample_execution_data = cls.getSampleExecutionData(plan_stats)
+                all_sample_execution_data.extend(sample_execution_data)
+
+                # set return_records to be records from champion model
+                champion_model_name = getChampionModelName()
+
+                # find champion model plan records and add those to all_records
+                if champion_model_name in plan.getPlanModelNames():
+                    return_records = records
+
+        return all_sample_execution_data, return_records # TODO: make sure you capture cost of sentinel plans.
+
+
+    @classmethod
+    def execute_dag(cls, plan: PhysicalPlan, plan_stats: PlanStats):
+        """
+        Helper function which executes the physical plan. This function is overly complex for today's
+        plans which are simple cascades -- but is designed with an eye towards 
+        """
+        # initialize list of output records
+        output_records = []
+
+        # initialize processing queues for each operation
+        processing_queues = {
+            op.physical_op_id(): []
+            for op in plan.operators
+            if not isinstance(op, DataSourcePhysicalOperator)
+        }
+
+        # execute the plan until either:
+        # 1. all records have been processed, or
+        # 2. the final limit operation has completed
+        finished_executing = False
+        while not finished_executing:
+            more_source_records = False
+            for idx, operator in enumerate(plan.operators):
+                op_id = operator.physical_op_id()
+
+                # if the operator is a data source, execute __call__ to get the output record(s)
+                records, record_op_stats_lst = None, None
+                if isinstance(operator, DataSourcePhysicalOperator):
+                    record, record_op_stats = operator()
+                    if record is None:
+                        continue
+
+                    more_source_records = True
+                    records = [record]
+                    record_op_stats_lst = [record_op_stats]
+
+                elif len(processing_queues[op_id]) > 0:
+                    input_record = processing_queues[op_id].pop(0)
+                    records, record_op_stats_lst = operator(input_record)
+
+                # update plan stats
+                for record_op_stats in record_op_stats_lst:
+                    plan_stats[op_id] += record_op_stats
+
+                # get id for next physical operator (currently just next op in plan.operators)
+                next_op_id = (
+                    plan.operators[idx + 1].physical_op_id()
+                    if idx + 1 < len(plan.operators)
+                    else None
+                )
+
+                # update processing_queues or output_records
+                for record in records:
+                    filtered = isinstance(operator, FilterOp) and not record._passed_filter
+                    if next_op_id is not None and not filtered:
+                        processing_queues[next_op_id].append(record)
+                    else:
+                        output_records.append(record)
+
+            # update finished_executing based on whether all records have been processed
+            still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
+            finished_executing = not more_source_records and not still_processing
+
+            # update finished_executing based on limit
+            if isinstance(operator, LimitScanOp):
+                finished_executing = len(output_records) >= operator.limit
+
+        return output_records, plan_stats
+
+    @classmethod
+    def execute(cls, plan: PhysicalPlan):
+        """Initialize the stats and invoke _execute_dag() to execute the plan."""
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id())
+        plan_stats = PlanStats(plan_id=plan.plan_id()) # TODO move into PhysicalPlan.__init__
         for op_idx, op in enumerate(plan.operators):
             op_id = op.physical_op_id()
             plan_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
 
-        # initialize list of output records
-        output_records = []
-
-        # TODO: execution issues I still need to resolve:
-        #  - need to force upstream execution to complete for agg., groupby, and parallel operators
-        #    -  eventually we could allow for pipelining and not block on parallel operators, but pre-SIGMOD let's keep that behavior intact
-        # iterate over records from the datasource operator
-        datasource_operator = plan.operators[0]
-        for record, record_op_stats in datasource_operator:
-            plan_stats[datasource_operator.physical_op_id()] += record_op_stats
-
-            # apply sequence of subsequent operators
-            filtered = False
-            for operator in plan.operators[1:]:
-                record, record_op_stats = operator(record)
-
-                # add record_op_stats to appropriate operator
-                plan_stats[datasource_operator.physical_op_id()] += record_op_stats
-
-                # TODO: confirm if this isinstance will work with sub-class operations
-                if isinstance(operator, FilterOp) and not record._passed_filter:
-                    filtered = True
-                    break
-
-            if not filtered:
-                output_records.append(record)
+        # NOTE: I am writing this execution helper function with the goal of supporting future
+        #       physical plans that may have joins and/or other operations with multiple sources.
+        #       Thus, the implementation is overkill for today's plans, but hopefully this will
+        #       avoid the need for a lot of refactoring in the future.
+        # execute the physical plan;
+        output_records, plan_stats = cls.execute_dag(plan, plan_stats)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
@@ -213,9 +260,23 @@ class Execute:
 
         return output_records, plan_stats
 
-    @staticmethod
-    def getSampleExecutionData(cls, plan_stats:PhysicalPlan) -> List[Dict[str, Any]]:
+    @classmethod
+    def getSampleExecutionData(cls, plan_stats: PlanStats) -> List[SampleExecutionData]:
         """Compute and return all sample execution data collected by this plan so far."""
+        # define helper function to extract answer from filter and convert operations
+        def _get_answer(record_op_stats):
+            # return T/F for filter
+            if "_passed_filter" in record_op_stats.record_state:
+                return record_op_stats.record_state["_passed_filter"]
+
+            # return key->value mapping for generated fields for induce
+            answer = {}
+            if "generated_fields" in record_op_stats.op_details:
+                for field in record_op_stats.op_details["generated_fields"]:
+                    answer[field] = record_op_stats.record_state[field]
+
+            return answer
+
         # construct table of observation data from sample batch of processed records
         sample_execution_data, source_op_id = [], None
         for op_id, operator_stats in plan_stats.operator_stats.items():
@@ -224,68 +285,60 @@ class Execute:
                 # compute minimal observation which is supported by all operators
                 # TODO: one issue with this setup is that cache_scans of previously computed queries
                 #       may not match w/these observations due to the diff. op_name
-                
-                # GV Readability changes
-                observation_arguments = {
-                    "passed_filter": (
+                observation = SampleExecutionData(
+                    record_uuid=record_op_stats.record_uuid,
+                    record_parent_uuid=record_op_stats.record_parent_uuid,
+                    op_id=op_id,
+                    op_name=record_op_stats.op_name,
+                    source_op_id=source_op_id,
+                    op_time=record_op_stats.op_time,
+                    passed_filter=(
                         record_op_stats.record_state["_passed_filter"]
                         if "_passed_filter" in record_op_stats.record_state
                         else None
                     ),
-                    "model_name": (
+                    model_name=(
                         record_op_stats.op_details["model_name"]
                         if "model_name" in record_op_stats.op_details
                         else None
                     ),
-                    "filter_str": (
+                    filter_str=(
                         record_op_stats.op_details["filter_str"]
                         if "filter_str" in record_op_stats.op_details
                         else None
                     ),
-                    "input_fields_str": (
+                    input_fields_str=(
                         "-".join(sorted(record_op_stats.op_details["input_fields"]))
                         if "input_fields" in record_op_stats.op_details
                         else None
                     ),
-                    "generated_fields_str": (
+                    generated_fields_str=(
                         "-".join(sorted(record_op_stats.op_details["generated_fields"]))
                         if "generated_fields" in record_op_stats.op_details
                         else None
                     ),
-                    "total_input_tokens": (
+                    total_input_tokens=(
                         record_op_stats.record_stats["total_input_tokens"]
                         if "total_input_tokens" in record_op_stats.record_stats
                         else None
                     ),
-                    "total_output_tokens": (
+                    total_output_tokens=(
                         record_op_stats.record_stats["total_output_tokens"]
                         if "total_output_tokens" in record_op_stats.record_stats
                         else None
                     ),
-                    "total_input_cost": (
+                    total_input_cost=(
                         record_op_stats.record_stats["total_input_cost"]
                         if "total_input_cost" in record_op_stats.record_stats
                         else None
                     ),
-                    "total_output_cost": (
+                    total_output_cost=(
                         record_op_stats.record_stats["total_output_cost"]
                         if "total_output_cost" in record_op_stats.record_stats
                         else None
                     ),
-                }
-
-                # return T/F for filter
-                if "_passed_filter" in record_op_stats.record_state:
-                    observation_arguments["answer"] = record_op_stats.record_state["_passed_filter"]
-                else:
-                    answer = {}
-                    # return key->value mapping for generated fields for induce
-                    if "generated_fields" in record_op_stats.op_details:
-                        for field in record_op_stats.op_details["generated_fields"]:
-                            answer[field] = record_op_stats.record_state[field]
-                    observation_arguments["answer"] = answer
-
-                observation = SampleExecutionData(**observation_arguments)
+                    answer=_get_answer(record_op_stats)
+                )
 
                 # add observation to list of observations
                 sample_execution_data.append(observation)

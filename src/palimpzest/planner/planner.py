@@ -411,7 +411,7 @@ class PhysicalPlanner(Planner):
 
         # otherwise, create convert op for the given set of hyper-parameters
         else:
-            op = pz_ops.physical.LLMTypeConversion(
+            op = pz_ops.LLMConvert(
                 inputSchema=inputSchema,
                 outputSchema=outputSchema,
                 model=model,

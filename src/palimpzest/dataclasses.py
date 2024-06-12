@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from palimpzest.elements import DataRecord
 from dataclasses import dataclass, asdict, field
 
 from typing import Any, Dict, List
@@ -9,9 +10,6 @@ class RecordOpStats:
     """
     Dataclass for storing statistics about the execution of an operator on a single record.
     """
-    # the index of the record in the operator's processing
-    record_idx: int
-
     # record id; a unique identifier for this record
     record_uuid: str
 
@@ -34,14 +32,27 @@ class RecordOpStats:
     record_state: Dict[str, Any]
 
     # an OPTIONAL dictionary with more detailed information about the processing of this record
-    record_stats: Dict[str, Any] = field(default_factory=dict)
+    record_stats: Dict[str, Any] = None
 
     # an OPTIONAL dictionary with more detailed information about the operation processing this record
-    op_details: Dict[str, Any] = field(default_factory=dict)
+    op_details: Dict[str, Any] = None
 
     def to_dict(self):
         return asdict(self)
 
+    @staticmethod
+    def from_record_and_kwargs(record: DataRecord, **kwargs: Dict[str, Any]) -> RecordOpStats:
+        return RecordOpStats(
+            record_uuid=record._uuid,
+            record_parent_uuid=record._parent_uuid,
+            op_id=kwargs['op_id'],
+            op_name=kwargs['op_name'],
+            op_time=kwargs['op_time'],
+            op_cost=kwargs['op_cost'],
+            record_state=record._asDict(include_bytes=False),
+            record_stats=kwargs.get('record_stats', None),
+            op_details=kwargs.get('op_details', None),
+        )
 
 @dataclass
 class OperatorStats:

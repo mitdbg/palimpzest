@@ -7,7 +7,7 @@ from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.operators import logical
 
-from typing import Any, Callable, Dict, Tuple, Optional
+from typing import Any, Callable, Dict, List, Tuple, Optional
 
 import hashlib
 import json
@@ -47,7 +47,7 @@ class PhysicalOperator(metaclass=ImplementationMeta):
         self,
         outputSchema: Schema,
         inputSchema: Optional[Schema] = None,
-        shouldProfile=False,
+        shouldProfile: bool = False,
         max_workers: int = 1,
     ) -> None:
         self.outputSchema = outputSchema
@@ -90,7 +90,7 @@ class PhysicalOperator(metaclass=ImplementationMeta):
     def copy(self) -> PhysicalOperator:
         raise NotImplementedError("__copy___ on abstract class")
 
-    def __call__(self, candidate: Any) -> DataRecordWithStats:
+    def __call__(self, candidate: Any) -> List[DataRecordWithStats]:
         raise NotImplementedError("Using __call__ from abstract method")
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
@@ -138,7 +138,7 @@ class DataSourcePhysicalOperator(PhysicalOperator):
         """
         raise NotImplementedError("Abstract method")
 
-    def __call__(self) -> DataRecordWithStats:
+    def __call__(self) -> List[DataRecordWithStats]:
         raise Exception(f"Use __iter__ to retrieve records from {self.op_name()}")
 
     def __iter__(self) -> DataSourceIteratorFn:
@@ -229,12 +229,15 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
                     start_time = time.time()
                     continue
 
-                record_op_stats = RecordOpStats(
-                    op_id=self.physical_op_id(),
-                    op_name=self.op_name(),
-                    op_time=(end_time - start_time),
-                    op_cost=0.0,
-                )
+                kwargs = {
+                    "op_id": self.physical_op_id(),
+                    "op_name": self.op_name(),
+                    "op_time": (end_time - start_time),
+                    "op_cost": 0.0,
+                    "record_stats": None,
+                    "op_details": self.__dict__,
+                }
+                record_op_stats = RecordOpStats.from_record_and_kwargs(nextCandidate, **kwargs)
 
                 yield nextCandidate, record_op_stats
 
@@ -334,7 +337,6 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
 
     def __call__(self) -> DataSourceIteratorFn:
         def iteratorFn():
-            # NOTE: see comment in `estimateCost()`
             counter = 0
             start_time = time.time()
             for idx, nextCandidate in enumerate(
@@ -345,12 +347,15 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
                     start_time = time.time()
                     continue
 
-                record_op_stats = RecordOpStats(
-                    op_id=self.physical_op_id(),
-                    op_name=self.op_name(),
-                    op_time=(end_time - start_time),
-                    op_cost=0.0,
-                )
+                kwargs = {
+                    "op_id": self.physical_op_id(),
+                    "op_name": self.op_name(),
+                    "op_time": (end_time - start_time),
+                    "op_cost": 0.0,
+                    "record_stats": None,
+                    "op_details": self.__dict__,
+                }
+                record_op_stats = RecordOpStats.from_record_and_kwargs(nextCandidate, **kwargs)
 
                 yield nextCandidate, record_op_stats
 

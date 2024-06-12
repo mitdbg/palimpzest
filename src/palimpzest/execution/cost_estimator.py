@@ -2,19 +2,25 @@
 Operators needs statprocessors, defined in stats.py
 CostEstimators needs PhysicalPlans which needs operators.py
 
-Notes: 1. why is it called costOptimizer if all it does is Estimate costs? Should rename to CostEstimator?
-       2. why is _estimate_plan cost a hidden function? Probably we should only expose the single parameter function
+Notes: 2. why is _estimate_plan cost a hidden function? Probably we should only expose the single parameter function
        that takes a single plan, and have the Execution call it in a for loop on a list of plans.
 """
 
-import palimpzest as pz
-from palimpzest.planner import PhysicalPlan
-from typing import Any, Dict, List, Optional, Tuple
+from __future__ import annotations
+
 from palimpzest.constants import GPT_4_MODEL_CARD, Model, MODEL_CARDS, QueryStrategy
+from palimpzest.planner import PhysicalPlan
 from palimpzest.utils import getModels
+
+import palimpzest as pz
+
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import math
+
+import math
+
 
 # TYPE DEFINITIONS
 SampleExecutionData = Dict[str, Any] # TODO: dataclass?
@@ -32,12 +38,16 @@ class CostEstimator:
             else None
         )
 
-        # store number of sentinel plans from which we gathered 
         # TODO: come up w/solution for listing operators by name due to circular import
         # determine the set of operators which may use a distinct model
         self.MODEL_OPERATORS = ["LLMFilter", "LLMConvert"]
 
     # GV: Does it make sense to have static and private method?
+    # MR: My understanding, which may be wrong / overly-simplified, is that:
+    #     "static" == "doesn't rely on self or cls", and
+    #     "private" == "does not need to be called from outside of this class"
+    #
+    #     so I thought this fit? but maybe I'm wrong
     @staticmethod
     def _est_time_per_record(
         op_df: pd.DataFrame, model_name: Optional[str] = None, agg: str = "mean"
@@ -130,7 +140,6 @@ class CostEstimator:
         """
         return op_df.shape[0] / len(op_df.plan_id.unique())
 
-
     @staticmethod
     def _est_selectivity(
         df: pd.DataFrame, op_df: pd.DataFrame, model_name: Optional[str] = None
@@ -169,7 +178,6 @@ class CostEstimator:
             num_output_records = df[df.source_op_id.isin(op_ids)].shape[0]
 
         return num_output_records / num_input_records
-
 
     @staticmethod
     def _est_quality(op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
@@ -249,13 +257,8 @@ class CostEstimator:
         if self.sample_execution_data_df is None:
             return None
 
-
-        # construct full dataset of samples
-        sample_exec_data_df = (
-            pd.DataFrame(self.sample_execution_data)
-            if self.sample_execution_data is not None and self.sample_execution_data != []
-            else pd.DataFrame()
-        )
+        # get the set of operator ids for which we have sample data
+        op_ids = self.sample_execution_data_df.op_id.unique()
 
         # get the set of operator ids for which we have sample data
         op_ids = self.sample_execution_data_df.op_id.unique()
@@ -307,7 +310,6 @@ class CostEstimator:
             operator_estimates[op_id] = estimates
         
         return operator_estimates
-
 
     def _estimate_plan_cost(physical_plan: PhysicalPlan, sample_op_estimates: Optional[Dict[str, Any]]) -> None:
         # initialize dictionary w/estimates for entire plan
@@ -404,7 +406,6 @@ class CostEstimator:
         physical_plan.total_cost = plan_estimates["total_cost"]
         physical_plan.quality = plan_estimates["quality"]
 
-
     def estimate_plan_costs(self, physical_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
         """
         Estimate the cost of each physical plan by making use of the sample execution data
@@ -417,5 +418,3 @@ class CostEstimator:
             self._estimate_plan_cost(physical_plan, operator_estimates)
 
         return physical_plans
-
-

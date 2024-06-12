@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from palimpzest.operators import FilteredScan, FilterOp, LogicalOperator, PhysicalOperator
-from palimpzest.operators.physical import PhysicalOperator
+from palimpzest.operators.physical import DataSourcePhysicalOperator, LimitScanOp, PhysicalOperator
 
 
 from typing import Any, Dict, List

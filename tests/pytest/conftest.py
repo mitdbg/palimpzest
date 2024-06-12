@@ -3,6 +3,7 @@ import pytest
 
 # DEFINITIONS
 ENRON_EVAL_TINY_TEST_DATA = "testdata/enron-eval-tiny"
+ENRON_EVAL_TINY_DATASET_ID = "enron-eval-tiny"
 
 @pytest.fixture
 def email_schema():
@@ -17,7 +18,7 @@ def email_schema():
 
 @pytest.fixture(scope="class")
 def emails_dataset():
-    datasetIdentifier = "enron-eval-tiny"
+    datasetIdentifier = ENRON_EVAL_TINY_DATASET_ID
     datadir = pz.DataDirectory()
     datadir.registerLocalDirectory(ENRON_EVAL_TINY_TEST_DATA, datasetIdentifier)
 
@@ -26,7 +27,7 @@ def emails_dataset():
 
 @pytest.fixture
 def enron_eval(email_schema):
-    emails = pz.Dataset("enron-eval-tiny", schema=email_schema)
+    emails = pz.Dataset(ENRON_EVAL_TINY_DATASET_ID, schema=email_schema)
     emails = emails.filter(
         'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
     )

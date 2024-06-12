@@ -1,4 +1,3 @@
-from palimpzest.datamanager import DataDirectory
 from palimpzest.operators import MarshalAndScanDataOp
 
 import palimpzest as pz
