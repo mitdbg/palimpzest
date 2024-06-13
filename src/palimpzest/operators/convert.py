@@ -344,12 +344,12 @@ class LLMConvert(ConvertOp):
             if err_msg is not None:
                 print(f"BondedQuery Error: {err_msg}")
                 dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
-                for field_name in td.outputSchema.fieldNames():
+                for field_name in self.outputSchema.fieldNames():
                     setattr(dr, field_name, None)
                 drs = [dr]
 
             # if profiling, set record's stats for the given op_id
-            if shouldProfile:
+            if self.shouldProfile:
                 for dr in drs:
                     dr._stats[td.op_id] = ConvertLLMStats(
                         query_strategy=td.query_strategy.value,
@@ -359,7 +359,7 @@ class LLMConvert(ConvertOp):
 
             return drs, new_heatmap_obj
 
-        elif td.query_strategy == QueryStrategy.BONDED_WITH_FALLBACK:
+        elif self.query_strategy == QueryStrategy.BONDED_WITH_FALLBACK:
             drs, new_heatmap_obj, bonded_query_stats, err_msg = runBondedQuery(
                 candidate, td, self._verbose
             )
@@ -373,11 +373,11 @@ class LLMConvert(ConvertOp):
                 )
                 drs = [dr] if type(dr) is not list else dr
             # if profiling, set record's stats for the given op_id
-            if shouldProfile:
+            if self.shouldProfile:
                 for dr in drs:
                     # TODO: divide bonded query_stats time, cost, and input/output tokens by len(drs)
                     dr._stats[td.op_id] = ConvertLLMStats(
-                        query_strategy=td.query_strategy.value,
+                        query_strategy=self.query_strategy.value,
                         token_budget=td.token_budget,
                         bonded_query_stats=bonded_query_stats,
                         conventional_query_stats=conventional_query_stats,
@@ -385,22 +385,22 @@ class LLMConvert(ConvertOp):
 
             return drs, new_heatmap_obj
 
-        elif td.query_strategy == QueryStrategy.CODE_GEN:
+        elif self.query_strategy == QueryStrategy.CODE_GEN:
             dr, full_code_gen_stats = runCodeGenQuery(candidate, td, self._verbose)
             drs = [dr]
 
             # if profiling, set record's stats for the given op_id
-            if shouldProfile:
+            if self.shouldProfile:
                 for dr in drs:
                     dr._stats[td.op_id] = ConvertLLMStats(
-                        query_strategy=td.query_strategy.value,
+                        query_strategy=self.query_strategy.value,
                         token_budget=td.token_budget,
                         full_code_gen_stats=full_code_gen_stats,
                     )
 
             return drs, None
 
-        elif td.query_strategy == QueryStrategy.CODE_GEN_WITH_FALLBACK:
+        elif self.query_strategy == QueryStrategy.CODE_GEN_WITH_FALLBACK:
             # similar to in _makeLLMTypeConversionFn; maybe we can have one strategy in which we try
             # to use code generation, but if it fails then we fall back to a conventional query strategy?
             dr, full_code_gen_stats, conventional_query_stats = runCodeGenQuery(
@@ -432,4 +432,4 @@ class LLMConvert(ConvertOp):
             return drs, None
 
         else:
-            raise ValueError(f"Unrecognized QueryStrategy: {td.query_strategy.value}")
+            raise ValueError(f"Unrecognized QueryStrategy: {self.query_strategy.value}")

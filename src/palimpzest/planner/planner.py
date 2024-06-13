@@ -293,7 +293,6 @@ class PhysicalPlanner(Planner):
                 if physical_op.implements(logical_op):
                     self.logical_physical_map[logical_op].append(physical_op)
 
-        print(f"LOGICAL PHYSICAL MAP: {self.logical_physical_map}")
 
     def _getAllowedModels(self, subplan: PhysicalPlan) -> List[Model]:
         """
@@ -511,7 +510,7 @@ class PhysicalPlanner(Planner):
             shouldProfile = True
 
             if isinstance(logical_op, pz_ops.BaseScan):
-                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
                 op = op_class(outputSchema=logical_op.outputSchema,
                               datasetIdentifier=logical_op.datasetIdentifier,
                               num_samples=self.num_samples,
@@ -519,7 +518,7 @@ class PhysicalPlanner(Planner):
                               shouldProfile=shouldProfile,)
 
             elif isinstance(logical_op, pz_ops.CacheScan):
-                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                op_class = self.logical_physical_map[logical_op][0]
                 op = op_class(outputSchema=logical_op.outputSchema,
                                 cacheIdentifier=logical_op.cachedDataIdentifier,
                                 num_samples=self.num_samples,
@@ -547,7 +546,7 @@ class PhysicalPlanner(Planner):
                 )
 
             elif isinstance(logical_op, pz_ops.LimitScan):
-                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                op_class = self.logical_physical_map[logical_op][0]
                 op = op_class(
                         inputSchema=logical_op.inputSchema,
                         outputSchema=logical_op.outputSchema,
@@ -605,7 +604,7 @@ class PhysicalPlanner(Planner):
         for logical_op in operators:
             # base case, if this operator is a BaseScan set all_plans to be the physical plan with just this operator
             if isinstance(logical_op, pz_ops.BaseScan):
-                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
                 physical_op = op_class(outputSchema = logical_op.outputSchema,
                               datasetIdentifier=logical_op.datasetIdentifier,
                               num_samples=self.num_samples,
@@ -616,7 +615,7 @@ class PhysicalPlanner(Planner):
             # base case (possibly), if this operator is a CacheScan and all_plans is empty, set all_plans to be
             # the physical plan with just this operator; if all_plans is NOT empty, then merge w/all_plans
             elif isinstance(logical_op, pz_ops.CacheScan):
-                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
                 physical_op = op_class(outputSchema=logical_op.outputSchema,
                                 cacheIdentifier=logical_op.cachedDataIdentifier,
                                 num_samples=self.num_samples,
@@ -688,7 +687,7 @@ class PhysicalPlanner(Planner):
                 all_plans = plans
 
             elif isinstance(logical_op, pz_ops.LimitScan):
-                op_class = self.logical_physical_map[logical_op][0] # only one physical operator
+                op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
                 physical_op = op_class(
                         inputSchema=logical_op.inputSchema,
                         outputSchema=logical_op.outputSchema,
@@ -706,7 +705,7 @@ class PhysicalPlanner(Planner):
                 all_plans = plans
 
             elif isinstance(logical_op, pz_ops.GroupByAggregate):
-                op_class = self.logical_physical_map[logical_op][0]
+                op_class = self.logical_physical_map[type(logical_op)][0]
                 physical_op = op_class(
                     inputSchema=logical_op.inputSchema,
                     gbySig=logical_op.gbySig,

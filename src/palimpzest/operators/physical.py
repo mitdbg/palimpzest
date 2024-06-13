@@ -138,11 +138,11 @@ class DataSourcePhysicalOperator(PhysicalOperator):
         """
         raise NotImplementedError("Abstract method")
 
-    def __call__(self) -> List[DataRecordWithStats]:
-        raise Exception(f"Use __iter__ to retrieve records from {self.op_name()}")
+    def __call__(self) -> Tuple[List[DataRecord], List[RecordOpStats]]:
+        raise NotImplementedError(f"You are calling this method from an abstract class.")
 
     def __iter__(self) -> DataSourceIteratorFn:
-        raise NotImplementedError("Abstract method")
+        raise Exception("This method is legacy.")
 
 
 class MarshalAndScanDataOp(DataSourcePhysicalOperator):
@@ -199,6 +199,8 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
         return self._compute_op_id_from_dict(op_dict, plan_position)
 
     def naiveCostEstimates(self):
+        # TODO I have a strong feeling this should belong in the execution layer
+        # And datasetIdentified factored out of the logical/physical operators
         cardinality = self.datadir.getCardinality(self.datasetIdentifier) + 1
         size = self.datadir.getSize(self.datasetIdentifier)
         perRecordSizeInKb = (size / float(cardinality)) / 1024.0
@@ -219,35 +221,37 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
             quality=1.0,
         )
 
-    def __iter__(self) -> DataSourceIteratorFn:
-        def iteratorFn():
-            counter = 0
-            start_time = time.time()
-            for idx, nextCandidate in enumerate(self.datadir.getRegisteredDataset(self.datasetIdentifier)):
-                end_time = time.time()
-                if idx < self.scan_start_idx:
-                    start_time = time.time()
-                    continue
+    def __call__(self) -> Tuple[List[DataRecord], List[RecordOpStats]]:
+        # Copilot magic
+        num_samples = self.num_samples if self.num_samples else float("inf")
 
-                kwargs = {
-                    "op_id": self.physical_op_id(),
-                    "op_name": self.op_name(),
-                    "op_time": (end_time - start_time),
-                    "op_cost": 0.0,
-                    "record_stats": None,
-                    "op_details": self.__dict__,
-                }
-                record_op_stats = RecordOpStats.from_record_and_kwargs(nextCandidate, **kwargs)
+        start_time = time.time()
+        records = []
+        stats = []
+        dataset = self.datadir.getRegisteredDataset(self.datasetIdentifier)
+        for idx, record in enumerate(dataset):
+            end_time = time.time()
+            if idx > num_samples:
+                break
 
-                yield nextCandidate, record_op_stats
+            if idx < self.scan_start_idx:
+                start_time = time.time()
+                continue
 
-                if self.num_samples:
-                    counter += 1
-                    if counter >= self.num_samples:
-                        break
+            kwargs = {
+                "op_id": self.physical_op_id(),
+                "op_name": self.op_name(),
+                "op_time": (end_time - start_time),
+                "op_cost": 0.0,
+                "record_stats": None,
+                "op_details": self.__dict__,
+            }
+            record_op_stats = RecordOpStats.from_record_and_kwargs(record, **kwargs)
 
-        return iteratorFn()
+            records.append(record)
+            stats.append(record_op_stats)
 
+        return records, stats
 
 class CacheScanDataOp(DataSourcePhysicalOperator):
     implemented_op = logical.CacheScan

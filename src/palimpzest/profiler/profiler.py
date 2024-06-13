@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from palimpzest.constants import MODEL_CARDS
-from palimpzest.profiler.stats import *
 
 from functools import wraps
 from typing import Any, Dict

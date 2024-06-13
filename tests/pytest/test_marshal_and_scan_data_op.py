@@ -5,14 +5,13 @@ import palimpzest as pz
 import pytest
 
 # TEST CLASS
-class TestMarshalAndScanDataOp:
-    def test_call(self, email_schema, emails_dataset):
-        scanOp = MarshalAndScanDataOp(
-            outputSchema=email_schema,
-            datasetIdentifier=emails_dataset,
-        )
+def test_call(email_schema, emails_dataset):
+    scanOp = MarshalAndScanDataOp(
+        outputSchema=email_schema,
+        datasetIdentifier=emails_dataset
+    )
 
-        iterator_fn = scanOp
-        for record, record_op_stats in iterator_fn:
-            print(record.filename)
-            pass
+    records, record_op_stats = scanOp()
+    for record in records:
+        print(record.filename)
+    print(record_op_stats)

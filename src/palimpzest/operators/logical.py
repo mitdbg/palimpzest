@@ -110,6 +110,7 @@ class CacheScan(LogicalOperator):
         )
 
 
+# NOTE: I feel we should remove datasetIdentifier from both the logical and physical operator. My argument is that the logical BaseScan is the same no matter what the datasetidentifier is. The datasetIdentifier is an execution-level  detail. Think about having two exactly equal workloads: except one is defined on folder enron-eval-tiny, one is defined on enron-eval-full. Why should the logical and physical *plans* be different ? The *execution* will be different, much like running a Filter on two different data items will differ.
 class BaseScan(LogicalOperator):
     """A BaseScan is a logical operator that represents a scan of a particular data source."""
 
@@ -120,7 +121,7 @@ class BaseScan(LogicalOperator):
         self.datasetIdentifier = datasetIdentifier
 
     def __str__(self):
-        return f"BaseScan({str(self.outputSchema)},{self.datasetIdentifier})"
+        return f"BaseScan({self.datasetIdentifier},{str(self.outputSchema)})"
 
     def copy(self):
         return BaseScan(

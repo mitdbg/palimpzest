@@ -116,7 +116,7 @@ class Execute:
         return all_records, plan, stats
 
     @classmethod
-    def run_sentinel_plan(cls, plan: PhysicalPlan, plan_idx=0, verbose=False): # TODO: does ThreadPoolExecutor support tuple unpacking for arguments?
+    def run_sentinel_plan(cls, plan: PhysicalPlan, plan_idx=0, verbose=False): 
         # display the plan output
         if verbose:
             print("----------------------")
@@ -138,26 +138,25 @@ class Execute:
 
         all_sample_execution_data, return_records = [], []
         with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
-            results = list(
-                executor.map(
-                    cls.run_sentinel_plan,
+            results = list(executor.map( lambda x:
+                    cls.run_sentinel_plan(*x),
                     [(plan, idx, verbose) for idx, plan in enumerate(sentinel_plans)],
                 )
             )
 
-            # write out result dict and samples collected for each sentinel
-            sentinel_records, sentinel_stats = zip(*results)
-            for records, plan_stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
-                # aggregate sentinel est. data
-                sample_execution_data = cls.getSampleExecutionData(plan_stats)
-                all_sample_execution_data.extend(sample_execution_data)
+        # write out result dict and samples collected for each sentinel
+        sentinel_records, sentinel_stats = zip(*results)
+        for records, plan_stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
+            # aggregate sentinel est. data
+            sample_execution_data = cls.getSampleExecutionData(plan_stats)
+            all_sample_execution_data.extend(sample_execution_data)
 
-                # set return_records to be records from champion model
-                champion_model_name = getChampionModelName()
+            # set return_records to be records from champion model
+            champion_model_name = getChampionModelName()
 
-                # find champion model plan records and add those to all_records
-                if champion_model_name in plan.getPlanModelNames():
-                    return_records = records
+            # find champion model plan records and add those to all_records
+            if champion_model_name in plan.getPlanModelNames():
+                return_records = records
 
         return all_sample_execution_data, return_records # TODO: make sure you capture cost of sentinel plans.
 
@@ -170,7 +169,6 @@ class Execute:
         """
         # initialize list of output records
         output_records = []
-
         # initialize processing queues for each operation
         processing_queues = {
             op.physical_op_id(): []
@@ -187,26 +185,22 @@ class Execute:
             for idx, operator in enumerate(plan.operators):
                 op_id = operator.physical_op_id()
 
-                # TODO: need to modify DataSourcePhysicalOperators to use __call__ again (instead of __iter__)
-                #       and return (None, None) once they've finished processing their source input
-                # if the operator is a data source, execute __call__ to get the output record(s)
-                records, record_op_stats_lst = None, None
+                # TODO: Is it okay to have call return a list?
                 if isinstance(operator, DataSourcePhysicalOperator):
-                    record, record_op_stats = operator()
-                    if record is None:
-                        continue
-
-                    more_source_records = True
-                    records = [record]
-                    record_op_stats_lst = [record_op_stats]
-
+                    records, record_op_stats_lst = operator()
                 elif len(processing_queues[op_id]) > 0:
                     input_record = processing_queues[op_id].pop(0)
                     records, record_op_stats_lst = operator(input_record)
 
                 # update plan stats
                 for record_op_stats in record_op_stats_lst:
-                    plan_stats[op_id] += record_op_stats
+                    # TODO code a nice __add__ function for OperatorStats and RecordOpStats
+                    x = plan_stats.operator_stats[op_id]
+                    x.record_op_stats_lst.append(record_op_stats)
+                    x.total_op_time += record_op_stats.op_time
+                    x.total_op_cost += record_op_stats.op_cost
+                    plan_stats.operator_stats[op_id] = x
+
 
                 # get id for next physical operator (currently just next op in plan.operators)
                 next_op_id = (
@@ -242,8 +236,7 @@ class Execute:
         plan_stats = PlanStats(plan_id=plan.plan_id()) # TODO move into PhysicalPlan.__init__?
         for op_idx, op in enumerate(plan.operators):
             op_id = op.physical_op_id()
-            plan_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
-
+            plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
         # NOTE: I am writing this execution helper function with the goal of supporting future
         #       physical plans that may have joins and/or other operations with multiple sources.
         #       Thus, the implementation is overkill for today's plans, but hopefully this will
