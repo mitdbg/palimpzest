@@ -8,16 +8,7 @@ from palimpzest.generators import (
     codeEnsembleExecution,
     reGenerationCondition,
 )
-from palimpzest.profiler import (
-    Stats,
-    BondedQueryStats,
-    ConventionalQueryStats,
-    FieldQueryStats,
-    CodeGenEnsembleStats,
-    CodeGenSingleStats,
-    FullCodeGenStats,
-    GenerationStats,
-)
+from palimpzest.dataclasses import *
 from palimpzest.utils import API, getJsonFromAnswer
 
 from typing import Any, Dict, List, Tuple
@@ -28,8 +19,12 @@ import re
 
 
 def _construct_query_prompt(
-    td: TaskDescriptor,
     doc_type: str,
+    inputSchema,
+    outputSchema,
+    cardinality: str,
+    prompt_strategy: PromptStrategy,
+    conversionDesc: str,
     generate_field_names: List[str],
     is_conventional: bool = False,
 ) -> str:
@@ -38,26 +33,26 @@ def _construct_query_prompt(
     """
     # build string of input fields and their descriptions
     multilineInputFieldDescription = ""
-    for field_name in td.inputSchema.fieldNames():
-        f = getattr(td.inputSchema, field_name)
+    for field_name in inputSchema.fieldNames():
+        f = getattr(inputSchema, field_name)
         multilineInputFieldDescription += f"INPUT FIELD {field_name}: {f.desc}\n"
 
     # build string of output fields and their descriptions
     multilineOutputFieldDescription = ""
     for field_name in generate_field_names:
-        f = getattr(td.outputSchema, field_name)
+        f = getattr(outputSchema, field_name)
         multilineOutputFieldDescription += f"OUTPUT FIELD {field_name}: {f.desc}\n"
 
     # add input/output schema descriptions (if they have a docstring)
     optionalInputDesc = (
         ""
-        if td.inputSchema.__doc__ is None
-        else f"Here is a description of the input object: {td.inputSchema.__doc__}."
+        if inputSchema.__doc__ is None
+        else f"Here is a description of the input object: {inputSchema.__doc__}."
     )
     optionalOutputDesc = (
         ""
-        if td.outputSchema.__doc__ is None
-        else f"Here is a description of the output object: {td.outputSchema.__doc__}."
+        if outputSchema.__doc__ is None
+        else f"Here is a description of the output object: {outputSchema.__doc__}."
     )
 
     # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
@@ -66,7 +61,7 @@ def _construct_query_prompt(
     )
     outputSingleOrPlural = "the output object"
     appendixInstruction = "Be sure to emit a JSON object only"
-    if td.cardinality == "oneToMany":
+    if cardinality == "oneToMany":
         targetOutputDescriptor = f"an output array of zero or more JSON objects that describe objects of type {doc_type}."
         outputSingleOrPlural = "the output objects"
         appendixInstruction = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields described above. You must decide the correct number of output objects."
@@ -77,10 +72,10 @@ def _construct_query_prompt(
 
     # construct promptQuestion
     promptQuestion = None
-    if td.prompt_strategy != PromptStrategy.IMAGE_TO_TEXT:
+    if prompt_strategy != PromptStrategy.IMAGE_TO_TEXT:
         promptQuestion = (
             f"""I would like you to create {targetOutputDescriptor}. 
-        You will use the information in an input JSON object that I will provide. The input object has type {td.inputSchema.className()}.
+        You will use the information in an input JSON object that I will provide. The input object has type {inputSchema.className()}.
         All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
         {optionalInputDesc}
         {optionalOutputDesc}
@@ -91,14 +86,14 @@ def _construct_query_prompt(
         {appendixInstruction}
         """
             + ""
-            if td.conversionDesc is None
-            else f" Keep in mind that this process is described by this text: {td.conversionDesc}."
+            if conversionDesc is None
+            else f" Keep in mind that this process is described by this text: {conversionDesc}."
         )
 
     else:
         promptQuestion = (
             f"""You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor} {doc_type}.
-        You will use the information in the image that I will provide. The input image(s) has type {td.inputSchema.className()}.
+        You will use the information in the image that I will provide. The input image(s) has type {inputSchema.className()}.
         All of the fields in {outputSingleOrPlural} can be derived using information from the input image(s).
         {optionalInputDesc}
         {optionalOutputDesc}
@@ -107,28 +102,31 @@ def _construct_query_prompt(
         {appendixInstruction}
         """
             + ""
-            if td.conversionDesc is None
-            else f" Keep in mind that this process is described by this text: {td.conversionDesc}."
+            if conversionDesc is None
+            else f" Keep in mind that this process is described by this text: {conversionDesc}."
         )
 
     # TODO: add this for boolean questions?
-    # if td.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
+    # if prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
     #     promptQuestion += "\nRemember, your output MUST be one of TRUE or FALSE."
 
     return promptQuestion
 
 
 def _create_data_record_from_json(
-    jsonObj: Any, td: TaskDescriptor, candidate: DataRecord, cardinality_idx: int = None
+    jsonObj: Any, 
+    inputSchema,
+    outputSchema,
+    candidate: DataRecord, cardinality_idx: int = None
 ) -> DataRecord:
     # initialize data record
     dr = DataRecord(
-        td.outputSchema, parent_uuid=candidate._uuid, cardinality_idx=cardinality_idx
+        outputSchema, parent_uuid=candidate._uuid, cardinality_idx=cardinality_idx
     )
 
     # get input field names and output field names
-    input_fields = td.inputSchema.fieldNames()
-    output_fields = td.outputSchema.fieldNames()
+    input_fields = inputSchema.fieldNames()
+    output_fields = outputSchema.fieldNames()
 
     # first, copy all fields from input schema
     for field_name in input_fields:
@@ -146,7 +144,15 @@ def _create_data_record_from_json(
 
 
 def runBondedQuery(
-    candidate: DataRecord, td: TaskDescriptor, verbose: bool = False
+    candidate: DataRecord,
+    inputSchema,
+    outputSchema,
+    cardinality: str,
+    prompt_strategy: PromptStrategy,
+    model: Model,
+    token_budget: float,
+    heatmap_json_obj: Dict[str, Any],
+    verbose: bool = False
 ) -> Tuple[List[DataRecord], Stats, str]:
     """
     Run a bonded query, in which all new fields in the outputSchema are generated simultaneously
@@ -164,41 +170,49 @@ def runBondedQuery(
 
     # construct list of fields in outputSchema which will need to be generated
     generate_field_names = []
-    for field_name in td.outputSchema.fieldNames():
-        if field_name not in td.inputSchema.fieldNames():
+    for field_name in outputSchema.fieldNames():
+        if field_name not in inputSchema.fieldNames():
             generate_field_names.append(field_name)
 
     # fetch input information
     text_content = candidate._asJSON(include_bytes=False)
-    doc_schema = str(td.outputSchema)
-    doc_type = td.outputSchema.className()
+    doc_schema = str(outputSchema)
+    doc_type = outputSchema.className()
 
     # construct prompt question
-    promptQuestion = _construct_query_prompt(td, doc_type, generate_field_names)
+    promptQuestion = _construct_query_prompt(
+        doc_type=doc_type,
+        inputSchema=inputSchema,
+        outputSchema=outputSchema,
+        cardinality=cardinality,
+        prompt_strategy=prompt_strategy,
+        conversionDesc=None,
+        generate_field_names=generate_field_names,
+    )
 
     # generate LLM response and capture statistics
     answer, new_heatmap_json_obj, bonded_query_stats = None, None, None
     try:
-        if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+        if prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # invoke LLM to generate output JSON
             generator = DSPyGenerator(
-                td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose
+                model.value, prompt_strategy, doc_schema, doc_type, verbose
             )
             answer, new_heatmap_json_obj, gen_stats = generator.generate(
                 text_content,
                 promptQuestion,
-                budget=td.token_budget,
-                heatmap_json_obj=td.heatmap_json_obj,
+                budget=token_budget,
+                heatmap_json_obj=heatmap_json_obj,
             )
 
             # construct BondedQueryStats object
             bonded_query_stats = BondedQueryStats(
                 gen_stats=gen_stats,
-                input_fields=td.inputSchema.fieldNames(),
+                input_fields=inputSchema.fieldNames(),
                 generated_fields=generate_field_names,
             )
 
-        elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
+        elif prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
             # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
             # b64 decode of candidate.contents or candidate.image_contents
             base64_images = []
@@ -211,40 +225,49 @@ def runBondedQuery(
                 ]
 
             # invoke LLM to generate output JSON
-            generator = ImageTextGenerator(td.model.value)
+            generator = ImageTextGenerator(model.value)
             answer, gen_stats = generator.generate(base64_images, promptQuestion)
 
             # construct BondedQueryStats object
             bonded_query_stats = BondedQueryStats(
                 gen_stats=gen_stats,
-                input_fields=td.inputSchema.fieldNames(),
+                input_fields=inputSchema.fieldNames(),
                 generated_fields=generate_field_names,
             )
 
         # TODO
-        elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:
+        elif prompt_strategy == PromptStrategy.ZERO_SHOT:
             raise Exception("not implemented yet")
 
         # TODO
-        elif td.prompt_strategy == PromptStrategy.FEW_SHOT:
+        elif prompt_strategy == PromptStrategy.FEW_SHOT:
             raise Exception("not implemented yet")
 
         # parse JSON object from the answer
         jsonObj = getJsonFromAnswer(answer)
 
         # parse JSON output and construct data records
-        if td.cardinality == "oneToMany":
+        if cardinality == "oneToMany":
             if len(jsonObj["items"]) == 0:
                 raise Exception(
                     "No output objects were generated with bonded query - trying with conventional query..."
                 )
             for idx, elt in enumerate(jsonObj["items"]):
                 dr = _create_data_record_from_json(
-                    elt, td, candidate, cardinality_idx=idx
+                    jsonObj=elt,
+                    inputSchema=inputSchema,
+                    outputSchema=outputSchema,
+                    candidate=candidate,
+                    cardinality_idx=idx
                 )
                 drs.append(dr)
         else:
-            dr = _create_data_record_from_json(jsonObj, td, candidate)
+            dr = _create_data_record_from_json(
+                    jsonObj=elt,
+                    inputSchema=inputSchema,
+                    outputSchema=outputSchema,
+                    candidate=candidate,
+            )
             drs = [dr]
 
     except Exception as e:
@@ -259,8 +282,17 @@ def runBondedQuery(
     return drs, new_heatmap_json_obj, bonded_query_stats, None
 
 
+# NOTE: temporary to have running code. Refactor this out into strategies
 def runConventionalQuery(
-    candidate: DataRecord, td: TaskDescriptor, verbose: bool = False
+    candidate: DataRecord,
+    inputSchema,
+    outputSchema,
+    cardinality: str,
+    prompt_strategy: PromptStrategy,
+    model: Model,
+    token_budget: float,
+    conversionDesc: str,
+    verbose: bool = False
 ) -> Tuple[DataRecord, Stats]:
     """
     Run a conventional query, in which each output field is generated using its own LLM call.
@@ -268,13 +300,13 @@ def runConventionalQuery(
     At the moment, conventional queries cannot execute tasks with cardinality == "oneToMany".
     """
     # initialize output data record
-    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
+    dr = DataRecord(outputSchema, parent_uuid=candidate._uuid)
 
     # copy fields from the candidate (input) record if they already exist
     # and construct list of fields in outputSchema which will need to be generated
     generate_field_names = []
-    for field_name in td.outputSchema.fieldNames():
-        if field_name in td.inputSchema.fieldNames():
+    for field_name in outputSchema.fieldNames():
+        if field_name in inputSchema.fieldNames():
             setattr(dr, field_name, getattr(candidate, field_name))
         elif hasattr(candidate, field_name) and (
             getattr(candidate, field_name) is not None
@@ -285,10 +317,10 @@ def runConventionalQuery(
 
     # fetch input information
     text_content = candidate._asJSON(include_bytes=False)
-    doc_schema = str(td.outputSchema)
-    doc_type = td.outputSchema.className()
+    doc_schema = str(outputSchema)
+    doc_type = outputSchema.className()
 
-    if td.cardinality == "oneToMany":
+    if cardinality == "oneToMany":
         # TODO here the problem is: which is the 1:N field that we are splitting the output into?
         # do we need to know this to construct the prompt question ?
         # for now, we will just assume there is only one list in the JSON.
@@ -296,106 +328,36 @@ def runConventionalQuery(
         split_attribute = [att for att in dct.keys() if type(dct[att]) == list][0]
         n_splits = len(dct[split_attribute])
 
-        if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+        if prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # TODO Hacky to nest return and not disrupt the rest of method!!!
             # NOTE: this is a bonded query, but we are treating it as a conventional query
             query_stats = {}
             drs = []
-            promptQuestion = _construct_query_prompt(td, doc_type, generate_field_names)
-
-            # iterate over the length of the split attribute, and generate a new JSON for each split
-            for idx in range(n_splits):
-                if verbose:
-                    print(f"Processing {split_attribute} with index {idx}")
-                new_json = {k: v for k, v in dct.items() if k != split_attribute}
-                new_json[split_attribute] = dct[split_attribute][idx]
-
-                text_content = json.dumps(new_json)
-                generator = DSPyGenerator(
-                    td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose
-                )
-                answer, record_stats = None, None
-                try:
-                    answer, _, record_stats = generator.generate(
-                        text_content,
-                        promptQuestion,
-                    )
-                    jsonObj = getJsonFromAnswer(answer)["items"][0]
-                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = (
-                        record_stats
-                    )
-                except IndexError as e:
-                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = (
-                        record_stats
-                    )
-                    print("Could not find any items in the JSON response")
-                    continue
-                except json.JSONDecodeError as e:
-                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = (
-                        record_stats
-                    )
-                    print(f"Could not decode JSON response: {e}")
-                    print(answer)
-                    continue
-                except Exception as e:
-                    query_stats[f"all_fields_one_to_many_conventional_{idx}"] = (
-                        record_stats
-                    )
-                    print(f"Could not decode JSON response: {e}")
-                    print(answer)
-                    continue
-
-                dr = _create_data_record_from_json(
-                    jsonObj, td, candidate, cardinality_idx=idx
-                )
-                drs.append(dr)
-
-            # TODO how to stat this? I feel that we need a new Stats class for this type of query
-            # construct ConventionalQueryStats object
-            field_query_stats_lst = [
-                FieldQueryStats(gen_stats=gen_stats, field_name=field_name)
-                for field_name, gen_stats in query_stats.items()
-            ]
-            conventional_query_stats = ConventionalQueryStats(
-                field_query_stats_lst=field_query_stats_lst,
-                input_fields=td.inputSchema.fieldNames(),
-                generated_fields=generate_field_names,
-            )
-
-            # TODO: debug root cause
-            for dr in drs:
-                if not hasattr(dr, "filename"):
-                    setattr(dr, "filename", candidate.filename)
-
-            return drs, conventional_query_stats
-
-        else:
-            raise Exception(
-                "Conventional queries cannot execute tasks with cardinality == 'oneToMany'"
-            )
-
-    # iterate over fields and generate their values using an LLM
-    query_stats = {}
-    for field_name in generate_field_names:
-        # construct prompt question
-        promptQuestion = _construct_query_prompt(td, doc_type, [field_name])
+            promptQuestion = _construct_query_prompt(
+                doc_type=doc_type,
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                cardinality=cardinality,
+                prompt_strategy=prompt_strategy,
+                conversionDesc=conversionDesc,
+                generate_field_names=[field_name])
         field_stats = None
         try:
             field_stats = None
-            if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+            if prompt_strategy == PromptStrategy.DSPY_COT_QA:
                 # print(f"FALL BACK FIELD: {field_name}")
                 # print("---------------")
                 # invoke LLM to generate output JSON
                 generator = DSPyGenerator(
-                    td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose
+                    model.value, prompt_strategy, doc_schema, doc_type, verbose
                 )
                 answer, field_stats = generator.generate(
                     text_content,
                     promptQuestion,
-                    budget=td.token_budget,
+                    budget=token_budget,
                 )
 
-            elif td.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
+            elif prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
                 # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
                 # b64 decode of candidate.contents or candidate.image_contents
                 base64_images = []
@@ -410,15 +372,15 @@ def runConventionalQuery(
                     ]
 
                 # invoke LLM to generate output JSON
-                generator = ImageTextGenerator(td.model.value)
+                generator = ImageTextGenerator(model.value)
                 answer, field_stats = generator.generate(base64_images, promptQuestion)
 
             # TODO
-            elif td.prompt_strategy == PromptStrategy.ZERO_SHOT:
+            elif prompt_strategy == PromptStrategy.ZERO_SHOT:
                 raise Exception("not implemented yet")
 
             # TODO
-            elif td.prompt_strategy == PromptStrategy.FEW_SHOT:
+            elif prompt_strategy == PromptStrategy.FEW_SHOT:
                 raise Exception("not implemented yet")
 
             # update query_stats
@@ -440,7 +402,7 @@ def runConventionalQuery(
     ]
     conventional_query_stats = ConventionalQueryStats(
         field_query_stats_lst=field_query_stats_lst,
-        input_fields=td.inputSchema.fieldNames(),
+        input_fields=inputSchema.fieldNames(),
         generated_fields=generate_field_names,
     )
 
@@ -452,25 +414,33 @@ def runConventionalQuery(
 
 
 def runCodeGenQuery(
-    candidate: DataRecord, td: TaskDescriptor, verbose: bool = False
-) -> Tuple[DataRecord, Stats]:
+    candidate: DataRecord, 
+    inputSchema,
+    outputSchema,
+    cardinality: str,
+    prompt_strategy: PromptStrategy,
+    model: Model,
+    op_id: str,
+    plan_idx: int,
+    token_budget: float,
+    verbose: bool = False) -> Tuple[DataRecord, Stats]:
     """
     I think this would roughly map to the internals of _makeCodeGenTypeConversionFn() in your branch.
     Similar to the functions above, I moved most of the details of generating responses
     """
     # initialize output data record
-    dr = DataRecord(td.outputSchema, parent_uuid=candidate._uuid)
+    dr = DataRecord(outputSchema, parent_uuid=candidate._uuid)
 
     # copy fields from the candidate (input) record if they already exist
     # and construct list of fields in outputSchema which will need to be generated
     generate_field_names = []
-    for field_name in td.outputSchema.fieldNames():
-        if field_name in td.inputSchema.fieldNames():
+    for field_name in outputSchema.fieldNames():
+        if field_name in inputSchema.fieldNames():
             setattr(dr, field_name, getattr(candidate, field_name))
         else:
             generate_field_names.append(field_name)
 
-    if td.cardinality == "oneToMany":
+    if cardinality == "oneToMany":
         # TODO here the problem is: which is the 1:N field that we are splitting the output into?
         # do we need to know this to construct the prompt question ?
         # for now, we will just assume there is only one list in the JSON.
@@ -486,20 +456,20 @@ def runCodeGenQuery(
         for idx in range(n_splits):
             # initialize output data record
             dr = DataRecord(
-                td.outputSchema, parent_uuid=candidate._uuid, cardinality_idx=idx
+                outputSchema, parent_uuid=candidate._uuid, cardinality_idx=idx
             )
 
             cache = DataDirectory().getCacheService()
             for field_name in generate_field_names:
-                code_ensemble_id = "_".join([td.op_id, field_name])
+                code_ensemble_id = "_".join([op_id, field_name])
                 cached_code_ensemble_info = cache.getCachedData(
-                    f"codeEnsemble{td.plan_idx}", code_ensemble_id
+                    f"codeEnsemble{plan_idx}", code_ensemble_id
                 )
                 if cached_code_ensemble_info is not None:
                     code_ensemble, _ = cached_code_ensemble_info
                     gen_stats = CodeGenEnsembleStats()
                     examples = cache.getCachedData(
-                        f"codeSamples{td.plan_idx}", code_ensemble_id
+                        f"codeSamples{plan_idx}", code_ensemble_id
                     )
                 else:
                     code_ensemble, gen_stats, examples = dict(), None, list()
@@ -520,7 +490,7 @@ def runCodeGenQuery(
                 # print(candidate_dicts)
                 examples.extend(candidate_dicts)
                 cache.putCachedData(
-                    f"codeSamples{td.plan_idx}", code_ensemble_id, examples
+                    f"codeSamples{plan_idx}", code_ensemble_id, examples
                 )
                 api = API.from_task_descriptor(
                     td, field_name, input_fields=new_json.keys()
@@ -532,7 +502,7 @@ def runCodeGenQuery(
                         api, examples=examples, code_num_examples=n_splits
                     )
                     cache.putCachedData(
-                        f"codeEnsemble{td.plan_idx}",
+                        f"codeEnsemble{plan_idx}",
                         code_ensemble_id,
                         (code_ensemble, gen_stats),
                     )
@@ -551,8 +521,8 @@ def runCodeGenQuery(
                         f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}"
                     )
                     # construct prompt question
-                    doc_schema = str(td.outputSchema)
-                    doc_type = td.outputSchema.className()
+                    doc_schema = str(outputSchema)
+                    doc_type = outputSchema.className()
                     promptQuestion = _construct_query_prompt(td, doc_type, [field_name])
                     field_stats = None
                     try:
@@ -562,7 +532,7 @@ def runCodeGenQuery(
                         text_content = json.dumps(new_json)
                         generator = DSPyGenerator(
                             Model.GPT_3_5.value,
-                            td.prompt_strategy,
+                            prompt_strategy,
                             doc_schema,
                             doc_type,
                             verbose,
@@ -570,7 +540,7 @@ def runCodeGenQuery(
                         answer, field_stats = generator.generate(
                             text_content,
                             promptQuestion,
-                            budget=td.token_budget,
+                            budget=token_budget,
                         )
 
                         # update conv_query_stats
@@ -603,7 +573,7 @@ def runCodeGenQuery(
         ]
         conventional_query_stats = ConventionalQueryStats(
             field_query_stats_lst=field_query_stats_lst,
-            input_fields=td.inputSchema.fieldNames(),
+            input_fields=inputSchema.fieldNames(),
             generated_fields=generate_field_names,
         )
 
@@ -618,15 +588,15 @@ def runCodeGenQuery(
         full_code_gen_stats, conv_query_stats = FullCodeGenStats(), {}
         cache = DataDirectory().getCacheService()
         for field_name in generate_field_names:
-            code_ensemble_id = "_".join([td.op_id, field_name])
+            code_ensemble_id = "_".join([op_id, field_name])
             cached_code_ensemble_info = cache.getCachedData(
-                f"codeEnsemble{td.plan_idx}", code_ensemble_id
+                f"codeEnsemble{plan_idx}", code_ensemble_id
             )
             if cached_code_ensemble_info is not None:
                 code_ensemble, _ = cached_code_ensemble_info
                 gen_stats = CodeGenEnsembleStats()
                 examples = cache.getCachedData(
-                    f"codeSamples{td.plan_idx}", code_ensemble_id
+                    f"codeSamples{plan_idx}", code_ensemble_id
                 )
             else:
                 code_ensemble, gen_stats, examples = dict(), None, list()
@@ -639,7 +609,7 @@ def runCodeGenQuery(
             candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
 
             examples.append(candidate_dict)
-            cache.putCachedData(f"codeSamples{td.plan_idx}", code_ensemble_id, examples)
+            cache.putCachedData(f"codeSamples{plan_idx}", code_ensemble_id, examples)
             api = API.from_task_descriptor(
                 td, field_name, input_fields=candidate_dict.keys()
             )
@@ -648,7 +618,7 @@ def runCodeGenQuery(
                     api, examples=examples
                 )
                 cache.putCachedData(
-                    f"codeEnsemble{td.plan_idx}",
+                    f"codeEnsemble{plan_idx}",
                     code_ensemble_id,
                     (code_ensemble, gen_stats),
                 )
@@ -667,8 +637,8 @@ def runCodeGenQuery(
             if answer is None:
                 print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
                 # construct prompt question
-                doc_schema = str(td.outputSchema)
-                doc_type = td.outputSchema.className()
+                doc_schema = str(outputSchema)
+                doc_type = outputSchema.className()
                 promptQuestion = _construct_query_prompt(td, doc_type, [field_name])
                 field_stats = None
                 try:
@@ -678,7 +648,7 @@ def runCodeGenQuery(
                     text_content = json.loads(candidate_dict)
                     generator = DSPyGenerator(
                         Model.GPT_3_5.value,
-                        td.prompt_strategy,
+                        prompt_strategy,
                         doc_schema,
                         doc_type,
                         verbose,
@@ -686,7 +656,7 @@ def runCodeGenQuery(
                     answer, field_stats = generator.generate(
                         text_content,
                         promptQuestion,
-                        budget=td.token_budget,
+                        budget=token_budget,
                     )
 
                     # update stats
@@ -715,7 +685,7 @@ def runCodeGenQuery(
         ]
         conventional_query_stats = ConventionalQueryStats(
             field_query_stats_lst=field_query_stats_lst,
-            input_fields=td.inputSchema.fieldNames(),
+            input_fields=inputSchema.fieldNames(),
             generated_fields=generate_field_names,
         )
 
