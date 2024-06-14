@@ -1,5 +1,5 @@
 from __future__ import annotations
-from palimpzest.dataclasses import OperatorCostEstimates
+from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.operators import DataRecordWithStats, PhysicalOperator
 
 from palimpzest.constants import *
@@ -12,7 +12,7 @@ from typing import List, Optional
 import math
 import concurrent
 
-from palimpzest.solver.query_strategies import runCodeGenQuery, runConventionalQuery
+from palimpzest.solver.query_strategies import runBondedQuery, runCodeGenQuery, runConventionalQuery
 
 
 class ConvertOp(PhysicalOperator):
@@ -38,16 +38,14 @@ class ConvertOp(PhysicalOperator):
         self.desc = desc
         self.targetCacheId = targetCacheId
 
-    def physical_op_id(self, plan_position: Optional[int] = None):
-        op_dict = {
+    def get_op_dict(self):
+        return {
             "operator": self.op_name(),
             "inputSchema": str(self.inputSchema),
             "outputSchema": str(self.outputSchema),
             "cardinality": self.cardinality,
             "desc": str(self.desc),
         }
-
-        return self._compute_op_id_from_dict(op_dict, plan_position)
 
     def __str__(self):
         return f"{self.model}_{self.query_strategy}_{self.token_budget}"
@@ -225,8 +223,8 @@ class LLMConvert(ConvertOp):
             shouldProfile=self.shouldProfile,
         )
 
-    def physical_op_id(self, plan_position: Optional[int] = None):
-        op_dict = {
+    def get_op_dict(self):
+        return {
             "operator": self.op_name(),
             "inputSchema": str(self.inputSchema),
             "outputSchema": str(self.outputSchema),
@@ -241,8 +239,6 @@ class LLMConvert(ConvertOp):
             "token_budget": self.token_budget,
             "desc": str(self.desc),
         }
-
-        return self._compute_op_id_from_dict(op_dict, plan_position)
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # estimate number of input and output tokens from source
@@ -320,44 +316,91 @@ class LLMConvert(ConvertOp):
     # TODO
     def __call__(self, candidate: DataRecord) -> List[DataRecordWithStats]:
         # initialize stats objects
-        bonded_query_stats, conventional_query_stats = None, None
-
+        op_id = self.get_op_id()
         if self.query_strategy == QueryStrategy.CONVENTIONAL:
             # NOTE: runConventionalQuery does exception handling internally
-            dr, conventional_query_stats = runConventionalQuery(
+            dr, record_stats = runConventionalQuery(
                 candidate=candidate, 
                 inputSchema=self.inputSchema,
                 outputSchema=self.outputSchema,
                 token_budget=self.token_budget,
                 model=self.model,
+                conversionDesc=self.desc,
                 prompt_strategy=self.prompt_strategy,
-                query_strategy=self.query_strategy,
-                    verbose=self._verbose
+                verbose=False
                 )
             drs = [dr] if type(dr) is not list else dr
             # if profiling, set record's stats for the given op_id
             if self.shouldProfile:
-                for dr in drs:
-                    # TODO: divide bonded query_stats time, cost, and input/output tokens by len(drs)
-                    dr._stats[td.op_id] = ConvertLLMStats(
-                        query_strategy=self.query_strategy.value,
-                        token_budget=td.token_budget,
-                        bonded_query_stats=bonded_query_stats,
-                        conventional_query_stats=conventional_query_stats,
-                    )
+                # TODO: divide bonded query_stats time, cost, and input/output tokens by len(drs)
+                record_stats.record_state = {
+                    "query_strategy": self.query_strategy.value,
+                    "token_budget": self.token_budget,
+                }                     
 
-            return drs, new_heatmap_obj
+            record_stats.record_state['heatmap_obj'] = new_heatmap_obj
 
+            return drs, record_stats
+
+        elif self.query_strategy == QueryStrategy.BONDED_WITH_FALLBACK:
+            drs, new_heatmap_obj, record_stats, err_msg = runBondedQuery(
+                candidate=candidate, 
+                inputSchema=self.inputSchema,
+                outputSchema=self.outputSchema,
+                token_budget=self.token_budget,
+                model=self.model,
+                conversionDesc=self.desc,
+                prompt_strategy=self.prompt_strategy,
+                cardinality=self.cardinality,
+                heatmap_json_obj=self.heatmap_json_obj,
+                verbose=False                
+            )
+
+            # if bonded query failed, run conventional query
+            if err_msg is not None:
+                print(f"BondedQuery Error: {err_msg}")
+                print("Falling back to conventional query")
+                dr, record_stats = runConventionalQuery(
+                    candidate=candidate, 
+                    inputSchema=self.inputSchema,
+                    outputSchema=self.outputSchema,
+                    token_budget=self.token_budget,
+                    model=self.model,
+                    cardinality=self.cardinality,
+                    conversionDesc=self.desc,
+                    prompt_strategy=self.prompt_strategy,
+                    verbose=False
+                )
+                drs = [dr] if type(dr) is not list else dr
+            # if profiling, set record's stats for the given op_id
+            if self.shouldProfile:
+                # TODO: divide bonded query_stats time, cost, and input/output tokens by len(drs)
+                record_stats.record_state = {
+                    "query_strategy": self.query_strategy.value,
+                    "token_budget": self.token_budget,
+                }                     
+            record_stats.record_state['heatmap_obj'] = new_heatmap_obj
+            return drs, record_stats
+        
         elif self.query_strategy == QueryStrategy.CODE_GEN:
-            dr, full_code_gen_stats = runCodeGenQuery(candidate, td, self._verbose)
+            dr, full_code_gen_stats = runCodeGenQuery(
+                candidate=candidate,
+                inputSchema=self.inputSchema,
+                outputSchema=self.outputSchema,
+                token_budget=self.token_budget,
+                model=self.model,
+                conversionDesc=self.desc,
+                prompt_strategy=self.prompt_strategy,
+                verbose=False
+                )
             drs = [dr]
 
             # if profiling, set record's stats for the given op_id
             if self.shouldProfile:
                 for dr in drs:
-                    dr._stats[td.op_id] = ConvertLLMStats(
+                    dr._stats[op_id] = ConvertLLMStats(
                         query_strategy=self.query_strategy.value,
-                        token_budget=td.token_budget,
+                        token_budget=self.token_budget,
                         full_code_gen_stats=full_code_gen_stats,
                     )
 
@@ -372,9 +415,9 @@ class LLMConvert(ConvertOp):
                 outputSchema=self.outputSchema,
                 token_budget=self.token_budget,
                 model=self.model,
+                conversionDesc=self.desc,
                 prompt_strategy=self.prompt_strategy,
-                query_strategy=self.query_strategy,
-                verbose=self._verbose
+                verbose=False
             )
             drs = [dr] if type(dr) is not list else dr
             # # Deleting all failure fields
@@ -383,7 +426,7 @@ class LLMConvert(ConvertOp):
             #         delattr(new_candidate, field_name)
             # if td.cardinality == 'oneToMany':
             #     td.cardinality = 'oneToOne'
-            # dr, conventional_query_stats = runConventionalQuery(new_candidate, td, self._verbose)
+            # dr, conventional_query_stats = runConventionalQuery(new_candidate, td, False)
             # drs = [dr] if type(dr) is not list else dr
             for dr in drs:
                 dr._parent_uuid = candidate._uuid

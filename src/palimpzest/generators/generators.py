@@ -29,12 +29,6 @@ import json
 import os
 import time
 
-class CodeGenEnsembleStats:
-    pass
-
-class GenerationStats:
-    pass
-
 from palimpzest.profiler.attentive_trim import (
     find_best_range,
     get_trimed,
@@ -456,16 +450,18 @@ class DSPyGenerator(BaseGenerator):
         answer_log_probs = self._get_answer_log_probs(dspy_lm, pred.answer)
         usage, finish_reason = self._get_usage_and_finish_reason(dspy_lm)
 
-        # collect statistics on prompt, usage, and timing
-        stats = GenerationStats(
-            model_name=self.model_name,
-            llm_call_duration_secs=end_time - start_time,
-            prompt=dspy_lm.history[-1]["prompt"],
-            usage=usage,
-            finish_reason=finish_reason,
-            answer_log_probs=answer_log_probs,
-            answer=pred.answer,
-        )
+        # collect statistics on prompt, usage, and timing        
+        stats={
+            "model_name": self.model_name,
+            "op_time": end_time - start_time,
+            # "llm_call_duration_secs": end_time - start_time,
+            "op_cost": 0.0, #TODO ?
+            "prompt": dspy_lm.history[-1]["prompt"],
+            "usage": usage,
+            "finish_reason": finish_reason,
+            "answer_log_probs": answer_log_probs,
+            "answer": pred.answer,
+        }
 
         # if reduction is enabled but the answer is None, fallback to the full context
         if reduction and pred.answer == None:
@@ -480,13 +476,13 @@ class DSPyGenerator(BaseGenerator):
             answer_log_probs = self._get_answer_log_probs(dspy_lm, pred.answer)
             usage, finish_reason = self._get_usage_and_finish_reason(dspy_lm)
 
-            stats.llm_call_duration_secs = end_time - start_time
-            stats.prompt = dspy_lm.history[-1]["prompt"]
-            for k, _ in stats.usage.items():
-                stats.usage[k] += usage[k]
-            stats.finish_reason = finish_reason
-            stats.answer_log_probs = answer_log_probs
-            stats.answer = pred.answer
+            stats["llm_call_duration_secs"] = end_time - start_time
+            stats["prompt"] = dspy_lm.history[-1]["prompt"]
+            for k, _ in stats['usage'].items():
+                stats['usage'][k] += usage[k]
+            stats['finish_reason'] = finish_reason
+            stats['answer_log_probs'] = answer_log_probs
+            stats['answer'] = pred.answer
 
         # print("----------------")
         # print(f"PROMPT")
@@ -496,7 +492,8 @@ class DSPyGenerator(BaseGenerator):
         # print("----------------")
         # print(f"ANSWER")
         # print("----------------")
-        print(pred.answer)
+        if self.verbose:
+            print(pred.answer)
 
         # taken reduction post processing if enabled
         if (
@@ -699,14 +696,29 @@ class ImageTextGenerator(BaseGenerator):
         #       especially since many of them are not implemented for the Gemini model -- but
         #       we will likely want a more robust solution in the future.
         # collect statistics on prompt, usage, and timing
-        stats = GenerationStats(
-            model_name=self.model_name,
-            llm_call_duration_secs=end_time - start_time,
-            prompt=prompt,
-            usage=usage,
-            finish_reason=finish_reason,
-            answer_log_probs=answer_log_probs,
-            answer=answer,
+        op_time = end_time - start_time
+        op_cost = 0.0
+
+        record_state = {
+            "model_name": self.model_name,
+            "llm_call_duration_secs": op_time,
+            "prompt": prompt,
+            "usage": usage,
+            "finish_reason": finish_reason,
+            "answer_log_probs": answer_log_probs,
+            "answer": answer,
+        }
+
+        #TODO fill in the details
+        raise NotImplementedError("Fill in the details")
+        stats = RecordOpStats(
+            record_uuid="",
+            record_parent_uuid="",
+            op_id="",
+            op_name="",
+            op_time=op_time,
+            op_cost=op_cost,
+            record_state = record_state,
         )
 
         return answer, stats
@@ -748,7 +760,7 @@ def run_advgen(prompt):
     advs = parse_ideas(pred); return advs, stats
 
 def codeGenDefault(api):
-    return api.api_def()+"  return None\n", GenerationStats()
+    return api.api_def()+"  return None\n", RecordOpStats()
 
 EXAMPLE_PROMPT = """Example{idx}:
 {example_inputs}
@@ -787,11 +799,23 @@ def codeGenSingle(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(),
     print("GENERATED CODE")
     print("---------------")
     print(f"{code}")
-    stats = CodeGenSingleStats(
-        prompt_template = prompt_template,
-        context = context,
-        code = code,
-        gen_stats = gen_stats,
+    record_state = {
+        'prompt_template': prompt_template,
+        'context': context,
+        'code': code,
+        'gen_stats': gen_stats,
+    }
+
+    raise NotImplementedError("Fill in the details")
+    stats = RecordOpStats(
+        record_idx=0,
+        record_uuid="",
+        record_parent_uuid="",
+        op_id="",
+        op_name="",
+        op_time=0.0,
+        op_cost=0.0,
+        record_state = record_state,
     )
     return code, stats
 
@@ -847,8 +871,8 @@ def codeEnsembleGeneration(api: API, examples: List[Dict[DataRecord, DataRecord]
     code_ensemble_num: int=1,           # if strategy != SINGLE
     code_num_examples: int=1,           # if strategy != EXAMPLE_ENSEMBLE
     code_regenerate_frequency: int=200, # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION
-) -> Tuple[Dict[str, str], CodeGenEnsembleStats]:
-    code_ensemble = dict(); code_gen_stats = CodeGenEnsembleStats()
+) -> Tuple[Dict[str, str], RecordOpStats]:
+    code_ensemble = dict(); code_gen_stats = RecordOpStats()
     if strategy == CodeGenStrategy.NONE:
         code, stats = codeGenDefault(api)
         for i in range(code_ensemble_num):
@@ -888,19 +912,24 @@ def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose:b
     response = api.api_execute(code, inputs)
     pred = response['response'] if response['status'] and response['response'] else None
     end_time = time.time()
-    stats = CodeExecutionSingleStats(
-        code_response = response,
-        code_exec_duration_secs = end_time - start_time,
-    )
-    return pred, stats
+    record_state = {
+        'code_response': response,
+        'code_exec_duration_secs': end_time - start_time,
+    }
+    return pred, record_state
 
 # Temporarily set default verbose to True for debugging
 def codeEnsembleExecution(api: API, code_ensemble: List[str], candidate_dict: Dict[str, Any], verbose:bool=True) -> Tuple[DataRecord, Dict]:
-    ensemble_stats = CodeExecutionEnsembleStats(); preds = list()
+    ensemble_stats = RecordOpStats()
+    preds = list()
+
+    op_state = dict()
     for code_name, code in code_ensemble.items():
-        pred, stats = codeExecution(api, code, candidate_dict)
+        pred, record_state = codeExecution(api, code, candidate_dict)
         preds.append(pred)
-        ensemble_stats.code_versions_stats[code_name] = stats
+        op_state[code_name] = record_state
+
+    ensemble_stats.op_state = op_state
     preds = [pred for pred in preds if pred is not None]
     print(preds)
 

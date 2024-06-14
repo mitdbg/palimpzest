@@ -9,7 +9,7 @@ from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.elements import *
 from palimpzest.operators import logical
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import concurrent
 import multiprocessing
@@ -31,6 +31,15 @@ class FilterOp(PhysicalOperator):
         self.targetCacheId = targetCacheId
         self.max_workers = max_workers
 
+
+    def get_op_dict(self):
+        return {
+            "operator": self.op_name(),
+            "outputSchema": str(self.outputSchema),
+            "filter": str(self.filter),
+        }
+
+
     def __eq__(self, other: FilterOp):
         return (
             isinstance(other, self.__class__)
@@ -48,15 +57,6 @@ class FilterOp(PhysicalOperator):
             shouldProfile=self.shouldProfile,
             max_workers=self.max_workers,
         )
-
-    def physical_op_id(self, plan_position: Optional[int] = None):
-        op_dict = {
-            "operator": self.op_name(),
-            "outputSchema": str(self.outputSchema),
-            "filter": str(self.filter),
-        }
-
-        return self._compute_op_id_from_dict(op_dict, plan_position)
 
     def __iter__(self):
         # TODO GV Why is this logic in the __iter__ method and not in execution?
@@ -264,7 +264,7 @@ class LLMFilter(FilterOp):
         )
 
     # TODO: modify to support parallel execution and RecordOpStats collection
-    def __call__(self, candidate: DataRecord):
+    def __call__(self, candidate: DataRecord)-> Tuple[DataRecord, RecordOpStats]:
         # compute record schema and type
         doc_schema = str(self.inputSchema)
         doc_type = self.inputSchema.className()
@@ -282,7 +282,7 @@ class LLMFilter(FilterOp):
                 self.prompt_strategy,
                 doc_schema,
                 doc_type,
-                self._verbose,
+                verbose=False, # TODO pass verbose argument
             )
         # TODO
         elif self.prompt_strategy == PromptStrategy.ZERO_SHOT:
@@ -296,12 +296,21 @@ class LLMFilter(FilterOp):
 
         # invoke LLM to generate filter decision (True or False)
         text_content = candidate._asJSON(include_bytes=False)
+        gen_stats = None
         try:
             response, _, gen_stats = generator.generate(
                 context=text_content,
                 question=self.filter.filterCondition,
             )
-
+            record_op_stats = RecordOpStats(
+                record_uuid=candidate._uuid,
+                record_parent_uuid=candidate._parent_uuid,
+                op_id=self.get_op_id(),
+                op_name=self.op_name(),
+                op_time=gen_stats['op_time'],
+                op_cost=gen_stats['op_cost'],
+                record_state= gen_stats,                
+            )
             # if profiling, set record's stats for the given op_id
             # if shouldProfile:
             # candidate._stats[td.op_id] = FilterLLMStats(
@@ -314,5 +323,14 @@ class LLMFilter(FilterOp):
             # If there is an exception consider the record as not passing the filter
             print(f"Error invoking LLM for filter: {e}")
             setattr(candidate, "_passed_filter", False)
+            record_op_stats = RecordOpStats(
+                record_uuid=candidate._uuid,
+                record_parent_uuid=candidate._parent_uuid,
+                op_id=self.get_op_id(),
+                op_name=self.op_name(),
+                op_time=0,
+                op_cost=0,
+                record_state= {}
+            )
 
-        return candidate
+        return candidate, record_op_stats

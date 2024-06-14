@@ -518,7 +518,7 @@ class PhysicalPlanner(Planner):
                               shouldProfile=shouldProfile,)
 
             elif isinstance(logical_op, pz_ops.CacheScan):
-                op_class = self.logical_physical_map[logical_op][0]
+                op_class = self.logical_physical_map[type(logical_op)][0]
                 op = op_class(outputSchema=logical_op.outputSchema,
                                 cacheIdentifier=logical_op.cachedDataIdentifier,
                                 num_samples=self.num_samples,
@@ -546,7 +546,7 @@ class PhysicalPlanner(Planner):
                 )
 
             elif isinstance(logical_op, pz_ops.LimitScan):
-                op_class = self.logical_physical_map[logical_op][0]
+                op_class = self.logical_physical_map[type(logical_op)][0]
                 op = op_class(
                         inputSchema=logical_op.inputSchema,
                         outputSchema=logical_op.outputSchema,
@@ -556,7 +556,7 @@ class PhysicalPlanner(Planner):
                     )
 
             elif isinstance(logical_op, pz_ops.GroupByAggregate):
-                op_class = self.logical_physical_map[logical_op][0]
+                op_class = self.logical_physical_map[type(logical_op)][0]
                 op = op_class(
                     inputSchema=logical_op.inputSchema,
                     gbySig=logical_op.gbySig,

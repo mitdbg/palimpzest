@@ -137,13 +137,18 @@ class Execute:
         num_sentinel_plans = len(sentinel_plans)
 
         all_sample_execution_data, return_records = [], []
-        with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
-            results = list(executor.map( lambda x:
-                    cls.run_sentinel_plan(*x),
-                    [(plan, idx, verbose) for idx, plan in enumerate(sentinel_plans)],
-                )
+        results = list(map(lambda x:
+                cls.run_sentinel_plan(*x),
+                [(plan, idx, verbose) for idx, plan in enumerate(sentinel_plans)],
             )
-
+        )
+        # with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
+        #     results = list(executor.map( lambda x:
+        #             cls.run_sentinel_plan(*x),
+        #             [(plan, idx, verbose) for idx, plan in enumerate(sentinel_plans)],
+        #         )
+        #     )
+        print("Finished executing sentinel plans")
         # write out result dict and samples collected for each sentinel
         sentinel_records, sentinel_stats = zip(*results)
         for records, plan_stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
@@ -160,9 +165,59 @@ class Execute:
 
         return all_sample_execution_data, return_records # TODO: make sure you capture cost of sentinel plans.
 
-
     @classmethod
     def execute_dag(cls, plan: PhysicalPlan, plan_stats: PlanStats):
+        """
+        Helper function which executes the physical plan. This function is overly complex for today's
+        plans which are simple cascades -- but is designed with an eye towards 
+        """
+        output_records = []
+        # execute the plan until either:
+        # 1. all records have been processed, or
+        # 2. the final limit operation has completed
+
+        for idx, operator in enumerate(plan.operators):
+            op_id = operator.get_op_id()
+            # TODO: Is it okay to have call return a list?
+            if isinstance(operator, DataSourcePhysicalOperator):
+                out_records, record_op_stats_lst = operator()
+            else:
+                input_records = out_records
+                out_records = []
+                record_op_stats_lst = []
+                for idx,input_record in enumerate(input_records):
+                    if isinstance(operator, LimitScanOp) and idx == operator.limit:
+                        break
+
+                    records, record_op_stats = operator(input_record)
+                    if records is None:
+                        records = []
+                        continue
+                    elif type(records) != type([]):
+                        records = [records]
+
+                    for record in records:
+                        if isinstance(operator, FilterOp):
+                            if not record._passed_filter:
+                                continue
+                        out_records.append(record)
+                    record_op_stats_lst.append(record_op_stats)
+
+            # TODO code a nice __add__ function for OperatorStats and RecordOpStats
+            for record_op_stats in record_op_stats_lst:
+                x = plan_stats.operator_stats[op_id]
+                x.record_op_stats_lst.append(record_op_stats)
+                x.total_op_time += record_op_stats.op_time
+                x.total_op_cost += record_op_stats.op_cost
+                plan_stats.operator_stats[op_id] = x
+
+
+        return out_records, plan_stats
+
+
+    #TODO The dag style execution is not really working. I am implementing a per-records execution
+    @classmethod
+    def _todebug_execute_dag(cls, plan: PhysicalPlan, plan_stats: PlanStats):
         """
         Helper function which executes the physical plan. This function is overly complex for today's
         plans which are simple cascades -- but is designed with an eye towards 
@@ -171,7 +226,7 @@ class Execute:
         output_records = []
         # initialize processing queues for each operation
         processing_queues = {
-            op.physical_op_id(): []
+            op.get_op_id(): []
             for op in plan.operators
             if not isinstance(op, DataSourcePhysicalOperator)
         }
@@ -183,14 +238,16 @@ class Execute:
         while not finished_executing:
             more_source_records = False
             for idx, operator in enumerate(plan.operators):
-                op_id = operator.physical_op_id()
-
+                op_id = operator.get_op_id()
                 # TODO: Is it okay to have call return a list?
                 if isinstance(operator, DataSourcePhysicalOperator):
                     records, record_op_stats_lst = operator()
                 elif len(processing_queues[op_id]) > 0:
+                    print(f"Processing operator {op_id} - queue length: {len(processing_queues[op_id])}")
                     input_record = processing_queues[op_id].pop(0)
-                    records, record_op_stats_lst = operator(input_record)
+                    records, record_op_stats = operator(input_record)
+                    record_op_stats_lst = [record_op_stats]
+
 
                 # update plan stats
                 for record_op_stats in record_op_stats_lst:
@@ -204,23 +261,35 @@ class Execute:
 
                 # get id for next physical operator (currently just next op in plan.operators)
                 next_op_id = (
-                    plan.operators[idx + 1].physical_op_id()
+                    plan.operators[idx + 1].get_op_id()
                     if idx + 1 < len(plan.operators)
                     else None
                 )
+                if not isinstance(operator, DataSourcePhysicalOperator):
+                    print(f"Now operator {op_id} - queue length: {len(processing_queues[op_id])}")
 
+                if records is None:
+                    continue
+                elif type(records) != type([]):
+                    records = [records]
                 # update processing_queues or output_records
                 for record in records:
-                    filtered = isinstance(operator, FilterOp) and not record._passed_filter
-                    if next_op_id is not None and not filtered:
+                    if isinstance(operator, FilterOp):
+                        if not record._passed_filter:
+                            continue
+                    if next_op_id is not None:
                         processing_queues[next_op_id].append(record)
+                        print(f"For next operator {next_op_id} - queue length: {len(processing_queues[next_op_id])}")                    
                     else:
                         output_records.append(record)
+                input("Press Enter to continue...")
 
             # update finished_executing based on whether all records have been processed
             still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
             finished_executing = not more_source_records and not still_processing
-
+            print(f"Length of queue: {[len(queue) for queue in processing_queues.values()]}")
+            print(f"More source records: {more_source_records}")
+            input("Press Enter to continue...")
             # update finished_executing based on limit
             if isinstance(operator, LimitScanOp):
                 finished_executing = (len(output_records) == operator.limit)
@@ -235,7 +304,7 @@ class Execute:
         # initialize plan and operator stats
         plan_stats = PlanStats(plan_id=plan.plan_id()) # TODO move into PhysicalPlan.__init__?
         for op_idx, op in enumerate(plan.operators):
-            op_id = op.physical_op_id()
+            op_id = op.get_op_id()
             plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
         # NOTE: I am writing this execution helper function with the goal of supporting future
         #       physical plans that may have joins and/or other operations with multiple sources.
@@ -268,13 +337,12 @@ class Execute:
                     "record_parent_uuid": record_op_stats.record_parent_uuid,
                     "op_id": op_id,
                     "op_name": record_op_stats.op_name,
+                    "op_cost": record_op_stats.op_cost,
                     "source_op_id": source_op_id,
                     "op_time": record_op_stats.op_time,
-                    "passed_filter": (
-                        record_op_stats.record_state["_passed_filter"]
-                        if "_passed_filter" in record_op_stats.record_state
-                        else None
-                    ),
+                }
+                if record_op_stats.op_details is not None:
+                    observation_arguments.update({
                     "model_name": (
                         record_op_stats.op_details["model_name"]
                         if "model_name" in record_op_stats.op_details
@@ -294,39 +362,51 @@ class Execute:
                         "-".join(sorted(record_op_stats.op_details["generated_fields"]))
                         if "generated_fields" in record_op_stats.op_details
                         else None
-                    ),
-                    "total_input_tokens": (
-                        record_op_stats.record_stats["total_input_tokens"]
-                        if "total_input_tokens" in record_op_stats.record_stats
-                        else None
-                    ),
-                    "total_output_tokens": (
-                        record_op_stats.record_stats["total_output_tokens"]
-                        if "total_output_tokens" in record_op_stats.record_stats
-                        else None
-                    ),
-                    "total_input_cost": (
-                        record_op_stats.record_stats["total_input_cost"]
-                        if "total_input_cost" in record_op_stats.record_stats
-                        else None
-                    ),
-                    "total_output_cost": (
-                        record_op_stats.record_stats["total_output_cost"]
-                        if "total_output_cost" in record_op_stats.record_stats
-                        else None
-                    ),
-                }
-
-                # return T/F for filter
-                if "_passed_filter" in record_op_stats.record_state:
-                    observation_arguments["answer"] = record_op_stats.record_state["_passed_filter"]
-                else:
+                    ),}
+                    )
                     answer = {}
                     # return key->value mapping for generated fields for induce
                     if "generated_fields" in record_op_stats.op_details:
                         for field in record_op_stats.op_details["generated_fields"]:
                             answer[field] = record_op_stats.record_state[field]
                     observation_arguments["answer"] = answer
+
+
+                if record_op_stats.record_state is not None:
+                    observation_arguments.update({
+                    "total_input_tokens": (
+                        record_op_stats.record_stats["total_input_tokens"]
+                        if "total_input_tokens" in record_op_stats.record_state
+                        else None
+                    ),
+                    "total_output_tokens": (
+                        record_op_stats.record_stats["total_output_tokens"]
+                        if "total_output_tokens" in record_op_stats.record_state
+                        else None
+                    ),
+                    "total_input_cost": (
+                        record_op_stats.record_stats["total_input_cost"]
+                        if "total_input_cost" in record_op_stats.record_state
+                        else None
+                    ),
+                    "total_output_cost": (
+                        record_op_stats.record_stats["total_output_cost"]
+                        if "total_output_cost" in record_op_stats.record_state
+                        else None
+                    ),
+                    "answer": (record_op_stats.record_state["answer"] 
+                        if "answer" in record_op_stats.record_state
+                        else None),
+                    "passed_filter": (
+                        record_op_stats.record_state["_passed_filter"]
+                        if "_passed_filter" in record_op_stats.record_state
+                        else None
+                    ),
+                    })
+
+                    # return T/F for filter
+                    if "_passed_filter" in record_op_stats.record_state:
+                        observation_arguments["answer"] = record_op_stats.record_state["_passed_filter"]
 
                 observation = SampleExecutionData(**observation_arguments)
                 # add observation to list of observations

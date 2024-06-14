@@ -96,7 +96,9 @@ class CostEstimator:
 
         # # compute average combined input/output usd spent
         # return (df['adj_input_usd'] + df['adj_output_usd']).agg(agg=agg).iloc[0]
-        return (op_df["input_usd"] + op_df["output_usd"]).agg(agg=agg).iloc[0]
+        return 0
+        #TODO This code is not working? There are None in the total_input_cost columns
+        return (op_df["total_input_cost"] + op_df["total_output_cost"]).agg(agg=agg).iloc[0]
 
     @staticmethod
     def _est_tokens_per_record(
@@ -261,7 +263,9 @@ class CostEstimator:
         operator_estimates = {}
         for op_id in op_ids:
             # filter for subset of sample execution data related to this operation
-            op_df = self.sample_execution_data_df.query(op_id)
+            op_df = self.sample_execution_data_df[
+                self.sample_execution_data_df.op_id == op_id
+            ]
 
             # skip computing an estimate if we didn't capture any sampling data for this operator
             # (this can happen if/when upstream filter operation(s) filter out all records) 
@@ -305,14 +309,14 @@ class CostEstimator:
         
         return operator_estimates
 
-    def _estimate_plan_cost(physical_plan: PhysicalPlan, sample_op_estimates: Optional[Dict[str, Any]]) -> None:
+    def _estimate_plan_cost(self, physical_plan: PhysicalPlan, sample_op_estimates: Optional[Dict[str, Any]]) -> None:
         # initialize dictionary w/estimates for entire plan
         plan_estimates = {"total_time": 0.0, "total_cost": 0.0, "quality": 0.0}
 
         op_estimates, source_op_estimates = None, None
         for op in physical_plan.operators:
             # get identifier for operation which is unique within sentinel plan but consistent across sentinels
-            op_id = op.physical_op_id()
+            op_id = op.get_op_id()
 
             # initialize estimates of operator metrics based on naive (but sometimes precise) logic
             op_estimates = (

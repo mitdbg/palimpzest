@@ -151,9 +151,10 @@ def runBondedQuery(
     prompt_strategy: PromptStrategy,
     model: Model,
     token_budget: float,
+    conversionDesc: str,
     heatmap_json_obj: Dict[str, Any],
     verbose: bool = False
-) -> Tuple[List[DataRecord], Stats, str]:
+) -> Tuple[List[DataRecord], RecordOpStats, str]:
     """
     Run a bonded query, in which all new fields in the outputSchema are generated simultaneously
     in a single LLM call. This is in contrast to a conventional query, in which each output field
@@ -206,10 +207,14 @@ def runBondedQuery(
             )
 
             # construct BondedQueryStats object
-            bonded_query_stats = BondedQueryStats(
-                gen_stats=gen_stats,
-                input_fields=inputSchema.fieldNames(),
-                generated_fields=generate_field_names,
+            bonded_query_stats = RecordOpStats(
+                record_uuid=candidate._uuid,
+                record_parent_uuid=candidate._parent_uuid,
+                op_id="bonded_query_123",
+                op_name="bonded_query",
+                op_time=gen_stats['op_time'],
+                op_cost=gen_stats['op_cost'],
+                record_state= gen_stats,
             )
 
         elif prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
@@ -229,10 +234,14 @@ def runBondedQuery(
             answer, gen_stats = generator.generate(base64_images, promptQuestion)
 
             # construct BondedQueryStats object
-            bonded_query_stats = BondedQueryStats(
-                gen_stats=gen_stats,
-                input_fields=inputSchema.fieldNames(),
-                generated_fields=generate_field_names,
+            bonded_query_stats = RecordOpStats(
+                record_uuid=candidate._uuid,
+                record_parent_uuid=candidate.parent_uuid,
+                op_id="bonded_query_123",
+                op_name="bonded_query",
+                op_time=gen_stats['op_time'],
+                op_cost=gen_stats['op_cost'],
+                record_stats= gen_stats,
             )
 
         # TODO
@@ -263,7 +272,7 @@ def runBondedQuery(
                 drs.append(dr)
         else:
             dr = _create_data_record_from_json(
-                    jsonObj=elt,
+                    jsonObj=jsonObj,
                     inputSchema=inputSchema,
                     outputSchema=outputSchema,
                     candidate=candidate,
@@ -293,7 +302,7 @@ def runConventionalQuery(
     token_budget: float,
     conversionDesc: str,
     verbose: bool = False
-) -> Tuple[DataRecord, Stats]:
+) -> Tuple[DataRecord, RecordOpStats]:
     """
     Run a conventional query, in which each output field is generated using its own LLM call.
 
@@ -328,11 +337,10 @@ def runConventionalQuery(
         split_attribute = [att for att in dct.keys() if type(dct[att]) == list][0]
         n_splits = len(dct[split_attribute])
 
+        query_stats = {}
         if prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # TODO Hacky to nest return and not disrupt the rest of method!!!
             # NOTE: this is a bonded query, but we are treating it as a conventional query
-            query_stats = {}
-            drs = []
             promptQuestion = _construct_query_prompt(
                 doc_type=doc_type,
                 inputSchema=inputSchema,
@@ -340,7 +348,8 @@ def runConventionalQuery(
                 cardinality=cardinality,
                 prompt_strategy=prompt_strategy,
                 conversionDesc=conversionDesc,
-                generate_field_names=[field_name])
+                generate_field_names=generate_field_names)
+        
         field_stats = None
         try:
             field_stats = None
@@ -394,16 +403,56 @@ def runConventionalQuery(
             print(f"Conventional field processing error: {e}")
             setattr(dr, field_name, None)
             query_stats[f"{field_name}"] = field_stats
+    else:
+        for field_name in generate_field_names:
+            # construct prompt question
+            promptQuestion = _construct_query_prompt(
+                doc_type=doc_type,
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                cardinality=cardinality,
+                prompt_strategy=prompt_strategy,
+                conversionDesc=conversionDesc,
+                generate_field_names=[field_name]
+            )
 
-    # construct ConventionalQueryStats object
-    field_query_stats_lst = [
-        FieldQueryStats(gen_stats=gen_stats, field_name=field_name)
-        for field_name, gen_stats in query_stats.items()
-    ]
-    conventional_query_stats = ConventionalQueryStats(
-        field_query_stats_lst=field_query_stats_lst,
-        input_fields=inputSchema.fieldNames(),
-        generated_fields=generate_field_names,
+            try:
+                field_stats = None
+                if prompt_strategy == PromptStrategy.DSPY_COT_QA:
+                    # invoke LLM to generate output JSON
+                    generator = DSPyGenerator(model.value, prompt_strategy, doc_schema, doc_type, verbose)
+                    answer, field_stats = generator.generate(text_content, promptQuestion)
+
+                elif prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:                               
+                    # b64 decode of candidate.contents
+                    image_b64 = base64.b64encode(candidate.contents).decode('utf-8')
+                    # invoke LLM to generate output JSON
+                    generator = ImageTextGenerator(model.value)
+                    answer, field_stats = generator.generate(image_b64, promptQuestion)
+
+                else:
+                    raise Exception("not implemented yet")
+
+                # set the DataRecord's field with its generated value
+                setattr(dr, field_name, answer)
+                # update query_stats
+                query_stats[f"{field_name}"] = field_stats
+
+            except Exception as e:
+                print(f"Conventional field processing error: {e}")
+                setattr(dr, field_name, None)
+                query_stats[f"{field_name}"] = None
+
+    op_time = sum([gen_stats['op_time'] for gen_stats in query_stats.values()])
+    op_cost = sum([gen_stats['op_cost'] for gen_stats in query_stats.values()])
+
+    conventional_query_stats = RecordOpStats(
+        record_uuid=candidate._uuid,
+        record_parent_uuid=candidate.parent_uuid,
+        op_id="conventional_query_123",
+        op_name="conventional__query",
+        op_time=op_time,
+        op_cost=op_cost,
     )
 
     # # TODO: debug root cause
@@ -422,8 +471,9 @@ def runCodeGenQuery(
     model: Model,
     op_id: str,
     plan_idx: int,
+    conversionDesc: str,
     token_budget: float,
-    verbose: bool = False) -> Tuple[DataRecord, Stats]:
+    verbose: bool = False) -> Tuple[DataRecord, RecordOpStats]:
     """
     I think this would roughly map to the internals of _makeCodeGenTypeConversionFn() in your branch.
     Similar to the functions above, I moved most of the details of generating responses
@@ -452,7 +502,7 @@ def runCodeGenQuery(
         # TODO Hacky to nest return and not disrupt the rest of method!!!
         # NOTE: this is a bonded query, but we are treating it as a conventional query
         drs = []
-        full_code_gen_stats, conv_query_stats = FullCodeGenStats(), {}
+        full_code_gen_stats, conv_query_stats = RecordOpStats(), {}
         for idx in range(n_splits):
             # initialize output data record
             dr = DataRecord(
@@ -465,14 +515,15 @@ def runCodeGenQuery(
                 cached_code_ensemble_info = cache.getCachedData(
                     f"codeEnsemble{plan_idx}", code_ensemble_id
                 )
+
+                gen_stats = None
                 if cached_code_ensemble_info is not None:
                     code_ensemble, _ = cached_code_ensemble_info
-                    gen_stats = CodeGenEnsembleStats()
                     examples = cache.getCachedData(
                         f"codeSamples{plan_idx}", code_ensemble_id
                     )
                 else:
-                    code_ensemble, gen_stats, examples = dict(), None, list()
+                    code_ensemble, examples = dict(), list()
 
                 if verbose:
                     print(f"Processing {split_attribute} with index {idx}")
@@ -492,8 +543,8 @@ def runCodeGenQuery(
                 cache.putCachedData(
                     f"codeSamples{plan_idx}", code_ensemble_id, examples
                 )
-                api = API.from_task_descriptor(
-                    td, field_name, input_fields=new_json.keys()
+                api = API.from_inout_schema(
+                    inputSchema=inputSchema, outputSchema=outputSchema, field_name=field_name, input_fields=candidate_dict.keys()
                 )
                 if len(code_ensemble) == 0 or reGenerationCondition(
                     api, examples=examples
@@ -523,7 +574,16 @@ def runCodeGenQuery(
                     # construct prompt question
                     doc_schema = str(outputSchema)
                     doc_type = outputSchema.className()
-                    promptQuestion = _construct_query_prompt(td, doc_type, [field_name])
+                    promptQuestion = _construct_query_prompt(
+                        doc_type=doc_type,
+                        inputSchema=inputSchema,
+                        outputSchema=outputSchema,
+                        cardinality=cardinality,
+                        prompt_strategy=prompt_strategy,
+                        conversionDesc=conversionDesc,
+                        generate_field_names=[field_name],
+                        is_conventional=False
+                    )
                     field_stats = None
                     try:
                         # print(f"FALL BACK FIELD: {field_name}")
@@ -567,14 +627,17 @@ def runCodeGenQuery(
             drs.append(dr)
 
         # construct ConventionalQueryStats object
-        field_query_stats_lst = [
-            FieldQueryStats(gen_stats=gen_stats, field_name=field_name)
-            for field_name, gen_stats in conv_query_stats.items()
-        ]
-        conventional_query_stats = ConventionalQueryStats(
-            field_query_stats_lst=field_query_stats_lst,
-            input_fields=inputSchema.fieldNames(),
-            generated_fields=generate_field_names,
+        op_time = sum([gen_stats['op_time'] for gen_stats in conv_query_stats.values()])
+        op_cost = sum([gen_stats['op_cosr'] for gen_stats in conv_query_stats.values()])
+
+        conventional_query_stats = RecordOpStats(
+            record_uuid=candidate._uuid,
+            record_parent_uuid=candidate.parent_uuid,
+            op_id="conventional_query_123",
+            op_name="conventional_query",
+            op_time=op_time,
+            op_cost=op_cost,
+            record_stats= conv_query_stats,
         )
 
         # TODO: debug root cause
@@ -585,7 +648,7 @@ def runCodeGenQuery(
         return drs, full_code_gen_stats, conventional_query_stats
 
     else:
-        full_code_gen_stats, conv_query_stats = FullCodeGenStats(), {}
+        full_code_gen_stats, conv_query_stats = RecordOpStats(), {}
         cache = DataDirectory().getCacheService()
         for field_name in generate_field_names:
             code_ensemble_id = "_".join([op_id, field_name])
@@ -594,7 +657,7 @@ def runCodeGenQuery(
             )
             if cached_code_ensemble_info is not None:
                 code_ensemble, _ = cached_code_ensemble_info
-                gen_stats = CodeGenEnsembleStats()
+                gen_stats = RecordOpStats()
                 examples = cache.getCachedData(
                     f"codeSamples{plan_idx}", code_ensemble_id
                 )
@@ -610,8 +673,8 @@ def runCodeGenQuery(
 
             examples.append(candidate_dict)
             cache.putCachedData(f"codeSamples{plan_idx}", code_ensemble_id, examples)
-            api = API.from_task_descriptor(
-                td, field_name, input_fields=candidate_dict.keys()
+            api = API.from_inout_schema(
+                inputSchema=inputSchema, outputSchema=outputSchema, field_name=field_name, input_fields=candidate_dict.keys()
             )
             if len(code_ensemble) == 0 or reGenerationCondition(api, examples=examples):
                 code_ensemble, gen_stats = codeEnsembleGeneration(
@@ -639,7 +702,18 @@ def runCodeGenQuery(
                 # construct prompt question
                 doc_schema = str(outputSchema)
                 doc_type = outputSchema.className()
-                promptQuestion = _construct_query_prompt(td, doc_type, [field_name])
+                promptQuestion = _construct_query_prompt(
+                    promptQuestion = _construct_query_prompt(
+                    doc_type=doc_type,
+                    inputSchema=inputSchema,
+                    outputSchema=outputSchema,
+                    cardinality=cardinality,
+                    prompt_strategy=prompt_strategy,
+                    conversionDesc=None,
+                    generate_field_names=[field_name],
+                    is_conventional=False
+                    )
+                    )
                 field_stats = None
                 try:
                     # print(f"FALL BACK FIELD: {field_name}")
@@ -679,14 +753,14 @@ def runCodeGenQuery(
         #     setattr(dr, 'filename', candidate.filename)
 
         # construct ConventionalQueryStats object
-        field_query_stats_lst = [
-            FieldQueryStats(gen_stats=gen_stats, field_name=field_name)
-            for field_name, gen_stats in conv_query_stats.items()
-        ]
-        conventional_query_stats = ConventionalQueryStats(
-            field_query_stats_lst=field_query_stats_lst,
-            input_fields=inputSchema.fieldNames(),
-            generated_fields=generate_field_names,
+        conventional_query_stats = RecordOpStats(
+            record_uuid=candidate._uuid,
+            record_parent_uuid=candidate.parent_uuid,
+            op_id="conventional_query_123",
+            op_name="conventional_query",
+            op_time=sum([gen_stats['op_time'] for gen_stats in conv_query_stats.values()]),
+            op_cost=sum([gen_stats['op_cost'] for gen_stats in conv_query_stats.values()]),
+            record_stats= conv_query_stats,
         )
 
         # TODO: debug root cause

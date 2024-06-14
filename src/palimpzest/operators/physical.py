@@ -63,10 +63,12 @@ class PhysicalOperator(metaclass=ImplementationMeta):
         """Name of the physical operator."""
         return self.__class__.__name__
 
-    def physical_op_id(self, plan_position: Optional[int] = None) -> str:
-        raise NotImplementedError("physical_op_id is an abstract method")
-
-    def _compute_op_id_from_dict(self, op_dict: Dict[str, Any], plan_position: Optional[int] = None) -> str:
+    def get_op_dict(self):
+        raise NotImplementedError("You should implement get_op_dict with op specific parameters")
+    
+    # NOTE: Simplified the whole op_id flow. Now ops have to implement their get_op_dict method and this method will return the op_id
+    def get_op_id(self, plan_position: Optional[int] = None) -> str:
+        op_dict = self.get_op_dict()
         if plan_position is not None:
             op_dict["plan_position"] = plan_position
 
@@ -78,7 +80,6 @@ class PhysicalOperator(metaclass=ImplementationMeta):
             if plan_position is None
             else f"{self.op_name()}_{plan_position}_{hash}"
         )
-
         return op_id
 
     def is_hardcoded(self) -> bool:
@@ -189,14 +190,12 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
             self.shouldProfile,
         )
 
-    def physical_op_id(self, plan_position: Optional[int] = None):
-        op_dict = {
+    def get_op_dict(self):
+        return {
             "operator": self.op_name(),
             "outputSchema": str(self.outputSchema),
             "datasetIdentifier": self.datasetIdentifier,
         }
-
-        return self._compute_op_id_from_dict(op_dict, plan_position)
 
     def naiveCostEstimates(self):
         # TODO I have a strong feeling this should belong in the execution layer
@@ -239,7 +238,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
                 continue
 
             kwargs = {
-                "op_id": self.physical_op_id(),
+                "op_id": self.get_op_id(),
                 "op_name": self.op_name(),
                 "op_time": (end_time - start_time),
                 "op_cost": 0.0,
@@ -296,14 +295,12 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
             self.shouldProfile,
         )
 
-    def physical_op_id(self, plan_position: Optional[int] = None):
-        op_dict = {
+    def get_op_dict(self):
+        return {
             "operator": self.op_name(),
             "outputSchema": str(self.outputSchema),
             "datasetIdentifier": self.cacheIdentifier,
         }
-
-        return self._compute_op_id_from_dict(op_dict, plan_position)
 
     def naiveCostEstimates(self):
         # TODO: at the moment, getCachedResult() looks up a pickled file that stores
@@ -340,6 +337,7 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
         )
 
     def __call__(self) -> DataSourceIteratorFn:
+        # TODO
         def iteratorFn():
             counter = 0
             start_time = time.time()
@@ -352,7 +350,7 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
                     continue
 
                 kwargs = {
-                    "op_id": self.physical_op_id(),
+                    "op_id": self.get_op_id(),
                     "op_name": self.op_name(),
                     "op_time": (end_time - start_time),
                     "op_cost": 0.0,
@@ -407,13 +405,11 @@ class ApplyGroupByOp(PhysicalOperator):
             self.inputSchema, self.gbySig, self.targetCacheId, self.shouldProfile
         )
 
-    def physical_op_id(self, plan_position: Optional[int] = None):
-        op_dict = {
+    def get_op_dict(self):
+        return {
             "operator": self.op_name(),
             "gbySig": str(GroupBySig.serialize(self.gbySig)),
         }
-
-        return self._compute_op_id_from_dict(op_dict, plan_position)
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the groupby takes negligible additional time (and no cost in USD)
@@ -550,14 +546,11 @@ class ApplyCountAggregateOp(PhysicalOperator):
             shouldProfile=self.shouldProfile,
         )
 
-    def physical_op_id(self, plan_position: Optional[int] = None):
-        op_dict = {
+    def get_op_dict(self):
+        return {
             "operator": self.op_name(),
             "aggFunction": str(self.aggFunction)
         }
-
-        return self._compute_op_id_from_dict(op_dict, plan_position)
-
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
@@ -642,13 +635,11 @@ class ApplyAverageAggregateOp(PhysicalOperator):
             shouldProfile=self.shouldProfile,
         )
 
-    def physical_op_id(self, plan_position: Optional[int] = None):
-        op_dict = {
+    def get_op_dict(self):
+        return {
             "operator": self.op_name(),
             "aggFunction": str(self.aggFunction)
         }
-
-        return self._compute_op_id_from_dict(op_dict, plan_position)
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
@@ -736,14 +727,13 @@ class LimitScanOp(PhysicalOperator):
             shouldProfile=self.shouldProfile,
         )
 
-    def physical_op_id(self, plan_position: Optional[int] = None):
-        op_dict = {
+    def get_op_dict(self):
+        return {
             "operator": self.op_name(),
             "outputSchema": str(self.outputSchema),
             "limit": self.limit,
         }
 
-        return self._compute_op_id_from_dict(op_dict, plan_position)
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the limit takes negligible additional time (and no cost in USD)
