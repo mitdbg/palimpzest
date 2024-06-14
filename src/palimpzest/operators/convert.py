@@ -313,6 +313,7 @@ class LLMConvert(ConvertOp):
             quality=quality,
         )
 
+
     # TODO
     def __call__(self, candidate: DataRecord) -> List[DataRecordWithStats]:
         # initialize stats objects
@@ -417,6 +418,9 @@ class LLMConvert(ConvertOp):
                 model=self.model,
                 conversionDesc=self.desc,
                 prompt_strategy=self.prompt_strategy,
+                cardinality=self.cardinality,
+                plan_idx=0, # TODO DIRE need of refactor this out! 
+                op_id=op_id,
                 verbose=False
             )
             drs = [dr] if type(dr) is not list else dr

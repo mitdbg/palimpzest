@@ -1,4 +1,5 @@
 from palimpzest.constants import Model, PromptStrategy, QueryStrategy
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.operators import PhysicalOperator
 from palimpzest.planner import LogicalPlan, PhysicalPlan
 from palimpzest.utils import getModels, getVisionModels
@@ -109,7 +110,8 @@ class LogicalPlanner(Planner):
         and convert operations re-ordered.
         """
         operators = logical_plan.operators
-
+        datasetIdentifier = logical_plan.datasetIdentifier
+        print("in compute reorderings, datasetIdentifier: ", datasetIdentifier)
         all_plans, op_idx = [], 0
         while op_idx < len(operators):
             op = operators[op_idx]
@@ -117,7 +119,7 @@ class LogicalPlanner(Planner):
             # base case, if this is the first operator (currently must be a BaseScan or CacheScan)
             # then set all_plans to be the logical plan with just this operator
             if (isinstance(op, pz_ops.BaseScan) or isinstance(op, pz_ops.CacheScan)) and all_plans == []:
-                all_plans = [LogicalPlan(operators=[op])]
+                all_plans = [LogicalPlan(operators=[op], datasetIdentifier=datasetIdentifier)]
                 op_idx += 1
 
             # if this operator is not a FilteredScan or a ConvertScan: join op with each of the
@@ -164,12 +166,14 @@ class LogicalPlanner(Planner):
 
     def _construct_logical_plan(self, dataset_nodes: List[pz.Set]) -> LogicalPlan:
         operators = []
+        datasetIdentifier = None
         for idx, node in enumerate(dataset_nodes):
             uid = node.universalIdentifier()
 
             # Use cache if allowed
             if not self.no_cache and pz.datamanager.DataDirectory().hasCachedAnswer(uid):
-                op = pz_ops.CacheScan(node.schema, datasetIdentifier=uid)
+                datasetIdentifier = uid
+                op = pz_ops.CacheScan(node.schema, datasetIdentifier=datasetIdentifier)
                 operators.append(op)
                 #return LogicalPlan(operators=operators)
                 continue
@@ -177,9 +181,10 @@ class LogicalPlanner(Planner):
             # First node is DataSource
             if idx == 0:
                 assert isinstance(node, pz.datasources.DataSource)
+                datasetIdentifier = uid
                 op = pz_ops.BaseScan(
                     outputSchema=node.schema,
-                    datasetIdentifier=uid,
+                    datasetIdentifier=datasetIdentifier,
                 )
 
             # if the Set's source is another Set, apply the appropriate scan to the Set
@@ -230,7 +235,7 @@ class LogicalPlanner(Planner):
 
             operators.append(op)
 
-        return LogicalPlan(operators=operators)
+        return LogicalPlan(operators=operators, datasetIdentifier=datasetIdentifier)
 
     def generate_plans(self, dataset: pz.Dataset, sentinels: bool=False) -> List[LogicalPlan]:
         """Return a set of possible logical trees of operators on Sets."""
@@ -262,6 +267,7 @@ class LogicalPlanner(Planner):
 class PhysicalPlanner(Planner):
     def __init__(
         self,
+            # I feel that num_samples is an attribute who does not belong in the planner, but in the exeuction module: because all we use it for  here is to pass it to the physical operators (which again should have no business knowing the num samples they process)
             num_samples: Optional[int]=10,
             scan_start_idx: Optional[int]=0,
             allow_model_selection: Optional[bool]=True,
@@ -280,7 +286,7 @@ class PhysicalPlanner(Planner):
         self.allow_token_reduction = allow_token_reduction
         self.shouldProfile = shouldProfile
         self.useParallelOps = useParallelOps
-
+        print("in physical planner, allow code synth: ", allow_code_synth)
         # Ideally this gets customized by model selection, code synth, etc. etc. using strategies
         self.physical_ops = pz_ops.PHYSICAL_OPERATORS
 
@@ -410,6 +416,7 @@ class PhysicalPlanner(Planner):
 
         # otherwise, create convert op for the given set of hyper-parameters
         else:
+            assert prompt_strategy is not None, "Prompt strategy must be specified for LLMConvert"
             op = pz_ops.LLMConvert(
                 inputSchema=inputSchema,
                 outputSchema=outputSchema,
@@ -504,6 +511,7 @@ class PhysicalPlanner(Planner):
         sentinel plan is a plan with a single model which follows the naive logical
         plan implied by the user's program.
         """
+        datasetIdentifier = logical_plan.datasetIdentifier
         physical_operators = []
         for logical_op in logical_plan.operators:
             op = None
@@ -511,8 +519,10 @@ class PhysicalPlanner(Planner):
 
             if isinstance(logical_op, pz_ops.BaseScan):
                 op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
+                dataset_type = DataDirectory().getRegisteredDatasetType(datasetIdentifier)
+
                 op = op_class(outputSchema=logical_op.outputSchema,
-                              datasetIdentifier=logical_op.datasetIdentifier,
+                              dataset_type=dataset_type,
                               num_samples=self.num_samples,
                               scan_start_idx=self.scan_start_idx,
                               shouldProfile=shouldProfile,)
@@ -576,7 +586,7 @@ class PhysicalPlanner(Planner):
 
             physical_operators.append(op)
 
-        return PhysicalPlan(operators=physical_operators)
+        return PhysicalPlan(operators=physical_operators, datasetIdentifier=datasetIdentifier)
 
     def _createPhysicalPlans(self, logical_plan: LogicalPlan) -> List[PhysicalPlan]:
         """
@@ -587,7 +597,7 @@ class PhysicalPlanner(Planner):
         assert (
             len(getModels()) > 0
         ), "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
-
+        datasetIdentifier = logical_plan.datasetIdentifier
         # determine which query strategies may be used
         query_strategies = [QueryStrategy.BONDED_WITH_FALLBACK]
         if self.allow_code_synth:
@@ -605,12 +615,13 @@ class PhysicalPlanner(Planner):
             # base case, if this operator is a BaseScan set all_plans to be the physical plan with just this operator
             if isinstance(logical_op, pz_ops.BaseScan):
                 op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
+                dataset_type = DataDirectory().getRegisteredDatasetType(datasetIdentifier)
                 physical_op = op_class(outputSchema = logical_op.outputSchema,
-                              datasetIdentifier=logical_op.datasetIdentifier,
+                              dataset_type=dataset_type,
                               num_samples=self.num_samples,
                               scan_start_idx=self.scan_start_idx,
                               shouldProfile=self.shouldProfile,)
-                all_plans = [PhysicalPlan(operators=[physical_op])]
+                all_plans = [PhysicalPlan(operators=[physical_op], datasetIdentifier=datasetIdentifier)]
 
             # base case (possibly), if this operator is a CacheScan and all_plans is empty, set all_plans to be
             # the physical plan with just this operator; if all_plans is NOT empty, then merge w/all_plans
@@ -625,7 +636,7 @@ class PhysicalPlanner(Planner):
 
 
                 if all_plans == []:
-                    all_plans = [PhysicalPlan(operators=[physical_op])]
+                    all_plans = [PhysicalPlan(operators=[physical_op], datasetIdentifier=datasetIdentifier)]
                 else:
                     plans = []
                     for subplan in all_plans:
@@ -645,6 +656,7 @@ class PhysicalPlanner(Planner):
                             physical_op = self._resolveLogicalConvertOp(
                                 logical_op,
                                 query_strategy=qs,
+                                prompt_strategy=PromptStrategy.DSPY_COT_QA,
                                 shouldProfile=self.shouldProfile,
                             )
                             new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
@@ -659,6 +671,7 @@ class PhysicalPlanner(Planner):
                                     logical_op,
                                     model=model,
                                     query_strategy=qs,
+                                    prompt_strategy=PromptStrategy.DSPY_COT_QA,
                                     token_budget=token_budget,
                                     shouldProfile=self.shouldProfile,
                                 )

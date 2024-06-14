@@ -44,8 +44,12 @@ class Plan:
 
 class LogicalPlan(Plan):
 
-    def __init__(self, operators: List[LogicalOperator] = []):
+    def __init__(self, 
+                 operators: List[LogicalOperator] = [],
+                 datasetIdentifier: str = None,):
         self.operators = operators
+        self.datasetIdentifier = datasetIdentifier
+
 
     @staticmethod
     def fromOpsAndSubPlan(ops: List[LogicalOperator], subPlan: LogicalPlan) -> LogicalPlan:
@@ -68,16 +72,19 @@ class LogicalPlan(Plan):
                 nextOp.inputSchema = op.outputSchema
 
         # return the LogicalPlan
-        return LogicalPlan(fullOperators)
+        return LogicalPlan(fullOperators, subPlan.datasetIdentifier)
 
 
 class PhysicalPlan(Plan):
 
-    def __init__(self, operators: List[PhysicalOperator]):
+    def __init__(self, 
+                 operators: List[PhysicalOperator],
+                 datasetIdentifier: str = None,):
         self.operators = operators
         self.total_time = None
         self.total_cost = None
         self.quality = None
+        self.datasetIdentifier = datasetIdentifier
         # MR: Maybe we should keep the plan stats tied to the plan object for easy reference?
         #     Even if it's just by adding a setter method which pz.Execute can call after it's
         #     finished doing it's thing? I'm not sure what the use-case will be, but I imagine
@@ -95,7 +102,7 @@ class PhysicalPlan(Plan):
         copySubPlan.extend(copyOps)
 
         # return the PhysicalPlan
-        return PhysicalPlan(operators=copySubPlan)
+        return PhysicalPlan(operators=copySubPlan, datasetIdentifier=subPlan.datasetIdentifier)
 
     def __str__(self) -> str:
         """Computes a string representation for this plan."""

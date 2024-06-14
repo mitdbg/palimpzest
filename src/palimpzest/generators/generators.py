@@ -872,7 +872,9 @@ def codeEnsembleGeneration(api: API, examples: List[Dict[DataRecord, DataRecord]
     code_num_examples: int=1,           # if strategy != EXAMPLE_ENSEMBLE
     code_regenerate_frequency: int=200, # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION
 ) -> Tuple[Dict[str, str], RecordOpStats]:
-    code_ensemble = dict(); code_gen_stats = RecordOpStats()
+    code_ensemble = dict(); 
+    # TODO make this compatible with new stats refactor
+    code_gen_stats = RecordOpStats()
     if strategy == CodeGenStrategy.NONE:
         code, stats = codeGenDefault(api)
         for i in range(code_ensemble_num):

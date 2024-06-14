@@ -205,13 +205,12 @@ def runBondedQuery(
                 budget=token_budget,
                 heatmap_json_obj=heatmap_json_obj,
             )
-
             # construct BondedQueryStats object
             bonded_query_stats = RecordOpStats(
                 record_uuid=candidate._uuid,
                 record_parent_uuid=candidate._parent_uuid,
-                op_id="bonded_query_123",
-                op_name="bonded_query",
+                op_id="LLMConvert_eeaca",
+                op_name="LLMConvert",
                 op_time=gen_stats['op_time'],
                 op_cost=gen_stats['op_cost'],
                 record_state= gen_stats,
@@ -236,7 +235,7 @@ def runBondedQuery(
             # construct BondedQueryStats object
             bonded_query_stats = RecordOpStats(
                 record_uuid=candidate._uuid,
-                record_parent_uuid=candidate.parent_uuid,
+                record_parent_uuid=candidate._parent_uuid,
                 op_id="bonded_query_123",
                 op_name="bonded_query",
                 op_time=gen_stats['op_time'],
@@ -251,7 +250,13 @@ def runBondedQuery(
         # TODO
         elif prompt_strategy == PromptStrategy.FEW_SHOT:
             raise Exception("not implemented yet")
+        else:
+            raise Exception(f"Prompt strategy not implemented: {prompt_strategy}")
+    except Exception as e:
+        print(f"Bonded query processing error: {e}")
+        return None, new_heatmap_json_obj, bonded_query_stats, str(e)
 
+    try:
         # parse JSON object from the answer
         jsonObj = getJsonFromAnswer(answer)
 
@@ -278,10 +283,10 @@ def runBondedQuery(
                     candidate=candidate,
             )
             drs = [dr]
-
     except Exception as e:
-        print(f"Bonded query processing error: {e}")
+        print(f"Parsing answer error: {e}")
         return None, new_heatmap_json_obj, bonded_query_stats, str(e)
+
 
     # # TODO: debug root cause
     # for dr in drs:
@@ -337,7 +342,7 @@ def runConventionalQuery(
         split_attribute = [att for att in dct.keys() if type(dct[att]) == list][0]
         n_splits = len(dct[split_attribute])
 
-        query_stats = {}
+        query_stats = dict()
         if prompt_strategy == PromptStrategy.DSPY_COT_QA:
             # TODO Hacky to nest return and not disrupt the rest of method!!!
             # NOTE: this is a bonded query, but we are treating it as a conventional query
@@ -404,6 +409,7 @@ def runConventionalQuery(
             setattr(dr, field_name, None)
             query_stats[f"{field_name}"] = field_stats
     else:
+        query_stats = dict()
         for field_name in generate_field_names:
             # construct prompt question
             promptQuestion = _construct_query_prompt(
@@ -448,7 +454,7 @@ def runConventionalQuery(
 
     conventional_query_stats = RecordOpStats(
         record_uuid=candidate._uuid,
-        record_parent_uuid=candidate.parent_uuid,
+        record_parent_uuid=candidate._parent_uuid,
         op_id="conventional_query_123",
         op_name="conventional__query",
         op_time=op_time,
@@ -632,9 +638,9 @@ def runCodeGenQuery(
 
         conventional_query_stats = RecordOpStats(
             record_uuid=candidate._uuid,
-            record_parent_uuid=candidate.parent_uuid,
-            op_id="conventional_query_123",
-            op_name="conventional_query",
+            record_parent_uuid=candidate._parent_uuid,
+            op_id="codegen_query_123", # TODO
+            op_name="codegen_query",
             op_time=op_time,
             op_cost=op_cost,
             record_stats= conv_query_stats,
@@ -648,7 +654,16 @@ def runCodeGenQuery(
         return drs, full_code_gen_stats, conventional_query_stats
 
     else:
-        full_code_gen_stats, conv_query_stats = RecordOpStats(), {}
+        #TODO here fill real stats
+        full_code_gen_stats = RecordOpStats(
+            record_uuid=candidate._uuid,
+            record_parent_uuid=candidate._parent_uuid,
+            op_id="codegen_query_123",
+            op_name="codegen_query",
+            op_time=0,
+            op_cost=0,
+            record_state= {},
+        )
         cache = DataDirectory().getCacheService()
         for field_name in generate_field_names:
             code_ensemble_id = "_".join([op_id, field_name])
@@ -694,8 +709,9 @@ def runCodeGenQuery(
             answer, exec_stats = codeEnsembleExecution(
                 api, code_ensemble, candidate_dict
             )
-            full_code_gen_stats.code_gen_stats[field_name] = gen_stats
-            full_code_gen_stats.code_exec_stats[field_name] = exec_stats
+            # TODO refactor stats to be compatible with new RecordOpStats
+            # full_code_gen_stats.record_state[field_name] = gen_stats
+            # full_code_gen_stats.code_exec_stats[field_name] = exec_stats
 
             if answer is None:
                 print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
@@ -755,7 +771,7 @@ def runCodeGenQuery(
         # construct ConventionalQueryStats object
         conventional_query_stats = RecordOpStats(
             record_uuid=candidate._uuid,
-            record_parent_uuid=candidate.parent_uuid,
+            record_parent_uuid=candidate._parent_uuid,
             op_id="conventional_query_123",
             op_name="conventional_query",
             op_time=sum([gen_stats['op_time'] for gen_stats in conv_query_stats.values()]),

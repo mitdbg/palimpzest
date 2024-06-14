@@ -20,7 +20,8 @@ def test_enron(enron_eval):
     """Test the enron demo"""
     dataset = enron_eval
     logical = LogicalPlanner()
-    physical = PhysicalPlanner()
+    physical = PhysicalPlanner(allow_code_synth=False,
+)
 
     plans = logical.generate_plans(dataset)
     lp = plans[0]
@@ -29,7 +30,9 @@ def test_enron(enron_eval):
     pp = physicalPlans[0]
     print(pp)
 
-    records, stats= Execute(dataset, policy=pz.MinCost())
+    records, plan, stats= Execute(dataset, 
+                                  policy=pz.MinCost(),
+                                  allow_code_synth=False)
     for r in records:
         print(r)
     # execution.execute(pp)

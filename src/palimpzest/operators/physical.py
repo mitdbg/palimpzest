@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from palimpzest.constants import *
 from palimpzest.corelib import Number, Schema
+from palimpzest.corelib.schemas import File
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
@@ -153,23 +154,23 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
     def __init__(
         self,
         outputSchema: Schema,
-        datasetIdentifier: str,
+        dataset_type: str,
         num_samples: int = None,
         scan_start_idx: int = 0,
         shouldProfile=False,
     ):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
-        self.datasetIdentifier = datasetIdentifier
         self.num_samples = num_samples
         self.scan_start_idx = scan_start_idx
+        self.dataset_type = dataset_type
 
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
-            and self.datasetIdentifier == other.datasetIdentifier
             and self.outputSchema == other.outputSchema
             and self.num_samples == other.num_samples
             and self.scan_start_idx == other.scan_start_idx
+            and self.dataset_type == other.dataset_type
         )
 
     def __str__(self):
@@ -177,14 +178,14 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
             f"{self.op_name()}("
             + str(self.outputSchema)
             + ", "
-            + self.datasetIdentifier
+            + self.dataset_type
             + ")"
         )
 
     def copy(self):
         return MarshalAndScanDataOp(
             self.outputSchema,
-            self.datasetIdentifier,
+            self.dataset_type,
             self.num_samples,
             self.scan_start_idx,
             self.shouldProfile,
@@ -194,21 +195,16 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
         return {
             "operator": self.op_name(),
             "outputSchema": str(self.outputSchema),
-            "datasetIdentifier": self.datasetIdentifier,
         }
 
-    def naiveCostEstimates(self):
-        # TODO I have a strong feeling this should belong in the execution layer
-        # And datasetIdentified factored out of the logical/physical operators
-        cardinality = self.datadir.getCardinality(self.datasetIdentifier) + 1
-        size = self.datadir.getSize(self.datasetIdentifier)
+    # TODO truly refactor to have the naiveCostEstimates be transparent to cardinality and size
+    def naiveCostEstimates(self, cardinality, size):
         perRecordSizeInKb = (size / float(cardinality)) / 1024.0
 
         # estimate time spent reading each record
-        datasetType = self.datadir.getRegisteredDatasetType(self.datasetIdentifier)
         timePerRecord = (
             LOCAL_SCAN_TIME_PER_KB * perRecordSizeInKb
-            if datasetType in ["dir", "file"]
+            if self.dataset_type in ["dir", "file"]
             else MEMORY_SCAN_TIME_PER_KB * perRecordSizeInKb
         )
 
@@ -220,37 +216,27 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
             quality=1.0,
         )
 
-    def __call__(self) -> Tuple[List[DataRecord], List[RecordOpStats]]:
-        # Copilot magic
-        num_samples = self.num_samples if self.num_samples else float("inf")
-
+    def __call__(self, candidate) -> Tuple[DataRecord, RecordOpStats]:
+        """ candidate is an individual file path 
+        TODO find the right abstraction for the input candidate"""
         start_time = time.time()
-        records = []
-        stats = []
-        dataset = self.datadir.getRegisteredDataset(self.datasetIdentifier)
-        for idx, record in enumerate(dataset):
-            end_time = time.time()
-            if idx > num_samples:
-                break
+        record = DataRecord(File, scan_idx=candidate['idx'])
+        record.filename = candidate['path']
+        # record.filename = os.path.basename(candidate['path'])
+        with open(candidate['path'], "rb") as f:
+            record.contents = f.read()
+        end_time = time.time()
 
-            if idx < self.scan_start_idx:
-                start_time = time.time()
-                continue
-
-            kwargs = {
-                "op_id": self.get_op_id(),
-                "op_name": self.op_name(),
-                "op_time": (end_time - start_time),
-                "op_cost": 0.0,
-                "record_stats": None,
-                "op_details": self.__dict__,
-            }
-            record_op_stats = RecordOpStats.from_record_and_kwargs(record, **kwargs)
-
-            records.append(record)
-            stats.append(record_op_stats)
-
-        return records, stats
+        kwargs = {
+            "op_id": self.get_op_id(),
+            "op_name": self.op_name(),
+            "op_time": (end_time - start_time),
+            "op_cost": 0.0,
+            "record_stats": None,
+            "op_details": self.__dict__,
+        }
+        record_op_stats = RecordOpStats.from_record_and_kwargs(record, **kwargs)
+        return record, record_op_stats
 
 class CacheScanDataOp(DataSourcePhysicalOperator):
     implemented_op = logical.CacheScan
@@ -302,7 +288,7 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
             "datasetIdentifier": self.cacheIdentifier,
         }
 
-    def naiveCostEstimates(self):
+    def naiveCostEstimates(self, cardinality, size):
         # TODO: at the moment, getCachedResult() looks up a pickled file that stores
         #       the cached data specified by self.cacheIdentifier, opens the file,
         #       and then returns an iterator over records in the pickled file.
@@ -317,12 +303,6 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
         #       At a minimum, we could use this function call to load the data into DataManager._cache
         #       since we have to iterate over it anyways; which would cache the data before the __iter__
         #       method below gets called.
-        cached_data_info = [
-            (1, sys.getsizeof(data))
-            for data in self.datadir.getCachedResult(self.cacheIdentifier)
-        ]
-        cardinality = sum(list(map(lambda tup: tup[0], cached_data_info))) + 1
-        size = sum(list(map(lambda tup: tup[1], cached_data_info)))
         perRecordSizeInKb = (size / float(cardinality)) / 1024.0
 
         # estimate time spent reading each record

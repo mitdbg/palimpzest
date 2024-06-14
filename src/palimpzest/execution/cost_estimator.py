@@ -7,6 +7,7 @@ Notes: 2. why is _estimate_plan cost a hidden function? Probably we should only 
 """
 
 from __future__ import annotations
+import sys
 
 from palimpzest.constants import GPT_4_MODEL_CARD, Model, MODEL_CARDS, QueryStrategy
 from palimpzest.planner import PhysicalPlan
@@ -202,7 +203,7 @@ class CostEstimator:
 
         def _is_correct(row):
             # simple equality check suffices for filter
-            if "filter" in row["op_name"]:
+            if "filter" in row["op_name"].lower():
                 return row["answer"] == row["accepted_answer"]
 
             # otherwise, check equality on a per-key basis
@@ -210,7 +211,6 @@ class CostEstimator:
                 # we'll measure recal on accepted_answer, as extraneous info is often not an issue
                 answer = row["answer"]
                 accepted_answer = row["accepted_answer"]
-
                 tp = 0
                 for key, value in accepted_answer.items():
                     if key in answer and answer[key] == value:
@@ -319,11 +319,21 @@ class CostEstimator:
             op_id = op.get_op_id()
 
             # initialize estimates of operator metrics based on naive (but sometimes precise) logic
-            op_estimates = (
-                op.naiveCostEstimates()
-                if isinstance(op, pz.MarshalAndScanDataOp) or isinstance(op, pz.CacheScanDataOp)
-                else op.naiveCostEstimates(source_op_estimates)
-            )
+            if isinstance(op, pz.MarshalAndScanDataOp):
+                # TODO raise card/size one level further
+                cardinality = op.datadir.getCardinality(physical_plan.datasetIdentifier) + 1
+                size = op.datadir.getSize(physical_plan.datasetIdentifier)
+                op_estimates = op.naiveCostEstimates(cardinality, size)
+            elif isinstance(op, pz.CacheScanDataOp):
+                cached_data_info = [
+                    (1, sys.getsizeof(data))
+                    for data in op.datadir.getCachedResult(op.cacheIdentifier)
+                ]
+                cardinality = sum(list(map(lambda tup: tup[0], cached_data_info))) + 1
+                size = sum(list(map(lambda tup: tup[1], cached_data_info)))
+
+            else:
+                op_estimates =  op.naiveCostEstimates(source_op_estimates)
 
             # if we have sample execution data, update naive estimates with more informed ones
             if sample_op_estimates is not None and op_id in sample_op_estimates:
