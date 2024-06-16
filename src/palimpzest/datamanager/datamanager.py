@@ -228,16 +228,14 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
     #
     def getCachedResult(self, cacheId):
         """Return a cached result."""
+        cachedResult = None
         if not cacheId in self._cache:
-            return None
+            return cachedResult
+
         with open(self._cache[cacheId], "rb") as f:
             cachedResult = pickle.load(f)
 
-        def iterateOverCachedResult():
-            for x in cachedResult:
-                yield x
-
-        return iterateOverCachedResult()
+        return MemorySource(cachedResult, cacheId)
 
     def clearCache(self, keep_registry=False):
         """Clear the cache."""

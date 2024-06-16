@@ -5,7 +5,7 @@ from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import DataRecord
 from palimpzest.operators.convert import ConvertOp, LLMConvert
-from palimpzest.operators.physical import DataSourcePhysicalOperator, LimitScanOp
+from palimpzest.operators.physical import DataSourcePhysicalOperator, LimitScanOp, MarshalAndScanDataOp, CacheScanDataOp
 from palimpzest.operators.filter import FilterOp
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
@@ -136,7 +136,7 @@ class SimpleExecution(ExecutionEngine):
                 all_physical_plans.append(physical_plan)
 
         # construct the CostEstimator with any sample execution data we've gathered
-        cost_estimator = CostEstimator(sample_execution_data)
+        cost_estimator = CostEstimator(sample_execution_data, self.source_dataset_id)
 
         # estimate the cost of each plan
         plans = cost_estimator.estimate_plan_costs(all_physical_plans)
@@ -274,10 +274,6 @@ class SimpleExecution(ExecutionEngine):
             if not isinstance(op, DataSourcePhysicalOperator)
         }
 
-        # get handle to DataSource and pre-compute its size
-        datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
-        datasource_size = datasource.getSize()
-
         # if num_samples is not provided, set it to infinity
         num_samples = num_samples if num_samples is not None else float("inf")
 
@@ -289,6 +285,14 @@ class SimpleExecution(ExecutionEngine):
             for op_idx, operator in enumerate(plan.operators):
                 op_id = operator.get_op_id()
                 if isinstance(operator, DataSourcePhysicalOperator) and keep_scanning_source_records:
+                    # get handle to DataSource and pre-compute its size
+                    datasource = (
+                        self.datadir.getRegisteredDataset(self.source_dataset_id)
+                        if isinstance(operator, MarshalAndScanDataOp)
+                        else self.datadir.getCachedResult(operator.cachedDataIdentifier)
+                    )
+                    datasource_size = datasource.getSize()
+
                     # construct input DataRecord for DataSourcePhysicalOperator
                     candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=self.current_scan_idx)
                     candidate.idx = self.current_scan_idx

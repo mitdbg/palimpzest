@@ -111,6 +111,9 @@ DSPY_TIME_INFLATION = 2.0
 # size of the input.
 FEW_SHOT_PROMPT_INFLATION = 1.25
 
+# a naive estimate for the input record size
+NAIVE_EST_SOURCE_RECORD_SIZE_IN_BYTES = 1_000_000
+
 # a naive estimate for filter selectivity
 NAIVE_EST_FILTER_SELECTIVITY = 0.5
 

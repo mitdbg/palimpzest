@@ -172,20 +172,16 @@ class LogicalPlanner(Planner):
 
             # Use cache if allowed
             if not self.no_cache and pz.datamanager.DataDirectory().hasCachedAnswer(uid):
-                datasetIdentifier = uid
-                op = pz_ops.CacheScan(node.schema, datasetIdentifier=datasetIdentifier)
+                op = pz_ops.CacheScan(node.schema, cachedDataIdentifier=uid)
                 operators.append(op)
                 #return LogicalPlan(operators=operators)
                 continue
 
-            # First node is DataSource
+            # first node is DataSource
             if idx == 0:
                 assert isinstance(node, pz.datasources.DataSource)
                 datasetIdentifier = uid
-                op = pz_ops.BaseScan(
-                    outputSchema=node.schema,
-                    datasetIdentifier=datasetIdentifier,
-                )
+                op = pz_ops.BaseScan(outputSchema=node.schema)
 
             # if the Set's source is another Set, apply the appropriate scan to the Set
             else:
@@ -530,7 +526,7 @@ class PhysicalPlanner(Planner):
             elif isinstance(logical_op, pz_ops.CacheScan):
                 op_class = self.logical_physical_map[type(logical_op)][0]
                 op = op_class(outputSchema=logical_op.outputSchema,
-                                cacheIdentifier=logical_op.cachedDataIdentifier,
+                                cachedDataIdentifier=logical_op.cachedDataIdentifier,
                                 num_samples=self.num_samples,
                                 scan_start_idx=self.scan_start_idx,
                                 shouldProfile=shouldProfile,
@@ -628,7 +624,7 @@ class PhysicalPlanner(Planner):
             elif isinstance(logical_op, pz_ops.CacheScan):
                 op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
                 physical_op = op_class(outputSchema=logical_op.outputSchema,
-                                cacheIdentifier=logical_op.cachedDataIdentifier,
+                                cachedDataIdentifier=logical_op.cachedDataIdentifier,
                                 num_samples=self.num_samples,
                                 scan_start_idx=self.scan_start_idx,
                                 shouldProfile=self.shouldProfile,

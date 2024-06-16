@@ -9,7 +9,9 @@ Notes: 2. why is _estimate_plan cost a hidden function? Probably we should only 
 from __future__ import annotations
 import sys
 
-from palimpzest.constants import GPT_4_MODEL_CARD, Model, MODEL_CARDS, QueryStrategy
+from palimpzest.constants import Cardinality, GPT_4_MODEL_CARD, Model, MODEL_CARDS, QueryStrategy
+from palimpzest.dataclasses import OperatorCostEstimates
+from palimpzest.datamanager import DataDirectory
 from palimpzest.planner import PhysicalPlan
 from palimpzest.utils import getModels
 
@@ -28,7 +30,10 @@ class CostEstimator:
     This class takes in a list of SampleExecutionData and exposes a function which uses this data
     to perform cost estimation on a list of physical plans.
     """
-    def __init__(self, sample_execution_data: List[SampleExecutionData] = []):
+    def __init__(self, source_dataset_id: str, sample_execution_data: List[SampleExecutionData] = []):
+        # store source dataset id to help with estimating cardinalities
+        self.source_dataset_id = source_dataset_id
+
         # construct full dataset of samples
         self.sample_execution_data_df = (
             pd.DataFrame(sample_execution_data)
@@ -40,12 +45,9 @@ class CostEstimator:
         # determine the set of operators which may use a distinct model
         self.MODEL_OPERATORS = ["LLMFilter", "LLMConvert"]
 
-    # GV: Does it make sense to have static and private method?
-    # MR: My understanding, which may be wrong / overly-simplified, is that:
-    #     "static" == "doesn't rely on self or cls", and
-    #     "private" == "does not need to be called from outside of this class"
-    #
-    #     so I thought this fit? but maybe I'm wrong
+        # reference to data directory
+        self.datadir = DataDirectory()
+
     @staticmethod
     def _est_time_per_record(
         op_df: pd.DataFrame, model_name: Optional[str] = None, agg: str = "mean"
@@ -320,17 +322,45 @@ class CostEstimator:
 
             # initialize estimates of operator metrics based on naive (but sometimes precise) logic
             if isinstance(op, pz.MarshalAndScanDataOp):
-                # TODO raise card/size one level further
-                cardinality = op.datadir.getCardinality(physical_plan.datasetIdentifier) + 1
-                size = op.datadir.getSize(physical_plan.datasetIdentifier)
-                op_estimates = op.naiveCostEstimates(cardinality, size)
+                # get handle to DataSource and pre-compute its size (number of records)
+                datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
+                datasource_size = datasource.getSize()
+
+                source_op_estimates = OperatorCostEstimates(
+                    cardinality=datasource_size,
+                    time_per_record=0.0,
+                    cost_per_record=0.0,
+                    quality=1.0,
+                )
+
+                kwargs = {
+                    "input_cardinality": datasource.cardinality,
+                }
+
+                op_estimates = op.naiveCostEstimates(source_op_estimates, **kwargs)
+
             elif isinstance(op, pz.CacheScanDataOp):
-                cached_data_info = [
-                    (1, sys.getsizeof(data))
-                    for data in op.datadir.getCachedResult(op.cacheIdentifier)
-                ]
-                cardinality = sum(list(map(lambda tup: tup[0], cached_data_info))) + 1
-                size = sum(list(map(lambda tup: tup[1], cached_data_info)))
+                datasource = self.datadir.getCachedResult(op.cachedDataIdentifier)
+                datasource_size = datasource.getSize()
+
+                source_op_estimates = OperatorCostEstimates(
+                    cardinality=datasource_size,
+                    time_per_record=0.0,
+                    cost_per_record=0.0,
+                    quality=1.0,
+                )
+
+                total_size_in_bytes = sum([
+                    sys.getsizeof(datasource.getItem(idx))
+                    for idx in range(datasource.getSize())
+                ])
+                per_record_size_in_bytes = total_size_in_bytes / datasource_size
+                kwargs = {
+                    "input_cardinality": Cardinality.ONE_TO_ONE,
+                    "per_record_size_in_bytes": per_record_size_in_bytes,
+                }
+
+                op_estimates = op.naiveCostEstimates(source_op_estimates, **kwargs)
 
             else:
                 op_estimates =  op.naiveCostEstimates(source_op_estimates)

@@ -101,7 +101,6 @@ class PhysicalOperator(metaclass=ImplementationMeta):
         - cardinality
         - time_per_record
         - cost_per_record
-        - output_tokens_per_record
         - quality
 
         The function takes an argument which contains the OperatorCostEstimates
@@ -122,13 +121,17 @@ class DataSourcePhysicalOperator(PhysicalOperator):
     a candidate DataRecord as input (because they produce them). Thus, we use
     a slightly modified abstract base class for these operators.
     """
-    def naiveCostEstimates(self) -> OperatorCostEstimates:
+    def naiveCostEstimates(
+        self,
+        source_op_cost_estimates: OperatorCostEstimates,
+        **kwargs: Dict[str, Any],
+    ) -> OperatorCostEstimates:
         """
+        In addition to 
         This function returns a naive estimate of this operator's:
         - cardinality
         - time_per_record
         - cost_per_record
-        - output_tokens_per_record
         - quality
     
         For the implemented operator. These will be used by the CostEstimator
@@ -149,21 +152,15 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
         self,
         outputSchema: Schema,
         dataset_type: str,
-        num_samples: int = None,
-        scan_start_idx: int = 0,
         shouldProfile=False,
     ):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
-        self.num_samples = num_samples
-        self.scan_start_idx = scan_start_idx
         self.dataset_type = dataset_type
 
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
             and self.outputSchema == other.outputSchema
-            and self.num_samples == other.num_samples
-            and self.scan_start_idx == other.scan_start_idx
             and self.dataset_type == other.dataset_type
         )
 
@@ -180,8 +177,6 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
         return MarshalAndScanDataOp(
             self.outputSchema,
             self.dataset_type,
-            self.num_samples,
-            self.scan_start_idx,
             self.shouldProfile,
         )
 
@@ -191,16 +186,29 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
             "outputSchema": str(self.outputSchema),
         }
 
-    # TODO: have this estimate the per-record output cardinality (?)
-    # TODO truly refactor to have the naiveCostEstimates be transparent to cardinality and size
-    def naiveCostEstimates(self, cardinality, size):
-        perRecordSizeInKb = (size / float(cardinality)) / 1024.0
+    def naiveCostEstimates(
+        self,
+        source_op_cost_estimates: OperatorCostEstimates,
+        **kwargs: Dict[str, Any],
+    ) -> OperatorCostEstimates:
+        # get inputs needed for naive cost estimation
+        input_record_size_in_bytes = kwargs["input_record_size_in_bytes"]
+        input_cardinality = kwargs["input_cardinality"]
+        # TODO: we should rename cardinality --> "multiplier" or "selectivity" one-to-one / one-to-many
 
         # estimate time spent reading each record
+        perRecordSizeInKb = input_record_size_in_bytes / 1024.0
         timePerRecord = (
             LOCAL_SCAN_TIME_PER_KB * perRecordSizeInKb
             if self.dataset_type in ["dir", "file"]
             else MEMORY_SCAN_TIME_PER_KB * perRecordSizeInKb
+        )
+
+        # estimate output cardinality
+        cardinality = (
+            source_op_cost_estimates.cardinality
+            if input_cardinality == Cardinality.ONE_TO_ONE
+            else source_op_cost_estimates.cardinality * NAIVE_EST_ONE_TO_MANY_SELECTIVITY
         )
 
         # for now, assume no cost per record for reading data
@@ -242,22 +250,16 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
     def __init__(
         self,
         outputSchema: Schema,
-        cacheIdentifier: str,
-        num_samples: int = None,
-        scan_start_idx: int = 0,
+        cachedDataIdentifier: str,
         shouldProfile=False,
     ):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
-        self.cacheIdentifier = cacheIdentifier
-        self.num_samples = num_samples
-        self.scan_start_idx = scan_start_idx
+        self.cachedDataIdentifier = cachedDataIdentifier
 
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
-            and self.cacheIdentifier == other.cacheIdentifier
-            and self.num_samples == other.num_samples
-            and self.scan_start_idx == other.scan_start_idx
+            and self.cachedDataIdentifier == other.cachedDataIdentifier
             and self.outputSchema == other.outputSchema
         )
 
@@ -266,16 +268,14 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
             f"{self.op_name()}("
             + str(self.outputSchema)
             + ", "
-            + self.cacheIdentifier
+            + self.cachedDataIdentifier
             + ")"
         )
 
     def copy(self):
         return CacheScanDataOp(
             self.outputSchema,
-            self.cacheIdentifier,
-            self.num_samples,
-            self.scan_start_idx,
+            self.cachedDataIdentifier,
             self.shouldProfile,
         )
 
@@ -283,29 +283,29 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
         return {
             "operator": self.op_name(),
             "outputSchema": str(self.outputSchema),
-            "datasetIdentifier": self.cacheIdentifier,
+            "cachedDataIdentifier": self.cachedDataIdentifier,
         }
 
-    # TODO: refactor as well
-    def naiveCostEstimates(self, cardinality, size):
-        # TODO: at the moment, getCachedResult() looks up a pickled file that stores
-        #       the cached data specified by self.cacheIdentifier, opens the file,
-        #       and then returns an iterator over records in the pickled file.
-        #
-        #       I'm guessing that in the future we may want to load the cached data into
-        #       the DataDirectory._cache object on __init__ (or in the background) so
-        #       that this operation doesn't require a read from disk. If that happens, be
-        #       sure to switch LOCAL_SCAN_TIME_PER_KB --> MEMORY_SCAN_TIME_PER_KB; and store
-        #       metadata about the cardinality and size of cached data upfront so that we
-        #       can access it in constant time.
-        #
-        #       At a minimum, we could use this function call to load the data into DataManager._cache
-        #       since we have to iterate over it anyways; which would cache the data before the __iter__
-        #       method below gets called.
-        perRecordSizeInKb = (size / float(cardinality)) / 1024.0
+    def naiveCostEstimates(
+        self, 
+        source_op_cost_estimates: OperatorCostEstimates,
+        **kwargs: Dict[str, Any],
+    ):
+        # get inputs needed for naive cost estimation
+        input_cardinality = kwargs["input_cardinality"]
+        per_record_size_in_bytes = kwargs["per_record_size_in_bytes"]
+        # TODO: we should rename cardinality --> "multiplier" or "selectivity" one-to-one / one-to-many
 
         # estimate time spent reading each record
+        perRecordSizeInKb = per_record_size_in_bytes / 1024.0
         timePerRecord = LOCAL_SCAN_TIME_PER_KB * perRecordSizeInKb
+
+        # estimate output cardinality
+        cardinality = (
+            source_op_cost_estimates.cardinality
+            if input_cardinality == Cardinality.ONE_TO_ONE
+            else source_op_cost_estimates.cardinality * NAIVE_EST_ONE_TO_MANY_SELECTIVITY
+        )
 
         # for now, assume no cost per record for reading from cache
         return OperatorCostEstimates(
