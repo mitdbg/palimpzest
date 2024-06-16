@@ -1,26 +1,16 @@
 from __future__ import annotations
 
 from palimpzest.datamanager import DataDirectory
-from palimpzest.corelib import File, Number, Schema
+from palimpzest.corelib import Number, Schema
 from palimpzest.elements import (
     AggregateFunction,
     Filter,
     UserFunction,
     GroupBySig,
 )
-from palimpzest.operators import (
-    ApplyAggregateFunction,
-    BaseScan,
-    CacheScan,
-    ConvertScan,
-    FilteredScan,
-    LimitScan,
-    LogicalOperator,
-    GroupByAggregate,
-)
-from palimpzest.datasources import DataSource, DirectorySource, FileSource, MemorySource
+from palimpzest.datasources import DataSource, DirectorySource, FileSource
 
-from typing import List, Union
+from typing import List, Optional, Union
 
 import hashlib
 import json
@@ -172,100 +162,16 @@ class Set:
         result = hashlib.sha256(ordered.encode()).hexdigest()
         return result
 
+    def dataSourceId(self) -> Optional[str]:
+        """
+        Return the dataset_id of the DataSource if this Set's source is a DataSource.
+        Otherwise return None.
+        """
+        return self._source.dataset_id if isinstance(self._source, DataSource) else None
+
     def jsonSchema(self):
         """Return the JSON schema for this Set."""
         return self.schema.jsonSchema()
-
-    def dumpSyntacticTree(self):
-        """Return the syntactic tree of this Set."""
-        if isinstance(self._source, DataSource):
-            return (self, None)
-
-        return (self, self._source.dumpSyntacticTree())
-
-        # def _deprecated_getLogicalTree(self, *args, **kwargs) -> LogicalOperator:
-        """
-        DEPRECATION: Use a LogicalPlanner() and create a LogicalPlan()
-        Return the logical tree of operators on Sets."""
-        # set _num_samples, _scan_start_idx, and _nocache if specified
-        self._num_samples = kwargs.get("num_samples", None)
-        self._scan_start_idx = kwargs.get("scan_start_idx", 0)
-        self._nocache = kwargs.get("nocache", False)
-
-        # first, check to see if this set has previously been cached
-        uid = self.universalIdentifier()
-        if not self._nocache and DataDirectory().hasCachedAnswer(uid):
-            return CacheScan(self.schema, uid, self._num_samples, self._scan_start_idx)
-
-        # otherwise, if this Set's source is a DataSource
-        if isinstance(self._source, DataSource):
-            dataset_id = self._source.universalIdentifier()
-            sourceSchema = self._source.schema
-
-            if self.schema == sourceSchema:
-                return BaseScan(
-                    self.schema, dataset_id, self._num_samples, self._scan_start_idx
-                )
-            else:
-                return ConvertScan(
-                    self.schema,
-                    BaseScan(
-                        sourceSchema,
-                        dataset_id,
-                        self._num_samples,
-                        self._scan_start_idx,
-                    ),
-                    targetCacheId=uid,
-                )
-
-        # if the Set's source is another Set, apply the appropriate scan to the Set
-        if self._filter is not None:
-            return FilteredScan(
-                self.schema,
-                self._source._deprecated_getLogicalTree(*args, **kwargs),
-                self._filter,
-                self._depends_on,
-                targetCacheId=uid,
-            )
-        elif self._groupBy is not None:
-            return GroupByAggregate(
-                self.schema,
-                self._source._deprecated_getLogicalTree(*args, **kwargs),
-                self._groupBy,
-                targetCacheId=uid,
-            )
-        elif self._aggFunc is not None:
-            return ApplyAggregateFunction(
-                self.schema,
-                self._source._deprecated_getLogicalTree(*args, **kwargs),
-                self._aggFunc,
-                targetCacheId=uid,
-            )
-        elif self._limit is not None:
-            return LimitScan(
-                self.schema,
-                self._source._deprecated_getLogicalTree(*args, **kwargs),
-                self._limit,
-                targetCacheId=uid,
-            )
-        elif self._fnid is not None:
-            return ApplyUserFunction(
-                self.schema,
-                self._source._deprecated_getLogicalTree(*args, **kwargs),
-                self._fnid,
-                targetCacheId=uid,
-            )
-        elif not self.schema == self._source.schema:
-            return ConvertScan(
-                self.schema,
-                self._source._deprecated_getLogicalTree(*args, **kwargs),
-                self._cardinality,
-                self._image_conversion,
-                self._depends_on,
-                targetCacheId=uid,
-            )
-        else:
-            return self._source._deprecated_getLogicalTree(*args, **kwargs)
 
 
 class Dataset(Set):
@@ -283,13 +189,15 @@ class Dataset(Set):
 
     def __init__(self, source: Union[str, DataSource], *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
-        super().__init__(source=source, *args, **kwargs)
-
-        self._source = (
+        source = (
             DataDirectory().getRegisteredDataset(source)
             if isinstance(source, str)
             else source
         )
+
+        # intialize class
+        super().__init__(source=source, *args, **kwargs)
+
         if type(self._depends_on) == str:
             self._depends_on = [self._depends_on]
 

@@ -609,7 +609,7 @@ if __name__ == "__main__":
 
     elif task == "streaming":
         # register the ephemeral dataset
-        datasetid = "ephemeral:githubtest"
+        datasetid = "githubtest"
         owner = "mikecafarella"
         repo = "palimpzest"
         url = f"https://api.github.com/repos/{owner}/{repo}/commits"
