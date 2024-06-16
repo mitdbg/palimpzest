@@ -1,11 +1,5 @@
 from palimpzest.constants import MAX_ROWS
-from palimpzest.corelib import (
-    BytesField,
-    Field,
-    ListField,
-    NumericField,
-    StringField,
-)
+from palimpzest.corelib.fields import *
 from typing import Any, Dict, List
 
 import json
@@ -162,6 +156,16 @@ class OperatorDerivedSchema(Schema):
 # "Core" useful Schemas. These are Schemas that almost everyone will need.
 # File, TextFile, Image, PDF, etc.
 ###################################################################################
+class SourceRecord(Schema):
+    """
+    Schema used inside of Execution.execute_dag to produce a candidate for operators
+    which implement the BaseScan or CacheScan logical operators.
+    """
+    idx = NumericField(desc="The scan index of the record", required=True)
+    get_item_fn = CallableField(desc="The get_item() function from the DataSource", required=True)
+    cardinality = StringField(desc="The cardinality of the datasource", required=True)
+
+
 class File(Schema):
     """
     A File is defined by two Fields:

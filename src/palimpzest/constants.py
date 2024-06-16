@@ -59,6 +59,14 @@ class CodeGenStrategy(Enum):
     ADVICE_ENSEMBLE = "advice-ensemble"
     ADVICE_ENSEMBLE_WITH_VALIDATION = "advice-ensemble-with-validation"
 
+class Cardinality(Enum):
+    ONE_TO_ONE = "one-to-one"
+    ONE_TO_MANY = "one-to-many"
+
+class PlanType(Enum):
+    SENTINEL = "Sentinel Plan"
+    FINAL = "Final Plan"
+
 # character limit(s) for different IDs
 MAX_OP_ID_CHARS = 6
 

@@ -53,6 +53,14 @@ class BooleanField(Field):
     def jsonSchema(self) -> Dict[str, str]:
         return {"description": self._desc, "type": "boolean"}
 
+class CallableField(Field):
+    """A CallableField is a Field that stores a function."""
+
+    def __init__(self, desc: str, required: bool = False):
+        super().__init__(desc=desc, required=required)
+
+    def jsonSchema(self) -> Dict[str, str]:
+        return {"description": self._desc, "type": "callable"}
 
 class StringField(Field):
     """A StringField is a Field that is definitely a string of text."""

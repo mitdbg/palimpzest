@@ -1,6 +1,7 @@
+from palimpzest.constants import Cardinality
 from palimpzest.corelib import File, Number, Schema
 from palimpzest.elements import DataRecord
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Dict, List, Union
 
 import os
 
@@ -32,11 +33,18 @@ class AbstractDataSource:
     def schema(self) -> Schema:
         return self.schema
 
+    def getSize(self) -> int:
+        raise NotImplementedError(f"You are calling this method from an abstract class.")
+
+    def getItem(self, idx: int) -> DataRecord:
+        raise NotImplementedError(f"You are calling this method from an abstract class.")
+
 
 class DataSource(AbstractDataSource):
-    def __init__(self, schema: Schema, dataset_id: str) -> None:
+    def __init__(self, schema: Schema, dataset_id: str, cardinality: Cardinality = Cardinality.ONE_TO_ONE) -> None:
         super().__init__(schema)
         self.dataset_id = dataset_id
+        self.cardinality = cardinality
 
     def universalIdentifier(self):
         """Return a unique identifier for this Set."""
@@ -54,14 +62,15 @@ class MemorySource(DataSource):
         super().__init__(Number, dataset_id)
         self.vals = vals
 
-    def __iter__(self) -> Callable[[], DataRecord]:
-        def valIterator():
-            for idx, v in enumerate(self.vals):
-                dr = DataRecord(self.schema, scan_idx=idx)
-                dr.value = v
-                yield dr
+    def getSize(self):
+        return len(self.vals)
 
-        return valIterator()
+    def getItem(self, idx: int):
+        value = self.vals[idx]
+        dr = DataRecord(self.schema, scan_idx=idx)
+        dr.value = value
+
+        return dr
 
 
 class DirectorySource(DataSource):
@@ -69,23 +78,11 @@ class DirectorySource(DataSource):
 
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(File, dataset_id)
-        self.path = path
-        self.idx = 0
-
-    def __iter__(self) -> Callable[[], DataRecord]:
-        def filteredIterator():
-            for filename in sorted(os.listdir(self.path)):
-                file_path = os.path.join(self.path, filename)
-                if os.path.isfile(file_path):
-                    dr = DataRecord(self.schema, scan_idx=self.idx)
-                    dr.filename = file_path
-                    with open(file_path, "rb") as f:
-                        dr.contents = f.read()
-                    yield dr
-
-                    self.idx += 1
-
-        return filteredIterator()
+        self.filepaths = [
+            os.path.join(path, filename)
+            for filename in sorted(os.listdir(path))
+            if os.path.isfile(os.path.join(path, filename))
+        ]
 
     def serialize(self) -> Dict[str, Any]:
         return {
@@ -94,28 +91,25 @@ class DirectorySource(DataSource):
             "source_type": "directory",
         }
 
+    def getSize(self):
+        return len(self.filepaths)
+
+    def getItem(self, idx: int):
+        filepath = self.filepaths[idx]
+        dr = DataRecord(self.schema, scan_idx=idx)
+        dr.filename = filepath
+        with open(filepath, "rb") as f:
+            dr.contents = f.read()
+
+        return dr
+
 
 class FileSource(DataSource):
     """FileSource returns a single File object from a single real-world local file"""
 
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(File, dataset_id)
-        self.path = path
-        self.idx = 0
-
-    def __iter__(self) -> Callable[[], DataRecord]:
-        def filteredIterator():
-            for path in [self.path]:
-                dr = DataRecord(self.schema, scan_idx=self.idx)
-                dr.filename = path
-                with open(path, "rb") as f:
-                    dr.contents = f.read()
-
-                yield dr
-
-                self.idx += 1
-
-        return filteredIterator()
+        self.filepath = path
 
     def serialize(self) -> Dict[str, Any]:
         return {
@@ -124,21 +118,23 @@ class FileSource(DataSource):
             "source_type": "file",
         }
 
+    def getSize(self):
+        return 1
+
+    def getItem(self, idx: int):
+        dr = DataRecord(self.schema, scan_idx=idx)
+        dr.filename = self.filepath
+        with open(self.filepath, "rb") as f:
+            dr.contents = f.read()
+
+        return dr
+
 
 class UserSource(DataSource):
     """UserSource is a DataSource that is created by the user and not loaded from a file"""
 
-    def __init__(self, schema: Schema, dataset_id: str) -> None:
-        super().__init__(schema, dataset_id)
-
-    def __iter__(self) -> Callable[[], DataRecord]:
-        def userIterator():
-            return self.userImplementedIterator()
-
-        return userIterator()
-
-    def userImplementedIterator(self) -> Callable[[], DataRecord]:
-        raise Exception("User sources must implement their own iterator.")
+    def __init__(self, schema: Schema, dataset_id: str, cardinality: Cardinality = Cardinality.ONE_TO_ONE) -> None:
+        super().__init__(schema, dataset_id, cardinality)
 
     def serialize(self) -> Dict[str, Any]:
         return {
@@ -147,7 +143,7 @@ class UserSource(DataSource):
         }
 
     def getSize(self):
-        return 100  # this should be overridden
+        raise NotImplementedError("User needs to implement this method.")
 
-    def getCardinality(self):
-        return 100  # this should be overridden
+    def getItem(self):
+        raise NotImplementedError("User needs to implement this method.")

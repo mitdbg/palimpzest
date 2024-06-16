@@ -92,7 +92,7 @@ class PhysicalOperator(metaclass=ImplementationMeta):
     def copy(self) -> PhysicalOperator:
         raise NotImplementedError("__copy___ on abstract class")
 
-    def __call__(self, candidate: Any) -> List[DataRecordWithStats]:
+    def __call__(self, candidate: DataRecord) -> List[DataRecordWithStats]:
         raise NotImplementedError("Using __call__ from abstract method")
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
@@ -139,12 +139,6 @@ class DataSourcePhysicalOperator(PhysicalOperator):
         at least ballpark correct estimates of this quantity).
         """
         raise NotImplementedError("Abstract method")
-
-    def __call__(self) -> Tuple[List[DataRecord], List[RecordOpStats]]:
-        raise NotImplementedError(f"You are calling this method from an abstract class.")
-
-    def __iter__(self) -> DataSourceIteratorFn:
-        raise Exception("This method is legacy.")
 
 
 class MarshalAndScanDataOp(DataSourcePhysicalOperator):
@@ -197,6 +191,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
             "outputSchema": str(self.outputSchema),
         }
 
+    # TODO: have this estimate the per-record output cardinality (?)
     # TODO truly refactor to have the naiveCostEstimates be transparent to cardinality and size
     def naiveCostEstimates(self, cardinality, size):
         perRecordSizeInKb = (size / float(cardinality)) / 1024.0
@@ -216,15 +211,14 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
             quality=1.0,
         )
 
-    def __call__(self, candidate) -> Tuple[DataRecord, RecordOpStats]:
-        """ candidate is an individual file path 
-        TODO find the right abstraction for the input candidate"""
+    def __call__(self, candidate: DataRecord) -> List[DataRecordWithStats]:
+        """
+        This function takes the candidate -- which is a DataRecord with a SourceRecord schema --
+        and invokes its get_item_fn on the given idx to return the next DataRecord from the DataSource.
+        """
         start_time = time.time()
-        record = DataRecord(File, scan_idx=candidate['idx'])
-        record.filename = candidate['path']
-        # record.filename = os.path.basename(candidate['path'])
-        with open(candidate['path'], "rb") as f:
-            record.contents = f.read()
+        output = candidate.get_item_fn(candidate.idx)
+        records = [output] if candidate.cardinality == Cardinality.ONE_TO_ONE else output
         end_time = time.time()
 
         kwargs = {
@@ -235,8 +229,12 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
             "record_stats": None,
             "op_details": self.__dict__,
         }
-        record_op_stats = RecordOpStats.from_record_and_kwargs(record, **kwargs)
-        return record, record_op_stats
+        record_op_stats_lst = []
+        for record in records:
+            record_op_stats = RecordOpStats.from_record_and_kwargs(record, **kwargs)
+            record_op_stats_lst.append(record_op_stats)
+
+        return records, record_op_stats_lst
 
 class CacheScanDataOp(DataSourcePhysicalOperator):
     implemented_op = logical.CacheScan
@@ -288,6 +286,7 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
             "datasetIdentifier": self.cacheIdentifier,
         }
 
+    # TODO: refactor as well
     def naiveCostEstimates(self, cardinality, size):
         # TODO: at the moment, getCachedResult() looks up a pickled file that stores
         #       the cached data specified by self.cacheIdentifier, opens the file,
@@ -316,37 +315,26 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
             quality=1.0,
         )
 
-    def __call__(self) -> DataSourceIteratorFn:
-        # TODO
-        def iteratorFn():
-            counter = 0
-            start_time = time.time()
-            for idx, nextCandidate in enumerate(
-                self.datadir.getCachedResult(self.cacheIdentifier)
-            ):
-                end_time = time.time()
-                if idx < self.scan_start_idx:
-                    start_time = time.time()
-                    continue
+    def __call__(self, candidate: DataRecord) -> List[DataRecordWithStats]:
+        start_time = time.time()
+        output = candidate.get_item_fn(candidate.idx)
+        records = [output] if candidate.cardinality == Cardinality.ONE_TO_ONE else output
+        end_time = time.time()
 
-                kwargs = {
-                    "op_id": self.get_op_id(),
-                    "op_name": self.op_name(),
-                    "op_time": (end_time - start_time),
-                    "op_cost": 0.0,
-                    "record_stats": None,
-                    "op_details": self.__dict__,
-                }
-                record_op_stats = RecordOpStats.from_record_and_kwargs(nextCandidate, **kwargs)
+        kwargs = {
+            "op_id": self.get_op_id(),
+            "op_name": self.op_name(),
+            "op_time": (end_time - start_time),
+            "op_cost": 0.0,
+            "record_stats": None,
+            "op_details": self.__dict__,
+        }
+        record_op_stats_lst = []
+        for record in records:
+            record_op_stats = RecordOpStats.from_record_and_kwargs(record, **kwargs)
+            record_op_stats_lst.append(record_op_stats)
 
-                yield nextCandidate, record_op_stats
-
-                if self.num_samples:
-                    counter += 1
-                    if counter >= self.num_samples:
-                        break
-
-        return iteratorFn()
+        return records, record_op_stats_lst
 
 
 class ApplyGroupByOp(PhysicalOperator):
