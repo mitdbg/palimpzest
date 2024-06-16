@@ -111,45 +111,25 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
     def registerLocalDirectory(self, path, dataset_id):
         """Register a local directory as a data source."""
         self._registry[dataset_id] = ("dir", path)
-        if not dataset_id.startswith("ephemeral"):
-            with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
-                pickle.dump(self._registry, f)
+        with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
+            pickle.dump(self._registry, f)
 
     def registerLocalFile(self, path, dataset_id):
         """Register a local file as a data source."""
         self._registry[dataset_id] = ("file", path)
-        if not dataset_id.startswith("ephemeral"):
-            with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
-                pickle.dump(self._registry, f)
+        with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
+            pickle.dump(self._registry, f)
 
     def registerDataset(self, vals, dataset_id):
         """Register an in-memory dataset as a data source"""
         self._registry[dataset_id] = ("memory", vals)
-        if not dataset_id.startswith("ephemeral"):
-            with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
-                pickle.dump(self._registry, f)
+        with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
+            pickle.dump(self._registry, f)
 
     def registerUserSource(self, src: UserSource, dataset_id: str):
         """Register a user source as a data source."""
+        # user sources are always ephemeral
         self._registry[dataset_id] = ("user", src)
-
-    #        # user sources are always ephemeral
-
-    def registerUserFunction(self, udf: UserFunction):
-        """Register a user function as a data source."""
-        self._registry[udf.udfid] = ("udf", udf)
-        # user functions are always ephemeral
-
-    def getUserFunction(self, udfid):
-        """Return a user function from the registry."""
-        if not udfid in self._registry:
-            raise Exception("Cannot find user function", udfid, "in the registry.")
-
-        entry, rock = self._registry[udfid]
-        if entry == "udf":
-            return rock
-        else:
-            raise Exception("Unknown entry type")
 
     def getRegisteredDataset(self, dataset_id):
         """Return a dataset from the registry."""
@@ -308,8 +288,3 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
         entry, path = self._registry[dataset_id]
         return path
-
-
-# TODO: can we remove this?
-DataDirectory().registerUserFunction(DownloadHTMLFunction())
-DataDirectory().registerUserFunction(DownloadBinaryFunction())
