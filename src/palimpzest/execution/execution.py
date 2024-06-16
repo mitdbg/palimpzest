@@ -264,8 +264,10 @@ class SimpleExecution(ExecutionEngine):
         Helper function which executes the physical plan. This function is overly complex for today's
         plans which are simple cascades -- but is designed with an eye towards 
         """
-        # initialize list of output records and the number of input records scanned
-        output_records, source_records_scanned = [], 0
+        # initialize list of output records and intermediate variables
+        output_records = []
+        source_records_scanned = 0
+        datasource_size = 0
 
         # initialize processing queues for each operation
         processing_queues = {
