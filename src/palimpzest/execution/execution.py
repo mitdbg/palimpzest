@@ -116,7 +116,7 @@ class SimpleExecution(ExecutionEngine):
         scan_start_idx = self.num_samples if run_sentinels else 0
         logical_planner = LogicalPlanner(self.nocache)
         physical_planner = PhysicalPlanner(
-            num_samples=self.num_samples,
+            num_samples=self.num_samples, # TODO: remove?
             scan_start_idx=scan_start_idx,
             allow_model_selection=self.allow_model_selection,
             allow_code_synth=self.allow_code_synth,
@@ -298,6 +298,8 @@ class SimpleExecution(ExecutionEngine):
         while not finished_executing:
             for op_idx, operator in enumerate(plan.operators):
                 op_id = operator.get_op_id()
+
+                # TODO: if self.useParallelOps is True; execute each operator with parallelism
                 if isinstance(operator, DataSourcePhysicalOperator) and keep_scanning_source_records:
                     # get handle to DataSource and pre-compute its size
                     datasource = (
@@ -324,7 +326,7 @@ class SimpleExecution(ExecutionEngine):
                     print(f"Processing operator {op_id} - queue length: {len(processing_queues[op_id])}")
                     input_record = processing_queues[op_id].pop(0)
                     records, record_op_stats = operator(input_record)
-                    record_op_stats_lst = [record_op_stats]
+                    record_op_stats_lst = record_op_stats
 
                 # update plan stats
                 op_stats = plan_stats.operator_stats[op_id]
@@ -346,6 +348,8 @@ class SimpleExecution(ExecutionEngine):
                 # TODO some operator is not returning a singleton list
                 if type(records) != type([]):
                     records = [records]
+
+                # TODO: manage the cache here
 
                 # update processing_queues or output_records
                 for record in records:
@@ -455,22 +459,22 @@ class SimpleExecution(ExecutionEngine):
                 if record_op_stats.record_state is not None:
                     observation_arguments.update({
                     "total_input_tokens": (
-                        record_op_stats.record_stats["total_input_tokens"]
+                        record_op_stats.record_details["total_input_tokens"]
                         if "total_input_tokens" in record_op_stats.record_state
                         else None
                     ),
                     "total_output_tokens": (
-                        record_op_stats.record_stats["total_output_tokens"]
+                        record_op_stats.record_details["total_output_tokens"]
                         if "total_output_tokens" in record_op_stats.record_state
                         else None
                     ),
                     "total_input_cost": (
-                        record_op_stats.record_stats["total_input_cost"]
+                        record_op_stats.record_details["total_input_cost"]
                         if "total_input_cost" in record_op_stats.record_state
                         else None
                     ),
                     "total_output_cost": (
-                        record_op_stats.record_stats["total_output_cost"]
+                        record_op_stats.record_details["total_output_cost"]
                         if "total_output_cost" in record_op_stats.record_state
                         else None
                     ),

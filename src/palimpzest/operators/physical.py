@@ -235,8 +235,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
             "op_name": self.op_name(),
             "op_time": (end_time - start_time),
             "op_cost": 0.0,
-            "record_stats": None,
-            "op_details": self.__dict__,
+            "record_details": None,
         }
         record_op_stats_lst = []
         for record in records:
@@ -327,8 +326,7 @@ class CacheScanDataOp(DataSourcePhysicalOperator):
             "op_name": self.op_name(),
             "op_time": (end_time - start_time),
             "op_cost": 0.0,
-            "record_stats": None,
-            "op_details": self.__dict__,
+            "record_details": None,
         }
         record_op_stats_lst = []
         for record in records:

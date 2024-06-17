@@ -37,7 +37,7 @@ from palimpzest.profiler.attentive_trim import (
 )
 
 # DEFINITIONS
-GenerationOutput = Tuple[str, RecordOpStats]
+GenerationOutput = Tuple[str, Dict[str, Any]]
 
 
 def get_api_key(key: str) -> str:
@@ -450,12 +450,15 @@ class DSPyGenerator(BaseGenerator):
         answer_log_probs = self._get_answer_log_probs(dspy_lm, pred.answer)
         usage, finish_reason = self._get_usage_and_finish_reason(dspy_lm)
 
-        # collect statistics on prompt, usage, and timing        
+        # collect statistics on prompt, usage, and timing
+        usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
+        usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
+        input_tokens = usage["prompt_tokens"]
+        output_tokens = usage["completion_tokens"]
         stats={
             "model_name": self.model_name,
-            "op_time": end_time - start_time,
-            # "llm_call_duration_secs": end_time - start_time,
-            "op_cost": 0.0, #TODO ?
+            "llm_call_duration_secs": end_time - start_time,
+            "op_cost": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
             "prompt": dspy_lm.history[-1]["prompt"],
             "usage": usage,
             "finish_reason": finish_reason,
@@ -495,7 +498,7 @@ class DSPyGenerator(BaseGenerator):
         if self.verbose:
             print(pred.answer)
 
-        # taken reduction post processing if enabled
+        # token reduction post processing if enabled
         if (
             budget < 1.0
             and self.prompt_strategy == PromptStrategy.DSPY_COT_QA

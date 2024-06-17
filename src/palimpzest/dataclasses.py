@@ -32,10 +32,7 @@ class RecordOpStats:
     record_state: Dict[str, Any]
 
     # an OPTIONAL dictionary with more detailed information about the processing of this record
-    record_stats: Dict[str, Any] = None
-
-    # an OPTIONAL dictionary with more detailed information about the operation processing this record
-    op_details: Dict[str, Any] = None
+    record_details: Dict[str, Any] = None
 
     def to_dict(self):
         return asdict(self)
@@ -50,8 +47,7 @@ class RecordOpStats:
             op_time=kwargs['op_time'],
             op_cost=kwargs['op_cost'],
             record_state=record._asDict(include_bytes=False),
-            record_stats=kwargs.get('record_stats', None),
-            op_details=kwargs.get('op_details', None),
+            record_details=kwargs.get('record_details', None),
         )
 
 @dataclass
