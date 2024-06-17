@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from palimpzest.generators.generators import DSPyGenerator
-from .physical import PhysicalOperator
+from .physical import PhysicalOperator, DataRecordWithStats
 
 from palimpzest.constants import *
+from palimpzest.dataclasses import RecordOpStats
 from palimpzest.corelib import Schema
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.elements import *
@@ -13,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import concurrent
 import multiprocessing
+import time
 
 
 class FilterOp(PhysicalOperator):
@@ -169,22 +171,30 @@ class NonLLMFilter(FilterOp):
             quality=1.0,
         )
 
-    # TODO: modify to support parallel execution and RecordOpStats collection
-    def __call__(self, candidate: DataRecord):
-        # start_time = time.time()
+    def __call__(self, candidate: DataRecord) -> List[DataRecordWithStats]:
+        # apply filter to input record
+        start_time = time.time()
         result = self.filter.filterFn(candidate)
-        # fn_call_duration_secs = time.time() - start_time
-        # if profiling, set record's stats for the given op_id
-        # if shouldProfile:
-        # candidate._stats[td.op_id] = FilterNonLLMStats(
-        # fn_call_duration_secs=fn_call_duration_secs,
-        # filter=str(td.filter.filterFn),
-        # )
-        # set _passed_filter attribute and return record
-        setattr(candidate, "_passed_filter", result)
-        print(f"ran filter function on {candidate}")
+        filter_fn_call_duration_secs = time.time() - start_time
 
-        return candidate
+        # set _passed_filter attribute
+        setattr(candidate, "_passed_filter", result)
+
+        # create RecordOpStats object
+        record_details = {
+            "filter_fn_call_duration_secs": filter_fn_call_duration_secs,
+            "filter_str": self.filter.getFilterStr()
+        }
+        kwargs = {
+            "op_id": self.get_op_id(),
+            "op_name": self.op_name(),
+            "op_time": filter_fn_call_duration_secs,
+            "op_cost": 0.0,
+            "record_details": record_details,
+        }
+        record_op_stats = RecordOpStats.from_record_and_kwargs(candidate, **kwargs)
+
+        return [candidate], [record_op_stats]
 
 
 class LLMFilter(FilterOp):
@@ -264,16 +274,12 @@ class LLMFilter(FilterOp):
             quality=quality,
         )
 
-    # TODO: modify to support parallel execution and RecordOpStats collection
     def __call__(self, candidate: DataRecord)-> Tuple[DataRecord, RecordOpStats]:
+        start_time = time.time()
+
         # compute record schema and type
         doc_schema = str(self.inputSchema)
         doc_type = self.inputSchema.className()
-
-        # TODO: is this needed anymore?
-        # do not filter candidate if it doesn't match inputSchema
-        if not candidate.schema == self.inputSchema:
-            return False
 
         # create generator
         generator = None
@@ -297,41 +303,47 @@ class LLMFilter(FilterOp):
 
         # invoke LLM to generate filter decision (True or False)
         text_content = candidate._asJSON(include_bytes=False)
-        gen_stats = None
+        record_op_stats, gen_stats = None, None
         try:
             response, _, gen_stats = generator.generate(
                 context=text_content,
                 question=self.filter.filterCondition,
             )
-            record_op_stats = RecordOpStats(
-                record_uuid=candidate._uuid,
-                record_parent_uuid=candidate._parent_uuid,
-                op_id=self.get_op_id(),
-                op_name=self.op_name(),
-                op_time=gen_stats['op_time'],
-                op_cost=gen_stats['op_cost'],
-                record_state= gen_stats,                
-            )
-            # if profiling, set record's stats for the given op_id
-            # if shouldProfile:
-            # candidate._stats[td.op_id] = FilterLLMStats(
-            # gen_stats=gen_stats, filter=td.filter.filterCondition
-            # )
+
+            # create RecordOpStats object
+            record_details = {
+                "filter_str": self.filter.getFilterStr(),
+                **gen_stats,
+            }
+            kwargs = {
+                "op_id": self.get_op_id(),
+                "op_name": self.op_name(),
+                "op_time": time.time() - start_time,
+                "op_cost": gen_stats['op_cost'],
+                "record_details": record_details,
+            }
+            record_op_stats = RecordOpStats.from_record_and_kwargs(candidate, **kwargs)
 
             # set _passed_filter attribute and return record
             setattr(candidate, "_passed_filter", "true" in response.lower())
+
         except Exception as e:
             # If there is an exception consider the record as not passing the filter
             print(f"Error invoking LLM for filter: {e}")
             setattr(candidate, "_passed_filter", False)
-            record_op_stats = RecordOpStats(
-                record_uuid=candidate._uuid,
-                record_parent_uuid=candidate._parent_uuid,
-                op_id=self.get_op_id(),
-                op_name=self.op_name(),
-                op_time=0,
-                op_cost=0,
-                record_state= {}
-            )
 
-        return candidate, record_op_stats
+            # create RecordOpStats object
+            record_details = {
+                "filter_str": self.filter.getFilterStr(),
+                **gen_stats,
+            }
+            kwargs = {
+                "op_id": self.get_op_id(),
+                "op_name": self.op_name(),
+                "op_time": time.time() - start_time,
+                "op_cost": gen_stats['op_cost'],
+                "record_details": record_details,
+            }
+            record_op_stats = RecordOpStats.from_record_and_kwargs(candidate, **kwargs)
+
+        return [candidate], [record_op_stats]

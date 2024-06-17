@@ -17,6 +17,7 @@ import pandas as pd
 
 import json
 import modal
+import time
 
 
 class HardcodedConvert(ConvertOp):
@@ -75,20 +76,25 @@ class ConvertFileToText(HardcodedConvert):
     inputSchema = schemas.File
     outputSchema = schemas.TextFile
 
-    # TODO
     def __call__(self, candidate: DataRecord):
+        start_time = time.time()
 
-        if not candidate.schema == self.inputSchema:
-            return None
         text_content = str(candidate.contents, "utf-8")
         dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
         dr.filename = candidate.filename
         dr.contents = text_content
-        # if profiling, set record's stats for the given op_id to be an empty Stats object
-        # if shouldProfile:
-        # candidate._stats[td.op_id] = ConvertNonLLMStats()
 
-        return [dr], None
+        # create RecordOpStats object
+        kwargs = {
+            "op_id": self.get_op_id(),
+            "op_name": self.op_name(),
+            "op_time": time.time() - start_time,
+            "op_cost": 0.0,
+            "record_details": None,
+        }
+        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+
+        return [dr], [record_op_stats]
 
 
 class ConvertImageToEquation(HardcodedConvert):
@@ -109,39 +115,66 @@ class ConvertImageToEquation(HardcodedConvert):
             quality=1.0,
         )
 
-    # TODO
     def __call__(self, candidate: DataRecord):
-        print("handling image to equation through skema")
-        if not candidate.schema == self.inputSchema:
-            return None
+        start_time = time.time()
 
         dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
         dr.filename = candidate.filename
         dr.contents = candidate.contents
-        dr.equation_text, api_stats = equations_to_latex(candidate.contents)
-        print("Running equations_to_latex_base64: ", dr.equation_text)
-        # if profiling, set record's stats for the given op_id
-        # if shouldProfile:
-        # dr._stats[td.op_id] = ConvertNonLLMStats(api_stats=api_stats)
-        return [dr], None
+
+        api_start_time = time.time()
+        dr.equation_text = equations_to_latex(candidate.contents)
+        api_call_duration_secs = time.time() - api_start_time
+
+        # create RecordOpStats object
+        kwargs = {
+            "op_id": self.get_op_id(),
+            "op_name": self.op_name(),
+            "op_time": time.time() - start_time,
+            "op_cost": 0.0,
+            "record_details": {"api_call_duration_secs": api_call_duration_secs},
+        }
+        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+
+        return [dr], [record_op_stats]
 
 
 class ConvertDownloadToFile(HardcodedConvert):
+    """
+    NOTE: I am happy leaving this as-is for now, but in the long(er) term I think
+    we should look back at our demos and either:
+
+    (A) extract the pieces that generalize across workloads, or
+    (B) move demo-specific code into user-supported classes
+
+    For example, similar to how we have user-defined DataSources, we should soon
+    support a user-defined hard-coded convert operation. This class could then be
+    implemented as a hard-coded convert (or be better generalized).
+    """
 
     inputSchema = schemas.Download
     outputSchema = schemas.File
 
-    # TODO
     def __call__(self, candidate: DataRecord):
-        if not candidate.schema == self.inputSchema:
-            return None
-        dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
+        start_time = time.time()
+
         # Assign a filename that is parsed from the URL
+        # NOTE: will this generalize? if not, it should be moved into a user-specific class
+        dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
         dr.filename = candidate.url.split("/")[-1]
         dr.contents = candidate.content
-        # if shouldProfile:
-        # candidate._stats[td.op_id] = ConvertNonLLMStats()
-        return [dr], None
+
+        # create RecordOpStats object
+        kwargs = {
+            "op_id": self.get_op_id(),
+            "op_name": self.op_name(),
+            "op_time": time.time() - start_time,
+            "op_cost": 0.0,
+            "record_details": None,
+        }
+        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+
+        return [dr], [record_op_stats]
 
 
 class ConvertFileToXLS(HardcodedConvert):
@@ -149,20 +182,31 @@ class ConvertFileToXLS(HardcodedConvert):
     inputSchema = schemas.File
     outputSchema = schemas.XLSFile
 
-    # TODO
     def __call__(self, candidate: DataRecord):
-        if not candidate.schema == self.inputSchema:
-            return None
+        start_time = time.time()
+        
         dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
         dr.filename = candidate.filename
         dr.contents = candidate.contents
-        # start_time = time.time()
+        
+        api_start_time = time.time()
         xls = pd.ExcelFile(BytesIO(candidate.contents), engine="openpyxl")
-        # api_stats = ApiStats(api_call_duration_secs=time.time() - start_time)
+        api_call_duration_secs = time.time() - api_start_time
+
         dr.number_sheets = len(xls.sheet_names)
         dr.sheet_names = xls.sheet_names
-        # if shouldProfile:
-        # candidate._stats[td.op_id] = ConvertNonLLMStats(api_stats=api_stats)
+
+        # create RecordOpStats object
+        kwargs = {
+            "op_id": self.get_op_id(),
+            "op_name": self.op_name(),
+            "op_time": time.time() - start_time,
+            "op_cost": 0.0,
+            "record_details": {"api_call_duration_secs": api_call_duration_secs},
+        }
+        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+
+        return [dr], [record_op_stats]
 
 
 class ConvertXLSToTable(HardcodedConvert):
@@ -170,23 +214,22 @@ class ConvertXLSToTable(HardcodedConvert):
     inputSchema = schemas.XLSFile
     outputSchema = schemas.Table
 
-    # TODO
     def __call__(self, candidate: DataRecord):
+        start_time = time.time()
         cardinality = self.cardinality
-
         xls_bytes = candidate.contents
         # dr.sheets = [xls.parse(name) for name in candidate.sheet_names]
         sheet_names = (
             [candidate.sheet_names[0]] if cardinality == "oneToOne" else candidate.sheet_names
         )
 
-        records = []
+        records, record_op_stats_lst = [], []
         for sheet_name in sheet_names:
-            # start_time = time.time()
+            api_start_time = time.time()
             dataframe = pd.read_excel(
                 BytesIO(xls_bytes), sheet_name=sheet_name, engine="openpyxl"
             )
-            # api_stats = ApiStats(api_call_duration_secs=time.time() - start_time)
+            api_call_duration_secs = time.time() - api_start_time
 
             # TODO extend number of rows with dynamic sizing of context length
             # construct data record
@@ -200,10 +243,22 @@ class ConvertXLSToTable(HardcodedConvert):
             dr.header = dataframe.columns.values.tolist()
             dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
 
-            # if shouldProfile:
-            # dr._stats[td.op_id] = ConvertNonLLMStats(api_stats=api_stats)
+            # create RecordOpStats object
+            kwargs = {
+                "op_id": self.get_op_id(),
+                "op_name": self.op_name(),
+                "op_time": time.time() - start_time,
+                "op_cost": 0.0,
+                "record_details": {"api_call_duration_secs": api_call_duration_secs},
+            }
+            record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+
+            # update start_time, records, and record_op_stats_lst
+            start_time = time.time()
             records.append(dr)
-        return records, None
+            record_op_stats_lst.append(record_op_stats)
+
+        return records, record_op_stats_lst
 
 
 class ConvertFileToPDF(HardcodedConvert):
@@ -248,8 +303,8 @@ class ConvertFileToPDF(HardcodedConvert):
             quality=1.0,
         )
 
-    # TODO
     def __call__(self, candidate: DataRecord):
+        start_time = time.time()
         if self.pdfprocessor == "modal":
             print("handling PDF processing remotely")
             remoteFunc = modal.Function.lookup(
@@ -263,7 +318,7 @@ class ConvertFileToPDF(HardcodedConvert):
         pdf_filename = candidate.filename
 
         # generate text_content from PDF
-        # start_time = time.time()
+        api_start_time = time.time()
         if remoteFunc is not None:
             docJsonStr = remoteFunc.remote([pdf_bytes])
             docdict = json.loads(docJsonStr[0])
@@ -273,28 +328,27 @@ class ConvertFileToPDF(HardcodedConvert):
                 text_content += p.text
         else:
             text_content = get_text_from_pdf(candidate.filename, candidate.contents)
-
-        # construct an ApiStats object to reflect time spent waiting
-        # api_stats = ApiStats(api_call_duration_secs=time.time() - start_time)
+        api_call_duration_secs = time.time() - api_start_time
 
         # construct data record
         dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
         dr.filename = pdf_filename
         dr.contents = pdf_bytes
         dr.text_contents = text_content[:10000]  # TODO Very hacky
-        # if profiling, set record's stats for the given op_id
-        # if shouldProfile:
-        # dr._stats[td.op_id] = ConvertNonLLMStats(api_stats=api_stats)
-        return [dr], None
+
+        # create RecordOpStats object
+        kwargs = {
+            "op_id": self.get_op_id(),
+            "op_name": self.op_name(),
+            "op_time": time.time() - start_time,
+            "op_cost": 0.0,
+            "record_details": {"api_call_duration_secs": api_call_duration_secs},
+        }
+        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+
+        return [dr], [record_op_stats]
 
 
-# NOTE 1: My motivation for making this inherit from HardcodedConvert is that I have at least one place
-#         in the CostEstimator where it would be nice to simply check if an operator is an instance of HardcodedConvert
-# NOTE 2: I realize that this does not match the convention of having an inputSchema
-#         and outputSchema which can be checked against self.__class__.inputSchema
-#         and self.__class__.outputSchema. But, since it is a hard-coded convert operation,
-#         I feel like having this inherit from HardcodedConvert and overriding the __init__
-#         is a middle-ground
 class SimpleTypeConvert(HardcodedConvert):
     """This is a very simple function that converts a DataRecord from one Schema to another, when we know they have identical fields."""
 
@@ -305,23 +359,24 @@ class SimpleTypeConvert(HardcodedConvert):
             self.inputSchema == self.outputSchema
         ), "This convert has to be instantiated to convert an input to the same output Schema!"
 
-    # TODO
     def __call__(self, candidate: DataRecord):
-        if not candidate.schema == self.inputSchema:
-            return None
+        start_time = time.time()
 
         dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
         for field in self.outputSchema.fieldNames():  # type: ignore
-
-            # TODO: I think we can drop the if/elif since we check candidate.schema == self.inputSchema above?
             if hasattr(candidate, field):
                 setattr(dr, field, getattr(candidate, field))
             elif field.required:
                 return None
 
-        # TODO profiling should be done somewhere else
-        # if profiling, set record's stats for the given op_id to be an empty Stats object
-        # if self.shouldProfile:
-        # candidate._stats[td.op_id] = ConvertNonLLMStats()
+        # create RecordOpStats object
+        kwargs = {
+            "op_id": self.get_op_id(),
+            "op_name": self.op_name(),
+            "op_time": time.time() - start_time,
+            "op_cost": 0.0,
+            "record_details": None,
+        }
+        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
 
-        return [dr], None
+        return [dr], [record_op_stats]
