@@ -324,20 +324,19 @@ class CostEstimator:
             if isinstance(op, pz.MarshalAndScanDataOp):
                 # get handle to DataSource and pre-compute its size (number of records)
                 datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
-                datasource_size = datasource.getSize()
+                datasource_len = datasource.getSize()
+                datasource_memsize = datasource.getMemorySize()
 
                 source_op_estimates = OperatorCostEstimates(
-                    cardinality=datasource_size,
+                    cardinality=datasource_len,
                     time_per_record=0.0,
                     cost_per_record=0.0,
                     quality=1.0,
                 )
 
-                kwargs = {
-                    "input_cardinality": datasource.cardinality,
-                }
-
-                op_estimates = op.naiveCostEstimates(source_op_estimates, **kwargs)
+                op_estimates = op.naiveCostEstimates(source_op_estimates,
+                                                     input_cardinality=datasource.cardinality,
+                                                     input_record_size_in_bytes=datasource_memsize/datasource_len)
 
             elif isinstance(op, pz.CacheScanDataOp):
                 datasource = self.datadir.getCachedResult(op.cachedDataIdentifier)

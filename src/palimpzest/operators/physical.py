@@ -153,6 +153,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
         outputSchema: Schema,
         dataset_type: str,
         shouldProfile=False,
+        *args, **kwargs
     ):
         super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
         self.dataset_type = dataset_type
@@ -167,7 +168,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
     def __str__(self):
         return (
             f"{self.op_name()}("
-            + str(self.outputSchema)
+            + str(self.outputSchema) 
             + ", "
             + self.dataset_type
             + ")"
@@ -189,11 +190,11 @@ class MarshalAndScanDataOp(DataSourcePhysicalOperator):
     def naiveCostEstimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
+        input_cardinality,
+        input_record_size_in_bytes,
         **kwargs: Dict[str, Any],
     ) -> OperatorCostEstimates:
         # get inputs needed for naive cost estimation
-        input_record_size_in_bytes = kwargs["input_record_size_in_bytes"]
-        input_cardinality = kwargs["input_cardinality"]
         # TODO: we should rename cardinality --> "multiplier" or "selectivity" one-to-one / one-to-many
 
         # estimate time spent reading each record

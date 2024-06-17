@@ -83,6 +83,7 @@ class DirectorySource(DataSource):
             for filename in sorted(os.listdir(path))
             if os.path.isfile(os.path.join(path, filename))
         ]
+        self.path=path
 
     def serialize(self) -> Dict[str, Any]:
         return {
@@ -91,6 +92,12 @@ class DirectorySource(DataSource):
             "source_type": "directory",
         }
 
+    # Consider making this the getSize method?
+    def getMemorySize(self):
+        # Get the memory size of the files in the directory
+        return sum([os.path.getsize(filepath) for filepath in self.filepaths])
+
+    # Consider making this the __len__ method?
     def getSize(self):
         return len(self.filepaths)
 

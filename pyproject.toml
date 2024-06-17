@@ -78,6 +78,7 @@ namespaces = false
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning",
+    "ignore::ResourceWarning",
 ]
 
 [build-system]

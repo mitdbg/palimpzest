@@ -41,7 +41,7 @@ class SimpleExecution(ExecutionEngine):
             useParallelOps: Optional[bool]=False,
         ) -> None:
         self.num_samples = num_samples
-        self.current_scan_idx = scan_start_idx
+        self.scan_start_idx = scan_start_idx
         self.nocache = nocache
         self.include_baselines = include_baselines
         self.min_plans = min_plans
@@ -136,7 +136,8 @@ class SimpleExecution(ExecutionEngine):
                 all_physical_plans.append(physical_plan)
 
         # construct the CostEstimator with any sample execution data we've gathered
-        cost_estimator = CostEstimator(sample_execution_data, self.source_dataset_id)
+        cost_estimator = CostEstimator(source_dataset_id=self.source_dataset_id,
+                                       sample_execution_data=sample_execution_data)
 
         # estimate the cost of each plan
         plans = cost_estimator.estimate_plan_costs(all_physical_plans)
@@ -168,17 +169,17 @@ class SimpleExecution(ExecutionEngine):
         num_sentinel_plans = len(sentinel_plans)
 
         all_sample_execution_data, return_records = [], []
-        # results = list(map(lambda x:
-        #         self.execute_plan(*x),
-        #         [(plan, idx, "Sentinel Plan") for idx, plan in enumerate(sentinel_plans)],
-        #     )
-        # )
-        with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
-            results = list(executor.map(lambda x:
-                    self.execute_plan(*x),
-                    [(plan, idx, "Sentinel Plan") for idx, plan in enumerate(sentinel_plans)],
-                )
+        results = list(map(lambda x:
+                self.execute_plan(*x),
+                [(plan, idx, PlanType.SENTINEL) for idx, plan in enumerate(sentinel_plans)],
             )
+        )
+        # with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
+        #     results = list(executor.map(lambda x:
+        #             self.execute_plan(*x),
+        #             [(plan, idx, PlanType.SENTINEL) for idx, plan in enumerate(sentinel_plans)],
+        #         )
+        #     )
 
         sentinel_records, sentinel_stats = zip(*results)
         for records, plan_stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
@@ -195,12 +196,13 @@ class SimpleExecution(ExecutionEngine):
 
         return all_sample_execution_data, return_records # TODO: make sure you capture cost of sentinel plans.
 
-    def _execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats):
+    def _execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: Optional[int] = None):
         """
         Helper function which executes the physical plan. This function is overly complex for today's
         plans which are simple cascades -- but is designed with an eye towards 
         """
         output_records = []
+        current_scan_idx = self.scan_start_idx
         # execute the plan until either:
         # 1. all records have been processed, or
         # 2. the final limit operation has completed
@@ -210,8 +212,8 @@ class SimpleExecution(ExecutionEngine):
             # TODO: Is it okay to have call return a list?
             if isinstance(operator, DataSourcePhysicalOperator):
                 idx=0
-                out_records, record_op_stats_lst = [], []
-                num_samples = self.num_samples if self.num_samples else float("inf")
+                out_records, out_stats_lst = [], []
+                num_samples = num_samples if num_samples else float("inf")
 
                 ds = operator.datadir.getRegisteredDataset(plan.datasetIdentifier)
                 for filename in sorted(os.listdir(ds.path)):
@@ -219,17 +221,24 @@ class SimpleExecution(ExecutionEngine):
                     if os.path.isfile(file_path):
                         if idx > num_samples:
                             break
-                        candidate = {"path": file_path, 
-                                     "idx": idx}
-                        record, record_op_stats = operator(candidate)
-                        out_records.append(record)
-                        record_op_stats_lst.append(record_op_stats)
+                        datasource = (
+                            self.datadir.getRegisteredDataset(self.source_dataset_id)
+                            if isinstance(operator, MarshalAndScanDataOp)
+                            else self.datadir.getCachedResult(operator.cachedDataIdentifier)
+                        )
+                        candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
+                        candidate.idx = current_scan_idx
+                        candidate.get_item_fn = datasource.getItem
+                        candidate.cardinality = datasource.cardinality
+                        record, record_op_stats_lst = operator(candidate)
+                        out_records.extend(record)
+                        out_stats_lst.extend(record_op_stats_lst)
                         # Incrementing here bc folder may contain subfolders
                         idx += 1
             else:
                 input_records = out_records
                 out_records = []
-                record_op_stats_lst = []
+                out_stats_lst = []
                 for idx,input_record in enumerate(input_records):
                     if isinstance(operator, LimitScanOp) and idx == operator.limit:
                         break
@@ -246,10 +255,10 @@ class SimpleExecution(ExecutionEngine):
                             if not record._passed_filter:
                                 continue
                         out_records.append(record)
-                    record_op_stats_lst.append(record_op_stats)
+                    out_stats_lst.append(record_op_stats)
 
             # TODO code a nice __add__ function for OperatorStats and RecordOpStats
-            for record_op_stats in record_op_stats_lst:
+            for record_op_stats in out_stats_lst:
                 x = plan_stats.operator_stats[op_id]
                 x.record_op_stats_lst.append(record_op_stats)
                 x.total_op_time += record_op_stats.op_time
@@ -268,6 +277,9 @@ class SimpleExecution(ExecutionEngine):
         output_records = []
         source_records_scanned = 0
         datasource_size = 0
+        # As I understand it, we only need current_scan_idx here?
+        # Otherwise there is a bug bc after the first execution the scan_idx is not initialized
+        current_scan_idx = self.scan_start_idx
 
         # initialize processing queues for each operation
         processing_queues = {
@@ -296,8 +308,8 @@ class SimpleExecution(ExecutionEngine):
                     datasource_size = datasource.getSize()
 
                     # construct input DataRecord for DataSourcePhysicalOperator
-                    candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=self.current_scan_idx)
-                    candidate.idx = self.current_scan_idx
+                    candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
+                    candidate.idx = current_scan_idx
                     candidate.get_item_fn = datasource.getItem
                     candidate.cardinality = datasource.cardinality
 
@@ -306,7 +318,7 @@ class SimpleExecution(ExecutionEngine):
 
                     # update number of source records scanned and the current index
                     source_records_scanned += len(records)
-                    self.current_scan_idx += 1
+                    current_scan_idx += 1
 
                 elif len(processing_queues[op_id]) > 0:
                     print(f"Processing operator {op_id} - queue length: {len(processing_queues[op_id])}")
@@ -331,6 +343,10 @@ class SimpleExecution(ExecutionEngine):
                     else None
                 )
 
+                # TODO some operator is not returning a singleton list
+                if type(records) != type([]):
+                    records = [records]
+
                 # update processing_queues or output_records
                 for record in records:
                     if isinstance(operator, FilterOp):
@@ -344,7 +360,7 @@ class SimpleExecution(ExecutionEngine):
             # update finished_executing based on whether all records have been processed
             still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
             keep_scanning_source_records = (
-                self.current_scan_idx < datasource_size
+                current_scan_idx < datasource_size
                 and source_records_scanned < num_samples
             )
             finished_executing = not keep_scanning_source_records and not still_processing

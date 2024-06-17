@@ -181,7 +181,7 @@ class LogicalPlanner(Planner):
             if idx == 0:
                 assert isinstance(node, pz.datasources.DataSource)
                 datasetIdentifier = uid
-                op = pz_ops.BaseScan(outputSchema=node.schema)
+                op = pz_ops.BaseScan(datasetIdentifier=uid,outputSchema=node.schema)
 
             # if the Set's source is another Set, apply the appropriate scan to the Set
             else:
