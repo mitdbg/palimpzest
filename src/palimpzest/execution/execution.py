@@ -1,5 +1,5 @@
 import time
-from palimpzest.constants import PlanType
+from palimpzest.constants import Model, PlanType
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.datamanager import DataDirectory
@@ -9,6 +9,7 @@ from palimpzest.operators.physical import DataSourcePhysicalOperator, LimitScanO
 from palimpzest.operators.filter import FilterOp
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
+from palimpzest.utils.model_helpers import getModels, getVisionModels
 from .cost_estimator import CostEstimator
 from palimpzest.sets import Set
 from palimpzest.utils import getChampionModelName
@@ -20,6 +21,36 @@ from typing import List, Optional
 
 import os
 import shutil
+
+
+def _getAllowedModels(self, subplan: PhysicalPlan) -> List[Model]:
+    """
+    This function handles the logic of determining which model(s) can be used for a Convert or Filter
+    operation during physical plan construction.
+
+    The logic for determining which models can be used is as follows:
+    - If model selection is allowed --> then all models may be used
+    - If the subplan does not yet have an operator which uses a (non-vision) model --> then all models may be used
+    - If the subplan has an operator which uses a (non-vision) model --> only the subplan's model may be used
+    """
+    # return all models if model selection is allowed
+    if self.allow_model_selection:
+        return getModels()
+
+    # otherwise, get models used by subplan
+    subplan_model, vision_models = None, getVisionModels()
+    for phys_op in subplan.operators:
+        model = getattr(phys_op, "model", None)
+        if model is not None and model not in vision_models:
+            subplan_model = model
+            break
+
+    # return all models if subplan does not have any models yet
+    if subplan_model is None:
+        return getModels()
+
+    # otherwise return the subplan model
+    return [subplan_model]
 
 
 class ExecutionEngine:
@@ -35,10 +66,12 @@ class SimpleExecution(ExecutionEngine):
             include_baselines: bool=False,
             min_plans: Optional[int] = None,
             verbose: bool = False,
+            available_models: Optional[List[Model]] = [],
             allow_model_selection: Optional[bool]=True,
             allow_code_synth: Optional[bool]=True,
             allow_token_reduction: Optional[bool]=True,
             useParallelOps: Optional[bool]=False,
+            *args, **kwargs
         ) -> None:
         self.num_samples = num_samples
         self.scan_start_idx = scan_start_idx
@@ -46,6 +79,7 @@ class SimpleExecution(ExecutionEngine):
         self.include_baselines = include_baselines
         self.min_plans = min_plans
         self.verbose = verbose
+        self.available_models = available_models
         self.allow_model_selection = allow_model_selection
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
@@ -88,21 +122,24 @@ class SimpleExecution(ExecutionEngine):
         run_sentinels = self.nocache or not self.datadir.hasCachedAnswer(uid)
 
         sentinel_plans, sample_execution_data, sentinel_records = [], [], []
-        if run_sentinels:
-            # initialize logical and physical planner
-            # NOTE The Exeuction class MUST KNOW THE PLANNER!
-            #  if I disallow code synth for my planning, I will have to disallow it for my execution. Now, I can't do that.
-            logical_planner = LogicalPlanner(self.nocache)
-            physical_planner = PhysicalPlanner(
-                num_samples=self.num_samples,
-                scan_start_idx=0,
-                allow_model_selection=self.allow_model_selection,
-                allow_code_synth=self.allow_code_synth,
-                allow_token_reduction=self.allow_token_reduction,
-                useParallelOps=self.useParallelOps,
-            )
 
-            # get sentinel plans
+        # initialize logical and physical planner
+        # NOTE The Exeuction class MUST KNOW THE PLANNER!
+        #  if I disallow code synth for my planning, I will have to disallow it for my execution. Now, I can't do that.
+        # get sentinel plans
+        logical_planner = LogicalPlanner(self.nocache)
+        physical_planner = PhysicalPlanner(
+            num_samples=self.num_samples,
+            scan_start_idx=0,
+            available_models=self.available_models,
+            allow_model_selection=self.allow_model_selection,
+            allow_code_synth=self.allow_code_synth,
+            allow_token_reduction=self.allow_token_reduction,
+            useParallelOps=self.useParallelOps,
+            useStrategies=True,
+        )
+
+        if run_sentinels:
             for logical_plan in logical_planner.generate_plans(dataset, sentinels=True):
                 for sentinel_plan in physical_planner.generate_plans(logical_plan, sentinels=True):
                     sentinel_plans.append(sentinel_plan)
@@ -114,15 +151,7 @@ class SimpleExecution(ExecutionEngine):
 
         # (re-)initialize logical and physical planner
         scan_start_idx = self.num_samples if run_sentinels else 0
-        logical_planner = LogicalPlanner(self.nocache)
-        physical_planner = PhysicalPlanner(
-            num_samples=self.num_samples,
-            scan_start_idx=scan_start_idx,
-            allow_model_selection=self.allow_model_selection,
-            allow_code_synth=self.allow_code_synth,
-            allow_token_reduction=self.allow_token_reduction,
-            useParallelOps=self.useParallelOps,
-        )
+        physical_planner.scan_start_idx = scan_start_idx
 
         # NOTE: in the future we may use operator_estimates below to limit the number of plans
         #       that we need to consider during plan generation. I.e., we may be able to save time
@@ -507,11 +536,14 @@ class Execute:
         include_baselines: bool=False,
         min_plans: Optional[int] = None,
         verbose: bool = False,
+        available_models: Optional[List[Model]] = [],
         allow_model_selection: Optional[bool]=True,
         allow_code_synth: Optional[bool]=True,
         allow_token_reduction: Optional[bool]=True,
         useParallelOps: Optional[bool]=False,
         execution_engine: ExecutionEngine = SimpleExecution,
+        *args,
+        **kwargs
     ):
 
         return execution_engine(
@@ -520,10 +552,13 @@ class Execute:
             include_baselines=include_baselines,
             min_plans=min_plans,
             verbose=verbose,
+            available_models=available_models,
             allow_code_synth=allow_code_synth,
             allow_model_selection=allow_model_selection,
             allow_token_reduction=allow_token_reduction,
-            useParallelOps=useParallelOps
+            useParallelOps=useParallelOps,
+            *args,
+            **kwargs
         ).execute(
             dataset=dataset,
             policy=policy

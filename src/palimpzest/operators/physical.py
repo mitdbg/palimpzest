@@ -50,6 +50,7 @@ class PhysicalOperator(metaclass=ImplementationMeta):
         inputSchema: Optional[Schema] = None,
         shouldProfile: bool = False,
         max_workers: int = 1,
+        *args, **kwargs
     ) -> None:
         self.outputSchema = outputSchema
         self.inputSchema = inputSchema

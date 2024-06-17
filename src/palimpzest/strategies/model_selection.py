@@ -1,8 +1,10 @@
+from __future__ import annotations
+from typing import List, Tuple
 from palimpzest.constants import Model
 from palimpzest.operators.logical import FilteredScan
-from palimpzest.operators.filter import FilterOp
+from palimpzest.operators.filter import FilterOp, LLMFilter
+from palimpzest.operators.physical import PhysicalOperator
 from .strategy import PhysicalOpStrategy
-from __future__ import annotations
 
 from palimpzest.generators.generators import DSPyGenerator
 
@@ -12,10 +14,24 @@ from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.elements import *
 from palimpzest.operators import logical
 
-class ModelSelectionFilter(PhysicalOpStrategy):
 
-    logical_op_class = FilteredScan
-    physical_op_class = FilterOp
+class ModelSelectionFilterStrategy(PhysicalOpStrategy):
 
-    # I want the execution to have some available models.
-    # I want to tell my strategy: with model X,Y,Z, give me the relevant physical operator.
+    logical_op_class = logical.FilteredScan
+    physical_op_class = LLMFilter
+
+    @staticmethod
+    def __new__(cls, 
+                available_models: List[Model]) -> List[PhysicalOperator]:
+
+        return_operators = []
+        for model in available_models:
+            if model.value not in MODEL_CARDS:
+                raise ValueError(f"Model {model} not found in MODEL_CARDS")
+            physical_op_type = type('LLMFilter'+model.name,
+                                    (cls.physical_op_class,),
+                                    {'model': model})
+            return_operators.append(physical_op_type)
+
+        return return_operators
+        

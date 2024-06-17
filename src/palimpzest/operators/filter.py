@@ -24,9 +24,10 @@ class FilterOp(PhysicalOperator):
         targetCacheId: str = None,
         shouldProfile=False,
         max_workers=1,
+        *args, **kwargs
     ):
         assert inputSchema == outputSchema, "Input and output schemas must match for FilterOp"
-        super().__init__(inputSchema=inputSchema, outputSchema=outputSchema, shouldProfile=shouldProfile)
+        super().__init__(inputSchema=inputSchema, outputSchema=outputSchema, shouldProfile=shouldProfile, *args, **kwargs)
         self.filter = filter
         self.targetCacheId = targetCacheId
         self.max_workers = max_workers
@@ -188,11 +189,11 @@ class NonLLMFilter(FilterOp):
 
 class LLMFilter(FilterOp):
     implemented_op = logical.FilteredScan
+    model = None
+    prompt_strategy = PromptStrategy.DSPY_COT_BOOL
 
-    def __init__(self, model: Model, prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_BOOL, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.model = model
-        self.prompt_strategy = prompt_strategy
 
     def __eq__(self, other: LLMFilter):
         return (

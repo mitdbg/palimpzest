@@ -14,23 +14,19 @@ from palimpzest.planner import LogicalPlanner, PhysicalPlanner
 from palimpzest.operators import ConvertOp, ConvertFileToText
 from palimpzest.execution import Execute
 from utils import remove_cache, buildNestedStr
+from palimpzest.strategies.model_selection import ModelSelectionFilterStrategy
 
 
-def test_enron(enron_eval):
-    """Test the enron demo"""
-    dataset = enron_eval
-    logical = LogicalPlanner()
-    physical = PhysicalPlanner(allow_code_synth=False,)
+def test_strategy(enron_eval):
+    """Test whether strategy creation works"""
+    available_models = [pz.Model.GPT_4, pz.Model.GPT_3_5]
 
-    plans = logical.generate_plans(dataset)
-    lp = plans[0]
-    physicalPlans = physical.generate_plans(lp)
-    pp = physicalPlans[0]
-    print(pp)
+    strategy = ModelSelectionFilterStrategy(available_models=available_models)
+    print(strategy)
 
-    records, plan, stats= Execute(dataset, 
+    records, plan, stats= Execute(enron_eval, 
                                   policy=pz.MinCost(),
+                                  available_models=available_models,
+                                  useStrategies=True,
+                                  allow_model_selection=False,
                                   allow_code_synth=False)
-    for r in records:
-        print(r)
-    # execution.execute(pp)
