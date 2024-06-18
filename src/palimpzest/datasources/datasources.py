@@ -4,6 +4,7 @@ from palimpzest.elements import DataRecord
 from typing import Any, Dict, List, Union
 
 import os
+import sys
 
 
 class AbstractDataSource:
@@ -26,6 +27,9 @@ class AbstractDataSource:
 
     def __eq__(self, __value: object) -> bool:
         return self.__dict__ == __value.__dict__
+
+    def __len__(self) -> int:
+        raise NotImplementedError(f"You are calling this method from an abstract class.")
 
     def serialize(self) -> Dict[str, Any]:
         return {"schema": self.schema.jsonSchema()}
@@ -62,8 +66,11 @@ class MemorySource(DataSource):
         super().__init__(Number, dataset_id)
         self.vals = vals
 
-    def getSize(self):
+    def __len__(self):
         return len(self.vals)
+
+    def getSize(self):
+        return sum([sys.getsizeof(self.getItem(idx)) for idx in range(len(self))])
 
     def getItem(self, idx: int):
         value = self.vals[idx]
@@ -92,14 +99,12 @@ class DirectorySource(DataSource):
             "source_type": "directory",
         }
 
-    # Consider making this the getSize method?
-    def getMemorySize(self):
+    def __len__(self):
+        return len(self.filepaths)
+
+    def getSize(self):
         # Get the memory size of the files in the directory
         return sum([os.path.getsize(filepath) for filepath in self.filepaths])
-
-    # Consider making this the __len__ method?
-    def getSize(self):
-        return len(self.filepaths)
 
     def getItem(self, idx: int):
         filepath = self.filepaths[idx]
@@ -125,8 +130,12 @@ class FileSource(DataSource):
             "source_type": "file",
         }
 
-    def getSize(self):
+    def __len__(self):
         return 1
+
+    def getSize(self):
+        # Get the memory size of the filepath
+        return os.path.getsize(self.filepath)
 
     def getItem(self, idx: int):
         dr = DataRecord(self.schema, scan_idx=idx)
@@ -149,8 +158,11 @@ class UserSource(DataSource):
             "source_type": "user-defined:" + self.__class__.__name__,
         }
 
+    def __len__(self):
+        raise NotImplementedError("User needs to implement this method")
+
     def getSize(self):
-        raise NotImplementedError("User needs to implement this method.")
+        raise NotImplementedError("User may optionally implement this method.")
 
     def getItem(self):
         raise NotImplementedError("User needs to implement this method.")

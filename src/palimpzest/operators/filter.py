@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from palimpzest.generators.generators import DSPyGenerator
-from .physical import PhysicalOperator, DataRecordWithStats
+from .physical import PhysicalOperator, DataRecordsWithStats
 
 from palimpzest.constants import *
 from palimpzest.dataclasses import RecordOpStats
 from palimpzest.corelib import Schema
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.elements import *
+from palimpzest.elements import DataRecord, Filter
 from palimpzest.operators import logical
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List
 
 import concurrent
 import multiprocessing
@@ -171,7 +171,7 @@ class NonLLMFilter(FilterOp):
             quality=1.0,
         )
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordWithStats]:
+    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         # apply filter to input record
         start_time = time.time()
         result = self.filter.filterFn(candidate)
@@ -274,7 +274,7 @@ class LLMFilter(FilterOp):
             quality=quality,
         )
 
-    def __call__(self, candidate: DataRecord)-> Tuple[DataRecord, RecordOpStats]:
+    def __call__(self, candidate: DataRecord) -> DataRecordsWithStats:
         start_time = time.time()
 
         # compute record schema and type

@@ -157,34 +157,6 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
 
         return entry
 
-    def getSize(self, dataset_id):
-        """Return the size (in bytes) of a dataset."""
-        if not dataset_id in self._registry:
-            raise Exception("Cannot find dataset", dataset_id, "in the registry.")
-
-        entry, rock = self._registry[dataset_id]
-        if entry == "dir":
-            # Sum the size in bytes of every file in the directory
-            path = rock
-            return sum(
-                [
-                    os.path.getsize(os.path.join(path, name))
-                    for name in os.listdir(path)
-                    if os.path.isfile(os.path.join(path, name))
-                ]
-            )
-        elif entry == "file":
-            # Get the size of the file in bytes
-            path = rock
-            return os.path.getsize(path)
-        elif entry == "memory":
-            # get the size of the values in bytes
-            return sys.getsizeof(rock)
-        elif entry == "user":
-            return rock.getSize()
-        else:
-            raise Exception("Unknown entry type")
-
     def getCardinality(self, dataset_id):
         """Return the number of records in a dataset."""
         if not dataset_id in self._registry:

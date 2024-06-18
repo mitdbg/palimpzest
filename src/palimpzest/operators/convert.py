@@ -1,6 +1,6 @@
 from __future__ import annotations
-from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.operators import DataRecordWithStats, PhysicalOperator
+from palimpzest.dataclasses import OperatorCostEstimates
+from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
 
 from palimpzest.constants import *
 from palimpzest.corelib import *
@@ -50,7 +50,7 @@ class ConvertOp(PhysicalOperator):
     def __str__(self):
         return f"{self.model}_{self.query_strategy}_{self.token_budget}"
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordWithStats]:
+    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
 
     # TODO: where does caching go?
@@ -315,7 +315,7 @@ class LLMConvert(ConvertOp):
 
 
     # TODO
-    def __call__(self, candidate: DataRecord) -> List[DataRecordWithStats]:
+    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         # initialize stats objects
         op_id = self.get_op_id()
         if self.query_strategy == QueryStrategy.CONVENTIONAL:

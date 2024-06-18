@@ -253,3 +253,11 @@ class TestExecutionNoCache:
         for dr, expected_filename in zip(output_records, expected_filenames):
             assert dr.filename == os.path.join("testdata/enron-eval-tiny/", expected_filename)
             assert hasattr(dr, 'contents') and dr.contents != None
+
+    # TODO
+    def test_execute_dat_with_aggregate(self):
+        raise Exception("TODO")
+
+    # TODO
+    def test_execute_dat_with_limit(self):
+        raise Exception("TODO")
