@@ -13,7 +13,7 @@ from .cost_estimator import CostEstimator
 from palimpzest.sets import Set
 from palimpzest.utils import getChampionModelName
 
-from palimpzest.dataclasses import OperatorStats, PlanStats, SampleExecutionData
+from palimpzest.dataclasses import OperatorStats, PlanStats
 
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
