@@ -341,7 +341,7 @@ class LLMConvert(ConvertOp):
 
             record_stats.record_state['heatmap_obj'] = new_heatmap_obj
 
-            return drs, record_stats
+            return drs, [record_stats]
 
         elif self.query_strategy == QueryStrategy.BONDED_WITH_FALLBACK:
             drs, new_heatmap_obj, record_stats, err_msg = runBondedQuery(
@@ -381,7 +381,7 @@ class LLMConvert(ConvertOp):
                     "token_budget": self.token_budget,
                 }                     
             record_stats.record_state['heatmap_obj'] = new_heatmap_obj
-            return drs, record_stats
+            return drs, [record_stats]
         
         elif self.query_strategy == QueryStrategy.CODE_GEN:
             dr, full_code_gen_stats = runCodeGenQuery(

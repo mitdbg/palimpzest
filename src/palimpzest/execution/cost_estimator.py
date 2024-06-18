@@ -2,15 +2,14 @@
 Operators needs statprocessors, defined in stats.py
 CostEstimators needs PhysicalPlans which needs operators.py
 
-Notes: 2. why is _estimate_plan cost a hidden function? Probably we should only expose the single parameter function
-       that takes a single plan, and have the Execution call it in a for loop on a list of plans.
+I de-statified methods within the class and made estimate_plan_cost the explicit function called on a per-plan basis by the execution engine.
 """
 
 from __future__ import annotations
 import sys
 
 from palimpzest.constants import Cardinality, GPT_4_MODEL_CARD, Model, MODEL_CARDS, QueryStrategy
-from palimpzest.dataclasses import OperatorCostEstimates
+from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.planner import PhysicalPlan
 from palimpzest.utils import getModels
@@ -25,12 +24,24 @@ import math
 # TYPE DEFINITIONS
 SampleExecutionData = Dict[str, Any] # TODO: dataclass?
 
+
+def extract_keys(row):
+    # TODO disambiguate
+    if isinstance(row['record_state'], dict):
+        for key in row['record_state']:
+            row[key] = row['record_state'][key]
+    if isinstance(row['record_details'], dict):
+        for key in row['record_details']:
+            row[key] = row['record_details'][key]
+    
+    return row
+
 class CostEstimator:
     """
     This class takes in a list of SampleExecutionData and exposes a function which uses this data
     to perform cost estimation on a list of physical plans.
     """
-    def __init__(self, source_dataset_id: str, sample_execution_data: List[SampleExecutionData] = []):
+    def __init__(self, source_dataset_id: str, sample_execution_data: List[RecordOpStats] = []):
         # store source dataset id to help with estimating cardinalities
         self.source_dataset_id = source_dataset_id
 
@@ -39,17 +50,21 @@ class CostEstimator:
             pd.DataFrame(sample_execution_data)
             if len(sample_execution_data) > 0
             else None
-        )
+        ).apply(extract_keys, axis=1)
+        # df contains a column called record_state, that sometimes contain a dict
+        # we want to extract the keys from the dict and create a new column for each key
+        
 
         # TODO: come up w/solution for listing operators by name due to circular import
         # determine the set of operators which may use a distinct model
-        self.MODEL_OPERATORS = ["LLMFilter", "LLMConvert"]
 
         # reference to data directory
         self.datadir = DataDirectory()
+        # TODO: Are there op_ids that repeat across plans? Otherwise we can move this into estimate_plan_cost function
 
-    @staticmethod
-    def _est_time_per_record(
+        self.operator_estimates = self._compute_operator_estimates()
+
+    def _est_time_per_record(self,
         op_df: pd.DataFrame, model_name: Optional[str] = None, agg: str = "mean"
     ) -> float:
         """
@@ -65,8 +80,7 @@ class CostEstimator:
         # compute aggregate
         return op_df["op_time"].agg(agg=agg).iloc[0]
 
-    @staticmethod
-    def _est_cost_per_record(
+    def _est_cost_per_record(self,
         op_df: pd.DataFrame, model_name: Optional[str] = None, agg: str = "mean"
     ) -> float:
         """
@@ -78,7 +92,7 @@ class CostEstimator:
             model_df = op_df[op_df.model_name == model_name]
             if not model_df.empty:
                 return (
-                    (model_df["input_usd"] + model_df["output_usd"])
+                    (model_df["total_input_cost"] + model_df["total_output_cost"])
                     .agg(agg=agg)
                     .iloc[0]
                 )
@@ -103,8 +117,7 @@ class CostEstimator:
         #TODO This code is not working? There are None in the total_input_cost columns
         return (op_df["total_input_cost"] + op_df["total_output_cost"]).agg(agg=agg).iloc[0]
 
-    @staticmethod
-    def _est_tokens_per_record(
+    def _est_tokens_per_record(self,
         op_df: pd.DataFrame, model_name: Optional[str] = None, agg: str = "mean"
     ) -> Tuple[float, float]:
         """
@@ -126,8 +139,8 @@ class CostEstimator:
             op_df["total_output_tokens"].agg(agg=agg).iloc[0],
         )
 
-    @staticmethod
-    def _est_cardinality(op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
+    def _est_cardinality(self,
+    op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the number of
         rows output by the operation.
@@ -142,8 +155,7 @@ class CostEstimator:
         """
         return op_df.shape[0] / len(op_df.plan_id.unique())
 
-    @staticmethod
-    def _est_selectivity(
+    def _est_selectivity(self,
         df: pd.DataFrame, op_df: pd.DataFrame, model_name: Optional[str] = None
     ) -> float:
         """
@@ -181,8 +193,31 @@ class CostEstimator:
 
         return num_output_records / num_input_records
 
-    @staticmethod
-    def _est_quality(op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
+    # NOTE: What should this function return?
+    def _is_correct(self, row):
+        # simple equality check suffices for filter
+        if "filter" in row["op_name"].lower():
+            return row["answer"] == row["accepted_answer"]
+
+        # otherwise, check equality on a per-key basis
+        try:
+            # we'll measure recal on accepted_answer, as extraneous info is often not an issue
+            answer = row["answer"]
+            accepted_answer = row["accepted_answer"]
+            tp = 0
+            for key, value in accepted_answer.items():
+                if key in answer and answer[key] == value:
+                    tp += 1
+
+            return tp / len(accepted_answer)
+
+        except Exception as e:
+            print(f"WARNING: error decoding answer or accepted_answer: {str(e)}")
+            import pdb; pdb.set_trace()
+            return 0 # or False?
+            
+
+    def _est_quality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the an estimate
         of the quality of its outputs by using GPT-4 as a champion model.
@@ -203,33 +238,12 @@ class CostEstimator:
             else:
                 record_uuid_to_answer[record_uuid] = record_df.answer.mode().iloc[0]
 
-        def _is_correct(row):
-            # simple equality check suffices for filter
-            if "filter" in row["op_name"].lower():
-                return row["answer"] == row["accepted_answer"]
-
-            # otherwise, check equality on a per-key basis
-            try:
-                # we'll measure recal on accepted_answer, as extraneous info is often not an issue
-                answer = row["answer"]
-                accepted_answer = row["accepted_answer"]
-                tp = 0
-                for key, value in accepted_answer.items():
-                    if key in answer and answer[key] == value:
-                        tp += 1
-
-                return tp / len(accepted_answer)
-
-            except Exception as e:
-                print(f"WARNING: error decoding answer or accepted_answer: {str(e)}")
-                return False
-
         # compute accepted answers and clean all answers
         pd.options.mode.chained_assignment = None  # turn off copy warnings
         op_df.loc[:, "accepted_answer"] = op_df.record_uuid.apply(
             lambda uuid: record_uuid_to_answer[uuid]
         )
-        op_df.loc[:, "correct"] = op_df.apply(lambda row: _is_correct(row), axis=1)
+        op_df.loc[:, "correct"] = op_df.apply(lambda row: self._is_correct(row), axis=1)
 
         # get subset of observations for model_name and estimate quality w/fraction of answers that match accepted answer
         model_df = (
@@ -257,7 +271,6 @@ class CostEstimator:
         # if we don't have sample execution data, we cannot compute per-operator estimates
         if self.sample_execution_data_df is None:
             return None
-
         # get the set of operator ids for which we have sample data
         op_ids = self.sample_execution_data_df.op_id.unique()
 
@@ -279,41 +292,42 @@ class CostEstimator:
 
             # get the op_name for this operation
             op_name = str(op_df.op_name.iloc[0])
-            if op_name in self.MODEL_OPERATORS:
+            if 'LLM' in op_name:
                 # compute estimates per-model, and add None which forces computation of avg. across all models
                 models = getModels(include_vision=True) + [None]
                 estimates = {model: None for model in models}
                 for model in models:
                     model_name = model.value if model is not None else None
-                    est_tokens = CostEstimator._est_tokens_per_record(op_df, model_name=model_name)
+                    est_tokens = self._est_tokens_per_record(op_df, model_name=model_name)
                     model_estimates = {
-                        "time_per_record": CostEstimator._est_time_per_record(op_df, model_name=model_name),
-                        "cost_per_record": CostEstimator._est_cost_per_record(op_df, model_name=model_name),
+                        "time_per_record": self._est_time_per_record(op_df, model_name=model_name),
+                        "cost_per_record": self._est_cost_per_record(op_df, model_name=model_name),
                         "input_tokens": est_tokens[0],
                         "output_tokens": est_tokens[1],
-                        "selectivity": CostEstimator._est_selectivity(self.sample_execution_data_df, op_df, model_name=model_name),
-                        "quality": CostEstimator._est_quality(op_df, model_name=model_name),
+                        "selectivity": self._est_selectivity(self.sample_execution_data_df, op_df, model_name=model_name),
+                        "quality": self._est_quality(op_df, model_name=model_name),
                     }
                     estimates[model_name] = model_estimates
             
             elif op_name in ["MarshalAndScanDataOp", "CacheScanDataOp", "LimitScanOp", "ApplyCountAggregateOp", "ApplyAverageAggregateOp"]:
                 estimates = {
-                    "time_per_record": CostEstimator._est_time_per_record(op_df),
+                    "time_per_record": self._est_time_per_record(op_df),
                 }
 
             elif op_name in ["ApplyGroupByOp"]:
                 estimates = {
-                    "time_per_record": CostEstimator._est_time_per_record(op_df),
-                    "cardinality": CostEstimator._est_cardinality(op_df),
+                    "time_per_record": self._est_time_per_record(op_df),
+                    "cardinality": self._est_cardinality(op_df),
                 }
 
             operator_estimates[op_id] = estimates
         
         return operator_estimates
 
-    def _estimate_plan_cost(self, physical_plan: PhysicalPlan, sample_op_estimates: Optional[Dict[str, Any]]) -> None:
+    def estimate_plan_cost(self, physical_plan: PhysicalPlan) -> Tuple[float, float, float]:
         # initialize dictionary w/estimates for entire plan
         plan_estimates = {"total_time": 0.0, "total_cost": 0.0, "quality": 0.0}
+        sample_op_estimates = self.operator_estimates
 
         op_estimates, source_op_estimates = None, None
         for op in physical_plan.operators:
@@ -439,19 +453,21 @@ class CostEstimator:
             source_op_estimates = op_estimates
 
         # set the plan's estimates
-        physical_plan.total_time = plan_estimates["total_time"]
-        physical_plan.total_cost = plan_estimates["total_cost"]
-        physical_plan.quality = plan_estimates["quality"]
+        total_time = plan_estimates["total_time"]
+        total_cost = plan_estimates["total_cost"]
+        quality = plan_estimates["quality"]
 
-    def estimate_plan_costs(self, physical_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
-        """
-        Estimate the cost of each physical plan by making use of the sample execution data
-        provided to the CostEstimator. The plan cost, runtime, and quality are set as attributes
-        on each physical plan and the updated set of physical plans is returned.
-        """
-        operator_estimates = self._compute_operator_estimates()
+        return total_time, total_cost, quality
 
-        for physical_plan in physical_plans:
-            self._estimate_plan_cost(physical_plan, operator_estimates)
+    # def estimate_plan_costs(self, physical_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
+    #     """
+    #     Estimate the cost of each physical plan by making use of the sample execution data
+    #     provided to the CostEstimator. The plan cost, runtime, and quality are set as attributes
+    #     on each physical plan and the updated set of physical plans is returned.
+    #     """
+    #     operator_estimates = self._compute_operator_estimates()
 
-        return physical_plans
+    #     for physical_plan in physical_plans:
+    #         self._estimate_plan_cost(physical_plan, operator_estimates)
+
+    #     return physical_plans

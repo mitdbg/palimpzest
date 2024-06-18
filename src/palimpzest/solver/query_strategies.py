@@ -205,13 +205,14 @@ def runBondedQuery(
                 budget=token_budget,
                 heatmap_json_obj=heatmap_json_obj,
             )
+
             # construct BondedQueryStats object
             bonded_query_stats = RecordOpStats(
                 record_uuid=candidate._uuid,
                 record_parent_uuid=candidate._parent_uuid,
                 op_id="LLMConvert_eeaca",
                 op_name="LLMConvert",
-                op_time=gen_stats['op_time'],
+                op_time=gen_stats['llm_call_duration_secs'],
                 op_cost=gen_stats['op_cost'],
                 record_state= gen_stats,
             )

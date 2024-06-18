@@ -7,7 +7,7 @@ from palimpzest.operators.physical import PhysicalOperator
 try:
     from itertools import pairwise
 except:
-    from more_itertools import pairwise
+    from more_itertools import pairwise # type: ignore
 
 from typing import List
 

@@ -28,10 +28,10 @@ class ModelSelectionFilterStrategy(PhysicalOpStrategy):
         for model in available_models:
             if model.value not in MODEL_CARDS:
                 raise ValueError(f"Model {model} not found in MODEL_CARDS")
-            physical_op_type = type('LLMFilter'+model.name,
+            # physical_op_type = type('LLMFilter'+model.name,
+            physical_op_type = type('LLMFilter',
                                     (cls.physical_op_class,),
                                     {'model': model})
             return_operators.append(physical_op_type)
 
         return return_operators
-        

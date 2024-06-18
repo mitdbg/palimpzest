@@ -1,7 +1,7 @@
 import time
 from palimpzest.constants import Model, PlanType
 from palimpzest.corelib.schemas import SourceRecord
-from palimpzest.dataclasses import OperatorStats, PlanStats
+from palimpzest.dataclasses import OperatorStats, PlanStats, RecordOpStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import DataRecord
 from palimpzest.operators.convert import ConvertOp, LLMConvert
@@ -169,10 +169,14 @@ class SimpleExecution(ExecutionEngine):
                                        sample_execution_data=sample_execution_data)
 
         # estimate the cost of each plan
-        plans = cost_estimator.estimate_plan_costs(all_physical_plans)
+        for physical_plan in all_physical_plans:
+            total_time, total_cost, quality = cost_estimator.estimate_plan_cost(physical_plan)
+            physical_plan.total_time = total_time
+            physical_plan.total_cost = total_cost
+            physical_plan.quality = quality
 
         # deduplicate plans with identical cost estimates
-        plans = physical_planner.deduplicate_plans(plans)
+        plans = physical_planner.deduplicate_plans(all_physical_plans)
 
         # select pareto frontier of plans
         final_plans = physical_planner.select_pareto_optimal_plans(plans)
@@ -328,6 +332,15 @@ class SimpleExecution(ExecutionEngine):
             for op_idx, operator in enumerate(plan.operators):
                 op_id = operator.get_op_id()
 
+                prev_op_id = (
+                    plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
+                )
+                next_op_id = (
+                    plan.operators[op_idx + 1].get_op_id()
+                    if op_idx + 1 < len(plan.operators)
+                    else None
+                )
+
                 # TODO: if self.useParallelOps is True; execute each operator with parallelism
                 if isinstance(operator, DataSourcePhysicalOperator) and keep_scanning_source_records:
                     # get handle to DataSource and pre-compute its size
@@ -361,18 +374,12 @@ class SimpleExecution(ExecutionEngine):
                 op_stats = plan_stats.operator_stats[op_id]
                 for record_op_stats in record_op_stats_lst:
                     # TODO code a nice __add__ function for OperatorStats and RecordOpStats
+                    record_op_stats.source_op_id = prev_op_id
                     op_stats.record_op_stats_lst.append(record_op_stats)
                     op_stats.total_op_time += record_op_stats.op_time
                     op_stats.total_op_cost += record_op_stats.op_cost
 
                 plan_stats.operator_stats[op_id] = op_stats
-
-                # get id for next physical operator (currently just next op in plan.operators)
-                next_op_id = (
-                    plan.operators[op_idx + 1].get_op_id()
-                    if op_idx + 1 < len(plan.operators)
-                    else None
-                )
 
                 # TODO some operator is not returning a singleton list
                 if type(records) != type([]):
@@ -436,12 +443,14 @@ class SimpleExecution(ExecutionEngine):
 
         return output_records, plan_stats
 
-    def getSampleExecutionData(self, plan_stats: PlanStats) -> List[SampleExecutionData]:
+    def getSampleExecutionData(self, plan_stats: PlanStats) -> List[RecordOpStats]:
         """Compute and return all sample execution data collected by this plan so far."""
         # construct table of observation data from sample batch of processed records
         sample_execution_data, source_op_id = [], None
         for op_id, operator_stats in plan_stats.operator_stats.items():
             # append observation data for each record
+            sample_execution_data.extend(operator_stats.record_op_stats_lst)
+            continue
             for record_op_stats in operator_stats.record_op_stats_lst:
                 # compute minimal observation which is supported by all operators
                 # TODO: one issue with this setup is that cache_scans of previously computed queries
@@ -455,15 +464,15 @@ class SimpleExecution(ExecutionEngine):
                     "source_op_id": source_op_id,
                     "op_time": record_op_stats.op_time,
                 }
-                if record_op_stats.op_details is not None:
+                if "record_details" in record_op_stats.__dict__:
                     observation_arguments.update({
                     "model_name": (
-                        record_op_stats.op_details["model_name"]
+                        record_op_stats.record_details["record_details"]
                         if "model_name" in record_op_stats.op_details
                         else None
                     ),
                     "filter_str": (
-                        record_op_stats.op_details["filter_str"]
+                        record_op_stats.record_details["filter_str"]
                         if "filter_str" in record_op_stats.op_details
                         else None
                     ),
@@ -485,7 +494,7 @@ class SimpleExecution(ExecutionEngine):
                             answer[field] = record_op_stats.record_state[field]
                     observation_arguments["answer"] = answer
 
-                if record_op_stats.record_state is not None:
+                if 'record_state' in record_op_stats.__dict__:
                     observation_arguments.update({
                     "total_input_tokens": (
                         record_op_stats.record_details["total_input_tokens"]
