@@ -4,8 +4,7 @@ from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats, RecordOpStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import DataRecord
-from palimpzest.operators.convert import ConvertOp, LLMConvert
-from palimpzest.operators.physical import DataSourcePhysicalOperator, LimitScanOp, MarshalAndScanDataOp, CacheScanDataOp
+from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
@@ -243,7 +242,7 @@ class SimpleExecution(ExecutionEngine):
         for idx, operator in enumerate(plan.operators):
             op_id = operator.get_op_id()
             # TODO: Is it okay to have call return a list?
-            if isinstance(operator, DataSourcePhysicalOperator):
+            if isinstance(operator, DataSourcePhysicalOp):
                 idx=0
                 out_records, out_stats_lst = [], []
                 num_samples = num_samples if num_samples else float("inf")
@@ -304,21 +303,19 @@ class SimpleExecution(ExecutionEngine):
     def execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: Optional[int] = None):
         """
         Helper function which executes the physical plan. This function is overly complex for today's
-        plans which are simple cascades -- but is designed with an eye towards 
+        plans which are simple cascades -- but is designed with an eye towards the future.
         """
         # initialize list of output records and intermediate variables
         output_records = []
         source_records_scanned = 0
-        datasource_size = 0
-        # As I understand it, we only need current_scan_idx here?
-        # Otherwise there is a bug bc after the first execution the scan_idx is not initialized
+        datasource_len = 0
         current_scan_idx = self.scan_start_idx
 
         # initialize processing queues for each operation
         processing_queues = {
             op.get_op_id(): []
             for op in plan.operators
-            if not isinstance(op, DataSourcePhysicalOperator)
+            if not isinstance(op, DataSourcePhysicalOp)
         }
 
         # if num_samples is not provided, set it to infinity
@@ -342,33 +339,46 @@ class SimpleExecution(ExecutionEngine):
                 )
 
                 # TODO: if self.useParallelOps is True; execute each operator with parallelism
-                if isinstance(operator, DataSourcePhysicalOperator) and keep_scanning_source_records:
+                # invoke datasource operator(s) until we run out of source records
+                if isinstance(operator, DataSourcePhysicalOp) and keep_scanning_source_records:
                     # get handle to DataSource and pre-compute its size
                     datasource = (
                         self.datadir.getRegisteredDataset(self.source_dataset_id)
                         if isinstance(operator, MarshalAndScanDataOp)
                         else self.datadir.getCachedResult(operator.cachedDataIdentifier)
                     )
-                    datasource_size = datasource.getSize()
+                    datasource_len = len(datasource)
 
-                    # construct input DataRecord for DataSourcePhysicalOperator
+                    # construct input DataRecord for DataSourcePhysicalOp
                     candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
                     candidate.idx = current_scan_idx
                     candidate.get_item_fn = datasource.getItem
                     candidate.cardinality = datasource.cardinality
 
-                    # run DataSourcePhysicalOperator on record
+                    # run DataSourcePhysicalOp on record
                     records, record_op_stats_lst = operator(candidate)
 
                     # update number of source records scanned and the current index
                     source_records_scanned += len(records)
                     current_scan_idx += 1
 
+                # only invoke aggregate operator(s) once there are no more source records and all
+                # upstream operators' processing queues are empty
+                elif isinstance(operator, AggregateOp):
+                    upstream_queues_are_empty = True
+                    for upstream_op_idx in range(op_idx):
+                        upstream_queues_are_empty = (
+                            upstream_queues_are_empty
+                            and len(processing_queues[upstream_op_idx]) == 0
+                        )
+                    if not keep_scanning_source_records and upstream_queues_are_empty:
+                        records, record_op_stats_lst = operator(candidates=processing_queues[op_idx])
+
+                # otherwise, process the next record in the processing queue for this operator
                 elif len(processing_queues[op_id]) > 0:
                     print(f"Processing operator {op_id} - queue length: {len(processing_queues[op_id])}")
                     input_record = processing_queues[op_id].pop(0)
-                    records, record_op_stats = operator(input_record)
-                    record_op_stats_lst = record_op_stats
+                    records, record_op_stats_lst = operator(input_record)
 
                 # update plan stats
                 op_stats = plan_stats.operator_stats[op_id]
@@ -400,7 +410,7 @@ class SimpleExecution(ExecutionEngine):
             # update finished_executing based on whether all records have been processed
             still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
             keep_scanning_source_records = (
-                current_scan_idx < datasource_size
+                current_scan_idx < datasource_len
                 and source_records_scanned < num_samples
             )
             finished_executing = not keep_scanning_source_records and not still_processing

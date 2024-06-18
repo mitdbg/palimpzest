@@ -1,6 +1,6 @@
 from conftest import ENRON_EVAL_TINY_DATASET_ID
 
-from palimpzest.corelib import File
+from palimpzest.corelib import File, TextFile
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements import Filter
 from palimpzest.execution import Execute, SimpleExecution
@@ -11,6 +11,7 @@ from palimpzest.policy import MaxQuality
 import os
 import pytest
 
+# TODO: mock out all model calls
 
 class TestExecutionNoCache:
 
@@ -197,3 +198,66 @@ class TestExecutionNoCache:
         for dr, expected_filename in zip(output_records, expected_filenames):
             assert dr.filename == os.path.join("testdata/enron-eval-tiny/", expected_filename)
             assert hasattr(dr, 'contents') and dr.contents != None
+
+
+    def test_execute_dag_with_hardcoded_convert(self):
+        scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
+        convertOp = ConvertFileToText(inputSchema=File, outputSchema=TextFile, shouldProfile=True)
+        plan = PhysicalPlan(
+            operators=[scanOp, convertOp],
+            datasetIdentifier=ENRON_EVAL_TINY_DATASET_ID,
+        )
+        plan_stats = PlanStats(plan.plan_id())
+        for op in plan.operators:
+            op_id = op.get_op_id()
+            plan_stats.operator_stats[op_id] = OperatorStats(op_idx=0, op_id=op_id, op_name=op.op_name())
+
+        simple_execution = SimpleExecution(num_samples=1, nocache=True)
+
+        # set state which is computed in execute(); should try to remove this side-effect from the code
+        simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
+
+        # test sampling three records, with one making it past the filter
+        output_records, plan_stats = simple_execution.execute_dag(plan, plan_stats, num_samples=1)
+
+        assert len(output_records) == 1
+
+        dr = output_records[0]
+        assert dr.filename == "testdata/enron-eval-tiny/buy-r-inbox-628.txt"
+        assert hasattr(dr, 'contents') and dr.contents != None
+
+        for op in plan.operators:
+            op_id = op.get_op_id()
+            operator_stats = plan_stats.operator_stats[op_id]
+            assert operator_stats.total_op_time > 0.0
+            assert operator_stats.total_op_cost == 0.0
+
+            if isinstance(op, HardcodedConvert):
+                record_stats = operator_stats.record_op_stats_lst[-1]
+                assert record_stats.record_uuid == dr._uuid
+                assert record_stats.record_parent_uuid == dr._parent_uuid
+                assert record_stats.op_id == op_id
+                assert record_stats.op_name == op.op_name()
+                assert record_stats.op_time > 0.0
+                assert record_stats.op_cost == 0.0
+                assert record_stats.record_state == dr._asDict(include_bytes=False)
+
+        # test full scan
+        simple_execution = SimpleExecution(nocache=True)
+        simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
+        output_records, plan_stats = simple_execution.execute_dag(plan, plan_stats)
+
+        assert len(output_records) == 6
+
+        expected_filenames = sorted(os.listdir("testdata/enron-eval-tiny"))
+        for dr, expected_filename in zip(output_records, expected_filenames):
+            assert dr.filename == os.path.join("testdata/enron-eval-tiny/", expected_filename)
+            assert hasattr(dr, 'contents') and dr.contents != None
+
+    # TODO
+    def test_execute_dat_with_aggregate(self):
+        raise Exception("TODO")
+
+    # TODO
+    def test_execute_dat_with_limit(self):
+        raise Exception("TODO")

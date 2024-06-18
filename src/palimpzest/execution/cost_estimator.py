@@ -338,8 +338,8 @@ class CostEstimator:
             if isinstance(op, pz.MarshalAndScanDataOp):
                 # get handle to DataSource and pre-compute its size (number of records)
                 datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
-                datasource_len = datasource.getSize()
-                datasource_memsize = datasource.getMemorySize()
+                datasource_len = len(datasource)
+                datasource_memsize = datasource.getSize()
 
                 source_op_estimates = OperatorCostEstimates(
                     cardinality=datasource_len,
@@ -354,26 +354,19 @@ class CostEstimator:
 
             elif isinstance(op, pz.CacheScanDataOp):
                 datasource = self.datadir.getCachedResult(op.cachedDataIdentifier)
-                datasource_size = datasource.getSize()
+                datasource_len = len(datasource)
+                datasource_memsize = datasource.getSize()
 
                 source_op_estimates = OperatorCostEstimates(
-                    cardinality=datasource_size,
+                    cardinality=datasource_len,
                     time_per_record=0.0,
                     cost_per_record=0.0,
                     quality=1.0,
                 )
 
-                total_size_in_bytes = sum([
-                    sys.getsizeof(datasource.getItem(idx))
-                    for idx in range(datasource.getSize())
-                ])
-                per_record_size_in_bytes = total_size_in_bytes / datasource_size
-                kwargs = {
-                    "input_cardinality": Cardinality.ONE_TO_ONE,
-                    "per_record_size_in_bytes": per_record_size_in_bytes,
-                }
-
-                op_estimates = op.naiveCostEstimates(source_op_estimates, **kwargs)
+                op_estimates = op.naiveCostEstimates(source_op_estimates,
+                                                     input_cardinality=Cardinality.ONE_TO_ONE,
+                                                     input_record_size_in_bytes=datasource_memsize/datasource_len)
 
             else:
                 op_estimates =  op.naiveCostEstimates(source_op_estimates)
