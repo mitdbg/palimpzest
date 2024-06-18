@@ -24,10 +24,10 @@ class ConvertOp(PhysicalOperator):
         self,
         inputSchema: Schema,
         outputSchema: Schema,
-        cardinality: Optional[str] = "oneToOne",
+        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         desc: Optional[str] = None,
         targetCacheId: Optional[str] = None,
-        shouldProfile: Optional[bool] = False,
+        shouldProfile: bool = False,
     ):
         super().__init__(
             inputSchema=inputSchema,
@@ -43,7 +43,7 @@ class ConvertOp(PhysicalOperator):
             "operator": self.op_name(),
             "inputSchema": str(self.inputSchema),
             "outputSchema": str(self.outputSchema),
-            "cardinality": self.cardinality,
+            "cardinality": self.cardinality.value,
             "desc": str(self.desc),
         }
 
