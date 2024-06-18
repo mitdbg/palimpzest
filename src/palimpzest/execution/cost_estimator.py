@@ -25,17 +25,6 @@ import math
 SampleExecutionData = Dict[str, Any] # TODO: dataclass?
 
 
-def extract_keys(row):
-    # TODO disambiguate
-    if isinstance(row['record_state'], dict):
-        for key in row['record_state']:
-            row[key] = row['record_state'][key]
-    if isinstance(row['record_details'], dict):
-        for key in row['record_details']:
-            row[key] = row['record_details'][key]
-    
-    return row
-
 class CostEstimator:
     """
     This class takes in a list of SampleExecutionData and exposes a function which uses this data
@@ -50,7 +39,7 @@ class CostEstimator:
             pd.DataFrame(sample_execution_data)
             if len(sample_execution_data) > 0
             else None
-        ).apply(extract_keys, axis=1)
+        )
         # df contains a column called record_state, that sometimes contain a dict
         # we want to extract the keys from the dict and create a new column for each key
         
@@ -213,7 +202,6 @@ class CostEstimator:
 
         except Exception as e:
             print(f"WARNING: error decoding answer or accepted_answer: {str(e)}")
-            import pdb; pdb.set_trace()
             return 0 # or False?
             
 
@@ -236,7 +224,10 @@ class CostEstimator:
             if not gpt4_most_common_answer.empty:
                 record_uuid_to_answer[record_uuid] = gpt4_most_common_answer.iloc[0]
             else:
-                record_uuid_to_answer[record_uuid] = record_df.answer.mode().iloc[0]
+                try:
+                    record_uuid_to_answer[record_uuid] = record_df.answer.mode().iloc[0]
+                except Exception as e:
+                    import pdb; pdb.set_trace()
 
         # compute accepted answers and clean all answers
         pd.options.mode.chained_assignment = None  # turn off copy warnings

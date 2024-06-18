@@ -458,6 +458,10 @@ class DSPyGenerator(BaseGenerator):
         stats={
             "model_name": self.model_name,
             "llm_call_duration_secs": end_time - start_time,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "input_cost": input_tokens * usd_per_input_token,
+            "output_cost": output_tokens * usd_per_output_token,
             "op_cost": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
             "prompt": dspy_lm.history[-1]["prompt"],
             "usage": usage,

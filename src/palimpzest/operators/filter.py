@@ -315,14 +315,23 @@ class LLMFilter(FilterOp):
                 "filter_str": self.filter.getFilterStr(),
                 **gen_stats,
             }
-            kwargs = {
-                "op_id": self.get_op_id(),
-                "op_name": self.op_name(),
-                "op_time": time.time() - start_time,
-                "op_cost": gen_stats['op_cost'],
-                "record_details": record_details,
-            }
-            record_op_stats = RecordOpStats.from_record_and_kwargs(candidate, **kwargs)
+            record_op_stats = RecordOpStats(
+                record_uuid=candidate._uuid,
+                record_parent_uuid=candidate._parent_uuid,
+                record_state=candidate._asDict(include_bytes=False),
+                op_id=self.get_op_id(),
+                op_name=self.op_name(),
+                op_time=time.time() - start_time,
+                op_cost=gen_stats['op_cost'],
+                record_details=record_details,
+                model_name=self.model.value,
+                filter_str=self.filter.getFilterStr(),
+                total_input_tokens=gen_stats['input_tokens'],
+                total_output_tokens=gen_stats['output_tokens'],
+                total_input_cost=gen_stats['input_cost'],
+                total_output_cost=gen_stats['output_cost'],
+                answer=response
+            )
 
             # set _passed_filter attribute and return record
             setattr(candidate, "_passed_filter", "true" in response.lower())

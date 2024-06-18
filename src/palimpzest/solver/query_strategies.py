@@ -215,6 +215,14 @@ def runBondedQuery(
                 op_time=gen_stats['llm_call_duration_secs'],
                 op_cost=gen_stats['op_cost'],
                 record_state= gen_stats,
+                model_name=model.value,
+                input_fields_str=inputSchema.fieldNames(),
+                generated_fields_str=generate_field_names,
+                total_input_tokens=gen_stats['input_tokens'],
+                total_output_tokens=gen_stats['output_tokens'],
+                total_input_cost=gen_stats['input_cost'],
+                total_output_cost=gen_stats['output_cost'],
+                answer=answer
             )
 
         elif prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
@@ -242,6 +250,14 @@ def runBondedQuery(
                 op_time=gen_stats['op_time'],
                 op_cost=gen_stats['op_cost'],
                 record_stats= gen_stats,
+                model_name=model.value,
+                input_fields_str=inputSchema.fieldNames(),
+                generated_fields_str=generate_field_names,
+                total_input_tokens=gen_stats['input_tokens'],
+                total_output_tokens=gen_stats['output_tokens'],
+                total_input_cost=gen_stats['input_cost'],
+                total_output_cost=gen_stats['output_cost'],
+                answer=answer
             )
 
         # TODO
@@ -460,6 +476,15 @@ def runConventionalQuery(
         op_name="conventional__query",
         op_time=op_time,
         op_cost=op_cost,
+        model_name=model.value,
+        input_fields_str=inputSchema.fieldNames(),
+        generated_fields_str=generate_field_names,
+        total_input_tokens=sum([q['input_tokens'] for q in query_stats.values()]),
+        total_output_tokens=sum([q['output_tokens'] for q in query_stats.values()]),
+        total_input_cost=sum([q['input_cost'] for q in query_stats.values()]),
+        total_output_cost=sum([q['output_cost'] for q in query_stats.values()]),
+        answer=answer
+
     )
 
     # # TODO: debug root cause
@@ -645,6 +670,7 @@ def runCodeGenQuery(
             op_time=op_time,
             op_cost=op_cost,
             record_stats= conv_query_stats,
+            # TODO update RecordOpStats
         )
 
         # TODO: debug root cause

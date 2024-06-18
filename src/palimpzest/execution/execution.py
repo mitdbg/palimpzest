@@ -216,8 +216,9 @@ class SimpleExecution(ExecutionEngine):
         sentinel_records, sentinel_stats = zip(*results)
         for records, plan_stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
             # aggregate sentinel est. data
-            sample_execution_data = self.getSampleExecutionData(plan_stats)
-            all_sample_execution_data.extend(sample_execution_data)
+            sample_execution_data = []
+            for op_id, operator_stats in plan_stats.operator_stats.items():
+                all_sample_execution_data.extend(operator_stats.record_op_stats_lst)
 
             # set return_records to be records from champion model
             champion_model_name = getChampionModelName()
@@ -452,102 +453,6 @@ class SimpleExecution(ExecutionEngine):
         plan_stats.finalize(total_plan_time)
 
         return output_records, plan_stats
-
-    def getSampleExecutionData(self, plan_stats: PlanStats) -> List[RecordOpStats]:
-        """Compute and return all sample execution data collected by this plan so far."""
-        # construct table of observation data from sample batch of processed records
-        sample_execution_data, source_op_id = [], None
-        for op_id, operator_stats in plan_stats.operator_stats.items():
-            # append observation data for each record
-            sample_execution_data.extend(operator_stats.record_op_stats_lst)
-            continue
-            for record_op_stats in operator_stats.record_op_stats_lst:
-                # compute minimal observation which is supported by all operators
-                # TODO: one issue with this setup is that cache_scans of previously computed queries
-                #       may not match w/these observations due to the diff. op_name
-                observation_arguments = {
-                    "record_uuid": record_op_stats.record_uuid,
-                    "record_parent_uuid": record_op_stats.record_parent_uuid,
-                    "op_id": op_id,
-                    "op_name": record_op_stats.op_name,
-                    "op_cost": record_op_stats.op_cost,
-                    "source_op_id": source_op_id,
-                    "op_time": record_op_stats.op_time,
-                }
-                if "record_details" in record_op_stats.__dict__:
-                    observation_arguments.update({
-                    "model_name": (
-                        record_op_stats.record_details["record_details"]
-                        if "model_name" in record_op_stats.op_details
-                        else None
-                    ),
-                    "filter_str": (
-                        record_op_stats.record_details["filter_str"]
-                        if "filter_str" in record_op_stats.op_details
-                        else None
-                    ),
-                    "input_fields_str": (
-                        "-".join(sorted(record_op_stats.op_details["input_fields"]))
-                        if "input_fields" in record_op_stats.op_details
-                        else None
-                    ),
-                    "generated_fields_str": (
-                        "-".join(sorted(record_op_stats.op_details["generated_fields"]))
-                        if "generated_fields" in record_op_stats.op_details
-                        else None
-                    ),}
-                    )
-                    answer = {}
-                    # return key->value mapping for generated fields for induce
-                    if "generated_fields" in record_op_stats.op_details:
-                        for field in record_op_stats.op_details["generated_fields"]:
-                            answer[field] = record_op_stats.record_state[field]
-                    observation_arguments["answer"] = answer
-
-                if 'record_state' in record_op_stats.__dict__:
-                    observation_arguments.update({
-                    "total_input_tokens": (
-                        record_op_stats.record_details["total_input_tokens"]
-                        if "total_input_tokens" in record_op_stats.record_state
-                        else None
-                    ),
-                    "total_output_tokens": (
-                        record_op_stats.record_details["total_output_tokens"]
-                        if "total_output_tokens" in record_op_stats.record_state
-                        else None
-                    ),
-                    "total_input_cost": (
-                        record_op_stats.record_details["total_input_cost"]
-                        if "total_input_cost" in record_op_stats.record_state
-                        else None
-                    ),
-                    "total_output_cost": (
-                        record_op_stats.record_details["total_output_cost"]
-                        if "total_output_cost" in record_op_stats.record_state
-                        else None
-                    ),
-                    "answer": (record_op_stats.record_state["answer"] 
-                        if "answer" in record_op_stats.record_state
-                        else None),
-                    "passed_filter": (
-                        record_op_stats.record_state["_passed_filter"]
-                        if "_passed_filter" in record_op_stats.record_state
-                        else None
-                    ),
-                    })
-
-                    # return T/F for filter
-                    if "_passed_filter" in record_op_stats.record_state:
-                        observation_arguments["answer"] = record_op_stats.record_state["_passed_filter"]
-
-                observation = SampleExecutionData(**observation_arguments)
-                # add observation to list of observations
-                sample_execution_data.append(observation)
-
-            # update source_op_id
-            source_op_id = op_id
-
-        return sample_execution_data
 
 class Execute:
     def __new__(

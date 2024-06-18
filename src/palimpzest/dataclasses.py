@@ -64,6 +64,10 @@ class RecordOpStats:
 
     passed_filter: bool = None
 
+    
+# ['answer_log_probs', 'contents', 'filename', 'finish_reason', 'heatmap_obj', 'llm_call_duration_secs', 'prompt', 'sender', 'subject', 'usage']
+
+
     def to_dict(self):
         dct = asdict(self)
 
