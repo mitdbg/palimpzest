@@ -4,6 +4,7 @@ from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
 
 from palimpzest.constants import *
 from palimpzest.corelib import *
+from palimpzest.dataclasses import RecordOpStats
 from palimpzest.elements import *
 from palimpzest.operators import logical
 
@@ -37,6 +38,8 @@ class ConvertOp(PhysicalOperator):
         self.cardinality = cardinality
         self.desc = desc
         self.targetCacheId = targetCacheId
+        # TODO: as a temporary hack to get token reduction working, I'm adding this attribute
+        self.heatmap_json_obj = None
 
     def get_op_dict(self):
         return {
@@ -314,37 +317,46 @@ class LLMConvert(ConvertOp):
         )
 
 
-    # TODO
+    # TODO still: code generation
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
-        # initialize stats objects
-        op_id = self.get_op_id()
         if self.query_strategy == QueryStrategy.CONVENTIONAL:
+            # TODO: conventional queries currently do not support token reduction); we will need to confer w/Chunwei on a way to address this
             # NOTE: runConventionalQuery does exception handling internally
-            dr, record_stats = runConventionalQuery(
+            dr, stats = runConventionalQuery(
                 candidate=candidate, 
                 inputSchema=self.inputSchema,
                 outputSchema=self.outputSchema,
+                cardinality=self.cardinality,
                 token_budget=self.token_budget,
                 model=self.model,
                 conversionDesc=self.desc,
                 prompt_strategy=self.prompt_strategy,
                 verbose=False
-                )
-            drs = [dr] if type(dr) is not list else dr
-            # if profiling, set record's stats for the given op_id
-            if self.shouldProfile:
-                # TODO: divide bonded query_stats time, cost, and input/output tokens by len(drs)
-                record_stats.record_state = {
-                    "query_strategy": self.query_strategy.value,
-                    "token_budget": self.token_budget,
-                }                     
+            )
 
-            record_stats.record_state['heatmap_obj'] = new_heatmap_obj
+            # create RecordOpStats object
+            record_op_stats = RecordOpStats(
+                record_uuid=dr._uuid,
+                record_parent_uuid=dr._parent_uuid,
+                record_state=dr._asDict(include_bytes=False),
+                op_id=self.get_op_id(),
+                op_name=self.op_name(),
+                time_per_record=stats["time_per_record"],
+                cost_per_record=stats["cost_per_record"],
+                model_name=self.model.value,
+                input_fields=self.inputSchema.fieldNames(),
+                generated_fields=stats["generated_field_names"],
+                total_input_tokens=stats["total_input_tokens"],
+                total_output_tokens=stats["total_output_tokens"],
+                total_input_cost=stats["total_input_cost"],
+                total_output_cost=stats["total_output_cost"],
+                answer=stats["answer"],
+            )
 
-            return drs, [record_stats]
+            return [dr], [record_op_stats]
 
         elif self.query_strategy == QueryStrategy.BONDED_WITH_FALLBACK:
-            drs, new_heatmap_obj, record_stats, err_msg = runBondedQuery(
+            drs, new_heatmap_obj, stats_lst, err_msg = runBondedQuery(
                 candidate=candidate, 
                 inputSchema=self.inputSchema,
                 outputSchema=self.outputSchema,
@@ -361,7 +373,7 @@ class LLMConvert(ConvertOp):
             if err_msg is not None:
                 print(f"BondedQuery Error: {err_msg}")
                 print("Falling back to conventional query")
-                dr, record_stats = runConventionalQuery(
+                dr, stats = runConventionalQuery(
                     candidate=candidate, 
                     inputSchema=self.inputSchema,
                     outputSchema=self.outputSchema,
@@ -372,16 +384,35 @@ class LLMConvert(ConvertOp):
                     prompt_strategy=self.prompt_strategy,
                     verbose=False
                 )
-                drs = [dr] if type(dr) is not list else dr
-            # if profiling, set record's stats for the given op_id
-            if self.shouldProfile:
-                # TODO: divide bonded query_stats time, cost, and input/output tokens by len(drs)
-                record_stats.record_state = {
-                    "query_strategy": self.query_strategy.value,
-                    "token_budget": self.token_budget,
-                }                     
-            record_stats.record_state['heatmap_obj'] = new_heatmap_obj
-            return drs, [record_stats]
+                drs = [dr]
+                stats_lst = [stats]
+
+            # update heatmap
+            self.heatmap_json_obj = new_heatmap_obj
+
+            # create RecordOpStats objects
+            record_op_stats_lst = []
+            for stats in stats_lst:
+                record_op_stats = RecordOpStats(
+                    record_uuid=dr._uuid,
+                    record_parent_uuid=dr._parent_uuid,
+                    record_state=dr._asDict(include_bytes=False),
+                    op_id=self.get_op_id(),
+                    op_name=self.op_name(),
+                    time_per_record=stats["time_per_record"],
+                    cost_per_record=stats["cost_per_record"],
+                    model_name=self.model.value,
+                    input_fields=self.inputSchema.fieldNames(),
+                    generated_fields=stats["generated_field_names"],
+                    total_input_tokens=stats["total_input_tokens"],
+                    total_output_tokens=stats["total_output_tokens"],
+                    total_input_cost=stats["total_input_cost"],
+                    total_output_cost=stats["total_output_cost"],
+                    answer=stats["answer"],
+                )
+                record_op_stats_lst.append(record_op_stats)
+
+            return drs, record_op_stats_lst
         
         elif self.query_strategy == QueryStrategy.CODE_GEN:
             dr, full_code_gen_stats = runCodeGenQuery(

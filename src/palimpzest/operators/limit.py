@@ -73,14 +73,15 @@ class LimitScanOp(PhysicalOperator):
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         # NOTE: SimpleExecution.execute_dag ensures that no more than self.limit
         #       records are returned to the user by this operator.
-        # create RecordOpStats objects
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": 0.0,
-            "op_cost": 0.0,
-            "record_details": None,
-        }
-        record_op_stats = RecordOpStats.from_record_and_kwargs(candidate, **kwargs)
+        # create RecordOpStats object
+        record_op_stats = RecordOpStats(
+            record_uuid=candidate._uuid,
+            record_parent_uuid=candidate._parent_uuid,
+            record_state=candidate._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=0.0,
+            cost_per_record=0.0,
+        )
 
         return [candidate], [record_op_stats]

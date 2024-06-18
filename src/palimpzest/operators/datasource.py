@@ -126,16 +126,18 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         records = [output] if candidate.cardinality == Cardinality.ONE_TO_ONE else output
         end_time = time.time()
 
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": (end_time - start_time),
-            "op_cost": 0.0,
-            "record_details": None,
-        }
+        # create RecordOpStats objects
         record_op_stats_lst = []
         for record in records:
-            record_op_stats = RecordOpStats.from_record_and_kwargs(record, **kwargs)
+            record_op_stats = RecordOpStats(
+                record_uuid=record._uuid,
+                record_parent_uuid=record._parent_uuid,
+                record_state=record._asDict(include_bytes=False),
+                op_id=self.get_op_id(),
+                op_name=self.op_name(),
+                time_per_record=(end_time - start_time) / len(records),
+                cost_per_record=0.0,
+            )
             record_op_stats_lst.append(record_op_stats)
 
         return records, record_op_stats_lst
@@ -216,16 +218,18 @@ class CacheScanDataOp(DataSourcePhysicalOp):
         records = [output] if candidate.cardinality == Cardinality.ONE_TO_ONE else output
         end_time = time.time()
 
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": (end_time - start_time),
-            "op_cost": 0.0,
-            "record_details": None,
-        }
+        # create RecordOpStats objects
         record_op_stats_lst = []
         for record in records:
-            record_op_stats = RecordOpStats.from_record_and_kwargs(record, **kwargs)
+            record_op_stats = RecordOpStats(
+                record_uuid=record._uuid,
+                record_parent_uuid=record._parent_uuid,
+                record_state=record._asDict(include_bytes=False),
+                op_id=self.get_op_id(),
+                op_name=self.op_name(),
+                time_per_record=(end_time - start_time) / len(records),
+                cost_per_record=0.0,
+            )
             record_op_stats_lst.append(record_op_stats)
 
         return records, record_op_stats_lst

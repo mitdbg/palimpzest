@@ -24,7 +24,7 @@ class TestExecutionNoCache:
     #     output = Execute(enron_eval, policy=MaxQuality(), num_samples=2, nocache=True)
 
     # TODO: register dataset in fixture
-    def test_execute_dag_simple_scan(self):
+    def test_execute_dag_simple_scan(self, fixture, expected_output):
         scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
         plan = PhysicalPlan(
             operators=[scanOp],
@@ -57,8 +57,8 @@ class TestExecutionNoCache:
         assert record_stats.record_parent_uuid is None
         assert record_stats.op_id == op_id
         assert record_stats.op_name == "MarshalAndScanDataOp"
-        assert record_stats.op_time > 0.0
-        assert record_stats.op_cost == 0.0
+        assert record_stats.time_per_record > 0.0
+        assert record_stats.cost_per_record == 0.0
         assert record_stats.record_state == dr._asDict(include_bytes=False)
         assert record_stats.record_details is None
 
@@ -117,8 +117,8 @@ class TestExecutionNoCache:
                 assert record_stats.record_parent_uuid == dr._parent_uuid
                 assert record_stats.op_id == op_id
                 assert record_stats.op_name == op.op_name()
-                assert record_stats.op_time > 0.0
-                assert record_stats.op_cost == 0.0
+                assert record_stats.time_per_record > 0.0
+                assert record_stats.cost_per_record == 0.0
                 assert record_stats.record_state == dr._asDict(include_bytes=False)
                 assert record_stats.record_details["filter_fn_call_duration_secs"] > 0
                 assert record_stats.record_details["filter_str"] == filter.getFilterStr()
@@ -181,8 +181,8 @@ class TestExecutionNoCache:
                 assert record_stats.record_parent_uuid == dr._parent_uuid
                 assert record_stats.op_id == op_id
                 assert record_stats.op_name == op.op_name()
-                assert record_stats.op_time > 0.0
-                assert record_stats.op_cost > 0.0
+                assert record_stats.time_per_record > 0.0
+                assert record_stats.cost_per_record > 0.0
                 assert record_stats.record_state == dr._asDict(include_bytes=False)
                 assert record_stats.record_details["llm_call_duration_secs"] > 0
                 assert record_stats.record_details["filter_str"] == filter.getFilterStr()
@@ -238,8 +238,8 @@ class TestExecutionNoCache:
                 assert record_stats.record_parent_uuid == dr._parent_uuid
                 assert record_stats.op_id == op_id
                 assert record_stats.op_name == op.op_name()
-                assert record_stats.op_time > 0.0
-                assert record_stats.op_cost == 0.0
+                assert record_stats.time_per_record > 0.0
+                assert record_stats.cost_per_record == 0.0
                 assert record_stats.record_state == dr._asDict(include_bytes=False)
 
         # test full scan

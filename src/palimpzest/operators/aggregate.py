@@ -147,17 +147,18 @@ class ApplyGroupByOp(AggregateOp):
             drs.append(dr)
 
         # create RecordOpStats objects
-        per_record_op_time = time.time() - start_time
+        total_time = time.time() - start_time
         record_op_stats_lst = []
         for dr in drs:
-            kwargs = {
-                "op_id": self.get_op_id(),
-                "op_name": self.op_name(),
-                "op_time": per_record_op_time / len(drs),
-                "op_cost": 0.0,
-                "record_details": None,
-            }
-            record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+            record_op_stats = RecordOpStats(
+                record_uuid=dr._uuid,
+                record_parent_uuid=dr._parent_uuid,
+                record_state=dr._asDict(include_bytes=False),
+                op_id=self.get_op_id(),
+                op_name=self.op_name(),
+                time_per_record=total_time / len(drs),
+                cost_per_record=0.0,
+            )
             record_op_stats_lst.append(record_op_stats)
 
         return drs, record_op_stats_lst
@@ -227,15 +228,16 @@ class ApplyCountAggregateOp(AggregateOp):
         dr = DataRecord(Number, parent_uuid=candidates[-1]._uuid)
         dr.value = len(candidates)
 
-        # create RecordOpStats objects
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": time.time() - start_time,
-            "op_cost": 0.0,
-            "record_details": None,
-        }
-        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+        # create RecordOpStats object
+        record_op_stats = RecordOpStats(
+            record_uuid=dr._uuid,
+            record_parent_uuid=dr._parent_uuid,
+            record_state=dr._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+        )
 
         return [dr], [record_op_stats]
 
@@ -308,14 +310,15 @@ class ApplyAverageAggregateOp(AggregateOp):
         dr = DataRecord(Number, parent_uuid=candidates[-1]._uuid)
         dr.value = sum(list(map(lambda c: float(c.value), candidates))) / len(candidates)
 
-        # create RecordOpStats objects
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": time.time() - start_time,
-            "op_cost": 0.0,
-            "record_details": None,
-        }
-        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+        # create RecordOpStats object
+        record_op_stats = RecordOpStats(
+            record_uuid=dr._uuid,
+            record_parent_uuid=dr._parent_uuid,
+            record_state=dr._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+        )
 
         return [dr], [record_op_stats]

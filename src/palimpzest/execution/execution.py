@@ -79,6 +79,8 @@ class SimpleExecution(ExecutionEngine):
         self.min_plans = min_plans
         self.verbose = verbose
         self.available_models = available_models
+        if not available_models:
+            self.available_models = getModels()
         self.allow_model_selection = allow_model_selection
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
@@ -294,8 +296,8 @@ class SimpleExecution(ExecutionEngine):
             for record_op_stats in out_stats_lst:
                 x = plan_stats.operator_stats[op_id]
                 x.record_op_stats_lst.append(record_op_stats)
-                x.total_op_time += record_op_stats.op_time
-                x.total_op_cost += record_op_stats.op_cost
+                x.total_op_time += record_op_stats.time_per_record
+                x.total_op_cost += record_op_stats.cost_per_record
                 plan_stats.operator_stats[op_id] = x
 
         return out_records, plan_stats
@@ -387,8 +389,8 @@ class SimpleExecution(ExecutionEngine):
                     # TODO code a nice __add__ function for OperatorStats and RecordOpStats
                     record_op_stats.source_op_id = prev_op_id
                     op_stats.record_op_stats_lst.append(record_op_stats)
-                    op_stats.total_op_time += record_op_stats.op_time
-                    op_stats.total_op_cost += record_op_stats.op_cost
+                    op_stats.total_op_time += record_op_stats.time_per_record
+                    op_stats.total_op_cost += record_op_stats.cost_per_record
 
                 plan_stats.operator_stats[op_id] = op_stats
 

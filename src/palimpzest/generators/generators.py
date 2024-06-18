@@ -214,8 +214,8 @@ class CustomGenerator(BaseGenerator):
             record_parent_uuid="",
             op_id="",
             op_name="",
-            op_time=0.0,
-            op_cost=0.0,
+            time_per_record=0.0,
+            cost_per_record=0.0,
             record_state = {},
             op_details=op_details,
         )
@@ -365,7 +365,6 @@ class DSPyGenerator(BaseGenerator):
         after=log_attempt_number,
         reraise=True,
     )
-    # the generate method requires a user-provided budget parameter to specify te token budget. Default is 1.0, meaning the full context will be used.
     def generate(
         self,
         context: str,
@@ -462,7 +461,7 @@ class DSPyGenerator(BaseGenerator):
             "output_tokens": output_tokens,
             "input_cost": input_tokens * usd_per_input_token,
             "output_cost": output_tokens * usd_per_output_token,
-            "op_cost": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
             "prompt": dspy_lm.history[-1]["prompt"],
             "usage": usage,
             "finish_reason": finish_reason,
@@ -703,12 +702,12 @@ class ImageTextGenerator(BaseGenerator):
         #       especially since many of them are not implemented for the Gemini model -- but
         #       we will likely want a more robust solution in the future.
         # collect statistics on prompt, usage, and timing
-        op_time = end_time - start_time
-        op_cost = 0.0
+        time_per_record = end_time - start_time
+        cost_per_record = 0.0
 
         record_state = {
             "model_name": self.model_name,
-            "llm_call_duration_secs": op_time,
+            "llm_call_duration_secs": time_per_record,
             "prompt": prompt,
             "usage": usage,
             "finish_reason": finish_reason,
@@ -723,8 +722,8 @@ class ImageTextGenerator(BaseGenerator):
             record_parent_uuid="",
             op_id="",
             op_name="",
-            op_time=op_time,
-            op_cost=op_cost,
+            time_per_record=time_per_record,
+            cost_per_record=cost_per_record,
             record_state = record_state,
         )
 
@@ -820,8 +819,8 @@ def codeGenSingle(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(),
         record_parent_uuid="",
         op_id="",
         op_name="",
-        op_time=0.0,
-        op_cost=0.0,
+        time_per_record=0.0,
+        cost_per_record=0.0,
         record_state = record_state,
     )
     return code, stats

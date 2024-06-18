@@ -58,16 +58,16 @@ class CostEstimator:
     ) -> float:
         """
         Given sample cost data observations for a specific operation, compute the aggregate over
-        the `op_time` column.
+        the `time_per_record` column.
         """
         # use model-specific estimate if possible
         if model_name is not None:
             model_df = op_df[op_df.model_name == model_name]
             if not model_df.empty:
-                return model_df["op_time"].agg(agg=agg).iloc[0]
+                return model_df["time_per_record"].agg(agg=agg).iloc[0]
 
         # compute aggregate
-        return op_df["op_time"].agg(agg=agg).iloc[0]
+        return op_df["time_per_record"].agg(agg=agg).iloc[0]
 
     def _est_cost_per_record(self,
         op_df: pd.DataFrame, model_name: Optional[str] = None, agg: str = "mean"
@@ -102,8 +102,7 @@ class CostEstimator:
 
         # # compute average combined input/output usd spent
         # return (df['adj_input_usd'] + df['adj_output_usd']).agg(agg=agg).iloc[0]
-        return 0
-        #TODO This code is not working? There are None in the total_input_cost columns
+
         return (op_df["total_input_cost"] + op_df["total_output_cost"]).agg(agg=agg).iloc[0]
 
     def _est_tokens_per_record(self,
@@ -182,11 +181,10 @@ class CostEstimator:
 
         return num_output_records / num_input_records
 
-    # NOTE: What should this function return?
     def _is_correct(self, row):
         # simple equality check suffices for filter
         if "filter" in row["op_name"].lower():
-            return row["answer"] == row["accepted_answer"]
+            return int(row["answer"] == row["accepted_answer"])
 
         # otherwise, check equality on a per-key basis
         try:
@@ -202,7 +200,7 @@ class CostEstimator:
 
         except Exception as e:
             print(f"WARNING: error decoding answer or accepted_answer: {str(e)}")
-            return 0 # or False?
+            return 0
             
 
     def _est_quality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:

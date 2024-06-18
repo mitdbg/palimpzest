@@ -85,14 +85,15 @@ class ConvertFileToText(HardcodedConvert):
         dr.contents = text_content
 
         # create RecordOpStats object
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": time.time() - start_time,
-            "op_cost": 0.0,
-            "record_details": None,
-        }
-        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+        record_op_stats = RecordOpStats(
+            record_uuid=dr._uuid,
+            record_parent_uuid=dr._parent_uuid,
+            record_state=dr._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+        )
 
         return [dr], [record_op_stats]
 
@@ -127,14 +128,16 @@ class ConvertImageToEquation(HardcodedConvert):
         api_call_duration_secs = time.time() - api_start_time
 
         # create RecordOpStats object
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": time.time() - start_time,
-            "op_cost": 0.0,
-            "record_details": {"api_call_duration_secs": api_call_duration_secs},
-        }
-        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+        record_op_stats = RecordOpStats(
+            record_uuid=dr._uuid,
+            record_parent_uuid=dr._parent_uuid,
+            record_state=dr._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+            fn_call_duration_secs=api_call_duration_secs,
+        )
 
         return [dr], [record_op_stats]
 
@@ -165,14 +168,15 @@ class ConvertDownloadToFile(HardcodedConvert):
         dr.contents = candidate.content
 
         # create RecordOpStats object
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": time.time() - start_time,
-            "op_cost": 0.0,
-            "record_details": None,
-        }
-        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+        record_op_stats = RecordOpStats(
+            record_uuid=dr._uuid,
+            record_parent_uuid=dr._parent_uuid,
+            record_state=dr._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+        )
 
         return [dr], [record_op_stats]
 
@@ -197,14 +201,16 @@ class ConvertFileToXLS(HardcodedConvert):
         dr.sheet_names = xls.sheet_names
 
         # create RecordOpStats object
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": time.time() - start_time,
-            "op_cost": 0.0,
-            "record_details": {"api_call_duration_secs": api_call_duration_secs},
-        }
-        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+        record_op_stats = RecordOpStats(
+            record_uuid=dr._uuid,
+            record_parent_uuid=dr._parent_uuid,
+            record_state=dr._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+            fn_call_duration_secs=api_call_duration_secs,
+        )
 
         return [dr], [record_op_stats]
 
@@ -244,14 +250,16 @@ class ConvertXLSToTable(HardcodedConvert):
             dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
 
             # create RecordOpStats object
-            kwargs = {
-                "op_id": self.get_op_id(),
-                "op_name": self.op_name(),
-                "op_time": time.time() - start_time,
-                "op_cost": 0.0,
-                "record_details": {"api_call_duration_secs": api_call_duration_secs},
-            }
-            record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+            record_op_stats = RecordOpStats(
+                record_uuid=dr._uuid,
+                record_parent_uuid=dr._parent_uuid,
+                record_state=dr._asDict(include_bytes=False),
+                op_id=self.get_op_id(),
+                op_name=self.op_name(),
+                time_per_record=time.time() - start_time,
+                cost_per_record=0.0,
+                fn_call_duration_secs=api_call_duration_secs,
+            )
 
             # update start_time, records, and record_op_stats_lst
             start_time = time.time()
@@ -337,14 +345,16 @@ class ConvertFileToPDF(HardcodedConvert):
         dr.text_contents = text_content[:10000]  # TODO Very hacky
 
         # create RecordOpStats object
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": time.time() - start_time,
-            "op_cost": 0.0,
-            "record_details": {"api_call_duration_secs": api_call_duration_secs},
-        }
-        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+        record_op_stats = RecordOpStats(
+            record_uuid=dr._uuid,
+            record_parent_uuid=dr._parent_uuid,
+            record_state=dr._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+            fn_call_duration_secs=api_call_duration_secs,
+        )
 
         return [dr], [record_op_stats]
 
@@ -370,13 +380,14 @@ class SimpleTypeConvert(HardcodedConvert):
                 return None
 
         # create RecordOpStats object
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": time.time() - start_time,
-            "op_cost": 0.0,
-            "record_details": None,
-        }
-        record_op_stats = RecordOpStats.from_record_and_kwargs(dr, **kwargs)
+        record_op_stats = RecordOpStats(
+            record_uuid=dr._uuid,
+            record_parent_uuid=dr._parent_uuid,
+            record_state=dr._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+        )
 
         return [dr], [record_op_stats]

@@ -174,25 +174,27 @@ class NonLLMFilter(FilterOp):
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         # apply filter to input record
         start_time = time.time()
-        result = self.filter.filterFn(candidate)
-        filter_fn_call_duration_secs = time.time() - start_time
+        try:
+            result = self.filter.filterFn(candidate)
+        except Exception as e:
+            print(f"Error invoking user-defined function for filter: {e}")
 
-        # set _passed_filter attribute
-        setattr(candidate, "_passed_filter", result)
+        # time spent executing the filter function
+        fn_call_duration_secs = time.time() - start_time
 
         # create RecordOpStats object
-        record_details = {
-            "filter_fn_call_duration_secs": filter_fn_call_duration_secs,
-            "filter_str": self.filter.getFilterStr()
-        }
-        kwargs = {
-            "op_id": self.get_op_id(),
-            "op_name": self.op_name(),
-            "op_time": filter_fn_call_duration_secs,
-            "op_cost": 0.0,
-            "record_details": record_details,
-        }
-        record_op_stats = RecordOpStats.from_record_and_kwargs(candidate, **kwargs)
+        record_op_stats = RecordOpStats(
+            record_uuid=candidate._uuid,
+            record_parent_uuid=candidate._parent_uuid,
+            record_state=candidate._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=fn_call_duration_secs,
+            cost_per_record=0.0,
+            filter_str=self.filter.getFilterStr(),
+            passed_filter=result,
+            fn_call_duration_secs=fn_call_duration_secs,
+        )
 
         return [candidate], [record_op_stats]
 
@@ -303,56 +305,48 @@ class LLMFilter(FilterOp):
 
         # invoke LLM to generate filter decision (True or False)
         text_content = candidate._asJSON(include_bytes=False)
-        record_op_stats, gen_stats = None, None
+        response, gen_stats = None, {}
         try:
             response, _, gen_stats = generator.generate(
                 context=text_content,
                 question=self.filter.filterCondition,
             )
-
-            # create RecordOpStats object
-            record_details = {
-                "filter_str": self.filter.getFilterStr(),
-                **gen_stats,
-            }
-            record_op_stats = RecordOpStats(
-                record_uuid=candidate._uuid,
-                record_parent_uuid=candidate._parent_uuid,
-                record_state=candidate._asDict(include_bytes=False),
-                op_id=self.get_op_id(),
-                op_name=self.op_name(),
-                op_time=time.time() - start_time,
-                op_cost=gen_stats['op_cost'],
-                record_details=record_details,
-                model_name=self.model.value,
-                filter_str=self.filter.getFilterStr(),
-                total_input_tokens=gen_stats['input_tokens'],
-                total_output_tokens=gen_stats['output_tokens'],
-                total_input_cost=gen_stats['input_cost'],
-                total_output_cost=gen_stats['output_cost'],
-                answer=response
-            )
-
-            # set _passed_filter attribute and return record
-            setattr(candidate, "_passed_filter", "true" in response.lower())
-
         except Exception as e:
-            # If there is an exception consider the record as not passing the filter
             print(f"Error invoking LLM for filter: {e}")
-            setattr(candidate, "_passed_filter", False)
 
-            # create RecordOpStats object
-            record_details = {
-                "filter_str": self.filter.getFilterStr(),
-                **gen_stats,
-            }
-            kwargs = {
-                "op_id": self.get_op_id(),
-                "op_name": self.op_name(),
-                "op_time": time.time() - start_time,
-                "op_cost": gen_stats['op_cost'],
-                "record_details": record_details,
-            }
-            record_op_stats = RecordOpStats.from_record_and_kwargs(candidate, **kwargs)
+        # compute whether the record passed the filter or not
+        passed_filter = (
+            "true" in response.lower()
+            if response is not None
+            else False
+        )
+
+        # NOTE: this will treat the cost of failed LLM invocations as having 0.0 tokens and dollars,
+        #       when in reality this is only true if the error in generator.generate() happens before
+        #       the invocation of the LLM -- not if it happens after. (If it happens *during* the
+        #       invocation, then it's difficult to say what the true cost really should be). I think
+        #       the best solution is to place a try-except inside of the DSPyGenerator to still capture
+        #       and return the gen_stats if/when there is an error after invocation.
+        # create RecordOpStats object
+        record_op_stats = RecordOpStats(
+            record_uuid=candidate._uuid,
+            record_parent_uuid=candidate._parent_uuid,
+            record_state=candidate._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=gen_stats.get('cost_per_record', 0.0),
+            model_name=self.model.value,
+            filter_str=self.filter.getFilterStr(),
+            total_input_tokens=gen_stats.get('input_tokens', 0.0),
+            total_output_tokens=gen_stats.get('output_tokens', 0.0),
+            total_input_cost=gen_stats.get('input_cost', 0.0),
+            total_output_cost=gen_stats.get('output_cost', 0.0),
+            answer=response,
+            passed_filter=passed_filter,
+        )
+
+        # set _passed_filter attribute and return
+        setattr(candidate, "_passed_filter", passed_filter)
 
         return [candidate], [record_op_stats]

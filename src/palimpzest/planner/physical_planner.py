@@ -306,7 +306,7 @@ class PhysicalPlanner(Planner):
 
             elif isinstance(logical_op, pz_ops.LimitScan):
                 op_class = self.logical_physical_map[type(logical_op)][0]
-                op = op_class(
+                op = op_class( # **logical_op.getParameters()
                         inputSchema=logical_op.inputSchema,
                         outputSchema=logical_op.outputSchema,
                         limit=logical_op.limit,
