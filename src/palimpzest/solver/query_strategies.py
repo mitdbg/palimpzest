@@ -26,7 +26,6 @@ def _construct_query_prompt(
     prompt_strategy: PromptStrategy,
     conversionDesc: str,
     generate_field_names: List[str],
-    is_conventional: bool = False,
 ) -> str:
     """
     This function constructs the prompt for a bonded query.
@@ -66,10 +65,6 @@ def _construct_query_prompt(
         outputSingleOrPlural = "the output objects"
         appendixInstruction = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields described above. You must decide the correct number of output objects."
 
-    # if this is a conventional query, focus only on generating output field
-    if is_conventional:
-        targetOutputDescriptor = f'an output JSON object with a single key "{generate_field_names[0]}" whose value is specified in the input object.'
-
     # construct promptQuestion
     promptQuestion = None
     if prompt_strategy != PromptStrategy.IMAGE_TO_TEXT:
@@ -92,7 +87,7 @@ def _construct_query_prompt(
 
     else:
         promptQuestion = (
-            f"""You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor} {doc_type}.
+            f"""You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor}.
         You will use the information in the image that I will provide. The input image(s) has type {inputSchema.className()}.
         All of the fields in {outputSingleOrPlural} can be derived using information from the input image(s).
         {optionalInputDesc}
@@ -117,23 +112,26 @@ def _create_data_record_from_json(
     jsonObj: Any, 
     inputSchema,
     outputSchema,
-    candidate: DataRecord, cardinality_idx: int = None
+    candidate: DataRecord,
+    cardinality_idx: int = None
 ) -> DataRecord:
     # initialize data record
     dr = DataRecord(
         outputSchema, parent_uuid=candidate._uuid, cardinality_idx=cardinality_idx
     )
 
+    # TODO: This inherits all pre-computed fields in an incremental fashion. The positive / pros
+    #       of this approach is that it enables incremental schema computation, which tends to
+    #       feel more natural for the end-user. The downside is it requires us to support an
+    #       explicit projection to eliminate unwanted input / intermediate computation.
+    #
+    # first, copy all fields from input schema
+    for field_name in candidate.getFields():
+        setattr(dr, field_name, getattr(candidate, field_name))
+
     # get input field names and output field names
     input_fields = inputSchema.fieldNames()
     output_fields = outputSchema.fieldNames()
-
-    # TODO: this will not inherit all pre-computed fields if intermediate schema(s) do not inherit from the same base schema (as happens in Real Estate)
-    #       for example, if TextRealEstateListing did not inherit from RealEstateListingSourceFiles then the image_contents would not be present when we
-    #       make the call to generate the output fields for the ImageRealEstateListing
-    # first, copy all fields from input schema
-    for field_name in input_fields:
-        setattr(dr, field_name, getattr(candidate, field_name))
 
     # parse newly generated fields from the generated jsonObj
     for field_name in output_fields:
@@ -141,7 +139,7 @@ def _create_data_record_from_json(
             # parse the json object and set the DataRecord's fields with their generated values
             setattr(
                 dr, field_name, jsonObj.get(field_name, None)
-            )  # the use of get prevents a KeyError if an individual field is missing. TODO: is this behavior desired?
+            )  # the use of get prevents a KeyError if an individual field is missing.
 
     return dr
 
@@ -314,20 +312,14 @@ def runConventionalQuery(
     """
     start_time = time.time()
 
-    # initialize output data record
-    dr = DataRecord(outputSchema, parent_uuid=candidate._uuid)
-
-    # copy fields from the candidate (input) record if they already exist
-    # and construct list of fields in outputSchema which will need to be generated
+    # construct the list of fields in outputSchema which will need to be generated;
+    # specifically, this is the set of fields which are:
+    # 1. not declared in the input schema, and
+    # 2. not present in the candidate's attributes
+    #    a. if the field is present, but its value is None --> we will try to generate it
     generate_field_names = []
     for field_name in outputSchema.fieldNames():
-        if field_name in inputSchema.fieldNames():
-            setattr(dr, field_name, getattr(candidate, field_name))
-        elif hasattr(candidate, field_name) and (
-            getattr(candidate, field_name) is not None
-        ):
-            setattr(dr, field_name, getattr(candidate, field_name))
-        else:
+        if field_name not in inputSchema.fieldNames() and getattr(candidate, field_name, None) is None:
             generate_field_names.append(field_name)
 
     # fetch input information
@@ -335,144 +327,134 @@ def runConventionalQuery(
     doc_schema = str(outputSchema)
     doc_type = outputSchema.className()
 
-    # TODO: this is a hack we added which is currently doing a bonded query inside of runConventionalQuery in the event of a one-to-many cardinality convert
-    #       we should either:
-    #       (A) disallow conventional queries for one-to-many cardinality LLMConverts, or
-    #       (B) make this actually produce multiple outputs per-field in a "conventional" manner
-    if cardinality == Cardinality.ONE_TO_MANY:
-        raise NotImplementedError("We need to rethink this")
-        # # TODO here the problem is: which is the 1:N field that we are splitting the output into?
-        # # do we need to know this to construct the prompt question ?
-        # # for now, we will just assume there is only one list in the JSON.
-        # dct = json.loads(text_content)
-        # split_attribute = [att for att in dct.keys() if type(dct[att]) == list][0]
-        # n_splits = len(dct[split_attribute])
+    # generate each output field and update the query_stats (and the heatmap, if using a token_budget)
+    field_outputs, query_stats, new_heatmap_json_obj = dict(), dict(), None
+    for field_name in generate_field_names:
+        # construct prompt question
+        promptQuestion = _construct_query_prompt(
+            doc_type=doc_type,
+            inputSchema=inputSchema,
+            outputSchema=outputSchema,
+            cardinality=cardinality,
+            prompt_strategy=prompt_strategy,
+            conversionDesc=conversionDesc,
+            generate_field_names=[field_name]
+        )
 
-        # query_stats = dict()
-        # if prompt_strategy == PromptStrategy.DSPY_COT_QA:
-        #     # TODO doesn't this^ if-statement make promptQuestion undefined for image-to-text conventional queries?
-        #     #
-        #     # TODO Hacky to nest return and not disrupt the rest of method!!!
-        #     # NOTE: this is a bonded query, but we are treating it as a conventional query
-        #     promptQuestion = _construct_query_prompt(
-        #         doc_type=doc_type,
-        #         inputSchema=inputSchema,
-        #         outputSchema=outputSchema,
-        #         cardinality=cardinality,
-        #         prompt_strategy=prompt_strategy,
-        #         conversionDesc=conversionDesc,
-        #         generate_field_names=generate_field_names)
-        
-        # field_stats = None
-        # try:
-        #     if prompt_strategy == PromptStrategy.DSPY_COT_QA:
-        #         # print(f"FALL BACK FIELD: {field_name}")
-        #         # print("---------------")
-        #         # invoke LLM to generate output JSON
-        #         generator = DSPyGenerator(
-        #             model.value, prompt_strategy, doc_schema, doc_type, verbose
-        #         )
-        #         answer, field_stats = generator.generate(
-        #             text_content,
-        #             promptQuestion,
-        #             budget=token_budget,
-        #         )
+        # generate the output field and add the field_stats to the full query_stats
+        field_stats = None
+        try:
+            if prompt_strategy == PromptStrategy.DSPY_COT_QA:
+                # invoke LLM to generate output JSON
+                generator = DSPyGenerator(model.value, prompt_strategy, doc_schema, doc_type, verbose)
+                answer, new_heatmap_json_obj, field_stats = generator.generate(text_content, promptQuestion, budget=token_budget)
 
-        #     elif prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
-        #         # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
-        #         # b64 decode of candidate.contents or candidate.image_contents
-        #         base64_images = []
-        #         if hasattr(candidate, "contents"):
-        #             base64_images = [
-        #                 base64.b64encode(candidate.contents).decode("utf-8")  # TODO: should address this now; we need a way to infer (or have the programmer declare) what fields contain image content
-        #             ]
-        #         else:
-        #             base64_images = [
-        #                 base64.b64encode(image).decode("utf-8")
-        #                 for image in candidate.image_contents  # TODO: we should address this (see note above)
-        #             ]
-
-        #         # invoke LLM to generate output JSON
-        #         generator = ImageTextGenerator(model.value)
-        #         answer, field_stats = generator.generate(base64_images, promptQuestion)  # TODO: I think promptQuestion will be un-defined here b/c of the if-statement on line ~365
-
-        #     # TODO
-        #     elif prompt_strategy == PromptStrategy.ZERO_SHOT:
-        #         raise Exception("not implemented yet")
-
-        #     # TODO
-        #     elif prompt_strategy == PromptStrategy.FEW_SHOT:
-        #         raise Exception("not implemented yet")
-
-        #     # update query_stats
-        #     query_stats[f"{field_name}"] = field_stats
-
-        #     # extract result from JSON and set the DataRecord's field with its generated value
-        #     jsonObj = getJsonFromAnswer(answer)
-        #     setattr(dr, field_name, jsonObj[field_name])
-
-        # except Exception as e:
-        #     print(f"Conventional field processing error: {e}")
-        #     setattr(dr, field_name, None)
-        #     query_stats[f"{field_name}"] = field_stats
-    else:
-        query_stats = dict()
-        for field_name in generate_field_names:
-            # construct prompt question
-            promptQuestion = _construct_query_prompt(
-                doc_type=doc_type,
-                inputSchema=inputSchema,
-                outputSchema=outputSchema,
-                cardinality=cardinality,
-                prompt_strategy=prompt_strategy,
-                conversionDesc=conversionDesc,
-                generate_field_names=[field_name]
-            )
-
-            try:
-                field_stats = None
-                if prompt_strategy == PromptStrategy.DSPY_COT_QA:
-                    # invoke LLM to generate output JSON
-                    generator = DSPyGenerator(model.value, prompt_strategy, doc_schema, doc_type, verbose)
-                    answer, _, field_stats = generator.generate(text_content, promptQuestion)
-
-                elif prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:                               
-                    # b64 decode of candidate.contents
-                    image_b64 = base64.b64encode(candidate.contents).decode('utf-8')
-                    # invoke LLM to generate output JSON
-                    generator = ImageTextGenerator(model.value)
-                    answer, field_stats = generator.generate(image_b64, promptQuestion)
-
+            elif prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:                               
+                # TODO: this is very hacky; need to come up w/more general solution for multimodal schemas
+                # b64 decode of candidate.contents or candidate.image_contents
+                base64_images = []
+                if hasattr(candidate, "contents"):
+                    base64_images = [
+                        base64.b64encode(candidate.contents).decode("utf-8")  # TODO: should address this now; we need a way to infer (or have the programmer declare) what fields contain image content
+                    ]
                 else:
-                    raise Exception("not implemented yet")
+                    base64_images = [
+                        base64.b64encode(image).decode("utf-8")
+                        for image in candidate.image_contents  # TODO: we should address this (see note above)
+                    ]
+                # invoke LLM to generate output JSON
+                generator = ImageTextGenerator(model.value)
+                answer, field_stats = generator.generate(base64_images, promptQuestion)
 
-                # set the DataRecord's field with its generated value
-                setattr(dr, field_name, answer)
-                # update query_stats
-                query_stats[f"{field_name}"] = field_stats
+            else:
+                raise Exception("not implemented yet")
 
-            except Exception as e:
-                print(f"Conventional field processing error: {e}")
-                setattr(dr, field_name, None)
-                query_stats[f"{field_name}"] = None
+            # update field outputs
+            field_outputs[field_name] = answer
 
-    # create output stats object
-    stats = {
-        "time_per_record": (time.time() - start_time) / len(query_stats.values()),
-        "cost_per_record": sum([q['cost_per_record'] for q in query_stats.values()]),
-        "generated_fields": generate_field_names,
-        "total_input_tokens": sum([q['input_tokens'] for q in query_stats.values()]),
-        "total_output_tokens": sum([q['output_tokens'] for q in query_stats.values()]),
-        "total_input_cost": sum([q['input_cost'] for q in query_stats.values()]),
-        "total_output_cost": sum([q['output_cost'] for q in query_stats.values()]),
-        "answer": {field_name: getattr(dr, field_name) for field_name in generate_field_names},
-    }
+            # update query_stats
+            query_stats[field_name] = field_stats
+
+            # TODO: remove
+            # extract result from JSON and set the DataRecord's field with its generated value
+            jsonObj = getJsonFromAnswer(answer)
+            setattr(dr, field_name, jsonObj[field_name])
+
+        except Exception as e:
+            print(f"Conventional field processing error: {e}")
+            field_outputs[field_name] = None
+            query_stats[field_name] = field_stats
+
+    # TODO: helper fcn.
+    # for each field, parse the final json objects and standardize the outputs to be lists
+    field_to_clean_json_object, field_max_outputs = {}, 0
+    for field_name, answer in field_outputs.items():
+        try:
+            # parse JSON object from the answer
+            jsonObj = getJsonFromAnswer(answer)
+
+            # set the cleaned json object
+            if cardinality == Cardinality.ONE_TO_MANY:
+                assert isinstance(jsonObj["items"], list) and len(jsonObj["items"]) > 0, "No output objects were generated for one-to-many query"
+                field_to_clean_json_object[field_name] = jsonObj["items"]
+                field_max_outputs = max(field_max_outputs, len(jsonObj["items"]))
+            else:
+                field_to_clean_json_object[field_name] = [jsonObj]
+                field_max_outputs = 1
+        except:
+            field_to_clean_json_object[field_name] = []
+
+    # extend each field to have the same number of outputs
+    for field_name, json_lst in field_to_clean_json_object.items():
+        while len(json_lst) < field_max_outputs:
+            json_lst.append(None)
+
+    # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
+    final_json_objects = []
+    for idx in range(field_max_outputs):
+        output_fields_dict = {}
+        for field_name, json_lst in field_to_clean_json_object.items():
+            output_fields_dict[field_name] = json_lst[idx]
+
+        final_json_objects.append(output_fields_dict)
+
+    # TODO: helper fcn.
+    # construct the lists of output data records and stats
+    drs = []
+    for idx, elt in enumerate(final_json_objects):
+        # create output data record
+        dr = _create_data_record_from_json(
+            jsonObj=elt,
+            inputSchema=inputSchema,
+            outputSchema=outputSchema,
+            candidate=candidate,
+            cardinality_idx=idx
+        )
+        drs.append(dr)
+
+    # create output stats objects by amortizing runtime and cost across all output records
+    stats_lst = []
+    for dr in drs:
+        stats = {
+            "time_per_record": (time.time() - start_time) / len(drs),
+            # minor note: q["cost_per_record"] actually represents the cost-per-field (only
+            # for conventional queries), but the summation over all fields and division by
+            # all records yields the same effective calculation for the amortized cost_per_record
+            "cost_per_record": sum([q['cost_per_record'] for q in query_stats.values()]) / len(drs),
+            "generated_fields": generate_field_names,
+            "total_input_tokens": sum([q['input_tokens'] for q in query_stats.values()]) / len(drs),
+            "total_output_tokens": sum([q['output_tokens'] for q in query_stats.values()]) / len(drs),
+            "total_input_cost": sum([q['input_cost'] for q in query_stats.values()]) / len(drs),
+            "total_output_cost": sum([q['output_cost'] for q in query_stats.values()]) / len(drs),
+            "answer": {field_name: getattr(dr, field_name) for field_name in generate_field_names},
+        }
+        stats_lst.append(stats)
 
     # # TODO: debug root cause
     # if not hasattr(dr, 'filename'):
     #     setattr(dr, 'filename', candidate.filename)
 
-    return dr, stats
+    return drs, new_heatmap_json_obj, stats_lst
 
 
 def runCodeGenQuery(
@@ -595,7 +577,6 @@ def runCodeGenQuery(
                         prompt_strategy=prompt_strategy,
                         conversionDesc=conversionDesc,
                         generate_field_names=[field_name],
-                        is_conventional=False
                     )
                     field_stats = None
                     try:
@@ -735,7 +716,6 @@ def runCodeGenQuery(
                     prompt_strategy=prompt_strategy,
                     conversionDesc=None,
                     generate_field_names=[field_name],
-                    is_conventional=False
                     )
                     )
                 field_stats = None

@@ -36,22 +36,6 @@ class DataRecord:
         ]
         self._parent_uuid = parent_uuid
 
-        # attribute which may collect profiling stats pertaining to a record;
-        # keys will the the ID of the operation which generated the stats and the
-        # values will be Stats objects
-        self._stats = {}
-
-    def __setattr__(self, key, value):
-        # TODO: in the real-estate example, we define two schemas (one for text conversion
-        #       and one for image conversion), and the resulting record is meant to have the union
-        #       of their keys; we may need to rethink schemas and their relationship(s) to records,
-        #       as convert(s) can be defined to incrementally add to a schema.
-
-        # if not key.startswith("_") and not hasattr(self.schema, key):
-        #     raise Exception(f"Schema {self.schema} does not have a field named {key}")
-
-        super().__setattr__(key, value)
-
     def __getitem__(self, key):
         return super().__getattr__(key)
 
@@ -62,11 +46,7 @@ class DataRecord:
 
     def _asDict(self, include_bytes: bool = True):
         """Return a dictionary representation of this DataRecord"""
-        dct = {
-            k: self.__dict__[k]
-            for k in self.__dict__.keys()
-            if not k.startswith("_") and k != "schema"
-        }
+        dct = {k: self.__dict__[k] for k in self.getFields()}
         if not include_bytes:
             for k in dct:
                 if isinstance(dct[k], bytes) or (
@@ -82,3 +62,6 @@ class DataRecord:
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
+
+    def getFields(self):
+        return [k for k in self.__dict__.keys() if not k.startswith("_") and k != "schema"]

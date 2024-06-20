@@ -320,9 +320,7 @@ class LLMConvert(ConvertOp):
     # TODO still: code generation
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         if self.query_strategy == QueryStrategy.CONVENTIONAL:
-            # TODO: conventional queries currently do not support token reduction); we will need to confer w/Chunwei on a way to address this
-            # NOTE: runConventionalQuery does exception handling internally
-            dr, stats = runConventionalQuery(
+            drs, new_heatmap_obj, stats_lst = runConventionalQuery(
                 candidate=candidate, 
                 inputSchema=self.inputSchema,
                 outputSchema=self.outputSchema,
@@ -334,26 +332,32 @@ class LLMConvert(ConvertOp):
                 verbose=False
             )
 
-            # create RecordOpStats object
-            record_op_stats = RecordOpStats(
-                record_uuid=dr._uuid,
-                record_parent_uuid=dr._parent_uuid,
-                record_state=dr._asDict(include_bytes=False),
-                op_id=self.get_op_id(),
-                op_name=self.op_name(),
-                time_per_record=stats["time_per_record"],
-                cost_per_record=stats["cost_per_record"],
-                model_name=self.model.value,
-                input_fields=self.inputSchema.fieldNames(),
-                generated_fields=stats["generated_field_names"],
-                total_input_tokens=stats["total_input_tokens"],
-                total_output_tokens=stats["total_output_tokens"],
-                total_input_cost=stats["total_input_cost"],
-                total_output_cost=stats["total_output_cost"],
-                answer=stats["answer"],
-            )
+            # update heatmap
+            self.heatmap_json_obj = new_heatmap_obj
 
-            return [dr], [record_op_stats]
+            # create RecordOpStats objects
+            record_op_stats_lst = []
+            for stats in stats_lst:
+                record_op_stats = RecordOpStats(
+                    record_uuid=dr._uuid,
+                    record_parent_uuid=dr._parent_uuid,
+                    record_state=dr._asDict(include_bytes=False),
+                    op_id=self.get_op_id(),
+                    op_name=self.op_name(),
+                    time_per_record=stats["time_per_record"],
+                    cost_per_record=stats["cost_per_record"],
+                    model_name=self.model.value,
+                    input_fields=self.inputSchema.fieldNames(),
+                    generated_fields=stats["generated_field_names"],
+                    total_input_tokens=stats["total_input_tokens"],
+                    total_output_tokens=stats["total_output_tokens"],
+                    total_input_cost=stats["total_input_cost"],
+                    total_output_cost=stats["total_output_cost"],
+                    answer=stats["answer"],
+                )
+                record_op_stats_lst.append(record_op_stats)
+
+            return drs, record_op_stats_lst
 
         elif self.query_strategy == QueryStrategy.BONDED_WITH_FALLBACK:
             drs, new_heatmap_obj, stats_lst, err_msg = runBondedQuery(
@@ -413,30 +417,6 @@ class LLMConvert(ConvertOp):
                 record_op_stats_lst.append(record_op_stats)
 
             return drs, record_op_stats_lst
-        
-        elif self.query_strategy == QueryStrategy.CODE_GEN:
-            dr, full_code_gen_stats = runCodeGenQuery(
-                candidate=candidate,
-                inputSchema=self.inputSchema,
-                outputSchema=self.outputSchema,
-                token_budget=self.token_budget,
-                model=self.model,
-                conversionDesc=self.desc,
-                prompt_strategy=self.prompt_strategy,
-                verbose=False
-                )
-            drs = [dr]
-
-            # if profiling, set record's stats for the given op_id
-            if self.shouldProfile:
-                for dr in drs:
-                    dr._stats[op_id] = ConvertLLMStats(
-                        query_strategy=self.query_strategy.value,
-                        token_budget=self.token_budget,
-                        full_code_gen_stats=full_code_gen_stats,
-                    )
-
-            return drs, None
 
         elif self.query_strategy == QueryStrategy.CODE_GEN_WITH_FALLBACK:
             # similar to in _makeLLMTypeConversionFn; maybe we can have one strategy in which we try
@@ -480,4 +460,4 @@ class LLMConvert(ConvertOp):
             return drs, None
 
         else:
-            raise ValueError(f"Unrecognized QueryStrategy: {self.query_strategy.value}")
+            raise ValueError(f"Unimplemented QueryStrategy: {self.query_strategy.value}")
