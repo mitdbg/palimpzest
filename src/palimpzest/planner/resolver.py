@@ -1,13 +1,8 @@
 from palimpzest.constants import Model, PromptStrategy, QueryStrategy
 from palimpzest.operators import PhysicalOperator
-
-import palimpzest as pz
 import palimpzest.operators as pz_ops
 import palimpzest.corelib.schemas as schemas
-
 from typing import Optional
-
-
 import multiprocessing
 
 
@@ -105,28 +100,3 @@ def resolveLogicalFilterOp(
         op_class = pz_ops.NonLLMFilter
 
     return op_class(**parameters)
-
-def resolveLogicalApplyAggFuncOp(
-    logical_apply_agg_fn_op: pz_ops.ApplyAggregateFunction,
-    shouldProfile: bool = False,
-) -> PhysicalOperator:
-    """
-    Given the logical operator for a group by, determine which (set of) physical operation(s)
-    the PhysicalPlanner can use to implement that logical operation.
-    """
-
-    # TODO: use an Enum to list possible funcDesc(s)
-    physicalOp = None
-    if logical_apply_agg_fn_op.aggregationFunction.funcDesc == "COUNT":
-        physicalOp = pz_ops.ApplyCountAggregateOp
-    elif logical_apply_agg_fn_op.aggregationFunction.funcDesc == "AVERAGE":
-        physicalOp = pz_ops.ApplyAverageAggregateOp
-
-    op = physicalOp(
-        inputSchema=logical_apply_agg_fn_op.inputSchema,
-        aggFunction=logical_apply_agg_fn_op.aggregationFunction,
-        targetCacheId=logical_apply_agg_fn_op.targetCacheId,
-        shouldProfile=shouldProfile,
-    )
-
-    return op

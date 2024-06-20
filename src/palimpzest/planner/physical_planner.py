@@ -1,10 +1,9 @@
 from palimpzest.constants import Model, PromptStrategy, QueryStrategy
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.operators import PhysicalOperator
 from palimpzest.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.planner import LogicalPlan, PhysicalPlan
 from palimpzest.planner.planner import Planner
-from src.palimpzest.planner.resolver import resolveLogicalApplyAggFuncOp, resolveLogicalConvertOp, resolveLogicalFilterOp
+from src.palimpzest.planner.resolver import resolveLogicalConvertOp, resolveLogicalFilterOp
 from .plan import LogicalPlan, PhysicalPlan
 
 import palimpzest as pz
