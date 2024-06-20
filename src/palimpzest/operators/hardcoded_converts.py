@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import palimpzest as pz
 from palimpzest.constants import *
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.elements import DataRecord
@@ -273,9 +274,9 @@ class ConvertFileToPDF(HardcodedConvert):
     inputSchema = schemas.File
     outputSchema = schemas.PDFFile
 
-    def __init__(self, pdfprocessor: Optional[str] = None, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.pdfprocessor = pdfprocessor
+        self.pdfprocessor=pz.DataDirectory().current_config.get("pdfprocessing"),
 
     def __eq__(self, other: ConvertFileToPDF):
         return (

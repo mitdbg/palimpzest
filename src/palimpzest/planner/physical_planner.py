@@ -80,30 +80,14 @@ class PhysicalPlanner(Planner):
             op = None
             shouldProfile = True
 
-            if isinstance(logical_op, pz_ops.BaseScan):
-                op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
-                parameters = logical_op.getParameters()
-                op = op_class(num_samples = self.num_samples,
-                              scan_start_idx=self.scan_start_idx, 
-                              shouldProfile = shouldProfile,
-                              **parameters)
-
-            elif isinstance(logical_op, pz_ops.CacheScan):
-                op_class = self.logical_physical_map[type(logical_op)][0]
-                parameters = logical_op.getParameters()
-                op = op_class(num_samples=self.num_samples,
-                                scan_start_idx=self.scan_start_idx,
-                                shouldProfile=shouldProfile,
-                                **parameters)
-                    
-            elif isinstance(logical_op, pz_ops.ConvertScan):
+            if isinstance(logical_op, pz_ops.ConvertScan):
                 op = resolveLogicalConvertOp(
                     logical_op,
                     model=model,
                     prompt_strategy=PromptStrategy.DSPY_COT_QA,
                     query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
                     token_budget=1.0,
-                    sentinel=True,
+                    shouldProfile=shouldProfile,
                 )
 
             elif isinstance(logical_op, pz_ops.FilteredScan):
@@ -119,7 +103,7 @@ class PhysicalPlanner(Planner):
                             inputSchema=logical_op.inputSchema,
                             outputSchema=logical_op.outputSchema,
                             filter=logical_op.filter,
-                            shouldProfile=self.shouldProfile,
+                            shouldProfile=shouldProfile,
                         )
                 else:
                     op = resolveLogicalFilterOp(
@@ -127,38 +111,26 @@ class PhysicalPlanner(Planner):
                         model=model,
                         prompt_strategy=PromptStrategy.DSPY_COT_BOOL,
                         useParallelOps = self.useParallelOps,
-                        sentinel=True,
+                        shouldProfile=shouldProfile,
                     )
 
-            elif isinstance(logical_op, pz_ops.LimitScan):
-                op_class = self.logical_physical_map[type(logical_op)][0]
-                parameters = logical_op.getParameters()
-                op = op_class(num_samples=self.num_samples,
-                    scan_start_idx=self.scan_start_idx,
-                    shouldProfile=shouldProfile,
-                    **parameters
-                    )
-
-            elif isinstance(logical_op, pz_ops.GroupByAggregate):
-                op_class = self.logical_physical_map[type(logical_op)][0]
-                parameters = logical_op.getParameters()
-                op = op_class(**parameters,
-                    num_samples=self.num_samples,
-                    scan_start_idx=self.scan_start_idx,                              
-                    shouldProfile=shouldProfile,
-                    )
-
-            elif isinstance(logical_op, pz_ops.ApplyAggregateFunction):
-                if logical_op.aggregationFunction.funcDesc == "COUNT":
-                    op = pz_ops.ApplyCountAggregateOp
-                elif logical_op.aggregationFunction.funcDesc == "AVERAGE":
-                    op = pz_ops.ApplyAverageAggregateOp
+            else:
+                if isinstance(logical_op, pz_ops.BaseScan) or \
+                isinstance(logical_op, pz_ops.CacheScan) or \
+                isinstance(logical_op, pz_ops.LimitScan) or \
+                isinstance(logical_op, pz_ops.GroupByAggregate):
+                    op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
+                elif isinstance(logical_op, pz_ops.ApplyAggregateFunction):
+                    if logical_op.aggregationFunction.funcDesc == "COUNT":
+                        op_class = pz_ops.ApplyCountAggregateOp
+                    elif logical_op.aggregationFunction.funcDesc == "AVERAGE":
+                        op_class = pz_ops.ApplyAverageAggregateOp
 
                 parameters = logical_op.getParameters()
-                op = resolveLogicalApplyAggFuncOp(**parameters,
-                                                  num_samples=self.num_samples,
-                                                  scan_start_idx=self.scan_start_idx,
-                                                  shouldProfile=self.shouldProfile)
+                op = op_class(num_samples = self.num_samples,
+                                scan_start_idx=self.scan_start_idx, 
+                                shouldProfile = shouldProfile,
+                                **parameters)
 
             physical_operators.append(op)
 
