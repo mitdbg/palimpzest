@@ -15,6 +15,8 @@ class LogicalOperator:
     - ConvertScan (scans input Set and converts it to new Schema)
     - LimitScan (scans up to N records from a Set)
     - ApplyAggregateFunction (applies an aggregation on the Set)
+
+    Every logical operator must declare the getParameters() method, which returns a dictionary of parameters that are used to implement its physical operator.
     """
 
     def __init__(
@@ -25,6 +27,9 @@ class LogicalOperator:
         self.inputSchema = inputSchema
         self.outputSchema = outputSchema
 
+    def getParameters(self) -> dict:
+        raise NotImplementedError("Abstract method")
+    
     def __str__(self) -> str:
         raise NotImplementedError("Abstract method")
 
@@ -89,6 +94,18 @@ class ConvertScan(LogicalOperator):
 
     def logical_op_id(self):
         return f"{self.__class__.__name__}"
+    
+    def getParameters(self) -> dict:
+        return {
+            "inputSchema": self.inputSchema,
+            "outputSchema": self.outputSchema,
+            "cardinality": self.cardinality,
+            "image_conversion": self.image_conversion,
+            "depends_on": self.depends_on,
+            "desc": self.desc,
+            "targetCacheId": self.targetCacheId,
+            "generated_fields": self.generated_fields
+            }
 
 class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached Set."""
@@ -109,6 +126,11 @@ class CacheScan(LogicalOperator):
             cachedDataIdentifier=self.cachedDataIdentifier,
         )
 
+    def getParameters(self) -> dict:
+        return {
+            "outputSchema": self.outputSchema,
+            "cachedDataIdentifier": self.cachedDataIdentifier
+            }
 
 # NOTE: I feel we should remove datasetIdentifier from both the logical and physical operator. My argument is that the logical BaseScan is the same no matter what the datasetidentifier is. The datasetIdentifier is an execution-level  detail. Think about having two exactly equal workloads: except one is defined on folder enron-eval-tiny, one is defined on enron-eval-full. Why should the logical and physical *plans* be different ? The *execution* will be different, much like running a Filter on two different data items will differ.
 class BaseScan(LogicalOperator):
@@ -129,6 +151,12 @@ class BaseScan(LogicalOperator):
             outputSchema=self.outputSchema,
             datasetIdentifier=self.datasetIdentifier,
         )
+    
+    def getParameters(self) -> dict:
+        return {
+            "outputSchema": self.outputSchema,
+            "dataset_type": self.dataset_type
+            }
 
 
 class LimitScan(LogicalOperator):
@@ -147,6 +175,14 @@ class LimitScan(LogicalOperator):
             limit=self.limit,
             targetCacheId=self.targetCacheId,
         )
+
+    def getParameters(self) -> dict:
+        return {
+            "inputSchema": self.inputSchema,
+            "outputSchema": self.outputSchema,
+            "limit": self.limit,
+            "targetCacheId": self.targetCacheId
+            }
 
 
 class FilteredScan(LogicalOperator):
@@ -176,6 +212,13 @@ class FilteredScan(LogicalOperator):
             depends_on=self.depends_on,
             targetCacheId=self.targetCacheId,
         )
+    
+    def getParameters(self) -> dict:
+        return {
+            "inputSchema":self.inputSchema,
+            "outputSchema":self.outputSchema,
+            "filter":self.filter,
+            }
 
 
 class GroupByAggregate(LogicalOperator):
@@ -204,6 +247,13 @@ class GroupByAggregate(LogicalOperator):
             targetCacheId=self.targetCacheId,
         )
 
+    def getParameters(self) -> dict:
+        return {
+            "inputSchema": self.inputSchema,
+            "gbySig": self.gbySig,
+            "targetCacheId": self.targetCacheId
+            }
+
 
 class ApplyAggregateFunction(LogicalOperator):
     """ApplyAggregateFunction is a logical operator that applies a function to the input set and yields a single result."""
@@ -229,3 +279,10 @@ class ApplyAggregateFunction(LogicalOperator):
             aggregationFunction=self.aggregationFunction,
             targetCacheId=self.targetCacheId,
         )
+    
+    def getParameters(self) -> dict:
+        return {
+            "inputSchema":self.inputSchema,
+            "aggFunction":self.aggregationFunction,
+            "targetCacheId":self.targetCacheId,
+        }
