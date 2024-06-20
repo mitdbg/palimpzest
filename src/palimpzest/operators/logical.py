@@ -5,6 +5,8 @@ from palimpzest.elements import *
 
 from typing import List
 
+from src.palimpzest.datamanager.datamanager import DataDirectory
+
 
 class LogicalOperator:
     """
@@ -138,9 +140,9 @@ class BaseScan(LogicalOperator):
 
     def __init__(self, datasetIdentifier: str, *args, **kwargs):
         kwargs["inputSchema"] = None
-
         super().__init__(*args, **kwargs)
         self.datasetIdentifier = datasetIdentifier
+        self.dataset_type = DataDirectory().getRegisteredDatasetType(datasetIdentifier)
 
     def __str__(self):
         return f"BaseScan({self.datasetIdentifier},{str(self.outputSchema)})"

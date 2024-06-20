@@ -82,24 +82,20 @@ class PhysicalPlanner(Planner):
 
             if isinstance(logical_op, pz_ops.BaseScan):
                 op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
-                dataset_type = DataDirectory().getRegisteredDatasetType(datasetIdentifier)
-
-                op = op_class(outputSchema=logical_op.outputSchema,
-                              dataset_type=dataset_type,
-                              num_samples=self.num_samples,
-                              scan_start_idx=self.scan_start_idx,
-                              shouldProfile=shouldProfile,)
+                parameters = logical_op.getParameters()
+                op = op_class(num_samples = self.num_samples,
+                              scan_start_idx=self.scan_start_idx, 
+                              shouldProfile = shouldProfile,
+                              **parameters)
 
             elif isinstance(logical_op, pz_ops.CacheScan):
                 op_class = self.logical_physical_map[type(logical_op)][0]
-                op = op_class(outputSchema=logical_op.outputSchema,
-                                cachedDataIdentifier=logical_op.cachedDataIdentifier,
-                                num_samples=self.num_samples,
+                parameters = logical_op.getParameters()
+                op = op_class(num_samples=self.num_samples,
                                 scan_start_idx=self.scan_start_idx,
                                 shouldProfile=shouldProfile,
-                )
-
-                              
+                                **parameters)
+                    
             elif isinstance(logical_op, pz_ops.ConvertScan):
                 op = resolveLogicalConvertOp(
                     logical_op,
@@ -136,32 +132,33 @@ class PhysicalPlanner(Planner):
 
             elif isinstance(logical_op, pz_ops.LimitScan):
                 op_class = self.logical_physical_map[type(logical_op)][0]
-                op = op_class( # **logical_op.getParameters()
-                        inputSchema=logical_op.inputSchema,
-                        outputSchema=logical_op.outputSchema,
-                        limit=logical_op.limit,
-                        targetCacheId=logical_op.targetCacheId,
-                        shouldProfile=shouldProfile,
+                parameters = logical_op.getParameters()
+                op = op_class(num_samples=self.num_samples,
+                    scan_start_idx=self.scan_start_idx,
+                    shouldProfile=shouldProfile,
+                    **parameters
                     )
 
             elif isinstance(logical_op, pz_ops.GroupByAggregate):
                 op_class = self.logical_physical_map[type(logical_op)][0]
-                op = op_class(
-                    inputSchema=logical_op.inputSchema,
-                    gbySig=logical_op.gbySig,
-                    targetCacheId=logical_op.targetCacheId,
+                parameters = logical_op.getParameters()
+                op = op_class(**parameters,
+                    num_samples=self.num_samples,
+                    scan_start_idx=self.scan_start_idx,                              
                     shouldProfile=shouldProfile,
                     )
 
             elif isinstance(logical_op, pz_ops.ApplyAggregateFunction):
-                op = resolveLogicalApplyAggFuncOp(logical_op, sentinel=True)
-                # op_class = self.logical_physical_map[logical_op][0]
-                # op = op_class(
-                #     inputSchema=logical_op.inputSchema,
-                #     gbySig=logical_op.gbySig,
-                #     targetCacheId=logical_op.targetCacheId,
-                #     shouldProfile=shouldProfile,
-                #     )
+                if logical_op.aggregationFunction.funcDesc == "COUNT":
+                    op = pz_ops.ApplyCountAggregateOp
+                elif logical_op.aggregationFunction.funcDesc == "AVERAGE":
+                    op = pz_ops.ApplyAverageAggregateOp
+
+                parameters = logical_op.getParameters()
+                op = resolveLogicalApplyAggFuncOp(**parameters,
+                                                  num_samples=self.num_samples,
+                                                  scan_start_idx=self.scan_start_idx,
+                                                  shouldProfile=self.shouldProfile)
 
             physical_operators.append(op)
 

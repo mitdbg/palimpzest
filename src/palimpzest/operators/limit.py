@@ -18,6 +18,8 @@ class LimitScanOp(PhysicalOperator):
         limit: int,
         targetCacheId: str = None,
         shouldProfile=False,
+        *args,
+        **kwargs,
     ):
         super().__init__(
             inputSchema=inputSchema,

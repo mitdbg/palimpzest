@@ -30,6 +30,7 @@ class ApplyGroupByOp(AggregateOp):
         gbySig: GroupBySig,
         targetCacheId: str = None,
         shouldProfile=False,
+        *args, **kwargs,
     ):
         super().__init__(
             inputSchema=inputSchema,

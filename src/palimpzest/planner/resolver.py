@@ -157,14 +157,11 @@ def resolveLogicalFilterOp(
 def resolveLogicalApplyAggFuncOp(
     logical_apply_agg_fn_op: pz_ops.ApplyAggregateFunction,
     shouldProfile: bool = False,
-    sentinel: bool = False,
 ) -> PhysicalOperator:
     """
     Given the logical operator for a group by, determine which (set of) physical operation(s)
     the PhysicalPlanner can use to implement that logical operation.
     """
-    if sentinel:
-        shouldProfile = True
 
     # TODO: use an Enum to list possible funcDesc(s)
     physicalOp = None
