@@ -166,7 +166,7 @@ class ApplyGroupByOp(AggregateOp):
 
 
 class ApplyCountAggregateOp(AggregateOp):
-    implemented_op = logical.ApplyAggregateFunction
+    implemented_op = logical.ApplyCountAggregateFunction
 
     def __init__(
         self,
@@ -244,7 +244,7 @@ class ApplyCountAggregateOp(AggregateOp):
 
 
 class ApplyAverageAggregateOp(AggregateOp):
-    implemented_op = logical.ApplyAggregateFunction
+    implemented_op = logical.ApplyAverageAggregateFunction
 
     def __init__(
         self,

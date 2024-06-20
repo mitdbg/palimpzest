@@ -122,18 +122,7 @@ class PhysicalPlanner(Planner):
                     )
 
             else:
-                if isinstance(logical_op, pz_ops.BaseScan) or \
-                isinstance(logical_op, pz_ops.CacheScan) or \
-                isinstance(logical_op, pz_ops.LimitScan) or \
-                isinstance(logical_op, pz_ops.GroupByAggregate):
-                    op_class = self.logical_physical_map[type(logical_op)][0]
-                # TODO simplify this nested if
-                elif isinstance(logical_op, pz_ops.ApplyAggregateFunction):
-                    if logical_op.aggregationFunction.funcDesc == "COUNT":
-                        op_class = pz_ops.ApplyCountAggregateOp
-                    elif logical_op.aggregationFunction.funcDesc == "AVERAGE":
-                        op_class = pz_ops.ApplyAverageAggregateOp
-
+                op_class = self.logical_physical_map[type(logical_op)][0]
                 kw_parameters = logical_op.getParameters()
                 kw_parameters.update(execution_parameters)
                 op = op_class(**kw_parameters)
@@ -239,18 +228,7 @@ class PhysicalPlanner(Planner):
                 all_plans = plans
 
             else:
-                # Physical op implementation
-                if isinstance(logical_op, pz_ops.BaseScan) or \
-                    isinstance(logical_op, pz_ops.CacheScan) or \
-                    isinstance(logical_op, pz_ops.LimitScan) or \
-                    isinstance(logical_op, pz_ops.GroupByAggregate):
-                    op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
-                elif isinstance(logical_op, pz_ops.ApplyAggregateFunction):
-                    if logical_op.aggregationFunction.funcDesc == "COUNT":
-                        op_class = pz_ops.ApplyCountAggregateOp
-                    elif logical_op.aggregationFunction.funcDesc == "AVERAGE":
-                        op_class = pz_ops.ApplyAverageAggregateOp
-
+                op_class = self.logical_physical_map[type(logical_op)][0]
                 kw_parameters = logical_op.getParameters()
                 kw_parameters.update(execution_parameters)
                 physical_op = op_class(**kw_parameters)

@@ -258,21 +258,22 @@ class GroupByAggregate(LogicalOperator):
 
 
 class ApplyAggregateFunction(LogicalOperator):
-    """ApplyAggregateFunction is a logical operator that applies a function to the input set and yields a single result."""
+    """ApplyAggregateFunction is a logical operator that applies a function to the input set and yields a single result.
+    This is a base class that has to be further specialized to implement specific aggregation functions.
+    """
+    aggregationFunction: None
 
     def __init__(
         self,
-        aggregationFunction: AggregateFunction,
         targetCacheId: str = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.aggregationFunction = aggregationFunction
         self.targetCacheId = targetCacheId
 
     def __str__(self):
-        return f"ApplyAggregateFunction(function: {str(self.aggregationFunction)})"
+        return f"{self.__class__.__name__}(function: {str(self.aggregationFunction)})"
 
     def copy(self):
         return ApplyAggregateFunction(
@@ -288,3 +289,9 @@ class ApplyAggregateFunction(LogicalOperator):
             "aggFunction":self.aggregationFunction,
             "targetCacheId":self.targetCacheId,
         }
+
+class ApplyCountAggregateFunction(ApplyAggregateFunction):
+    aggregationFunction = AggregateFunction.COUNT
+
+class ApplyAverageAggregateFunction(ApplyAggregateFunction):
+    aggregationFunction = AggregateFunction.AVERAGE
