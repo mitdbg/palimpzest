@@ -4,6 +4,7 @@ from palimpzest.operators import PhysicalOperator
 from palimpzest.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.planner import LogicalPlan, PhysicalPlan
 from palimpzest.planner.planner import Planner
+from src.palimpzest.planner.resolver import resolveLogicalApplyAggFuncOp, resolveLogicalConvertOp, resolveLogicalFilterOp
 from .plan import LogicalPlan, PhysicalPlan
 
 import palimpzest as pz
@@ -63,178 +64,6 @@ class PhysicalPlanner(Planner):
                         ops = strategy(self.available_models)
                         self.logical_physical_map.get(logical_op, []).extend(ops)
 
-    def _resolveLogicalConvertOp(
-        self,
-        logical_convert_op: pz_ops.ConvertScan,
-        model: Optional[Model] = None,
-        prompt_strategy: Optional[PromptStrategy] = None,
-        query_strategy: Optional[QueryStrategy] = None,
-        token_budget: Optional[float] = 1.0,
-        shouldProfile: bool = False,
-        sentinel: bool = False,
-    ) -> PhysicalOperator:
-        """
-        Given the logical operator for a convert, determine which (set of) physical operation(s)
-        the PhysicalPlanner can use to implement that logical operation.
-        """
-        if sentinel:
-            shouldProfile = True
-
-        # get input and output schemas for convert
-        inputSchema = logical_convert_op.inputSchema
-        outputSchema = logical_convert_op.outputSchema
-
-        # TODO: test schema equality
-        # use simple convert if the input and output schemas are the same
-        if inputSchema == outputSchema:
-            op = pz_ops.SimpleTypeConvert(
-                inputSchema=inputSchema,
-                outputSchema=outputSchema,
-                targetCacheId=logical_convert_op.targetCacheId,
-                shouldProfile=shouldProfile,
-            )
-
-        # TODO: replace all these elif's with iteration over self.physical_ops
-        #       - Q: what happens if we ever have two hard-coded conversions w/same input and output schema?
-        #            - e.g. imagine if we had ConvertDownloadToFileTypeA and ConvertDownloadToFileTypeB
-        # if input and output schema are covered by a hard-coded convert; use that
-        elif isinstance(inputSchema, schemas.File) and isinstance(outputSchema, schemas.TextFile):
-            op = pz_ops.ConvertFileToText(
-                inputSchema=inputSchema,
-                outputSchema=outputSchema,
-                targetCacheId=logical_convert_op.targetCacheId,
-                shouldProfile=shouldProfile,
-            )
-
-        elif isinstance(inputSchema, schemas.ImageFile) and isinstance(outputSchema, schemas.EquationImage):
-            op = pz_ops.ConvertImageToEquation(
-                inputSchema=inputSchema,
-                outputSchema=outputSchema,
-                targetCacheId=logical_convert_op.targetCacheId,
-                shouldProfile=shouldProfile,
-            )
-
-        elif isinstance(inputSchema, schemas.Download) and isinstance(outputSchema, schemas.File):
-            op = pz_ops.ConvertDownloadToFile(
-                inputSchema=inputSchema,
-                outputSchema=outputSchema,
-                targetCacheId=logical_convert_op.targetCacheId,
-                shouldProfile=shouldProfile,
-            )
-
-        elif isinstance(inputSchema, schemas.File) and isinstance(outputSchema, schemas.XLSFile):
-            op = pz_ops.ConvertFileToXLS(
-                inputSchema=inputSchema,
-                outputSchema=outputSchema,
-                targetCacheId=logical_convert_op.targetCacheId,
-                shouldProfile=shouldProfile,
-            )
-
-        elif isinstance(inputSchema, schemas.XLSFile) and isinstance(outputSchema, schemas.Table):
-            op = pz_ops.ConvertXLSToTable(
-                inputSchema=inputSchema,
-                outputSchema=outputSchema,
-                cardinality=logical_convert_op.cardinality,
-                targetCacheId=logical_convert_op.targetCacheId,
-                shouldProfile=shouldProfile,
-            )
-
-        elif isinstance(inputSchema, schemas.File) and isinstance(outputSchema, schemas.PDFFile):
-            op = pz_ops.ConvertFileToPDF(
-                inputSchema=inputSchema,
-                outputSchema=outputSchema,
-                pdfprocessor=pz.DataDirectory().current_config.get("pdfprocessing"),
-                targetCacheId=logical_convert_op.targetCacheId,
-                shouldProfile=shouldProfile,
-            )
-
-        # otherwise, create convert op for the given set of hyper-parameters
-        else:
-            assert prompt_strategy is not None, "Prompt strategy must be specified for LLMConvert"
-            op = pz_ops.LLMConvert(
-                inputSchema=inputSchema,
-                outputSchema=outputSchema,
-                model=model,
-                prompt_strategy=prompt_strategy,
-                query_strategy=query_strategy,
-                token_budget=token_budget,
-                cardinality=logical_convert_op.cardinality,
-                image_conversion=logical_convert_op.image_conversion,
-                desc=logical_convert_op.desc,
-                targetCacheId=logical_convert_op.targetCacheId,
-            )
-
-        return op
-
-    def _resolveLogicalFilterOp(
-        self,
-        logical_filter_op: pz_ops.FilteredScan,
-        model: Optional[Model] = None,
-        prompt_strategy: Optional[PromptStrategy] = None,
-        shouldProfile: bool = False,
-        sentinel: bool = False,
-    ) -> PhysicalOperator:
-        """
-        Given the logical operator for a filter, determine which (set of) physical operation(s)
-        the PhysicalPlanner can use to implement that logical operation.
-        """
-        if sentinel:
-            shouldProfile = True
-
-        use_llm_filter = logical_filter_op.filter.filterFn is None
-        op = (
-            pz_ops.LLMFilter(
-                inputSchema=logical_filter_op.inputSchema,
-                outputSchema=logical_filter_op.outputSchema,
-                filter=logical_filter_op.filter,
-                model=model,
-                prompt_strategy=prompt_strategy,
-                targetCacheId=logical_filter_op.targetCacheId,
-                shouldProfile=shouldProfile,
-                max_workers=multiprocessing.cpu_count() if self.useParallelOps else 1,
-            )
-            if use_llm_filter
-            else pz_ops.NonLLMFilter(
-                inputSchema=logical_filter_op.inputSchema,
-                outputSchema=logical_filter_op.outputSchema,
-                filter=logical_filter_op.filter,
-                targetCacheId=logical_filter_op.targetCacheId,
-                shouldProfile=shouldProfile,
-                max_workers=multiprocessing.cpu_count() if self.useParallelOps else 1,
-            )
-        )
-
-        return op
-
-    def _resolveLogicalApplyAggFuncOp(
-        self,
-        logical_apply_agg_fn_op: pz_ops.ApplyAggregateFunction,
-        shouldProfile: bool = False,
-        sentinel: bool = False,
-    ) -> PhysicalOperator:
-        """
-        Given the logical operator for a group by, determine which (set of) physical operation(s)
-        the PhysicalPlanner can use to implement that logical operation.
-        """
-        if sentinel:
-            shouldProfile = True
-
-        # TODO: use an Enum to list possible funcDesc(s)
-        physicalOp = None
-        if logical_apply_agg_fn_op.aggregationFunction.funcDesc == "COUNT":
-            physicalOp = pz_ops.ApplyCountAggregateOp
-        elif logical_apply_agg_fn_op.aggregationFunction.funcDesc == "AVERAGE":
-            physicalOp = pz_ops.ApplyAverageAggregateOp
-
-        op = physicalOp(
-            inputSchema=logical_apply_agg_fn_op.inputSchema,
-            aggFunction=logical_apply_agg_fn_op.aggregationFunction,
-            targetCacheId=logical_apply_agg_fn_op.targetCacheId,
-            shouldProfile=shouldProfile,
-        )
-
-        return op
-
     def _createBaselinePlan(self, logical_plan: LogicalPlan, model: Model) -> PhysicalPlan:
         """A simple wrapper around _createSentinelPlan as right now these are one and the same."""
         return self._createSentinelPlan(logical_plan, model)
@@ -272,7 +101,7 @@ class PhysicalPlanner(Planner):
 
                               
             elif isinstance(logical_op, pz_ops.ConvertScan):
-                op = self._resolveLogicalConvertOp(
+                op = resolveLogicalConvertOp(
                     logical_op,
                     model=model,
                     prompt_strategy=PromptStrategy.DSPY_COT_QA,
@@ -297,10 +126,11 @@ class PhysicalPlanner(Planner):
                             shouldProfile=self.shouldProfile,
                         )
                 else:
-                    op = self._resolveLogicalFilterOp(
+                    op = resolveLogicalFilterOp(
                         logical_op,
                         model=model,
                         prompt_strategy=PromptStrategy.DSPY_COT_BOOL,
+                        useParallelOps = self.useParallelOps,
                         sentinel=True,
                     )
 
@@ -324,7 +154,7 @@ class PhysicalPlanner(Planner):
                     )
 
             elif isinstance(logical_op, pz_ops.ApplyAggregateFunction):
-                op = self._resolveLogicalApplyAggFuncOp(logical_op, sentinel=True)
+                op = resolveLogicalApplyAggFuncOp(logical_op, sentinel=True)
                 # op_class = self.logical_physical_map[logical_op][0]
                 # op = op_class(
                 #     inputSchema=logical_op.inputSchema,
@@ -402,7 +232,7 @@ class PhysicalPlanner(Planner):
                     for qs in query_strategies:
                         # for code generation: we do not need to iterate over models and token budgets
                         if qs in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
-                            physical_op = self._resolveLogicalConvertOp(
+                            physical_op = resolveLogicalConvertOp(
                                 logical_op,
                                 query_strategy=qs,
                                 prompt_strategy=PromptStrategy.DSPY_COT_QA,
@@ -416,7 +246,7 @@ class PhysicalPlanner(Planner):
                         models = self.available_models
                         for model in models:
                             for token_budget in token_budgets:
-                                physical_op = self._resolveLogicalConvertOp(
+                                physical_op = resolveLogicalConvertOp(
                                     logical_op,
                                     model=model,
                                     query_strategy=qs,
@@ -447,9 +277,10 @@ class PhysicalPlanner(Planner):
                     else:
                         models = self.available_models
                         for m in models:
-                            physical_op = self._resolveLogicalFilterOp(
+                            physical_op = resolveLogicalFilterOp(
                                 logical_op,
                                 model=m,
+                                useParallelOps = self.useParallelOps,
                                 prompt_strategy=PromptStrategy.DSPY_COT_BOOL,
                                 shouldProfile=self.shouldProfile,
                             )
@@ -497,7 +328,7 @@ class PhysicalPlanner(Planner):
                 all_plans = plans
 
             elif isinstance(logical_op, pz_ops.ApplyAggregateFunction):
-                physical_op = self._resolveLogicalApplyAggFuncOp(logical_op, shouldProfile=self.shouldProfile)
+                physical_op = resolveLogicalApplyAggFuncOp(logical_op, shouldProfile=self.shouldProfile)
 
                 plans = []
                 for subplan in all_plans:
