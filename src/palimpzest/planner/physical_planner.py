@@ -79,7 +79,14 @@ class PhysicalPlanner(Planner):
         for logical_op in logical_plan.operators:
             op = None
             shouldProfile = True
+            execution_parameters = {
+                "num_samples": self.num_samples,
+                "scan_start_idx": self.scan_start_idx,
+                "shouldProfile": self.shouldProfile,
+            }
 
+            # TODO the goal is to simply this if else into the following loop
+            # for op in self.logical_physical_map[type(logical_op)]:
             if isinstance(logical_op, pz_ops.ConvertScan):
                 op = resolveLogicalConvertOp(
                     logical_op,
@@ -119,18 +126,17 @@ class PhysicalPlanner(Planner):
                 isinstance(logical_op, pz_ops.CacheScan) or \
                 isinstance(logical_op, pz_ops.LimitScan) or \
                 isinstance(logical_op, pz_ops.GroupByAggregate):
-                    op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
+                    op_class = self.logical_physical_map[type(logical_op)][0]
+                # TODO simplify this nested if
                 elif isinstance(logical_op, pz_ops.ApplyAggregateFunction):
                     if logical_op.aggregationFunction.funcDesc == "COUNT":
                         op_class = pz_ops.ApplyCountAggregateOp
                     elif logical_op.aggregationFunction.funcDesc == "AVERAGE":
                         op_class = pz_ops.ApplyAverageAggregateOp
 
-                parameters = logical_op.getParameters()
-                op = op_class(num_samples = self.num_samples,
-                                scan_start_idx=self.scan_start_idx, 
-                                shouldProfile = shouldProfile,
-                                **parameters)
+                kw_parameters = logical_op.getParameters()
+                kw_parameters.update(execution_parameters)
+                op = op_class(**kw_parameters)
 
             physical_operators.append(op)
 
@@ -157,44 +163,15 @@ class PhysicalPlanner(Planner):
 
         # get logical operators
         operators = logical_plan.operators
-
+        execution_parameters = {
+            "num_samples": self.num_samples,
+            "scan_start_idx": self.scan_start_idx,
+            "shouldProfile": self.shouldProfile,
+        }
         all_plans = []
         for logical_op in operators:
-            # base case, if this operator is a BaseScan set all_plans to be the physical plan with just this operator
-            if isinstance(logical_op, pz_ops.BaseScan):
-                op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
-                dataset_type = DataDirectory().getRegisteredDatasetType(datasetIdentifier)
-                physical_op = op_class(outputSchema = logical_op.outputSchema,
-                              dataset_type=dataset_type,
-                              num_samples=self.num_samples,
-                              scan_start_idx=self.scan_start_idx,
-                              shouldProfile=self.shouldProfile,)
-                all_plans = [PhysicalPlan(operators=[physical_op], datasetIdentifier=datasetIdentifier)]
 
-            # base case (possibly), if this operator is a CacheScan and all_plans is empty, set all_plans to be
-            # the physical plan with just this operator; if all_plans is NOT empty, then merge w/all_plans
-            elif isinstance(logical_op, pz_ops.CacheScan):
-                op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
-                physical_op = op_class(outputSchema=logical_op.outputSchema,
-                                cachedDataIdentifier=logical_op.cachedDataIdentifier,
-                                num_samples=self.num_samples,
-                                scan_start_idx=self.scan_start_idx,
-                                shouldProfile=self.shouldProfile,
-                )
-
-
-                if all_plans == []:
-                    all_plans = [PhysicalPlan(operators=[physical_op], datasetIdentifier=datasetIdentifier)]
-                else:
-                    plans = []
-                    for subplan in all_plans:
-                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
-                        plans.append(new_physical_plan)
-
-                    # update all_plans
-                    all_plans = plans
-
-            elif isinstance(logical_op, pz_ops.ConvertScan):
+            if isinstance(logical_op, pz_ops.ConvertScan):
                 plans = []
                 for subplan in all_plans:
                     # TODO: if hard-coded conversion, don't iterate over all plan possibilities
@@ -261,51 +238,34 @@ class PhysicalPlanner(Planner):
                 # update all_plans
                 all_plans = plans
 
-            elif isinstance(logical_op, pz_ops.LimitScan):
-                op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
-                physical_op = op_class(
-                        inputSchema=logical_op.inputSchema,
-                        outputSchema=logical_op.outputSchema,
-                        limit=logical_op.limit,
-                        targetCacheId=logical_op.targetCacheId,
-                        shouldProfile=self.shouldProfile,
-                    )
+            else:
+                # Physical op implementation
+                if isinstance(logical_op, pz_ops.BaseScan) or \
+                    isinstance(logical_op, pz_ops.CacheScan) or \
+                    isinstance(logical_op, pz_ops.LimitScan) or \
+                    isinstance(logical_op, pz_ops.GroupByAggregate):
+                    op_class = self.logical_physical_map[type(logical_op)][0] # only one physical operator
+                elif isinstance(logical_op, pz_ops.ApplyAggregateFunction):
+                    if logical_op.aggregationFunction.funcDesc == "COUNT":
+                        op_class = pz_ops.ApplyCountAggregateOp
+                    elif logical_op.aggregationFunction.funcDesc == "AVERAGE":
+                        op_class = pz_ops.ApplyAverageAggregateOp
 
-                plans = []
-                for subplan in all_plans:
-                    new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
-                    plans.append(new_physical_plan)
-
-                # update all_plans
-                all_plans = plans
-
-            elif isinstance(logical_op, pz_ops.GroupByAggregate):
-                op_class = self.logical_physical_map[type(logical_op)][0]
-                physical_op = op_class(
-                    inputSchema=logical_op.inputSchema,
-                    gbySig=logical_op.gbySig,
-                    targetCacheId=logical_op.targetCacheId,
-                    shouldProfile=self.shouldProfile,
-                    )
-
-                plans = []
-                for subplan in all_plans:
-                    new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
-                    plans.append(new_physical_plan)
-
-                # update all_plans
-                all_plans = plans
-
-            elif isinstance(logical_op, pz_ops.ApplyAggregateFunction):
-                physical_op = resolveLogicalApplyAggFuncOp(logical_op, shouldProfile=self.shouldProfile)
-
-                plans = []
-                for subplan in all_plans:
-                    new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
-                    plans.append(new_physical_plan)
-
-                # update all_plans
-                all_plans = plans
+                kw_parameters = logical_op.getParameters()
+                kw_parameters.update(execution_parameters)
+                physical_op = op_class(**kw_parameters)
+                
+                # base case, if this operator is a BaseScan set all_plans to be the physical plan with just this operatorù
+                # This also happens if the operator is a CacheScan and all_plans is empty
+                if isinstance(logical_op, pz_ops.BaseScan) or \
+                    (isinstance(logical_op, pz_ops.CacheScan) and all_plans == []):
+                    all_plans = [PhysicalPlan(operators=[physical_op], datasetIdentifier=datasetIdentifier)]
+                else:
+                    plans = []
+                    for subplan in all_plans:
+                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                        plans.append(new_physical_plan)
+                    all_plans = plans
 
         return all_plans
 
