@@ -67,6 +67,9 @@ class RecordOpStats:
     # (if applicable) the True/False result of whether this record passed the filter or not
     passed_filter: Optional[bool] = None
 
+    # (if applicable) the time (in seconds) spent executing a call to an LLM
+    llm_call_duration_secs: float = 0.0
+
     # (if applicable) the time (in seconds) spent executing a UDF or calling an external api
     fn_call_duration_secs: float = 0.0
 

@@ -95,7 +95,7 @@ class API:
         return cls(name=name, inputs=inputs, outputs=outputs)
 
     @classmethod
-    def from_inout_schema(cls, inputSchema, outputSchema, field_name, input_fields=None):
+    def from_input_output_schemas(cls, inputSchema, outputSchema, field_name, input_fields=None):
         name, inputs, outputs = "extraction", list(), list()
         if input_fields is None:
             input_fields = inputSchema.fieldNames()

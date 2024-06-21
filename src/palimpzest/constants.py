@@ -47,9 +47,9 @@ class QueryStrategy(Enum):
     CODE_GEN = "code-gen"
     CODE_GEN_WITH_FALLBACK = "codegen-with-fallback"
 
-class CodeGenStrategy(Enum):
+class CodeSynthStrategy(Enum):
     """
-    CodeGenStrategy describes the high-level approach to generating code.
+    CodeSynthStrategy describes the high-level approach to generating code.
     in order to perform a specified task.
     """
     # DEFAULT = "single"

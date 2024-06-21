@@ -30,8 +30,9 @@ class PhysicalPlanner(Planner):
             allow_code_synth: Optional[bool]=True,
             allow_token_reduction: Optional[bool]=True,
             shouldProfile: Optional[bool]=True,
+            no_cache: Optional[bool]=False,
             useParallelOps: Optional[bool]=False,
-            useStrategies: Optional[bool]=False, # only for debug purposes 
+            useStrategies: Optional[bool]=False, # only for debug purposes
         *args,
         **kwargs,
     ):
@@ -43,6 +44,7 @@ class PhysicalPlanner(Planner):
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.shouldProfile = shouldProfile
+        self.no_cache = no_cache
         self.useParallelOps = useParallelOps
         self.useStrategies = useStrategies
         # Ideally this gets customized by model selection, code synth, etc. etc. using strategies

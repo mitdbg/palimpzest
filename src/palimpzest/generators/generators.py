@@ -195,30 +195,28 @@ class CustomGenerator(BaseGenerator):
         finish_reason = response["choices"][0]["finish_reason"]
         usage = response["usage"]
 
-        op_details = {
+        # collect statistics on prompt, usage, and timing
+        usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
+        usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
+        input_tokens = usage["prompt_tokens"]
+        output_tokens = usage["completion_tokens"]
+
+        # NOTE: needs to match subset of keys produced by LLMConvert._create_empty_query_stats()
+        stats={
             "model_name": self.model_name,
             "llm_call_duration_secs": end_time - start_time,
+            "fn_call_duration_secs": 0.0,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "input_cost": input_tokens * usd_per_input_token,
+            "output_cost": output_tokens * usd_per_output_token,
+            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
             "prompt": dspy_lm.history[-1]["prompt"],
             "usage": usage,
             "finish_reason": finish_reason,
             "answer_log_probs": answer_log_probs,
             "answer": answer,
         }
-
-        # collect statistics on prompt, usage, and timing
-        # TODO the actual values cannot be filled here but have to filled by the execution
-        # GV My feeling is that we should only return the op_details object up to the exeuction
-        stats = RecordOpStats(
-            record_idx=0,
-            record_uuid="",
-            record_parent_uuid="",
-            op_id="",
-            op_name="",
-            time_per_record=0.0,
-            cost_per_record=0.0,
-            record_state = {},
-            op_details=op_details,
-        )
 
         if self.verbose:
             print("Prompt history:")
@@ -254,6 +252,10 @@ class DSPyGenerator(BaseGenerator):
             raise ValueError(
                 f"DSPyGenerator does not support prompt_strategy: {prompt_strategy.value}"
             )
+
+    def _print_verbose(self, msg) -> None:
+        if self.verbose:
+            print(msg)
 
     def _get_model(self) -> dsp.LM:
         model = None
@@ -382,19 +384,9 @@ class DSPyGenerator(BaseGenerator):
         dspy.settings.configure(lm=dspy_lm)
         cot = dspyCOT(self.promptSignature)
 
-        json_object = {}
-        heatmap_file = ""
         # check if the promptSignature is a QA signature, so we can match the answer to get heatmap
         if budget < 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-            # file_cache = DataDirectory().getFileCacheDir()
             prompt_schema = self.promptSignature
-            # print("Prompt QA Signature: ", prompt_schema)
-            # print('Question: ', question)
-            # ordered = f'{prompt_schema} {question} {plan_idx}'
-            # task_hash = hashlib.sha256(ordered.encode()).hexdigest()
-            # heatmap_file = os.path.join(file_cache, f"heatmap-{task_hash}.json")
-            # print("Heatmap file: ", heatmap_file)
-            # if not os.path.exists(heatmap_file):
             if heatmap_json_obj is None:
                 # create the heatmap structure with default resolution of 0.001 and count of 0
                 buckets = int(1.0 / TOKEN_REDUCTION_GRANULARITY)
@@ -408,15 +400,10 @@ class DSPyGenerator(BaseGenerator):
                 }
 
             else:
-                # only parse the heatmap file if token reduction is enabled (budget is less than 1.0)
-                # with open(heatmap_file, 'r') as f:
-                #     json_object = json.load(f)
-                #     heatmap = json_object['heatmap']
-                #     count = json_object['count']
-                #     print("count:", count)
                 heatmap = heatmap_json_obj["heatmap"]
                 count = heatmap_json_obj["count"]
-                print("count:", count)
+                self._print_verbose(f"count: {count}")
+
                 # only refer to the heatmap if the count is greater than a enough sample size
                 # TODO: only trim the context if the attention is clustered in a small region
                 if count >= TOKEN_REDUCTION_SAMPLE:
@@ -429,18 +416,14 @@ class DSPyGenerator(BaseGenerator):
                         si * TOKEN_REDUCTION_GRANULARITY,
                         ei * TOKEN_REDUCTION_GRANULARITY,
                     )
-                    print("start ratio:", sr, "end ratio:", er)
+                    self._print_verbose(f"start ratio: {sr} -- end ratio: {er}")
                     context = get_trimed(context, sr, er)
                     reduction = True
 
         # execute LLM generation
         start_time = time.time()
 
-        print(f"Generating -- {self.model_name} -- Token budget: {budget}")
-        # print(f"FALL BACK question: {question}")
-        # print(f"FALL BACK CONTEXT")
-        # print("--------------------")
-        # print(f"{context}")
+        self._print_verbose(f"Generating -- {self.model_name} -- Token budget: {budget}")
         pred = cot(question, context)
 
         end_time = time.time()
@@ -454,9 +437,12 @@ class DSPyGenerator(BaseGenerator):
         usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
         input_tokens = usage["prompt_tokens"]
         output_tokens = usage["completion_tokens"]
+
+        # NOTE: needs to match subset of keys produced by LLMConvert._create_empty_query_stats()
         stats={
             "model_name": self.model_name,
             "llm_call_duration_secs": end_time - start_time,
+            "fn_call_duration_secs": 0.0,
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "input_cost": input_tokens * usd_per_input_token,
@@ -490,16 +476,7 @@ class DSPyGenerator(BaseGenerator):
             stats['answer_log_probs'] = answer_log_probs
             stats['answer'] = pred.answer
 
-        # print("----------------")
-        # print(f"PROMPT")
-        # print("----------------")
-        # print(dspy_lm.history[-1]['prompt'])
-
-        # print("----------------")
-        # print(f"ANSWER")
-        # print("----------------")
-        if self.verbose:
-            print(pred.answer)
+        self._print_verbose(pred.answer)
 
         # token reduction post processing if enabled
         if (
@@ -507,8 +484,8 @@ class DSPyGenerator(BaseGenerator):
             and self.prompt_strategy == PromptStrategy.DSPY_COT_QA
             and heatmap_json_obj["count"] < MAX_HEATMAP_UPDATES
         ):
-            print("Reduction enabled")
-            print("answer:", pred.answer)
+            self._print_verbose("Reduction enabled")
+            self._print_verbose(f"answer: {pred.answer}")
             try:
                 gsi, gei = best_substring_match(pred.answer, full_context)
             except Exception as e:
@@ -519,10 +496,8 @@ class DSPyGenerator(BaseGenerator):
             norm_si, norm_ei = int(gsr / TOKEN_REDUCTION_GRANULARITY), int(
                 ger / TOKEN_REDUCTION_GRANULARITY
             )
-            print("best_start:", gsi, "best_end:", gei)
+            self._print_verbose(f"best_start: {gsi} -- best_end: {gei}")
             heatmap_json_obj = update_heatmap_json(heatmap_json_obj, norm_si, norm_ei)
-            # with open(heatmap_file, 'w') as f:
-            #     json.dump(json_object, f)
 
         if self.verbose:
             print("Prompt history:")
@@ -732,212 +707,21 @@ class ImageTextGenerator(BaseGenerator):
 
 
 # TODO: refactor this to have a CodeSynthGenerator
-llm = CustomGenerator(model_name=Model.GPT_4.value)
-def run_codegen(prompt, language='Python'):
-    pred, stats = llm.generate(prompt=prompt)
-    ordered_keys = [
-        f'```{language}',
-        f'```{language.lower()}',
-        f'```'
-    ]
-    code = None
-    for key in ordered_keys:
-        if key in pred:
-            code = pred.split(key)[1].split('```')[0].strip()
-            break
-    return code, stats
-
-def parse_multiple_outputs(text, outputs=['Thought', 'Action']):
-    data = {}
-    for key in reversed(outputs):
-        if key+':' in text:
-            remain, value = text.rsplit(key+':', 1)
-            data[key.lower()] = value.strip()
-            text = remain
-        else:
-            data[key.lower()] = None
-    return data
-
-def parse_ideas(text, limit=3):
-    return parse_multiple_outputs(text, outputs=[f'Idea {i}' for i in range(1, limit+1)])
-
-def run_advgen(prompt):
-    pred, stats = llm.generate(prompt=prompt)
-    advs = parse_ideas(pred); return advs, stats
-
-def codeGenDefault(api):
-    return api.api_def()+"  return None\n", RecordOpStats()
-
-EXAMPLE_PROMPT = """Example{idx}:
-{example_inputs}
-{example_output}
-"""
-CODEGEN_PROMPT = """You are a helpful programming assistant and an expert {language} programmer. Implement the {language} function `{api}` that extracts `{output}` ({output_desc}) from given inputs:
-{inputs_desc}
-{examples_desc}
-Notice that the evaluation will severely punish incorrect outputs. Thus, when the function is uncertain, it should return `None` to abstain instead of returning an incorrect guess.
-{advice}
-Return the implementation only."""
-# NOTE: I think examples was List[DataRecord] and is now List[dict]
-def codeGenSingle(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), advice: str=None, language='Python'):
-    prompt_template = CODEGEN_PROMPT
-    context = {
-        'language': language,
-        'api': api.args_call(),
-        'output': api.output,
-        'inputs_desc': "\n".join([f"- {k} ({api.input_descs[i]})" for i, k in enumerate(api.inputs)]),
-        'output_desc': api.output_desc,
-        'examples_desc': "\n".join([
-            EXAMPLE_PROMPT.format(
-                idx = f" {i}" if len(examples)>1 else "",
-                example_inputs = "\n".join([f"- {k} = {repr(example[k])}" for k in api.inputs]),
-                example_output = ""
-            ) for i, example in enumerate(examples, 1)
-        ]),
-        'advice': f"Hint: {advice}" if advice else "",
-    }
-    prompt = prompt_template.format(**context)
-    print("PROMPT")
-    print("-------")
-    print(f"{prompt}")
-    code, gen_stats = run_codegen(prompt, language=language)
-    print("-------")
-    print("GENERATED CODE")
-    print("---------------")
-    print(f"{code}")
-    record_state = {
-        'prompt_template': prompt_template,
-        'context': context,
-        'code': code,
-        'gen_stats': gen_stats,
-    }
-
-    raise NotImplementedError("Fill in the details")
-    stats = RecordOpStats(
-        record_idx=0,
-        record_uuid="",
-        record_parent_uuid="",
-        op_id="",
-        op_name="",
-        time_per_record=0.0,
-        cost_per_record=0.0,
-        record_state = record_state,
-    )
-    return code, stats
-
-ADVICEGEN_PROMPT = """You are a helpful programming assistant and an expert {language} programmer. Your job is to provide programming ideas to help me write {language} programs.
-For example, if I want to complete a task: "extract the salary number (in USD) from a given employee's document", you can provide me with {n} different ways to do it like:
-Idea 1: Use regular expressions to extract the salary number: a number with a dollar sign in front of it. For example, $100,000.
-Idea 2: Find the table entry with the salary number.
-Idea 3: Use a pre-trained NLP model to extract the salary number.
-# 
-Now, consider the following {language} programming task that extracts `{output}` ({output_desc}) from given inputs:
-{examples_desc}
-Please provide me with {n} different ideas to complete this task. Return the ideas only, following the format above.
-"""
-# NOTE: I think examples was List[DataRecord] and is now List[dict]
-def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), language='Python', n_advices=4):
-    prompt_template = ADVICEGEN_PROMPT
-    context = {
-        'language': language,
-        'api': api.args_call(),
-        'output': api.output,
-        'inputs_desc': "\n".join([f"- {k} ({api.input_descs[i]})" for i, k in enumerate(api.inputs)]),
-        'output_desc': api.output_desc,
-        'examples_desc': "\n".join([
-            EXAMPLE_PROMPT.format(
-                idx = f" {i}" if len(examples)>1 else "",
-                example_inputs = "\n".join([f"- {k} = {repr(example[k])}" for k in api.inputs]),
-                example_output = ""
-            ) for i, example in enumerate(examples, 1)
-        ]),
-        'n': n_advices,
-    }
-    prompt = prompt_template.format(**context)
-    advs, stats = run_advgen(prompt)
-    return advs, stats
-
-# NOTE: I think examples was List[DataRecord] and is now List[dict]
-def reGenerationCondition(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), strategy: CodeGenStrategy=CodeGenStrategy.SINGLE,
-    code_ensemble: int=4,               # if strategy != SINGLE
-    code_num_examples: int=1,           # if strategy != EXAMPLE_ENSEMBLE
-    code_regenerate_frequency: int=200, # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION
-) -> bool:
-    if strategy == CodeGenStrategy.NONE:
-        return False
-    if strategy == CodeGenStrategy.EXAMPLE_ENSEMBLE:
-        return len(examples) <= code_ensemble
-    if strategy == CodeGenStrategy.ADVICE_ENSEMBLE:
-        return False
-    if strategy == CodeGenStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION:
-        return len(examples)%code_regenerate_frequency == 0
-
-# NOTE: I think examples was List[DataRecord] and is now List[dict]
-def codeEnsembleGeneration(api: API, examples: List[Dict[DataRecord, DataRecord]]=list(), strategy: CodeGenStrategy=CodeGenStrategy.SINGLE,
-    code_ensemble_num: int=1,           # if strategy != SINGLE
-    code_num_examples: int=1,           # if strategy != EXAMPLE_ENSEMBLE
-    code_regenerate_frequency: int=200, # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION
-) -> Tuple[Dict[str, str], RecordOpStats]:
-    code_ensemble = dict(); 
-    # TODO make this compatible with new stats refactor
-    code_gen_stats = RecordOpStats()
-    if strategy == CodeGenStrategy.NONE:
-        code, stats = codeGenDefault(api)
-        for i in range(code_ensemble_num):
-            code_name = f"{api.name}_v{i}"
-            code_gen_stats.code_versions_stats[code_name] = stats
-            code_ensemble[code_name] = code
-        return code_ensemble, code_gen_stats
-    if strategy == CodeGenStrategy.SINGLE:
-        code, stats = codeGenSingle(api, examples=examples[:code_num_examples])
-        for i in range(code_ensemble_num):
-            code_name = f"{api.name}_v{i}"
-            code_gen_stats.code_versions_stats[code_name] = stats
-            code_ensemble[code_name] = code
-        return code_ensemble, code_gen_stats
-    if strategy == CodeGenStrategy.EXAMPLE_ENSEMBLE:
-        for i in range(code_ensemble_num):
-            code_name = f"{api.name}_v{i}"
-            code, stats = codeGenSingle(api, examples=[examples[i]])
-            code_gen_stats.code_versions_stats[code_name] = stats
-            code_ensemble[code_name] = code
-        return code_ensemble, code_gen_stats
-    if strategy == CodeGenStrategy.ADVICE_ENSEMBLE:
-        advices, adv_stats = adviceGen(api, examples=examples[:code_num_examples], n_advices=code_ensemble_num)
-        code_gen_stats.advice_gen_stats = adv_stats
-        for i, adv in enumerate(advices):
-            code_name = f"{api.name}_v{i}"
-            code, stats = codeGenSingle(api, examples=examples[:code_num_examples], advice=adv)
-            code_gen_stats.code_versions_stats[code_name] = stats
-            code_ensemble[code_name] = code
-        return code_ensemble, code_gen_stats
-    if strategy == CodeGenStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION:
-        raise Exception("not implemented yet")
-
 def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose:bool=False):
     start_time = time.time()
     inputs = {field_name: candidate_dict[field_name] for field_name in api.inputs}
     response = api.api_execute(code, inputs)
     pred = response['response'] if response['status'] and response['response'] else None
-    end_time = time.time()
-    record_state = {
-        'code_response': response,
-        'code_exec_duration_secs': end_time - start_time,
-    }
-    return pred, record_state
+    return pred
 
 # Temporarily set default verbose to True for debugging
-def codeEnsembleExecution(api: API, code_ensemble: List[str], candidate_dict: Dict[str, Any], verbose:bool=True) -> Tuple[DataRecord, Dict]:
-    ensemble_stats = RecordOpStats()
+def codeEnsembleExecution(api: API, code_ensemble: List[Dict[str, str]], candidate_dict: Dict[str, Any], verbose: bool=True) -> Tuple[DataRecord, Dict]:
+    start_time = time.time()
     preds = list()
-
-    op_state = dict()
-    for code_name, code in code_ensemble.items():
-        pred, record_state = codeExecution(api, code, candidate_dict)
+    for _, code in code_ensemble.items():
+        pred = codeExecution(api, code, candidate_dict)
         preds.append(pred)
-        op_state[code_name] = record_state
 
-    ensemble_stats.op_state = op_state
     preds = [pred for pred in preds if pred is not None]
     print(preds)
 
@@ -945,12 +729,13 @@ def codeEnsembleExecution(api: API, code_ensemble: List[str], candidate_dict: Di
     #       
     if len(preds) == 1:
         majority_response = preds[0]
-        ensemble_stats.majority_response = majority_response
-        return majority_response, ensemble_stats
+        exec_stats = {"fn_call_duration_secs": time.time() - start_time}
+        return majority_response, exec_stats
 
     if len(preds) > 0:
         majority_response = Counter(preds).most_common(1)[0][0]
-        ensemble_stats.majority_response = majority_response
+        exec_stats = {"fn_call_duration_secs": time.time() - start_time}
         # return majority_response+(" (codegen)" if verbose else ""), ensemble_stats
-        return majority_response, ensemble_stats
-    return None, ensemble_stats
+        return majority_response, exec_stats
+
+    return None, {"fn_call_duration_secs": time.time() - start_time}

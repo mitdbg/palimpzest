@@ -111,7 +111,7 @@ class Schema(metaclass=SchemaMetaclass):
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
 
-    def asJSON(
+    def asJSONStr(
         self, record_dict: Dict[str, Any], include_data_cols: bool = True
     ) -> str:
         """Return a JSON representation of a data record with this Schema"""
@@ -273,7 +273,7 @@ class Table(Schema):
         element_type=ListField, desc="The rows of the table", required=True
     )
 
-    def asJSON(self, record_dict: Dict[str, Any], *args, **kwargs) -> str:
+    def asJSONStr(self, record_dict: Dict[str, Any], *args, **kwargs) -> str:
         """Return a JSON representation of an instantiated object of this Schema"""
         # Take the rows in the record_dict and turn them into comma separated strings
         rows = []
@@ -286,4 +286,4 @@ class Table(Schema):
         header = ",".join(record_dict["header"])
         record_dict["header"] = header
 
-        return super(Table, self).asJSON(record_dict, *args, **kwargs)
+        return super(Table, self).asJSONStr(record_dict, *args, **kwargs)

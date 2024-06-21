@@ -39,10 +39,10 @@ class DataRecord:
     def __getitem__(self, key):
         return super().__getattr__(key)
 
-    def _asJSON(self, include_bytes: bool = True, *args, **kwargs):
+    def _asJSONStr(self, include_bytes: bool = True, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
         record_dict = self._asDict(include_bytes)
-        return self.schema().asJSON(record_dict, *args, **kwargs)
+        return self.schema().asJSONStr(record_dict, *args, **kwargs)
 
     def _asDict(self, include_bytes: bool = True):
         """Return a dictionary representation of this DataRecord"""

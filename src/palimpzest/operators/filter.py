@@ -196,6 +196,9 @@ class NonLLMFilter(FilterOp):
             fn_call_duration_secs=fn_call_duration_secs,
         )
 
+        # set _passed_filter attribute and return
+        setattr(candidate, "_passed_filter", result)
+
         return [candidate], [record_op_stats]
 
 
@@ -204,8 +207,11 @@ class LLMFilter(FilterOp):
     model = None
     prompt_strategy = PromptStrategy.DSPY_COT_BOOL
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, model: Model, prompt_strategy: PromptStrategy, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.model = model
+        self.prompt_strategy = prompt_strategy
+        # NOTE: right now I need to add these^ back otherwise self.model is never set
 
     def __eq__(self, other: LLMFilter):
         return (
@@ -293,18 +299,12 @@ class LLMFilter(FilterOp):
                 doc_type,
                 verbose=False, # TODO pass verbose argument
             )
-        # TODO
-        elif self.prompt_strategy == PromptStrategy.ZERO_SHOT:
-            raise Exception("not implemented yet")
-        # TODO
-        elif self.prompt_strategy == PromptStrategy.FEW_SHOT:
-            raise Exception("not implemented yet")
-        # TODO
-        elif self.prompt_strategy == PromptStrategy.CODE_GEN_BOOL:
+
+        else:
             raise Exception("not implemented yet")
 
         # invoke LLM to generate filter decision (True or False)
-        text_content = candidate._asJSON(include_bytes=False)
+        text_content = candidate._asJSONStr(include_bytes=False)
         response, gen_stats = None, {}
         try:
             response, _, gen_stats = generator.generate(
@@ -342,6 +342,7 @@ class LLMFilter(FilterOp):
             total_output_tokens=gen_stats.get('output_tokens', 0.0),
             total_input_cost=gen_stats.get('input_cost', 0.0),
             total_output_cost=gen_stats.get('output_cost', 0.0),
+            llm_call_duration_secs=gen_stats.get('llm_call_duration_secs', 0.0),
             answer=response,
             passed_filter=passed_filter,
         )

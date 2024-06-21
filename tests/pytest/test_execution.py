@@ -24,7 +24,7 @@ class TestExecutionNoCache:
     #     output = Execute(enron_eval, policy=MaxQuality(), num_samples=2, nocache=True)
 
     # TODO: register dataset in fixture
-    def test_execute_dag_simple_scan(self, fixture, expected_output):
+    def test_execute_dag_simple_scan(self):
         scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
         plan = PhysicalPlan(
             operators=[scanOp],
@@ -60,7 +60,6 @@ class TestExecutionNoCache:
         assert record_stats.time_per_record > 0.0
         assert record_stats.cost_per_record == 0.0
         assert record_stats.record_state == dr._asDict(include_bytes=False)
-        assert record_stats.record_details is None
 
         # test full scan
         simple_execution = SimpleExecution(nocache=True)
@@ -120,8 +119,8 @@ class TestExecutionNoCache:
                 assert record_stats.time_per_record > 0.0
                 assert record_stats.cost_per_record == 0.0
                 assert record_stats.record_state == dr._asDict(include_bytes=False)
-                assert record_stats.record_details["filter_fn_call_duration_secs"] > 0
-                assert record_stats.record_details["filter_str"] == filter.getFilterStr()
+                assert record_stats.fn_call_duration_secs > 0
+                assert record_stats.filter_str == filter.getFilterStr()
 
         # test full scan
         simple_execution = SimpleExecution(nocache=True)
@@ -184,8 +183,8 @@ class TestExecutionNoCache:
                 assert record_stats.time_per_record > 0.0
                 assert record_stats.cost_per_record > 0.0
                 assert record_stats.record_state == dr._asDict(include_bytes=False)
-                assert record_stats.record_details["llm_call_duration_secs"] > 0
-                assert record_stats.record_details["filter_str"] == filter.getFilterStr()
+                assert record_stats.llm_call_duration_secs > 0
+                assert record_stats.filter_str == filter.getFilterStr()
 
         # test full scan
         simple_execution = SimpleExecution(nocache=True)
@@ -254,10 +253,10 @@ class TestExecutionNoCache:
             assert dr.filename == os.path.join("testdata/enron-eval-tiny/", expected_filename)
             assert hasattr(dr, 'contents') and dr.contents != None
 
-    # TODO
-    def test_execute_dat_with_aggregate(self):
-        raise Exception("TODO")
+    # # TODO
+    # def test_execute_dag_with_aggregate(self):
+    #     raise Exception("TODO")
 
-    # TODO
-    def test_execute_dat_with_limit(self):
-        raise Exception("TODO")
+    # # TODO
+    # def test_execute_dag_with_limit(self):
+    #     raise Exception("TODO")
