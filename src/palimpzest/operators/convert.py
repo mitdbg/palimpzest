@@ -372,6 +372,7 @@ class LLMConvert(ConvertOp):
             "fn_call_duration_secs": 0.0,
         }
 
+
     def _generate_field_names(self, candidate: DataRecord, inputSchema: Schema, outputSchema: Schema) -> List[str]:
         """
         Creates the list of field names that the convert operation needs to generate.
@@ -511,6 +512,7 @@ class LLMConvert(ConvertOp):
             record_op_stats_lst.append(record_op_stats)
 
         return record_op_stats_lst
+
 
     def _create_data_record_from_json(
         self,
@@ -695,13 +697,13 @@ class LLMConvert(ConvertOp):
         self,
         exemplars: List[Exemplar],
         strategy: CodeSynthStrategy=CodeSynthStrategy.SINGLE,
-        num_exemplars: int=4,               # if strategy == EXAMPLE_ENSEMBLE
+        num_exemplars: int=1,               # if strategy == EXAMPLE_ENSEMBLE
         code_regenerate_frequency: int=200, # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION
     ) -> bool:
         if strategy == CodeSynthStrategy.NONE:
             return False
         elif strategy == CodeSynthStrategy.SINGLE:
-            return not self.code_synthesized
+            return not self.code_synthesized and len(exemplars) >= num_exemplars
         elif strategy == CodeSynthStrategy.EXAMPLE_ENSEMBLE:
             if len(exemplars) <= num_exemplars:
                 return False
@@ -899,10 +901,6 @@ class LLMConvert(ConvertOp):
             # if we're not synthesizing new code ensemble(s) and there is nothing to fetch, return None
             return None
 
-        # if there are no exemplars; return None
-        if len(exemplars) == 0:
-            return None
-
         # initialize stats to be collected for each field's code sythesis
         total_code_synth_stats = self._create_empty_query_stats()
 
@@ -938,6 +936,10 @@ class LLMConvert(ConvertOp):
                 print(f"CODE NAME: {code_name}")
                 print("-----------------------")
                 print(code)
+
+        # set field_to_code_ensemble and code_synthesized to True
+        self.field_to_code_ensemble = field_to_code_ensemble
+        self.code_synthesized = True
 
         return field_to_code_ensemble, total_code_synth_stats
 
@@ -998,14 +1000,14 @@ class LLMConvert(ConvertOp):
                 # extend each field to have the same number of outputs
                 for field_name, json_objects in field_outputs.items():
                     while len(json_objects) < field_max_outputs:
-                        json_objects.append(None)
+                        json_objects.append({field_name: None})
 
                 # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
                 final_json_objects = []
                 for idx in range(field_max_outputs):
                     output_fields_dict = {}
                     for field_name, json_objects in field_outputs.items():
-                        output_fields_dict[field_name] = json_objects[idx]
+                        output_fields_dict[field_name] = json_objects[field_name][idx]
 
                     final_json_objects.append(output_fields_dict)
 
@@ -1064,14 +1066,14 @@ class LLMConvert(ConvertOp):
             # extend each field to have the same number of outputs
             for field_name, json_objects in field_outputs.items():
                 while len(json_objects) < field_max_outputs:
-                    json_objects.append(None)
+                    json_objects.append({field_name: None})
 
             # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
             final_json_objects = []
             for idx in range(field_max_outputs):
                 output_fields_dict = {}
                 for field_name, json_objects in field_outputs.items():
-                    output_fields_dict[field_name] = json_objects[idx]
+                    output_fields_dict[field_name] = json_objects[field_name][idx]
 
                 final_json_objects.append(output_fields_dict)
 
@@ -1116,7 +1118,7 @@ class LLMConvert(ConvertOp):
                 final_json_objects, query_stats = self._dspy_generate_fields(
                     generate_field_names,
                     text_content=text_content,
-                    model=Model.GPT_4,
+                    model=Model.GPT_4,  # TODO: assert GPT-4 is available; maybe fall back to another model otherwise
                     prompt_strategy=PromptStrategy.DSPY_COT_QA,
                 )
 
@@ -1129,7 +1131,7 @@ class LLMConvert(ConvertOp):
                 # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
                 #       keep an eye out for a regression in code synth performance and revert if necessary
                 # update operator's set of exemplars
-                exemplars = [dr._asDict(include_bytes=False) for dr in drs]
+                exemplars = [dr._asDict(include_bytes=False) for dr in drs] # TODO: need to extend candidate to same length and zip
                 self.exemplars.extend(exemplars)
 
                 # if we are allowed to cache exemplars across plan executions, add exemplars to cache

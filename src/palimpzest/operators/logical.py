@@ -5,7 +5,7 @@ from palimpzest.elements import *
 
 from typing import List
 
-from src.palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.datamanager import DataDirectory
 
 
 class LogicalOperator:
