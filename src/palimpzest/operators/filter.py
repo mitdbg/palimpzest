@@ -207,10 +207,8 @@ class LLMFilter(FilterOp):
     model = None
     prompt_strategy = PromptStrategy.DSPY_COT_BOOL
 
-    def __init__(self, model: Model, prompt_strategy: PromptStrategy, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.model = model
-        self.prompt_strategy = prompt_strategy
         # NOTE: right now I need to add these^ back otherwise self.model is never set
 
     def __eq__(self, other: LLMFilter):

@@ -173,6 +173,7 @@ class DSPyInterfaceWrapper(LLMGeneratorWrapper):
         answer_log_probs = response["choices"][0]["logprobs"]
         finish_reason = response["choices"][0]["finish_reason"]
         usage = response["usage"]
+        print("Generator usage", usage)
 
         # collect statistics on prompt, usage, and timing
         stats = GenerationStats(

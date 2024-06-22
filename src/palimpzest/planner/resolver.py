@@ -52,7 +52,7 @@ def resolveLogicalConvertOp(
         op_class = pz_ops.ConvertFileToXLS
 
     elif isinstance(inputSchema, schemas.XLSFile) and isinstance(outputSchema, schemas.Table):
-        op = pz_ops.ConvertXLSToTable
+        op_class = pz_ops.ConvertXLSToTable
         parameters["cardinality"] = logical_convert_op.cardinality
 
     elif isinstance(inputSchema, schemas.File) and isinstance(outputSchema, schemas.PDFFile):

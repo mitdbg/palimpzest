@@ -3,7 +3,7 @@ from palimpzest.operators import PhysicalOperator
 from palimpzest.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.planner import LogicalPlan, PhysicalPlan
 from palimpzest.planner.planner import Planner
-from src.palimpzest.planner.resolver import resolveLogicalConvertOp, resolveLogicalFilterOp
+from palimpzest.planner.resolver import resolveLogicalConvertOp, resolveLogicalFilterOp
 from .plan import LogicalPlan, PhysicalPlan
 
 import palimpzest as pz
@@ -114,6 +114,7 @@ class PhysicalPlanner(Planner):
                             shouldProfile=shouldProfile,
                         )
                 else:
+                    raise NotImplementedError("This should not be called")
                     op = resolveLogicalFilterOp(
                         logical_op,
                         model=model,
@@ -211,6 +212,7 @@ class PhysicalPlanner(Planner):
                                 shouldProfile=self.shouldProfile,
                             )
                     else:
+                        raise NotImplementedError("This should not be called")
                         models = self.available_models
                         for m in models:
                             physical_op = resolveLogicalFilterOp(

@@ -291,7 +291,7 @@ class ApplyAggregateFunction(LogicalOperator):
         }
 
 class ApplyCountAggregateFunction(ApplyAggregateFunction):
-    aggregationFunction = AggregateFunction.COUNT
+    aggregationFunction = AggregateFunction(funcDesc="COUNT")
 
 class ApplyAverageAggregateFunction(ApplyAggregateFunction):
-    aggregationFunction = AggregateFunction.AVERAGE
+    aggregationFunction = AggregateFunction(funcDesc="AVERAGE")
