@@ -153,25 +153,21 @@ class ParallelConvertFromCandidateOp(ConvertOp):
 
 class LLMConvert(ConvertOp):
     implemented_op = logical.ConvertScan
+    model: Model
+    prompt_strategy: PromptStrategy
 
     def __init__(
         self,
-        model: Optional[Model] = None,
-        prompt_strategy: Optional[PromptStrategy] = None,
         query_strategy: Optional[QueryStrategy] = None,
         token_budget: Optional[float] = None,
         image_conversion: bool = False,
-        no_cache_across_plans: bool = False,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.model = model
-        self.prompt_strategy = prompt_strategy
         self.query_strategy = query_strategy
         self.token_budget = token_budget
         self.image_conversion = image_conversion
-        self.no_cache_across_plans = no_cache_across_plans
 
         # for now, forbid CodeSynthesis on one-to-many cardinality queries
         if self.cardinality == Cardinality.ONE_TO_MANY:
@@ -233,13 +229,11 @@ class LLMConvert(ConvertOp):
         return f"{self.__class__.__name__}({str(self.outputSchema):10s}, Model: {model}, Prompt Strategy: {ps}, Query Strategy: {qs}, Token Budget: {str(self.token_budget)})"
 
     def copy(self):
-        return LLMConvert(
+        return self.__class__(
             outputSchema=self.outputSchema,
             inputSchema=self.inputSchema,
-            model=self.model,
             cardinality=self.cardinality,
             image_conversion=self.image_conversion,
-            prompt_strategy=self.prompt_strategy,
             query_strategy=self.query_strategy,
             token_budget=self.token_budget,
             desc=self.desc,
@@ -451,7 +445,6 @@ class LLMConvert(ConvertOp):
         """
         Construct list of RecordOpStats objects (one for each DataRecord).
         """
-        end_time = time.time()
         record_op_stats_lst = []
         for idx, dr in enumerate(records):
             record_op_stats = RecordOpStats(
@@ -471,7 +464,7 @@ class LLMConvert(ConvertOp):
                 total_output_cost=query_stats.get("output_cost", 0.0) / len(records),
                 llm_call_duration_secs=query_stats.get("llm_call_duration_secs", 0.0) / len(records),
                 fn_call_duration_secs=query_stats.get("fn_call_duration_secs", 0.0) / len(records),
-                answer= {field_name: getattr(dr[idx], field_name) for field_name in fields}
+                answer= {field_name: getattr(dr, field_name) for field_name in fields}
             )
             record_op_stats_lst.append(record_op_stats)
 
@@ -620,7 +613,7 @@ class LLMConvert(ConvertOp):
             raise Exception(f"Prompt strategy not implemented: {self.prompt_strategy}")
 
         marshal_time = time.time() - start_time
-        field_outputs, query_stats = self.convert(candidate, fields=fields_to_generate, content=content)
+        field_outputs, query_stats = self.convert(fields=fields_to_generate, candidate_content=content)
         query_stats["total_time"] += marshal_time
 
         # compute the max number of outputs in any field (for one-to-many cardinality queries,
@@ -637,13 +630,11 @@ class LLMConvert(ConvertOp):
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
-        records_json = [
-            {
-                field_name: json_objects[field_name][idx]
-                for field_name in fields
-            }
-            for idx in range(field_outputs)
-        ]
+        n_records = max([len(lst) for lst in field_outputs.values()])
+        records_json = [{} for _ in range(n_records)]
+        for field in field_outputs:
+            for idx, output in enumerate(field_outputs[field]):
+                records_json[idx].update(output)
 
         drs = [
             self._create_data_record_from_json(
@@ -654,7 +645,6 @@ class LLMConvert(ConvertOp):
 
         record_op_stats_lst = self._create_record_op_stats_lst(
             records=drs,
-            start_time=start_time,
             fields=fields_to_generate,
             query_stats=query_stats,
         )
@@ -670,7 +660,17 @@ class LLMConvertConventional(LLMConvert):
         for field_name in fields:
             json_objects, field_stats = self._dspy_generate_fields([field_name], content=candidate_content)
             for key, value in field_stats.items():
-                query_stats[key] = query_stats.get(key,0) + value
+                # TODO maybe a better way to find which stats to aggregate?
+                if type(value) == type(''):
+                    query_stats[key] = value
+                elif type(value) in [type(1), type(1.)]:
+                    query_stats[key] = query_stats.get(key, 0) + value
+                elif type(value) == type(dict()):
+                    for k2, v2 in value.items():
+                        query_stats[k2] = query_stats.get(k2,0) + v2 # Should we simply throw the usage away here?
+                else:
+                    # TODO what to do with list fields like answer_log_probs? 
+                    continue 
             field_outputs[field_name] = json_objects
 
         query_stats["total_time"] = time.time() - start_time

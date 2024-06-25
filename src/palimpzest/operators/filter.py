@@ -209,7 +209,6 @@ class LLMFilter(FilterOp):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        # NOTE: right now I need to add these^ back otherwise self.model is never set
 
     def __eq__(self, other: LLMFilter):
         return (
@@ -225,8 +224,6 @@ class LLMFilter(FilterOp):
 
     def copy(self):
         return self.__class__(
-            model=self.model,
-            prompt_strategy=self.prompt_strategy,
             inputSchema=self.inputSchema,
             outputSchema=self.outputSchema,
             filter=self.filter,
@@ -299,7 +296,7 @@ class LLMFilter(FilterOp):
             )
 
         else:
-            raise Exception("not implemented yet")
+            raise Exception(f"Prompt strategy {self.prompt_strategy} implemented yet")
 
         # invoke LLM to generate filter decision (True or False)
         text_content = candidate._asJSONStr(include_bytes=False)

@@ -8,9 +8,9 @@ from .strategy import PhysicalOpStrategy
 
 from palimpzest.constants import *
 from palimpzest.elements import *
-from palimpzest.operators import logical, physical
+from palimpzest.operators import logical, physical, convert
 
-class BondedQueryConvert(physical.LLMConvert):
+class LLMBondedQueryConvert(convert.LLMConvert):
 
     def convert(self, candidate_content,
                 fields) -> None:
@@ -36,28 +36,30 @@ class BondedQueryConvert(physical.LLMConvert):
                 # update field_outputs
                 field_outputs[field_name] = json_objects
 
-class BondedQueryConvertStrategy(PhysicalOpStrategy):
-    """
-    This strategy creates physical operator classes using a bonded query strategy.
-    It ties together several records for the same fields, possibly defaulting to a conventional conversion strategy.
-    """
-
-
-    logical_op_class = logical.ConvertScan
-    physical_op_class = physical.LLMBondedQueryConvert
+class BondedQueryStrategy(PhysicalOpStrategy):
 
     @staticmethod
     def __new__(cls, 
-                available_models: List[Model]) -> List[physical.PhysicalOperator]:
+                available_models: List[Model],
+                prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_QA,
+                *args, **kwargs) -> List[physical.PhysicalOperator]:
 
         return_operators = []
         for model in available_models:
             if model.value not in MODEL_CARDS:
                 raise ValueError(f"Model {model} not found in MODEL_CARDS")
-            # physical_op_type = type('LLMBondedQueryConvert'+model.name,
-            physical_op_type = type('LLMBondedQueryConvert',
+            # physical_op_type = type(cls.__name__+model.name,
+            physical_op_type = type(cls.__name__,
                                     (cls.physical_op_class,),
-                                    {'model': model})
+                                    {'model': model,
+                                     'prompt_strategy': prompt_strategy})
             return_operators.append(physical_op_type)
 
         return return_operators
+class BondedQueryConvertStrategy(BondedQueryStrategy):
+    """
+    This strategy creates physical operator classes using a bonded query strategy.
+    It ties together several records for the same fields, possibly defaulting to a conventional conversion strategy.
+    """
+    logical_op_class = logical.ConvertScan
+    physical_op_class = LLMBondedQueryConvert

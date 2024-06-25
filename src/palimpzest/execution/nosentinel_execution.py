@@ -1,136 +1,51 @@
 import time
-from palimpzest.constants import Model, PlanType
+from palimpzest.constants import PlanType
 from palimpzest.corelib.schemas import SourceRecord
-from palimpzest.dataclasses import OperatorStats, PlanStats, RecordOpStats
-from palimpzest.datamanager import DataDirectory
+from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements import DataRecord
 from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
-from palimpzest.utils.model_helpers import getModels, getVisionModels
 from .cost_estimator import CostEstimator
+from .execution import SimpleExecution
 from palimpzest.sets import Set
-from palimpzest.utils import getChampionModelName
 
 from palimpzest.dataclasses import OperatorStats, PlanStats
 
-from concurrent.futures import ThreadPoolExecutor
-from typing import List, Optional
+from typing import Optional
 
 import os
 import shutil
 
 
-def _getAllowedModels(self, subplan: PhysicalPlan) -> List[Model]:
-    """
-    This function handles the logic of determining which model(s) can be used for a Convert or Filter
-    operation during physical plan construction.
-
-    The logic for determining which models can be used is as follows:
-    - If model selection is allowed --> then all models may be used
-    - If the subplan does not yet have an operator which uses a (non-vision) model --> then all models may be used
-    - If the subplan has an operator which uses a (non-vision) model --> only the subplan's model may be used
-    """
-    # return all models if model selection is allowed
-    if self.allow_model_selection:
-        return getModels()
-
-    # otherwise, get models used by subplan
-    subplan_model, vision_models = None, getVisionModels()
-    for phys_op in subplan.operators:
-        model = getattr(phys_op, "model", None)
-        if model is not None and model not in vision_models:
-            subplan_model = model
-            break
-
-    # return all models if subplan does not have any models yet
-    if subplan_model is None:
-        return getModels()
-
-    # otherwise return the subplan model
-    return [subplan_model]
-
-
-class ExecutionEngine:
-    def __init__(self) -> None:
-        raise NotImplementedError
-
-class SimpleExecution(ExecutionEngine):
+class NoSentinelExecution(SimpleExecution):
+    """ This class is a dummy execution engine that can be used for testing purposes. 
+    It does not include sentinel plans or all that jazz."""
 
     def __init__(self,
-            num_samples: int=20,
-            scan_start_idx: int=0,
-            nocache: bool=False,
-            include_baselines: bool=False,
-            min_plans: Optional[int] = None,
-            verbose: bool = False,
-            available_models: Optional[List[Model]] = [],
-            allow_bonded_query: Optional[List[Model]] = True,
-            allow_model_selection: Optional[bool]=True,
-            allow_code_synth: Optional[bool]=True,
-            allow_token_reduction: Optional[bool]=True,
-            useParallelOps: Optional[bool]=False,
             *args, **kwargs
         ) -> None:
-        self.num_samples = num_samples
-        self.scan_start_idx = scan_start_idx
-        self.nocache = nocache
-        self.include_baselines = include_baselines
-        self.min_plans = min_plans
-        self.verbose = verbose
-        self.available_models = available_models
-        if not available_models:
-            self.available_models = getModels()
-        self.allow_model_selection = allow_model_selection
-        self.allow_bonded_query = allow_bonded_query
-        self.allow_code_synth = allow_code_synth
-        self.allow_token_reduction = allow_token_reduction
-        self.useParallelOps = useParallelOps
-        self.datadir = DataDirectory()
-
-    def set_source_dataset_id(self, dataset: Set) -> str:
-        """
-        Sets the dataset_id of the DataSource for the given dataset.
-        """
-        # iterate until we reach DataSource
-        while isinstance(dataset, Set):
-            dataset = dataset._source
-
-        self.source_dataset_id = dataset.dataset_id
+        super().__init__(*args, **kwargs)
 
     def execute(self,
         dataset: Set,
         policy: Policy,
     ):
-        # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
-        if self.nocache:
-            dspy_cache_dir = os.path.join(
-                os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/"
-            )
-            if os.path.exists(dspy_cache_dir):
-                shutil.rmtree(dspy_cache_dir)
+        # Always delete cache
+        dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+        if os.path.exists(dspy_cache_dir):
+            shutil.rmtree(dspy_cache_dir)
+        cache = self.datadir.getCacheService()
+        cache.rmCache()
 
-            # remove codegen samples from previous dataset from cache
-            cache = self.datadir.getCacheService()
-            cache.rmCache()
-
-        # set the the id of the source dataset
         self.set_source_dataset_id(dataset)
 
         # NOTE: this checks if the entire computation is cached; it will re-run
         #       the sentinels even if the computation is partially cached
         # only run sentinels if there isn't a cached result already
         uid = dataset.universalIdentifier()
-        run_sentinels = self.nocache or not self.datadir.hasCachedAnswer(uid)
-
-        sentinel_plans, sample_execution_data, sentinel_records = [], [], []
-
-        # initialize logical and physical planner
-        # NOTE The Exeuction class MUST KNOW THE PLANNER!
-        #  if I disallow code synth for my planning, I will have to disallow it for my execution. Now, I can't do that.
-        # get sentinel plans
-        logical_planner = LogicalPlanner(self.nocache)
+        logical_planner = LogicalPlanner(no_cache=True)
         physical_planner = PhysicalPlanner(
             num_samples=self.num_samples,
             scan_start_idx=0,
@@ -143,25 +58,6 @@ class SimpleExecution(ExecutionEngine):
             useStrategies=True,
         )
 
-        if run_sentinels:
-            for logical_plan in logical_planner.generate_plans(dataset, sentinels=True):
-                for sentinel_plan in physical_planner.generate_plans(logical_plan, sentinels=True):
-                    sentinel_plans.append(sentinel_plan)
-
-            # run sentinel plans
-            sample_execution_data, sentinel_records = self.run_sentinel_plans(
-                sentinel_plans, self.verbose
-            )
-
-        # (re-)initialize logical and physical planner
-        scan_start_idx = self.num_samples if run_sentinels else 0
-        physical_planner.scan_start_idx = scan_start_idx
-
-        # NOTE: in the future we may use operator_estimates below to limit the number of plans
-        #       that we need to consider during plan generation. I.e., we may be able to save time
-        #       by pre-computing the set of viable models / execution strategies at each operator
-        #       based on the sample execution data we get.
-        #
         # enumerate all possible physical plans
         all_physical_plans = []
         for logical_plan in logical_planner.generate_plans(dataset):
@@ -169,8 +65,7 @@ class SimpleExecution(ExecutionEngine):
                 all_physical_plans.append(physical_plan)
 
         # construct the CostEstimator with any sample execution data we've gathered
-        cost_estimator = CostEstimator(source_dataset_id=self.source_dataset_id,
-                                       sample_execution_data=sample_execution_data)
+        cost_estimator = CostEstimator(source_dataset_id=self.source_dataset_id)
 
         # estimate the cost of each plan
         for physical_plan in all_physical_plans:
@@ -195,44 +90,9 @@ class SimpleExecution(ExecutionEngine):
         # choose best plan and execute it
         plan = policy.choose(plans)
         new_records, stats = self.execute_plan(plan, plan_type=PlanType.FINAL) # TODO: Still WIP
-        all_records = sentinel_records + new_records
+        all_records = new_records
 
         return all_records, plan, stats
-
-    def run_sentinel_plans(
-        self, sentinel_plans: List[PhysicalPlan], verbose: bool = False
-    ):
-        # compute number of plans
-        num_sentinel_plans = len(sentinel_plans)
-
-        all_sample_execution_data, return_records = [], []
-        results = list(map(lambda x:
-                self.execute_plan(*x),
-                [(plan, idx, PlanType.SENTINEL) for idx, plan in enumerate(sentinel_plans)],
-            )
-        )
-        # with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
-        #     results = list(executor.map(lambda x:
-        #             self.execute_plan(*x),
-        #             [(plan, idx, PlanType.SENTINEL) for idx, plan in enumerate(sentinel_plans)],
-        #         )
-        #     )
-
-        sentinel_records, sentinel_stats = zip(*results)
-        for records, plan_stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
-            # aggregate sentinel est. data
-            sample_execution_data = []
-            for op_id, operator_stats in plan_stats.operator_stats.items():
-                all_sample_execution_data.extend(operator_stats.record_op_stats_lst)
-
-            # set return_records to be records from champion model
-            champion_model_name = getChampionModelName()
-
-            # find champion model plan records and add those to all_records
-            if champion_model_name in plan.getPlanModelNames():
-                return_records = records
-
-        return all_sample_execution_data, return_records # TODO: make sure you capture cost of sentinel plans.
 
     def _execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: Optional[int] = None):
         """
@@ -306,7 +166,7 @@ class SimpleExecution(ExecutionEngine):
         return out_records, plan_stats
 
     # TODO The dag style execution is not really working. I am implementing a per-records execution
-    def execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: Optional[int] = None):
+    def execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats):
         """
         Helper function which executes the physical plan. This function is overly complex for today's
         plans which are simple cascades -- but is designed with an eye towards the future.
@@ -323,9 +183,6 @@ class SimpleExecution(ExecutionEngine):
             for op in plan.operators
             if not isinstance(op, DataSourcePhysicalOp)
         }
-
-        # if num_samples is not provided, set it to infinity
-        num_samples = num_samples if num_samples is not None else float("inf")
 
         # execute the plan until either:
         # 1. all records have been processed, or
@@ -417,7 +274,6 @@ class SimpleExecution(ExecutionEngine):
             still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
             keep_scanning_source_records = (
                 current_scan_idx < datasource_len
-                and source_records_scanned < num_samples
             )
             finished_executing = not keep_scanning_source_records and not still_processing
 
@@ -450,8 +306,7 @@ class SimpleExecution(ExecutionEngine):
         #       Thus, the implementation is overkill for today's plans, but hopefully this will
         #       avoid the need for a lot of refactoring in the future.
         # execute the physical plan;
-        num_samples = self.num_samples if plan_type == PlanType.SENTINEL else None
-        output_records, plan_stats = self.execute_dag(plan, plan_stats, num_samples)
+        output_records, plan_stats = self.execute_dag(plan, plan_stats)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
@@ -459,42 +314,3 @@ class SimpleExecution(ExecutionEngine):
 
         return output_records, plan_stats
 
-class Execute:
-    def __new__(
-        cls,
-        dataset: Set,
-        policy: Policy,
-        num_samples: int=20,
-        nocache: bool=False,
-        include_baselines: bool=False,
-        min_plans: Optional[int] = None,
-        verbose: bool = False,
-        available_models: Optional[List[Model]] = [],
-        allow_bonded_query: Optional[List[Model]] = [],
-        allow_model_selection: Optional[bool]=True,
-        allow_code_synth: Optional[bool]=True,
-        allow_token_reduction: Optional[bool]=True,
-        useParallelOps: Optional[bool]=False,
-        execution_engine: ExecutionEngine = SimpleExecution,
-        *args,
-        **kwargs
-    ):
-
-        return execution_engine(
-            num_samples=num_samples,
-            nocache=nocache,
-            include_baselines=include_baselines,
-            min_plans=min_plans,
-            verbose=verbose,
-            available_models=available_models,
-            allow_bonded_query=allow_bonded_query,
-            allow_code_synth=allow_code_synth,
-            allow_model_selection=allow_model_selection,
-            allow_token_reduction=allow_token_reduction,
-            useParallelOps=useParallelOps,
-            *args,
-            **kwargs
-        ).execute(
-            dataset=dataset,
-            policy=policy
-        )

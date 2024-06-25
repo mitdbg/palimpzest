@@ -5,7 +5,7 @@ import os
 
 
 # ENUMS
-class Model(Enum):
+class Model(str, Enum):
     """
     Model describes the underlying LLM which should be used to perform some operation
     which requires invoking an LLM. It does NOT specify whether the model need be executed
@@ -23,7 +23,7 @@ class Model(Enum):
     def __repr__(self):
         return f'{self.name}'
     
-class PromptStrategy(Enum):
+class PromptStrategy(str, Enum):
     """
     PromptStrategy describes the prompting technique to be used by a Generator when
     performing some task with a specified Model.
@@ -35,7 +35,7 @@ class PromptStrategy(Enum):
     DSPY_COT_QA = "dspy-chain-of-thought-question"
     CODE_GEN_BOOL = "code-gen-bool"
 
-class QueryStrategy(Enum):
+class QueryStrategy(str, Enum):
     """
     QueryStrategy describes the high-level approach to querying a Model (or generated code)
     in order to perform a specified task.
@@ -47,7 +47,7 @@ class QueryStrategy(Enum):
     CODE_GEN = "code-gen"
     CODE_GEN_WITH_FALLBACK = "codegen-with-fallback"
 
-class CodeSynthStrategy(Enum):
+class CodeSynthStrategy(str, Enum):
     """
     CodeSynthStrategy describes the high-level approach to generating code.
     in order to perform a specified task.
@@ -59,11 +59,11 @@ class CodeSynthStrategy(Enum):
     ADVICE_ENSEMBLE = "advice-ensemble"
     ADVICE_ENSEMBLE_WITH_VALIDATION = "advice-ensemble-with-validation"
 
-class Cardinality(Enum):
+class Cardinality(str, Enum): 
     ONE_TO_ONE = "one-to-one"
     ONE_TO_MANY = "one-to-many"
 
-class PlanType(Enum):
+class PlanType(str, Enum):
     SENTINEL = "Sentinel Plan"
     FINAL = "Final Plan"
 

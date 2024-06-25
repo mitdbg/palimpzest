@@ -1,5 +1,6 @@
 from palimpzest.constants import Model, PromptStrategy, QueryStrategy
 from palimpzest.operators import PhysicalOperator
+from palimpzest.operators.convert import LLMConvert, LLMConvertConventional
 from palimpzest.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.planner import LogicalPlan, PhysicalPlan
 from palimpzest.planner.planner import Planner
@@ -18,7 +19,6 @@ import multiprocessing
 import palimpzest.strategies as physical_strategies
 
 
-
 class PhysicalPlanner(Planner):
     def __init__(
         self,
@@ -27,6 +27,7 @@ class PhysicalPlanner(Planner):
             scan_start_idx: Optional[int]=0,
             available_models: Optional[List[Model]]=[],
             allow_model_selection: Optional[bool]=True,
+            allow_bonded_query: Optional[bool]=True,
             allow_code_synth: Optional[bool]=True,
             allow_token_reduction: Optional[bool]=True,
             shouldProfile: Optional[bool]=True,
@@ -41,6 +42,7 @@ class PhysicalPlanner(Planner):
         self.scan_start_idx = scan_start_idx
         self.available_models = available_models
         self.allow_model_selection = allow_model_selection
+        self.allow_bonded_query = allow_bonded_query
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.shouldProfile = shouldProfile
@@ -61,9 +63,25 @@ class PhysicalPlanner(Planner):
 
             if self.useStrategies:
                 for strategy in physical_strategies.REGISTERED_STRATEGIES:
+                    if not self.allow_model_selection and issubclass(strategy, physical_strategies.ModelSelectionStrategy):
+                        continue
+                    if not self.allow_bonded_query and issubclass(strategy, physical_strategies.BondedQueryStrategy):
+                        continue
+                    if not self.allow_token_reduction and issubclass(strategy, physical_strategies.TokenReductionStrategy):
+                        continue                    
+                    if not self.allow_code_synth and issubclass(strategy, physical_strategies.CodeSynthStrategy):
+                        continue
+
                     if strategy.logical_op_class == logical_op:
-                        ops = strategy(self.available_models)
+                        ops = strategy(available_models=self.available_models,
+                                       prompt_strategy=PromptStrategy.DSPY_COT_QA,)
                         self.logical_physical_map.get(logical_op, []).extend(ops)
+
+        # print("Available strategies")
+        # print(physical_strategies.REGISTERED_STRATEGIES)
+        print("Map for Convert")
+        print(self.logical_physical_map[pz_ops.ConvertScan])
+        print(self.logical_physical_map[pz_ops.FilteredScan])
 
     def _createBaselinePlan(self, logical_plan: LogicalPlan, model: Model) -> PhysicalPlan:
         """A simple wrapper around _createSentinelPlan as right now these are one and the same."""
@@ -89,14 +107,28 @@ class PhysicalPlanner(Planner):
             # TODO the goal is to simply this if else into the following loop
             # for op in self.logical_physical_map[type(logical_op)]:
             if isinstance(logical_op, pz_ops.ConvertScan):
-                op = resolveLogicalConvertOp(
-                    logical_op,
-                    model=model,
-                    prompt_strategy=PromptStrategy.DSPY_COT_QA,
-                    query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
-                    token_budget=1.0,
-                    shouldProfile=shouldProfile,
-                )
+                if self.useStrategies:
+                    op_class: PhysicalOperator = None
+                    for op in self.logical_physical_map[type(logical_op)]:
+                        if op in [LLMConvert]:
+                            continue
+                        op = op_class(
+                                inputSchema=logical_op.inputSchema,
+                                outputSchema=logical_op.outputSchema,
+                                query_strategy = QueryStrategy.BONDED_WITH_FALLBACK,
+                                token_budget=1.0,
+                                shouldProfile=shouldProfile,
+                            )
+                else:
+                    raise NotImplementedError("This should not be called")
+                    op = resolveLogicalConvertOp(
+                        logical_op,
+                        model=model,
+                        prompt_strategy=PromptStrategy.DSPY_COT_QA,
+                        query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
+                        token_budget=1.0,
+                        shouldProfile=shouldProfile,
+                    )
 
             elif isinstance(logical_op, pz_ops.FilteredScan):
                 if self.useStrategies:
@@ -165,34 +197,48 @@ class PhysicalPlanner(Planner):
             if isinstance(logical_op, pz_ops.ConvertScan):
                 plans = []
                 for subplan in all_plans:
-                    # TODO: if hard-coded conversion, don't iterate over all plan possibilities
-                    for qs in query_strategies:
-                        # for code generation: we do not need to iterate over models and token budgets
-                        if qs in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
-                            physical_op = resolveLogicalConvertOp(
-                                logical_op,
-                                query_strategy=qs,
-                                prompt_strategy=PromptStrategy.DSPY_COT_QA,
+                    if self.useStrategies:
+                        for op_class in self.logical_physical_map[type(logical_op)]:
+                            if op_class in [LLMConvert, LLMConvertConventional]:
+                                continue
+                            physical_op = op_class(
+                                inputSchema=logical_op.inputSchema,
+                                outputSchema=logical_op.outputSchema,
+                                query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
+                                token_budget=1.0,
                                 shouldProfile=self.shouldProfile,
                             )
                             new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
-                            plans.append(new_physical_plan)
-                            continue
-
-                        # for non-code generation query strategies, consider models and token budgets
-                        models = self.available_models
-                        for model in models:
-                            for token_budget in token_budgets:
+                            plans.append(new_physical_plan)                        
+                    else:
+                        # TODO: if hard-coded conversion, don't iterate over all plan possibilities
+                        for qs in query_strategies:
+                            # for code generation: we do not need to iterate over models and token budgets
+                            if qs in [QueryStrategy.CODE_GEN_WITH_FALLBACK, QueryStrategy.CODE_GEN]:
                                 physical_op = resolveLogicalConvertOp(
                                     logical_op,
-                                    model=model,
                                     query_strategy=qs,
                                     prompt_strategy=PromptStrategy.DSPY_COT_QA,
-                                    token_budget=token_budget,
                                     shouldProfile=self.shouldProfile,
                                 )
                                 new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
                                 plans.append(new_physical_plan)
+                                continue
+
+                            # for non-code generation query strategies, consider models and token budgets
+                            models = self.available_models
+                            for model in models:
+                                for token_budget in token_budgets:
+                                    physical_op = resolveLogicalConvertOp(
+                                        logical_op,
+                                        model=model,
+                                        query_strategy=qs,
+                                        prompt_strategy=PromptStrategy.DSPY_COT_QA,
+                                        token_budget=token_budget,
+                                        shouldProfile=self.shouldProfile,
+                                    )
+                                    new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                                    plans.append(new_physical_plan)
 
                 # update all_plans
                 all_plans = plans
@@ -202,10 +248,10 @@ class PhysicalPlanner(Planner):
                 for subplan in all_plans:
                     # TODO: if non-llm filter, don't iterate over all plan possibilities
                     if self.useStrategies:
-                        for op in self.logical_physical_map[type(logical_op)]:
-                            if logical_op in [LLMFilter, NonLLMFilter]:
+                        for op_class in self.logical_physical_map[type(logical_op)]:
+                            if op_class in [LLMFilter, NonLLMFilter]:
                                 continue
-                            physical_op = op(
+                            physical_op = op_class(
                                 inputSchema=logical_op.inputSchema,
                                 outputSchema=logical_op.outputSchema,
                                 filter=logical_op.filter,
@@ -223,7 +269,6 @@ class PhysicalPlanner(Planner):
                                 shouldProfile=self.shouldProfile,
                             )
 
-
                     new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
                     plans.append(new_physical_plan)
 
@@ -235,7 +280,7 @@ class PhysicalPlanner(Planner):
                 kw_parameters = logical_op.getParameters()
                 kw_parameters.update(execution_parameters)
                 physical_op = op_class(**kw_parameters)
-                
+
                 # base case, if this operator is a BaseScan set all_plans to be the physical plan with just this operatorù
                 # This also happens if the operator is a CacheScan and all_plans is empty
                 if isinstance(logical_op, pz_ops.BaseScan) or \
