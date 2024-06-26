@@ -38,8 +38,10 @@ class ModelSelectionFilterStrategy(ModelSelectionStrategy):
     def __new__(cls, 
                 available_models: List[Model],
                 prompt_strategy: PromptStrategy) -> List[physical.PhysicalOperator]:
-        super(cls, ModelSelectionStrategy).__new__(cls, available_models, prompt_strategy=PromptStrategy.DSPY_COT_BOOL) # TODO hardcode for now 
+        ops = super(ModelSelectionFilterStrategy, cls).__new__(cls, available_models, prompt_strategy=PromptStrategy.DSPY_COT_BOOL) # TODO hardcode for now 
+        return ops
     
+
 class ModelSelectionConvertStrategy(ModelSelectionStrategy):
     """
     This strategy creates physical operator classes for the Conventional strategy 
