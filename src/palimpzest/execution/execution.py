@@ -1,10 +1,9 @@
-import time
-from palimpzest.constants import Model, PlanType
+from palimpzest.constants import ExecutionStrategy, Model, PlanType, PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats, RecordOpStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import DataRecord
-from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
+from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp, PhysicalOperator
 from palimpzest.operators.filter import FilterOp
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
@@ -15,11 +14,13 @@ from palimpzest.utils import getChampionModelName
 
 from palimpzest.dataclasses import OperatorStats, PlanStats
 
-from concurrent.futures import ThreadPoolExecutor
-from typing import List, Optional
+from concurrent.futures import ThreadPoolExecutor, wait
+from typing import List, Optional, Union
 
+import multiprocessing
 import os
 import shutil
+import time
 
 
 def _getAllowedModels(self, subplan: PhysicalPlan) -> List[Model]:
@@ -65,12 +66,13 @@ class SimpleExecution(ExecutionEngine):
             include_baselines: bool=False,
             min_plans: Optional[int] = None,
             verbose: bool = False,
-            available_models: Optional[List[Model]] = [],
-            allow_bonded_query: Optional[List[Model]] = True,
-            allow_model_selection: Optional[bool]=True,
-            allow_code_synth: Optional[bool]=True,
-            allow_token_reduction: Optional[bool]=True,
-            useParallelOps: Optional[bool]=False,
+            available_models: List[Model] = [],
+            allow_bonded_query: List[Model] = True,
+            allow_model_selection: bool=True,
+            allow_code_synth: bool=True,
+            allow_token_reduction: bool=True,
+            execution_strategy: bool=ExecutionStrategy.SINGLE_THREADED,
+            max_workers: Optional[int]=None,
             *args, **kwargs
         ) -> None:
         self.num_samples = num_samples
@@ -86,7 +88,10 @@ class SimpleExecution(ExecutionEngine):
         self.allow_bonded_query = allow_bonded_query
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
-        self.useParallelOps = useParallelOps
+        self.execution_strategy = execution_strategy
+        self.max_workers = max_workers
+        if self.max_workers is None and self.execution_strategy == ExecutionStrategy.PARALLEL:
+            self.max_workers = self.set_max_workers()
         self.datadir = DataDirectory()
 
     def set_source_dataset_id(self, dataset: Set) -> str:
@@ -99,10 +104,21 @@ class SimpleExecution(ExecutionEngine):
 
         self.source_dataset_id = dataset.dataset_id
 
+    def set_max_workers(self):
+        # for now, return the number of system CPUs;
+        # in the future, we may want to consider the models the user has access to
+        # and whether or not they will encounter rate-limits. If they will, we should
+        # set the max workers in a manner that is designed to avoid hitting them.
+        # Doing this "right" may require considering their logical, physical plan,
+        # and tier status with LLM providers. It may also be worth dynamically
+        # changing the max_workers in response to 429 errors.
+        return multiprocessing.cpu_count()
+
     def execute(self,
         dataset: Set,
         policy: Policy,
     ):
+        # TODO: we should be able to remove this w/our cache management
         # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
         if self.nocache:
             dspy_cache_dir = os.path.join(
@@ -194,7 +210,7 @@ class SimpleExecution(ExecutionEngine):
 
         # choose best plan and execute it
         plan = policy.choose(plans)
-        new_records, stats = self.execute_plan(plan, plan_type=PlanType.FINAL) # TODO: Still WIP
+        new_records, stats = self.execute_plan(plan, plan_type=PlanType.FINAL)
         all_records = sentinel_records + new_records
 
         return all_records, plan, stats
@@ -206,17 +222,18 @@ class SimpleExecution(ExecutionEngine):
         num_sentinel_plans = len(sentinel_plans)
 
         all_sample_execution_data, return_records = [], []
-        results = list(map(lambda x:
-                self.execute_plan(*x),
-                [(plan, idx, PlanType.SENTINEL) for idx, plan in enumerate(sentinel_plans)],
-            )
-        )
-        # with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
-        #     results = list(executor.map(lambda x:
-        #             self.execute_plan(*x),
-        #             [(plan, idx, PlanType.SENTINEL) for idx, plan in enumerate(sentinel_plans)],
-        #         )
+
+        # results = list(map(lambda x:
+        #         self.execute_plan(*x),
+        #         [(plan, idx, PlanType.SENTINEL) for idx, plan in enumerate(sentinel_plans)],
         #     )
+        # )
+        with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
+            max_workers_per_plan = max(self.max_workers / len(num_sentinel_plans), 1)
+            results = list(executor.map(lambda x: self.execute_plan(*x),
+                    [(plan, idx, PlanType.SENTINEL, max_workers_per_plan) for idx, plan in enumerate(sentinel_plans)],
+                )
+            )
 
         sentinel_records, sentinel_stats = zip(*results)
         for records, plan_stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
@@ -234,79 +251,179 @@ class SimpleExecution(ExecutionEngine):
 
         return all_sample_execution_data, return_records # TODO: make sure you capture cost of sentinel plans.
 
-    def _execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: Optional[int] = None):
+    @staticmethod
+    def execute_op_wrapper(operator: PhysicalOperator, op_input: Union[DataRecord, List[DataRecord]]):
         """
-        Helper function which executes the physical plan. This function is overly complex for today's
-        plans which are simple cascades -- but is designed with an eye towards 
+        Wrapper function around operator execution which also and returns the operator.
+        This is useful in the parallel setting(s) where operators are executed by a worker pool,
+        and it is convenient to return the op_id along with the computation result.
         """
+        records, record_op_stats_lst = operator(op_input)
+
+        return records, record_op_stats_lst, operator
+
+    def execute_dag_ray(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: int):
+        """
+        Helper function which executes the physical plan with Ray.
+        """
+        raise Exception("not implemented")
+
+    def execute_dag_parallel(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: int, max_workers: int):
+        """
+        Helper function which executes the physical plan with parallelism allowed.
+        """
+        # initialize list of output records and intermediate variables
         output_records = []
-        current_scan_idx = self.scan_start_idx
-        # execute the plan until either:
-        # 1. all records have been processed, or
-        # 2. the final limit operation has completed
+        source_records_scanned = 0
 
-        for idx, operator in enumerate(plan.operators):
-            op_id = operator.get_op_id()
-            # TODO: Is it okay to have call return a list?
-            if isinstance(operator, DataSourcePhysicalOp):
-                idx=0
-                out_records, out_stats_lst = [], []
-                num_samples = num_samples if num_samples else float("inf")
+        # initialize data structures to help w/processing DAG
+        processing_queue = []
+        op_id_to_futures_in_flight = {op.get_op_id(): 0 for op in plan.operators}
+        op_id_to_prev_operator = {
+            op.get_op_id(): plan.operators[idx - 1] if idx > 0 else None
+            for idx, op in enumerate(plan.operators)
+        }
+        op_id_to_next_operator = {
+            op.get_op_id(): plan.operators[idx + 1] if idx + 1 < len(plan.operators) else None
+            for idx, op in enumerate(plan.operators)
+        }
 
-                ds = operator.datadir.getRegisteredDataset(plan.datasetIdentifier)
-                for filename in sorted(os.listdir(ds.path)):
-                    file_path = os.path.join(ds.path, filename)
-                    if os.path.isfile(file_path):
-                        if idx > num_samples:
-                            break
-                        datasource = (
-                            self.datadir.getRegisteredDataset(self.source_dataset_id)
-                            if isinstance(operator, MarshalAndScanDataOp)
-                            else self.datadir.getCachedResult(operator.cachedDataIdentifier)
-                        )
-                        candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
-                        candidate.idx = current_scan_idx
-                        candidate.get_item_fn = datasource.getItem
-                        candidate.cardinality = datasource.cardinality
-                        record, record_op_stats_lst = operator(candidate)
-                        out_records.extend(record)
-                        out_stats_lst.extend(record_op_stats_lst)
-                        # Incrementing here bc folder may contain subfolders
-                        idx += 1
-            else:
-                input_records = out_records
-                out_records = []
-                out_stats_lst = []
-                for idx,input_record in enumerate(input_records):
-                    if isinstance(operator, LimitScanOp) and idx == operator.limit:
+        # get handle to DataSource and pre-compute its op_id and size
+        source_operator = plan.operators[0]
+        datasource = (
+            self.datadir.getRegisteredDataset(self.source_dataset_id)
+            if isinstance(source_operator, MarshalAndScanDataOp)
+            else self.datadir.getCachedResult(source_operator.cachedDataIdentifier)
+        )
+        source_op_id = source_operator.get_op_id()
+        datasource_len = len(datasource)
+
+        # compute op_id and limit of final limit operator (if one exists)
+        final_limit = plan.operators[-1].limit if isinstance(plan.operators[-1], LimitScanOp) else None
+
+        # create thread pool w/max workers
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # create initial set of futures to read all source files
+            futures = []
+            for idx in range(datasource_len):
+                # construct input DataRecord for DataSourcePhysicalOp
+                candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=idx)
+                candidate.idx = idx
+                candidate.get_item_fn = datasource.getItem
+                candidate.cardinality = datasource.cardinality
+                future = executor.submit(SimpleExecution.execute_op_wrapper, source_operator, candidate)
+
+                # add future to list of futures and mapping of in-flight futures
+                futures.append(future)
+                op_id_to_futures_in_flight[source_op_id] += 1
+
+            # iterate until we have processed all operators on all records or come to an early stopping condition
+            keep_executing = True
+            while len(futures) > 0 and keep_executing:
+                # get the set of futures that have (and have not) finished in the last PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
+                done_futures, not_done_futures = wait(futures, timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
+
+                # cast not_done_futures from a set to a list so we can append to it
+                not_done_futures = list(not_done_futures)
+
+                # process finished futures, creating new ones as needed
+                new_futures = []
+                for future in done_futures:
+                    # get the result
+                    records, record_op_stats_lst, operator = future.result()
+                    op_id = operator.get_op_id()
+
+                    # decrement future from mapping of futures in-flight
+                    op_id_to_futures_in_flight[op_id] -= 1
+
+                    # update plan stats
+                    op_stats = plan_stats.operator_stats[op_id]
+                    for record_op_stats in record_op_stats_lst:
+                        # TODO code a nice __add__ function for OperatorStats and RecordOpStats
+                        record_op_stats.source_op_id = op_id_to_prev_operator[op_id].get_op_id()
+                        op_stats.record_op_stats_lst.append(record_op_stats)
+                        op_stats.total_op_time += record_op_stats.time_per_record
+                        op_stats.total_op_cost += record_op_stats.cost_per_record
+
+                    plan_stats.operator_stats[op_id] = op_stats
+
+                    # process each record output by the future's operator
+                    for record in records:
+                        # skip records which are filtered out
+                        if not getattr(record, "_passed_filter", True):
+                            continue
+
+                        # add records (which are not filtered) to the cache, if allowed
+                        if not self.nocache:
+                            self.datadir.appendCache(operator.targetCacheId, record)
+
+                        # add records to processing queue if there is a next_operator; otherwise add to output_records
+                        next_operator = op_id_to_next_operator[op_id]
+                        if next_operator is not None:
+                            processing_queue.append((next_operator, record))
+                        else:
+                            output_records.append(record)
+
+                    # if this operator was a source scan, update the number of source records scanned
+                    if op_id == source_op_id:
+                        source_records_scanned += len(records)
+
+                    # check early stopping condition based on number of scan samples
+                    if source_records_scanned >= num_samples:
+                        keep_executing = False
                         break
 
-                    records, record_op_stats = operator(input_record)
-                    if records is None:
-                        records = []
-                        continue
-                    elif type(records) != type([]):
-                        records = [records]
+                    # check early stopping condition based on final limit
+                    if len(output_records) >= final_limit:
+                        keep_executing = False
+                        output_records = output_records[:final_limit]
+                        break
 
-                    for record in records:
-                        if isinstance(operator, FilterOp):
-                            if not record._passed_filter:
-                                continue
-                        out_records.append(record)
-                    out_stats_lst.append(record_op_stats)
+                    # only invoke aggregate operator(s) once all upstream operators' processing queues are empty
+                    # and their in-flight futures are finished
+                    if isinstance(operator, AggregateOp):
+                        this_op_idx = 0
+                        while op_id != plan.operators[this_op_idx].get_op_id():
+                            this_op_idx += 1
 
-            # TODO code a nice __add__ function for OperatorStats and RecordOpStats
-            for record_op_stats in out_stats_lst:
-                x = plan_stats.operator_stats[op_id]
-                x.record_op_stats_lst.append(record_op_stats)
-                x.total_op_time += record_op_stats.time_per_record
-                x.total_op_cost += record_op_stats.cost_per_record
-                plan_stats.operator_stats[op_id] = x
+                        upstream_ops_are_finished = True
+                        for upstream_op_idx in range(this_op_idx):
+                            upstream_op_id = plan.operators[upstream_op_idx].get_op_id()
+                            upstream_op_id_queue = list(filter(lambda tup: tup[0].get_op_id() == upstream_op_id, processing_queue))
 
-        return out_records, plan_stats
+                            upstream_ops_are_finished = (
+                                upstream_ops_are_finished
+                                and len(upstream_op_id_queue) == 0
+                                and op_id_to_futures_in_flight[upstream_op_id] == 0
+                            )
 
-    # TODO The dag style execution is not really working. I am implementing a per-records execution
-    def execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: Optional[int] = None):
+                        if upstream_ops_are_finished:
+                            candidates = list(filter(lambda tup: tup[0].get_op_id() == op_id, processing_queue))
+                            candidates = list(map(lambda tup: tup[1], candidates))
+                            future = executor.submit(SimpleExecution.execute_op_wrapper, operator, candidates)
+                            new_futures.append(future)
+                            op_id_to_futures_in_flight[op_id] += 1
+
+                    # otherwise, process the next record in the processing queue for this operator
+                    else:
+                        for operator, candidate in processing_queue:
+                            future = executor.submit(SimpleExecution.execute_op_wrapper, operator, candidate)
+                            new_futures.append(future)
+                            op_id_to_futures_in_flight[op_id] += 1
+
+                # update list of futures
+                not_done_futures.extend(new_futures)
+                futures = not_done_futures
+
+        # if caching was allowed, close the cache
+        if not self.nocache:
+            for operator in plan.operators:
+                self.datadir.closeCache(operator.targetCacheId)
+
+        return output_records, plan_stats
+
+
+    def execute_dag_single_threaded(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: int):
         """
         Helper function which executes the physical plan. This function is overly complex for today's
         plans which are simple cascades -- but is designed with an eye towards the future.
@@ -314,8 +431,15 @@ class SimpleExecution(ExecutionEngine):
         # initialize list of output records and intermediate variables
         output_records = []
         source_records_scanned = 0
-        datasource_len = 0
         current_scan_idx = self.scan_start_idx
+
+        # get handle to DataSource and pre-compute its size
+        datasource = (
+            self.datadir.getRegisteredDataset(self.source_dataset_id)
+            if isinstance(operator, MarshalAndScanDataOp)
+            else self.datadir.getCachedResult(operator.cachedDataIdentifier)
+        )
+        datasource_len = len(datasource)
 
         # initialize processing queues for each operation
         processing_queues = {
@@ -323,9 +447,6 @@ class SimpleExecution(ExecutionEngine):
             for op in plan.operators
             if not isinstance(op, DataSourcePhysicalOp)
         }
-
-        # if num_samples is not provided, set it to infinity
-        num_samples = num_samples if num_samples is not None else float("inf")
 
         # execute the plan until either:
         # 1. all records have been processed, or
@@ -347,14 +468,6 @@ class SimpleExecution(ExecutionEngine):
                 # TODO: if self.useParallelOps is True; execute each operator with parallelism
                 # invoke datasource operator(s) until we run out of source records
                 if isinstance(operator, DataSourcePhysicalOp) and keep_scanning_source_records:
-                    # get handle to DataSource and pre-compute its size
-                    datasource = (
-                        self.datadir.getRegisteredDataset(self.source_dataset_id)
-                        if isinstance(operator, MarshalAndScanDataOp)
-                        else self.datadir.getCachedResult(operator.cachedDataIdentifier)
-                    )
-                    datasource_len = len(datasource)
-
                     # construct input DataRecord for DataSourcePhysicalOp
                     candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
                     candidate.idx = current_scan_idx
@@ -371,18 +484,18 @@ class SimpleExecution(ExecutionEngine):
                 # only invoke aggregate operator(s) once there are no more source records and all
                 # upstream operators' processing queues are empty
                 elif isinstance(operator, AggregateOp):
-                    upstream_queues_are_empty = True
+                    upstream_ops_are_finished = True
                     for upstream_op_idx in range(op_idx):
-                        upstream_queues_are_empty = (
-                            upstream_queues_are_empty
-                            and len(processing_queues[upstream_op_idx]) == 0
+                        upstream_op_id = plan.operators[upstream_op_idx].get_op_id()
+                        upstream_ops_are_finished = (
+                            upstream_ops_are_finished
+                            and len(processing_queues[upstream_op_id]) == 0
                         )
-                    if not keep_scanning_source_records and upstream_queues_are_empty:
-                        records, record_op_stats_lst = operator(candidates=processing_queues[op_idx])
+                    if not keep_scanning_source_records and upstream_ops_are_finished:
+                        records, record_op_stats_lst = operator(candidates=processing_queues[op_id])
 
                 # otherwise, process the next record in the processing queue for this operator
                 elif len(processing_queues[op_id]) > 0:
-                    print(f"Processing operator {op_id} - queue length: {len(processing_queues[op_id])}")
                     input_record = processing_queues[op_id].pop(0)
                     records, record_op_stats_lst = operator(input_record)
 
@@ -397,11 +510,11 @@ class SimpleExecution(ExecutionEngine):
 
                 plan_stats.operator_stats[op_id] = op_stats
 
-                # TODO some operator is not returning a singleton list
-                if type(records) != type([]):
-                    records = [records]
-
-                # TODO: manage the cache here
+                # add records (which are not filtered) to the cache, if allowed
+                if not self.nocache:
+                    for record in records:
+                        if getattr(record, "_passed_filter", True):
+                            self.datadir.appendCache(operator.targetCacheId, record)
 
                 # update processing_queues or output_records
                 for record in records:
@@ -425,13 +538,19 @@ class SimpleExecution(ExecutionEngine):
             if isinstance(operator, LimitScanOp):
                 finished_executing = (len(output_records) == operator.limit)
 
+        # if caching was allowed, close the cache
+        if not self.nocache:
+            for operator in plan.operators:
+                self.datadir.closeCache(operator.targetCacheId)
+
         return output_records, plan_stats
 
     # NOTE: Adding a few optional arguments for printing, etc.
     def execute_plan(self, plan: PhysicalPlan,
                      plan_type: PlanType = PlanType.FINAL,
-                     plan_idx: Optional[int] = None):
-        """Initialize the stats and invoke execute_dag() to execute the plan."""
+                     plan_idx: Optional[int] = None,
+                     max_workers: Optional[int] = None):
+        """Initialize the stats and the execute the plan according to the user's execution strategy."""
         if self.verbose:
             print("----------------------")
             print(f"{plan_type.value} {str(plan_idx)}:")
@@ -445,13 +564,18 @@ class SimpleExecution(ExecutionEngine):
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
             plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
-        # NOTE: I am writing this execution helper function with the goal of supporting future
-        #       physical plans that may have joins and/or other operations with multiple sources.
-        #       Thus, the implementation is overkill for today's plans, but hopefully this will
-        #       avoid the need for a lot of refactoring in the future.
+
         # execute the physical plan;
-        num_samples = self.num_samples if plan_type == PlanType.SENTINEL else None
-        output_records, plan_stats = self.execute_dag(plan, plan_stats, num_samples)
+        num_samples = self.num_samples if plan_type == PlanType.SENTINEL else float("inf")
+        if self.execution_strategy == ExecutionStrategy.SINGLE_THREADED:
+            output_records, plan_stats = self.execute_dag_single_threaded(plan, plan_stats, num_samples)
+        
+        elif self.execution_strategy == ExecutionStrategy.PARALLEL:
+            max_workers = max_workers if max_workers is not None else self.max_workers
+            output_records, plan_stats = self.execute_dag_parallel(plan, plan_stats, num_samples, max_workers)
+
+        elif self.execution_strategy == ExecutionStrategy.RAY:
+            output_records, plan_stats = self.execute_dag_ray(plan, plan_stats, num_samples)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
