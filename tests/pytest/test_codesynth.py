@@ -18,11 +18,12 @@ from palimpzest.strategies.model_selection import ModelSelectionFilterStrategy
 from palimpzest.execution.nosentinel_execution import NoSentinelExecution
 
 
-def test_codesynth(enron_eval):
+def test_codesynth(email_schema):
     """Test whether codesynth strategy creation works"""
-    available_models = [pz.Model.GPT_4, pz.Model.GPT_3_5]
+    available_models = [pz.Model.GPT_4]
 
-    records, plan, stats= Execute(enron_eval, 
+    emails = pz.Dataset("enron-eval-tiny", schema=email_schema)
+    records, plan, stats= Execute(emails, 
                                   policy=pz.MinCost(),
                                   available_models=available_models,
                                   useStrategies=True,

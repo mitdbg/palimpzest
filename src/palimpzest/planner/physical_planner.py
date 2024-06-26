@@ -257,6 +257,8 @@ class PhysicalPlanner(Planner):
                                 filter=logical_op.filter,
                                 shouldProfile=self.shouldProfile,
                             )
+                            new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                            plans.append(new_physical_plan)
                     else:
                         raise NotImplementedError("This should not be called")
                         models = self.available_models
@@ -268,9 +270,6 @@ class PhysicalPlanner(Planner):
                                 prompt_strategy=PromptStrategy.DSPY_COT_BOOL,
                                 shouldProfile=self.shouldProfile,
                             )
-
-                    new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
-                    plans.append(new_physical_plan)
 
                 # update all_plans
                 all_plans = plans
@@ -290,7 +289,6 @@ class PhysicalPlanner(Planner):
                     plans = []
                     for subplan in all_plans:
                         new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
-                        plans.append(new_physical_plan)
                     all_plans = plans
 
         return all_plans

@@ -12,6 +12,7 @@ from palimpzest.generators import codeEnsembleExecution
 from palimpzest.constants import *
 from palimpzest.elements import *
 from palimpzest.operators import logical, physical, convert
+from palimpzest.operators.convert import EXAMPLE_PROMPT # TODO move to constants
 
 CODEGEN_PROMPT = """You are a helpful programming assistant and an expert {language} programmer. Implement the {language} function `{api}` that extracts `{output}` ({output_desc}) from given inputs:
 {inputs_desc}
@@ -30,7 +31,7 @@ CodeEnsemble = Dict[CodeName, Code]
 
 class LLMConvertCodeSynthesis(convert.LLMConvert):
 
-    strategy: CodeSynthStrategy # Default is CodeSynthStrategy.SINGLE,
+    code_strategy: CodeSynthStrategy # Default is CodeSynthStrategy.SINGLE,
 
     def __init__(self, 
                 cache_across_plans: bool = True,
@@ -47,6 +48,8 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             # set and return exemplars if it is not empty
             if exemplars is not None and len(exemplars) > 0:
                 self.exemplars = exemplars
+            else:
+                self.exemplars = []
         else:
             self.exemplars = []
 
@@ -58,30 +61,29 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         """ This function determines whether code synthesis 
         should be performed based on the strategy and the number of exemplars available. """
 
-        if self.strategy == CodeSynthStrategy.NONE:
+        if self.code_strategy == CodeSynthStrategy.NONE:
             return False
-        
-        elif self.strategy == CodeSynthStrategy.SINGLE:
+
+        elif self.code_strategy == CodeSynthStrategy.SINGLE:
             return not self.code_synthesized and len(self.exemplars) >= num_exemplars
-        
-        elif self.strategy == CodeSynthStrategy.EXAMPLE_ENSEMBLE:
+
+        elif self.code_strategy == CodeSynthStrategy.EXAMPLE_ENSEMBLE:
             if len(self.exemplars) <= num_exemplars:
                 return False
             return not self.code_synthesized
-        
-        elif self.strategy == CodeSynthStrategy.ADVICE_ENSEMBLE:
+
+        elif self.code_strategy == CodeSynthStrategy.ADVICE_ENSEMBLE:
             return False
-        
-        elif self.strategy == CodeSynthStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION:
+
+        elif self.code_strategy == CodeSynthStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION:
             return len(self.exemplars) % code_regenerate_frequency == 0
-        
+
         else:
             raise Exception("not implemented yet")
 
-
     def _fetch_code_ensemble(self, generate_field_names: List[str]) -> Tuple[Dict[CodeName, Code]]:
         # if we are allowed to cache synthesized code across plan executions, check the cache
-        if not self.no_cache_across_plans:
+        if self.cache_across_plans:
             field_to_code_ensemble = {}
             cache = DataDirectory().getCacheService()
             for field_name in generate_field_names:
@@ -94,11 +96,12 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             if all([field_to_code_ensemble.get(field_name, None) is not None for field_name in generate_field_names]):
                 self.field_to_code_ensemble = field_to_code_ensemble
                 return self.field_to_code_ensemble, {}
+            else:
+                return {}, {}
 
         else:
             # if we're not synthesizing new code ensemble(s) and there is nothing to fetch, return empty dicts
             return {}, {}
-
 
     def _synthesize_code_ensemble(
         self,
@@ -114,59 +117,66 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
 
         if strategy == CodeSynthStrategy.NONE:
             # create an ensemble with one function which returns None
-            code, code_synth_stats = self._code_synth_default(api)
+            code, output_stats = self._code_synth_default(api)
             code_name = f"{api.name}_v0"
             code_ensemble[code_name] = code
-            return code_ensemble, code_synth_stats
+            return code_ensemble, output_stats
 
         elif strategy == CodeSynthStrategy.SINGLE:
             # use exemplars to create an ensemble with a single synthesized function
-            code, code_synth_stats = self._code_synth_single(api, output_field_name, exemplars=exemplars[:num_exemplars])
+            code, output_stats = self._code_synth_single(api, output_field_name, exemplars=exemplars[:num_exemplars])
             code_name = f"{api.name}_v0"
             code_ensemble[code_name] = code
-            return code_ensemble, code_synth_stats
+            return code_ensemble, output_stats
 
         elif strategy == CodeSynthStrategy.EXAMPLE_ENSEMBLE:
             # creates an ensemble of `code_ensemble_num` synthesized functions; each of
             # which uses a different exemplar (modulo the # of exemplars) for its synthesis
-            code_synth_stats = self._create_empty_query_stats()
+            output_stats = {}
             for i in range(code_ensemble_num):
                 code_name = f"{api.name}_v{i}"
                 exemplar = exemplars[i % len(exemplars)]
                 code, stats = self._code_synth_single(api, output_field_name, exemplars=[exemplar])
                 code_ensemble[code_name] = code
-                for key in code_synth_stats.keys():
-                    code_synth_stats[key] += stats[key]
-            return code_ensemble, code_synth_stats
+                for key,value in stats.items():
+                    if type(value) == type(dict()):
+                        for k2, v2 in value.items():
+                            output_stats[k2] = output_stats.get(k2,0) + v2 # Should we simply throw the usage away here?
+                    else:
+                        output_stats[key] += output_stats.get(key,type(value)()) + value
+            return code_ensemble, output_stats
 
         elif strategy == CodeSynthStrategy.ADVICE_ENSEMBLE:
             # a more advanced approach in which advice is first solicited, and then
             # provided as context when synthesizing the code ensemble
-            code_synth_stats = self._create_empty_query_stats()
+            output_stats = {}
 
             # solicit advice
             advices, adv_stats = self._synthesize_advice(api, output_field_name, exemplars=exemplars[:num_exemplars], n_advices=code_ensemble_num)
-            for key in code_synth_stats.keys():
-                code_synth_stats[key] += adv_stats[key]
+            for key,value in adv_stats.items():
+                if type(value) == type(dict()):
+                    for k2, v2 in value.items():
+                        output_stats[k2] = output_stats.get(k2,0) + v2
+                else:
+                    output_stats[key] += output_stats.get(key,type(value)()) + value
 
             # synthesize code ensemble
             for i, adv in enumerate(advices):
                 code_name = f"{api.name}_v{i}"
                 code, stats = self._code_synth_single(api, output_field_name, exemplars=exemplars[:num_exemplars], advice=adv)
                 code_ensemble[code_name] = code
-                for key in code_synth_stats.keys():
-                    code_synth_stats[key] += stats[key]
-            return code_ensemble, code_synth_stats
+                for key in output_stats.keys():
+                    output_stats[key] += stats[key]
+            return code_ensemble, output_stats
 
         else:
             raise Exception("not implemented yet")
-
 
     def NEW_synthesize_code_ensemble(self,
                                      generate_field_names: List[str],
                                      candidate_dict: DataRecordDict,):
         # initialize stats to be collected for each field's code sythesis
-        total_code_synth_stats = self._create_empty_query_stats()
+        output_stats = {}
 
         # synthesize the per-field code ensembles
         field_to_code_ensemble = {}
@@ -183,14 +193,19 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             code_ensemble, code_synth_stats = self._synthesize_code_ensemble(api, field_name)
 
             # update stats
-            for key in total_code_synth_stats.keys():
-                total_code_synth_stats[key] += code_synth_stats[key]
+            for key,value in code_synth_stats.items():
+                if type(value) == type(dict()):
+                    for k2, v2 in value.items():
+                        # TODO havky bc we don't know the type of v2!
+                        output_stats[k2] = output_stats.get(k2,type(v2)()) + v2
+                else:
+                    output_stats[key] = output_stats.get(key,type(value)()) + value
 
             # add synthesized code ensemble to field_to_code_ensemble
             field_to_code_ensemble[field_name] = code_ensemble
 
             # add code ensemble to the cache
-            if not self.no_cache_across_plans:
+            if self.cache_across_plans:
                 cache = DataDirectory().getCacheService()
                 code_ensemble_cache_id = "_".join([self.get_op_id(), field_name])
                 cache.putCachedData("codeEnsembles", code_ensemble_cache_id, code_ensemble)
@@ -205,8 +220,7 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         self.field_to_code_ensemble = field_to_code_ensemble
         self.code_synthesized = True
 
-        return field_to_code_ensemble, total_code_synth_stats
-
+        return field_to_code_ensemble, output_stats
 
     def convert(self, candidate_content,
                 fields) -> None:
@@ -216,6 +230,7 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         "This code is used for codegen with a fallback to default"
         start_time = time.time()
         fields_to_generate = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
+
 
         # convert the data record to a dictionary of field --> value
         # NOTE: the following is how we used to compute the candidate_dict;
@@ -243,10 +258,10 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         # if we have yet to synthesize code (perhaps b/c we are waiting for more exemplars),
         # use GPT-4 to perform the convert (and generate high-quality exemplars) using a bonded query
         if not len(field_to_code_ensemble):
-            text_content = json.loads(candidate_dict)
+            text_content = json.dumps(candidate_dict) # TODO is this correct?
             final_json_objects, query_stats = self._dspy_generate_fields(
                 fields_to_generate,
-                text_content=text_content,
+                content=text_content,
                 model=Model.GPT_4,  # TODO: assert GPT-4 is available; maybe fall back to another model otherwise
                 prompt_strategy=PromptStrategy.DSPY_COT_QA,
             )
@@ -261,11 +276,12 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
                 )
                 drs.append(dr)
 
+            marshal_time = time.time() - start_time
+            query_stats["total_time"] = marshal_time # TODO this is not correct
             # construct the set of output data records and record_op_stats
-            query_stats_lst = self._extract_stats(records=drs, start_time=start_time, fields=fields_to_generate, query_stats=query_stats)
 
             # compute the record_op_stats for each data record and return
-            record_op_stats_lst = self._create_record_op_stats_lst(drs, query_stats_lst)
+            record_op_stats_lst = self._create_record_op_stats_lst(records=drs, fields=fields_to_generate, query_stats=query_stats)
 
             # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
             #       keep an eye out for a regression in code synth performance and revert if necessary
@@ -274,18 +290,21 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             self.exemplars.extend(exemplars)
 
             # if we are allowed to cache exemplars across plan executions, add exemplars to cache
-            if not self.no_cache_across_plans:
+            if self.cache_across_plans:
                 cache = DataDirectory().getCacheService()
                 exemplars_cache_id = self.get_op_id()
                 cache.putCachedData(f"codeExemplars", exemplars_cache_id, exemplars)
 
             return drs, record_op_stats_lst
 
-
         # add total_code_synth_stats to query_stats
-        query_stats = self._create_empty_query_stats()
-        for key in total_code_synth_stats:
-            query_stats[key] += total_code_synth_stats
+        query_stats = {}
+        for key,value in total_code_synth_stats.items():
+            if type(value) == type(dict()):
+                for k2, v2 in value.items():
+                    query_stats[k2] = query_stats.get(k2,0) + v2
+            else:
+                query_stats[key] = query_stats.get(key,type(value)()) + value
 
         # if we have synthesized code run it on each field
         field_outputs = {}
@@ -307,10 +326,10 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             else:
                 # if there is a failure, run a conventional query
                 print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
-                text_content = json.loads(candidate_dict)
+                text_content = json.dumps(candidate_dict)
                 final_json_objects, field_stats = self._dspy_generate_fields(
                     [field_name],
-                    text_content=text_content,
+                    content=text_content,
                     model=Model.GPT_3_5,
                     prompt_strategy=PromptStrategy.DSPY_COT_QA,
                 )
@@ -322,24 +341,30 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
 
                 # update query_stats
                 for key, value in field_stats.items():
-                    query_stats[key] += value
+                    if type(value) == type(dict()):
+                        for k2, v2 in value.items():
+                            query_stats[k2] = query_stats.get(k2,type(v2)()) + v2
+                    else:
+                        query_stats[key] = query_stats.get(key,type(value)()) + value
 
                 # NOTE: we disallow code synth for one-to-many queries, so there will only be
                 #       one element in final_json_objects
                 # update field_outputs
                 field_outputs[field_name] = final_json_objects[0][field_name]
 
-        # construct the set of output data records and record_op_stats
-        drs, query_stats_lst = self._extract_data_records_and_stats(candidate, start_time, fields_to_generate, [field_outputs], query_stats)
+        drs = [
+            self._create_data_record_from_json(
+                jsonObj=field_outputs, candidate=candidate, cardinality_idx=0
+            )
+        ]
 
         # compute the record_op_stats for each data record and return
-        record_op_stats_lst = self._create_record_op_stats_lst(drs, query_stats_lst)
+        record_op_stats_lst = self._create_record_op_stats_lst(drs, fields_to_generate,query_stats)
 
         return drs, record_op_stats_lst
 
     def _parse_ideas(self, text, limit=3):
         return self._parse_multiple_outputs(text, outputs=[f'Idea {i}' for i in range(1, limit+1)])
-
 
     def _generate_advice(self, prompt):
         pred, stats = self.gpt4_llm.generate(prompt=prompt)
@@ -363,9 +388,8 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
     def _code_synth_default(self, api):
         # returns a function with the correct signature which simply returns None
         code = api.api_def() + "  return None\n"
-        stats = self._create_empty_query_stats()
+        stats = {}
         return code, stats
-
 
     def _code_synth_single(self, api: API, output_field_name: str, exemplars: List[Exemplar]=list(), advice: str=None, language='Python'):
         context = {
@@ -377,8 +401,8 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             'examples_desc': "\n".join([
                 EXAMPLE_PROMPT.format(
                     idx = f" {i}",
-                    example_inputs = "\n".join([f"- {field_name} = {repr(example[0][field_name])}" for field_name in api.inputs]),
-                    example_output = f"{example[1][output_field_name]}"
+                    example_inputs = "\n".join([f"- {field_name} = {repr(example[field_name])}" for field_name in api.inputs]),
+                    example_output = f"{example[output_field_name]}"
                 ) for i, example in enumerate(exemplars)
             ]),
             'advice': f"Hint: {advice}" if advice else "",
@@ -394,7 +418,6 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         print(f"{code}")
 
         return code, stats
-
 
     def _synthesize_advice(self, api: API, output_field_name: str, exemplars: List[Dict[DataRecord, DataRecord]]=list(), language='Python', n_advices=4):
         context = {
@@ -428,8 +451,6 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         return data
 
 
-
-
 class CodeSynthesisConvertStrategy(PhysicalOpStrategy):
     """
     This strategy creates physical operator classes that convert records to one schema to another using code synthesis.
@@ -455,8 +476,8 @@ class CodeSynthesisConvertStrategy(PhysicalOpStrategy):
                                     (cls.physical_op_class,),
                                     {'model': model,
                                      'prompt_strategy': prompt_strategy,
+                                     'code_strategy': CodeSynthStrategy.SINGLE,
                                      })
             return_operators.append(physical_op_type)
 
         return return_operators
-    

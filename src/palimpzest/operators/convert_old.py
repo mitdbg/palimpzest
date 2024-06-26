@@ -1119,10 +1119,10 @@ class LLMConvert(ConvertOp):
             # if we have yet to synthesize code (perhaps b/c we are waiting for more exemplars),
             # use GPT-4 to perform the convert (and generate high-quality exemplars) using a bonded query
             if synthesize_output is None:
-                text_content = json.loads(candidate_dict)
+                text_content = json.dumps(candidate_dict)
                 final_json_objects, query_stats = self._dspy_generate_fields(
                     generate_field_names,
-                    text_content=text_content,
+                    content=text_content,
                     model=Model.GPT_4,  # TODO: assert GPT-4 is available; maybe fall back to another model otherwise
                     prompt_strategy=PromptStrategy.DSPY_COT_QA,
                 )

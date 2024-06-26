@@ -532,8 +532,8 @@ class LLMConvert(ConvertOp):
                     model.value, prompt_strategy, doc_schema, doc_type, verbose
                 )
                 answer, new_heatmap_json_obj, query_stats = generator.generate(
-                    content,
-                    promptQuestion,
+                    context=content,
+                    question=promptQuestion,
                     budget=token_budget,
                     heatmap_json_obj=self.heatmap_json_obj,
                 )
