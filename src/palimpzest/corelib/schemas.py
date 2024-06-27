@@ -258,6 +258,8 @@ class XLSFile(File):
     )
 
 
+# TODO: When using LLM to convert of filter, the schema type is not gurantted at all. Then we will run into errors.
+#      Probably we need to assert type of the schema before processing? Or at least we need to log such info and just return.
 class Table(Schema):
     """A Table is an object composed of a header and rows."""
 
@@ -276,6 +278,9 @@ class Table(Schema):
     def asJSONStr(self, record_dict: Dict[str, Any], *args, **kwargs) -> str:
         """Return a JSON representation of an instantiated object of this Schema"""
         # Take the rows in the record_dict and turn them into comma separated strings
+        if record_dict is None or record_dict["rows"] is None:
+            return "No rows in table!!!"
+
         rows = []
         for i, row in enumerate(
             record_dict["rows"][:MAX_ROWS]
@@ -283,7 +288,10 @@ class Table(Schema):
             rows += [",".join(row) + "\n"]
         record_dict["rows"] = rows
 
-        header = ",".join(record_dict["header"])
+        if type(record_dict["header"]) == list:
+            header = ",".join(record_dict["header"])
+        else:
+            header = record_dict["header"]
         record_dict["header"] = header
 
         return super(Table, self).asJSONStr(record_dict, *args, **kwargs)
