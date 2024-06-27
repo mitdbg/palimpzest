@@ -22,6 +22,8 @@ def resolveLogicalConvertOp(
     # get input and output schemas for convert
     inputSchema = logical_convert_op.inputSchema
     outputSchema = logical_convert_op.outputSchema
+    inputSchemaName = inputSchema.__name__
+    outputSchemaName = outputSchema.__name__
 
     parameters = {
         'inputSchema': inputSchema,
@@ -48,10 +50,11 @@ def resolveLogicalConvertOp(
     elif isinstance(inputSchema, schemas.Download) and isinstance(outputSchema, schemas.File):
         op_class = pz_ops.ConvertDownloadToFile
 
-    elif isinstance(inputSchema, schemas.File) and isinstance(outputSchema, schemas.XLSFile):
+    elif inputSchemaName == "File" and outputSchemaName =="XLSFile":
         op_class = pz_ops.ConvertFileToXLS
 
-    elif isinstance(inputSchema, schemas.XLSFile) and isinstance(outputSchema, schemas.Table):
+    elif inputSchemaName == "XLSFile" and outputSchemaName =="Table": 
+    # isinstance(inputSchema, schemas.XLSFile) and isinstance(outputSchema, schemas.Table):
         op_class = pz_ops.ConvertXLSToTable
         parameters["cardinality"] = logical_convert_op.cardinality
 
@@ -61,7 +64,7 @@ def resolveLogicalConvertOp(
     # otherwise, create convert op for the given set of hyper-parameters
     else:
         assert prompt_strategy is not None, "Prompt strategy must be specified for LLMConvert"
-        op_class = pz_ops.LLMConvert
+        op_class = pz_ops.LLMConvertConventional
         parameters["model"] = model
         parameters["prompt_strategy"] = prompt_strategy
         parameters["query_strategy"] = query_strategy
