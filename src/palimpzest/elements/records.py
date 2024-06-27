@@ -37,7 +37,7 @@ class DataRecord:
         self._parent_uuid = parent_uuid
 
     def __getitem__(self, key):
-        return super().__getattr__(key)
+        return getattr(self, key, None)
 
     def _asJSONStr(self, include_bytes: bool = True, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""

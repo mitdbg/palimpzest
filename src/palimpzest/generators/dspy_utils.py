@@ -63,7 +63,6 @@ class dspyCOT(dspy.Module):
         self.generate_answer = dspy.ChainOfThought(f_signature)
 
     def forward(self, question, context):
-        context = context
         answer = self.generate_answer(context=context, question=question)
         return answer
 

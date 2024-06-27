@@ -1,7 +1,8 @@
+import pandas as pd
 from palimpzest.constants import Cardinality
 from palimpzest.corelib import File, Number, Schema
 from palimpzest.elements import DataRecord
-from typing import Any, Dict, List, Union
+from typing import Any, Callable, Dict, List, Union
 
 import os
 import sys
@@ -110,6 +111,7 @@ class DirectorySource(DataSource):
         filepath = self.filepaths[idx]
         dr = DataRecord(self.schema, scan_idx=idx)
         dr.filename = filepath
+        print("Reading DirectorySource: ", filepath)
         with open(filepath, "rb") as f:
             dr.contents = f.read()
 
@@ -140,6 +142,7 @@ class FileSource(DataSource):
     def getItem(self, idx: int):
         dr = DataRecord(self.schema, scan_idx=idx)
         dr.filename = self.filepath
+        print("Reading FileSource: ", self.filepath)
         with open(self.filepath, "rb") as f:
             dr.contents = f.read()
 
