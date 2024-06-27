@@ -308,6 +308,14 @@ class CostEstimator:
                     "time_per_record": self._est_time_per_record(op_df),
                     "cardinality": self._est_cardinality(op_df),
                 }
+            #TODO(chjun): Temporary fix. We need to revisit there later.
+            elif op_name in ["ConvertFileToXLS", "ConvertXLSToTable"]:
+                estimates = {
+                    "time_per_record": self._est_time_per_record(op_df),
+                }
+            else:
+                #TODO(chjun): Temporary fix. We need to revisit there later.
+                raise NotImplementedError(f"Operator {op_name} not yet supported")
 
             operator_estimates[op_id] = estimates
         
@@ -381,7 +389,8 @@ class CostEstimator:
                     op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
 
                 elif isinstance(op, pz.HardcodedConvert):
-                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
+                    # TODO(chjun): temporary fix. Remove for not implemented 
+                    # op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
                     op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
 
                 elif isinstance(op, pz.LLMFilter):
