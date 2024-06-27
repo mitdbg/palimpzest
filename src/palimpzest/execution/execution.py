@@ -262,13 +262,13 @@ class SimpleExecution(ExecutionEngine):
 
         return records, record_op_stats_lst, operator
 
-    def execute_dag_ray(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: int):
+    def execute_ray(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: int):
         """
         Helper function which executes the physical plan with Ray.
         """
         raise Exception("not implemented")
 
-    def execute_dag_parallel(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: int, max_workers: int):
+    def execute_parallel(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: int, max_workers: int):
         """
         Helper function which executes the physical plan with parallelism allowed.
         """
@@ -423,7 +423,7 @@ class SimpleExecution(ExecutionEngine):
         return output_records, plan_stats
 
 
-    def execute_dag_single_threaded(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: int):
+    def execute_sequential(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: int):
         """
         Helper function which executes the physical plan. This function is overly complex for today's
         plans which are simple cascades -- but is designed with an eye towards the future.
@@ -568,14 +568,14 @@ class SimpleExecution(ExecutionEngine):
         # execute the physical plan;
         num_samples = self.num_samples if plan_type == PlanType.SENTINEL else float("inf")
         if self.execution_strategy == ExecutionStrategy.SINGLE_THREADED:
-            output_records, plan_stats = self.execute_dag_single_threaded(plan, plan_stats, num_samples)
+            output_records, plan_stats = self.execute_sequential(plan, plan_stats, num_samples)
         
         elif self.execution_strategy == ExecutionStrategy.PARALLEL:
             max_workers = max_workers if max_workers is not None else self.max_workers
-            output_records, plan_stats = self.execute_dag_parallel(plan, plan_stats, num_samples, max_workers)
+            output_records, plan_stats = self.execute_parallel(plan, plan_stats, num_samples, max_workers)
 
         elif self.execution_strategy == ExecutionStrategy.RAY:
-            output_records, plan_stats = self.execute_dag_ray(plan, plan_stats, num_samples)
+            output_records, plan_stats = self.execute_ray(plan, plan_stats, num_samples)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
