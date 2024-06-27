@@ -127,8 +127,12 @@ class PhysicalPlan(Plan):
     def printPlan(self) -> None:
         """Print the physical plan."""
         print_ops = self.operators[1:]
+        if len(print_ops) == 0:
+            print("Empty plan: ", self.plan_id())
+            return
+
         start = print_ops[0]
-        print(f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n")
+        print(f" 0. {start.inputSchema.__name__} -> {type(start).__name__} -> {start.outputSchema.__name__} \n")
 
         for idx, (left, right) in enumerate(pairwise(print_ops)):
             in_schema = left.outputSchema
@@ -155,6 +159,8 @@ class PhysicalPlan(Plan):
                     print(f"\n    Token budget: {right.token_budget}", end="")
                 if hasattr(right, "query_strategy"):
                     print(f"\n    Query strategy: {right.query_strategy}", end="")
+                if hasattr(right, "prompt_strategy"):
+                    print(f"\n    Prompt strategy: {right.prompt_strategy}", end="")
             print()
             print(
                 f"    ({','.join(in_schema.fieldNames())[:15]}...) -> ({','.join(out_schema.fieldNames())[:15]}...)"
