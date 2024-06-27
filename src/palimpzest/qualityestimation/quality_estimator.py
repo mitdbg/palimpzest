@@ -1,7 +1,4 @@
-from palimpzest.datasources import FileSource, RecordsFromXLSFile
-from palimpzest.corelib import Schema, XLSFile, Table
-from palimpzest.sets import Set, Dataset
-from typing import Any, Callable, Dict, List, Tuple, Union, Optional
+
 import logging
 
 from palimpzest.dataclasses import PlanStats
@@ -10,6 +7,8 @@ from palimpzest.elements.records import DataRecord
 import math
 
 class QualityEstimator:
+
+    # TODO(chjun): WIP, different ways to calculate the quality score.
     @staticmethod
     def _update_plan_stats(planStats: PlanStats, f1: float):
         if planStats is None:
@@ -20,23 +19,13 @@ class QualityEstimator:
         # for op in planStats.operator_stats:
         #     op.
 
-        
 
     @staticmethod
     def update_quality_score(planStats: PlanStats=None, real: list[DataRecord]=None, expected: list[DataRecord]=None):
         """
-        Validate the quality of the quality estimator using the validation data.
-
-        Args:
-            validation_data: ValidationData
-                The validation data to be used to validate the quality estimator.
-            quality_estimator: Callable
-                The quality estimator to be validated.
-
-        Returns:
-            Dict[str, Any]
-                A dictionary containing the results of the validation.
+        WIP: Update the quality score of the plan based on the real and expected data.
         """
+
         if planStats is None:
             raise Exception("PlanStats is required.")
         if real is None and expected is None:
