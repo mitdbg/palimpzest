@@ -141,6 +141,10 @@ class PlanStats:
     # total cost for plan
     total_plan_cost: float = 0.0
 
+    # Plan level details: an OPTIONAL dictionary with more detailed information about this plan;
+    # Currently we put per record real/expected outputs.
+    exe_output_details: Dict[str, Any] = field(default_factory=dict)
+
     def finalize(self, total_plan_time: float):
         self.total_plan_time = total_plan_time
         self.total_plan_cost = sum([op_stats.total_op_cost for _, op_stats in self.operator_stats.items()])
