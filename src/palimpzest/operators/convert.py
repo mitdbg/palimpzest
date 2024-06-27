@@ -47,6 +47,7 @@ class ConvertOp(PhysicalOperator):
         desc: Optional[str] = None,
         targetCacheId: Optional[str] = None,
         shouldProfile: bool = False,
+        *args, **kwargs
     ):
         super().__init__(
             inputSchema=inputSchema,
@@ -63,7 +64,7 @@ class ConvertOp(PhysicalOperator):
             "operator": self.op_name(),
             "inputSchema": str(self.inputSchema),
             "outputSchema": str(self.outputSchema),
-            "cardinality": self.cardinality.value,
+            "cardinality": str(self.cardinality),
             "desc": str(self.desc),
         }
 
@@ -153,7 +154,7 @@ class ParallelConvertFromCandidateOp(ConvertOp):
 
 class LLMConvert(ConvertOp):
     implemented_op = logical.ConvertScan
-    model: Model
+    model=None
     prompt_strategy: PromptStrategy
 
     def __init__(
@@ -165,6 +166,8 @@ class LLMConvert(ConvertOp):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+        self.model = kwargs.get("model", None)
+        self.prompt_strategy = kwargs.get("prompt_strategy", PromptStrategy.DSPY_COT_QA)
         self.query_strategy = query_strategy
         self.token_budget = token_budget
         self.image_conversion = image_conversion
@@ -203,8 +206,9 @@ class LLMConvert(ConvertOp):
             QueryStrategy.CODE_GEN_WITH_FALLBACK,
             QueryStrategy.CODE_GEN,
         ]:
-            self.model = None
-            self.prompt_strategy = None
+            #TODO(chjun): temporary change to avoid a bug. Change it back to None after testing.
+            self.model = Model.MIXTRAL
+            self.prompt_strategy = PromptStrategy.DSPY_COT_QA 
             self.token_budget = 1.0
 
     def __eq__(self, other: PhysicalOperator):
@@ -675,3 +679,18 @@ class LLMConvertConventional(LLMConvert):
 
         query_stats["total_time"] = time.time() - start_time
         return field_outputs, query_stats
+    
+    def copy(self):
+        return LLMConvertConventional(
+            outputSchema=self.outputSchema,
+            inputSchema=self.inputSchema,
+            model=self.model,
+            cardinality=self.cardinality,
+            image_conversion=self.image_conversion,
+            prompt_strategy=self.prompt_strategy,
+            query_strategy=self.query_strategy,
+            token_budget=self.token_budget,
+            desc=self.desc,
+            targetCacheId=self.targetCacheId,
+            shouldProfile=self.shouldProfile,
+        )
