@@ -1,6 +1,48 @@
 ### This file contains prompts used by Palimpzest ###
 from enum import Enum
 
+### CONVERT PROMPTS ### 
+INPUT_FIELD = "{field_name}: {field_desc}\n"
+OUTPUT_FIELD = "{field_name}: {field_desc}\n"
+
+OPTIONAL_INPUT_DESC = "Here is a description of the input object: {desc}."
+OPTIONAL_OUTPUT_DESC = "Here is a description of the input object: {desc}."
+
+OPTIONAL_DESC = "Keep in mind that this process is described by this text: {desc}."
+
+### ONE TO ONE ###
+ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR = "an output JSON object that describes an object of type {doc_type}."
+ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL = "the output object"
+ONE_TO_ONE_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only"
+
+### ONE_TO_MANY ###
+ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR = "an output array of zero or more JSON objects that describe objects of type {doc_type}."
+ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL = "the output objects"
+ONE_TO_MANY_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields described above. You must decide the correct number of output objects."
+
+STRUCTURED_CONVERT_PROMPT = """I would like you to create{targetOutputDescriptor}. 
+You will use the information in an input JSON object that I will provide. The input object has type {input_type}.
+All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
+{optionalInputDesc}
+{optionalOutputDesc}
+Here is every input field name and a description: 
+{multilineInputFieldDescription}
+Here is every output field name and a description:
+{multilineOutputFieldDescription}
+{appendixInstruction}
+{optional_desc}"""
+
+IMAGE_CONVERT_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor}.
+You will use the information in the image that I will provide. The input image(s) has type {input_type}.
+All of the fields in {outputSingleOrPlural} can be derived using information from the input image(s).
+{optionalInputDesc}
+{optionalOutputDesc}
+Here is every output field name and a description:
+{multilineOutputFieldDescription}
+{appendixInstruction}
+{optional_desc}"""
+
+
 ### CODE SYNTHESIS PROMPTS ###
 EXAMPLE_PROMPT = """Example{idx}:
 {example_inputs}

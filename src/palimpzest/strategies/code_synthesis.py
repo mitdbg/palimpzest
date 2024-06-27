@@ -47,18 +47,18 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             self.exemplars = []
         self.field_to_code_ensemble = {}
 
-    def _fetch_cached_code(self, generate_field_names: List[str]) -> Tuple[Dict[CodeName, Code]]:
+    def _fetch_cached_code(self, fields_to_generate: List[str]) -> Tuple[Dict[CodeName, Code]]:
         # if we are allowed to cache synthesized code across plan executions, check the cache
         field_to_code_ensemble = {}
         cache = DataDirectory().getCacheService()
-        for field_name in generate_field_names:
+        for field_name in fields_to_generate:
             code_ensemble_cache_id = "_".join([self.get_op_id(), field_name])
             code_ensemble = cache.getCachedData("codeEnsembles", code_ensemble_cache_id)
             if code_ensemble is not None:
                 field_to_code_ensemble[field_name] = code_ensemble
 
         # set and return field_to_code_ensemble if all fields are present and have code
-        if all([field_to_code_ensemble.get(field_name, None) is not None for field_name in generate_field_names]):
+        if all([field_to_code_ensemble.get(field_name, None) is not None for field_name in fields_to_generate]):
             self.field_to_code_ensemble = field_to_code_ensemble
             return self.field_to_code_ensemble
         else:

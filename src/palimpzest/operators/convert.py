@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from palimpzest import prompts
 from palimpzest.constants import *
 from palimpzest.corelib import *
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
@@ -340,17 +341,17 @@ class LLMConvert(ConvertOp):
         # 1. not declared in the input schema, and
         # 2. not present in the candidate's attributes
         #    a. if the field is present, but its value is None --> we will try to generate it
-        generate_field_names = []
+        fields_to_generate = []
         for field_name in outputSchema.fieldNames():
             if field_name not in inputSchema.fieldNames() and getattr(candidate, field_name, None) is None:
-                generate_field_names.append(field_name)
+                fields_to_generate.append(field_name)
 
-        return generate_field_names
+        return fields_to_generate
 
     def _construct_query_prompt(
         self,
         doc_type: str,
-        generate_field_names: List[str],
+        fields_to_generate: List[str],
         prompt_strategy: Optional[PromptStrategy] = None,
     ) -> str:
         """
@@ -362,79 +363,65 @@ class LLMConvert(ConvertOp):
         # build string of input fields and their descriptions
         multilineInputFieldDescription = ""
         for field_name in self.inputSchema.fieldNames():
-            f = getattr(self.inputSchema, field_name)
-            multilineInputFieldDescription += f"INPUT FIELD {field_name}: {f.desc}\n"
+            field_desc = getattr(self.inputSchema, field_name).desc
+            multilineInputFieldDescription += prompts.INPUT_FIELD.format(
+                field_name=field_name, field_desc=field_desc
+            )
 
         # build string of output fields and their descriptions
         multilineOutputFieldDescription = ""
-        for field_name in generate_field_names:
-            f = getattr(self.outputSchema, field_name)
-            multilineOutputFieldDescription += f"OUTPUT FIELD {field_name}: {f.desc}\n"
+        for field_name in fields_to_generate:
+            field_desc = getattr(self.outputSchema, field_name).desc
+            multilineOutputFieldDescription += prompts.OUTPUT_FIELD.formats(
+                field_name=field_name, field_desc=field_desc
+            )
 
         # add input/output schema descriptions (if they have a docstring)
         optionalInputDesc = (
             ""
             if self.inputSchema.__doc__ is None
-            else f"Here is a description of the input object: {self.inputSchema.__doc__}."
+            else prompts.OPTIONAL_INPUT_DESC.format(desc=self.inputSchema.__doc__)
         )
         optionalOutputDesc = (
             ""
             if self.outputSchema.__doc__ is None
-            else f"Here is a description of the output object: {self.outputSchema.__doc__}."
+            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.inputSchema.__doc__)
         )
 
         # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
-        targetOutputDescriptor = (
-            f"an output JSON object that describes an object of type {doc_type}."
-        )
-        outputSingleOrPlural = "the output object"
-        appendixInstruction = "Be sure to emit a JSON object only"
         if self.cardinality == Cardinality.ONE_TO_MANY:
-            targetOutputDescriptor = f"an output array of zero or more JSON objects that describe objects of type {doc_type}."
-            outputSingleOrPlural = "the output objects"
-            appendixInstruction = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields described above. You must decide the correct number of output objects."
+            targetOutputDescriptor = prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
+            outputSingleOrPlural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
+            appendixInstruction = prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION
+        else:
+            targetOutputDescriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
+            outputSingleOrPlural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
+            appendixInstruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION
 
         # construct promptQuestion
-        promptQuestion = None
+        optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
         if prompt_strategy != PromptStrategy.IMAGE_TO_TEXT:
-            promptQuestion = (
-                f"""I would like you to create {targetOutputDescriptor}. 
-            You will use the information in an input JSON object that I will provide. The input object has type {self.inputSchema.className()}.
-            All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
-            {optionalInputDesc}
-            {optionalOutputDesc}
-            Here is every input field name and a description: 
-            {multilineInputFieldDescription}
-            Here is every output field name and a description:
-            {multilineOutputFieldDescription}
-            {appendixInstruction}
-            """
-                + ""
-                if self.desc is None
-                else f" Keep in mind that this process is described by this text: {self.desc}."
-            )
-
+            prompt_question = prompts.STRUCTURED_CONVERT_PROMPT
         else:
-            promptQuestion = (
-                f"""You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor}.
-            You will use the information in the image that I will provide. The input image(s) has type {self.inputSchema.className()}.
-            All of the fields in {outputSingleOrPlural} can be derived using information from the input image(s).
-            {optionalInputDesc}
-            {optionalOutputDesc}
-            Here is every output field name and a description:
-            {multilineOutputFieldDescription}
-            {appendixInstruction}
-            """
-                + ""
-                if self.desc is None
-                else f" Keep in mind that this process is described by this text: {self.desc}."
-            )
+            prompt_question = prompts.IMAGE_CONVERT_PROMPT
+
+        prompt_question.format(
+            targetOutputDescriptor=targetOutputDescriptor,
+            input_type = self.inputSchema.className(),
+            outputSingleOrPlural = outputSingleOrPlural,
+            optionalInputDesc = optionalInputDesc,
+            optionalOutputDesc = optionalOutputDesc,
+            multilineInputFieldDescription = multilineInputFieldDescription,
+            multilineOutputFieldDescription = multilineOutputFieldDescription,
+            appendixInstruction = appendixInstruction,
+            optional_desc = optional_desc
+        )
 
         # TODO: add this for boolean questions?
         # if prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
         #     promptQuestion += "\nRemember, your output MUST be one of TRUE or FALSE."
 
-        return promptQuestion
+        return prompt_question
 
     def _create_record_op_stats_lst(
         self,
@@ -503,7 +490,7 @@ class LLMConvert(ConvertOp):
 
     def _dspy_generate_fields(
         self,
-        generate_field_names: List[str],
+        fields_to_generate: List[str],
         content: Optional[Union[str, List[bytes]]] = None, #either text or image
         model: Optional[Model] = None,
         prompt_strategy: Optional[PromptStrategy] = None,
@@ -520,7 +507,7 @@ class LLMConvert(ConvertOp):
         doc_type = self.outputSchema.className()
         promptQuestion = self._construct_query_prompt(
             doc_type=doc_type,
-            generate_field_names=generate_field_names,
+            fields_to_generate=fields_to_generate,
             prompt_strategy=prompt_strategy,
         )
         # generate LLM response and capture statistics
@@ -548,7 +535,7 @@ class LLMConvert(ConvertOp):
 
         except Exception as e:
             print(f"DSPy generation error: {e}")
-            return [{field_name: None for field_name in generate_field_names}], query_stats
+            return [{field_name: None for field_name in fields_to_generate}], query_stats
 
         # if using token reduction, this will set the new heatmap (if not, it will just set it to None)
         self.heatmap_json_obj = new_heatmap_json_obj
@@ -569,13 +556,13 @@ class LLMConvert(ConvertOp):
             # TODO: in the future, do not perform this cleaning step if the field is a ListField
             # if value of field_name is a list; flatten the list
             for json_obj in final_json_objects:
-                for field_name in generate_field_names:
+                for field_name in fields_to_generate:
                     while type(json_obj[field_name]) == type([]):
                         json_obj[field_name] = json_obj[field_name][0]
 
         except Exception as e:
             print(f"Error extracting json objects: {str(e)}")
-            return [{field_name: None for field_name in generate_field_names}], query_stats
+            return [{field_name: None for field_name in fields_to_generate}], query_stats
 
         return final_json_objects, query_stats
 

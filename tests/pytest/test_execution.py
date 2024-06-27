@@ -7,6 +7,7 @@ from palimpzest.execution import Execute, SimpleExecution
 from palimpzest.operators import *
 from palimpzest.planner import PhysicalPlan
 from palimpzest.policy import MaxQuality
+from palimpzest.strategies import ModelSelectionFilterStrategy
 
 import os
 import pytest
@@ -24,7 +25,7 @@ class TestExecutionNoCache:
     #     output = Execute(enron_eval, policy=MaxQuality(), num_samples=2, nocache=True)
 
     # TODO: register dataset in fixture
-    def test_execute_dag_simple_scan(self):
+    def test_execute_sequential_simple_scan(self):
         scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
         plan = PhysicalPlan(
             operators=[scanOp],
@@ -40,7 +41,7 @@ class TestExecutionNoCache:
         simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
 
         # test sampling a single record
-        output_records, plan_stats = simple_execution.execute_dag(plan, plan_stats, num_samples=1)
+        output_records, plan_stats = simple_execution.execute_sequential(plan, plan_stats, num_samples=1)
 
         assert len(output_records) == 1
 
@@ -64,7 +65,7 @@ class TestExecutionNoCache:
         # test full scan
         simple_execution = SimpleExecution(nocache=True)
         simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
-        output_records, plan_stats = simple_execution.execute_dag(plan, plan_stats)
+        output_records, plan_stats = simple_execution.execute_sequential(plan, plan_stats, float("inf"))
 
         assert len(output_records) == 6
 
@@ -74,7 +75,7 @@ class TestExecutionNoCache:
             assert hasattr(dr, 'contents') and dr.contents != None
 
 
-    def test_execute_dag_with_non_llm_filter(self):
+    def test_execute_sequential_with_non_llm_filter(self):
         scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
         def filter_buy_emails(record):
             time.sleep(0.001)
@@ -96,7 +97,7 @@ class TestExecutionNoCache:
         simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
 
         # test sampling three records, with one making it past the filter
-        output_records, plan_stats = simple_execution.execute_dag(plan, plan_stats, num_samples=3)
+        output_records, plan_stats = simple_execution.execute_sequential(plan, plan_stats, num_samples=3)
 
         assert len(output_records) == 1
 
@@ -125,7 +126,7 @@ class TestExecutionNoCache:
         # test full scan
         simple_execution = SimpleExecution(nocache=True)
         simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
-        output_records, plan_stats = simple_execution.execute_dag(plan, plan_stats)
+        output_records, plan_stats = simple_execution.execute_sequential(plan, plan_stats, num_samples=float("inf"))
 
         assert len(output_records) == 4
 
@@ -135,14 +136,11 @@ class TestExecutionNoCache:
             assert hasattr(dr, 'contents') and dr.contents != None
 
     # TODO: mock response from GPT_3_5 if it's wrong
-    def test_execute_dag_with_llm_filter(self):
+    def test_execute_sequential_with_llm_filter(self):
         scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
         filter = Filter("The filename does not contain the string 'buy'")
-        filterOp = LLMFilter(
-            inputSchema=File, outputSchema=File,
-            model=Model.GPT_3_5, prompt_strategy=PromptStrategy.DSPY_COT_BOOL,
-            filter=filter, targetCacheId="abc123", shouldProfile=True,
-        )
+        filterOpClass = ModelSelectionFilterStrategy(available_models=[Model.GPT_3_5], prompt_strategy=PromptStrategy.DSPY_COT_BOOL)
+        filterOp = filterOpClass[0](inputSchema=File, outputSchema=File, filter=filter, targetCacheId="abc123", shouldProfile=True,)
         plan = PhysicalPlan(
             operators=[scanOp, filterOp],
             datasetIdentifier=ENRON_EVAL_TINY_DATASET_ID,
@@ -158,7 +156,7 @@ class TestExecutionNoCache:
         simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
 
         # test sampling three records, with one making it past the filter
-        output_records, plan_stats = simple_execution.execute_dag(plan, plan_stats, num_samples=3)
+        output_records, plan_stats = simple_execution.execute_sequential(plan, plan_stats, num_samples=3)
 
         assert len(output_records) == 1
 
@@ -189,7 +187,7 @@ class TestExecutionNoCache:
         # test full scan
         simple_execution = SimpleExecution(nocache=True)
         simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
-        output_records, plan_stats = simple_execution.execute_dag(plan, plan_stats)
+        output_records, plan_stats = simple_execution.execute_sequential(plan, plan_stats, num_samples=float("inf"))
 
         assert len(output_records) == 4
 
