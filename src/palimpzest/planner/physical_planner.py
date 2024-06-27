@@ -87,7 +87,9 @@ class PhysicalPlanner(Planner):
         """A simple wrapper around _createSentinelPlan as right now these are one and the same."""
         return self._createSentinelPlan(logical_plan, model)
 
-    def _createSentinelPlan(self, logical_plan: LogicalPlan, model: Model) -> PhysicalPlan:
+    def _createSentinelPlan(
+        self, logical_plan: LogicalPlan, model: Model
+    ) -> PhysicalPlan:
         """
         Create the sentinel plan for the given model. At least for now --- each
         sentinel plan is a plan with a single model which follows the naive logical
@@ -112,15 +114,18 @@ class PhysicalPlanner(Planner):
                     for op in self.logical_physical_map[type(logical_op)]:
                         if op in [LLMConvert]:
                             continue
-                        op = op_class(
-                                inputSchema=logical_op.inputSchema,
-                                outputSchema=logical_op.outputSchema,
-                                query_strategy = QueryStrategy.BONDED_WITH_FALLBACK,
-                                token_budget=1.0,
-                                shouldProfile=shouldProfile,
-                            )
+                    if op.model == model:
+                            op_class = op
+                            break
+                    op = op_class(
+                            inputSchema=logical_op.inputSchema,
+                            outputSchema=logical_op.outputSchema,
+                            query_strategy = QueryStrategy.BONDED_WITH_FALLBACK,
+                            token_budget=1.0,
+                            shouldProfile=shouldProfile,
+                        )
                 else:
-                    raise NotImplementedError("This should not be called")
+                    # raise NotImplementedError("This should not be called")
                     op = resolveLogicalConvertOp(
                         logical_op,
                         model=model,
@@ -140,18 +145,18 @@ class PhysicalPlanner(Planner):
                             op_class = op
                             break
                     op = op_class(
-                            inputSchema=logical_op.inputSchema,
-                            outputSchema=logical_op.outputSchema,
-                            filter=logical_op.filter,
-                            shouldProfile=shouldProfile,
-                        )
+                        inputSchema=logical_op.inputSchema,
+                        outputSchema=logical_op.outputSchema,
+                        filter=logical_op.filter,
+                        shouldProfile=shouldProfile,
+                    )
                 else:
-                    raise NotImplementedError("This should not be called")
+                    # raise NotImplementedError("This should not be called")
                     op = resolveLogicalFilterOp(
                         logical_op,
                         model=model,
                         prompt_strategy=PromptStrategy.DSPY_COT_BOOL,
-                        useParallelOps = self.useParallelOps,
+                        useParallelOps=self.useParallelOps,
                         shouldProfile=shouldProfile,
                     )
 
@@ -163,7 +168,10 @@ class PhysicalPlanner(Planner):
 
             physical_operators.append(op)
 
-        return PhysicalPlan(operators=physical_operators, datasetIdentifier=datasetIdentifier)
+        return PhysicalPlan(
+            operators=physical_operators, datasetIdentifier=datasetIdentifier
+        )
+
 
     def _createPhysicalPlans(self, logical_plan: LogicalPlan) -> List[PhysicalPlan]:
         """
@@ -193,7 +201,6 @@ class PhysicalPlanner(Planner):
         }
         all_plans = []
         for logical_op in operators:
-
             if isinstance(logical_op, pz_ops.ConvertScan):
                 plans = []
                 for subplan in all_plans:
@@ -221,7 +228,9 @@ class PhysicalPlanner(Planner):
                                     prompt_strategy=PromptStrategy.DSPY_COT_QA,
                                     shouldProfile=self.shouldProfile,
                                 )
-                                new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                                new_physical_plan = PhysicalPlan.fromOpsAndSubPlan(
+                                    [physical_op], subplan
+                                )
                                 plans.append(new_physical_plan)
                                 continue
 
@@ -258,13 +267,13 @@ class PhysicalPlanner(Planner):
                                 shouldProfile=self.shouldProfile,
                             )
                     else:
-                        raise NotImplementedError("This should not be called")
+                        # raise NotImplementedError("This should not be called")
                         models = self.available_models
                         for m in models:
                             physical_op = resolveLogicalFilterOp(
                                 logical_op,
                                 model=m,
-                                useParallelOps = self.useParallelOps,
+                                useParallelOps=self.useParallelOps,
                                 prompt_strategy=PromptStrategy.DSPY_COT_BOOL,
                                 shouldProfile=self.shouldProfile,
                             )
@@ -283,19 +292,28 @@ class PhysicalPlanner(Planner):
 
                 # base case, if this operator is a BaseScan set all_plans to be the physical plan with just this operatorù
                 # This also happens if the operator is a CacheScan and all_plans is empty
-                if isinstance(logical_op, pz_ops.BaseScan) or \
-                    (isinstance(logical_op, pz_ops.CacheScan) and all_plans == []):
-                    all_plans = [PhysicalPlan(operators=[physical_op], datasetIdentifier=datasetIdentifier)]
+                if isinstance(logical_op, pz_ops.BaseScan) or (
+                    isinstance(logical_op, pz_ops.CacheScan) and all_plans == []
+                ):
+                    all_plans = [
+                        PhysicalPlan(
+                            operators=[physical_op], datasetIdentifier=datasetIdentifier
+                        )
+                    ]
                 else:
                     plans = []
                     for subplan in all_plans:
-                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan(
+                            [physical_op], subplan
+                        )
                         plans.append(new_physical_plan)
                     all_plans = plans
 
         return all_plans
 
-    def deduplicate_plans(self, physical_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
+    def deduplicate_plans(
+        self, physical_plans: List[PhysicalPlan]
+    ) -> List[PhysicalPlan]:
         """De-duplicate plans with identical estimates for runtime, cost, and quality."""
         # drop duplicate plans in terms of time, cost, and quality, as these can cause
         # plans on the pareto frontier to be dropped if they are "dominated" by a duplicate
@@ -309,7 +327,9 @@ class PhysicalPlanner(Planner):
         print(f"DEDUP PLANS: {len(dedup_plans)}")
         return dedup_plans
 
-    def select_pareto_optimal_plans(self, physical_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
+    def select_pareto_optimal_plans(
+        self, physical_plans: List[PhysicalPlan]
+    ) -> List[PhysicalPlan]:
         """Select the subset of physical plans which lie on the pareto frontier of our runtime, cost, and quality estimates."""
         # compute the pareto frontier of candidate physical plans and return the list of such plans
         # - brute force: O(d*n^2);
@@ -348,7 +368,9 @@ class PhysicalPlanner(Planner):
 
     def add_baseline_plans(self, final_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
         # if specified, include all baseline plans in the final set of plans
-        for plan in [self._createBaselinePlan(model) for model in self.available_models]:
+        for plan in [
+            self._createBaselinePlan(model) for model in self.available_models
+        ]:
             for final_plan in final_plans:
                 if plan == final_plan:
                     continue
@@ -363,7 +385,6 @@ class PhysicalPlanner(Planner):
         physical_plans: List[PhysicalPlan],
         min_plans: int,
     ) -> List[PhysicalPlan]:
-
         # if specified, grab up to `min` total plans, and choose the remaining plans
         # based on their smallest agg. distance to the pareto frontier; distance is computed
         # by summing the pct. difference to the pareto frontier across each dimension
@@ -377,10 +398,15 @@ class PhysicalPlanner(Planner):
             # otherwise compute min distance to plans on pareto frontier
             min_dist, min_dist_idx = np.inf, -1
             for pareto_plan in final_plans:
-                time_dist = (plan.total_time - pareto_plan.total_time) / pareto_plan.total_time
-                cost_dist = (plan.total_cost - pareto_plan.total_cost) / pareto_plan.total_cost
+                time_dist = (
+                    plan.total_time - pareto_plan.total_time
+                ) / pareto_plan.total_time
+                cost_dist = (
+                    plan.total_cost - pareto_plan.total_cost
+                ) / pareto_plan.total_cost
                 quality_dist = (
-                    (pareto_plan.quality - plan.quality) / plan.quality if plan.quality > 0 else 10.0
+                    (pareto_plan.quality - plan.quality) / plan.quality
+                    if plan.quality > 0 else 10.0
                 )
                 dist = time_dist + cost_dist + quality_dist
                 if dist < min_dist:
@@ -400,7 +426,11 @@ class PhysicalPlanner(Planner):
 
         return final_plans
 
-    def generate_plans(self, logical_plan: LogicalPlan, sentinels: bool=False) -> List[PhysicalPlan]:
+    def generate_plans(
+        self,
+        logical_plan: LogicalPlan,
+        sentinels: bool = False,
+    ) -> List[PhysicalPlan]:
         """Return a set of possible physical plans."""
         # only fetch sentinel plans if specified
         if sentinels:
@@ -408,13 +438,14 @@ class PhysicalPlanner(Planner):
             assert (
                 len(models) > 0
             ), "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
-            sentinel_plans = [self._createSentinelPlan(logical_plan, model) for model in models]
+            sentinel_plans = [
+                self._createSentinelPlan(logical_plan, model) for model in models
+            ]
             return sentinel_plans
 
         # compute all physical plans for this logical plan
         physicalPlans = [
-            physicalPlan
-            for physicalPlan in self._createPhysicalPlans(logical_plan)
+            physicalPlan for physicalPlan in self._createPhysicalPlans(logical_plan)
         ]
         print(f"INITIAL PLANS: {len(physicalPlans)}")
         return physicalPlans
