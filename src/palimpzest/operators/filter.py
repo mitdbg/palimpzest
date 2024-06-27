@@ -302,7 +302,7 @@ class LLMFilter(FilterOp):
         text_content = candidate._asJSONStr(include_bytes=False)
         response, gen_stats = None, {}
         try:
-            response, _, gen_stats = generator.generate(
+            response, gen_stats = generator.generate(
                 context=text_content,
                 question=self.filter.filterCondition,
             )

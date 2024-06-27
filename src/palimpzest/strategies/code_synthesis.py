@@ -129,21 +129,26 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         # set field_to_code_ensemble and code_synthesized to True
         return field_to_code_ensemble, output_stats
 
-    def convert(self, candidate_content,
-                fields) -> None:
-        pass
-
     def _bonded_query_fallback(self, candidate):
         fields_to_generate = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
         candidate_dict = candidate._asDict(include_bytes=False)
 
+        prev_model = self.model
+        prev_prompt_strategy = self.prompt_strategy
+
+        # TODO: assert GPT-4 is available; maybe fall back to another model otherwise
+        self.model = Model.GPT_4
+        self.prompt_strategy = PromptStrategy.DSPY_COT_QA
+
+        prompt = self._construct_query_prompt(fields_to_generate=fields_to_generate)
         text_content = json.dumps(candidate_dict)
         final_json_objects, query_stats = self._dspy_generate_fields(
-            fields_to_generate,
+            fields_to_generate=fields_to_generate,
             content=text_content,
-            model=Model.GPT_4,  # TODO: assert GPT-4 is available; maybe fall back to another model otherwise
-            prompt_strategy=PromptStrategy.DSPY_COT_QA,
+            prompt=prompt
         )
+        self.model = prev_model
+        self.prompt_strategy = prev_prompt_strategy
 
         drs = []
         for idx, js in enumerate(final_json_objects):
@@ -230,13 +235,19 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             else:
                 # if there is a failure, run a conventional query
                 print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
+                prev_model = self.model
+                prev_prompt_strategy = self.prompt_strategy
+                self.model = Model.GPT_3_5
+                self.prompt_strategy = PromptStrategy.DSPY_COT_QA
+                prompt = self._construct_query_prompt(fields_to_generate=[field_name])
                 text_content = json.dumps(candidate_dict)
                 final_json_objects, field_stats = self._dspy_generate_fields(
-                    [field_name],
+                    fields_to_generate=[field_name],
                     content=text_content,
-                    model=Model.GPT_3_5,
-                    prompt_strategy=PromptStrategy.DSPY_COT_QA,
+                    prompt=prmpy
                 )
+                self.model = prev_model
+                self.prompt_strategy = prev_prompt_strategy
 
                 # include code execution time in field_stats
                 if "fn_call_duration_secs" not in field_stats:

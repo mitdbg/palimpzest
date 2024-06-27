@@ -1,3 +1,4 @@
+# NOTE: Why are these functions within the profiler directory? They should be in the strategies directory, or even better within the token_reduction strategy.
 from fuzzywuzzy import process, fuzz
 
 
@@ -84,7 +85,7 @@ def get_range_from_hist(file_path, range_budget, resolution=0.001, trim_zeros=Tr
     return start * 1.0 / index_range, end * 1.0 / index_range
 
 
-def get_trimed(context, sr, er):
+def trim_context(context, sr, er):
     test_len = len(context)
     start = int(sr * test_len)
     end = int(er * test_len)

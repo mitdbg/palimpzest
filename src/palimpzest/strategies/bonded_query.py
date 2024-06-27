@@ -12,18 +12,22 @@ from palimpzest.operators import logical, physical, convert
 
 class LLMBondedQueryConvert(convert.LLMConvert):
 
-    def convert(self, candidate_content,
+    def convert(self, 
+                candidate_content,
                 fields) -> None:
 
+        prompt = self._construct_query_prompt(fields_to_generate=fields)
+
         # generate all fields in a single query
-        final_json_objects, query_stats = self._dspy_generate_fields(fields, content=candidate_content)
+        final_json_objects, query_stats = self._dspy_generate_fields(fields_to_generate=fields, content=candidate_content, prompt=prompt)
 
         # if there was an error, execute a conventional query
         if all([v is None for v in final_json_objects[0].values()]):
             # generate each field one at a time
             field_outputs = {}
             for field_name in fields:
-                json_objects, field_stats = self._dspy_generate_fields([field_name], content = candidate_content)
+                prompt = self._construct_query_prompt(fields_to_generate=[field_name])
+                json_objects, field_stats = self._dspy_generate_fields(fields_to_generate=[field_name], content = candidate_content, prompt=prompt)
 
                 # update query_stats
                 for key, value in field_stats.items():

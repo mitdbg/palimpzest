@@ -1,4 +1,8 @@
-### This file contains prompts used by Palimpzest ###
+""" This file contains prompts used by Palimpzest 
+Whenever they are called, they can be parameterize with the str.format() method using the parameter names that are in brackets.
+For now, this is an easy decoupling. In the future, we maybe want a more sophisticated approach like a PromptBuilder.
+"""
+
 from enum import Enum
 
 ### CONVERT PROMPTS ### 

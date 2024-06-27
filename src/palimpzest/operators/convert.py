@@ -17,24 +17,6 @@ import concurrent
 import math
 import time
 
-# CODE SYNTHESIS PROMPTS
-EXAMPLE_PROMPT = """Example{idx}:
-{example_inputs}
-{example_output}
-"""
-
-ADVICEGEN_PROMPT = """You are a helpful programming assistant and an expert {language} programmer. Your job is to provide programming ideas to help me write {language} programs.
-For example, if I want to complete a task: "extract the salary number (in USD) from a given employee's document", you can provide me with {n} different ways to do it like:
-Idea 1: Use regular expressions to extract the salary number: a number with a dollar sign in front of it. For example, $100,000.
-Idea 2: Find the table entry with the salary number.
-Idea 3: Use a pre-trained NLP model to extract the salary number.
-# 
-Now, consider the following {language} programming task that extracts `{output}` ({output_desc}) from given inputs:
-{examples_desc}
-Please provide me with {n} different ideas to complete this task. Return the ideas only, following the format above.
-"""
-
-
 class ConvertOp(PhysicalOperator):
 
     inputSchema = Schema
@@ -350,16 +332,13 @@ class LLMConvert(ConvertOp):
 
     def _construct_query_prompt(
         self,
-        doc_type: str,
         fields_to_generate: List[str],
-        prompt_strategy: Optional[PromptStrategy] = None,
     ) -> str:
         """
         This function constructs the prompt for a bonded query.
         """
         # set defaults
-        prompt_strategy = prompt_strategy if prompt_strategy is not None else self.prompt_strategy
-
+        doc_type = self.outputSchema.className()
         # build string of input fields and their descriptions
         multilineInputFieldDescription = ""
         for field_name in self.inputSchema.fieldNames():
@@ -400,7 +379,7 @@ class LLMConvert(ConvertOp):
 
         # construct promptQuestion
         optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
-        if prompt_strategy != PromptStrategy.IMAGE_TO_TEXT:
+        if self.prompt_strategy != PromptStrategy.IMAGE_TO_TEXT:
             prompt_question = prompts.STRUCTURED_CONVERT_PROMPT
         else:
             prompt_question = prompts.IMAGE_CONVERT_PROMPT
@@ -491,75 +470,47 @@ class LLMConvert(ConvertOp):
     def _dspy_generate_fields(
         self,
         fields_to_generate: List[str],
+        prompt: str,
         content: Optional[Union[str, List[bytes]]] = None, #either text or image
-        model: Optional[Model] = None,
-        prompt_strategy: Optional[PromptStrategy] = None,
-        token_budget: Optional[float] = None,
         verbose: bool = False,
     ) -> Tuple[List[Dict[FieldName, Any]], StatsDict]:
-        # set defaults
-        model = model if model is not None else self.model
-        prompt_strategy = prompt_strategy if prompt_strategy is not None else self.prompt_strategy
-        token_budget = token_budget if token_budget is not None else self.token_budget
-
+        """ This functions wraps the call to the generator method to actually perform the field generation.
+        """
         # create DSPy generator and generate
         doc_schema = str(self.outputSchema)
         doc_type = self.outputSchema.className()
-        promptQuestion = self._construct_query_prompt(
-            doc_type=doc_type,
-            fields_to_generate=fields_to_generate,
-            prompt_strategy=prompt_strategy,
-        )
         # generate LLM response and capture statistics
-        answer, new_heatmap_json_obj, query_stats = None, None, {}
+        answer, query_stats = None, {}
         try:
-            if prompt_strategy == PromptStrategy.DSPY_COT_QA:
-                # invoke LLM to generate output JSON
+            if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
                 generator = DSPyGenerator(
-                    model.value, prompt_strategy, doc_schema, doc_type, verbose
+                    self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
                 )
-                answer, new_heatmap_json_obj, query_stats = generator.generate(
-                    context=content,
-                    question=promptQuestion,
-                    budget=token_budget,
-                    heatmap_json_obj=self.heatmap_json_obj,
-                )
-
-            elif prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
-                # invoke LLM to generate output JSON
-                generator = ImageTextGenerator(model.value)
-                answer, query_stats = generator.generate(content, promptQuestion)
-
+                answer, query_stats = generator.generate(context=content, question=prompt)
+            elif self.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
+                generator = ImageTextGenerator(self.model.value)
+                answer, query_stats = generator.generate(content, prompt)
             else:
-                raise Exception(f"Prompt strategy not implemented: {prompt_strategy}")
-
+                raise Exception(f"Prompt strategy not implemented: {self.prompt_strategy}")
         except Exception as e:
             print(f"DSPy generation error: {e}")
             return [{field_name: None for field_name in fields_to_generate}], query_stats
 
-        # if using token reduction, this will set the new heatmap (if not, it will just set it to None)
-        self.heatmap_json_obj = new_heatmap_json_obj
-
         # parse the final json objects and standardize the outputs to be lists
         final_json_objects = []
         try:
-            # parse JSON object from the answer
             jsonObj = getJsonFromAnswer(answer)
-
-            # parse JSON output
             if self.cardinality == Cardinality.ONE_TO_MANY:
                 assert isinstance(jsonObj["items"], list) and len(jsonObj["items"]) > 0, "No output objects were generated for one-to-many query"
                 final_json_objects = jsonObj["items"]
             else:
                 final_json_objects = [jsonObj]
-
             # TODO: in the future, do not perform this cleaning step if the field is a ListField
             # if value of field_name is a list; flatten the list
             for json_obj in final_json_objects:
                 for field_name in fields_to_generate:
                     while type(json_obj[field_name]) == type([]):
                         json_obj[field_name] = json_obj[field_name][0]
-
         except Exception as e:
             print(f"Error extracting json objects: {str(e)}")
             return [{field_name: None for field_name in fields_to_generate}], query_stats
@@ -587,13 +538,14 @@ class LLMConvert(ConvertOp):
         elif self.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
             base64_images = []
             if hasattr(candidate, "contents"):
+                # TODO: should address this now; we need a way to infer (or have the programmer declare) what fields contain image content
                 base64_images = [
-                    base64.b64encode(candidate.contents).decode("utf-8")  # TODO: should address this now; we need a way to infer (or have the programmer declare) what fields contain image content
+                    base64.b64encode(candidate.contents).decode("utf-8")  
                 ]
             else:
                 base64_images = [
                     base64.b64encode(image).decode("utf-8")
-                    for image in candidate.image_contents  # TODO: we should address this (see note above)
+                    for image in candidate.image_contents  # TODO: (see note above)
                 ]
             content = base64_images
         else:
@@ -644,20 +596,22 @@ class LLMConvertConventional(LLMConvert):
     def convert(self, candidate_content: Union[str, List[bytes]], fields: List[str]) -> Tuple[List[RecordJSONObjects], StatsDict]:
         start_time = time.time()
         field_outputs, query_stats = {}, {}
+
         for field_name in fields:
-            json_objects, field_stats = self._dspy_generate_fields([field_name], content=candidate_content)
+            prompt = self._construct_query_prompt(fields_to_generate=[field_name])
+            json_objects, field_stats = self._dspy_generate_fields(
+                fields_to_generate=[field_name],
+                content=candidate_content,
+                prompt=prompt,
+            )
             for key, value in field_stats.items():
                 # TODO maybe a better way to find which stats to aggregate?
-                if type(value) == type(''):
-                    query_stats[key] = value
-                elif type(value) in [type(1), type(1.)]:
-                    query_stats[key] = query_stats.get(key, 0) + value
-                elif type(value) == type(dict()):
+                if type(value) == type(dict()):
                     for k2, v2 in value.items():
-                        query_stats[k2] = query_stats.get(k2,0) + v2 # Should we simply throw the usage away here?
+                        # Should we simply throw the usage away here?
+                        query_stats[k2] = query_stats.get(k2,type(v2)()) + v2 
                 else:
-                    # TODO what to do with list fields like answer_log_probs? 
-                    continue 
+                    query_stats[key] = query_stats.get(key, type(value)()) + value
             field_outputs[field_name] = json_objects
 
         query_stats["total_time"] = time.time() - start_time

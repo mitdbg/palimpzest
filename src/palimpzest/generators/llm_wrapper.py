@@ -38,7 +38,7 @@ import time
 
 from palimpzest.profiler.attentive_trim import (
     find_best_range,
-    get_trimed,
+    trim_context,
     best_substring_match,
     update_heatmap_json,
 )
@@ -385,7 +385,7 @@ class DSPyGenerator(LLMGeneratorWrapper):
                         ei * TOKEN_REDUCTION_GRANULARITY,
                     )
                     print("start ratio:", sr, "end ratio:", er)
-                    context = get_trimed(context, sr, er)
+                    context = trim_context(context, sr, er)
                     reduction = True
 
         # execute LLM generation
