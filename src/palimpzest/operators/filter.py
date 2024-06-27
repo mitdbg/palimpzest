@@ -209,6 +209,9 @@ class LLMFilter(FilterOp):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.model = kwargs.get("model", None)
+        self.prompt_strategy = kwargs.get("prompt_strategy", PromptStrategy.DSPY_COT_BOOL)
+
 
     def __eq__(self, other: LLMFilter):
         return (
@@ -223,14 +226,17 @@ class LLMFilter(FilterOp):
         return f"{self.op_name()}({str(self.outputSchema)}, Filter: {str(self.filter)}, Model: {self.model.value}, Prompt Strategy: {str(self.prompt_strategy.value)})"
 
     def copy(self):
-        return self.__class__(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
-            filter=self.filter,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-            max_workers=self.max_workers,
-        )
+        parameters = {
+            'inputSchema': self.inputSchema,
+            'outputSchema': self.outputSchema,
+            'filter': self.filter,
+            'targetCacheId': self.targetCacheId,
+            'shouldProfile': self.shouldProfile,
+            'max_workers': self.shouldProfile,
+            'model': self.model,
+            'prompt_strategy': self.prompt_strategy,
+        }
+        return LLMFilter(**parameters)
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
@@ -278,6 +284,9 @@ class LLMFilter(FilterOp):
         )
 
     def __call__(self, candidate: DataRecord) -> DataRecordsWithStats:
+        if candidate is None:
+            return None
+        
         start_time = time.time()
 
         # compute record schema and type
