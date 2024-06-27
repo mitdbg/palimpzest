@@ -4,10 +4,16 @@ from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats, RecordOpStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import DataRecord
-from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
+from palimpzest.operators import (
+    AggregateOp,
+    DataSourcePhysicalOp,
+    LimitScanOp,
+    MarshalAndScanDataOp,
+)
 from palimpzest.operators.filter import FilterOp
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
+from palimpzest.qualityestimation import ValidationData
 from palimpzest.utils.model_helpers import getModels, getVisionModels
 from .cost_estimator import CostEstimator
 from palimpzest.sets import Set
@@ -56,24 +62,28 @@ class ExecutionEngine:
     def __init__(self) -> None:
         raise NotImplementedError
 
-class SimpleExecution(ExecutionEngine):
 
-    def __init__(self,
-            num_samples: int=20,
-            scan_start_idx: int=0,
-            nocache: bool=False,
-            include_baselines: bool=False,
-            min_plans: Optional[int] = None,
-            verbose: bool = False,
-            available_models: Optional[List[Model]] = [],
-            allow_bonded_query: Optional[List[Model]] = True,
-            allow_model_selection: Optional[bool]=True,
-            allow_code_synth: Optional[bool]=True,
-            allow_token_reduction: Optional[bool]=True,
-            useParallelOps: Optional[bool]=False,
-            *args, **kwargs
-        ) -> None:
+class SimpleExecution(ExecutionEngine):
+    def __init__(
+        self,
+        num_samples: int = 20,
+        validation_examples: ValidationData = None,  # TODO(chjun): probably not the best place, but it should stay with num_samples.
+        scan_start_idx: int = 0,
+        nocache: bool = False,
+        include_baselines: bool = False,
+        min_plans: Optional[int] = None,
+        verbose: bool = False,
+        available_models: Optional[List[Model]] = [],
+        allow_bonded_query: Optional[List[Model]] = True,
+        allow_model_selection: Optional[bool] = True,
+        allow_code_synth: Optional[bool] = True,
+        allow_token_reduction: Optional[bool] = True,
+        useParallelOps: Optional[bool] = False,
+        *args,
+        **kwargs,
+    ) -> None:
         self.num_samples = num_samples
+        self.validation_examples = validation_examples
         self.scan_start_idx = scan_start_idx
         self.nocache = nocache
         self.include_baselines = include_baselines
@@ -99,7 +109,8 @@ class SimpleExecution(ExecutionEngine):
 
         self.source_dataset_id = dataset.dataset_id
 
-    def execute(self,
+    def execute(
+        self,
         dataset: Set,
         policy: Policy,
     ):
@@ -140,18 +151,23 @@ class SimpleExecution(ExecutionEngine):
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
             useParallelOps=self.useParallelOps,
-            useStrategies=True,
+            # useStrategies=True,
         )
 
         if run_sentinels:
             for logical_plan in logical_planner.generate_plans(dataset, sentinels=True):
-                for sentinel_plan in physical_planner.generate_plans(logical_plan, sentinels=True):
+                for sentinel_plan in physical_planner.generate_plans(
+                    logical_plan, sentinels=True
+                ):
                     sentinel_plans.append(sentinel_plan)
 
             # run sentinel plans
             sample_execution_data, sentinel_records = self.run_sentinel_plans(
-                sentinel_plans, self.verbose
+                sentinel_plans,
+                self.verbose,
             )
+
+        print(sample_execution_data)
 
         # (re-)initialize logical and physical planner
         scan_start_idx = self.num_samples if run_sentinels else 0
@@ -169,12 +185,16 @@ class SimpleExecution(ExecutionEngine):
                 all_physical_plans.append(physical_plan)
 
         # construct the CostEstimator with any sample execution data we've gathered
-        cost_estimator = CostEstimator(source_dataset_id=self.source_dataset_id,
-                                       sample_execution_data=sample_execution_data)
+        cost_estimator = CostEstimator(
+            source_dataset_id=self.source_dataset_id,
+            sample_execution_data=sample_execution_data,
+        )
 
         # estimate the cost of each plan
         for physical_plan in all_physical_plans:
-            total_time, total_cost, quality = cost_estimator.estimate_plan_cost(physical_plan)
+            total_time, total_cost, quality = cost_estimator.estimate_plan_cost(
+                physical_plan
+            )
             physical_plan.total_time = total_time
             physical_plan.total_cost = total_cost
             physical_plan.quality = quality
@@ -190,25 +210,37 @@ class SimpleExecution(ExecutionEngine):
             final_plans = physical_planner.add_baseline_plans(final_plans)
 
         if self.min_plans is not None and len(final_plans) < self.min_plans:
-            final_plans = physical_planner.add_plans_closest_to_frontier(final_plans, plans, self.min_plans)
+            final_plans = physical_planner.add_plans_closest_to_frontier(
+                final_plans, plans, self.min_plans
+            )
 
         # choose best plan and execute it
         plan = policy.choose(plans)
-        new_records, stats = self.execute_plan(plan, plan_type=PlanType.FINAL) # TODO: Still WIP
-        all_records = sentinel_records + new_records
+        new_records, stats = self.execute_plan(
+            plan, plan_type=PlanType.FINAL
+        )  # TODO: Still WIP
+        all_records = new_records
+        if ValidationData is None:
+            all_records += sentinel_records
 
         return all_records, plan, stats
 
     def run_sentinel_plans(
-        self, sentinel_plans: List[PhysicalPlan], verbose: bool = False
+        self,
+        sentinel_plans: List[PhysicalPlan],
+        verbose: bool = False,
     ):
         # compute number of plans
         num_sentinel_plans = len(sentinel_plans)
 
         all_sample_execution_data, return_records = [], []
-        results = list(map(lambda x:
-                self.execute_plan(*x),
-                [(plan, idx, PlanType.SENTINEL) for idx, plan in enumerate(sentinel_plans)],
+        results = list(
+            map(
+                lambda x: self.execute_plan(*x),
+                [
+                    (plan, idx, PlanType.SENTINEL, self.validation_examples)
+                    for idx, plan in enumerate(sentinel_plans)
+                ],
             )
         )
         # with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
@@ -219,7 +251,9 @@ class SimpleExecution(ExecutionEngine):
         #     )
 
         sentinel_records, sentinel_stats = zip(*results)
-        for records, plan_stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
+        for records, plan_stats, plan in zip(
+            sentinel_records, sentinel_stats, sentinel_plans
+        ):
             # aggregate sentinel est. data
             sample_execution_data = []
             for op_id, operator_stats in plan_stats.operator_stats.items():
@@ -232,12 +266,20 @@ class SimpleExecution(ExecutionEngine):
             if champion_model_name in plan.getPlanModelNames():
                 return_records = records
 
-        return all_sample_execution_data, return_records # TODO: make sure you capture cost of sentinel plans.
+        return (
+            all_sample_execution_data,
+            return_records,
+        )  # TODO: make sure you capture cost of sentinel plans.
 
-    def _execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: Optional[int] = None):
+    def _execute_dag(
+        self,
+        plan: PhysicalPlan,
+        plan_stats: PlanStats,
+        num_samples: Optional[int] = None,
+    ):
         """
         Helper function which executes the physical plan. This function is overly complex for today's
-        plans which are simple cascades -- but is designed with an eye towards 
+        plans which are simple cascades -- but is designed with an eye towards
         """
         output_records = []
         current_scan_idx = self.scan_start_idx
@@ -249,7 +291,7 @@ class SimpleExecution(ExecutionEngine):
             op_id = operator.get_op_id()
             # TODO: Is it okay to have call return a list?
             if isinstance(operator, DataSourcePhysicalOp):
-                idx=0
+                idx = 0
                 out_records, out_stats_lst = [], []
                 num_samples = num_samples if num_samples else float("inf")
 
@@ -262,9 +304,15 @@ class SimpleExecution(ExecutionEngine):
                         datasource = (
                             self.datadir.getRegisteredDataset(self.source_dataset_id)
                             if isinstance(operator, MarshalAndScanDataOp)
-                            else self.datadir.getCachedResult(operator.cachedDataIdentifier)
+                            else self.datadir.getCachedResult(
+                                operator.cachedDataIdentifier
+                            )
                         )
-                        candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
+                        candidate = DataRecord(
+                            schema=SourceRecord,
+                            parent_uuid=None,
+                            scan_idx=current_scan_idx,
+                        )
                         candidate.idx = current_scan_idx
                         candidate.get_item_fn = datasource.getItem
                         candidate.cardinality = datasource.cardinality
@@ -277,7 +325,7 @@ class SimpleExecution(ExecutionEngine):
                 input_records = out_records
                 out_records = []
                 out_stats_lst = []
-                for idx,input_record in enumerate(input_records):
+                for idx, input_record in enumerate(input_records):
                     if isinstance(operator, LimitScanOp) and idx == operator.limit:
                         break
 
@@ -305,17 +353,53 @@ class SimpleExecution(ExecutionEngine):
 
         return out_records, plan_stats
 
+    def _get_data_source(self, operator, validation_examples: ValidationData=None):
+        if not isinstance(operator, DataSourcePhysicalOp):
+            return None
+    
+        if validation_examples is not None:
+            return validation_examples.get_input()
+        
+        if isinstance(operator, MarshalAndScanDataOp):
+            return self.datadir.getRegisteredDataset(self.source_dataset_id)
+        return self.datadir.getCachedResult(operator.cachedDataIdentifier)
+    
+
+    def _construct_datarecord(
+        self,
+        datasource,
+        current_scan_idx,
+    ):
+        # construct input DataRecord for DataSourcePhysicalOp
+        candidate = DataRecord(
+            schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx
+        )
+        candidate.idx = current_scan_idx
+        candidate.get_item_fn = datasource.getItem
+        candidate.cardinality = datasource.cardinality
+
+        return candidate
+
+
     # TODO The dag style execution is not really working. I am implementing a per-records execution
-    def execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: Optional[int] = None):
+    def execute_dag(
+        self,
+        plan: PhysicalPlan,
+        plan_stats: PlanStats,
+        num_samples: Optional[int] = None,
+        validation_examples: ValidationData = None,
+    ):
+        # TODO(chjun): When validation_examples is None and num_samples is None, this is a real run.
+        #              It seems to me that we should use a more explicit way to speak this logic out.
         """
         Helper function which executes the physical plan. This function is overly complex for today's
         plans which are simple cascades -- but is designed with an eye towards the future.
         """
         # initialize list of output records and intermediate variables
-        output_records = []
-        source_records_scanned = 0
+        final_output_records = []
+        source_records_readout = 0
         datasource_len = 0
-        current_scan_idx = self.scan_start_idx
+        current_source_scan_idx = self.scan_start_idx if validation_examples is None else 0
 
         # initialize processing queues for each operation
         processing_queues = {
@@ -324,14 +408,17 @@ class SimpleExecution(ExecutionEngine):
             if not isinstance(op, DataSourcePhysicalOp)
         }
 
-        # if num_samples is not provided, set it to infinity
-        num_samples = num_samples if num_samples is not None else float("inf")
+        # if num_samples is not provided, or validation_examples is not None, set it to infinity
+        if num_samples is None or validation_examples is not None:
+            num_samples = float("inf")
 
         # execute the plan until either:
         # 1. all records have been processed, or
         # 2. the final limit operation has completed
-        finished_executing, keep_scanning_source_records = False, True
-        while not finished_executing:
+        keep_scanning_source_records = True
+        while keep_scanning_source_records:
+            output_records_of_root_record = []
+            root_record_uuid = ""
             for op_idx, operator in enumerate(plan.operators):
                 op_id = operator.get_op_id()
 
@@ -346,27 +433,17 @@ class SimpleExecution(ExecutionEngine):
 
                 # TODO: if self.useParallelOps is True; execute each operator with parallelism
                 # invoke datasource operator(s) until we run out of source records
-                if isinstance(operator, DataSourcePhysicalOp) and keep_scanning_source_records:
-                    # get handle to DataSource and pre-compute its size
-                    datasource = (
-                        self.datadir.getRegisteredDataset(self.source_dataset_id)
-                        if isinstance(operator, MarshalAndScanDataOp)
-                        else self.datadir.getCachedResult(operator.cachedDataIdentifier)
-                    )
+                if isinstance(operator, DataSourcePhysicalOp):
+                    datasource = self._get_data_source(operator, validation_examples)
                     datasource_len = len(datasource)
-
-                    # construct input DataRecord for DataSourcePhysicalOp
-                    candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
-                    candidate.idx = current_scan_idx
-                    candidate.get_item_fn = datasource.getItem
-                    candidate.cardinality = datasource.cardinality
-
+                    new_dr = self._construct_datarecord(datasource, current_source_scan_idx)
                     # run DataSourcePhysicalOp on record
-                    records, record_op_stats_lst = operator(candidate)
+                    output_records, record_op_stats_lst = operator(new_dr)
+                    root_record_uuid = new_dr._uuid
 
                     # update number of source records scanned and the current index
-                    source_records_scanned += len(records)
-                    current_scan_idx += 1
+                    source_records_readout += len(output_records)
+                    current_source_scan_idx += 1
 
                 # only invoke aggregate operator(s) once there are no more source records and all
                 # upstream operators' processing queues are empty
@@ -378,13 +455,22 @@ class SimpleExecution(ExecutionEngine):
                             and len(processing_queues[upstream_op_idx]) == 0
                         )
                     if not keep_scanning_source_records and upstream_queues_are_empty:
-                        records, record_op_stats_lst = operator(candidates=processing_queues[op_idx])
+                        output_records, record_op_stats_lst = operator(
+                            candidates=processing_queues[op_idx]
+                        )
 
-                # otherwise, process the next record in the processing queue for this operator
                 elif len(processing_queues[op_id]) > 0:
-                    print(f"Processing operator {op_id} - queue length: {len(processing_queues[op_id])}")
-                    input_record = processing_queues[op_id].pop(0)
-                    records, record_op_stats_lst = operator(input_record)
+                    print(
+                        f"Processing operator {op_id} - queue length: {len(processing_queues[op_id])}"
+                    )
+                    # Finish the processing of the record for this operator, it's BFS.
+                    # TODO(chjun): if in future we have a DAG, we need to change this logic. Currently the plan is a list.
+                    output_records, record_op_stats_lst = [], []
+                    while len(processing_queues[op_id]) > 0:
+                        input_record = processing_queues[op_id].pop(0)
+                        tmp_records, tmp_record_op_stats_lst = operator(input_record)
+                        output_records.extend(tmp_records)
+                        record_op_stats_lst.extend(tmp_record_op_stats_lst)
 
                 # update plan stats
                 op_stats = plan_stats.operator_stats[op_id]
@@ -398,60 +484,74 @@ class SimpleExecution(ExecutionEngine):
                 plan_stats.operator_stats[op_id] = op_stats
 
                 # TODO some operator is not returning a singleton list
-                if type(records) != type([]):
-                    records = [records]
+                if type(output_records) != list:  # noqa: E721
+                    output_records = [output_records]
 
                 # TODO: manage the cache here
 
                 # update processing_queues or output_records
-                for record in records:
+                for record in output_records:
                     if isinstance(operator, FilterOp):
                         if not record._passed_filter:
                             continue
                     if next_op_id is not None:
                         processing_queues[next_op_id].append(record)
                     else:
-                        output_records.append(record)
+                        output_records_of_root_record.append(record)
+                        final_output_records.append(record)
 
-            # update finished_executing based on whether all records have been processed
-            still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
+            # TODO(chjun): How to reasonably save the data into PlanStats.
+            # When one round completes, we save the output_records and the expected_records
+            if validation_examples is not None:
+                plan_stats.exe_output_details["validation-expected-"+root_record_uuid] = validation_examples.get_output()
+                plan_stats.exe_output_details["validation-real-"+root_record_uuid] = output_records_of_root_record
+
             keep_scanning_source_records = (
-                current_scan_idx < datasource_len
-                and source_records_scanned < num_samples
+                current_source_scan_idx < datasource_len
+                and source_records_readout < num_samples
             )
-            finished_executing = not keep_scanning_source_records and not still_processing
 
             # update finished_executing based on limit
             if isinstance(operator, LimitScanOp):
-                finished_executing = (len(output_records) == operator.limit)
+                keep_scanning_source_records = operator.limit > len(output_records)  
 
         return output_records, plan_stats
 
     # NOTE: Adding a few optional arguments for printing, etc.
-    def execute_plan(self, plan: PhysicalPlan,
-                     plan_type: PlanType = PlanType.FINAL,
-                     plan_idx: Optional[int] = None):
+    def execute_plan(
+        self,
+        plan: PhysicalPlan,
+        plan_type: PlanType = PlanType.FINAL,
+        plan_idx: Optional[int] = None,
+        validation_examples: ValidationData = None,
+    ):
         """Initialize the stats and invoke execute_dag() to execute the plan."""
         if self.verbose:
             print("----------------------")
-            print(f"{plan_type.value} {str(plan_idx)}:")
+            print(f"{plan_type} {str(plan_idx)}:")
             plan.printPlan()
             print("---")
 
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id()) # TODO move into PhysicalPlan.__init__?
+        plan_stats = PlanStats(
+            plan_id=plan.plan_id()
+        )  # TODO move into PhysicalPlan.__init__?
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
+            plan_stats.operator_stats[op_id] = OperatorStats(
+                op_idx=op_idx, op_id=op_id, op_name=op.op_name()
+            )  # TODO: also add op_details here
         # NOTE: I am writing this execution helper function with the goal of supporting future
         #       physical plans that may have joins and/or other operations with multiple sources.
         #       Thus, the implementation is overkill for today's plans, but hopefully this will
         #       avoid the need for a lot of refactoring in the future.
         # execute the physical plan;
         num_samples = self.num_samples if plan_type == PlanType.SENTINEL else None
-        output_records, plan_stats = self.execute_dag(plan, plan_stats, num_samples)
+        output_records, plan_stats = self.execute_dag(
+            plan, plan_stats, num_samples, validation_examples
+        )
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
@@ -459,14 +559,15 @@ class SimpleExecution(ExecutionEngine):
 
         return output_records, plan_stats
 
+
 class Execute:
     def __new__(
         cls,
         dataset: Set,
         policy: Policy,
-        num_samples: int=20,
-        nocache: bool=False,
-        include_baselines: bool=False,
+        num_samples: int = 20,
+        nocache: bool = False,
+        include_baselines: bool = False,
         min_plans: Optional[int] = None,
         verbose: bool = False,
         available_models: Optional[List[Model]] = [],
@@ -477,9 +578,8 @@ class Execute:
         useParallelOps: Optional[bool]=False,
         execution_engine: ExecutionEngine = SimpleExecution,
         *args,
-        **kwargs
+        **kwargs,
     ):
-
         return execution_engine(
             num_samples=num_samples,
             nocache=nocache,
@@ -493,8 +593,5 @@ class Execute:
             allow_token_reduction=allow_token_reduction,
             useParallelOps=useParallelOps,
             *args,
-            **kwargs
-        ).execute(
-            dataset=dataset,
-            policy=policy
-        )
+            **kwargs,
+        ).execute(dataset=dataset, policy=policy)
