@@ -214,6 +214,19 @@ class ConvertFileToXLS(HardcodedConvert):
         )
 
         return [dr], [record_op_stats]
+    
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        cardinality = (
+            source_op_cost_estimates.cardinality
+            if self.cardinality == "oneToOne"
+            else NAIVE_EST_ONE_TO_MANY_SELECTIVITY * source_op_cost_estimates.cardinality
+        )
+        return OperatorCostEstimates(
+            cardinality=cardinality,
+            time_per_record=5,    #TODO: This is a placeholder value for testing
+            cost_per_record=0.0,
+            quality=1.0,
+        )
 
 
 class ConvertXLSToTable(HardcodedConvert):
