@@ -51,7 +51,7 @@ class ConvertOp(PhysicalOperator):
         }
 
     def __str__(self):
-        return f"{self.model}_{self.query_strategy}_{self.token_budget}"
+        return f"{self.model}_{self.query_strategy}"
 
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
@@ -142,14 +142,12 @@ class LLMConvert(ConvertOp):
     def __init__(
         self,
         query_strategy: Optional[QueryStrategy] = None,
-        token_budget: Optional[float] = None,
         image_conversion: bool = False,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.query_strategy = query_strategy
-        self.token_budget = token_budget
         self.image_conversion = image_conversion
 
         # for now, forbid CodeSynthesis on one-to-many cardinality queries
@@ -180,7 +178,6 @@ class LLMConvert(ConvertOp):
             self.model = Model.GPT_4V
             self.prompt_strategy = PromptStrategy.IMAGE_TO_TEXT
             self.query_strategy = QueryStrategy.BONDED_WITH_FALLBACK
-            self.token_budget = 1.0
 
         if self.query_strategy in [
             QueryStrategy.CODE_GEN_WITH_FALLBACK,
@@ -188,7 +185,6 @@ class LLMConvert(ConvertOp):
         ]:
             self.model = None
             self.prompt_strategy = None
-            self.token_budget = 1.0
 
     def __eq__(self, other: PhysicalOperator):
         return (
@@ -198,7 +194,6 @@ class LLMConvert(ConvertOp):
             and self.image_conversion == other.image_conversion
             and self.prompt_strategy == other.prompt_strategy
             and self.query_strategy == other.query_strategy
-            and self.token_budget == other.token_budget
             and self.outputSchema == other.outputSchema
             and self.inputSchema == other.inputSchema
             and self.max_workers == other.max_workers
@@ -209,7 +204,7 @@ class LLMConvert(ConvertOp):
         ps = self.prompt_strategy.value if self.prompt_strategy is not None else ""
         qs = self.query_strategy.value if self.query_strategy is not None else ""
 
-        return f"{self.__class__.__name__}({str(self.outputSchema):10s}, Model: {model}, Prompt Strategy: {ps}, Query Strategy: {qs}, Token Budget: {str(self.token_budget)})"
+        return f"{self.__class__.__name__}({str(self.outputSchema):10s}, Model: {model}, Prompt Strategy: {ps}, Query Strategy: {qs})"
 
     def copy(self):
         return self.__class__(
@@ -218,7 +213,6 @@ class LLMConvert(ConvertOp):
             cardinality=self.cardinality,
             image_conversion=self.image_conversion,
             query_strategy=self.query_strategy,
-            token_budget=self.token_budget,
             desc=self.desc,
             targetCacheId=self.targetCacheId,
             shouldProfile=self.shouldProfile,
@@ -237,7 +231,6 @@ class LLMConvert(ConvertOp):
             "query_strategy": (
                 self.query_strategy.value if self.query_strategy is not None else None
             ),
-            "token_budget": self.token_budget,
             "desc": str(self.desc),
         }
 
@@ -246,6 +239,8 @@ class LLMConvert(ConvertOp):
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
 
+        # TODO REMOVE! 
+        self.token_budget = 1.
         if self.token_budget is not None:
             est_num_input_tokens = self.token_budget * est_num_input_tokens
 
@@ -351,7 +346,7 @@ class LLMConvert(ConvertOp):
         multilineOutputFieldDescription = ""
         for field_name in fields_to_generate:
             field_desc = getattr(self.outputSchema, field_name).desc
-            multilineOutputFieldDescription += prompts.OUTPUT_FIELD.formats(
+            multilineOutputFieldDescription += prompts.OUTPUT_FIELD.format(
                 field_name=field_name, field_desc=field_desc
             )
 
@@ -384,7 +379,7 @@ class LLMConvert(ConvertOp):
         else:
             prompt_question = prompts.IMAGE_CONVERT_PROMPT
 
-        prompt_question.format(
+        prompt_question = prompt_question.format(
             targetOutputDescriptor=targetOutputDescriptor,
             input_type = self.inputSchema.className(),
             outputSingleOrPlural = outputSingleOrPlural,
@@ -395,7 +390,6 @@ class LLMConvert(ConvertOp):
             appendixInstruction = appendixInstruction,
             optional_desc = optional_desc
         )
-
         # TODO: add this for boolean questions?
         # if prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
         #     promptQuestion += "\nRemember, your output MUST be one of TRUE or FALSE."
@@ -475,61 +469,50 @@ class LLMConvert(ConvertOp):
         verbose: bool = False,
     ) -> Tuple[List[Dict[FieldName, Any]], StatsDict]:
         """ This functions wraps the call to the generator method to actually perform the field generation.
+        It returns a string which contains 
         """
         # create DSPy generator and generate
         doc_schema = str(self.outputSchema)
         doc_type = self.outputSchema.className()
         # generate LLM response and capture statistics
         answer, query_stats = None, {}
+        if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+            generator = DSPyGenerator(
+                self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
+            )
+        elif self.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
+            generator = ImageTextGenerator(self.model.value)
+        else:
+            raise Exception(f"Prompt strategy not implemented: {self.prompt_strategy}")
+
         try:
-            if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-                generator = DSPyGenerator(
-                    self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
-                )
-                answer, query_stats = generator.generate(context=content, question=prompt)
-            elif self.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
-                generator = ImageTextGenerator(self.model.value)
-                answer, query_stats = generator.generate(content, prompt)
-            else:
-                raise Exception(f"Prompt strategy not implemented: {self.prompt_strategy}")
+            answer, query_stats = generator.generate(context=content, question=prompt)
         except Exception as e:
             print(f"DSPy generation error: {e}")
-            return [{field_name: None for field_name in fields_to_generate}], query_stats
+            return {field_name: None for field_name in fields_to_generate}, query_stats
 
-        # parse the final json objects and standardize the outputs to be lists
-        final_json_objects = []
         try:
-            jsonObj = getJsonFromAnswer(answer)
-            if self.cardinality == Cardinality.ONE_TO_MANY:
-                assert isinstance(jsonObj["items"], list) and len(jsonObj["items"]) > 0, "No output objects were generated for one-to-many query"
-                final_json_objects = jsonObj["items"]
-            else:
-                final_json_objects = [jsonObj]
-            # TODO: in the future, do not perform this cleaning step if the field is a ListField
-            # if value of field_name is a list; flatten the list
-            for json_obj in final_json_objects:
-                for field_name in fields_to_generate:
-                    while type(json_obj[field_name]) == type([]):
-                        json_obj[field_name] = json_obj[field_name][0]
+            json_answer = getJsonFromAnswer(answer)
         except Exception as e:
             print(f"Error extracting json objects: {str(e)}")
-            return [{field_name: None for field_name in fields_to_generate}], query_stats
+            import pdb; pdb.set_trace()
 
-        return final_json_objects, query_stats
+            return {field_name: None for field_name in fields_to_generate}, query_stats
 
-    def convert(self, candidate_content: Union[str,List[bytes]] , fields: List[str]) -> List[RecordJSONObjects]:
+        return json_answer, query_stats
+
+    def convert(self, candidate_content: Union[str,List[bytes]] , fields: List[str]) -> Tuple[Dict[str, List], StatsDict]:
         """ This function is responsible for the LLM conversion process. 
         Different strategies may/should reimplement this function and leave the __call__ function untouched.
         The input is ...
-        The output is a list of record JSON objects where each object is a dictionary with the (field, value) 
-        pairs for each generated field."""
+        Outputs:
+         - field_outputs: a dictionary where keys are the fields and values are lists of JSON corresponding to the value of the field in that record.
+         - query_stats
+        """
         raise NotImplementedError("This is an abstract class. Use a subclass instead!")
 
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
-        # capture start time
         start_time = time.time()
-
-        # get the set of fields to generate
         fields_to_generate = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
 
         # get text or image content depending on prompt strategy
@@ -552,9 +535,47 @@ class LLMConvert(ConvertOp):
             raise Exception(f"Prompt strategy not implemented: {self.prompt_strategy}")
 
         marshal_time = time.time() - start_time
-        field_outputs, query_stats = self.convert(fields=fields_to_generate, candidate_content=content)
-        query_stats["total_time"] += marshal_time
+        fields_answers, fields_stats = self.convert(fields=fields_to_generate, candidate_content=content)
 
+        # parse the final json objects and standardize the outputs to be lists
+        field_outputs = {}
+        query_stats = {}
+        # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
+        # list is indexed per record
+
+        n_records = max([len(lst) for lst in fields_answers.values()])
+        
+        records_json = [{} for _ in range(n_records)]
+        
+        for field_name, field_answer in fields_answers.items():
+            if self.cardinality == Cardinality.ONE_TO_MANY:
+                assert isinstance(field_answer["items"], list) and len(field_answer["items"]) > 0, "No output objects were generated for one-to-many query"
+                json_objects = field_answer["items"]
+            else:
+                json_objects = [field_answer]
+            # NOTE: removed cleaning step
+
+            for idx, output in enumerate(json_objects):
+                import pdb; pdb.set_trace()
+                records_json[idx].update(output)
+
+            # TODO Aggregate field stats, maybe a better way?
+            field_stat = fields_stats[field_name]
+            for key, value in field_stat.items():
+                if type(value) == type(dict()):
+                    for k2, v2 in value.items():
+                        # Should we simply throw the usage away here?
+                        query_stats[k2] = query_stats.get(k2,type(v2)()) + v2 
+                else:
+                    query_stats[key] = query_stats.get(key, type(value)()) + value
+
+        query_stats["total_time"] = time.time() - start_time
+
+        # extend each record to have the same fields
+        for record in records_json:
+            record[field_name] = record.get(field_name, None)
+
+        # TODO how does this work here?
         # compute the max number of outputs in any field (for one-to-many cardinality queries,
         # it's possible to have differing output lengths per field)
         field_max_outputs = 1
@@ -562,18 +583,6 @@ class LLMConvert(ConvertOp):
             for field_name, json_objects in field_outputs.items():
                 field_max_outputs = max(field_max_outputs, len(json_objects))
 
-        # extend each field to have the same number of outputs
-        for field_name, json_objects in field_outputs.items():
-            while len(json_objects) < field_max_outputs:
-                json_objects.append({field_name: None})
-
-        # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
-        # list is indexed per record
-        n_records = max([len(lst) for lst in field_outputs.values()])
-        records_json = [{} for _ in range(n_records)]
-        for field in field_outputs:
-            for idx, output in enumerate(field_outputs[field]):
-                records_json[idx].update(output)
 
         drs = [
             self._create_data_record_from_json(
@@ -594,25 +603,17 @@ class LLMConvert(ConvertOp):
 class LLMConvertConventional(LLMConvert):
 
     def convert(self, candidate_content: Union[str, List[bytes]], fields: List[str]) -> Tuple[List[RecordJSONObjects], StatsDict]:
-        start_time = time.time()
-        field_outputs, query_stats = {}, {}
+        fields_answers = {}
+        fields_stats = {}
 
         for field_name in fields:
             prompt = self._construct_query_prompt(fields_to_generate=[field_name])
-            json_objects, field_stats = self._dspy_generate_fields(
+            json_answer, field_stats = self._dspy_generate_fields(
                 fields_to_generate=[field_name],
                 content=candidate_content,
                 prompt=prompt,
-            )
-            for key, value in field_stats.items():
-                # TODO maybe a better way to find which stats to aggregate?
-                if type(value) == type(dict()):
-                    for k2, v2 in value.items():
-                        # Should we simply throw the usage away here?
-                        query_stats[k2] = query_stats.get(k2,type(v2)()) + v2 
-                else:
-                    query_stats[key] = query_stats.get(key, type(value)()) + value
-            field_outputs[field_name] = json_objects
+            )          
+            fields_answers[field_name] = json_answer
+            fields_stats[field_name] = field_stats
 
-        query_stats["total_time"] = time.time() - start_time
-        return field_outputs, query_stats
+        return fields_answers, fields_stats

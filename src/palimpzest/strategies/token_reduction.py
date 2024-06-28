@@ -19,7 +19,7 @@ class TokenReducedConvert(convert.LLMConvert):
         self.heatmap_dict = None
 
     def reduce_context(self, question:str, full_context: str) -> str:
-        if self.token_budget < 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+        if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             heatmap = self.heatmap_dict["heatmap"]
             count = self.heatmap_dict["count"]
             # if self.verbose: # TODO not sure this exists
@@ -38,9 +38,8 @@ class TokenReducedConvert(convert.LLMConvert):
                     ei * TOKEN_REDUCTION_GRANULARITY,
                 )
                 self._print_verbose(f"start ratio: {sr} -- end ratio: {er}")
-                context = trim_context(context, sr, er)
+                return trim_context(full_context, sr, er)
     
-            return context
         else:
             raise NotImplementedError("Token reduction is only supported for DSPY_COT_QA prompts")
 
@@ -164,7 +163,7 @@ class TokenReductionStrategy(PhysicalOpStrategy):
     @staticmethod
     def __new__(cls, 
                 available_models: List[Model],
-                token_budgets: List[int],
+                token_budgets: List[float],
                 prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_QA,
                 *args, **kwargs) -> List[physical.PhysicalOperator]:
 

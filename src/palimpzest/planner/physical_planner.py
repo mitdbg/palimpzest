@@ -5,6 +5,7 @@ from palimpzest.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.planner import LogicalPlan, PhysicalPlan
 from palimpzest.planner.planner import Planner
 from palimpzest.planner.resolver import resolveLogicalConvertOp, resolveLogicalFilterOp
+from palimpzest.strategies.token_reduction import TokenReducedConvert
 from .plan import LogicalPlan, PhysicalPlan
 
 import palimpzest as pz
@@ -74,7 +75,8 @@ class PhysicalPlanner(Planner):
 
                     if strategy.logical_op_class == logical_op:
                         ops = strategy(available_models=self.available_models,
-                                       prompt_strategy=PromptStrategy.DSPY_COT_QA,)
+                                       prompt_strategy=PromptStrategy.DSPY_COT_QA,
+                                       token_budgets=[0.1, 0.5, 0.9],)
                         self.logical_physical_map.get(logical_op, []).extend(ops)
 
         # print("Available strategies")
@@ -112,11 +114,12 @@ class PhysicalPlanner(Planner):
                     for op in self.logical_physical_map[type(logical_op)]:
                         if op in [LLMConvert]:
                             continue
+                        if op.issubclass(TokenReducedConvert):
+                            continue
                         op = op_class(
                                 inputSchema=logical_op.inputSchema,
                                 outputSchema=logical_op.outputSchema,
                                 query_strategy = QueryStrategy.BONDED_WITH_FALLBACK,
-                                token_budget=1.0,
                                 shouldProfile=shouldProfile,
                             )
                 else:
@@ -126,7 +129,6 @@ class PhysicalPlanner(Planner):
                         model=model,
                         prompt_strategy=PromptStrategy.DSPY_COT_QA,
                         query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
-                        token_budget=1.0,
                         shouldProfile=shouldProfile,
                     )
 
@@ -180,10 +182,6 @@ class PhysicalPlanner(Planner):
         if self.allow_code_synth:
             query_strategies.append(QueryStrategy.CODE_GEN_WITH_FALLBACK)
 
-        token_budgets = [1.0]
-        if self.allow_token_reduction:
-            token_budgets.extend([0.1, 0.5, 0.9])
-
         # get logical operators
         operators = logical_plan.operators
         execution_parameters = {
@@ -205,7 +203,6 @@ class PhysicalPlanner(Planner):
                                 inputSchema=logical_op.inputSchema,
                                 outputSchema=logical_op.outputSchema,
                                 query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
-                                token_budget=1.0,
                                 shouldProfile=self.shouldProfile,
                             )
                             new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
