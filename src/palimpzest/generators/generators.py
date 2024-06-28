@@ -195,21 +195,21 @@ class CustomGenerator(BaseGenerator):
         output_tokens = usage["completion_tokens"]
 
         # NOTE: needs to match subset of keys produced by LLMConvert._create_empty_query_stats()
-        stats={
+        stats= GenerationStats(**{
             "model_name": self.model_name,
             "llm_call_duration_secs": end_time - start_time,
             "fn_call_duration_secs": 0.0,
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "input_cost": input_tokens * usd_per_input_token,
-            "output_cost": output_tokens * usd_per_output_token,
-            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
-            "prompt": dspy_lm.history[-1]["prompt"],
-            "usage": usage,
-            "finish_reason": finish_reason,
-            "answer_log_probs": answer_log_probs,
-            "answer": answer,
-        }
+            "total_input_tokens": input_tokens,
+            "total_output_tokens": output_tokens,
+            "total_input_cost": input_tokens * usd_per_input_token,
+            "total_output_cost": output_tokens * usd_per_output_token,
+            "total_cost": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+            # "prompt": dspy_lm.history[-1]["prompt"],
+            # "usage": usage,
+            # "finish_reason": finish_reason,
+            # "answer_log_probs": answer_log_probs,
+            # "answer": answer,
+        })
 
         if self.verbose:
             print("Prompt history:")

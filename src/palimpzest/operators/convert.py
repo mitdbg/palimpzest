@@ -400,12 +400,13 @@ class LLMConvert(ConvertOp):
         self,
         records: List[DataRecord],
         fields: List[str],
-        query_stats: StatsDict,
+        generation_stats: StatsDict,
     ) -> List[RecordOpStats]:
         """
         Construct list of RecordOpStats objects (one for each DataRecord).
         """
         record_op_stats_lst = []
+        per_record_stats = generation_stats / len(records)
         for idx, dr in enumerate(records):
             record_op_stats = RecordOpStats(
                 record_uuid=dr._uuid,
@@ -415,16 +416,9 @@ class LLMConvert(ConvertOp):
                 op_name=self.op_name(),
                 model_name=self.model.value,
                 input_fields=self.inputSchema.fieldNames(),
-                time_per_record= query_stats.get("total_time", 0.0) / len(records),
-                cost_per_record= query_stats.get("cost_per_record", 0.0) / len(records),
                 generated_fields=fields,
-                total_input_tokens= query_stats.get("input_tokens", 0.0) / len(records),
-                total_output_tokens=query_stats.get("output_tokens", 0.0) / len(records),
-                total_input_cost=query_stats.get("input_cost", 0.0) / len(records),
-                total_output_cost=query_stats.get("output_cost", 0.0) / len(records),
-                llm_call_duration_secs=query_stats.get("llm_call_duration_secs", 0.0) / len(records),
-                fn_call_duration_secs=query_stats.get("fn_call_duration_secs", 0.0) / len(records),
-                answer= {field_name: getattr(dr, field_name) for field_name in fields}
+                answer= {field_name: getattr(dr, field_name) for field_name in fields},
+                **per_record_stats,
             )
             record_op_stats_lst.append(record_op_stats)
 

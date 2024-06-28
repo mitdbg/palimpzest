@@ -3,8 +3,70 @@ from __future__ import annotations
 from palimpzest.elements import DataRecord
 from dataclasses import dataclass, asdict, field
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
+@dataclass
+class GenerationStats:
+    """
+    Dataclass for storing statistics about the execution of an operator on a single record.
+    """
+    model_name: Optional[str] = None
+
+    # The raw answer as output from the generator (a list of strings, possibly of len 1)
+    # raw_answers: Optional[List[str]] = field(default_factory=list)
+    
+    # the total number of input tokens processed by this operator; None if this operation did not use an LLM
+    total_input_tokens: int = 0.0
+
+    # the total number of output tokens processed by this operator; None if this operation did not use an LLM
+    total_output_tokens: int = 0.0
+
+    # the total cost of processing the input tokens; None if this operation did not use an LLM
+    total_input_cost: float = 0.0
+
+    # the total cost of processing the output tokens; None if this operation did not use an LLM
+    total_output_cost: float = 0.0
+
+    # the total cost of processing the output tokens; None if this operation did not use an LLM
+    total_cost: float = 0.0
+
+    # (if applicable) the time (in seconds) spent executing a call to an LLM
+    llm_call_duration_secs: float = 0.0
+
+    # (if applicable) the time (in seconds) spent executing a call to a function
+    fn_call_duration_secs: float = 0.0
+
+    def __iadd__(self, other: GenerationStats) -> GenerationStats:
+#        self.raw_answers.extend(other.raw_answers)
+        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost','total_cost','llm_call_duration_secs', 'fn_call_duration_secs']:
+            setattr(self, field, getattr(self, field) + getattr(other, field))
+        return self
+
+    def __add__(self, other: GenerationStats) -> GenerationStats:
+        dct = {field: getattr(self, field) + getattr(other, field) for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'llm_call_duration_secs', 'fn_call_duration_secs', 'total_cost']}
+        # dct['raw_answers'] = self.raw_answers + other.raw_answers
+        dct['model_name'] = self.model_name      
+        return GenerationStats(**dct)
+    
+    # Do the same as iadd and add but with division operator
+    def __itruediv__(self, quotient: float) -> GenerationStats:
+        if quotient == 0:
+            raise ZeroDivisionError("Cannot divide by zero")
+        if isinstance(quotient, int):
+            quotient = float(quotient)
+        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost','total_cost','llm_call_duration_secs', 'fn_call_duration_secs']:
+            setattr(self, field, getattr(self, field) / quotient)
+        return self
+    
+    def __truediv__(self, quotient: float) -> GenerationStats:
+        if quotient == 0:
+            raise ZeroDivisionError("Cannot divide by zero")
+        if isinstance(quotient, int):
+            quotient = float(quotient)
+        dct = {field: getattr(self, field) / quotient for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'llm_call_duration_secs', 'fn_call_duration_secs', 'total_cost']}
+        dct['model_name'] = self.model_name      
+        return GenerationStats(**dct)
+    
 @dataclass
 class RecordOpStats:
     """
@@ -42,6 +104,9 @@ class RecordOpStats:
 
     # (if applicable) the mapping from field-name to generated output for this record
     answer: Optional[Dict[str, Any]] = None
+
+    # (if applicable) the mapping from field-name to generated output for this record
+    # raw_answers: Optional[List[str, Any]] = field(default_factory=list)
 
     # (if applicable) the list of input fields for the generation for this record
     input_fields: Optional[List[str]] = None
