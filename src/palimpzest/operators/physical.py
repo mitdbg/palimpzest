@@ -64,18 +64,30 @@ class PhysicalOperator(metaclass=ImplementationMeta):
     def get_op_dict(self):
         raise NotImplementedError("You should implement get_op_dict with op specific parameters")
     
-    def get_op_id(self, plan_position: Optional[int] = None) -> str:
+    # Explicitly generate ID in different contexts.
+    def get_op_id(self) -> str:
         op_dict = self.get_op_dict()
-        if plan_position is not None:
-            op_dict["plan_position"] = plan_position
 
         ordered = json.dumps(op_dict, sort_keys=True)
         hash = hashlib.sha256(ordered.encode()).hexdigest()[:MAX_OP_ID_CHARS]
 
         op_id = (
             f"{self.op_name()}_{hash}"
-            if plan_position is None
-            else f"{self.op_name()}_{plan_position}_{hash}"
+        )
+        return op_id
+
+    def get_op_id_from_plan(self, plan_id:str, plan_position:int) -> str:
+        op_dict = self.get_op_dict()
+        if plan_position is not None:
+            op_dict["plan_position"] = plan_position
+        if plan_id is not None:
+            op_dict["plan_id"] = plan_id
+
+        ordered = json.dumps(op_dict, sort_keys=True)
+        hash = hashlib.sha256(ordered.encode()).hexdigest()[:MAX_OP_ID_CHARS]
+
+        op_id = (
+            f"{self.op_name()}_{plan_position}_{hash}"
         )
         return op_id
 
