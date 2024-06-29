@@ -255,12 +255,6 @@ class LLMFilter(FilterOp):
             else False
         )
 
-        # NOTE: this will treat the cost of failed LLM invocations as having 0.0 tokens and dollars,
-        #       when in reality this is only true if the error in generator.generate() happens before
-        #       the invocation of the LLM -- not if it happens after. (If it happens *during* the
-        #       invocation, then it's difficult to say what the true cost really should be). I think
-        #       the best solution is to place a try-except inside of the DSPyGenerator to still capture
-        #       and return the gen_stats if/when there is an error after invocation.
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
             record_uuid=candidate._uuid,
@@ -269,14 +263,14 @@ class LLMFilter(FilterOp):
             op_id=self.get_op_id(),
             op_name=self.op_name(),
             time_per_record=time.time() - start_time,
-            cost_per_record=gen_stats.get('cost_per_record', 0.0),
+            cost_per_record=gen_stats.total_cost,
             model_name=self.model.value,
             filter_str=self.filter.getFilterStr(),
-            total_input_tokens=gen_stats.get('input_tokens', 0.0),
-            total_output_tokens=gen_stats.get('output_tokens', 0.0),
-            total_input_cost=gen_stats.get('input_cost', 0.0),
-            total_output_cost=gen_stats.get('output_cost', 0.0),
-            llm_call_duration_secs=gen_stats.get('llm_call_duration_secs', 0.0),
+            total_input_tokens=gen_stats.total_input_tokens,
+            total_output_tokens=gen_stats.total_output_tokens,
+            total_input_cost=gen_stats.total_input_cost,
+            total_output_cost=gen_stats.total_output_cost,
+            llm_call_duration_secs=gen_stats.llm_call_duration_secs,
             answer=response,
             passed_filter=passed_filter,
         )

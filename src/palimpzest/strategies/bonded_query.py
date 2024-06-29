@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json 
 import time
-from typing import List
+from typing import Any, Dict, List, Tuple
 from palimpzest.constants import Model
 from .strategy import PhysicalOpStrategy
 
@@ -10,11 +10,15 @@ from palimpzest.constants import *
 from palimpzest.elements import *
 from palimpzest.operators import logical, physical, convert
 
+# TYPE DEFINITIONS
+FieldName = str
+StatsDict = Dict[str, Any]
+
 class LLMBondedQueryConvert(convert.LLMConvert):
 
     def convert(self, 
                 candidate_content,
-                fields) -> None:
+                fields) -> Tuple[Dict[FieldName, List[Any]], StatsDict]:
 
         prompt = self._construct_query_prompt(fields_to_generate=fields)
 
@@ -22,7 +26,7 @@ class LLMBondedQueryConvert(convert.LLMConvert):
         json_answers, field_stats = self._dspy_generate_fields(fields_to_generate=fields, content=candidate_content, prompt=prompt)
 
         # if there was an error, execute a conventional query
-        if all([v is None for v in json_answers.values()]):
+        if all([v == [] for v in json_answers.values()]):
             print("Falling back to conventional conversion")
             conventional_op = type('LLMFallback',
                                     (convert.LLMConvertConventional,),
@@ -38,8 +42,6 @@ class LLMBondedQueryConvert(convert.LLMConvert):
         
         return json_answers, field_stats
 
-
-        return
 
 class BondedQueryStrategy(PhysicalOpStrategy):
 

@@ -154,12 +154,6 @@ class TestExecutionNoCache:
                 else False
             )
 
-            # NOTE: this will treat the cost of failed LLM invocations as having 0.0 tokens and dollars,
-            #       when in reality this is only true if the error in generator.generate() happens before
-            #       the invocation of the LLM -- not if it happens after. (If it happens *during* the
-            #       invocation, then it's difficult to say what the true cost really should be). I think
-            #       the best solution is to place a try-except inside of the DSPyGenerator to still capture
-            #       and return the gen_stats if/when there is an error after invocation.
             # create RecordOpStats object
             record_op_stats = RecordOpStats(
                 record_uuid=candidate._uuid,
@@ -168,14 +162,14 @@ class TestExecutionNoCache:
                 op_id=llm_filter.get_op_id(),
                 op_name=llm_filter.op_name(),
                 time_per_record=time.time() - start_time,
-                cost_per_record=gen_stats.get('cost_per_record', 0.0),
+                cost_per_record=gen_stats.total_cost,
                 model_name=llm_filter.model.value,
                 filter_str=llm_filter.filter.getFilterStr(),
-                total_input_tokens=gen_stats.get('input_tokens', 0.0),
-                total_output_tokens=gen_stats.get('output_tokens', 0.0),
-                total_input_cost=gen_stats.get('input_cost', 0.0),
-                total_output_cost=gen_stats.get('output_cost', 0.0),
-                llm_call_duration_secs=gen_stats.get('llm_call_duration_secs', 0.0),
+                total_input_tokens=gen_stats.total_input_tokens,
+                total_output_tokens=gen_stats.total_output_tokens,
+                total_input_cost=gen_stats.total_input_cost,
+                total_output_cost=gen_stats.total_output_cost,
+                llm_call_duration_secs=gen_stats.llm_call_duration_secs,
                 answer=response,
                 passed_filter=passed_filter,
             )
@@ -337,16 +331,15 @@ class TestExecutionNoCache:
             op_id = op.get_op_id()
             operator_stats = plan_stats.operator_stats[op_id]
             assert operator_stats.total_op_time > 0.0
-            assert operator_stats.total_op_cost == 0.0
 
-            if isinstance(op, HardcodedConvert):
+            if isinstance(op, LLMConvert):
                 record_stats = operator_stats.record_op_stats_lst[-1]
                 assert record_stats.record_uuid == dr._uuid
                 assert record_stats.record_parent_uuid == dr._parent_uuid
                 assert record_stats.op_id == op_id
                 assert record_stats.op_name == op.op_name()
                 assert record_stats.time_per_record > 0.0
-                assert record_stats.cost_per_record == 0.0
+                assert record_stats.cost_per_record > 0.0
                 assert record_stats.record_state == dr._asDict(include_bytes=False)
 
         # test full scan
@@ -357,8 +350,8 @@ class TestExecutionNoCache:
         assert len(output_records) == 6
 
         expected_filenames = sorted(os.listdir("testdata/enron-eval-tiny"))
-        expected_senders = ["david.port@enron.com", "vkaminski@aol.com", "sarah.palmer@enron.com", "gary@cioclub.com", "travis.mccullough@enron.com"]
-        expected_subjects = ["RE: NewPower", "Fwd: FYI", "Enron Mentions -- 01/18/02", "Information Security Executive", "Redraft of the Exclusivity Agreement"]
+        expected_senders = ["sherron.watkins@enron.com", "david.port@enron.com", "vkaminski@aol.com", "sarah.palmer@enron.com", "gary@cioclub.com", "travis.mccullough@enron.com"]
+        expected_subjects = ["RE: portrac", "RE: NewPower", "Fwd: FYI", "Enron Mentions -- 01/18/02", "Information Security Executive -092501", "Redraft of the Exclusivity Agreement"]
         for dr, expected_filename, expected_sender, expected_subject in zip(output_records, expected_filenames, expected_senders, expected_subjects):
             assert dr.filename.endswith(expected_filename)
             assert getattr(dr, 'sender', None) == expected_sender
