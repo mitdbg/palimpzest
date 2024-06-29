@@ -172,7 +172,7 @@ If you want to use parallel PDF processing at modal.com, you have to:
 
 Below are simple instructions to run pz on a test data set of enron emails that is included with the system:
 
-- Initialize the configuration by running `pz --init`.
+- Initialize the configuration by running `pz init`.
 
 - Add the enron data set with:
 `pz reg --path testdata/enron-tiny --name enron-tiny`
