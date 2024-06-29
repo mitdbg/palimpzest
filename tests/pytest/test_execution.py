@@ -13,59 +13,6 @@ import os
 import time
 import pytest
 
-# TODO: mock out all model calls
-# custom class to be the mock return value
-# will override the requests.Response returned from requests.get
-class MockLLMFilterCall:
-
-    # mock __call__() method always returns the desired output
-    def __call__(self, candidate):
-        start_time = time.time()
-        text_content = candidate._asJSONStr(include_bytes=False)
-        response, _, gen_stats = self.generator.generate(
-            context=text_content,
-            question=self.filter.filterCondition,
-        )
-        response = str("buy" not in candidate.filename)
-
-        # compute whether the record passed the filter or not
-        passed_filter = (
-            "true" in response.lower()
-            if response is not None
-            else False
-        )
-
-        # NOTE: this will treat the cost of failed LLM invocations as having 0.0 tokens and dollars,
-        #       when in reality this is only true if the error in generator.generate() happens before
-        #       the invocation of the LLM -- not if it happens after. (If it happens *during* the
-        #       invocation, then it's difficult to say what the true cost really should be). I think
-        #       the best solution is to place a try-except inside of the DSPyGenerator to still capture
-        #       and return the gen_stats if/when there is an error after invocation.
-        # create RecordOpStats object
-        record_op_stats = RecordOpStats(
-            record_uuid=candidate._uuid,
-            record_parent_uuid=candidate._parent_uuid,
-            record_state=candidate._asDict(include_bytes=False),
-            op_id=self.get_op_id(),
-            op_name=self.op_name(),
-            time_per_record=time.time() - start_time,
-            cost_per_record=gen_stats.get('cost_per_record', 0.0),
-            model_name=self.model.value,
-            filter_str=self.filter.getFilterStr(),
-            total_input_tokens=gen_stats.get('input_tokens', 0.0),
-            total_output_tokens=gen_stats.get('output_tokens', 0.0),
-            total_input_cost=gen_stats.get('input_cost', 0.0),
-            total_output_cost=gen_stats.get('output_cost', 0.0),
-            llm_call_duration_secs=gen_stats.get('llm_call_duration_secs', 0.0),
-            answer=response,
-            passed_filter=passed_filter,
-        )
-
-        # set _passed_filter attribute and return
-        setattr(candidate, "_passed_filter", passed_filter)
-
-        return [candidate], [record_op_stats]
-
 class TestExecutionNoCache:
 
     def test_set_source_dataset_id(self, enron_eval):
@@ -189,13 +136,12 @@ class TestExecutionNoCache:
             assert dr.filename.endswith(expected_filename)
             assert getattr(dr, 'contents', None) != None
 
-    # TODO: mock response from GPT_3_5 if it's wrong
     def test_execute_sequential_with_llm_filter(self, monkeypatch):
         # define Mock to ensure correct response is returned by the LLM call
         def mock_call(llm_filter, candidate):
             start_time = time.time()
             text_content = candidate._asJSONStr(include_bytes=False)
-            response, _, gen_stats = llm_filter.generator.generate(
+            response, gen_stats = llm_filter.generator.generate(
                 context=text_content,
                 question=llm_filter.filter.filterCondition,
             )
