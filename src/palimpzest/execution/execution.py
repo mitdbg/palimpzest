@@ -434,10 +434,11 @@ class SimpleExecution(ExecutionEngine):
         current_scan_idx = self.scan_start_idx
 
         # get handle to DataSource and pre-compute its size
+        source_operator = plan.operators[0]
         datasource = (
             self.datadir.getRegisteredDataset(self.source_dataset_id)
-            if isinstance(operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(operator.cachedDataIdentifier)
+            if isinstance(source_operator, MarshalAndScanDataOp)
+            else self.datadir.getCachedResult(source_operator.cachedDataIdentifier)
         )
         datasource_len = len(datasource)
 

@@ -221,7 +221,7 @@ class Dataset(Set):
 
     def filter(
         self,
-        _filter: Filter,
+        _filter: Union[str, callable],
         depends_on: Union[str, List[str]] = None,
         desc: str = "Apply filter(s)",
     ) -> Dataset:

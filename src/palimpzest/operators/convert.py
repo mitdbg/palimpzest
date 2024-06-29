@@ -4,7 +4,6 @@ from palimpzest import prompts
 from palimpzest.constants import *
 from palimpzest.corelib import *
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.generators import CustomGenerator, DSPyGenerator, ImageTextGenerator
 from palimpzest.operators import logical, DataRecordsWithStats, PhysicalOperator
@@ -13,9 +12,14 @@ from palimpzest.utils import API, getJsonFromAnswer
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import base64
-import concurrent
 import math
 import time
+
+# TYPE DEFINITIONS
+FieldName = str
+StatsDict = Dict[str, Any]
+RecordJSONObjects = List[Dict[str, Any]]
+
 
 class ConvertOp(PhysicalOperator):
 
@@ -55,83 +59,6 @@ class ConvertOp(PhysicalOperator):
 
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
-
-    # TODO: where does caching go?
-    # def __iter__(self) -> IteratorFn:
-    #     shouldCache = self.datadir.openCache(self.targetCacheId)
-
-    #     @self.profile(name="convert", shouldProfile=self.shouldProfile)
-    #     def iteratorFn():
-    #         for nextCandidate in self.source:
-    #             resultRecordList = self.__call__(nextCandidate)
-    #             if resultRecordList is not None:
-    #                 for resultRecord in resultRecordList:
-    #                     if resultRecord is not None:
-    #                         if shouldCache:
-    #                             self.datadir.appendCache(
-    #                                 self.targetCacheId, resultRecord
-    #                             )
-    #                         yield resultRecord
-    #         if shouldCache:
-    #             self.datadir.closeCache(self.targetCacheId)
-
-    #     return iteratorFn()
-
-
-class ParallelConvertFromCandidateOp(ConvertOp):
-    def __init__(self, streaming, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.max_workers = 32  # TODO hardcoded for now
-        self.streaming = streaming
-
-    def __eq__(self, other: PhysicalOperator):
-        return super().__eq__(other) and self.streaming == other.streaming
-
-    def copy(self):
-        return super().copy(streaming=self.streaming)
-
-    def __iter__(self):
-        # This is very crudely implemented right now, since we materialize everything
-        shouldCache = self.datadir.openCache(self.targetCacheId)
-
-        @self.profile(name="p_convert", shouldProfile=self.shouldProfile)
-        def iteratorFn():
-            inputs = []
-            results = []
-
-            for nextCandidate in self.source:
-                inputs.append(nextCandidate)
-
-            # Grab items from the list inputs in chunks using self.max_workers
-            if self.streaming:
-                chunksize = self.max_workers
-            else:
-                chunksize = len(inputs)
-
-            if chunksize == 0:
-                return
-
-            for i in range(0, len(inputs), chunksize):
-                with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=self.max_workers
-                ) as executor:
-                    results = list(
-                        executor.map(self.__call__, inputs[i : i + chunksize])
-                    )
-
-                    for resultRecordList in results:
-                        if resultRecordList is not None:
-                            for resultRecord in resultRecordList:
-                                if resultRecord is not None:
-                                    if shouldCache:
-                                        self.datadir.appendCache(
-                                            self.targetCacheId, resultRecord
-                                        )
-                                    yield resultRecord
-            if shouldCache:
-                self.datadir.closeCache(self.targetCacheId)
-
-        return iteratorFn()
 
 
 class LLMConvert(ConvertOp):
@@ -238,6 +165,17 @@ class LLMConvert(ConvertOp):
         # estimate number of input and output tokens from source
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
+
+        if self.query_strategy == QueryStrategy.CONVENTIONAL:
+            # NOTE: this may over-estimate the number of fields that need to be generated
+            generate_field_names = []
+            for field_name in self.outputSchema.fieldNames():
+                if field_name not in self.inputSchema.fieldNames(): # and getattr(candidate, field_name, None) is None:
+                    generate_field_names.append(field_name)
+
+            num_fields_to_generate = len(generate_field_names)
+            est_num_input_tokens *= num_fields_to_generate
+            est_num_output_tokens *= num_fields_to_generate
 
         # TODO REMOVE! 
         self.token_budget = 1.

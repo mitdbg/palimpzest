@@ -136,17 +136,17 @@ class PhysicalPlanner(Planner):
                 if self.useStrategies:
                     op_class: PhysicalOperator = None
                     for op in self.logical_physical_map[type(logical_op)]:
-                        if op in [LLMFilter, NonLLMFilter]:
+                        if op in [LLMFilter]:
                             continue
                         if op.model == model:
                             op_class = op
                             break
                     op = op_class(
-                            inputSchema=logical_op.inputSchema,
-                            outputSchema=logical_op.outputSchema,
-                            filter=logical_op.filter,
-                            shouldProfile=shouldProfile,
-                        )
+                        inputSchema=logical_op.inputSchema,
+                        outputSchema=logical_op.outputSchema,
+                        filter=logical_op.filter,
+                        shouldProfile=shouldProfile,
+                    )
                 else:
                     raise NotImplementedError("This should not be called")
                     op = resolveLogicalFilterOp(
@@ -246,7 +246,7 @@ class PhysicalPlanner(Planner):
                     # TODO: if non-llm filter, don't iterate over all plan possibilities
                     if self.useStrategies:
                         for op_class in self.logical_physical_map[type(logical_op)]:
-                            if op_class in [LLMFilter, NonLLMFilter]:
+                            if op_class in [LLMFilter]: 
                                 continue
                             physical_op = op_class(
                                 inputSchema=logical_op.inputSchema,

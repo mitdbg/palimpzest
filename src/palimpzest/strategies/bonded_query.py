@@ -39,6 +39,8 @@ class LLMBondedQueryConvert(convert.LLMConvert):
         return json_answers, field_stats
 
 
+        return
+
 class BondedQueryStrategy(PhysicalOpStrategy):
 
     @staticmethod
@@ -59,6 +61,7 @@ class BondedQueryStrategy(PhysicalOpStrategy):
             return_operators.append(physical_op_type)
 
         return return_operators
+
 class BondedQueryConvertStrategy(BondedQueryStrategy):
     """
     This strategy creates physical operator classes using a bonded query strategy.

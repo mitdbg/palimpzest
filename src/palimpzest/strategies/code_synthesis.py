@@ -21,6 +21,7 @@ Code = str
 DataRecordDict = Dict[str, Any]
 Exemplar = Tuple[DataRecordDict, DataRecordDict]
 CodeEnsemble = Dict[CodeName, Code]
+StatsDict = Dict[str, Any]
 
 class LLMConvertCodeSynthesis(convert.LLMConvert):
 
@@ -160,14 +161,15 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             drs.append(dr)
 
         marshal_time = time.time() - self.start_time
-        query_stats["total_time"] = marshal_time # TODO this is not correct
+        query_stats["total_time"] = marshal_time # TODO this is not correct ; mrusso: why?
         # compute the record_op_stats for each data record and return
         record_op_stats_lst = self._create_record_op_stats_lst(records=drs, fields=fields_to_generate, query_stats=query_stats)
 
         # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
         #       keep an eye out for a regression in code synth performance and revert if necessary
         # update operator's set of exemplars
-        exemplars = [dr._asDict(include_bytes=False) for dr in drs] # TODO: need to extend candidate to same length and zip
+        
+        exemplars = [(candidate_dict, dr._asDict(include_bytes=False)) for dr in drs]
         self.exemplars.extend(exemplars)
 
         # if we are allowed to cache exemplars across plan executions, add exemplars to cache
@@ -311,8 +313,8 @@ class LLMConvertCodeSynthesisSingle(LLMConvertCodeSynthesis):
             'examples_desc': "\n".join([
                 EXAMPLE_PROMPT.format(
                     idx = f" {i}",
-                    example_inputs = "\n".join([f"- {field_name} = {repr(example[field_name])}" for field_name in api.inputs]),
-                    example_output = f"{example[output_field_name]}"
+                    example_inputs = "\n".join([f"- {field_name} = {repr(example[0][field_name])}" for field_name in api.inputs]),
+                    example_output = f"{example[1][output_field_name]}"
                 ) for i, example in enumerate(exemplars)
             ]),
             'advice': f"Hint: {advice}" if advice else "",
@@ -395,7 +397,7 @@ class LLMConvertCodeSynthesisAdviceEnsemble(LLMConvertCodeSynthesisSingle):
     def _synthesize_advice(self, 
                            api: API, 
                            output_field_name: str, 
-                           exemplars: List[Dict[DataRecord, DataRecord]]=list(), language='Python', 
+                           exemplars: List[Exemplar]=list(), language='Python', 
                            n_advices=4,
                            limit:int=3):
         context = {
