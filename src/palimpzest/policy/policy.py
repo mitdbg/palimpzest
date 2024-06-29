@@ -268,9 +268,6 @@ class MaxHarmonicMean(Policy):
             scaled_time = min(max(scaled_time, 0.0), 1.0)
             scaled_cost = min(max(scaled_cost, 0.0), 1.0)
             scaled_quality = min(max(scaled_quality, 0.0), 1.0)
-            print(f"scaled_time: {scaled_time}")
-            print(f"scaled_cost: {scaled_cost}")
-            print(f"scaled_quality: {scaled_quality}")
 
             harmonicMean = 3.0 / ((1.0 / (scaled_time + epsilon)) + (1.0 / (scaled_cost + epsilon)) + (1.0 / (scaled_quality + epsilon)))
 
@@ -279,7 +276,7 @@ class MaxHarmonicMean(Policy):
                 bestPlan = plan
                 bestPlanIdx = idx
 
-        return bestPlan if not return_idx else bestPlan, bestPlanIdx
+        return bestPlan if not return_idx else (bestPlan, bestPlanIdx)
 
 
 class UserChoice(Policy):
