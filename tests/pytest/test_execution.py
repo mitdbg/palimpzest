@@ -7,11 +7,7 @@ from palimpzest.execution import Execute, SimpleExecution
 from palimpzest.operators import *
 from palimpzest.planner import PhysicalPlan
 from palimpzest.policy import MaxQuality
-<<<<<<< HEAD
-from palimpzest.strategies import ModelSelectionFilterStrategy
-=======
 from palimpzest.strategies import ModelSelectionFilterStrategy, BondedQueryConvertStrategy
->>>>>>> c7142cd (debugging llm convert)
 
 import os
 import time
