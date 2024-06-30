@@ -11,6 +11,7 @@ from palimpzest.generators import (
     TogetherHFAdaptor,
 )
 from palimpzest.dataclasses import GenerationStats, RecordOpStats
+from palimpzest.dataclasses import GenerationStats, RecordOpStats
 from palimpzest.utils import API
 
 from collections import Counter
@@ -30,7 +31,7 @@ import os
 import time
 
 # DEFINITIONS
-GenerationOutput = Tuple[str, Dict[str, Any]]
+GenerationOutput = Tuple[str, GenerationStats]
 
 
 def get_api_key(key: str) -> str:
@@ -194,8 +195,8 @@ class CustomGenerator(BaseGenerator):
         input_tokens = usage["prompt_tokens"]
         output_tokens = usage["completion_tokens"]
 
-        # NOTE: needs to match subset of keys produced by LLMConvert._create_empty_query_stats()
-        stats= GenerationStats(**{
+        # create GenerationStats
+        stats = GenerationStats(**{
             "model_name": self.model_name,
             "llm_call_duration_secs": end_time - start_time,
             "fn_call_duration_secs": 0.0,
@@ -394,6 +395,22 @@ class DSPyGenerator(BaseGenerator):
             total_output_cost=output_tokens * usd_per_output_token,
             cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
         )
+        # create GenerationStats
+        stats = GenerationStats(**{
+            "model_name": self.model_name,
+            "llm_call_duration_secs": end_time - start_time,
+            "fn_call_duration_secs": 0.0,
+            "total_input_tokens": input_tokens,
+            "total_output_tokens": output_tokens,
+            "total_input_cost": input_tokens * usd_per_input_token,
+            "total_output_cost": output_tokens * usd_per_output_token,
+            "total_cost": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+            # "prompt": dspy_lm.history[-1]["prompt"],
+            # "usage": usage,
+            # "finish_reason": finish_reason,
+            # "answer_log_probs": answer_log_probs,
+            # "answer": pred.answer,
+        })
 
         if self.verbose:
             print(pred.answer)
@@ -567,28 +584,28 @@ class ImageTextGenerator(BaseGenerator):
         if self.verbose:
             print(answer)
 
-        # TODO: To simplify life for the time being, I am aggregating stats for multiple call(s)
-        #       to the Gemini vision model into a single GenerationStats object (when we have
-        #       more than one image to process). This has no effect on most of our fields --
-        #       especially since many of them are not implemented for the Gemini model -- but
-        #       we will likely want a more robust solution in the future.
         # collect statistics on prompt, usage, and timing
-
         usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
         usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
         input_tokens = usage["prompt_tokens"]
         output_tokens = usage["completion_tokens"]
 
-        stats = RecordOpStats(
-            model_name=self.model_name,
-            llm_call_duration_secs=end_time - start_time,
-            fn_call_duration_secs=0.0,
-            total_input_tokens=input_tokens,
-            total_output_tokens=output_tokens,
-            total_input_cost=input_tokens * usd_per_input_token,
-            total_output_cost=output_tokens * usd_per_output_token,
-            total_cost=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
-        )
+        # create GenerationStats
+        stats = GenerationStats(**{
+            "model_name": self.model_name,
+            "llm_call_duration_secs": end_time - start_time,
+            "fn_call_duration_secs": 0.0,
+            "total_input_tokens": input_tokens,
+            "total_output_tokens": output_tokens,
+            "total_input_cost": input_tokens * usd_per_input_token,
+            "total_output_cost": output_tokens * usd_per_output_token,
+            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+            # "prompt": dspy_lm.history[-1]["prompt"],
+            # "usage": usage,
+            # "finish_reason": finish_reason,
+            # "answer_log_probs": answer_log_probs,
+            # "answer": pred.answer,
+        })
 
         return answer, stats
 
@@ -617,13 +634,19 @@ def codeEnsembleExecution(api: API, code_ensemble: List[Dict[str, str]], candida
     #       
     if len(preds) == 1:
         majority_response = preds[0]
-        exec_stats = {"fn_call_duration_secs": time.time() - start_time}
+        exec_stats = GenerationStats(**{
+            "fn_call_duration_secs": time.time() - start_time,
+        })
         return majority_response, exec_stats
 
     if len(preds) > 0:
         majority_response = Counter(preds).most_common(1)[0][0]
-        exec_stats = {"fn_call_duration_secs": time.time() - start_time}
+        exec_stats = GenerationStats(**{
+            "fn_call_duration_secs": time.time() - start_time,
+        })
         # return majority_response+(" (codegen)" if verbose else ""), ensemble_stats
         return majority_response, exec_stats
 
-    return None, {"fn_call_duration_secs": time.time() - start_time}
+    return None, GenerationStats(**{
+            "fn_call_duration_secs": time.time() - start_time,
+        })

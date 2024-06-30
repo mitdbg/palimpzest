@@ -12,8 +12,6 @@ from palimpzest.operators import logical
 
 from typing import List
 
-import concurrent
-import multiprocessing
 import time
 
 
@@ -80,62 +78,6 @@ class FilterOp(PhysicalOperator):
                 elif self.shouldProfile:
                     yield resultRecord
 
-            if shouldCache:
-                self.datadir.closeCache(self.targetCacheId)
-
-        return iteratorFn()
-
-
-# TODO: delete once __call__ methods are implemented in NonLLLMFilter and LLMFilter
-class ParallelFilterCandidateOp(FilterOp):
-
-    def __init__(self, streaming=False, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.max_workers = multiprocessing.cpu_count()
-        self.streaming = streaming
-
-    def copy(self):
-        copy = super().copy()
-        copy.streaming = self.streaming
-        return copy
-
-    def __iter__(self):
-        shouldCache = self.datadir.openCache(self.targetCacheId)
-
-        @self.profile(name="p_filter", shouldProfile=self.shouldProfile)
-        def iteratorFn():
-            inputs = []
-            results = []
-
-            for nextCandidate in self.source:
-                inputs.append(nextCandidate)
-
-            if self.streaming:
-                chunksize = self.max_workers
-            else:
-                chunksize = len(inputs)
-
-            # Grab items from the list of inputs in chunks using self.max_workers
-            for i in range(0, len(inputs), chunksize):
-                with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=self.max_workers
-                ) as executor:
-                    results = list(
-                        executor.map(self._passesFilter, inputs[i : i + chunksize])
-                    )
-
-                    for resultRecord in results:
-                        if resultRecord._passed_filter:
-                            if shouldCache:
-                                self.datadir.appendCache(
-                                    self.targetCacheId, resultRecord
-                                )
-                            yield resultRecord
-
-                        # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
-                        # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
-                        elif self.shouldProfile:
-                            yield resultRecord
             if shouldCache:
                 self.datadir.closeCache(self.targetCacheId)
 
@@ -220,6 +162,21 @@ class LLMFilter(FilterOp):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
+        doc_schema = str(self.inputSchema)
+        doc_type = self.inputSchema.className()
+        if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
+            self.generator = DSPyGenerator(
+                self.model.value,
+                self.prompt_strategy,
+                doc_schema,
+                doc_type,
+                verbose=False, # TODO pass verbose argument
+            )
+
+        else:
+            raise Exception(f"Prompt strategy {self.prompt_strategy} implemented yet")
+        
+
     def __eq__(self, other: LLMFilter):
         return (
             isinstance(other, self.__class__)
@@ -290,29 +247,11 @@ class LLMFilter(FilterOp):
     def __call__(self, candidate: DataRecord) -> DataRecordsWithStats:
         start_time = time.time()
 
-        # compute record schema and type
-        doc_schema = str(self.inputSchema)
-        doc_type = self.inputSchema.className()
-
-        # create generator
-        generator = None
-        if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
-            generator = DSPyGenerator(
-                self.model.value,
-                self.prompt_strategy,
-                doc_schema,
-                doc_type,
-                verbose=False, # TODO pass verbose argument
-            )
-
-        else:
-            raise Exception(f"Prompt strategy {self.prompt_strategy} implemented yet")
-
         # invoke LLM to generate filter decision (True or False)
         text_content = candidate._asJSONStr(include_bytes=False)
         response, gen_stats = None, {}
         try:
-            response, gen_stats = generator.generate(
+            response, gen_stats = self.generator.generate(
                 context=text_content,
                 question=self.filter.filterCondition,
             )
@@ -326,12 +265,6 @@ class LLMFilter(FilterOp):
             else False
         )
 
-        # NOTE: this will treat the cost of failed LLM invocations as having 0.0 tokens and dollars,
-        #       when in reality this is only true if the error in generator.generate() happens before
-        #       the invocation of the LLM -- not if it happens after. (If it happens *during* the
-        #       invocation, then it's difficult to say what the true cost really should be). I think
-        #       the best solution is to place a try-except inside of the DSPyGenerator to still capture
-        #       and return the gen_stats if/when there is an error after invocation.
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
             record_uuid=candidate._uuid,
@@ -340,14 +273,14 @@ class LLMFilter(FilterOp):
             op_id=self.get_op_id(),
             op_name=self.op_name(),
             time_per_record=time.time() - start_time,
-            cost_per_record=gen_stats.get('cost_per_record', 0.0),
+            cost_per_record=gen_stats.total_cost,
             model_name=self.model.value,
             filter_str=self.filter.getFilterStr(),
-            total_input_tokens=gen_stats.get('input_tokens', 0.0),
-            total_output_tokens=gen_stats.get('output_tokens', 0.0),
-            total_input_cost=gen_stats.get('input_cost', 0.0),
-            total_output_cost=gen_stats.get('output_cost', 0.0),
-            llm_call_duration_secs=gen_stats.get('llm_call_duration_secs', 0.0),
+            total_input_tokens=gen_stats.total_input_tokens,
+            total_output_tokens=gen_stats.total_output_tokens,
+            total_input_cost=gen_stats.total_input_cost,
+            total_output_cost=gen_stats.total_output_cost,
+            llm_call_duration_secs=gen_stats.llm_call_duration_secs,
             answer=response,
             passed_filter=passed_filter,
         )

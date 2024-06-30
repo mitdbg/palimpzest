@@ -82,6 +82,9 @@ class RecordOpStats:
     # unique identifier for the parent of this record
     record_parent_uuid: str
 
+    # a dictionary with the record state after being processed by the operator
+    record_state: Dict[str, Any]
+
     # operation id; a unique identifier for this operation
     op_id: str
 
@@ -93,9 +96,6 @@ class RecordOpStats:
 
     # the cost (in dollars) to generate this record at this operation
     cost_per_record: float
-
-    # a dictionary with the record state after being processed by the operator
-    record_state: Dict[str, Any]
 
     ##### NOT-OPTIONAL, BUT FILLED BY EXECUTION CLASS AFTER CONSTRUCTOR CALL #####
     # the ID of the physical operation which produced the input record for this record at this operation

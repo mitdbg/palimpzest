@@ -22,7 +22,15 @@ class Model(str, Enum):
 
     def __repr__(self):
         return f'{self.name}'
-    
+
+class ExecutionStrategy(str, Enum):
+    """
+    ExecutionStrategy describes the framework / setting used to execute the user's plan.
+    """
+    SINGLE_THREADED = "single-threaded"
+    PARALLEL = "parallel"
+    RAY = "ray"
+
 class PromptStrategy(str, Enum):
     """
     PromptStrategy describes the prompting technique to be used by a Generator when
@@ -66,6 +74,9 @@ class Cardinality(str, Enum):
 class PlanType(str, Enum):
     SENTINEL = "Sentinel Plan"
     FINAL = "Final Plan"
+
+# the number of seconds the parallel execution will sleep for while waiting for futures to complete
+PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.1
 
 # character limit(s) for different IDs
 MAX_OP_ID_CHARS = 6

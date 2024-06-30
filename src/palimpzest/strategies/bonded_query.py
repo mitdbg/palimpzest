@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json 
 import time
-from typing import List
+from typing import Any, Dict, List, Tuple
 from palimpzest.constants import Model
 from .strategy import PhysicalOpStrategy
 
@@ -10,11 +10,15 @@ from palimpzest.constants import *
 from palimpzest.elements import *
 from palimpzest.operators import logical, physical, convert
 
+# TYPE DEFINITIONS
+FieldName = str
+StatsDict = Dict[str, Any]
+
 class LLMBondedQueryConvert(convert.LLMConvert):
 
     def convert(self, 
                 candidate_content,
-                fields) -> None:
+                fields) -> Tuple[Dict[FieldName, List[Any]], StatsDict]:
 
         prompt = self._construct_query_prompt(fields_to_generate=fields)
 
@@ -59,6 +63,7 @@ class BondedQueryStrategy(PhysicalOpStrategy):
             return_operators.append(physical_op_type)
 
         return return_operators
+
 class BondedQueryConvertStrategy(BondedQueryStrategy):
     """
     This strategy creates physical operator classes using a bonded query strategy.

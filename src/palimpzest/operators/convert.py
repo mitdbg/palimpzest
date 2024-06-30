@@ -13,9 +13,12 @@ from palimpzest.utils import API, getJsonFromAnswer
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import base64
-import concurrent
 import math
 import time
+
+# TYPE DEFINITIONS
+FieldName = str
+
 
 class ConvertOp(PhysicalOperator):
 
@@ -55,83 +58,6 @@ class ConvertOp(PhysicalOperator):
 
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
-
-    # TODO: where does caching go?
-    # def __iter__(self) -> IteratorFn:
-    #     shouldCache = self.datadir.openCache(self.targetCacheId)
-
-    #     @self.profile(name="convert", shouldProfile=self.shouldProfile)
-    #     def iteratorFn():
-    #         for nextCandidate in self.source:
-    #             resultRecordList = self.__call__(nextCandidate)
-    #             if resultRecordList is not None:
-    #                 for resultRecord in resultRecordList:
-    #                     if resultRecord is not None:
-    #                         if shouldCache:
-    #                             self.datadir.appendCache(
-    #                                 self.targetCacheId, resultRecord
-    #                             )
-    #                         yield resultRecord
-    #         if shouldCache:
-    #             self.datadir.closeCache(self.targetCacheId)
-
-    #     return iteratorFn()
-
-
-class ParallelConvertFromCandidateOp(ConvertOp):
-    def __init__(self, streaming, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.max_workers = 32  # TODO hardcoded for now
-        self.streaming = streaming
-
-    def __eq__(self, other: PhysicalOperator):
-        return super().__eq__(other) and self.streaming == other.streaming
-
-    def copy(self):
-        return super().copy(streaming=self.streaming)
-
-    def __iter__(self):
-        # This is very crudely implemented right now, since we materialize everything
-        shouldCache = self.datadir.openCache(self.targetCacheId)
-
-        @self.profile(name="p_convert", shouldProfile=self.shouldProfile)
-        def iteratorFn():
-            inputs = []
-            results = []
-
-            for nextCandidate in self.source:
-                inputs.append(nextCandidate)
-
-            # Grab items from the list inputs in chunks using self.max_workers
-            if self.streaming:
-                chunksize = self.max_workers
-            else:
-                chunksize = len(inputs)
-
-            if chunksize == 0:
-                return
-
-            for i in range(0, len(inputs), chunksize):
-                with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=self.max_workers
-                ) as executor:
-                    results = list(
-                        executor.map(self.__call__, inputs[i : i + chunksize])
-                    )
-
-                    for resultRecordList in results:
-                        if resultRecordList is not None:
-                            for resultRecord in resultRecordList:
-                                if resultRecord is not None:
-                                    if shouldCache:
-                                        self.datadir.appendCache(
-                                            self.targetCacheId, resultRecord
-                                        )
-                                    yield resultRecord
-            if shouldCache:
-                self.datadir.closeCache(self.targetCacheId)
-
-        return iteratorFn()
 
 
 class LLMConvert(ConvertOp):
@@ -239,7 +165,18 @@ class LLMConvert(ConvertOp):
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
 
-        # TODO REMOVE!
+        if self.query_strategy == QueryStrategy.CONVENTIONAL:
+            # NOTE: this may over-estimate the number of fields that need to be generated
+            generate_field_names = []
+            for field_name in self.outputSchema.fieldNames():
+                if field_name not in self.inputSchema.fieldNames(): # and getattr(candidate, field_name, None) is None:
+                    generate_field_names.append(field_name)
+
+            num_fields_to_generate = len(generate_field_names)
+            est_num_input_tokens *= num_fields_to_generate
+            est_num_output_tokens *= num_fields_to_generate
+
+        # TODO REMOVE! 
         self.token_budget = 1.
         if self.token_budget is not None:
             est_num_input_tokens = self.token_budget * est_num_input_tokens
@@ -400,7 +337,7 @@ class LLMConvert(ConvertOp):
         self,
         records: List[DataRecord],
         fields: List[str],
-        generation_stats: StatsDict,
+        generation_stats: GenerationStats,
         total_time: float,
     ) -> List[RecordOpStats]:
         """
@@ -408,18 +345,25 @@ class LLMConvert(ConvertOp):
         """
         record_op_stats_lst = []
         per_record_stats = generation_stats / len(records)
-        for idx, dr in enumerate(records):
+        for dr in records:
             record_op_stats = RecordOpStats(
                 record_uuid=dr._uuid,
                 record_parent_uuid=dr._parent_uuid,
                 record_state=dr._asDict(include_bytes=False),
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),
+                time_per_record=total_time / len(records),
+                cost_per_record=per_record_stats.cost_per_record,
+                model_name=self.model.value,
+                answer={field_name: getattr(dr, field_name) for field_name in fields},
                 input_fields=self.inputSchema.fieldNames(),
                 generated_fields=fields,
-                answer={field_name: getattr(dr, field_name) for field_name in fields},
-                time_per_record=total_time / len(records),
-                **per_record_stats.__dict__,
+                total_input_tokens=per_record_stats.total_input_tokens,
+                total_output_tokens=per_record_stats.total_output_tokens,
+                total_input_cost=per_record_stats.total_input_cost,
+                total_output_cost=per_record_stats.total_output_cost,
+                llm_call_duration_secs=per_record_stats.llm_call_duration_secs,
+                fn_call_duration_secs=per_record_stats.fn_call_duration_secs,
             )
             record_op_stats_lst.append(record_op_stats)
 
@@ -468,6 +412,7 @@ class LLMConvert(ConvertOp):
         # create DSPy generator and generate
         doc_schema = str(self.outputSchema)
         doc_type = self.outputSchema.className()
+
         # generate LLM response and capture statistics
         answer:str
         query_stats:GenerationStats
@@ -496,6 +441,23 @@ class LLMConvert(ConvertOp):
             print(f"No output was found!")
             return {field_name: [] for field_name in fields_to_generate}, query_stats
 
+        # get output into iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
+        if self.cardinality == Cardinality.ONE_TO_MANY:
+            assert "items" in json_answer, "malformatted one-to-many output"
+            assert isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0, "No output objects were generated for one-to-many query"
+            json_objects = json_answer["items"]
+        else:
+            json_objects = [json_answer]
+
+        # standardize output to be {"field1": [...], "field2": [...]}
+        standardized_json_output = {field: [] for field in fields_to_generate}
+        for json_object in json_objects:
+            for field, value in json_object.items():
+                standardized_json_output[field].append(value)
+
+        return standardized_json_output, query_stats
+
+    def convert(self, candidate_content: Union[str,List[bytes]] , fields: List[str]) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
         if self.cardinality == Cardinality.ONE_TO_MANY:
             assert isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0, "No output objects were generated for one-to-many query"
             # json_answer["items"] is a list of dictionaries, each of which contains the generated fields
@@ -544,9 +506,6 @@ class LLMConvert(ConvertOp):
         field_answers: Dict[str, List]
         field_answers, field_stats = self.convert(fields=fields_to_generate, candidate_content=content)
 
-        # parse the final json objects and standardize the outputs to be lists
-        field_outputs = {}
-        query_stats = {}
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
 

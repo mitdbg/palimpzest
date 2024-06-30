@@ -7,12 +7,11 @@ from palimpzest.execution import Execute, SimpleExecution
 from palimpzest.operators import *
 from palimpzest.planner import PhysicalPlan
 from palimpzest.policy import MaxQuality
-from palimpzest.strategies import ModelSelectionFilterStrategy
+from palimpzest.strategies import ModelSelectionFilterStrategy, BondedQueryConvertStrategy
 
 import os
+import time
 import pytest
-
-# TODO: mock out all model calls
 
 class TestExecutionNoCache:
 
@@ -46,8 +45,8 @@ class TestExecutionNoCache:
         assert len(output_records) == 1
 
         dr = output_records[0]
-        assert dr.filename == "testdata/enron-eval-tiny/buy-r-inbox-628.txt"
-        assert hasattr(dr, 'contents') and dr.contents != None
+        assert dr.filename.endswith("buy-r-inbox-628.txt")
+        assert getattr(dr, 'contents', None) != None
 
         operator_stats = plan_stats.operator_stats[op_id]
         assert operator_stats.total_op_time > 0.0
@@ -71,8 +70,8 @@ class TestExecutionNoCache:
 
         expected_filenames = sorted(os.listdir("testdata/enron-eval-tiny"))
         for dr, expected_filename in zip(output_records, expected_filenames):
-            assert dr.filename == os.path.join("testdata/enron-eval-tiny/", expected_filename)
-            assert hasattr(dr, 'contents') and dr.contents != None
+            assert dr.filename.endswith(expected_filename)
+            assert getattr(dr, 'contents', None) != None
 
 
     def test_execute_sequential_with_non_llm_filter(self):
@@ -81,6 +80,8 @@ class TestExecutionNoCache:
             time.sleep(0.001)
             return "buy" not in record.filename
         filter = Filter(filterFn=filter_buy_emails)
+        filterOpClass = ModelSelectionFilterStrategy(available_models=[Model.GPT_3_5], prompt_strategy=PromptStrategy.DSPY_COT_BOOL)
+        filterOp = filterOpClass[0](inputSchema=File, outputSchema=File, filter=filter, targetCacheId="abc123", shouldProfile=True)
         filterOp = NonLLMFilter(inputSchema=File, outputSchema=File, filter=filter, targetCacheId="abc123", shouldProfile=True)
         plan = PhysicalPlan(
             operators=[scanOp, filterOp],
@@ -102,8 +103,8 @@ class TestExecutionNoCache:
         assert len(output_records) == 1
 
         dr = output_records[0]
-        assert dr.filename == "testdata/enron-eval-tiny/kaminski-v-deleted-items-1902.txt"
-        assert hasattr(dr, 'contents') and dr.contents != None
+        assert dr.filename.endswith("kaminski-v-deleted-items-1902.txt")
+        assert getattr(dr, 'contents', None) != None
 
         for op in plan.operators:
             op_id = op.get_op_id()
@@ -132,15 +133,60 @@ class TestExecutionNoCache:
 
         expected_filenames = [fn for fn in sorted(os.listdir("testdata/enron-eval-tiny")) if "buy" not in fn]
         for dr, expected_filename in zip(output_records, expected_filenames):
-            assert dr.filename == os.path.join("testdata/enron-eval-tiny/", expected_filename)
-            assert hasattr(dr, 'contents') and dr.contents != None
+            assert dr.filename.endswith(expected_filename)
+            assert getattr(dr, 'contents', None) != None
 
-    # TODO: mock response from GPT_3_5 if it's wrong
-    def test_execute_sequential_with_llm_filter(self):
+    def test_execute_sequential_with_llm_filter(self, monkeypatch):
+        # define Mock to ensure correct response is returned by the LLM call
+        def mock_call(llm_filter, candidate):
+            start_time = time.time()
+            text_content = candidate._asJSONStr(include_bytes=False)
+            response, gen_stats = llm_filter.generator.generate(
+                context=text_content,
+                question=llm_filter.filter.filterCondition,
+            )
+            response = str("buy" not in candidate.filename)
+
+            # compute whether the record passed the filter or not
+            passed_filter = (
+                "true" in response.lower()
+                if response is not None
+                else False
+            )
+
+            # create RecordOpStats object
+            record_op_stats = RecordOpStats(
+                record_uuid=candidate._uuid,
+                record_parent_uuid=candidate._parent_uuid,
+                record_state=candidate._asDict(include_bytes=False),
+                op_id=llm_filter.get_op_id(),
+                op_name=llm_filter.op_name(),
+                time_per_record=time.time() - start_time,
+                cost_per_record=gen_stats.total_cost,
+                model_name=llm_filter.model.value,
+                filter_str=llm_filter.filter.getFilterStr(),
+                total_input_tokens=gen_stats.total_input_tokens,
+                total_output_tokens=gen_stats.total_output_tokens,
+                total_input_cost=gen_stats.total_input_cost,
+                total_output_cost=gen_stats.total_output_cost,
+                llm_call_duration_secs=gen_stats.llm_call_duration_secs,
+                answer=response,
+                passed_filter=passed_filter,
+            )
+
+            # set _passed_filter attribute and return
+            setattr(candidate, "_passed_filter", passed_filter)
+
+            return [candidate], [record_op_stats]
+
         scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
         filter = Filter("The filename does not contain the string 'buy'")
-        filterOpClass = ModelSelectionFilterStrategy(available_models=[Model.GPT_3_5], prompt_strategy=PromptStrategy.DSPY_COT_BOOL)
-        filterOp = filterOpClass[0](inputSchema=File, outputSchema=File, filter=filter, targetCacheId="abc123", shouldProfile=True,)
+        filterOpClass = ModelSelectionFilterStrategy(available_models=[Model.GPT_3_5], prompt_strategy=PromptStrategy.DSPY_COT_BOOL)[0]
+
+        # apply the monkeypatch for requests.get to mock_get
+        monkeypatch.setattr(filterOpClass, "__call__", mock_call)
+
+        filterOp = filterOpClass(inputSchema=File, outputSchema=File, filter=filter, targetCacheId="abc123", shouldProfile=True)
         plan = PhysicalPlan(
             operators=[scanOp, filterOp],
             datasetIdentifier=ENRON_EVAL_TINY_DATASET_ID,
@@ -161,8 +207,8 @@ class TestExecutionNoCache:
         assert len(output_records) == 1
 
         dr = output_records[0]
-        assert dr.filename == "testdata/enron-eval-tiny/kaminski-v-deleted-items-1902.txt"
-        assert hasattr(dr, 'contents') and dr.contents != None
+        assert dr.filename.endswith("kaminski-v-deleted-items-1902.txt")
+        assert getattr(dr, 'contents', None) != None
 
         for op in plan.operators:
             op_id = op.get_op_id()
@@ -193,11 +239,11 @@ class TestExecutionNoCache:
 
         expected_filenames = [fn for fn in sorted(os.listdir("testdata/enron-eval-tiny")) if "buy" not in fn]
         for dr, expected_filename in zip(output_records, expected_filenames):
-            assert dr.filename == os.path.join("testdata/enron-eval-tiny/", expected_filename)
-            assert hasattr(dr, 'contents') and dr.contents != None
+            assert dr.filename.endswith(expected_filename)
+            assert getattr(dr, 'contents', None) != None
 
 
-    def test_execute_dag_with_hardcoded_convert(self):
+    def test_execute_sequential_with_hardcoded_convert(self):
         scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
         convertOp = ConvertFileToText(inputSchema=File, outputSchema=TextFile, shouldProfile=True)
         plan = PhysicalPlan(
@@ -215,13 +261,13 @@ class TestExecutionNoCache:
         simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
 
         # test sampling three records, with one making it past the filter
-        output_records, plan_stats = simple_execution.execute_dag(plan, plan_stats, num_samples=1)
+        output_records, plan_stats = simple_execution.execute_sequential(plan, plan_stats, num_samples=1)
 
         assert len(output_records) == 1
 
         dr = output_records[0]
-        assert dr.filename == "testdata/enron-eval-tiny/buy-r-inbox-628.txt"
-        assert hasattr(dr, 'contents') and dr.contents != None
+        assert dr.filename.endswith("buy-r-inbox-628.txt")
+        assert getattr(dr, 'contents', None) != None
 
         for op in plan.operators:
             op_id = op.get_op_id()
@@ -242,19 +288,77 @@ class TestExecutionNoCache:
         # test full scan
         simple_execution = SimpleExecution(nocache=True)
         simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
-        output_records, plan_stats = simple_execution.execute_dag(plan, plan_stats)
+        output_records, plan_stats = simple_execution.execute_sequential(plan, plan_stats, num_samples=float("inf"))
 
         assert len(output_records) == 6
 
         expected_filenames = sorted(os.listdir("testdata/enron-eval-tiny"))
         for dr, expected_filename in zip(output_records, expected_filenames):
-            assert dr.filename == os.path.join("testdata/enron-eval-tiny/", expected_filename)
-            assert hasattr(dr, 'contents') and dr.contents != None
+            assert dr.filename.endswith(expected_filename)
+            assert getattr(dr, 'contents', None) != None
+
+    def test_execute_sequential_with_llm_convert(self, email_schema):
+        scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
+        convertOpHardcoded = ConvertFileToText(inputSchema=File, outputSchema=TextFile, shouldProfile=True)
+        convertOpClass = BondedQueryConvertStrategy(available_models=[Model.GPT_3_5])[0]
+
+        convertOpLLM = convertOpClass(inputSchema=TextFile, outputSchema=email_schema, targetCacheId="abc123", shouldProfile=True)
+        plan = PhysicalPlan(
+            operators=[scanOp, convertOpHardcoded, convertOpLLM],
+            datasetIdentifier=ENRON_EVAL_TINY_DATASET_ID,
+        )
+        plan_stats = PlanStats(plan.plan_id())
+        for op in plan.operators:
+            op_id = op.get_op_id()
+            plan_stats.operator_stats[op_id] = OperatorStats(op_idx=0, op_id=op_id, op_name=op.op_name())
+
+        simple_execution = SimpleExecution(num_samples=1, nocache=True)
+
+        # set state which is computed in execute(); should try to remove this side-effect from the code
+        simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
+
+        # test sampling three records, with one making it past the filter
+        output_records, plan_stats = simple_execution.execute_sequential(plan, plan_stats, num_samples=1)
+
+        assert len(output_records) == 1
+
+        dr = output_records[0]
+        assert dr.filename.endswith("buy-r-inbox-628.txt")
+        assert getattr(dr, 'sender', None) == "sherron.watkins@enron.com"
+        assert getattr(dr, 'subject', None) == "RE: portrac"
+
+        for op in plan.operators:
+            op_id = op.get_op_id()
+            operator_stats = plan_stats.operator_stats[op_id]
+            assert operator_stats.total_op_time > 0.0
+
+            if isinstance(op, LLMConvert):
+                record_stats = operator_stats.record_op_stats_lst[-1]
+                assert record_stats.record_uuid == dr._uuid
+                assert record_stats.record_parent_uuid == dr._parent_uuid
+                assert record_stats.op_id == op_id
+                assert record_stats.op_name == op.op_name()
+                assert record_stats.time_per_record > 0.0
+                assert record_stats.cost_per_record > 0.0
+                assert record_stats.record_state == dr._asDict(include_bytes=False)
+
+        # test full scan
+        simple_execution = SimpleExecution(nocache=True)
+        simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
+        output_records, plan_stats = simple_execution.execute_sequential(plan, plan_stats, num_samples=float("inf"))
+
+        assert len(output_records) == 6
+
+        expected_filenames = sorted(os.listdir("testdata/enron-eval-tiny"))
+        expected_senders = ["sherron.watkins@enron.com", "david.port@enron.com", "vkaminski@aol.com", "sarah.palmer@enron.com", "gary@cioclub.com", "travis.mccullough@enron.com"]
+        expected_subjects = ["RE: portrac", "RE: NewPower", "Fwd: FYI", "Enron Mentions -- 01/18/02", "Information Security Executive -092501", "Redraft of the Exclusivity Agreement"]
+        for dr, expected_filename, expected_sender, expected_subject in zip(output_records, expected_filenames, expected_senders, expected_subjects):
+            assert dr.filename.endswith(expected_filename)
+            assert getattr(dr, 'sender', None) == expected_sender
+            assert getattr(dr, 'subject', None) == expected_subject
 
     # # TODO
-    # def test_execute_dag_with_aggregate(self):
+    # def test_execute_dag_with_agg(self):
     #     raise Exception("TODO")
-
-    # # TODO
     # def test_execute_dag_with_limit(self):
     #     raise Exception("TODO")
