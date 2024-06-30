@@ -145,6 +145,11 @@ class ParallelFilterCandidateOp(FilterOp):
 class NonLLMFilter(FilterOp):
     implemented_op = logical.FilteredScan
 
+    def implements(cls, logical_operator_class):
+        if logical_operator_class == cls.implemented_op:
+            return isinstance(logical_operator_class.filter, callable)
+        return False
+
     def __eq__(self, other: NonLLMFilter):
         return (
             isinstance(other, self.__class__)
@@ -206,6 +211,11 @@ class LLMFilter(FilterOp):
     implemented_op = logical.FilteredScan
     model = None
     prompt_strategy = PromptStrategy.DSPY_COT_BOOL
+
+    def implements(cls, logical_operator_class):
+        if logical_operator_class == cls.implemented_op:
+            return isinstance(logical_operator_class.filter, str)
+        return False
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

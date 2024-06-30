@@ -10,7 +10,7 @@ from palimpzest.generators import (
     gen_qa_signature_class,
     TogetherHFAdaptor,
 )
-from palimpzest.dataclasses import RecordOpStats
+from palimpzest.dataclasses import GenerationStats, RecordOpStats
 from palimpzest.utils import API
 
 from collections import Counter
@@ -203,7 +203,7 @@ class CustomGenerator(BaseGenerator):
             "total_output_tokens": output_tokens,
             "total_input_cost": input_tokens * usd_per_input_token,
             "total_output_cost": output_tokens * usd_per_output_token,
-            "total_cost": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
             # "prompt": dspy_lm.history[-1]["prompt"],
             # "usage": usage,
             # "finish_reason": finish_reason,
@@ -384,21 +384,16 @@ class DSPyGenerator(BaseGenerator):
         output_tokens = usage["completion_tokens"]
 
         # NOTE: needs to match subset of keys produced by LLMConvert._create_empty_query_stats()
-        stats={
-            "model_name": self.model_name,
-            "llm_call_duration_secs": end_time - start_time,
-            "fn_call_duration_secs": 0.0,
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "input_cost": input_tokens * usd_per_input_token,
-            "output_cost": output_tokens * usd_per_output_token,
-            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
-            "prompt": dspy_lm.history[-1]["prompt"],
-            "usage": usage,
-            "finish_reason": finish_reason,
-            "answer_log_probs": answer_log_probs,
-            "answer": pred.answer,
-        }
+        stats= GenerationStats(
+            model_name=self.model_name,
+            llm_call_duration_secs=end_time - start_time,
+            fn_call_duration_secs=0.0,
+            total_input_tokens=input_tokens,
+            total_output_tokens=output_tokens,
+            total_input_cost=input_tokens * usd_per_input_token,
+            total_output_cost=output_tokens * usd_per_output_token,
+            cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+        )
 
         if self.verbose:
             print(pred.answer)
@@ -562,16 +557,15 @@ class ImageTextGenerator(BaseGenerator):
         payloads = self._make_payloads(prompt, base64_images)
 
         # generate response
-        print(f"Generating")
+        if self.verbose:
+            print(f"Generating")
         start_time = time.time()
         answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(
             client, payloads
         )
         end_time = time.time()
-        print(answer)
-
-        # extract the log probabilities for the actual result(s) which are returned
-        answer_log_probs = self._get_answer_log_probs(tokens, token_logprobs, answer)
+        if self.verbose:
+            print(answer)
 
         # TODO: To simplify life for the time being, I am aggregating stats for multiple call(s)
         #       to the Gemini vision model into a single GenerationStats object (when we have
@@ -579,29 +573,21 @@ class ImageTextGenerator(BaseGenerator):
         #       especially since many of them are not implemented for the Gemini model -- but
         #       we will likely want a more robust solution in the future.
         # collect statistics on prompt, usage, and timing
-        time_per_record = end_time - start_time
-        cost_per_record = 0.0
 
-        record_state = {
-            "model_name": self.model_name,
-            "llm_call_duration_secs": time_per_record,
-            "prompt": prompt,
-            "usage": usage,
-            "finish_reason": finish_reason,
-            "answer_log_probs": answer_log_probs,
-            "answer": answer,
-        }
+        usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
+        usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
+        input_tokens = usage["prompt_tokens"]
+        output_tokens = usage["completion_tokens"]
 
-        #TODO fill in the details
-        raise NotImplementedError("Fill in the details")
         stats = RecordOpStats(
-            record_uuid="",
-            record_parent_uuid="",
-            op_id="",
-            op_name="",
-            time_per_record=time_per_record,
-            cost_per_record=cost_per_record,
-            record_state = record_state,
+            model_name=self.model_name,
+            llm_call_duration_secs=end_time - start_time,
+            fn_call_duration_secs=0.0,
+            total_input_tokens=input_tokens,
+            total_output_tokens=output_tokens,
+            total_input_cost=input_tokens * usd_per_input_token,
+            total_output_cost=output_tokens * usd_per_output_token,
+            total_cost=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
         )
 
         return answer, stats

@@ -3,7 +3,7 @@ from __future__ import annotations
 from palimpzest import prompts
 from palimpzest.constants import *
 from palimpzest.corelib import *
-from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
+from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import *
 from palimpzest.generators import CustomGenerator, DSPyGenerator, ImageTextGenerator
@@ -239,7 +239,7 @@ class LLMConvert(ConvertOp):
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
 
-        # TODO REMOVE! 
+        # TODO REMOVE!
         self.token_budget = 1.
         if self.token_budget is not None:
             est_num_input_tokens = self.token_budget * est_num_input_tokens
@@ -401,6 +401,7 @@ class LLMConvert(ConvertOp):
         records: List[DataRecord],
         fields: List[str],
         generation_stats: StatsDict,
+        total_time: float,
     ) -> List[RecordOpStats]:
         """
         Construct list of RecordOpStats objects (one for each DataRecord).
@@ -414,11 +415,11 @@ class LLMConvert(ConvertOp):
                 record_state=dr._asDict(include_bytes=False),
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),
-                model_name=self.model.value,
                 input_fields=self.inputSchema.fieldNames(),
                 generated_fields=fields,
-                answer= {field_name: getattr(dr, field_name) for field_name in fields},
-                **per_record_stats,
+                answer={field_name: getattr(dr, field_name) for field_name in fields},
+                time_per_record=total_time / len(records),
+                **per_record_stats.__dict__,
             )
             record_op_stats_lst.append(record_op_stats)
 
@@ -461,15 +462,15 @@ class LLMConvert(ConvertOp):
         prompt: str,
         content: Optional[Union[str, List[bytes]]] = None, #either text or image
         verbose: bool = False,
-    ) -> Tuple[List[Dict[FieldName, Any]], StatsDict]:
+    ) -> Tuple[List[Dict[FieldName, List]], StatsDict]:
         """ This functions wraps the call to the generator method to actually perform the field generation.
-        It returns a string which contains 
         """
         # create DSPy generator and generate
         doc_schema = str(self.outputSchema)
         doc_type = self.outputSchema.className()
         # generate LLM response and capture statistics
-        answer, query_stats = None, {}
+        answer:str
+        query_stats:GenerationStats
         if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             generator = DSPyGenerator(
                 self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
@@ -483,17 +484,29 @@ class LLMConvert(ConvertOp):
             answer, query_stats = generator.generate(context=content, question=prompt)
         except Exception as e:
             print(f"DSPy generation error: {e}")
-            return {field_name: None for field_name in fields_to_generate}, query_stats
+            return {field_name: [] for field_name in fields_to_generate}, query_stats
 
         try:
             json_answer = getJsonFromAnswer(answer)
         except Exception as e:
             print(f"Error extracting json objects: {str(e)}")
-            import pdb; pdb.set_trace()
+            return {field_name: [] for field_name in fields_to_generate}, query_stats
 
-            return {field_name: None for field_name in fields_to_generate}, query_stats
+        if json_answer == {}:
+            print(f"No output was found!")
+            return {field_name: [] for field_name in fields_to_generate}, query_stats
 
-        return json_answer, query_stats
+        if self.cardinality == Cardinality.ONE_TO_MANY:
+            assert isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0, "No output objects were generated for one-to-many query"
+            # json_answer["items"] is a list of dictionaries, each of which contains the generated fields
+            for field in fields_to_generate:
+                field_answers[field] = []
+                for item in json_answer["items"]:
+                    field_answers[field].append(item[field])
+        else:
+            field_answers = {field:[json_answer[field]] for field in fields_to_generate}
+
+        return field_answers, query_stats
 
     def convert(self, candidate_content: Union[str,List[bytes]] , fields: List[str]) -> Tuple[Dict[str, List], StatsDict]:
         """ This function is responsible for the LLM conversion process. 
@@ -528,8 +541,8 @@ class LLMConvert(ConvertOp):
         else:
             raise Exception(f"Prompt strategy not implemented: {self.prompt_strategy}")
 
-        marshal_time = time.time() - start_time
-        fields_answers, fields_stats = self.convert(fields=fields_to_generate, candidate_content=content)
+        field_answers: Dict[str, List]
+        field_answers, field_stats = self.convert(fields=fields_to_generate, candidate_content=content)
 
         # parse the final json objects and standardize the outputs to be lists
         field_outputs = {}
@@ -537,46 +550,15 @@ class LLMConvert(ConvertOp):
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
 
-        n_records = max([len(lst) for lst in fields_answers.values()])
-        
-        records_json = [{} for _ in range(n_records)]
-        
-        for field_name, field_answer in fields_answers.items():
-            if self.cardinality == Cardinality.ONE_TO_MANY:
-                assert isinstance(field_answer["items"], list) and len(field_answer["items"]) > 0, "No output objects were generated for one-to-many query"
-                json_objects = field_answer["items"]
-            else:
-                json_objects = [field_answer]
-            # NOTE: removed cleaning step
+        n_records = max([len(lst) for lst in field_answers.values()])
+        records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
 
-            for idx, output in enumerate(json_objects):
-                import pdb; pdb.set_trace()
-                records_json[idx].update(output)
+        for field_name, answer_list in field_answers.items():
+            for idx, output in enumerate(answer_list):
+                record = records_json[idx]
+                record[field_name] = output
 
-            # TODO Aggregate field stats, maybe a better way?
-            field_stat = fields_stats[field_name]
-            for key, value in field_stat.items():
-                if type(value) == type(dict()):
-                    for k2, v2 in value.items():
-                        # Should we simply throw the usage away here?
-                        query_stats[k2] = query_stats.get(k2,type(v2)()) + v2 
-                else:
-                    query_stats[key] = query_stats.get(key, type(value)()) + value
-
-        query_stats["total_time"] = time.time() - start_time
-
-        # extend each record to have the same fields
-        for record in records_json:
-            record[field_name] = record.get(field_name, None)
-
-        # TODO how does this work here?
-        # compute the max number of outputs in any field (for one-to-many cardinality queries,
-        # it's possible to have differing output lengths per field)
-        field_max_outputs = 1
-        if self.cardinality == Cardinality.ONE_TO_MANY:
-            for field_name, json_objects in field_outputs.items():
-                field_max_outputs = max(field_max_outputs, len(json_objects))
-
+        query_stats = sum(field_stats.values())
 
         drs = [
             self._create_data_record_from_json(
@@ -585,10 +567,12 @@ class LLMConvert(ConvertOp):
             for idx, js in enumerate(records_json)
         ]
 
+        total_time = time.time() - start_time
         record_op_stats_lst = self._create_record_op_stats_lst(
             records=drs,
             fields=fields_to_generate,
-            query_stats=query_stats,
+            generation_stats=query_stats,
+            total_time=total_time,
         )
 
         return drs, record_op_stats_lst
@@ -596,7 +580,7 @@ class LLMConvert(ConvertOp):
 
 class LLMConvertConventional(LLMConvert):
 
-    def convert(self, candidate_content: Union[str, List[bytes]], fields: List[str]) -> Tuple[List[RecordJSONObjects], StatsDict]:
+    def convert(self, candidate_content: Union[str, List[bytes]], fields: List[str]) -> Tuple[dict[List], StatsDict]:
         fields_answers = {}
         fields_stats = {}
 
@@ -607,7 +591,7 @@ class LLMConvertConventional(LLMConvert):
                 content=candidate_content,
                 prompt=prompt,
             )          
-            fields_answers[field_name] = json_answer
+            fields_answers.update(json_answer)
             fields_stats[field_name] = field_stats
 
         return fields_answers, fields_stats

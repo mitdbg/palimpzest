@@ -162,7 +162,7 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         marshal_time = time.time() - self.start_time
         query_stats["total_time"] = marshal_time # TODO this is not correct
         # compute the record_op_stats for each data record and return
-        record_op_stats_lst = self._create_record_op_stats_lst(records=drs, fields=fields_to_generate, query_stats=query_stats)
+        record_op_stats_lst = self._create_record_op_stats_lst(records=drs, fields=fields_to_generate, generation_stats=query_stats)
 
         # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
         #       keep an eye out for a regression in code synth performance and revert if necessary
@@ -275,7 +275,7 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
 
         # compute the record_op_stats for each data record and return
         record_op_stats_lst = self._create_record_op_stats_lst(
-            drs, fields_to_generate, query_stats
+            drs, fields_to_generate, generation_stats=query_stats
         )
 
         return drs, record_op_stats_lst

@@ -22,7 +22,7 @@ class LLMBondedQueryConvert(convert.LLMConvert):
         json_answers, field_stats = self._dspy_generate_fields(fields_to_generate=fields, content=candidate_content, prompt=prompt)
 
         # if there was an error, execute a conventional query
-        if all([v is None for v in json_answers.values()]):
+        if all([v == [] for v in json_answers.values()]):
             print("Falling back to conventional conversion")
             conventional_op = type('LLMFallback',
                                     (convert.LLMConvertConventional,),

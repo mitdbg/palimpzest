@@ -28,7 +28,7 @@ class GenerationStats:
     total_output_cost: float = 0.0
 
     # the total cost of processing the output tokens; None if this operation did not use an LLM
-    total_cost: float = 0.0
+    cost_per_record: float = 0.0
 
     # (if applicable) the time (in seconds) spent executing a call to an LLM
     llm_call_duration_secs: float = 0.0
@@ -38,15 +38,18 @@ class GenerationStats:
 
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
 #        self.raw_answers.extend(other.raw_answers)
-        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost','total_cost','llm_call_duration_secs', 'fn_call_duration_secs']:
+        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost','cost_per_record','llm_call_duration_secs', 'fn_call_duration_secs']:
             setattr(self, field, getattr(self, field) + getattr(other, field))
         return self
 
     def __add__(self, other: GenerationStats) -> GenerationStats:
-        dct = {field: getattr(self, field) + getattr(other, field) for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'llm_call_duration_secs', 'fn_call_duration_secs', 'total_cost']}
+        dct = {field: getattr(self, field) + getattr(other, field) for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'llm_call_duration_secs', 'fn_call_duration_secs', 'cost_per_record']}
         # dct['raw_answers'] = self.raw_answers + other.raw_answers
         dct['model_name'] = self.model_name      
         return GenerationStats(**dct)
+    
+    def __radd__(self, other: GenerationStats) -> GenerationStats:
+        return self
     
     # Do the same as iadd and add but with division operator
     def __itruediv__(self, quotient: float) -> GenerationStats:
@@ -54,7 +57,7 @@ class GenerationStats:
             raise ZeroDivisionError("Cannot divide by zero")
         if isinstance(quotient, int):
             quotient = float(quotient)
-        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost','total_cost','llm_call_duration_secs', 'fn_call_duration_secs']:
+        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost','cost_per_record','llm_call_duration_secs', 'fn_call_duration_secs']:
             setattr(self, field, getattr(self, field) / quotient)
         return self
     
@@ -63,7 +66,7 @@ class GenerationStats:
             raise ZeroDivisionError("Cannot divide by zero")
         if isinstance(quotient, int):
             quotient = float(quotient)
-        dct = {field: getattr(self, field) / quotient for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'llm_call_duration_secs', 'fn_call_duration_secs', 'total_cost']}
+        dct = {field: getattr(self, field) / quotient for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'llm_call_duration_secs', 'fn_call_duration_secs', 'cost_per_record']}
         dct['model_name'] = self.model_name      
         return GenerationStats(**dct)
     

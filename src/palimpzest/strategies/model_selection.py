@@ -39,7 +39,7 @@ class ModelSelectionFilterStrategy(ModelSelectionStrategy):
                 available_models: List[Model],
                 prompt_strategy: PromptStrategy,
                 *args, **kwargs) -> List[physical.PhysicalOperator]:
-        super(cls, ModelSelectionFilterStrategy).__new__(cls, available_models, prompt_strategy=PromptStrategy.DSPY_COT_BOOL) # TODO hardcode for now 
+        return super(cls, ModelSelectionFilterStrategy).__new__(cls, available_models, prompt_strategy=PromptStrategy.DSPY_COT_BOOL) # TODO hardcode for now 
     
 class ModelSelectionConvertStrategy(ModelSelectionStrategy):
     """

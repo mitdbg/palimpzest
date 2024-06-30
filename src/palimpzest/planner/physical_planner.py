@@ -79,6 +79,7 @@ class PhysicalPlanner(Planner):
                                        token_budgets=[0.1, 0.5, 0.9],)
                         self.logical_physical_map.get(logical_op, []).extend(ops)
 
+        self.hardcoded_functions = [x for x in logical_physical_map[pz_ops.ConvertScan] if isinstance(x, pz.HardcodedConvert)]
         # print("Available strategies")
         # print(physical_strategies.REGISTERED_STRATEGIES)
         print("Map for Convert")
@@ -112,6 +113,17 @@ class PhysicalPlanner(Planner):
                 if self.useStrategies:
                     op_class: PhysicalOperator = None
                     for op in self.logical_physical_map[type(logical_op)]:
+                        hardcoded_fns = [x for x in self.hardcoded_functions if x.implements(logical_op)]
+                        if len(hardcoded_fns) > 0:                                                    
+                            for op_class in hardcoded_fns:
+                                op = op_class(
+                                        inputSchema=logical_op.inputSchema,
+                                        outputSchema=logical_op.outputSchema,
+                                        query_strategy = QueryStrategy.BONDED_WITH_FALLBACK,
+                                        shouldProfile=shouldProfile,
+                                    )
+                            break
+
                         if op in [LLMConvert]:
                             continue
                         if op.issubclass(TokenReducedConvert):

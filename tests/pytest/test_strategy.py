@@ -48,13 +48,14 @@ def test_conventional_convert(email_schema):
     emails = pz.Dataset("enron-eval-tiny", schema=email_schema)
         
     scanOp = MarshalAndScanDataOp(outputSchema=pz.File, dataset_type="dir", shouldProfile=True)
+    hardcodedOp = ConvertFileToText(inputSchema=pz.File, outputSchema=pz.TextFile, shouldProfile=True)
     op_class = type('LLMConvert', 
-                    (LLMBondedQueryConvert,), 
+                    (LLMConvertConventional,), 
                     {'model': model, 
                      "prompt_strategy": PromptStrategy.DSPY_COT_QA})
     convertOp = op_class(
         inputSchema=pz.File, 
-        outputSchema=email_schema, 
+        outputSchema=email_schema,
         shouldProfile=True)
  
     datasource = DataDirectory().getRegisteredDataset("enron-eval-tiny")
@@ -65,8 +66,9 @@ def test_conventional_convert(email_schema):
     # run DataSourcePhysicalOp on record
 
     outputs = []
-    for idx in range(3):
-        record, _ = scanOp(candidate)
+    records, _ = scanOp(candidate)
+    for record in records:
+        record, _ = hardcodedOp(record)
         output, _ = convertOp(record[0])
         outputs.extend(output)
 
