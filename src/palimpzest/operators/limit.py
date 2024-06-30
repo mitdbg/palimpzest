@@ -10,6 +10,7 @@ from typing import List
 
 class LimitScanOp(PhysicalOperator):
     implemented_op = logical.LimitScan
+    final = True
 
     def __init__(
         self,

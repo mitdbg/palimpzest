@@ -429,33 +429,30 @@ class LLMConvert(ConvertOp):
             answer, query_stats = generator.generate(context=content, question=prompt)
         except Exception as e:
             print(f"DSPy generation error: {e}")
-            return {field_name: [] for field_name in fields_to_generate}, query_stats
+            return {field_name: [] for field_name in fields_to_generate}, {}
 
         try:
             json_answer = getJsonFromAnswer(answer)
         except Exception as e:
             print(f"Error extracting json objects: {str(e)}")
-            return {field_name: [] for field_name in fields_to_generate}, query_stats
+            return {field_name: [] for field_name in fields_to_generate}, {}
 
         if json_answer == {}:
             print(f"No output was found!")
-            return {field_name: [] for field_name in fields_to_generate}, query_stats
+            return {field_name: [] for field_name in fields_to_generate}, {}
 
         # get output into iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
         if self.cardinality == Cardinality.ONE_TO_MANY:
-            assert "items" in json_answer, "malformatted one-to-many output"
             assert isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0, "No output objects were generated for one-to-many query"
-            json_objects = json_answer["items"]
+            # json_answer["items"] is a list of dictionaries, each of which contains the generated fields
+            for field in fields_to_generate:
+                field_answers[field] = []
+                for item in json_answer["items"]:
+                    field_answers[field].append(item[field])
         else:
-            json_objects = [json_answer]
+            field_answers = {field:[json_answer[field]] for field in fields_to_generate}
 
-        # standardize output to be {"field1": [...], "field2": [...]}
-        standardized_json_output = {field: [] for field in fields_to_generate}
-        for json_object in json_objects:
-            for field, value in json_object.items():
-                standardized_json_output[field].append(value)
-
-        return standardized_json_output, query_stats
+        return field_answers, query_stats
 
     def convert(self, candidate_content: Union[str,List[bytes]] , fields: List[str]) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
         if self.cardinality == Cardinality.ONE_TO_MANY:
@@ -553,4 +550,5 @@ class LLMConvertConventional(LLMConvert):
             fields_answers.update(json_answer)
             fields_stats[field_name] = field_stats
 
+        print(field_stats)
         return fields_answers, fields_stats

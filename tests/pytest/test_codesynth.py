@@ -26,7 +26,6 @@ def test_codesynth(email_schema):
     records, plan, stats= Execute(emails, 
                                   policy=pz.MinCost(),
                                   available_models=available_models,
-                                  useStrategies=True,
                                   allow_bonded_query=False,
                                   allow_model_selection=False,
                                   allow_code_synth=True,

@@ -404,7 +404,7 @@ class DSPyGenerator(BaseGenerator):
             "total_output_tokens": output_tokens,
             "total_input_cost": input_tokens * usd_per_input_token,
             "total_output_cost": output_tokens * usd_per_output_token,
-            "total_cost": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
             # "prompt": dspy_lm.history[-1]["prompt"],
             # "usage": usage,
             # "finish_reason": finish_reason,

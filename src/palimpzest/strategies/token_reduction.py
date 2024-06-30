@@ -183,6 +183,7 @@ class TokenReductionStrategy(PhysicalOpStrategy):
                                             (op_class,),
                                             {'model': model,
                                             'prompt_strategy': prompt_strategy,
+                                            'final': True,
                                             'token_budget': token_budget})
                     return_operators.append(physical_op_type)
 

@@ -15,6 +15,7 @@ FieldName = str
 StatsDict = Dict[str, Any]
 
 class LLMBondedQueryConvert(convert.LLMConvert):
+    final = True
 
     def convert(self, 
                 candidate_content,

@@ -76,6 +76,7 @@ class ConvertFileToText(HardcodedConvert):
 
     inputSchema = schemas.File
     outputSchema = schemas.TextFile
+    final = True
 
     def __call__(self, candidate: DataRecord):
         start_time = time.time()
@@ -103,6 +104,7 @@ class ConvertImageToEquation(HardcodedConvert):
 
     inputSchema = schemas.ImageFile
     outputSchema = schemas.EquationImage
+    final = True
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         cardinality = (
@@ -158,6 +160,7 @@ class ConvertDownloadToFile(HardcodedConvert):
 
     inputSchema = schemas.Download
     outputSchema = schemas.File
+    final = True
 
     def __call__(self, candidate: DataRecord):
         start_time = time.time()
@@ -186,6 +189,7 @@ class ConvertFileToXLS(HardcodedConvert):
 
     inputSchema = schemas.File
     outputSchema = schemas.XLSFile
+    final = True
 
     def __call__(self, candidate: DataRecord):
         start_time = time.time()
@@ -220,6 +224,7 @@ class ConvertXLSToTable(HardcodedConvert):
 
     inputSchema = schemas.XLSFile
     outputSchema = schemas.Table
+    final = True
 
     def __call__(self, candidate: DataRecord):
         start_time = time.time()
@@ -273,6 +278,7 @@ class ConvertXLSToTable(HardcodedConvert):
 class ConvertFileToPDF(HardcodedConvert):
     inputSchema = schemas.File
     outputSchema = schemas.PDFFile
+    final = True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -72,6 +72,7 @@ class SimpleExecution(ExecutionEngine):
             allow_code_synth: bool=True,
             allow_token_reduction: bool=True,
             execution_strategy: bool=ExecutionStrategy.SINGLE_THREADED,
+            useParallelOps: bool=False,
             max_workers: Optional[int]=None,
             *args, **kwargs
         ) -> None:
@@ -93,6 +94,7 @@ class SimpleExecution(ExecutionEngine):
         if self.max_workers is None and self.execution_strategy == ExecutionStrategy.PARALLEL:
             self.max_workers = self.set_max_workers()
         self.datadir = DataDirectory()
+        self.useParallelOps = useParallelOps
 
     def set_source_dataset_id(self, dataset: Set) -> str:
         """
@@ -156,7 +158,6 @@ class SimpleExecution(ExecutionEngine):
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
             useParallelOps=self.useParallelOps,
-            useStrategies=True,
         )
 
         if run_sentinels:
@@ -229,7 +230,7 @@ class SimpleExecution(ExecutionEngine):
         #     )
         # )
         with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
-            max_workers_per_plan = max(self.max_workers / len(num_sentinel_plans), 1)
+            max_workers_per_plan = max(self.max_workers / num_sentinel_plans, 1)
             results = list(executor.map(lambda x: self.execute_plan(*x),
                     [(plan, idx, PlanType.SENTINEL, max_workers_per_plan) for idx, plan in enumerate(sentinel_plans)],
                 )

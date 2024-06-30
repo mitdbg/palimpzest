@@ -25,7 +25,8 @@ class ModelSelectionStrategy(PhysicalOpStrategy):
             physical_op_type = type(cls.physical_op_class.__name__,
                                     (cls.physical_op_class,),
                                     {'model': model,
-                                     'prompt_strategy': prompt_strategy})
+                                     'prompt_strategy': prompt_strategy,
+                                     'final': True,})
             print(f"PHYSOPTYPE: {physical_op_type}")
             return_operators.append(physical_op_type)
 
@@ -44,6 +45,7 @@ class ModelSelectionFilterStrategy(ModelSelectionStrategy):
                 prompt_strategy: PromptStrategy,
                 *args, **kwargs) -> List[physical.PhysicalOperator]:
         return super(cls, ModelSelectionFilterStrategy).__new__(cls, available_models, prompt_strategy=PromptStrategy.DSPY_COT_BOOL) # TODO hardcode for now 
+
 class ModelSelectionConvertStrategy(ModelSelectionStrategy):
     """
     This strategy creates physical operator classes for the Conventional strategy 

@@ -55,7 +55,6 @@ class NoSentinelExecution(SimpleExecution):
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
             useParallelOps=self.useParallelOps,
-            useStrategies=True,
         )
 
         # enumerate all possible physical plans

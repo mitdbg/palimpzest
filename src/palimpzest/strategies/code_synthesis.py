@@ -284,6 +284,7 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
 
 class LLMConvertCodeSynthesisNone(LLMConvertCodeSynthesis):
     code_strategy = CodeSynthStrategy.NONE
+    final = True
 
     def _shouldSynthesize(self, *args, **kwargs):
         return False
@@ -295,6 +296,7 @@ class LLMConvertCodeSynthesisNone(LLMConvertCodeSynthesis):
 
 class LLMConvertCodeSynthesisSingle(LLMConvertCodeSynthesis):
     code_strategy = CodeSynthStrategy.SINGLE
+    final = True
 
     def _shouldSynthesize(self, num_exemplars: int=1, *args, **kwargs) -> bool:
         """ This function determines whether code synthesis 
@@ -351,7 +353,8 @@ class LLMConvertCodeSynthesisSingle(LLMConvertCodeSynthesis):
 # NOTE A nicer truly class based approach would re-implement the code_synth_single method with calls to __super__ and then only re-implement the differences instead of having the code in the superclass know about the subclass-specific parameters (i.e., advice).
 class LLMConvertCodeSynthesisExampleEnsemble(LLMConvertCodeSynthesisSingle):
     code_strategy = CodeSynthStrategy.EXAMPLE_ENSEMBLE
-    
+    final = True
+
     def _shouldSynthesize(self, num_exemplars: int=1, *args, **kwargs) -> bool:
         if len(self.exemplars) <= num_exemplars:
             return False
@@ -379,6 +382,7 @@ class LLMConvertCodeSynthesisExampleEnsemble(LLMConvertCodeSynthesisSingle):
 
 class LLMConvertCodeSynthesisAdviceEnsemble(LLMConvertCodeSynthesisSingle):
     code_strategy = CodeSynthStrategy.ADVICE_ENSEMBLE
+    final = True
 
     def _shouldSynthesize(self, *args, **kwargs):
         return False
@@ -451,6 +455,7 @@ class LLMConvertCodeSynthesisAdviceEnsemble(LLMConvertCodeSynthesisSingle):
 
 class LLMConvertCodeSynthesisAdviceEnsembleValidation(LLMConvertCodeSynthesisSingle):
     code_strategy = CodeSynthStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION
+    final = True
 
     def _shouldSynthesize(self, code_regenerate_frequency:int = 200, *args, **kwargs):
         return len(self.exemplars) % code_regenerate_frequency == 0
@@ -467,6 +472,7 @@ class CodeSynthesisConvertStrategy(PhysicalOpStrategy):
 
     logical_op_class = logical.ConvertScan
     physical_op_class = LLMConvertCodeSynthesis
+    final = True
 
     code_strategy_map = {
         CodeSynthStrategy.NONE: LLMConvertCodeSynthesisNone,

@@ -86,11 +86,13 @@ class FilterOp(PhysicalOperator):
 
 class NonLLMFilter(FilterOp):
     implemented_op = logical.FilteredScan
+    final = True
 
-    def implements(cls, logical_operator_class):
-        if logical_operator_class == cls.implemented_op:
-            return isinstance(logical_operator_class.filter, callable)
-        return False
+    # @classmethod
+    # def implements(cls, logical_operator_class):
+        # if logical_operator_class == cls.implemented_op:
+            # return isinstance(logical_operator_class.filter, callable)
+        # return False
 
     def __eq__(self, other: NonLLMFilter):
         return (
@@ -153,11 +155,16 @@ class LLMFilter(FilterOp):
     implemented_op = logical.FilteredScan
     model = None
     prompt_strategy = PromptStrategy.DSPY_COT_BOOL
-
+   
+    @classmethod
     def implements(cls, logical_operator_class):
-        if logical_operator_class == cls.implemented_op:
+        if not logical_operator_class == cls.implemented_op:
+            return False
+        # logical_operator is a class
+        if isinstance(logical_operator_class, type): 
+            return logical_operator_class == cls.implemented_op
+        else:
             return isinstance(logical_operator_class.filter, str)
-        return False
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
