@@ -425,9 +425,10 @@ class ImageTextGenerator(BaseGenerator):
     Class for generating field descriptions for an image with a given image model.
     """
 
-    def __init__(self, model_name: str):
+    def __init__(self, model_name: str, verbose: bool = False):
         super().__init__()
         self.model_name = model_name
+        self.verbose = verbose
 
     def _decode_image(self, base64_string: str) -> bytes:
         return base64.b64decode(base64_string)
@@ -566,12 +567,13 @@ class ImageTextGenerator(BaseGenerator):
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
         after=log_attempt_number,
     )
-    def generate(self, base64_images: str, prompt: str) -> GenerationOutput:
+    def generate(self, context: List[bytes], question: str) -> GenerationOutput:
+        # NOTE: context is list of base64 images and question is prompt
         # fetch model client
         client = self._get_model_client()
 
         # create payload
-        payloads = self._make_payloads(prompt, base64_images)
+        payloads = self._make_payloads(question, context)
 
         # generate response
         if self.verbose:
@@ -613,14 +615,13 @@ class ImageTextGenerator(BaseGenerator):
 
 # TODO: refactor this to have a CodeSynthGenerator
 def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose:bool=False):
-    start_time = time.time()
     inputs = {field_name: candidate_dict[field_name] for field_name in api.inputs}
     response = api.api_execute(code, inputs)
     pred = response['response'] if response['status'] and response['response'] else None
     return pred
 
 # Temporarily set default verbose to True for debugging
-def codeEnsembleExecution(api: API, code_ensemble: List[Dict[str, str]], candidate_dict: Dict[str, Any], verbose: bool=True) -> Tuple[DataRecord, Dict]:
+def codeEnsembleExecution(api: API, code_ensemble: List[Dict[str, str]], candidate_dict: Dict[str, Any], verbose: bool=True) -> GenerationOutput:
     start_time = time.time()
     preds = list()
     for _, code in code_ensemble.items():

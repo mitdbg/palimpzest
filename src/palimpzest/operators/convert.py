@@ -80,13 +80,6 @@ class LLMConvert(ConvertOp):
         if self.cardinality == Cardinality.ONE_TO_MANY:
             assert self.query_strategy != QueryStrategy.CODE_GEN_WITH_FALLBACK, "Cannot run code-synthesis on one-to-many operation"
 
-        # optimization-specific attributes
-        self.heatmap_json_obj = None
-        self.field_to_code_ensemble = None
-        self.exemplars = None
-        self.code_synthesized = False
-        self.gpt4_llm = CustomGenerator(model_name=Model.GPT_4.value)
-
         # use image model if this is an image conversion
         if self.outputSchema == ImageFile and self.inputSchema == File or self.image_conversion:
             # TODO : find a more general way by llm provider
@@ -354,7 +347,7 @@ class LLMConvert(ConvertOp):
                 op_name=self.op_name(),
                 time_per_record=total_time / len(records),
                 cost_per_record=per_record_stats.cost_per_record,
-                model_name=self.model.value,
+                model_name=getattr(self, "model", None),
                 answer={field_name: getattr(dr, field_name) for field_name in fields},
                 input_fields=self.inputSchema.fieldNames(),
                 generated_fields=fields,
@@ -383,7 +376,9 @@ class LLMConvert(ConvertOp):
         # TODO: This inherits all pre-computed fields in an incremental fashion. The positive / pros of this approach is that it enables incremental schema computation, which tends to feel more natural for the end-user. The downside is it requires us to support an explicit projection to eliminate unwanted input / intermediate computation.
         #
         # first, copy all fields from input schema
-        for field_name in candidate.getFields():
+        # NOTE: the method is called _getFields instead of getFields to avoid it being picked up as a data record attribute;
+        #       in the future we will come up with a less ugly fix -- but for now do not remove the _ even though it's not private
+        for field_name in candidate._getFields():
             setattr(dr, field_name, getattr(candidate, field_name, None))
 
         # get input field names and output field names
@@ -406,7 +401,6 @@ class LLMConvert(ConvertOp):
         """ 
         This functions gets a string answer and parses it into an iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
         # """
-        
         try:
             json_answer = getJsonFromAnswer(answer)
             assert json_answer != {}, "No output was found!"
@@ -414,6 +408,7 @@ class LLMConvert(ConvertOp):
             print(f"Error parsing answer: {e}")
             json_answer = {field_name: [] for field_name in fields_to_generate}
 
+        field_answers = {}
         if self.cardinality == Cardinality.ONE_TO_MANY:
             assert (
                 isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0
@@ -427,15 +422,15 @@ class LLMConvert(ConvertOp):
             field_answers = {
                 field: [json_answer[field]] for field in fields_to_generate
             }
+
         return field_answers
 
     def _dspy_generate_fields(
         self,
-        fields_to_generate: List[str],
         prompt: str,
         content: Optional[Union[str, List[bytes]]] = None, #either text or image
         verbose: bool = False,
-    ) -> Tuple[str, StatsDict]:
+    ) -> Tuple[str, GenerationStats]:
         """ This functions wraps the call to the generator method to actually perform the field generation. Returns an answer which is a string and a query_stats which is a GenerationStats object.
         """
         # create DSPy generator and generate
@@ -458,8 +453,8 @@ class LLMConvert(ConvertOp):
             answer, query_stats = generator.generate(context=content, question=prompt)
         except Exception as e:
             print(f"DSPy generation error: {e}")
-            return ""
-        
+            return "", GenerationStats()
+
         return answer, query_stats
 
     def convert(self, candidate_content: Union[str,List[bytes]] , fields: List[str]) -> Tuple[Dict[str, List], StatsDict]:
@@ -502,7 +497,6 @@ class LLMConvert(ConvertOp):
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
-
         n_records = max([len(lst) for lst in field_answers.values()])
         records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
 
@@ -540,7 +534,6 @@ class LLMConvertConventional(LLMConvert):
         for field_name in fields:
             prompt = self._construct_query_prompt(fields_to_generate=[field_name])
             answer, stats = self._dspy_generate_fields(
-                fields_to_generate=[field_name],
                 content=candidate_content,
                 prompt=prompt,
             )
