@@ -55,9 +55,9 @@ class QueryStrategy(str, Enum):
     CODE_GEN = "code-gen"
     CODE_GEN_WITH_FALLBACK = "codegen-with-fallback"
 
-class CodeSynthStrategy(str, Enum):
+class CodingStrategy(str, Enum):
     """
-    CodeSynthStrategy describes the high-level approach to generating code.
+    CodingStrategy describes the high-level approach to generating code.
     in order to perform a specified task.
     """
     # DEFAULT = "single"

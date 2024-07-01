@@ -4,160 +4,212 @@ import time
 from typing import List
 from palimpzest.constants import Model
 from palimpzest.generators.dspy_utils import gen_filter_signature_class, gen_qa_signature_class
+from palimpzest.generators.generators import DSPyGenerator
+from palimpzest.utils.generation_helpers import getJsonFromAnswer
 from .strategy import PhysicalOpStrategy
-from palimpzest.profiler.attentive_trim import find_best_range, trim_context, update_heatmap_json, best_substring_match
 
+from palimpzest.strategies.bonded_query import LLMBondedQueryConvert
 from palimpzest.constants import *
 from palimpzest.elements import *
 from palimpzest.operators import logical, physical, convert
+from fuzzywuzzy import process, fuzz
+
+def find_best_range(values, budget, trim_zeros=False):
+    """
+    Finds the consecutive range with the biggest sum within a budget.
+
+    Args:
+        values: A list of non-negative numbers.
+        budget: The maximum number of consecutive elements to consider.
+
+    Returns:
+        A tuple containing the start and end indices (inclusive) of the best range,
+        or None if the array is empty.
+    """
+    if not values:
+        return None
+
+    n = len(values)
+    best_sum, best_start, current_sum, current_start = 0, 0, 0, 0
+
+    # Iterate through the array, keeping track of current and best ranges.
+    for i in range(n):
+        current_sum += values[i]
+
+        # If the current range exceeds the budget, remove elements from the beginning.
+        while current_start + budget - 1 < i and current_start + budget - 1 >= 0:
+            current_sum -= values[current_start]
+            current_start += 1
+
+        # Update best range if the current sum is bigger.
+        if current_sum > best_sum:
+            best_sum = current_sum
+            best_start = current_start
+
+    best_end = best_start + budget - 1
+    print("best_start:", best_start, "best_end:", best_end)
+    if trim_zeros:
+        # Trim leading/trailing zeros
+        while best_start >= 0 and values[best_start] == 0:
+            best_start += 1
+
+        while best_end < n and values[best_end] == 0:
+            best_end -= 1
+    else:
+        # balance the zero entries equally on both sides
+        leading_zeros = 0
+        trailing_zeros = 0
+        start_idx = best_start
+        end_idx = best_end
+        while start_idx >= 0 and values[start_idx] == 0:
+            leading_zeros += 1
+            start_idx += 1
+        while end_idx < n and values[end_idx] == 0:
+            trailing_zeros += 1
+            end_idx -= 1
+        half_zeros = int((leading_zeros + trailing_zeros) / 2)
+        print("leading_zeros:", leading_zeros, "trailing_zeros:", trailing_zeros, "half_zeros:", half_zeros)
+        best_start = best_start - half_zeros + leading_zeros
+        best_end = best_end - trailing_zeros + leading_zeros + trailing_zeros - half_zeros
+
+        if best_start < 0:
+            best_end = best_end - best_start
+            best_start = 0
+        if best_end >= n:
+            best_start = best_start - (best_end - n + 1)
+            best_end = n - 1
+
+    return best_start, best_end + 1
+
+
+def get_range_from_hist(file_path, range_budget, resolution=0.001, trim_zeros=True):
+    # Load data from csv file and extract he second column as values
+    values = []
+    with open(file_path, "r") as file:
+        for line in file:
+            line = line.strip()
+            values.append(int(float(line.split(",")[1])))
+    index_range = 1 / resolution
+    budget = int(range_budget * index_range)
+    # Find the best range
+    start, end = find_best_range(values, budget, trim_zeros=trim_zeros)
+    print("start:", start, "end:", end, "index_range:", index_range)
+    return start * 1.0 / index_range, end * 1.0 / index_range
+
+def best_substring_match(query, context):
+    # This will extract all substrings of length equal to the query from the string
+    candidates = [context[i:i + len(query)] for i in range(len(context) - len(query) + 1)]
+    print("grd:", query)
+    # Find the best match among the candidates
+    ret = process.extractOne(query, candidates, scorer=fuzz.ratio)
+    if ret is None:
+        return None
+
+    best_match, score = ret
+    positions = [can == best_match for can in candidates]
+    start = positions.index(True)
+    end = start + len(query)
+    # print("best match:", best_match, "score:", score, "start:", start, "end:", end)
+    # print("-------", string[start:end])
+    return start, end
 
 class TokenReducedConvert(convert.LLMConvert):
     token_budget: float
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.heatmap_dict = None
+        self.heatmap_dict = {}
+        self.resolution = TOKEN_REDUCTION_GRANULARITY
+        self.first_execution = True
 
-    def reduce_context(self, question:str, full_context: str) -> str:
+    def reduce_context(self, heatmap:List[int], full_context: str) -> str:
         if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-            heatmap = self.heatmap_dict["heatmap"]
-            count = self.heatmap_dict["count"]
-            # if self.verbose: # TODO not sure this exists
-            print(f"count: {count}")
-
-            # only refer to the heatmap if the count is greater than a enough sample size
-            # TODO: only trim the context if the attention is clustered in a small region
-            if count >= TOKEN_REDUCTION_SAMPLE:
-                si, ei = find_best_range(
-                    heatmap,
-                    int(self.token_budget / TOKEN_REDUCTION_GRANULARITY),
-                    trim_zeros=False,
-                )
-                sr, er = (
-                    si * TOKEN_REDUCTION_GRANULARITY,
-                    ei * TOKEN_REDUCTION_GRANULARITY,
-                )
-                self._print_verbose(f"start ratio: {sr} -- end ratio: {er}")
-                return trim_context(full_context, sr, er)
+            si, ei = find_best_range(
+                heatmap,
+                int(self.token_budget / TOKEN_REDUCTION_GRANULARITY),
+                trim_zeros=False,
+            )
+            print("si:", si, "ei:", ei)
+            sr, er = (
+                si * TOKEN_REDUCTION_GRANULARITY,
+                ei * TOKEN_REDUCTION_GRANULARITY,
+            )
+            test_len = len(full_context)
+            start = int(sr * test_len)
+            end = int(er * test_len)
+            if self.verbose:
+                print(f"start ratio: {sr} -- end ratio: {er}")
+                print("character start:", start, "end:", end)
+            sample = full_context[start:end]
+            return sample
     
         else:
             raise NotImplementedError("Token reduction is only supported for DSPY_COT_QA prompts")
 
+    def _dspy_generate_fields(self, fields_to_generate: List[str], prompt: str, content: str | List[bytes] | None = None, verbose: bool = False) -> physical.Tuple[List[logical.Dict[str, List]] | Any]:
 
-class TokenReducedConventionalConvert(TokenReducedConvert):
+        full_context = content
+        if self.first_execution or self.heatmap_dict["count"] < MAX_HEATMAP_UPDATES:
+            print("Falling back to unreduced generation")
+            answer, query_stats = super()._dspy_generate_fields(fields_to_generate, prompt, full_context, verbose)
+            self.first_execution = False
+            # create the heatmap structure with default resolution of 0.001 and count of 0
+            self.heatmap_dict = {
+                "count": 0,
+                "heatmap": [0] * int(1.0 / self.resolution),
+            }
+        else:
+            doc_schema = str(self.outputSchema)
+            doc_type = self.outputSchema.className()
 
-
-    def convert(self, candidate_content, fields) -> None:
-
-        doc_schema = str(self.outputSchema)
-        doc_type = self.outputSchema.className()
-
-        if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
-            promptSignature = gen_filter_signature_class(doc_schema, doc_type)
-        elif self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-            promptSignature = gen_qa_signature_class(doc_schema, doc_type)
-
-        reduction = False
-        start_time = time.time()
-        field_outputs, query_stats = {}, {}
-        for field_name in fields:
-            full_prompt = self._construct_query_prompt(fields_to_generate=[field_name])
-            # The first time we see a prompt, we need to generate the heatmap
-            if self.heatmap_dict is None:
-                # create the heatmap structure with default resolution of 0.001 and count of 0
-                buckets = int(1.0 / TOKEN_REDUCTION_GRANULARITY)
-                hist = [0] * buckets
-                heatmap_dict = {
-                    "prompt_schema": f"{promptSignature}",
-                    "question": field_name,
-                    "resolution": TOKEN_REDUCTION_GRANULARITY,
-                    "count": 0,
-                    "heatmap": hist,
-                }
-                self.heatmap_dict = heatmap_dict
-                prompt = full_prompt
-            else:
-                reduction = True
-                prompt = self.reduce_context(question=field_name, full_context=candidate_content)
-    
-
-            json_objects, field_stats = self._dspy_generate_fields(fields_to_generate=[field_name], content=candidate_content, prompt=prompt)
-            if reduction and field_stats['answer'] is None:
-                json_objects, new_stats = self._dspy_generate_fields(fields_to_generate=[field_name], content=candidate_content, prompt=full_prompt)
-
-                field_stats["llm_call_duration_secs"] += new_stats["llm_call_duration_secs"]
-                for k, _ in new_stats['usage'].items():
-                    field_stats['usage'][k] += new_stats['usage'][k]
-                field_stats['cost_per_record'] += new_stats['cost_per_record']
-                field_stats['finish_reason'] = new_stats['finish_reason']
-                field_stats['answer_log_probs'] = new_stats['answer_log_probs']
-                field_stats['answer'] = new_stats['answer']
-
-            if self.prompt_strategy == PromptStrategy.DSPY_COT_QA and self.heatmap_dict["count"] < MAX_HEATMAP_UPDATES:
-                if self.verbose: # TODO not sure this exists
-                    print("Reduction enabled")
-                    print(f"answer: {field_stats['answer']}")
-                try:
-                    gsi, gei = best_substring_match(field_stats['answer'], full_prompt)
-                except Exception as e:
-                    print("Error in substring match:", e)
-                    gsi, gei = 0, len(full_prompt)
-
-                context_len = len(full_prompt)
-                gsr, ger = gsi / context_len, gei / context_len
-                norm_si, norm_ei = int(gsr / TOKEN_REDUCTION_GRANULARITY), int(
-                    ger / TOKEN_REDUCTION_GRANULARITY
+            if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
+                promptSignature = gen_filter_signature_class(doc_schema, doc_type)
+                generator = DSPyGenerator(
+                    self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
                 )
-                if self.verbose:
-                    print(f"best_start: {gsi} -- best_end: {gei}")
+            else:
+                raise Exception(f"Token reduction not implemented for {self.prompt_strategy}")
 
-                self.heatmap_dict = update_heatmap_json(self.heatmap_dict, norm_si, norm_ei)
+            heatmap = self.heatmap_dict["heatmap"]
+            count = self.heatmap_dict["count"]
+            # only refer to the heatmap if the count is greater than a enough sample size
+            # TODO: only trim the context if the attention is clustered in a small region
+            if count >= TOKEN_REDUCTION_SAMPLE:
+                context = self.reduce_context(heatmap, full_context)
+                try:
+                    answer, query_stats = generator.generate(context=context, question=prompt)
+                except Exception as e:
+                    print(f"DSPy generation error: {e}, falling back to unreduced generation")
+                    answer, query_stats = super()._dspy_generate_fields(fields_to_generate, prompt, content, verbose)
 
-            for key, value in field_stats.items():
-                # TODO maybe a better way to find which stats to aggregate?
-                if type(value) == type(dict()):
-                    for k2, v2 in value.items():
-                        # Should we simply throw the usage away here?
-                        query_stats[k2] = query_stats.get(k2,type(v2)()) + v2 
-                else:
-                    query_stats[key] = query_stats.get(key, type(value)()) + value
-            field_outputs[field_name] = json_objects
+        try:
+            gsi, gei = best_substring_match(answer, full_context)
+        except Exception as e:
+            print("Error in substring match:", e)
+            gsi, gei = 0, len(full_context)
+        context_len = len(full_context)
+        gsr, ger = gsi / context_len, gei / context_len
+        norm_si, norm_ei = int(gsr/self.resolution), int(ger/self.resolution)
+        if verbose:
+            print(f"best_start: {gsi} -- best_end: {gei}")
 
-        query_stats["total_time"] = time.time() - start_time
-        return field_outputs, query_stats
+        self.heatmap_dict["count"] += 1
+        self.heatmap_dict["heatmap"][norm_si:norm_ei] = map(lambda x: x+1, self.heatmap_dict["heatmap"][norm_si:norm_ei])
+        
+        return answer, query_stats
 
-class TokenReducedBondedQueryConvert(TokenReducedConvert):
+class TokenReducedConventionalConvert(TokenReducedConvert, convert.LLMConvertConventional):
+    pass
 
-    def convert(self, candidate_content, fields) -> None:
-        prompt = self._construct_query_prompt(fields_to_generate=fields)
-        # generate all fields in a single query
-        final_json_objects, query_stats = self._dspy_generate_fields(fields_to_generate=fields, content=candidate_content, prompt=prompt)
-
-        # if there was an error, execute a conventional query
-        if all([v is None for v in final_json_objects[0].values()]):
-            # generate each field one at a time
-            field_outputs = {}
-            for field_name in fields:
-                prompt = self._construct_query_prompt(fields_to_generate=[field_name])
-                json_objects, field_stats = self._dspy_generate_fields(fields_to_generate=[field_name], content = candidate_content, prompt=prompt)
-
-                # update query_stats
-                for key, value in field_stats.items():
-                    if type(value) == type(dict()):
-                        for k, v in value.items():
-                            query_stats[key][k] = query_stats[key].get(k,0) + value[k]
-                    else:
-                        query_stats[key] += value
-
-                # update field_outputs
-                field_outputs[field_name] = json_objects
+class TokenReducedBondedConvert(TokenReducedConvert, LLMBondedQueryConvert):
+    pass
 
 
 class TokenReductionStrategy(PhysicalOpStrategy):
 
     query_strategy_map = {
-        QueryStrategy.BONDED: TokenReducedBondedQueryConvert,
         QueryStrategy.CONVENTIONAL: TokenReducedConventionalConvert,
+        QueryStrategy.BONDED: TokenReducedBondedConvert,
         }
 
     @staticmethod

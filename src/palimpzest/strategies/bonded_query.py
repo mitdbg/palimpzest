@@ -15,7 +15,6 @@ FieldName = str
 StatsDict = Dict[str, Any]
 
 class LLMBondedQueryConvert(convert.LLMConvert):
-    final = True
 
     def convert(self, 
                 candidate_content,
@@ -24,8 +23,9 @@ class LLMBondedQueryConvert(convert.LLMConvert):
         prompt = self._construct_query_prompt(fields_to_generate=fields)
 
         # generate all fields in a single query
-        json_answers, field_stats = self._dspy_generate_fields(fields_to_generate=fields, content=candidate_content, prompt=prompt)
+        answer, field_stats = self._dspy_generate_fields(fields_to_generate=fields, content=candidate_content, prompt=prompt)
 
+        json_answers = self.parse_answer(answer, fields)
         # if there was an error, execute a conventional query
         if all([v == [] for v in json_answers.values()]):
             print("Falling back to conventional conversion")

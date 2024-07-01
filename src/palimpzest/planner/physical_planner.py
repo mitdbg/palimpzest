@@ -67,7 +67,7 @@ class PhysicalPlanner(Planner):
                     continue
                 if not self.allow_token_reduction and issubclass(strategy, physical_strategies.TokenReductionStrategy):
                     continue                    
-                if not self.allow_code_synth and issubclass(strategy, physical_strategies.CodeSynthStrategy):
+                if not self.allow_code_synth and issubclass(strategy, physical_strategies.CodeSynthesisConvertStrategy):
                     continue
 
                 if strategy.logical_op_class == logical_op:

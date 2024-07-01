@@ -26,7 +26,7 @@ class ModelSelectionStrategy(PhysicalOpStrategy):
                                     (cls.physical_op_class,),
                                     {'model': model,
                                      'prompt_strategy': prompt_strategy,
-                                     'final': True,})
+                                     })
             print(f"PHYSOPTYPE: {physical_op_type}")
             return_operators.append(physical_op_type)
 

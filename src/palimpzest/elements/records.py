@@ -49,10 +49,17 @@ class DataRecord:
         dct = {k: self.__dict__[k] for k in self.getFields()}
         if not include_bytes:
             for k in dct:
-                if isinstance(dct[k], bytes) or (
-                    isinstance(dct[k], list) and isinstance(dct[k][0], bytes)
-                ):
+                if isinstance(dct[k], bytes):
                     dct[k] = "<bytes>"
+                elif isinstance(dct[k], list):
+                    if not len(dct[k]):
+                        dct[k] = ""
+                    elif (
+                    isinstance(dct[k], list) and isinstance(dct[k][0], bytes)
+                    ):
+                        dct[k] = "<bytes>"
+                    else:
+                        dct[k] = " ".join(dct[k]) # TODO what happens with list fields?
         return dct
 
     def __str__(self):

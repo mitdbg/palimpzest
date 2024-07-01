@@ -4,6 +4,9 @@ What it does is consider one of the demo scenarios and test whether we can obtai
 
 import sys
 import pdb
+import pytest
+from palimpzest.strategies.token_reduction import *
+from palimpzest.strategies.token_reduction import TokenReducedConventionalConvert, TokenReducedBondedConvert
 
 sys.path.append("./tests/")
 sys.path.append("./tests/refactor-tests/")
@@ -25,7 +28,7 @@ from palimpzest.operators.datasource import MarshalAndScanDataOp
 from palimpzest.constants import PromptStrategy
 
 
-def test_strategy(email_schema):
+def test_strategies(email_schema):
     """Test whether strategy creation works"""
     available_models = [pz.Model.GPT_4]
 
@@ -33,24 +36,24 @@ def test_strategy(email_schema):
     records, plan, stats= Execute(emails, 
                                   policy=pz.MinCost(),
                                   available_models=available_models,
-                                  allow_bonded_query=True,
+                                  allow_bonded_query=False,
                                   allow_model_selection=False,
                                   allow_code_synth=False,
+                                  allow_token_reduction=True,
                                   execution_engine=NoSentinelExecution)
     for record in records:
         print(record.sender, record.subject)
 
 
-def test_conventional_convert(email_schema):
+
+@pytest.mark.parametrize("convert_op", [TokenReducedBondedConvert])
+def test_convert(convert_op, email_schema):
     """Test whether convert operators"""
     model = pz.Model.GPT_4
-
-    emails = pz.Dataset("enron-eval-tiny", schema=email_schema)
-        
     scanOp = MarshalAndScanDataOp(outputSchema=pz.File, dataset_type="dir", shouldProfile=True)
     hardcodedOp = ConvertFileToText(inputSchema=pz.File, outputSchema=pz.TextFile, shouldProfile=True)
     op_class = type('LLMConvert', 
-                    (LLMConvertConventional,), 
+                    (convert_op,), 
                     {'model': model, 
                      "prompt_strategy": PromptStrategy.DSPY_COT_QA})
     convertOp = op_class(

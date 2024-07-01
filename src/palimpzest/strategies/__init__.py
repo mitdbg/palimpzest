@@ -20,5 +20,6 @@ def classesinmodule(module):
 
 REGISTERED_STRATEGIES = [*classesinmodule(model_selection),
                         *classesinmodule(bonded_query),
-                        *classesinmodule(code_synthesis)]
+                        *classesinmodule(code_synthesis),
+                        *classesinmodule(token_reduction)]
 

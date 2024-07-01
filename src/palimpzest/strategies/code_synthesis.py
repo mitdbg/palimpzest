@@ -25,7 +25,7 @@ StatsDict = Dict[str, Any]
 
 class LLMConvertCodeSynthesis(convert.LLMConvert):
 
-    code_strategy: CodeSynthStrategy # Default is CodeSynthStrategy.SINGLE,
+    code_strategy: CodingStrategy # Default is CodingStrategy.SINGLE,
 
     def __init__(self, 
                 cache_across_plans: bool = True,
@@ -143,11 +143,12 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
 
         prompt = self._construct_query_prompt(fields_to_generate=fields_to_generate)
         text_content = json.dumps(candidate_dict)
-        final_json_objects, query_stats = self._dspy_generate_fields(
+        answer, query_stats = self._dspy_generate_fields(
             fields_to_generate=fields_to_generate,
             content=text_content,
             prompt=prompt
         )
+        final_json_objects = self.parse_answer(answer, fields_to_generate)
         self.model = prev_model
         self.prompt_strategy = prev_prompt_strategy
 
@@ -243,11 +244,12 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
                 self.prompt_strategy = PromptStrategy.DSPY_COT_QA
                 prompt = self._construct_query_prompt(fields_to_generate=[field_name])
                 text_content = json.dumps(candidate_dict)
-                final_json_objects, field_stats = self._dspy_generate_fields(
+                answer, field_stats = self._dspy_generate_fields(
                     fields_to_generate=[field_name],
                     content=text_content,
                     prompt=prmpy
                 )
+                final_json_objects = self.parse_answer(answer, fields_to_generate)
                 self.model = prev_model
                 self.prompt_strategy = prev_prompt_strategy
 
@@ -283,8 +285,7 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         return drs, record_op_stats_lst
 
 class LLMConvertCodeSynthesisNone(LLMConvertCodeSynthesis):
-    code_strategy = CodeSynthStrategy.NONE
-    final = True
+    code_strategy = CodingStrategy.NONE
 
     def _shouldSynthesize(self, *args, **kwargs):
         return False
@@ -295,8 +296,7 @@ class LLMConvertCodeSynthesisNone(LLMConvertCodeSynthesis):
         return code_ensemble, {}
 
 class LLMConvertCodeSynthesisSingle(LLMConvertCodeSynthesis):
-    code_strategy = CodeSynthStrategy.SINGLE
-    final = True
+    code_strategy = CodingStrategy.SINGLE
 
     def _shouldSynthesize(self, num_exemplars: int=1, *args, **kwargs) -> bool:
         """ This function determines whether code synthesis 
@@ -352,8 +352,7 @@ class LLMConvertCodeSynthesisSingle(LLMConvertCodeSynthesis):
 
 # NOTE A nicer truly class based approach would re-implement the code_synth_single method with calls to __super__ and then only re-implement the differences instead of having the code in the superclass know about the subclass-specific parameters (i.e., advice).
 class LLMConvertCodeSynthesisExampleEnsemble(LLMConvertCodeSynthesisSingle):
-    code_strategy = CodeSynthStrategy.EXAMPLE_ENSEMBLE
-    final = True
+    code_strategy = CodingStrategy.EXAMPLE_ENSEMBLE
 
     def _shouldSynthesize(self, num_exemplars: int=1, *args, **kwargs) -> bool:
         if len(self.exemplars) <= num_exemplars:
@@ -381,8 +380,7 @@ class LLMConvertCodeSynthesisExampleEnsemble(LLMConvertCodeSynthesisSingle):
         return code_ensemble, output_stats
 
 class LLMConvertCodeSynthesisAdviceEnsemble(LLMConvertCodeSynthesisSingle):
-    code_strategy = CodeSynthStrategy.ADVICE_ENSEMBLE
-    final = True
+    code_strategy = CodingStrategy.ADVICE_ENSEMBLE
 
     def _shouldSynthesize(self, *args, **kwargs):
         return False
@@ -454,8 +452,7 @@ class LLMConvertCodeSynthesisAdviceEnsemble(LLMConvertCodeSynthesisSingle):
         return code_ensemble, output_stats
 
 class LLMConvertCodeSynthesisAdviceEnsembleValidation(LLMConvertCodeSynthesisSingle):
-    code_strategy = CodeSynthStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION
-    final = True
+    code_strategy = CodingStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION
 
     def _shouldSynthesize(self, code_regenerate_frequency:int = 200, *args, **kwargs):
         return len(self.exemplars) % code_regenerate_frequency == 0
@@ -472,21 +469,20 @@ class CodeSynthesisConvertStrategy(PhysicalOpStrategy):
 
     logical_op_class = logical.ConvertScan
     physical_op_class = LLMConvertCodeSynthesis
-    final = True
 
     code_strategy_map = {
-        CodeSynthStrategy.NONE: LLMConvertCodeSynthesisNone,
-        CodeSynthStrategy.SINGLE: LLMConvertCodeSynthesisSingle,
-        CodeSynthStrategy.EXAMPLE_ENSEMBLE: LLMConvertCodeSynthesisExampleEnsemble,
-        CodeSynthStrategy.ADVICE_ENSEMBLE: LLMConvertCodeSynthesisAdviceEnsemble,
-        CodeSynthStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION: LLMConvertCodeSynthesisAdviceEnsembleValidation
+        CodingStrategy.NONE: LLMConvertCodeSynthesisNone,
+        CodingStrategy.SINGLE: LLMConvertCodeSynthesisSingle,
+        CodingStrategy.EXAMPLE_ENSEMBLE: LLMConvertCodeSynthesisExampleEnsemble,
+        CodingStrategy.ADVICE_ENSEMBLE: LLMConvertCodeSynthesisAdviceEnsemble,
+        CodingStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION: LLMConvertCodeSynthesisAdviceEnsembleValidation
     }
 
     @staticmethod
     def __new__(cls, 
                 available_models: List[Model],
                 prompt_strategy: PromptStrategy,
-                code_synth_strategy: CodeSynthStrategy = CodeSynthStrategy.SINGLE,
+                code_synth_strategy: CodingStrategy = CodingStrategy.SINGLE,
                 *args, **kwargs) -> List[physical.PhysicalOperator]:
 
         return_operators = []
@@ -500,6 +496,7 @@ class CodeSynthesisConvertStrategy(PhysicalOpStrategy):
                                     (op_class,),
                                     {'model': model,
                                      'prompt_strategy': prompt_strategy,
+                                     'final': True,
                                      })
             return_operators.append(physical_op_type)
 
