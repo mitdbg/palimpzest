@@ -13,8 +13,9 @@ from palimpzest.operators import (
 from palimpzest.operators.filter import FilterOp
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
-from palimpzest.qualityestimation import ValidationData
+from palimpzest.qualityestimation import ValidationData, QualityEstimator
 from palimpzest.utils.model_helpers import getModels, getVisionModels
+from palimpzest.datasources.datasources import DataSource
 from .cost_estimator import CostEstimator
 from palimpzest.sets import Set
 from palimpzest.utils import getChampionModelName
@@ -127,6 +128,7 @@ class SimpleExecution(ExecutionEngine):
             cache.rmCache()
 
         # set the the id of the source dataset
+        # todo(chjun): If this plan will use Cashe source, we should set it to cache source here.
         self.set_source_dataset_id(dataset)
 
         # NOTE: this checks if the entire computation is cached; it will re-run
@@ -166,8 +168,6 @@ class SimpleExecution(ExecutionEngine):
                 sentinel_plans,
                 self.verbose,
             )
-
-        print(sample_execution_data)
 
         # (re-)initialize logical and physical planner
         scan_start_idx = self.num_samples if run_sentinels else 0
@@ -238,7 +238,7 @@ class SimpleExecution(ExecutionEngine):
             map(
                 lambda x: self.execute_plan(*x),
                 [
-                    (plan, idx, PlanType.SENTINEL, self.validation_examples)
+                    (plan, PlanType.SENTINEL, idx, self.validation_examples)
                     for idx, plan in enumerate(sentinel_plans)
                 ],
             )
@@ -265,6 +265,9 @@ class SimpleExecution(ExecutionEngine):
             # find champion model plan records and add those to all_records
             if champion_model_name in plan.getPlanModelNames():
                 return_records = records
+
+        if len(sentinel_records) > 0 and len(return_records) ==0:
+            return_records = sentinel_records[0]
 
         return (
             all_sample_execution_data,
@@ -354,9 +357,6 @@ class SimpleExecution(ExecutionEngine):
         return out_records, plan_stats
 
     def _get_data_source(self, operator, validation_examples: ValidationData=None):
-        if not isinstance(operator, DataSourcePhysicalOp):
-            return None
-    
         if validation_examples is not None:
             return validation_examples.get_input()
         
@@ -385,9 +385,9 @@ class SimpleExecution(ExecutionEngine):
     def execute_dag(
         self,
         plan: PhysicalPlan,
+        plan_source: DataSource,
         plan_stats: PlanStats,
         num_samples: Optional[int] = None,
-        validation_examples: ValidationData = None,
     ):
         # TODO(chjun): When validation_examples is None and num_samples is None, this is a real run.
         #              It seems to me that we should use a more explicit way to speak this logic out.
@@ -399,7 +399,7 @@ class SimpleExecution(ExecutionEngine):
         final_output_records = []
         source_records_readout = 0
         datasource_len = 0
-        current_source_scan_idx = self.scan_start_idx if validation_examples is None else 0
+        current_source_scan_idx = self.scan_start_idx
 
         # initialize processing queues for each operation
         processing_queues = {
@@ -408,8 +408,8 @@ class SimpleExecution(ExecutionEngine):
             if not isinstance(op, DataSourcePhysicalOp)
         }
 
-        # if num_samples is not provided, or validation_examples is not None, set it to infinity
-        if num_samples is None or validation_examples is not None:
+        # if num_samples is not provided, set it to infinity
+        if num_samples is None:
             num_samples = float("inf")
 
         # execute the plan until either:
@@ -418,7 +418,6 @@ class SimpleExecution(ExecutionEngine):
         keep_scanning_source_records = True
         while keep_scanning_source_records:
             output_records_of_root_record = []
-            root_record_uuid = ""
             for op_idx, operator in enumerate(plan.operators):
                 op_id = operator.get_op_id()
 
@@ -434,12 +433,10 @@ class SimpleExecution(ExecutionEngine):
                 # TODO: if self.useParallelOps is True; execute each operator with parallelism
                 # invoke datasource operator(s) until we run out of source records
                 if isinstance(operator, DataSourcePhysicalOp):
-                    datasource = self._get_data_source(operator, validation_examples)
-                    datasource_len = len(datasource)
-                    new_dr = self._construct_datarecord(datasource, current_source_scan_idx)
+                    datasource_len = len(plan_source)
+                    new_dr = self._construct_datarecord(plan_source, current_source_scan_idx)
                     # run DataSourcePhysicalOp on record
                     output_records, record_op_stats_lst = operator(new_dr)
-                    root_record_uuid = new_dr._uuid
 
                     # update number of source records scanned and the current index
                     source_records_readout += len(output_records)
@@ -500,12 +497,6 @@ class SimpleExecution(ExecutionEngine):
                         output_records_of_root_record.append(record)
                         final_output_records.append(record)
 
-            # TODO(chjun): How to reasonably save the data into PlanStats.
-            # When one round completes, we save the output_records and the expected_records
-            if validation_examples is not None:
-                plan_stats.exe_output_details["validation-expected-"+root_record_uuid] = validation_examples.get_output()
-                plan_stats.exe_output_details["validation-real-"+root_record_uuid] = output_records_of_root_record
-
             keep_scanning_source_records = (
                 current_source_scan_idx < datasource_len
                 and source_records_readout < num_samples
@@ -532,6 +523,9 @@ class SimpleExecution(ExecutionEngine):
             plan.printPlan()
             print("---")
 
+        if len(plan.operators) == 0:
+            return [], PlanStats(plan_id=plan.plan_id())
+
         plan_start_time = time.time()
 
         # initialize plan and operator stats
@@ -548,10 +542,23 @@ class SimpleExecution(ExecutionEngine):
         #       Thus, the implementation is overkill for today's plans, but hopefully this will
         #       avoid the need for a lot of refactoring in the future.
         # execute the physical plan;
-        num_samples = self.num_samples if plan_type == PlanType.SENTINEL else None
-        output_records, plan_stats = self.execute_dag(
-            plan, plan_stats, num_samples, validation_examples
-        )
+        plan_source = self._get_data_source(plan.operators[0], validation_examples)
+        if plan_type == PlanType.SENTINEL:
+            # Ideally, num of samples should be resoved outside execute_dag(), it's clearer
+            # if we just pass the source into execute_dag(). execute_dag doesn't need to know if 
+            # it's a sentinel plan or not.
+            num_samples = self.num_samples if validation_examples is None else None
+            output_records, plan_stats = self.execute_dag(
+                plan, plan_source, plan_stats, num_samples
+            )
+            # Compute the quality score of the plan before we send it to CostEstimator as we need plan level information.
+            dr = self._construct_datarecord(validation_examples.get_output(), 0)
+            expected_records, _ = plan.operators[0](dr)
+            QualityEstimator.update_quality_score_per_op_per_record(plan_stats, output_records, expected_records)
+        else:
+            output_records, plan_stats = self.execute_dag(
+                plan, plan_source, plan_stats,
+            )
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time

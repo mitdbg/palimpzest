@@ -203,15 +203,10 @@ class CostEstimator:
             return 0
             
 
-    def _est_quality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
-        """
-        Given sample cost data observations for a specific operation, compute the an estimate
-        of the quality of its outputs by using GPT-4 as a champion model.
-        """
-        # get unique set of records
+    def _est_quality_gpt4_baseline(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
         record_uuids = op_df.record_uuid.unique()
 
-        # compute GPT-4's answer (per-record) across all models; fall-back to most common answer if GPT-4 is not present
+        # # compute GPT-4's answer (per-record) across all models; fall-back to most common answer if GPT-4 is not present
         record_uuid_to_answer = {}
         for record_uuid in record_uuids:
             record_df = op_df[op_df.record_uuid == record_uuid]
@@ -252,6 +247,65 @@ class CostEstimator:
         )
 
         return est_quality
+    
+
+    def _est_quality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
+        """
+        Given sample cost data observations for a specific operation, compute the an estimate
+        of the quality of its outputs by using GPT-4 as a champion model.
+        """
+        # get unique set of records
+        record_uuids = op_df.record_uuid.unique()
+        final_quality = 0.0
+        for record_uuid in record_uuids:
+            record_df = op_df[op_df.record_uuid == record_uuid]
+            qulaity_score_per_record = record_df.quality_per_record.mode()
+            if qulaity_score_per_record.item() == -1.0:
+                return self._est_quality_gpt4_baseline(op_df, model_name=model_name)
+            final_quality += qulaity_score_per_record.item()
+
+        return final_quality / len(record_uuids)
+            
+
+        # # compute GPT-4's answer (per-record) across all models; fall-back to most common answer if GPT-4 is not present
+        # record_uuid_to_answer = {}
+        # for record_uuid in record_uuids:
+        #     record_df = op_df[op_df.record_uuid == record_uuid]
+        #     gpt4_most_common_answer = record_df[
+        #         record_df.model_name == Model.GPT_4.value
+        #     ].answer.mode()
+
+        #     if not gpt4_most_common_answer.empty:
+        #         record_uuid_to_answer[record_uuid] = gpt4_most_common_answer.iloc[0]
+        #     else:
+        #         try:
+        #             record_uuid_to_answer[record_uuid] = record_df.answer.mode().iloc[0]
+        #         except Exception as e:
+        #             import pdb; pdb.set_trace()
+
+        # # compute accepted answers and clean all answers
+        # pd.options.mode.chained_assignment = None  # turn off copy warnings
+        # op_df.loc[:, "accepted_answer"] = op_df.record_uuid.apply(
+        #     lambda uuid: record_uuid_to_answer[uuid]
+        # )
+        # op_df.loc[:, "correct"] = op_df.apply(lambda row: self._is_correct(row), axis=1)
+
+        # # get subset of observations for model_name and estimate quality w/fraction of answers that match accepted answer
+        # model_df = (
+        #     op_df[op_df.model_name == model_name]
+        #     if model_name is not None
+        #     else op_df[op_df.model_name.isna()]
+        # )
+
+        # est_quality = (
+        #     model_df.correct.sum() / model_df.shape[0]
+        #     if not model_df.empty
+        #     else (
+        #         op_df.correct.sum() / op_df.shape[0]
+        #         if not op_df.empty
+        #         else MODEL_CARDS[model_name]["MMLU"] / 100.0
+        #     )
+        # )
 
     def _compute_operator_estimates(self) -> Optional[Dict[str, Any]]:
         """

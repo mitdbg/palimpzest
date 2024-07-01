@@ -65,3 +65,24 @@ class DataRecord:
 
     def getFields(self):
         return [k for k in self.__dict__.keys() if not k.startswith("_") and k != "schema"]
+    
+    def schema(self):
+        return self.schema
+    
+    def merge_on(self, other, on:str=None):
+        if other is None:
+            return self
+        if on is None:
+            return self
+        if on not in self.getFields() or on not in other.getFields():
+            return self
+
+        self_item = self.get(on)
+        for item in other.get(on):
+            self_item.extend(item)
+
+        return self            
+        
+
+        
+        

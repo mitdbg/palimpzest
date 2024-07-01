@@ -52,9 +52,10 @@ class CaseData(pz.Schema):
 def filtering(input_dataset, policy):
     patient_tables = input_dataset.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
     patient_tables = patient_tables.filter("The rows of the table contain the patient age")
+
     validation = pz.ValidationData(
-        input_file="qe-dou_mmc1_input",
-        output_file="qe-dou_mmc1_output",
+        input_file_id="biofabric-tiny",
+        output_file_id="qe-dou_mmc1_output",
     )
     all_records, plan, stats = pz.Execute(patient_tables, num_samples=4, policy=policy, validation_examples=validation, verbose=args.verbose)
 

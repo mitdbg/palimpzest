@@ -15,6 +15,8 @@ class RecordOpStats:
     record_uuid: str
 
     # unique identifier for the parent of this record
+    # TODO(chjun): A record could have multiple parents??
+    # OR parent_record --> Filter --> None, how to track this case using RecordOpStats?, record_uuid=None
     record_parent_uuid: str
 
     # operation id; a unique identifier for this operation
@@ -29,8 +31,12 @@ class RecordOpStats:
     # the cost (in dollars) to generate this record at this operation
     cost_per_record: float
 
+    ##### OPTIONAL FIELDS
+    # the quality of this operator over this record, between 0 and 1
+    quality_per_record: Optional[float] = None
+
     # a dictionary with the record state after being processed by the operator
-    record_state: Dict[str, Any]
+    record_state: Dict[str, Any] = None
 
     ##### NOT-OPTIONAL, BUT FILLED BY EXECUTION CLASS AFTER CONSTRUCTOR CALL #####
     # the ID of the physical operation which produced the input record for this record at this operation
@@ -109,6 +115,10 @@ class OperatorStats:
     # the total cost of this operation
     total_op_cost: float = 0.0
 
+    # the total quality score of the output from this operation
+    # The highest score is 1.0, and the lowest score is 0.0
+    total_op_quality: float = 0.0
+
     # a list of RecordOpStats processed by the operation
     record_op_stats_lst: List[RecordOpStats] = field(default_factory=list)
 
@@ -147,7 +157,7 @@ class PlanStats:
 
     def finalize(self, total_plan_time: float):
         self.total_plan_time = total_plan_time
-        self.total_plan_cost = sum([op_stats.total_op_cost for _, op_stats in self.operator_stats.items()])
+        self.total_plan_cost = sum([op_stats.total_op_cost for _, op_stats in self.operator_stats.items()])        
 
 
 @dataclass
