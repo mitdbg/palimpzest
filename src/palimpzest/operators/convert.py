@@ -82,10 +82,6 @@ class LLMConvert(ConvertOp):
 
         # optimization-specific attributes
         self.heatmap_json_obj = None
-        self.field_to_code_ensemble = None
-        self.exemplars = None
-        self.code_synthesized = False
-        self.gpt4_llm = CustomGenerator(model_name=Model.GPT_4.value)
 
         # use image model if this is an image conversion
         if self.outputSchema == ImageFile and self.inputSchema == File or self.image_conversion:
@@ -354,7 +350,7 @@ class LLMConvert(ConvertOp):
                 op_name=self.op_name(),
                 time_per_record=total_time / len(records),
                 cost_per_record=per_record_stats.cost_per_record,
-                model_name=self.model.value,
+                model_name=getattr(self, "model", None),
                 answer={field_name: getattr(dr, field_name) for field_name in fields},
                 input_fields=self.inputSchema.fieldNames(),
                 generated_fields=fields,
@@ -383,7 +379,9 @@ class LLMConvert(ConvertOp):
         # TODO: This inherits all pre-computed fields in an incremental fashion. The positive / pros of this approach is that it enables incremental schema computation, which tends to feel more natural for the end-user. The downside is it requires us to support an explicit projection to eliminate unwanted input / intermediate computation.
         #
         # first, copy all fields from input schema
-        for field_name in candidate.getFields():
+        # NOTE: the method is called _getFields instead of getFields to avoid it being picked up as a data record attribute;
+        #       in the future we will come up with a less ugly fix -- but for now do not remove the _ even though it's not private
+        for field_name in candidate._getFields():
             setattr(dr, field_name, getattr(candidate, field_name, None))
 
         # get input field names and output field names
@@ -399,35 +397,6 @@ class LLMConvert(ConvertOp):
                 )  # the use of get prevents a KeyError if an individual field is missing.
 
         return dr
-
-    def parse_answer(
-        self, answer: str, fields_to_generate: List[str]
-    ) -> List[Dict[FieldName, List]]:
-        """ 
-        This functions gets a string answer and parses it into an iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
-        # """
-        
-        try:
-            json_answer = getJsonFromAnswer(answer)
-            assert json_answer != {}, "No output was found!"
-        except Exception as e:
-            print(f"Error parsing answer: {e}")
-            json_answer = {field_name: [] for field_name in fields_to_generate}
-
-        if self.cardinality == Cardinality.ONE_TO_MANY:
-            assert (
-                isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0
-            ), "No output objects were generated for one-to-many query"
-            # json_answer["items"] is a list of dictionaries, each of which contains the generated fields
-            for field in fields_to_generate:
-                field_answers[field] = []
-                for item in json_answer["items"]:
-                    field_answers[field].append(item[field])
-        else:
-            field_answers = {
-                field: [json_answer[field]] for field in fields_to_generate
-            }
-        return field_answers
 
     def _dspy_generate_fields(
         self,

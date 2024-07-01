@@ -46,7 +46,7 @@ class DataRecord:
 
     def _asDict(self, include_bytes: bool = True):
         """Return a dictionary representation of this DataRecord"""
-        dct = {k: self.__dict__[k] for k in self.getFields()}
+        dct = {k: self.__dict__[k] for k in self._getFields()}
         if not include_bytes:
             for k in dct:
                 if isinstance(dct[k], bytes):
@@ -70,5 +70,7 @@ class DataRecord:
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
-    def getFields(self):
+    # NOTE: the method is called _getFields instead of getFields to avoid it being picked up as a data record attribute;
+    #       in the future we will come up with a less ugly fix -- but for now do not remove the _ even though it's not private
+    def _getFields(self):
         return [k for k in self.__dict__.keys() if not k.startswith("_") and k != "schema"]
