@@ -69,9 +69,6 @@ class GenerationStats:
         dct = {field: getattr(self, field) / quotient for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'llm_call_duration_secs', 'fn_call_duration_secs', 'cost_per_record']}
         dct['model_name'] = self.model_name      
         return GenerationStats(**dct)
-
-    def __radd__(self, other: int) -> GenerationStats:
-        return self
     
 @dataclass
 class RecordOpStats:

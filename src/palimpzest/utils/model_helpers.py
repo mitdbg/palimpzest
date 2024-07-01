@@ -38,18 +38,15 @@ def getModels(include_vision: Optional[bool] = False) -> List[Model]:
 
     return models
 
-def getChampionModel():
+def getChampionModelName():
     champion_model_name = None
     if os.environ.get("OPENAI_API_KEY", None) is not None:
-        champion_model_name = Model.GPT_4
+        champion_model_name = Model.GPT_4.value
     elif os.environ.get("TOGETHER_API_KEY", None) is not None:
-        champion_model_name = Model.MIXTRAL
+        champion_model_name = Model.MIXTRAL.value
     elif os.environ.get("GOOGLE_API_KEY", None) is not None:
-        champion_model_name = Model.GEMINI_1
+        champion_model_name = Model.GEMINI_1.value
     else:
         raise Exception("No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]")
 
     return champion_model_name
-
-def getChampionModelName():
-    return getChampionModel().value

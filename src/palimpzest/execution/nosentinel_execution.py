@@ -8,7 +8,7 @@ from palimpzest.operators.filter import FilterOp
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
 from .cost_estimator import CostEstimator
-from .execution import SequentialSingleThreadExecution
+from .execution import SimpleExecution
 from palimpzest.sets import Set
 
 from palimpzest.dataclasses import OperatorStats, PlanStats
@@ -19,7 +19,7 @@ import os
 import shutil
 
 
-class NoSentinelExecution(SequentialSingleThreadExecution):
+class NoSentinelExecution(SimpleExecution):
     """ This class is a dummy execution engine that can be used for testing purposes. 
     It does not include sentinel plans or all that jazz."""
 

@@ -7,21 +7,18 @@ from .strategy import PhysicalOpStrategy
 
 
 from palimpzest.constants import *
-from palimpzest.dataclasses import GenerationStats
 from palimpzest.elements import *
 from palimpzest.operators import logical, physical, convert
 
 # TYPE DEFINITIONS
 FieldName = str
+StatsDict = Dict[str, Any]
 
 class LLMBondedQueryConvert(convert.LLMConvert):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def convert(self, 
                 candidate_content,
-                fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+                fields) -> Tuple[Dict[FieldName, List[Any]], StatsDict]:
 
         prompt = self._construct_query_prompt(fields_to_generate=fields)
 

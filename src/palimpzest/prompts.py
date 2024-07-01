@@ -49,12 +49,7 @@ Here is every output field name and a description:
 
 ### CODE SYNTHESIS PROMPTS ###
 EXAMPLE_PROMPT = """Example{idx}:
-Example Input
--------------
 {example_inputs}
-
-Example Output
---------------
 {example_output}
 """
 

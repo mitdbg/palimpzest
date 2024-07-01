@@ -5,7 +5,6 @@ import palimpzest as pz
 from palimpzest.execution import graphicEmit, flatten_nested_tuples
 from palimpzest.operators import ConvertFromCandidateOp
 
-from pathlib import Path
 from PIL import Image
 from sklearn.metrics import precision_recall_fscore_support
 from tabulate import tabulate
@@ -156,33 +155,29 @@ class RealEstateListingSource(pz.UserSource):
     def __init__(self, datasetId, listings_dir):
         super().__init__(RealEstateListingFiles, datasetId)
         self.listings_dir = listings_dir
-        self.listings = sorted(os.listdir(self.listings_dir))
+        self.idx = 0
 
-    def __len__(self):
-        return len(self.listings)
+    def userImplementedIterator(self):
+        for root, _, files in os.walk(self.listings_dir):
+            if root == self.listings_dir:
+                continue
 
-    def getSize(self):
-        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob('*'))
+            # create data record
+            dr = pz.DataRecord(self.schema, scan_idx=self.idx)
+            dr.listing = root.split("/")[-1]
+            dr.image_contents = []
+            for file in files:
+                bytes_data = None
+                with open(os.path.join(root, file), "rb") as f:
+                    bytes_data = f.read()
+                if file.endswith(".txt"):
+                    dr.text_content = bytes_data.decode("utf-8")
+                    # dr.text_content = str(bytes_data)
+                elif file.endswith(".png"):
+                    dr.image_contents.append(bytes_data)
+            yield dr
 
-    def getItem(self, idx: int):
-        # fetch listing
-        listing = self.listings[idx]
-
-        # create data record
-        dr = pz.DataRecord(self.schema, scan_idx=idx)
-        dr.listing = listing
-        dr.image_contents = []
-        listing_dir = os.path.join(self.listings_dir, listing)
-        for file in os.listdir(listing_dir):
-            bytes_data = None
-            with open(os.path.join(listing_dir, file), "rb") as f:
-                bytes_data = f.read()
-            if file.endswith(".txt"):
-                dr.text_content = bytes_data.decode("utf-8")
-            elif file.endswith(".png"):
-                dr.image_contents.append(bytes_data)
-
-        return dr
+            self.idx += 1
 
 
 def buildNestedStr(node, indent=0, buildStr=""):
