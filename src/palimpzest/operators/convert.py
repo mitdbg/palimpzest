@@ -458,7 +458,7 @@ class LLMConvert(ConvertOp):
             answer, query_stats = generator.generate(context=content, question=prompt)
         except Exception as e:
             print(f"DSPy generation error: {e}")
-            return ""
+            return "", GenerationStats()
         
         return answer, query_stats
 
