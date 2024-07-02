@@ -33,14 +33,13 @@ class Plan:
     def __len__(self):
         return len(self.operators)
 
-    def __repr__(self):
+    def __str__(self):
         if self.operators:
             return f"{self.__class__.__name__}:\n" + "\n".join(
                 map(str, [f"{idx}. {str(op)}" for idx, op in enumerate(self.operators)])
             )
         else:
             return f"{self.__class__.__name__}: No operator tree."
-
 
 class LogicalPlan(Plan):
 
@@ -104,7 +103,7 @@ class PhysicalPlan(Plan):
         # return the PhysicalPlan
         return PhysicalPlan(operators=copySubPlan, datasetIdentifier=subPlan.datasetIdentifier)
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         """Computes a string representation for this plan."""
         ops = [op for op in self.operators if not op.is_hardcoded()]
         label = "-".join([str(op) for op in ops])
@@ -113,7 +112,7 @@ class PhysicalPlan(Plan):
     # GV: Should we generate a unique ID for each plan in the __init__ ?
     # MR: I think that's a good idea (also in fromOpsAndSubPlan)
     def plan_id(self) -> str:
-        return self.__str__()
+        return self.__repr__()
 
     def getPlanModelNames(self) -> List[str]:
         model_names = []

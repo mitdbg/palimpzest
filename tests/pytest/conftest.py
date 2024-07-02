@@ -215,57 +215,43 @@ class ImageRealEstateListing(RealEstateListingFiles):
     )
 
 
-@pytest.fixture
-def real_estate_listing_source():
-    class RealEstateListingSource(pz.UserSource):
-        def __init__(self, datasetId, listings_dir):
-            super().__init__(RealEstateListingFiles, datasetId)
-            self.listings_dir = listings_dir
-            self.idx = 0
-            self.roots_files_dict = {root:files for root, _, files in os.walk(self.listings_dir)}
-            self.filepaths = [os.path.join(root, file) for root, files in self.roots_files_dict.items() for file in files]
+# @pytest.fixture
+# def real_estate_listing_source():
+class RealEstateListingSource(pz.UserSource):
 
-        def __len__(self):
-            return len(os.listdir(self.listings_dir))
-        
-        def getItem(self, idx):
-            # TODO check if this is equivalent
-            root = list(self.roots_files_dict.keys())[idx]
-            dr = pz.DataRecord(self.schema, scan_idx=idx)
-            dr.listing = root.split("/")[-1]
-            dr.image_contents = []
-            for file in self.roots_files_dict[root]:
-                bytes_data = None
-                with open(os.path.join(root, file), "rb") as f:
-                    bytes_data = f.read()
-                if file.endswith(".txt"):
-                    dr.text_content = bytes_data.decode("utf-8")
-                    # dr.text_content = str(bytes_data)
-                elif file.endswith(".png"):
-                    dr.image_contents.append(bytes_data)
-            return dr
+    def __init__(self, datasetId, listings_dir):
+        super().__init__(RealEstateListingFiles, datasetId)
+        self.listings_dir = listings_dir
+        self.idx = 0
+        self.listings = sorted(os.listdir(self.listings_dir))
 
-            # for root, dirs, files in os.walk(self.listings_dir):
-            #     if root == self.listings_dir:
-            #         continue
-            #     # create data record
-            #     dr = pz.DataRecord(self.schema, scan_idx=self.idx)
-            #     dr.listing = root.split("/")[-1]
-            #     dr.image_contents = []
-            #     for file in files:
-            #         bytes_data = None
-            #         with open(os.path.join(root, file), "rb") as f:
-            #             bytes_data = f.read()
-            #         if file.endswith(".txt"):
-            #             dr.text_content = bytes_data.decode("utf-8")
-            #             # dr.text_content = str(bytes_data)
-            #         elif file.endswith(".png"):
-            #             dr.image_contents.append(bytes_data)
-            #     yield dr
+    def __len__(self):
+        return len(self.listings)
 
-            #     self.idx += 1
+    def getSize(self):
+        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob('*'))
 
-    return RealEstateListingSource
+    def getItem(self, idx: int):
+        # fetch listing
+        listing = self.listings[idx]
+
+        # create data record
+        dr = pz.DataRecord(self.schema, scan_idx=idx)
+        dr.listing = listing
+        dr.image_contents = []
+        listing_dir = os.path.join(self.listings_dir, listing)
+        for file in os.listdir(listing_dir):
+            bytes_data = None
+            with open(os.path.join(listing_dir, file), "rb") as f:
+                bytes_data = f.read()
+            if file.endswith(".txt"):
+                dr.text_content = bytes_data.decode("utf-8")
+            elif file.endswith(".png"):
+                dr.image_contents.append(bytes_data)
+
+        return dr
+
+# return RealEstateListingSource
 
 def within_two_miles_of_mit(record):
     # NOTE: I'm using this hard-coded function so that folks w/out a
@@ -294,6 +280,9 @@ def in_price_range(record):
 
 @pytest.fixture
 def real_estate_eval():
+    pz.DataDirectory().registerUserSource(
+    RealEstateListingSource('real-estate-eval-tiny', 'testdata/real-estate-eval-tiny'), 'real-estate-eval-tiny')
+
     listings = pz.Dataset("real-estate-eval-tiny", schema=RealEstateListingFiles)
     listings = listings.convert(TextRealEstateListing, depends_on="text_content")
     listings = listings.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_contents")

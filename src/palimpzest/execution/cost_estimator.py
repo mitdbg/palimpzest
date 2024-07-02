@@ -214,7 +214,8 @@ class CostEstimator:
         # compute GPT-4's answer (per-record) across all models; fall-back to most common answer if GPT-4 is not present
         record_uuid_to_answer = {}
         for record_uuid in record_uuids:
-            record_df = op_df[op_df.record_uuid == record_uuid]
+            # TODO is the fillna correct?
+            record_df = op_df[op_df.record_uuid == record_uuid].fillna("")
             gpt4_most_common_answer = record_df[
                 record_df.model_name == Model.GPT_4.value
             ].answer.mode()

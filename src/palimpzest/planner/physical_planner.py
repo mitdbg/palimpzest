@@ -126,6 +126,7 @@ class PhysicalPlanner(Planner):
                         op = op_class(
                                 inputSchema=logical_op.inputSchema,
                                 outputSchema=logical_op.outputSchema,
+                                image_conversion=logical_op.image_conversion,
                                 query_strategy = QueryStrategy.BONDED_WITH_FALLBACK,
                                 shouldProfile=shouldProfile,
                             )
@@ -197,6 +198,7 @@ class PhysicalPlanner(Planner):
                             physical_op = op_class(
                                 inputSchema=logical_op.inputSchema,
                                 outputSchema=logical_op.outputSchema,
+                                image_conversion=logical_op.image_conversion,
                                 query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
                                 shouldProfile=self.shouldProfile,
                             )

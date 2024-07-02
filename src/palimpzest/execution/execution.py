@@ -234,7 +234,8 @@ class ExecutionEngine:
         #         [(plan, idx, PlanType.SENTINEL) for idx, plan in enumerate(sentinel_plans)],
         #     )
         # )
-        with ThreadPoolExecutor(max_workers=num_sentinel_plans) as executor:
+        sentinel_workers = min(self.max_workers, num_sentinel_plans)
+        with ThreadPoolExecutor(max_workers=sentinel_workers) as executor:
             max_workers_per_plan = max(self.max_workers / num_sentinel_plans, 1)
             results = list(executor.map(lambda x: self.execute_plan(*x),
                     [(plan, idx, PlanType.SENTINEL, max_workers_per_plan) for idx, plan in enumerate(sentinel_plans)],

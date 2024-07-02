@@ -135,7 +135,7 @@ class LLMConvert(ConvertOp):
         ps = getattr(self, "prompt_strategy", "")
         qs = getattr(self, "query_strategy", "")
 
-        return f"{self.__class__.__name__}({str(self.outputSchema):10s}, Model: {model}, Prompt Strategy: {ps}, Query Strategy: {qs})"
+        return f"{self.__class__.__name__}({str(self.inputSchema):10s}->{str(self.outputSchema):10s}, Model: {model}, Prompt Strategy: {ps}, Query Strategy: {qs})"
 
     def copy(self):
         return self.__class__(
@@ -509,11 +509,7 @@ class LLMConvert(ConvertOp):
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
-        try:
-            n_records = max([len(lst) for lst in field_answers.values()])
-        except ValueError:
-            import pdb; pdb.set_trace()
-            n_records = 0
+        n_records = max([len(lst) for lst in field_answers.values()])
         records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
 
         for field_name, answer_list in field_answers.items():
