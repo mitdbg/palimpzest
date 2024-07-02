@@ -12,22 +12,6 @@ REAL_ESTATE_EVAL_TINY_DATASET_ID = "real-estate-eval-tiny"
 BIOFABRIC_EVAL_TINY_TEST_DATA = "testdata/biofabric-tiny"
 BIOFABRIC_EVAL_TINY_DATASET_ID = "biofabric-tiny"
 
-# Addresses far from MIT; we use a simple lookup like this to make the
-# experiments re-producible w/out needed a Google API key for geocoding lookups
-FAR_AWAY_ADDRS = [
-    "Melcher St",
-    "Sleeper St",
-    "437 D St",
-    "Seaport Blvd",
-    "50 Liberty Dr",
-    "Telegraph St",
-    "Columbia Rd",
-    "E 6th St",
-    "E 7th St",
-    "E 5th St",
-]
-
-
 with open(".env") as f:
     for line in f:
         key, value = line.strip().split("=")
@@ -253,9 +237,22 @@ class RealEstateListingSource(pz.UserSource):
 
 # return RealEstateListingSource
 
+@pytest.fixture
 def within_two_miles_of_mit(record):
     # NOTE: I'm using this hard-coded function so that folks w/out a
     #       Geocoding API key from google can still run this example
+    FAR_AWAY_ADDRS = [
+        "Melcher St",
+        "Sleeper St",
+        "437 D St",
+        "Seaport Blvd",
+        "50 Liberty Dr",
+        "Telegraph St",
+        "Columbia Rd",
+        "E 6th St",
+        "E 7th St",
+        "E 5th St",
+    ]
     try:
         if any(
             [
@@ -268,6 +265,7 @@ def within_two_miles_of_mit(record):
     except:
         return False
 
+@pytest.fixture
 def in_price_range(record):
     try:
         price = record.price
@@ -279,7 +277,7 @@ def in_price_range(record):
         return False
 
 @pytest.fixture
-def real_estate_eval():
+def real_estate_eval(in_price_range, within_two_miles_of_mit):
     pz.DataDirectory().registerUserSource(
     RealEstateListingSource('real-estate-eval-tiny', 'testdata/real-estate-eval-tiny'), 'real-estate-eval-tiny')
 

@@ -19,12 +19,33 @@ import time
 import pytest
 
 @pytest.mark.parametrize("execution_engine", [PipelinedParallelExecution])
-class TestSingleThreadExecutionNoCache:
+class TestParallelExecutionNoCache:
 
     def test_set_source_dataset_id(self, execution_engine, enron_eval):
         simple_execution = execution_engine()
         simple_execution.set_source_dataset_id(enron_eval)
         assert simple_execution.source_dataset_id == ENRON_EVAL_TINY_DATASET_ID
+
+    @pytest.mark.parametrize(
+        "dataset,physical_plan,expected_output_records",
+        datasets, physical_plans, expected_output_records,
+    )
+    def test_execute_sentinel_plan(self, execution_engine, dataset, physical_plan, expected_output_records):
+        start_time = time.time()
+
+        # create execution instance
+        execution = execution_engine(num_samples=dataset['num_samples'], nocache=True)
+        execution.set_source_dataset_id(dataset['id'])
+
+        # execute the plan
+        _, plan_stats = execution.execute_plan(physical_plan, plan_type=PlanType.SENTINEL)
+        plan_stats.finalize(time.time() - start_time)
+
+        # NOTE: with parallel execution we TODO -- force order of records using mock
+        # test that we only executed plan on num_samples records
+
+        for output_record in output_records:
+        assert len(output_records) == len(expected_output_records)
 
     # TODO: register dataset in fixture
     def test_execute_plan_simple_scan(self, execution_engine):
