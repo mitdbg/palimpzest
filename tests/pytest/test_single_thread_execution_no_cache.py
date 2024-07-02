@@ -10,6 +10,8 @@ from palimpzest.strategies import (
     BondedQueryConvertStrategy,
     CodeSynthesisConvertStrategy,
     ModelSelectionFilterStrategy,
+    TokenReducedConvertStrategy,
+    TokenReducedConvert,
 )
 
 import os
@@ -176,7 +178,7 @@ class TestSingleThreadExecutionNoCache:
         filter = Filter("The filename does not contain the string 'buy'")
         filterOpClass = ModelSelectionFilterStrategy(available_models=[Model.GPT_3_5], prompt_strategy=PromptStrategy.DSPY_COT_BOOL)[0]
 
-        # apply the monkeypatch for requests.get to mock_get
+        # apply the monkeypatch for LLMFilter __call__
         monkeypatch.setattr(filterOpClass, "__call__", mock_call)
 
         filterOp = filterOpClass(inputSchema=File, outputSchema=File, filter=filter, targetCacheId="abc123", shouldProfile=True)
@@ -340,7 +342,67 @@ class TestSingleThreadExecutionNoCache:
         scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
         convertOpHardcoded = ConvertFileToText(inputSchema=File, outputSchema=TextFile, shouldProfile=True)
         convertOpClass = CodeSynthesisConvertStrategy(code_synth_strategy=CodingStrategy.SINGLE)[0]
-        convertOpLLM = convertOpClass(inputSchema=TextFile, outputSchema=email_schema, targetCacheId="abc123", shouldProfile=True, cache_across_plans=False)
+        convertOpCodeSynth = convertOpClass(inputSchema=TextFile, outputSchema=email_schema, targetCacheId="abc123", shouldProfile=True, cache_across_plans=False)
+        plan = PhysicalPlan(
+            operators=[scanOp, convertOpHardcoded, convertOpCodeSynth],
+            datasetIdentifier=ENRON_EVAL_TINY_DATASET_ID,
+        )
+        simple_execution = execution_engine(num_samples=1, nocache=True)
+
+        # set state which is computed in execute(); should try to remove this side-effect from the code
+        simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
+
+        # test sampling three records, with one making it past the filter
+        output_records, plan_stats = simple_execution.execute_plan(plan, plan_type=PlanType.SENTINEL)
+
+        assert len(output_records) == 1
+
+        dr = output_records[0]
+        assert dr.filename.endswith("buy-r-inbox-628.txt")
+        assert getattr(dr, 'sender', None) == "sherron.watkins@enron.com"
+        assert getattr(dr, 'subject', None) == "RE: portrac"
+
+        for op in plan.operators:
+            op_id = op.get_op_id()
+            operator_stats = plan_stats.operator_stats[op_id]
+            assert operator_stats.total_op_time > 0.0
+
+            if isinstance(op, LLMConvert):
+                record_stats = operator_stats.record_op_stats_lst[-1]
+                assert record_stats.record_uuid == dr._uuid
+                assert record_stats.record_parent_uuid == dr._parent_uuid
+                assert record_stats.op_id == op_id
+                assert record_stats.op_name == op.op_name()
+                assert record_stats.time_per_record > 0.0
+                assert record_stats.cost_per_record > 0.0
+                assert record_stats.record_state == dr._asDict(include_bytes=False)
+
+        # test full scan
+        simple_execution = execution_engine(nocache=True)
+        simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
+        output_records, plan_stats = simple_execution.execute_plan(plan, plan_type=PlanType.FINAL)
+
+        assert len(output_records) == 6
+
+        # TODO: mock out call(s) to synthesized code
+        expected_filenames = sorted(os.listdir(ENRON_EVAL_TINY_TEST_DATA))
+        expected_senders = ["sherron.watkins@enron.com", "david.port@enron.com", "vkaminski@aol.com", "sarah.palmer@enron.com", "gary@cioclub.com", "travis.mccullough@enron.com"]
+        expected_subjects = ["RE: portrac", "RE: NewPower", "Fwd: FYI", "Enron Mentions -- 01/18/02", "Information Security Executive", "Redraft of the Exclusivity Agreement"]
+        for dr, expected_filename, expected_sender, expected_subject in zip(output_records, expected_filenames, expected_senders, expected_subjects):
+            assert dr.filename.endswith(expected_filename)
+            assert getattr(dr, 'sender', None) == expected_sender
+            assert getattr(dr, 'subject', None) == expected_subject
+
+    def test_execute_plan_with_token_reduction_convert(self, execution_engine, email_schema, monkeypatch):
+        scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
+        convertOpHardcoded = ConvertFileToText(inputSchema=File, outputSchema=TextFile, shouldProfile=True)
+        # using [1] index to get bonded query convert
+        convertOpClass = TokenReducedConvertStrategy(available_models=[Model.GPT_3_5], token_budgets=[0.1])[1]
+
+        # apply the monkeypatch for maximum number of heatmap updates
+        monkeypatch.setattr(TokenReducedConvert, "MAX_HEATMAP_UPDATES", 3)
+
+        convertOpLLM = convertOpClass(inputSchema=TextFile, outputSchema=email_schema, targetCacheId="abc123", shouldProfile=True)
         plan = PhysicalPlan(
             operators=[scanOp, convertOpHardcoded, convertOpLLM],
             datasetIdentifier=ENRON_EVAL_TINY_DATASET_ID,
@@ -385,7 +447,7 @@ class TestSingleThreadExecutionNoCache:
         # TODO: mock out call(s) to synthesized code
         expected_filenames = sorted(os.listdir(ENRON_EVAL_TINY_TEST_DATA))
         expected_senders = ["sherron.watkins@enron.com", "david.port@enron.com", "vkaminski@aol.com", "sarah.palmer@enron.com", "gary@cioclub.com", "travis.mccullough@enron.com"]
-        expected_subjects = ["RE: portrac", "RE: NewPower", "Fwd: FYI", "Enron Mentions -- 01/18/02", "Information Security Executive", "Redraft of the Exclusivity Agreement"]
+        expected_subjects = ["RE: portrac", "RE: NewPower", "Fwd: FYI", "Enron Mentions -- 01/18/02", "Information Security Executive -092501", "Redraft of the Exclusivity Agreement"]
         for dr, expected_filename, expected_sender, expected_subject in zip(output_records, expected_filenames, expected_senders, expected_subjects):
             assert dr.filename.endswith(expected_filename)
             assert getattr(dr, 'sender', None) == expected_sender
