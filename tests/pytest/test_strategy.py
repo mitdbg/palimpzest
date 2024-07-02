@@ -18,7 +18,7 @@ from palimpzest.operators import ConvertOp, ConvertFileToText
 from palimpzest.execution import Execute
 from utils import remove_cache, buildNestedStr
 from palimpzest.strategies.model_selection import ModelSelectionFilterStrategy
-from palimpzest.execution import SimpleExecution
+from palimpzest.execution import SequentialSingleThreadExecution
 from palimpzest.execution.nosentinel_execution import NoSentinelExecution
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.elements.records import DataRecord

@@ -531,7 +531,7 @@ class LLMConvert(ConvertOp):
         #       explicit projection to eliminate unwanted input / intermediate computation.
         #
         # first, copy all fields from input schema
-        for field_name in candidate.getFields():
+        for field_name in candidate._getFields():
             setattr(dr, field_name, getattr(candidate, field_name))
 
         # get input field names and output field names

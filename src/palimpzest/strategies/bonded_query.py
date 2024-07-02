@@ -7,25 +7,28 @@ from .strategy import PhysicalOpStrategy
 
 
 from palimpzest.constants import *
+from palimpzest.dataclasses import GenerationStats
 from palimpzest.elements import *
 from palimpzest.operators import logical, physical, convert
 
 # TYPE DEFINITIONS
 FieldName = str
-StatsDict = Dict[str, Any]
 
 class LLMBondedQueryConvert(convert.LLMConvert):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def convert(self, 
                 candidate_content,
-                fields) -> Tuple[Dict[FieldName, List[Any]], StatsDict]:
+                fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
 
         prompt = self._construct_query_prompt(fields_to_generate=fields)
 
         # generate all fields in a single query
-        answer, field_stats = self._dspy_generate_fields(fields_to_generate=fields, content=candidate_content, prompt=prompt)
-
+        answer, field_stats = self._dspy_generate_fields(content=candidate_content, prompt=prompt)
         json_answers = self.parse_answer(answer, fields)
+
         # if there was an error, execute a conventional query
         if all([v == [] for v in json_answers.values()]):
             print("Falling back to conventional conversion")

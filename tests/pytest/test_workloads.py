@@ -1,10 +1,9 @@
 import pytest
-from palimpzest.execution.execution import Execute, SimpleExecution
+from palimpzest.execution.execution import Execute, SequentialSingleThreadExecution
 import palimpzest as pz
 
 from palimpzest.utils.model_helpers import getModels
 from sklearn.metrics import precision_recall_fscore_support
-
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -484,8 +483,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
 
 
 
-# @pytest.mark.parametrize("workload", ["biofabric", "enron", "real-estate"])
-@pytest.mark.parametrize("workload", ["enron"])
+@pytest.mark.parametrize("workload", ["biofabric", "enron", "real-estate"])
 def test_workload(workload, real_estate_listing_source, enron_eval, biofabric_eval, real_estate_eval):
 
     print("Testing on workload:", workload)
@@ -494,10 +492,11 @@ def test_workload(workload, real_estate_listing_source, enron_eval, biofabric_ev
     elif workload == "biofabric":
         dataset = biofabric_eval
     elif workload == "real-estate":
-        pz.DataDirectory().registerUserSource(
-            real_estate_listing_source('real-estate', 'testdata/real-estate-eval-100'), 'real-estate'
-        )
         dataset = real_estate_eval
+        pz.DataDirectory().registerUserSource(
+            real_estate_listing_source('real-estate-eval-tiny', 'testdata/real-estate-eval-tiny'), 'real-estate-eval-tiny'
+    )
+
     else:
         raise ValueError(f"Unknown workload: {workload}")
     
@@ -511,11 +510,12 @@ def test_workload(workload, real_estate_listing_source, enron_eval, biofabric_ev
                                   policy=pz.MinCost(),
                                   available_models=available_models,
                                   num_samples=num_samples,
+                                  nocache=True,
                                   allow_model_selection=True,
                                   allow_bonded_query=False,
                                   allow_code_synth=False,
                                   allow_token_reduction=False,
-                                  execution_engine=SimpleExecution)
+                                  execution_engine=SequentialSingleThreadExecution)
     
     import pdb; pdb.set_trace()
     # print(f"Plan: {result_dict['plan_info']['plan_label']}")

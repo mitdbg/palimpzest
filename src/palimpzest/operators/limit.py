@@ -74,7 +74,7 @@ class LimitScanOp(PhysicalOperator):
         )
 
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
-        # NOTE: SimpleExecution.execute_dag ensures that no more than self.limit
+        # NOTE: execution layer ensures that no more than self.limit
         #       records are returned to the user by this operator.
         # create RecordOpStats object
         record_op_stats = RecordOpStats(

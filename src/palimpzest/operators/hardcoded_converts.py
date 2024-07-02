@@ -193,11 +193,11 @@ class ConvertFileToXLS(HardcodedConvert):
 
     def __call__(self, candidate: DataRecord):
         start_time = time.time()
-        
+
         dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
         dr.filename = candidate.filename
         dr.contents = candidate.contents
-        
+
         api_start_time = time.time()
         xls = pd.ExcelFile(BytesIO(candidate.contents), engine="openpyxl")
         api_call_duration_secs = time.time() - api_start_time
@@ -216,6 +216,9 @@ class ConvertFileToXLS(HardcodedConvert):
             cost_per_record=0.0,
             fn_call_duration_secs=api_call_duration_secs,
         )
+
+        if not hasattr(dr, 'contents'):
+            import pdb; pdb.set_trace()
 
         return [dr], [record_op_stats]
 
