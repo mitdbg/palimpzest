@@ -118,8 +118,9 @@ class TokenReducedConvert(convert.LLMConvert):
     TOKEN_REDUCTION_SAMPLE: int=0
     TOKEN_REDUCTION_GRANULARITY: float=0.001
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, verbose: bool=False, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.verbose = verbose
         self.heatmap_dict = {}
         self.resolution = self.TOKEN_REDUCTION_GRANULARITY
         self.first_execution = True
@@ -218,7 +219,6 @@ class TokenReductionStrategy(PhysicalOpStrategy):
                 available_models: List[Model],
                 token_budgets: List[float],
                 prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_QA,
-                verbose: bool = False,
                 *args, **kwargs) -> List[physical.PhysicalOperator]:
 
         return_operators = []
@@ -239,7 +239,7 @@ class TokenReductionStrategy(PhysicalOpStrategy):
                                             'prompt_strategy': prompt_strategy,
                                             'final': True,
                                             'token_budget': token_budget,
-                                            'verbose': verbose})
+                                            })
                     return_operators.append(physical_op_type)
 
         return return_operators
