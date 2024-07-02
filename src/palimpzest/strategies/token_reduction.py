@@ -1,11 +1,8 @@
 from __future__ import annotations
-import json 
-import time
+
 from typing import List
 from palimpzest.constants import Model
-from palimpzest.generators.dspy_utils import gen_filter_signature_class, gen_qa_signature_class
 from palimpzest.generators.generators import DSPyGenerator
-from palimpzest.utils.generation_helpers import getJsonFromAnswer
 from .strategy import PhysicalOpStrategy
 
 from palimpzest.strategies.bonded_query import LLMBondedQueryConvert
@@ -115,24 +112,30 @@ def best_substring_match(query, context):
 
 class TokenReducedConvert(convert.LLMConvert):
     token_budget: float
+    # NOTE: moving these closer to the TokenReducedConvert class for now (in part to make
+    #       them easier to mock); we can make these parameterized as well
+    MAX_HEATMAP_UPDATES: int=5
+    TOKEN_REDUCTION_SAMPLE: int=0
+    TOKEN_REDUCTION_GRANULARITY: float=0.001
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, verbose: bool=False, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.verbose = verbose
         self.heatmap_dict = {}
-        self.resolution = TOKEN_REDUCTION_GRANULARITY
+        self.resolution = self.TOKEN_REDUCTION_GRANULARITY
         self.first_execution = True
 
     def reduce_context(self, heatmap:List[int], full_context: str) -> str:
         if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             si, ei = find_best_range(
                 heatmap,
-                int(self.token_budget / TOKEN_REDUCTION_GRANULARITY),
+                int(self.token_budget / self.TOKEN_REDUCTION_GRANULARITY),
                 trim_zeros=False,
             )
             print("si:", si, "ei:", ei)
             sr, er = (
-                si * TOKEN_REDUCTION_GRANULARITY,
-                ei * TOKEN_REDUCTION_GRANULARITY,
+                si * self.TOKEN_REDUCTION_GRANULARITY,
+                ei * self.TOKEN_REDUCTION_GRANULARITY,
             )
             test_len = len(full_context)
             start = int(sr * test_len)
@@ -146,12 +149,12 @@ class TokenReducedConvert(convert.LLMConvert):
         else:
             raise NotImplementedError("Token reduction is only supported for DSPY_COT_QA prompts")
 
-    def _dspy_generate_fields(self, fields_to_generate: List[str], prompt: str, content: str | List[bytes] | None = None, verbose: bool = False) -> physical.Tuple[List[logical.Dict[str, List]] | Any]:
+    def _dspy_generate_fields(self, prompt: str, content: str | List[bytes] | None = None, verbose: bool = False) -> physical.Tuple[List[logical.Dict[str, List]] | Any]:
 
         full_context = content
-        if self.first_execution or self.heatmap_dict["count"] < MAX_HEATMAP_UPDATES:
-            print("Falling back to unreduced generation")
-            answer, query_stats = super()._dspy_generate_fields(fields_to_generate, prompt, full_context, verbose)
+        if self.first_execution or self.heatmap_dict["count"] < self.MAX_HEATMAP_UPDATES:
+            print("Warming up heatmap")
+            answer, query_stats = super()._dspy_generate_fields(prompt, full_context, verbose)
             self.first_execution = False
             # create the heatmap structure with default resolution of 0.001 and count of 0
             self.heatmap_dict = {
@@ -162,8 +165,7 @@ class TokenReducedConvert(convert.LLMConvert):
             doc_schema = str(self.outputSchema)
             doc_type = self.outputSchema.className()
 
-            if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
-                promptSignature = gen_filter_signature_class(doc_schema, doc_type)
+            if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
                 generator = DSPyGenerator(
                     self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
                 )
@@ -174,13 +176,13 @@ class TokenReducedConvert(convert.LLMConvert):
             count = self.heatmap_dict["count"]
             # only refer to the heatmap if the count is greater than a enough sample size
             # TODO: only trim the context if the attention is clustered in a small region
-            if count >= TOKEN_REDUCTION_SAMPLE:
+            if count >= self.TOKEN_REDUCTION_SAMPLE:
                 context = self.reduce_context(heatmap, full_context)
                 try:
                     answer, query_stats = generator.generate(context=context, question=prompt)
                 except Exception as e:
                     print(f"DSPy generation error: {e}, falling back to unreduced generation")
-                    answer, query_stats = super()._dspy_generate_fields(fields_to_generate, prompt, content, verbose)
+                    answer, query_stats = super()._dspy_generate_fields(prompt, content, verbose)
 
         try:
             gsi, gei = best_substring_match(answer, full_context)
@@ -236,7 +238,8 @@ class TokenReductionStrategy(PhysicalOpStrategy):
                                             {'model': model,
                                             'prompt_strategy': prompt_strategy,
                                             'final': True,
-                                            'token_budget': token_budget})
+                                            'token_budget': token_budget,
+                                            })
                     return_operators.append(physical_op_type)
 
         return return_operators

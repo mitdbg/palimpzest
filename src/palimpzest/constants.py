@@ -89,9 +89,6 @@ RETRY_MAX_ATTEMPTS = 1
 # maximum number of rows to display in a table
 MAX_ROWS = 5
 
-# maximum number of updates to the token-reduction heatmap
-MAX_HEATMAP_UPDATES = 5
-
 def log_attempt_number(retry_state):
     """return the result of the last call attempt"""
     print(f"Retrying: {retry_state.attempt_number}...")
@@ -148,10 +145,6 @@ NAIVE_PDF_PROCESSOR_TIME_PER_RECORD = 10.0
 
 # Whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False
-
-# Resolution of the token reduction granularity
-TOKEN_REDUCTION_GRANULARITY = 0.001
-TOKEN_REDUCTION_SAMPLE = 0
 
 #### MODEL PERFORMANCE & COST METRICS ####
 # I've looked across models and grouped knowledge into commonly used categories:

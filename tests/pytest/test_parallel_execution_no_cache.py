@@ -10,6 +10,8 @@ from palimpzest.strategies import (
     BondedQueryConvertStrategy,
     CodeSynthesisConvertStrategy,
     ModelSelectionFilterStrategy,
+    TokenReducedConvertStrategy,
+    TokenReducedConvert,
 )
 
 import os
@@ -338,6 +340,76 @@ class TestSingleThreadExecutionNoCache:
             expected_sender, expected_subjects = filename_to_sender_subject[dr.filename.split("/")[-1]]
             assert getattr(dr, 'sender', None) == expected_sender
             assert getattr(dr, 'subject', None) in expected_subjects
+
+
+    def test_execute_plan_with_token_reduction_convert(self, execution_engine, email_schema, monkeypatch):
+        scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_type="dir", shouldProfile=True)
+        convertOpHardcoded = ConvertFileToText(inputSchema=File, outputSchema=TextFile, shouldProfile=True)
+        # using [1] index to get bonded query convert
+        convertOpClass = TokenReducedConvertStrategy(available_models=[Model.GPT_3_5], token_budgets=[0.1])[1]
+
+        # apply the monkeypatch for maximum number of heatmap updates
+        monkeypatch.setattr(TokenReducedConvert, "MAX_HEATMAP_UPDATES", 3)
+
+        convertOpLLM = convertOpClass(inputSchema=TextFile, outputSchema=email_schema, targetCacheId="abc123", shouldProfile=True)
+        plan = PhysicalPlan(
+            operators=[scanOp, convertOpHardcoded, convertOpLLM],
+            datasetIdentifier=ENRON_EVAL_TINY_DATASET_ID,
+        )
+        simple_execution = execution_engine(num_samples=1, nocache=True)
+
+        # set state which is computed in execute(); should try to remove this side-effect from the code
+        simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
+
+        # test sampling three records, with one making it past the filter
+        output_records, plan_stats = simple_execution.execute_plan(plan, plan_type=PlanType.SENTINEL)
+
+        assert len(output_records) == 1
+
+        expected_filenames = sorted(os.listdir(ENRON_EVAL_TINY_TEST_DATA))
+        filename_to_sender_subject = {
+            "buy-r-inbox-628.txt": ("sherron.watkins@enron.com", ["RE: portrac"]),
+            "buy-r-inbox-749.txt": ("david.port@enron.com", ["RE: NewPower"]),
+            "kaminski-v-deleted-items-1902.txt": ("vkaminski@aol.com", ["Fwd: FYI"]),
+            "martin-t-inbox-96-short.txt": ("sarah.palmer@enron.com", ["Enron Mentions -- 01/18/02"]),
+            "skilling-j-inbox-1109.txt": ("gary@cioclub.com", ["Information Security Executive -092501", "Information Security Executive"]),
+            "zipper-a-espeed-28.txt": ("travis.mccullough@enron.com", ["Redraft of the Exclusivity Agreement"])
+        }
+        dr = output_records[0]
+        assert any([dr.filename.endswith(filename) for filename in expected_filenames])
+        expected_sender, expected_subjects = filename_to_sender_subject[dr.filename.split("/")[-1]]
+        assert getattr(dr, 'sender', None) == expected_sender
+        assert getattr(dr, 'subject', None) in expected_subjects
+
+        for op in plan.operators:
+            op_id = op.get_op_id()
+            operator_stats = plan_stats.operator_stats[op_id]
+            assert operator_stats.total_op_time > 0.0
+
+            if isinstance(op, LLMConvert):
+                record_stats = operator_stats.record_op_stats_lst[-1]
+                assert record_stats.record_uuid == dr._uuid
+                assert record_stats.record_parent_uuid == dr._parent_uuid
+                assert record_stats.op_id == op_id
+                assert record_stats.op_name == op.op_name()
+                assert record_stats.time_per_record > 0.0
+                assert record_stats.cost_per_record > 0.0
+                assert record_stats.record_state == dr._asDict(include_bytes=False)
+
+        # test full scan
+        simple_execution = execution_engine(nocache=True)
+        simple_execution.source_dataset_id = ENRON_EVAL_TINY_DATASET_ID
+        output_records, plan_stats = simple_execution.execute_plan(plan, plan_type=PlanType.FINAL)
+
+        assert len(output_records) == 6
+
+        # TODO: mock out call(s) to LLM
+        for dr in output_records:
+            assert any([dr.filename.endswith(filename) for filename in expected_filenames])
+            expected_sender, expected_subjects = filename_to_sender_subject[dr.filename.split("/")[-1]]
+            assert getattr(dr, 'sender', None) == expected_sender
+            assert getattr(dr, 'subject', None) in expected_subjects
+
 
     def test_execute_plan_with_image_convert(self, execution_engine, real_estate_listing_datasource, real_estate_listing_files_schema, image_real_estate_listing_schema):
         # register user data source
