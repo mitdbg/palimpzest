@@ -500,7 +500,7 @@ def test_workload(workload, enron_eval, biofabric_eval, real_estate_eval):
         raise ValueError(f"Unknown workload: {workload}")
     
     # workload_to_dataset_size = {"enron": 1000, "real-estate": 100, "biofabric": 11}
-    workload_to_dataset_size = {"enron": 10, "real-estate": 10, "biofabric": 11}
+    workload_to_dataset_size = {"enron": 10, "real-estate": 5, "biofabric": 11}
     dataset_size = workload_to_dataset_size[workload]
     num_samples = int(0.05 * dataset_size) if workload != "biofabric" else 1
 

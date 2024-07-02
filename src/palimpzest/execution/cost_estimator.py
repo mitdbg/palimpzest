@@ -215,18 +215,19 @@ class CostEstimator:
         record_uuid_to_answer = {}
         for record_uuid in record_uuids:
             # TODO is the fillna correct?
-            record_df = op_df[op_df.record_uuid == record_uuid].fillna("")
+            record_df = op_df[op_df.record_uuid == record_uuid]
             gpt4_most_common_answer = record_df[
                 record_df.model_name == Model.GPT_4.value
             ].answer.mode()
 
+            all_models_most_common_answer = record_df.answer.mode()
+
             if not gpt4_most_common_answer.empty:
                 record_uuid_to_answer[record_uuid] = gpt4_most_common_answer.iloc[0]
+            elif not all_models_most_common_answer.empty:
+                record_uuid_to_answer[record_uuid] = all_models_most_common_answer.iloc[0]
             else:
-                try:
-                    record_uuid_to_answer[record_uuid] = record_df.answer.mode().iloc[0]
-                except Exception as e:
-                    import pdb; pdb.set_trace()
+                record_uuid_to_answer[record_uuid] = ''
 
         # compute accepted answers and clean all answers
         pd.options.mode.chained_assignment = None  # turn off copy warnings
@@ -377,9 +378,11 @@ class CostEstimator:
                     op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
             
                 elif isinstance(op, pz.NonLLMFilter):
-                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
-                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
-                    op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
+                    # TODO check this!
+                    model_name = None
+                    op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
+                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
+                    op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
 
                 elif isinstance(op, pz.HardcodedConvert):
                     op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
