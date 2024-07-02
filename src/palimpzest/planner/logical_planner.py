@@ -209,12 +209,12 @@ class LogicalPlanner(Planner):
         while isinstance(node, pz.sets.Dataset):
             dataset_nodes.append(node)
             node = node._source
-        # TODO this is a bandaid fix for the real-eval scenario
-        if isinstance(node, pz.UserSource):
-            dataset_nodes[-1] = node
-        else:
-            dataset_nodes.append(node)
+        dataset_nodes.append(node)
         dataset_nodes = list(reversed(dataset_nodes))
+
+        if dataset_nodes[0].schema == dataset_nodes[1].schema:
+            dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
+            dataset_nodes[1]._source = dataset_nodes[0]
 
         # construct naive logical plan
         plan = self._construct_logical_plan(dataset_nodes)

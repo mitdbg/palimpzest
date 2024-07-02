@@ -152,6 +152,7 @@ class NonLLMFilter(FilterOp):
             filter_str=self.filter.getFilterStr(),
             passed_filter=result,
             fn_call_duration_secs=fn_call_duration_secs,
+            answer=result,
         )
 
         # set _passed_filter attribute and return
