@@ -108,7 +108,7 @@ class PhysicalPlanner(Planner):
             # for op in self.logical_physical_map[type(logical_op)]:
             if isinstance(logical_op, pz_ops.ConvertScan):
                 op_class: PhysicalOperator = None
-                hardcoded_fns = [x for x in self.hardcoded_functions if x.implements(logical_op)]
+                hardcoded_fns = [x for x in self.hardcoded_functions if x.implements(type(logical_op))]
                 if len(hardcoded_fns) > 0:                                                    
                     for op_class in hardcoded_fns:
                         op = op_class(
@@ -121,6 +121,8 @@ class PhysicalPlanner(Planner):
                     break
                 else:
                     for op_class in self.logical_physical_map[type(logical_op)]:
+                        if not op_class.materializes(logical_op):
+                            continue
                         op = op_class(
                                 inputSchema=logical_op.inputSchema,
                                 outputSchema=logical_op.outputSchema,
@@ -131,15 +133,13 @@ class PhysicalPlanner(Planner):
             elif isinstance(logical_op, pz_ops.FilteredScan):
                 op_class: PhysicalOperator = None
                 for op_class in self.logical_physical_map[type(logical_op)]:
-                    if op_class.implements(logical_op):
+                    if op_class.materializes(logical_op):
                         op = op_class(
                             inputSchema=logical_op.inputSchema,
                             outputSchema=logical_op.outputSchema,
                             filter=logical_op.filter,
                             shouldProfile=shouldProfile,
                         )
-                        print("Using class", op_class, "for", logical_op)
-
             else:
                 op_class = self.logical_physical_map[type(logical_op)][0]
                 kw_parameters = logical_op.getParameters()
@@ -179,7 +179,7 @@ class PhysicalPlanner(Planner):
                 plans = []
                 op_alternatives = []
                 for subplan in all_plans:
-                    hardcoded_fns = [x for x in self.hardcoded_functions if x.implements(logical_op)]
+                    hardcoded_fns = [x for x in self.hardcoded_functions if x.implements(type(logical_op))]
                     if len(hardcoded_fns) > 0:                                                    
                         for op_class in hardcoded_fns:
                             physical_op = op_class(
@@ -192,6 +192,8 @@ class PhysicalPlanner(Planner):
                         break
                     else:
                         for op_class in self.logical_physical_map[type(logical_op)]:
+                            if not op_class.materializes(logical_op):
+                                continue
                             physical_op = op_class(
                                 inputSchema=logical_op.inputSchema,
                                 outputSchema=logical_op.outputSchema,
@@ -212,7 +214,7 @@ class PhysicalPlanner(Planner):
                 for subplan in all_plans:
                     # TODO: if non-llm filter, don't iterate over all plan possibilities
                     for op_class in self.logical_physical_map[type(logical_op)]:
-                        if not op_class.implements(logical_op): 
+                        if not op_class.materializes(logical_op): 
                             continue
                         physical_op = op_class(
                             inputSchema=logical_op.inputSchema,

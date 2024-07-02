@@ -12,9 +12,12 @@ from palimpzest.utils import API, getJsonFromAnswer
 
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import random
 import base64
 import math
 import time
+
+from palimpzest.utils.model_helpers import getVisionModels
 
 # TYPE DEFINITIONS
 FieldName = str
@@ -65,6 +68,18 @@ class LLMConvert(ConvertOp):
     model: Model
     prompt_strategy: PromptStrategy
 
+    @classmethod
+    def materializes(self, logical_operator) -> bool:
+        if not isinstance(logical_operator, logical.ConvertScan):
+            return False
+        is_vision_model = self.model in getVisionModels()
+        if logical_operator.image_conversion:
+            return is_vision_model
+        else:
+            return not is_vision_model
+        # use image model if this is an image conversion
+
+
     def __init__(
         self,
         query_strategy: Optional[QueryStrategy] = None,
@@ -79,8 +94,7 @@ class LLMConvert(ConvertOp):
         # for now, forbid CodeSynthesis on one-to-many cardinality queries
         if self.cardinality == Cardinality.ONE_TO_MANY:
             assert self.query_strategy != QueryStrategy.CODE_GEN_WITH_FALLBACK, "Cannot run code-synthesis on one-to-many operation"
-
-        # use image model if this is an image conversion
+        # TODO find a place where this is being checked by the planner
         if self.outputSchema == ImageFile and self.inputSchema == File or self.image_conversion:
             # TODO : find a more general way by llm provider
             # TODO : which module is responsible of setting PromptStrategy.IMAGE_TO_TEXT?
@@ -89,8 +103,6 @@ class LLMConvert(ConvertOp):
             if self.model == Model.GEMINI_1:
                 self.model = Model.GEMINI_1V
             if self.model in [Model.MIXTRAL, Model.LLAMA2]:
-                import random
-
                 self.model = random.choice([Model.GPT_4V, Model.GEMINI_1V])
 
             # TODO: in the future remove; for evaluations just use GPT_4V
@@ -454,7 +466,7 @@ class LLMConvert(ConvertOp):
         except Exception as e:
             print(f"DSPy generation error: {e}")
             return "", GenerationStats()
-
+        
         return answer, query_stats
 
     def convert(self, candidate_content: Union[str,List[bytes]] , fields: List[str]) -> Tuple[Dict[str, List], StatsDict]:
@@ -497,7 +509,11 @@ class LLMConvert(ConvertOp):
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
-        n_records = max([len(lst) for lst in field_answers.values()])
+        try:
+            n_records = max([len(lst) for lst in field_answers.values()])
+        except ValueError:
+            import pdb; pdb.set_trace()
+            n_records = 0
         records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
 
         for field_name, answer_list in field_answers.items():

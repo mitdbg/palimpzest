@@ -89,7 +89,7 @@ class CustomGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         return model
@@ -151,7 +151,7 @@ class CustomGenerator(BaseGenerator):
             token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         # get indices of the start and end token for the answer
@@ -272,7 +272,7 @@ class DSPyGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         return model
@@ -334,7 +334,7 @@ class DSPyGenerator(BaseGenerator):
             token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         # get indices of the start and end token for the answer
@@ -446,7 +446,7 @@ class ImageTextGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                f"Model must be one of the image models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         return client
@@ -488,7 +488,7 @@ class ImageTextGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                f"Model must be one of the image models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         return payloads
@@ -534,7 +534,7 @@ class ImageTextGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                f"Model must be one of the image models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         return answer, finish_reason, usage, tokens, token_logprobs

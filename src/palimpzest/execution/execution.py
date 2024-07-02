@@ -80,6 +80,7 @@ class ExecutionEngine:
         self.available_models = available_models
         if not available_models:
             self.available_models = getModels()
+        print("Available models: ", self.available_models)
         self.allow_model_selection = allow_model_selection
         self.allow_bonded_query = allow_bonded_query
         self.allow_code_synth = allow_code_synth
@@ -88,6 +89,8 @@ class ExecutionEngine:
         self.max_workers = max_workers
         if self.max_workers is None and self.execution_strategy == ExecutionStrategy.PARALLEL:
             self.max_workers = self.set_max_workers()
+        else:
+            self.max_workers = 1
         self.datadir = DataDirectory()
         self.useParallelOps = useParallelOps
 

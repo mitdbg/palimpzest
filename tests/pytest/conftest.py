@@ -12,6 +12,26 @@ REAL_ESTATE_EVAL_TINY_DATASET_ID = "real-estate-eval-tiny"
 BIOFABRIC_EVAL_TINY_TEST_DATA = "testdata/biofabric-tiny"
 BIOFABRIC_EVAL_TINY_DATASET_ID = "biofabric-tiny"
 
+# Addresses far from MIT; we use a simple lookup like this to make the
+# experiments re-producible w/out needed a Google API key for geocoding lookups
+FAR_AWAY_ADDRS = [
+    "Melcher St",
+    "Sleeper St",
+    "437 D St",
+    "Seaport Blvd",
+    "50 Liberty Dr",
+    "Telegraph St",
+    "Columbia Rd",
+    "E 6th St",
+    "E 7th St",
+    "E 5th St",
+]
+
+
+with open(".env") as f:
+    for line in f:
+        key, value = line.strip().split("=")
+        os.environ[key] = value
 
 @pytest.fixture
 def email_schema():
@@ -90,11 +110,11 @@ def real_estate_listing_datasource(real_estate_listing_files_schema):
 
             return dr
 
-    # datasetIdentifier = REAL_ESTATE_EVAL_TINY_DATASET_ID
-    # datadir = pz.DataDirectory()
-    # datadir.registerUserSource(
-    #     RealEstateListingSource(datasetIdentifier, REAL_ESTATE_EVAL_TINY_TEST_DATA), datasetIdentifier
-    # )
+    datasetIdentifier = REAL_ESTATE_EVAL_TINY_DATASET_ID
+    datadir = pz.DataDirectory()
+    datadir.registerUserSource(
+        RealEstateListingSource(datasetIdentifier, REAL_ESTATE_EVAL_TINY_TEST_DATA), datasetIdentifier
+    )
 
     return RealEstateListingSource
 
@@ -162,3 +182,179 @@ def enron_eval(email_schema):
         "The email is not quoting from a news article or an article written by someone outside of Enron"
     )
     return emails
+
+### Real Estate Listing Workloads ###
+class RealEstateListingFiles(pz.Schema):
+    """The source text and image data for a real estate listing."""
+
+    listing = pz.StringField(desc="The name of the listing", required=True)
+    text_content = pz.StringField(
+        desc="The content of the listing's text description", required=True
+    )
+    image_contents = pz.ListField(
+        element_type=pz.BytesField,
+        desc="A list of the contents of each image of the listing",
+        required=True,
+    )
+
+class TextRealEstateListing(RealEstateListingFiles):
+    """Represents a real estate listing with specific fields extracted from its text."""
+
+    address = pz.StringField(desc="The address of the property")
+    price = pz.NumericField(desc="The listed price of the property")
+
+
+class ImageRealEstateListing(RealEstateListingFiles):
+    """Represents a real estate listing with specific fields extracted from its text and images."""
+
+    is_modern_and_attractive = pz.BooleanField(
+        desc="True if the home interior design is modern and attractive and False otherwise"
+    )
+    has_natural_sunlight = pz.BooleanField(
+        desc="True if the home interior has lots of natural sunlight and False otherwise"
+    )
+
+
+@pytest.fixture
+def real_estate_listing_source():
+    class RealEstateListingSource(pz.UserSource):
+        def __init__(self, datasetId, listings_dir):
+            super().__init__(RealEstateListingFiles, datasetId)
+            self.listings_dir = listings_dir
+            self.idx = 0
+            self.roots_files_dict = {root:files for root, _, files in os.walk(self.listings_dir)}
+            self.filepaths = [os.path.join(root, file) for root, files in self.roots_files_dict.items() for file in files]
+
+        def __len__(self):
+            return len(os.listdir(self.listings_dir))
+        
+        def getItem(self, idx):
+            # TODO check if this is equivalent
+            root = list(self.roots_files_dict.keys())[idx]
+            dr = pz.DataRecord(self.schema, scan_idx=idx)
+            dr.listing = root.split("/")[-1]
+            dr.image_contents = []
+            for file in self.roots_files_dict[root]:
+                bytes_data = None
+                with open(os.path.join(root, file), "rb") as f:
+                    bytes_data = f.read()
+                if file.endswith(".txt"):
+                    dr.text_content = bytes_data.decode("utf-8")
+                    # dr.text_content = str(bytes_data)
+                elif file.endswith(".png"):
+                    dr.image_contents.append(bytes_data)
+            return dr
+
+            # for root, dirs, files in os.walk(self.listings_dir):
+            #     if root == self.listings_dir:
+            #         continue
+            #     # create data record
+            #     dr = pz.DataRecord(self.schema, scan_idx=self.idx)
+            #     dr.listing = root.split("/")[-1]
+            #     dr.image_contents = []
+            #     for file in files:
+            #         bytes_data = None
+            #         with open(os.path.join(root, file), "rb") as f:
+            #             bytes_data = f.read()
+            #         if file.endswith(".txt"):
+            #             dr.text_content = bytes_data.decode("utf-8")
+            #             # dr.text_content = str(bytes_data)
+            #         elif file.endswith(".png"):
+            #             dr.image_contents.append(bytes_data)
+            #     yield dr
+
+            #     self.idx += 1
+
+    return RealEstateListingSource
+
+def within_two_miles_of_mit(record):
+    # NOTE: I'm using this hard-coded function so that folks w/out a
+    #       Geocoding API key from google can still run this example
+    try:
+        if any(
+            [
+                street.lower() in record.address.lower()
+                for street in FAR_AWAY_ADDRS
+            ]
+        ):
+            return False
+        return True
+    except:
+        return False
+
+def in_price_range(record):
+    try:
+        price = record.price
+        if type(price) == str:
+            price = price.strip()
+            price = int(price.replace("$", "").replace(",", ""))
+        return 6e5 < price and price <= 2e6
+    except:
+        return False
+
+@pytest.fixture
+def real_estate_eval():
+    listings = pz.Dataset("real-estate-eval-tiny", schema=RealEstateListingFiles)
+    listings = listings.convert(TextRealEstateListing, depends_on="text_content")
+    listings = listings.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_contents")
+    listings = listings.filter(
+        "The interior is modern and attractive, and has lots of natural sunlight",
+        depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
+    )
+    listings = listings.filter(within_two_miles_of_mit, depends_on="address")
+    listings = listings.filter(in_price_range, depends_on="price")
+    return listings
+
+### Biofabric Workloads ###
+
+class CaseData(pz.Schema):
+    """An individual row extracted from a table containing medical study data."""
+
+    case_submitter_id = pz.Field(desc="The ID of the case", required=True)
+    age_at_diagnosis = pz.Field(
+        desc="The age of the patient at the time of diagnosis", required=False
+    )
+    race = pz.Field(
+        desc="An arbitrary classification of a taxonomic group that is a division of a species.",
+        required=False,
+    )
+    ethnicity = pz.Field(
+        desc="Whether an individual describes themselves as Hispanic or Latino or not.",
+        required=False,
+    )
+    gender = pz.Field(desc="Text designations that identify gender.", required=False)
+    vital_status = pz.Field(desc="The vital status of the patient", required=False)
+    ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
+    ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
+    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
+    tumor_grade = pz.Field(desc="The tumor grade", required=False)
+    tumor_focality = pz.Field(desc="The tumor focality", required=False)
+    tumor_largest_dimension_diameter = pz.Field(
+        desc="The tumor largest dimension diameter", required=False
+    )
+    primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
+    morphology = pz.Field(desc="The morphology", required=False)
+    tissue_or_organ_of_origin = pz.Field(
+        desc="The tissue or organ of origin", required=False
+    )
+    # tumor_code = pz.Field(desc="The tumor code", required=False)
+    filename = pz.Field(
+        desc="The name of the file the record was extracted from", required=False
+    )
+    study = pz.Field(
+        desc="The last name of the author of the study, from the table name",
+        required=False,
+    )
+
+@pytest.fixture
+def biofabric_eval():
+    xls = pz.Dataset("biofabric-medium",schema=pz.XLSFile)
+    patient_tables = xls.convert(
+        pz.Table, desc="All tables in the file", cardinality="oneToMany")
+    patient_tables = patient_tables.filter(
+        "The rows of the table contain the patient age"
+    )
+    case_data = patient_tables.convert(
+        CaseData, desc="The patient data in the table", cardinality="oneToMany"
+    )
+    return case_data

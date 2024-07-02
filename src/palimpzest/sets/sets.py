@@ -229,10 +229,10 @@ class Dataset(Set):
         f = None
         if type(_filter) == str:
             f = Filter(_filter)
-        elif type(_filter) == callable:
+        elif callable(_filter):
             f = Filter(filterFn=_filter)
         else:
-            raise Exception("Filter type not supported.")
+            raise Exception("Filter type not supported.", type(_filter))
 
         return Dataset(
             source=self,

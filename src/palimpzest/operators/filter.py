@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from palimpzest.generators.generators import DSPyGenerator
+from palimpzest.utils.model_helpers import getVisionModels
 from .physical import PhysicalOperator, DataRecordsWithStats
 
 from palimpzest.constants import *
-from palimpzest.dataclasses import RecordOpStats
+from palimpzest.dataclasses import GenerationStats, RecordOpStats
 from palimpzest.corelib import Schema
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.elements import DataRecord, Filter
@@ -88,11 +89,19 @@ class NonLLMFilter(FilterOp):
     implemented_op = logical.FilteredScan
     final = True
 
-    # @classmethod
-    # def implements(cls, logical_operator_class):
-        # if logical_operator_class == cls.implemented_op:
-            # return isinstance(logical_operator_class.filter, callable)
-        # return False
+    @classmethod
+    def implements(cls, logical_operator_class):
+        if not logical_operator_class == cls.implemented_op:
+            return False
+        # logical_operator is a class
+        if isinstance(logical_operator_class, type): 
+            return logical_operator_class == cls.implemented_op
+
+    @classmethod
+    def materializes(cls, logical_operator: logical.LogicalOperator):
+        if not isinstance(logical_operator, cls.implemented_op):
+            return False
+        return logical_operator.filter.filterFn is not None
 
     def __eq__(self, other: NonLLMFilter):
         return (
@@ -157,14 +166,12 @@ class LLMFilter(FilterOp):
     prompt_strategy = PromptStrategy.DSPY_COT_BOOL
    
     @classmethod
-    def implements(cls, logical_operator_class):
-        if not logical_operator_class == cls.implemented_op:
+    def materializes(cls, logical_operator: logical.LogicalOperator):
+        if not isinstance(logical_operator, cls.implemented_op):
             return False
-        # logical_operator is a class
-        if isinstance(logical_operator_class, type): 
-            return logical_operator_class == cls.implemented_op
-        else:
-            return isinstance(logical_operator_class.filter, str)
+        if cls.model in getVisionModels():
+            return False
+        return logical_operator.filter.filterCondition is not None
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -256,7 +263,7 @@ class LLMFilter(FilterOp):
 
         # invoke LLM to generate filter decision (True or False)
         text_content = candidate._asJSONStr(include_bytes=False)
-        response, gen_stats = None, {}
+        response, gen_stats = None, GenerationStats()
         try:
             response, gen_stats = self.generator.generate(
                 context=text_content,

@@ -505,13 +505,21 @@ class CodeSynthesisConvertStrategy(PhysicalOpStrategy):
 
     @staticmethod
     def __new__(cls, 
-                exemplar_generation_models: List[Model] = [getChampionModel()],
-                code_synth_models: List[Model] = [getCodeChampionModel()],
-                conventional_fallback_models: List[Model] = [getConventionalFallbackModel()],
+                exemplar_generation_models: List[Model] = None,
+                code_synth_models: List[Model] = None,
+                conventional_fallback_models: List[Model] = None,
                 prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_QA,
                 code_synth_strategy: CodingStrategy = CodingStrategy.SINGLE,
                 *args, **kwargs) -> List[physical.PhysicalOperator]:
 
+
+        if exemplar_generation_models is None:
+            exemplar_generation_models = [getChampionModel()]
+        if code_synth_models is None:
+            code_synth_models = [getCodeChampionModel()]
+        if conventional_fallback_models is None:
+            conventional_fallback_models = [getConventionalFallbackModel()]
+        
         op_class = cls.code_strategy_map[code_synth_strategy]
         # physical_op_type = type(op_class.__name__+model.name,
         return_operators = []
