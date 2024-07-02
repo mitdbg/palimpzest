@@ -27,26 +27,8 @@ from palimpzest.strategies.bonded_query import LLMBondedQueryConvert
 from palimpzest.operators.datasource import MarshalAndScanDataOp
 from palimpzest.constants import PromptStrategy
 
-
-def test_strategies(email_schema):
-    """Test whether strategy creation works"""
-    available_models = [pz.Model.GPT_4]
-
-    emails = pz.Dataset("enron-eval-tiny", schema=email_schema)
-    records, plan, stats= Execute(emails, 
-                                  policy=pz.MinCost(),
-                                  available_models=available_models,
-                                  allow_bonded_query=False,
-                                  allow_model_selection=False,
-                                  allow_code_synth=False,
-                                  allow_token_reduction=True,
-                                  execution_engine=NoSentinelExecution)
-    for record in records:
-        print(record.sender, record.subject)
-
-
-
 @pytest.mark.parametrize("convert_op", [TokenReducedBondedConvert])
+@pytest.mark.parametrize("convert_op", [LLMConvertConventional])
 def test_convert(convert_op, email_schema):
     """Test whether convert operators"""
     model = pz.Model.GPT_4

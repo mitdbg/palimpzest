@@ -75,6 +75,10 @@ class PlanType(str, Enum):
     SENTINEL = "Sentinel Plan"
     FINAL = "Final Plan"
 
+IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
+PDF_EXTENSIONS = [".pdf"]
+XLS_EXTENSIONS = [".xls", ".xlsx"]
+
 # the number of seconds the parallel execution will sleep for while waiting for futures to complete
 PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.1
 

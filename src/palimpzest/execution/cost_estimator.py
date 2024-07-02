@@ -282,8 +282,9 @@ class CostEstimator:
             estimates = {}
 
             # get the op_name for this operation
+            model_name = str(op_df.model_name.iloc[0])
             op_name = str(op_df.op_name.iloc[0])
-            if 'LLM' in op_name:
+            if model_name is not None:
                 # compute estimates per-model, and add None which forces computation of avg. across all models
                 models = getModels(include_vision=True) + [None]
                 estimates = {model: None for model in models}
@@ -399,11 +400,14 @@ class CostEstimator:
                 elif isinstance(op, pz.LLMConvert):
                     model_name = op.model.value
                     # TODO: account for scenario where model_name does not have samples but another model does
-                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
-                    op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
-                    op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
-                    op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
-
+                    try:
+                        op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
+                        op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
+                        op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
+                        op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
+                    except Exception as e:
+                        print(e)
+                        import pdb; pdb.set_trace()
                     # TODO: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
                     #       which would wildly mess up estimate of time and cost per-record
                     # do code synthesis adjustment

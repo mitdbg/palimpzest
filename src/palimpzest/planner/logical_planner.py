@@ -154,7 +154,6 @@ class LogicalPlanner(Planner):
             else:
                 inputSchema = dataset_nodes[idx - 1].schema
                 outputSchema = node.schema
-
                 if node._filter is not None:
                     op = pz_ops.FilteredScan(
                         inputSchema=inputSchema,

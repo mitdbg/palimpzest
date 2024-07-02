@@ -21,7 +21,6 @@ class ModelSelectionStrategy(PhysicalOpStrategy):
 
         return_operators = []
         for model in available_models:
-            print(f"MODEL: {model}")
             if model.value not in MODEL_CARDS:
                 raise ValueError(f"Model {model} not found in MODEL_CARDS")
             if not enable_vision and model in getVisionModels():
@@ -33,10 +32,8 @@ class ModelSelectionStrategy(PhysicalOpStrategy):
                                      'prompt_strategy': prompt_strategy,
                                      'final': True,
                                      })
-            print(f"PHYSOPTYPE: {physical_op_type}")
             return_operators.append(physical_op_type)
 
-        print(f"return ops: {return_operators}")
 
         return return_operators
 

@@ -6,6 +6,18 @@ from typing import Any, Dict, List, Union
 import os
 import sys
 
+from palimpzest import constants
+from palimpzest.corelib.schemas import ImageFile, PDFFile, TextFile, XLSFile
+
+from palimpzest.tools.pdfparser import get_text_from_pdf
+from papermage import Document
+
+
+import json
+import modal
+import pandas as pd
+from io import BytesIO
+
 
 class AbstractDataSource:
     """
@@ -83,14 +95,14 @@ class MemorySource(DataSource):
 class DirectorySource(DataSource):
     """DirectorySource returns multiple File objects from a real-world source (a directory on disk)"""
 
-    def __init__(self, path: str, dataset_id: str) -> None:
-        super().__init__(File, dataset_id)
+    def __init__(self, path: str, dataset_id: str, schema: Schema) -> None:
         self.filepaths = [
             os.path.join(path, filename)
             for filename in sorted(os.listdir(path))
             if os.path.isfile(os.path.join(path, filename))
         ]
         self.path=path
+        super().__init__(schema, dataset_id)
 
     def serialize(self) -> Dict[str, Any]:
         return {
@@ -107,12 +119,99 @@ class DirectorySource(DataSource):
         return sum([os.path.getsize(filepath) for filepath in self.filepaths])
 
     def getItem(self, idx: int):
+        raise NotImplementedError(f"You are calling this method from an abstract class.")
+
+class TextFileDirectorySource(DirectorySource):
+    def __init__(self, path: str, dataset_id: str) -> None:
+        super().__init__(path=path, dataset_id=dataset_id, schema=TextFile)
+
+    def getItem(self, idx: int):
         filepath = self.filepaths[idx]
         dr = DataRecord(self.schema, scan_idx=idx)
-        dr.filename = filepath
+        dr.filename = os.path.basename(filepath)
+        with open(filepath, "r") as f:
+            dr.contents = f.read()
+        return dr
+
+
+class ImageFileDirectorySource(DirectorySource):
+    def __init__(self, path: str, dataset_id: str) -> None:
+        super().__init__(path=path, dataset_id=dataset_id, schema=ImageFile)
+        assert all([filename.endswith(tuple(constants.IMAGE_EXTENSIONS)) for filename in self.filepaths])
+
+    def getItem(self, idx: int):
+        filepath = self.filepaths[idx]
+        dr = DataRecord(self.schema, scan_idx=idx)
+        dr.filename = os.path.basename(filepath)
+        with open(filepath, "rb") as f:
+            dr.contents = f.read()
+        return dr
+
+class PDFFileDirectorySource(DirectorySource):
+    def __init__(self, 
+                 path: str, 
+                 dataset_id: str, 
+                 pdfprocessor:str = "modal",
+                 file_cache_dir:str = "/tmp",
+                 ) -> None:
+        super().__init__(path=path, dataset_id=dataset_id, schema=PDFFile)
+        assert all([filename.endswith(tuple(constants.PDF_EXTENSIONS)) for filename in self.filepaths])
+        self.pdfprocessor = pdfprocessor
+        self.file_cache_dir = file_cache_dir
+
+    def getItem(self, idx: int):
+        filepath = self.filepaths[idx]
+        dr = DataRecord(self.schema, scan_idx=idx)
+        dr.filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
             dr.contents = f.read()
 
+        if self.pdfprocessor == "modal":
+            print("handling PDF processing remotely")
+            remoteFunc = modal.Function.lookup(
+                "palimpzest.tools", "processPapermagePdf"
+            )
+        else:
+            remoteFunc = None
+
+        # parse PDF variables
+        pdf_bytes = dr.contents
+        pdf_filename = dr.filename
+
+        # generate text_content from PDF
+        if remoteFunc is not None:
+            docJsonStr = remoteFunc.remote([pdf_bytes])
+            docdict = json.loads(docJsonStr[0])
+            doc = Document.from_json(docdict)
+            text_content = ""
+            for p in doc.pages:
+                text_content += p.text
+        else:
+            text_content = get_text_from_pdf(dr.filename, dr.contents, file_cache_dir = self.file_cache_dir)
+
+        # construct data record
+        dr = DataRecord(self.outputSchema, parent_uuid=dr._uuid)
+        dr.filename = pdf_filename
+        dr.contents = pdf_bytes
+        dr.text_contents = text_content[:10000]  # TODO Very hacky
+
+        return dr
+
+class XLSFileDirectorySource(DirectorySource):
+    def __init__(self, path: str, dataset_id: str) -> None:
+        super().__init__(path=path, dataset_id=dataset_id, schema=XLSFile)
+        assert all([filename.endswith(tuple(constants.XLS_EXTENSIONS)) for filename in self.filepaths])
+
+    def getItem(self, idx: int):
+        filepath = self.filepaths[idx]
+        dr = DataRecord(self.schema, scan_idx=idx)
+        dr.filename = os.path.basename(filepath)
+        with open(filepath, "rb") as f:
+            dr.contents = f.read()
+
+        xls = pd.ExcelFile(BytesIO(dr.contents), engine="openpyxl")
+        dr.number_sheets = len(xls.sheet_names)
+        dr.sheet_names = xls.sheet_names
         return dr
 
 

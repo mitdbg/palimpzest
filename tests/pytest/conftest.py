@@ -337,7 +337,7 @@ class CaseData(pz.Schema):
 
 @pytest.fixture
 def biofabric_eval():
-    xls = pz.Dataset("biofabric-medium",schema=pz.XLSFile)
+    xls = pz.Dataset("biofabric-medium", schema=pz.XLSFile)
     patient_tables = xls.convert(
         pz.Table, desc="All tables in the file", cardinality="oneToMany")
     patient_tables = patient_tables.filter(

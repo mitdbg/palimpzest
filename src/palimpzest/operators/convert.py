@@ -416,6 +416,7 @@ class LLMConvert(ConvertOp):
         try:
             json_answer = getJsonFromAnswer(answer)
             assert json_answer != {}, "No output was found!"
+            assert all([field in json_answer for field in fields_to_generate]), "Not all fields were generated!"
         except Exception as e:
             print(f"Error parsing answer: {e}")
             json_answer = {field_name: [] for field_name in fields_to_generate}
@@ -549,7 +550,6 @@ class LLMConvertConventional(LLMConvert):
                 content=candidate_content,
                 prompt=prompt,
             )
-
             json_answer = self.parse_answer(answer, [field_name])
             fields_answers.update(json_answer)
             fields_stats[field_name] = stats

@@ -3,14 +3,12 @@ My suggestion is to rename at least the base generator into LLMGenerator.
 See llm_wrapper.py for a proposed refactoring of generators.py using the class factory pattern.
 """
 from palimpzest.constants import *
-from palimpzest.elements import DataRecord
 from palimpzest.generators import (
     dspyCOT,
     gen_filter_signature_class,
     gen_qa_signature_class,
     TogetherHFAdaptor,
 )
-from palimpzest.dataclasses import GenerationStats, RecordOpStats
 from palimpzest.dataclasses import GenerationStats, RecordOpStats
 from palimpzest.utils import API
 

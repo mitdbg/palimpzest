@@ -500,7 +500,7 @@ def test_workload(workload, enron_eval, biofabric_eval, real_estate_eval):
         raise ValueError(f"Unknown workload: {workload}")
     
     # workload_to_dataset_size = {"enron": 1000, "real-estate": 100, "biofabric": 11}
-    workload_to_dataset_size = {"enron": 10, "real-estate": 5, "biofabric": 11}
+    workload_to_dataset_size = {"enron": 10, "real-estate": 5, "biofabric": 3}
     dataset_size = workload_to_dataset_size[workload]
     num_samples = int(0.05 * dataset_size) if workload != "biofabric" else 1
 
@@ -511,16 +511,16 @@ def test_workload(workload, enron_eval, biofabric_eval, real_estate_eval):
                                   num_samples=num_samples,
                                   nocache=True,
                                   allow_model_selection=True,
-                                  allow_bonded_query=False,
+                                  allow_bonded_query=True,
                                   allow_code_synth=False,
                                   allow_token_reduction=False,
                                   execution_engine=SequentialSingleThreadExecution)
     
-    import pdb; pdb.set_trace()
     # print(f"Plan: {result_dict['plan_info']['plan_label']}")
     # print(f"  F1: {result_dict['f1_score']}")
-    # print(f"  rt: {result_dict['runtime']}")
-    # print(f"  $$: {result_dict['cost']}")
+    print(f"  rt: {stats.total_plan_time}")
+    print(f"  $$: {stats.total_plan_cost}")
+    import pdb; pdb.set_trace()
     # print("---")
 
 

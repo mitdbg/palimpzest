@@ -1,6 +1,6 @@
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
-from palimpzest.datasources import DirectorySource, FileSource, MemorySource, UserSource
+from palimpzest.datasources import *
 from palimpzest.elements import (
     DownloadBinaryFunction,
     DownloadHTMLFunction,
@@ -12,6 +12,9 @@ import pickle
 import sys
 import yaml
 from threading import Lock
+
+from palimpzest import constants
+from palimpzest.datasources.datasources import ImageFileDirectorySource, PDFFileDirectorySource, TextFileDirectorySource, XLSFileDirectorySource
 
 
 class DataDirectorySingletonMeta(type):
@@ -137,7 +140,25 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
         entry, rock = self._registry[dataset_id]
         if entry == "dir":
-            return DirectorySource(rock, dataset_id)
+            if all([ f.endswith(tuple(constants.IMAGE_EXTENSIONS))
+                        for f in os.listdir(rock)]):
+                return ImageFileDirectorySource(rock, dataset_id)
+            elif all([ f.endswith(tuple(constants.PDF_EXTENSIONS))
+                        for f in os.listdir(rock)]):
+                pdfprocessor = self.current_config.get("pdfprocessing")
+                file_cache_dir = self.getFileCacheDir()
+                return PDFFileDirectorySource(path=rock, 
+                                              dataset_id=dataset_id, 
+                                              pdfprocessor=pdfprocessor,
+                                              file_cache_dir=file_cache_dir
+                                              )
+            elif all([ f.endswith(tuple(constants.XLS_EXTENSIONS))
+                        for f in os.listdir(rock)]):
+                return XLSFileDirectorySource(rock, dataset_id)
+            else:
+                return TextFileDirectorySource(rock, dataset_id)
+            
+
         elif entry == "file":
             return FileSource(rock, dataset_id)
         elif entry == "memory":
