@@ -278,16 +278,23 @@ class Table(Schema):
     def asJSONStr(self, record_dict: Dict[str, Any], *args, **kwargs) -> str:
         """Return a JSON representation of an instantiated object of this Schema"""
         # Take the rows in the record_dict and turn them into comma separated strings
-        rows = []
-        try:
-            for i, row in enumerate(
-                record_dict["rows"][:MAX_ROWS]
-            ):  # only sample the first MAX_ROWS
-                rows += [",".join(map(str,row)) + "\n"]
+        if record_dict["rows"] is not None:
+            rows = []
+            # only sample the first MAX_ROWS
+            try:
+                for i, row in enumerate(record_dict["rows"][:MAX_ROWS]):
+                    rows += [",".join(map(str, row)) + "\n"]
+            except Exception as e:
+                print(f"Exception: {e}")
+                import pdb; pdb.set_trace()
             record_dict["rows"] = rows
+        else:
+            record_dict["rows"] = ""
+
+        if record_dict["header"] is not None:
             header = ",".join(record_dict["header"])
             record_dict["header"] = header
-        except Exception:
-            import pdb; pdb.set_trace()
+        else:
+            record_dict["header"] = ""
 
         return super(Table, self).asJSONStr(record_dict, *args, **kwargs)
