@@ -486,10 +486,7 @@ class LLMConvert(ConvertOp):
 
         # get text or image content depending on prompt strategy
         if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-            try:
-                content = candidate._asJSONStr(include_bytes=False)
-            except:
-                import pdb; pdb.set_trace()
+            content = candidate._asJSONStr(include_bytes=False)
         elif self.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
             base64_images = []
             if hasattr(candidate, "contents"):

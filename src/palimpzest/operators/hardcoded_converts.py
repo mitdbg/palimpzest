@@ -227,9 +227,6 @@ class ConvertFileToXLS(HardcodedConvert):
             fn_call_duration_secs=api_call_duration_secs,
         )
 
-        if not hasattr(dr, 'contents'):
-            import pdb; pdb.set_trace()
-
         return [dr], [record_op_stats]
 
 

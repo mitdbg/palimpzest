@@ -92,10 +92,7 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
             max_matches = 0
             max_col = "missing"
             for input_col in input_df.columns:
-                try:
-                    matches = sum([1 for idx, x in enumerate(output_study[col]) if x == input_df[input_col][idx]])
-                except:
-                    pdb.set_trace()
+                matches = sum([1 for idx, x in enumerate(output_study[col]) if x == input_df[input_col][idx]])
                 if matches > max_matches:
                     max_matches = matches
                     max_col = input_col

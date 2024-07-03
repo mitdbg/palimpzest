@@ -290,7 +290,6 @@ class CostEstimator:
                 # TODO the following line should not harm, because in the _est_time functions we are subsampling op_df anyway
                 # models = op_df.model_name.unique().tolist()
                 estimates = {model: None for model in models}
-                import pdb; pdb.set_trace()
                 for model in models:
                     model_name = model.value if model is not None else None
                     est_tokens = self._est_tokens_per_record(op_df, model_name=model_name)
@@ -378,70 +377,66 @@ class CostEstimator:
 
             # if we have sample execution data, update naive estimates with more informed ones
             if sample_op_estimates is not None and op_id in sample_op_estimates:
-                try:
-                    if isinstance(op, pz.MarshalAndScanDataOp) or isinstance(op, pz.CacheScanDataOp):
-                        op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                if isinstance(op, pz.MarshalAndScanDataOp) or isinstance(op, pz.CacheScanDataOp):
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
 
-                    elif isinstance(op, pz.ApplyGroupByOp):
-                        op_estimates.cardinality = sample_op_estimates[op_id]["cardinality"]
-                        op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                elif isinstance(op, pz.ApplyGroupByOp):
+                    op_estimates.cardinality = sample_op_estimates[op_id]["cardinality"]
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
 
-                    elif isinstance(op, pz.ApplyCountAggregateOp) or isinstance(op, pz.ApplyAverageAggregateOp):
-                        op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                elif isinstance(op, pz.ApplyCountAggregateOp) or isinstance(op, pz.ApplyAverageAggregateOp):
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
 
-                    elif isinstance(op, pz.LimitScanOp):
-                        op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                elif isinstance(op, pz.LimitScanOp):
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+            
+                elif isinstance(op, pz.NonLLMFilter):
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
+                    op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
+
+                elif isinstance(op, pz.HardcodedConvert):
+                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+
+                elif isinstance(op, pz.LLMFilter):
+                    model_name = op.model.value
+                    # TODO: account for scenario where model_name does not have samples but another model does
+                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
+                    op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
+                    op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
+                    op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
                 
-                    elif isinstance(op, pz.NonLLMFilter):
-                        op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
-                        op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
-                        op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
+                elif isinstance(op, pz.LLMConvert):
+                    model_name = op.model.value
+                    # TODO: account for scenario where model_name does not have samples but another model does
+                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
+                    op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
+                    op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
+                    op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
+                    # TODO: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
+                    #       which would wildly mess up estimate of time and cost per-record
+                    # do code synthesis adjustment
+                    if op.query_strategy in [
+                        QueryStrategy.CODE_GEN_WITH_FALLBACK,
+                        QueryStrategy.CODE_GEN,
+                    ]:
+                        op_estimates.time_per_record = 1e-5
+                        op_estimates.cost_per_record = 1e-4
+                        op_estimates.quality = op_estimates.quality * (GPT_4_MODEL_CARD["code"] / 100.0)
 
-                    elif isinstance(op, pz.HardcodedConvert):
-                        op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
-                        op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                    # token reduction adjustment
+                    if op.token_budget is not None and op.token_budget < 1.0:
+                        input_tokens = op.token_budget * sample_op_estimates[op_id][model_name]["input_tokens"]
+                        output_tokens = sample_op_estimates[op_id][model_name]["output_tokens"]
+                        op_estimates.cost_per_record = (
+                            MODEL_CARDS[op.model.value]["usd_per_input_token"] * input_tokens
+                            + MODEL_CARDS[op.model.value]["usd_per_output_token"] * output_tokens
+                        )
+                        op_estimates.quality = op_estimates.quality * math.sqrt(math.sqrt(op.token_budget))
 
-                    elif isinstance(op, pz.LLMFilter):
-                        model_name = op.model.value
-                        # TODO: account for scenario where model_name does not have samples but another model does
-                        op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
-                        op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
-                        op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
-                        op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
-                    
-                    elif isinstance(op, pz.LLMConvert):
-                        model_name = op.model.value
-                        # TODO: account for scenario where model_name does not have samples but another model does
-                        op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
-                        op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
-                        op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
-                        op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
-                        # TODO: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
-                        #       which would wildly mess up estimate of time and cost per-record
-                        # do code synthesis adjustment
-                        if op.query_strategy in [
-                            QueryStrategy.CODE_GEN_WITH_FALLBACK,
-                            QueryStrategy.CODE_GEN,
-                        ]:
-                            op_estimates.time_per_record = 1e-5
-                            op_estimates.cost_per_record = 1e-4
-                            op_estimates.quality = op_estimates.quality * (GPT_4_MODEL_CARD["code"] / 100.0)
-
-                        # token reduction adjustment
-                        if op.token_budget is not None and op.token_budget < 1.0:
-                            input_tokens = op.token_budget * sample_op_estimates[op_id][model_name]["input_tokens"]
-                            output_tokens = sample_op_estimates[op_id][model_name]["output_tokens"]
-                            op_estimates.cost_per_record = (
-                                MODEL_CARDS[op.model.value]["usd_per_input_token"] * input_tokens
-                                + MODEL_CARDS[op.model.value]["usd_per_output_token"] * output_tokens
-                            )
-                            op_estimates.quality = op_estimates.quality * math.sqrt(math.sqrt(op.token_budget))
-
-                    else:
-                        raise Exception("Unknown operator")
-                except Exception as e:
-                    print(e)
-                    import pdb; pdb.set_trace()
+                else:
+                    raise Exception("Unknown operator")
 
 
             # NOTE: a slightly more accurate thing to do would be to estimate the time_per_record based on the
