@@ -5,11 +5,12 @@
 - Join our Discord: [discord](https://discord.gg/znFN2baN)
 - Read our short blog post: [read the blog post](https://dsg.csail.mit.edu/projects/palimpzest/)
 - Check out our Colab Demo: [colab demo](https://colab.research.google.com/drive/1zqOxnh_G6eZ8_xax6PvDr-EjMt7hp4R5?usp=sharing)
+- Check out the video: [MIT 2024](https://youtu.be/T8VQfyBiki0?si=eiph57DSEkDNbEIu)
 
 # Getting started
 You can install the Palimpzest package and CLI on your machine by cloning this repository and running:
 ```bash
-$ git clone git@github.com:mikecafarella/palimpzest.git
+$ git clone git@github.com:mitdbg/palimpzest.git
 $ cd palimpzest
 $ pip install .
 ```
@@ -171,7 +172,7 @@ If you want to use parallel PDF processing at modal.com, you have to:
 
 Below are simple instructions to run pz on a test data set of enron emails that is included with the system:
 
-- Initialize the configuration by running `pz --init`.
+- Initialize the configuration by running `pz init`.
 
 - Add the enron data set with:
 `pz reg --path testdata/enron-tiny --name enron-tiny`
