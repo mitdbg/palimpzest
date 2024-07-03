@@ -24,7 +24,7 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
     """
     # parse records
     exclude_keys = ["op_id", "uuid", "parent_uuid", "stats"]
-    include_keys = [
+    matching_columns = [
         "age_at_diagnosis",
         "ajcc_pathologic_n",
         "ajcc_pathologic_stage",
@@ -43,8 +43,9 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
     ]
     output_rows = []
     for rec in records:
-        dct = {k:v for k,v in rec._asDict().items() if k not in exclude_keys}
-        dct["study"] = os.path.basename(rec["filename"]).split("_")[0]
+        dct = {k:v for k,v in rec._asDict().items() if k in matching_columns}
+        filename = os.path.basename(rec._asDict()["filename"])
+        dct["study"] = os.path.basename(filename).split("_")[0]
         output_rows.append(dct)
 
     records_df = pd.DataFrame(output_rows)
@@ -72,7 +73,6 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
     studies = output["study"].unique()
     # Group by output by the "study" column and split it into many dataframes indexed by the "study" column
     df = pd.DataFrame(columns=target_matching.columns, index=index)
-    cols = output.columns
     predicted = []
     targets = []
 
@@ -88,20 +88,12 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
             predicted += ["missing"] * 5
             continue
         # for every column in output_study, check which column in input_df is the closest, i.e. the one with the highest number of matching values
-        for col in cols:
-            if col == "study":
-                continue
+        for col in matching_columns:
             max_matches = 0
             max_col = "missing"
             for input_col in input_df.columns:
                 try:
-                    matches = sum(
-                        [
-                            1
-                            for idx, x in enumerate(output_study[col])
-                            if x == input_df[input_col][idx]
-                        ]
-                    )
+                    matches = sum([1 for idx, x in enumerate(output_study[col]) if x == input_df[input_col][idx]])
                 except:
                     pdb.set_trace()
                 if matches > max_matches:

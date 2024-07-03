@@ -287,7 +287,10 @@ class CostEstimator:
             if model_name is not None:
                 # compute estimates per-model, and add None which forces computation of avg. across all models
                 models = getModels(include_vision=True) + [None]
+                # TODO the following line should not harm, because in the _est_time functions we are subsampling op_df anyway
+                # models = op_df.model_name.unique().tolist()
                 estimates = {model: None for model in models}
+                import pdb; pdb.set_trace()
                 for model in models:
                     model_name = model.value if model is not None else None
                     est_tokens = self._est_tokens_per_record(op_df, model_name=model_name)
