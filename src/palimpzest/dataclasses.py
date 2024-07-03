@@ -212,6 +212,9 @@ class PlanStats:
     # total cost for plan
     total_plan_cost: float = 0.0
 
+    # Human-readable index for the plan, do not use for identification
+    plan_idx: int = 0
+
     def finalize(self, total_plan_time: float):
         self.total_plan_time = total_plan_time
         self.total_plan_cost = sum([op_stats.total_op_cost for _, op_stats in self.operator_stats.items()])

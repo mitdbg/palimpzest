@@ -59,10 +59,6 @@ class SchemaMetaclass(type):
 
         return json.dumps(d, sort_keys=True)
 
-    def className(cls) -> str:
-        """Return the name of this class"""
-        return cls.__class__.__name__
-
     def jsonSchema(cls) -> Dict[str, Any]:
         """The JSON representation of the Schema"""
         fields = SchemaMetaclass.fieldNames(cls)
@@ -120,6 +116,12 @@ class Schema(metaclass=SchemaMetaclass):
             record_dict["data type description"] = str(self.__class__.__doc__)
 
         return json.dumps(record_dict, indent=2)
+
+    # TODO move logic from metaclass to here
+    @classmethod
+    def className(cls) -> str:
+        """Return the name of this class"""
+        return cls.__name__
 
 
 # TODO: Under the definition of __eq__ in SchemaMetaclass, I think that an equality check like
@@ -277,12 +279,11 @@ class Table(Schema):
         """Return a JSON representation of an instantiated object of this Schema"""
         # Take the rows in the record_dict and turn them into comma separated strings
         rows = []
-        for i, row in enumerate(
-            record_dict["rows"][:MAX_ROWS]
-        ):  # only sample the first MAX_ROWS
-            rows += [",".join(row) + "\n"]
+        # only sample the first MAX_ROWS
+        for i, row in enumerate(record_dict["rows"][:MAX_ROWS]):
+            rows += [",".join(map(str, row)) + "\n"]
         record_dict["rows"] = rows
-
+        record_dict["rows"] = ""
         header = ",".join(record_dict["header"])
         record_dict["header"] = header
 

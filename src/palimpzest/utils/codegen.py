@@ -1,4 +1,3 @@
-from palimpzest.profiler import GenerationStats, CodeGenSingleStats, CodeGenEnsembleStats, CodeExecutionSingleStats, CodeExecutionEnsembleStats
 from palimpzest.generators import CustomGenerator
 from .sandbox import API
 from palimpzest.constants import Model, CodeGenStrategy

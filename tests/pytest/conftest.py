@@ -21,21 +21,28 @@ pytest_plugins = [
 #       need to, for example, re-register datasets for each individual test.
 
 @pytest.fixture
-def dataset(request, enron_eval_tiny, real_estate_eval_tiny):
+def dataset(request, enron_eval_tiny, real_estate_eval_tiny, biofabric_tiny):
     dataset_id = request.param
     dataset_id_to_dataset = {
-        "enron": enron_eval_tiny,
-        "real-estate": real_estate_eval_tiny,
+        "enron-eval-tiny": enron_eval_tiny,
+        "real-estate-eval-tiny": real_estate_eval_tiny,
+        "biofabric-tiny": biofabric_tiny,
     }
     return dataset_id_to_dataset[dataset_id]
 
 
 @pytest.fixture
-def workload(request, enron_workload):
+def workload(
+    request,
+    enron_workload,
+    real_estate_workload,
+    biofabric_workload,
+):
     workload_id = request.param
     workload_id_to_workload = {
         "enron-workload": enron_workload,
-        # "real-estate-workload": real_estate_workload,
+        "real-estate-workload": real_estate_workload,
+        "biofabric-workload": biofabric_workload,
     }
     return workload_id_to_workload[workload_id]
 

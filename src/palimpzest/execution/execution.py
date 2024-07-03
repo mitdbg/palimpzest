@@ -215,8 +215,12 @@ class ExecutionEngine:
             final_plans = physical_planner.add_plans_closest_to_frontier(final_plans, plans, self.min_plans)
 
         # choose best plan and execute it
+        #TODO return plan_idx ?
         plan = policy.choose(plans)
-        new_records, stats = self.execute_plan(plan, plan_type=PlanType.FINAL)
+        new_records, stats = self.execute_plan(plan=plan, 
+                                               plan_type=PlanType.FINAL, 
+                                               plan_idx=0,
+                                               max_workers=self.max_workers)
         all_records = sentinel_records + new_records
 
         return all_records, plan, stats
@@ -237,8 +241,11 @@ class ExecutionEngine:
         sentinel_workers = min(self.max_workers, num_sentinel_plans)
         with ThreadPoolExecutor(max_workers=sentinel_workers) as executor:
             max_workers_per_plan = max(self.max_workers / num_sentinel_plans, 1)
-            results = list(executor.map(lambda x: self.execute_plan(*x),
-                    [(plan, idx, PlanType.SENTINEL, max_workers_per_plan) for idx, plan in enumerate(sentinel_plans)],
+            results = list(executor.map(lambda x: self.execute_plan(**x),
+                    [{"plan":plan, 
+                      "plan_type":PlanType.SENTINEL, 
+                      "plan_idx": idx,
+                      "max_workers":max_workers_per_plan} for idx, plan in enumerate(sentinel_plans)],
                 )
             )
 
@@ -275,7 +282,7 @@ class SequentialSingleThreadExecution(ExecutionEngine):
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id()) # TODO move into PhysicalPlan.__init__?
+        plan_stats = PlanStats(plan_id=plan.plan_id(), plan_idx = plan_idx) # TODO move into PhysicalPlan.__init__?
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
             plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here

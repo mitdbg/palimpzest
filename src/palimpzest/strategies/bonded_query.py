@@ -26,25 +26,28 @@ class LLMBondedQueryConvert(convert.LLMConvert):
         prompt = self._construct_query_prompt(fields_to_generate=fields)
 
         # generate all fields in a single query
-        answer, field_stats = self._dspy_generate_fields(content=candidate_content, prompt=prompt)
+        answer, generation_stats = self._dspy_generate_fields(content=candidate_content, prompt=prompt)
         json_answers = self.parse_answer(answer, fields)
 
         # if there was an error, execute a conventional query
-        if all([v == [] for v in json_answers.values()]):
-            print("Falling back to conventional conversion")
-            conventional_op = type('LLMFallback',
-                                    (convert.LLMConvertConventional,),
-                                    {'model': self.model,
-                                     'prompt_strategy': self.prompt_strategy})
+        for field, values in json_answers.items():
+            if values == []:
+                print("Falling back to conventional conversion")
+                conventional_op = type('LLMFallback',
+                                        (convert.LLMConvertConventional,),
+                                        {'model': self.model,
+                                        'prompt_strategy': self.prompt_strategy})
             
-            return conventional_op(
-                inputSchema = self.inputSchema,
-                outputSchema = self.outputSchema,
-                shouldProfile = self.shouldProfile,
-                query_strategy = self.query_strategy,
-            ).convert(candidate_content, fields)
+                field_answer, field_stats = conventional_op(
+                    inputSchema = self.inputSchema,
+                    outputSchema = self.outputSchema,
+                    shouldProfile = self.shouldProfile,
+                    query_strategy = self.query_strategy,
+                ).convert(candidate_content, field)
+                json_answers[field] = field_answer[field]
+                generation_stats += field_stats
         
-        return json_answers, field_stats
+        return json_answers, generation_stats
 
 
 class BondedQueryStrategy(PhysicalOpStrategy):

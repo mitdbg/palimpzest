@@ -84,7 +84,7 @@ def real_estate_eval_tiny(real_estate_eval_tiny_data):
         src=RealEstateListingSource(dataset_id, real_estate_eval_tiny_data),
         dataset_id=dataset_id,
     )
-    return dataset_id
+    yield dataset_id
 
 @pytest.fixture
 def biofabric_tiny(biofabric_tiny_data):

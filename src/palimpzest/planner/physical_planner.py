@@ -1,22 +1,16 @@
 from palimpzest.constants import Model, PromptStrategy, QueryStrategy
 from palimpzest.operators import PhysicalOperator
-from palimpzest.operators.convert import LLMConvert, LLMConvertConventional
-from palimpzest.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.planner import LogicalPlan, PhysicalPlan
 from palimpzest.planner.planner import Planner
-from palimpzest.planner.resolver import resolveLogicalConvertOp, resolveLogicalFilterOp
-from palimpzest.strategies.token_reduction import TokenReducedConvert
 from .plan import LogicalPlan, PhysicalPlan
 
 import palimpzest as pz
 import palimpzest.operators as pz_ops
-import palimpzest.corelib.schemas as schemas
 
 from typing import List, Optional
 
 import numpy as np
 
-import multiprocessing
 import palimpzest.strategies as physical_strategies
 
 
@@ -49,7 +43,7 @@ class PhysicalPlanner(Planner):
         self.no_cache = no_cache
         self.useParallelOps = useParallelOps
         # Ideally this gets customized by model selection, code synth, etc. etc. using strategies
-        self.physical_ops = pz_ops.PHYSICAL_OPERATORS
+        self.physical_ops = [op for op in pz_ops.PHYSICAL_OPERATORS if op.final]
 
         # This is a dictionary where the physical planner will keep track for all the logical plan operators defined,
         # which physical operators are available to implement them.
@@ -76,12 +70,12 @@ class PhysicalPlanner(Planner):
                                     token_budgets=[0.1, 0.5, 0.9],)
                     self.logical_physical_map.get(logical_op, []).extend(ops)
 
-        self.hardcoded_functions = [x for x in self.logical_physical_map[pz_ops.ConvertScan] if isinstance(x, pz.HardcodedConvert)]
+        self.hardcoded_converts = [x for x in self.logical_physical_map[pz_ops.ConvertScan] if issubclass(x, pz.HardcodedConvert)]
         # print("Available strategies")
         # print(physical_strategies.REGISTERED_STRATEGIES)
-        print("Maps")
-        print(self.logical_physical_map[pz_ops.ConvertScan])
-        print(self.logical_physical_map[pz_ops.FilteredScan])
+        # print("Maps")
+        # print(self.logical_physical_map[pz_ops.ConvertScan])
+        # print(self.logical_physical_map[pz_ops.FilteredScan])
 
     def _createBaselinePlan(self, logical_plan: LogicalPlan, model: Model) -> PhysicalPlan:
         """A simple wrapper around _createSentinelPlan as right now these are one and the same."""
@@ -108,18 +102,18 @@ class PhysicalPlanner(Planner):
             # for op in self.logical_physical_map[type(logical_op)]:
             if isinstance(logical_op, pz_ops.ConvertScan):
                 op_class: PhysicalOperator = None
-                hardcoded_fns = [x for x in self.hardcoded_functions if x.implements(type(logical_op))]
+                hardcoded_fns = [x for x in self.hardcoded_converts if x.materializes(logical_op)]
                 if len(hardcoded_fns) > 0:                                                    
                     for op_class in hardcoded_fns:
                         op = op_class(
                                 inputSchema=logical_op.inputSchema,
                                 outputSchema=logical_op.outputSchema,
-                                query_strategy = QueryStrategy.BONDED_WITH_FALLBACK,
                                 shouldProfile=shouldProfile,
                             )
                     # Todo not break but also try other hardcoded ops 
                     break
                 else:
+                    # TODO This will also re-try hardcoded functions that did not pass the previous test.
                     for op_class in self.logical_physical_map[type(logical_op)]:
                         if not op_class.materializes(logical_op):
                             continue
@@ -180,17 +174,16 @@ class PhysicalPlanner(Planner):
                 plans = []
                 op_alternatives = []
                 for subplan in all_plans:
-                    hardcoded_fns = [x for x in self.hardcoded_functions if x.implements(type(logical_op))]
+                    hardcoded_fns = [x for x in self.hardcoded_converts if x.materializes(logical_op)]
                     if len(hardcoded_fns) > 0:                                                    
                         for op_class in hardcoded_fns:
                             physical_op = op_class(
                                     inputSchema=logical_op.inputSchema,
                                     outputSchema=logical_op.outputSchema,
-                                    query_strategy = QueryStrategy.BONDED_WITH_FALLBACK,
                                     shouldProfile=self.shouldProfile,
                                 )
                             op_alternatives.append(physical_op)
-                        break
+                            break
                     else:
                         for op_class in self.logical_physical_map[type(logical_op)]:
                             if not op_class.materializes(logical_op):

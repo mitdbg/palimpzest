@@ -56,18 +56,18 @@ class TestParallelExecutionNoCache:
     @pytest.mark.parametrize(
         argnames=("dataset", "physical_plan", "expected_records", "side_effect"),
         argvalues=[
-            pytest.param("enron", "enron-scan-only", "enron-all-records", None, id="scan-only"),
-            pytest.param("enron", "enron-non-llm-filter", "enron-filtered-records", None, id="non-llm-filter"),
-            pytest.param("enron", "enron-llm-filter", "enron-filtered-records", "enron-filter", id="llm-filter"),
-            pytest.param("enron", "enron-bonded-llm-convert", "enron-all-records", "enron-convert", id="bonded-llm-convert"),
-            pytest.param("enron", "enron-code-synth-convert", "enron-all-records", "enron-convert", id="code-synth-convert"),
-            pytest.param("enron", "enron-token-reduction-convert", "enron-all-records", "enron-convert", id="token-reduction-convert"),
-            pytest.param("real-estate", "real-estate-image-convert", "real-estate-all-records", "real-estate-convert", id="image-convert"),
-            pytest.param("real-estate", "real-estate-one-to-many-convert", "real-estate-one-to-many-records", "real-estate-one-to-many-convert", id="one-to-many-convert"),
+            pytest.param("enron-eval-tiny", "enron-scan-only", "enron-all-records", None, id="scan-only"),
+            pytest.param("enron-eval-tiny", "enron-non-llm-filter", "enron-filtered-records", None, id="non-llm-filter"),
+            pytest.param("enron-eval-tiny", "enron-llm-filter", "enron-filtered-records", "enron-filter", id="llm-filter"),
+            pytest.param("enron-eval-tiny", "enron-bonded-llm-convert", "enron-all-records", "enron-convert", id="bonded-llm-convert"),
+            pytest.param("enron-eval-tiny", "enron-code-synth-convert", "enron-all-records", "enron-convert", id="code-synth-convert"),
+            pytest.param("enron-eval-tiny", "enron-token-reduction-convert", "enron-all-records", "enron-convert", id="token-reduction-convert"),
+            pytest.param("real-estate-eval-tiny", "real-estate-image-convert", "real-estate-all-records", "real-estate-convert", id="image-convert"),
+            pytest.param("real-estate-eval-tiny", "real-estate-one-to-many-convert", "real-estate-one-to-many-records", "real-estate-one-to-many-convert", id="one-to-many-convert"),
         ],
         indirect=True,
     )
-    def test_execute_full_plan(self, request, mocker, execution_engine, dataset, physical_plan, expected_records, side_effect):
+    def test_execute_full_plan(self, mocker, execution_engine, dataset, physical_plan, expected_records, side_effect):
         """
         This test executes the given 
         """

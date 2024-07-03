@@ -227,7 +227,7 @@ class CostEstimator:
             elif not all_models_most_common_answer.empty:
                 record_uuid_to_answer[record_uuid] = all_models_most_common_answer.iloc[0]
             else:
-                record_uuid_to_answer[record_uuid] = ''
+                record_uuid_to_answer[record_uuid] = None
 
         # compute accepted answers and clean all answers
         pd.options.mode.chained_assignment = None  # turn off copy warnings
@@ -282,13 +282,14 @@ class CostEstimator:
             estimates = {}
 
             # get the op_name for this operation
+            model_name = op_df.model_name.iloc[0] if op_df.model_name.iloc[0] is not None else None
             op_name = str(op_df.op_name.iloc[0])
-            if 'LLM' in op_name:
+            if model_name is not None:
                 # compute estimates per-model, and add None which forces computation of avg. across all models
-                models = getModels(include_vision=True) + [None]
-                estimates = {model: None for model in models}
-                for model in models:
-                    model_name = model.value if model is not None else None
+                model_names = [m.value for m in getModels(include_vision=True)] + [None]
+                # model_names = op_df.model_name.unique().tolist()
+                estimates = {model_name: None for model_name in model_names}
+                for model_name in model_names:
                     est_tokens = self._est_tokens_per_record(op_df, model_name=model_name)
                     model_estimates = {
                         "time_per_record": self._est_time_per_record(op_df, model_name=model_name),
@@ -299,7 +300,17 @@ class CostEstimator:
                         "quality": self._est_quality(op_df, model_name=model_name),
                     }
                     estimates[model_name] = model_estimates
-            
+
+            # TODO also include HarcodedConverts here?
+            elif op_name in ["NonLLMFilter"]:
+                est_tokens = self._est_tokens_per_record(op_df)
+                estimates = {
+                    "time_per_record": self._est_time_per_record(op_df),
+                    "cost_per_record": self._est_cost_per_record(op_df),
+                    "selectivity": self._est_selectivity(self.sample_execution_data_df, op_df),
+                    "quality": self._est_quality(op_df, model_name=model_name),
+                }
+
             elif op_name in ["MarshalAndScanDataOp", "CacheScanDataOp", "LimitScanOp", "ApplyCountAggregateOp", "ApplyAverageAggregateOp"]:
                 estimates = {
                     "time_per_record": self._est_time_per_record(op_df),
@@ -378,11 +389,9 @@ class CostEstimator:
                     op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
             
                 elif isinstance(op, pz.NonLLMFilter):
-                    # TODO check this!
-                    model_name = None
-                    op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
-                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
-                    op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
+                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
+                    op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
 
                 elif isinstance(op, pz.HardcodedConvert):
                     op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
@@ -403,7 +412,6 @@ class CostEstimator:
                     op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
                     op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
                     op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
-
                     # TODO: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
                     #       which would wildly mess up estimate of time and cost per-record
                     # do code synthesis adjustment
@@ -427,6 +435,7 @@ class CostEstimator:
 
                 else:
                     raise Exception("Unknown operator")
+
 
             # NOTE: a slightly more accurate thing to do would be to estimate the time_per_record based on the
             #       *input* cardinality to the operator and multiply by the estimated input cardinality.

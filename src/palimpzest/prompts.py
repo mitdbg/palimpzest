@@ -24,7 +24,7 @@ ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR = "an output array of zero or more JSON obj
 ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL = "the output objects"
 ONE_TO_MANY_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields described above. You must decide the correct number of output objects."
 
-STRUCTURED_CONVERT_PROMPT = """I would like you to create {targetOutputDescriptor}. 
+STRUCTURED_CONVERT_PROMPT = """I would like you to create {targetOutputDescriptor}
 You will use the information in an input JSON object that I will provide. The input object has type {input_type}.
 All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
 {optionalInputDesc}

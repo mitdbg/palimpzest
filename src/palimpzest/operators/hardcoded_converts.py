@@ -4,6 +4,7 @@ import palimpzest as pz
 from palimpzest.constants import *
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.elements import DataRecord
+from palimpzest.operators import logical
 from palimpzest.operators.convert import ConvertOp
 from palimpzest.tools.pdfparser import get_text_from_pdf
 from palimpzest.tools.skema_tools import equations_to_latex
@@ -23,12 +24,21 @@ import time
 
 class HardcodedConvert(ConvertOp):
 
+    implemented_op = logical.ConvertScan
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert (
             self.inputSchema == self.__class__.inputSchema
             and self.outputSchema == self.__class__.outputSchema
         ), f"This convert has to be instantiated to convert a {self.__class__.inputSchema} to a {self.__class__.outputSchema}! But it was instantiated to convert a {self.inputSchema} to a {self.outputSchema}!"
+
+    @classmethod
+    def materializes(cls, logical_operator: logical.LogicalOperator):
+        return (
+            cls.inputSchema == logical_operator.inputSchema
+            and cls.outputSchema == logical_operator.outputSchema
+        )
 
     def __eq__(self, other: HardcodedConvert):
         return (
@@ -67,7 +77,7 @@ class HardcodedConvert(ConvertOp):
 
     def __call__(self, candidate: DataRecord):
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
-    
+
     def is_hardcoded(self) -> bool:
         return True
 
@@ -81,7 +91,7 @@ class ConvertFileToText(HardcodedConvert):
     def __call__(self, candidate: DataRecord):
         start_time = time.time()
 
-        text_content = str(candidate.contents, "utf-8")
+        text_content = candidate.contents
         dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
         dr.filename = candidate.filename
         dr.contents = text_content
@@ -217,9 +227,6 @@ class ConvertFileToXLS(HardcodedConvert):
             fn_call_duration_secs=api_call_duration_secs,
         )
 
-        if not hasattr(dr, 'contents'):
-            import pdb; pdb.set_trace()
-
         return [dr], [record_op_stats]
 
 
@@ -279,6 +286,7 @@ class ConvertXLSToTable(HardcodedConvert):
 
 
 class ConvertFileToPDF(HardcodedConvert):
+
     inputSchema = schemas.File
     outputSchema = schemas.PDFFile
     final = True

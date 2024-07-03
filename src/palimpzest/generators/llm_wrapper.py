@@ -1,4 +1,6 @@
-"""GV: This class is about LLM wrappers. 
+"""GV: 
+Maybe this class should be deleted? 
+This class is about LLM wrappers. 
 My suggestion is to rename at least the base generator into LLMGenerator.
 Refactoring goal: provide a single interface to "LLM Generation" where we specify the model and prompt as input.
 This class serves as a wrapper around the DSPy and OpenAI models, abstracting away vendor-specific interfaces and parsing of the generation outputs.

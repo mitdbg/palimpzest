@@ -5,5 +5,5 @@ from palimpzest.corelib import (
 import pytest
 
 def test_schema_equality():
-    # test that equality depends on having
+    # TODO test that equality depends on having
     pass

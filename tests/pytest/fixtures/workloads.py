@@ -2,7 +2,6 @@ import pytest
 import palimpzest as pz
 
 ### UDFs ###
-@pytest.fixture
 def within_two_miles_of_mit(record):
     # NOTE: I'm using this hard-coded function so that folks w/out a
     #       Geocoding API key from google can still run this example
@@ -23,7 +22,6 @@ def within_two_miles_of_mit(record):
     except:
         return False
 
-@pytest.fixture
 def in_price_range(record):
     try:
         price = record.price
@@ -47,13 +45,11 @@ def enron_workload(enron_eval_tiny, email_schema):
     return emails
 
 @pytest.fixture
-def real_estate_eval(
+def real_estate_workload(
     real_estate_eval_tiny,
     real_estate_listing_files_schema,
     text_real_estate_listing_schema,
     image_real_estate_listing_schema,
-    within_two_miles_of_mit,
-    in_price_range,
 ):
     listings = pz.Dataset(real_estate_eval_tiny, schema=real_estate_listing_files_schema)
     listings = listings.convert(text_real_estate_listing_schema, depends_on="text_content")
@@ -67,7 +63,7 @@ def real_estate_eval(
     return listings
 
 @pytest.fixture
-def biofabric_eval(biofabric_tiny, case_data_schema):
+def biofabric_workload(biofabric_tiny, case_data_schema):
     xls = pz.Dataset(biofabric_tiny, schema=pz.XLSFile)
     patient_tables = xls.convert(
         pz.Table, desc="All tables in the file", cardinality=pz.Cardinality.ONE_TO_MANY)

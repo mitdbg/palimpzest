@@ -350,6 +350,7 @@ class LLMConvert(ConvertOp):
         """
         record_op_stats_lst = []
         per_record_stats = generation_stats / len(records)
+        model = getattr(self, "model", None)
         for dr in records:
             record_op_stats = RecordOpStats(
                 record_uuid=dr._uuid,
@@ -359,7 +360,7 @@ class LLMConvert(ConvertOp):
                 op_name=self.op_name(),
                 time_per_record=total_time / len(records),
                 cost_per_record=per_record_stats.cost_per_record,
-                model_name=getattr(self, "model", None),
+                model_name=model.value if model else None,
                 answer={field_name: getattr(dr, field_name) for field_name in fields},
                 input_fields=self.inputSchema.fieldNames(),
                 generated_fields=fields,
@@ -416,6 +417,7 @@ class LLMConvert(ConvertOp):
         try:
             json_answer = getJsonFromAnswer(answer)
             assert json_answer != {}, "No output was found!"
+            assert all([field in json_answer for field in fields_to_generate]), "Not all fields were generated!"
         except Exception as e:
             print(f"Error parsing answer: {e}")
             json_answer = {field_name: [] for field_name in fields_to_generate}
@@ -549,7 +551,6 @@ class LLMConvertConventional(LLMConvert):
                 content=candidate_content,
                 prompt=prompt,
             )
-
             json_answer = self.parse_answer(answer, [field_name])
             fields_answers.update(json_answer)
             fields_stats[field_name] = stats
