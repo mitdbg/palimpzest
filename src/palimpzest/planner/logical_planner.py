@@ -78,7 +78,6 @@ class LogicalPlanner(Planner):
         """
         operators = logical_plan.operators
         datasetIdentifier = logical_plan.datasetIdentifier
-        print("in compute reorderings, datasetIdentifier: ", datasetIdentifier)
         all_plans, op_idx = [], 0
         while op_idx < len(operators):
             op = operators[op_idx]

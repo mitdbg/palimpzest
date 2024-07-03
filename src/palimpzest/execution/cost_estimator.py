@@ -282,7 +282,7 @@ class CostEstimator:
             estimates = {}
 
             # get the op_name for this operation
-            model_name = str(op_df.model_name.iloc[0])
+            model_name = op_df.model_name.iloc[0] if op_df.model_name.iloc[0] is not None else None
             op_name = str(op_df.op_name.iloc[0])
             if model_name is not None:
                 # compute estimates per-model, and add None which forces computation of avg. across all models
@@ -301,6 +301,16 @@ class CostEstimator:
                     }
                     estimates[model_name] = model_estimates
             
+            # TODO also include HarcodedConverts here?
+            elif op_name in ["NonLLMFilter"]:
+                est_tokens = self._est_tokens_per_record(op_df)
+                estimates = {
+                    "time_per_record": self._est_time_per_record(op_df),
+                    "cost_per_record": self._est_cost_per_record(op_df),
+                    "selectivity": self._est_selectivity(self.sample_execution_data_df, op_df),
+                    "quality": self._est_quality(op_df, model_name=model_name),
+                }
+
             elif op_name in ["MarshalAndScanDataOp", "CacheScanDataOp", "LimitScanOp", "ApplyCountAggregateOp", "ApplyAverageAggregateOp"]:
                 estimates = {
                     "time_per_record": self._est_time_per_record(op_df),
@@ -367,8 +377,7 @@ class CostEstimator:
             if sample_op_estimates is not None and op_id in sample_op_estimates:
                 try:
                     if isinstance(op, pz.MarshalAndScanDataOp) or isinstance(op, pz.CacheScanDataOp):
-                        model_name = None
-                        op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
+                        op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
 
                     elif isinstance(op, pz.ApplyGroupByOp):
                         op_estimates.cardinality = sample_op_estimates[op_id]["cardinality"]
@@ -381,11 +390,9 @@ class CostEstimator:
                         op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
                 
                     elif isinstance(op, pz.NonLLMFilter):
-                        # TODO check this!
-                        model_name = None
-                        op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
-                        op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
-                        op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
+                        op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                        op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
+                        op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
 
                     elif isinstance(op, pz.HardcodedConvert):
                         op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
