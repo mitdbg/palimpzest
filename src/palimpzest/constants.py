@@ -3,8 +3,9 @@ from enum import Enum
 
 import os
 
+
 # ENUMS
-class Model(Enum):
+class Model(str, Enum):
     """
     Model describes the underlying LLM which should be used to perform some operation
     which requires invoking an LLM. It does NOT specify whether the model need be executed
@@ -21,8 +22,16 @@ class Model(Enum):
 
     def __repr__(self):
         return f'{self.name}'
-    
-class PromptStrategy(Enum):
+
+class ExecutionStrategy(str, Enum):
+    """
+    ExecutionStrategy describes the framework / setting used to execute the user's plan.
+    """
+    SINGLE_THREADED = "single-threaded"
+    PARALLEL = "parallel"
+    RAY = "ray"
+
+class PromptStrategy(str, Enum):
     """
     PromptStrategy describes the prompting technique to be used by a Generator when
     performing some task with a specified Model.
@@ -34,7 +43,7 @@ class PromptStrategy(Enum):
     DSPY_COT_QA = "dspy-chain-of-thought-question"
     CODE_GEN_BOOL = "code-gen-bool"
 
-class QueryStrategy(Enum):
+class QueryStrategy(str, Enum):
     """
     QueryStrategy describes the high-level approach to querying a Model (or generated code)
     in order to perform a specified task.
@@ -46,9 +55,9 @@ class QueryStrategy(Enum):
     CODE_GEN = "code-gen"
     CODE_GEN_WITH_FALLBACK = "codegen-with-fallback"
 
-class CodeGenStrategy(Enum):
+class CodingStrategy(str, Enum):
     """
-    CodeGenStrategy describes the high-level approach to generating code.
+    CodingStrategy describes the high-level approach to generating code.
     in order to perform a specified task.
     """
     # DEFAULT = "single"
@@ -58,6 +67,24 @@ class CodeGenStrategy(Enum):
     ADVICE_ENSEMBLE = "advice-ensemble"
     ADVICE_ENSEMBLE_WITH_VALIDATION = "advice-ensemble-with-validation"
 
+class Cardinality(str, Enum): 
+    ONE_TO_ONE = "one-to-one"
+    ONE_TO_MANY = "one-to-many"
+
+class PlanType(str, Enum):
+    SENTINEL = "Sentinel Plan"
+    FINAL = "Final Plan"
+
+IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
+PDF_EXTENSIONS = [".pdf"]
+XLS_EXTENSIONS = [".xls", ".xlsx"]
+
+# the number of seconds the parallel execution will sleep for while waiting for futures to complete
+PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.1
+
+# character limit(s) for different IDs
+MAX_OP_ID_CHARS = 6
+
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
 RETRY_MULTIPLIER = 2
 RETRY_MAX_SECS = 10
@@ -65,7 +92,6 @@ RETRY_MAX_ATTEMPTS = 1
 
 # maximum number of rows to display in a table
 MAX_ROWS = 5
-MAX_HEATMAP_UPDATES = 5
 
 def log_attempt_number(retry_state):
     """return the result of the last call attempt"""
@@ -79,12 +105,6 @@ LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
 
 # Assume 30 GB/sec for sequential access of memory
 MEMORY_SCAN_TIME_PER_KB = 1 / (float(30) * 1024 * 1024)
-
-# Assume number of output tokens is 0.25x the number of input tokens
-OUTPUT_TOKENS_MULTIPLE = 0.25
-
-# Guesstimate of the fraction of each input element which is fed into the LLM's as context 
-ELEMENT_FRAC_IN_CONTEXT = 1.0
 
 # Rough conversion from # of bytes --> # of tokens; assumes 1 token ~= 4 chars and 1 char == 1 byte
 BYTES_TO_TOKENS = 0.25
@@ -103,15 +123,32 @@ DSPY_TIME_INFLATION = 2.0
 # size of the input.
 FEW_SHOT_PROMPT_INFLATION = 1.25
 
-# A crude estimate for filter selectivity
-EST_FILTER_SELECTIVITY = 0.5
+# a naive estimate for the input record size
+NAIVE_EST_SOURCE_RECORD_SIZE_IN_BYTES = 1_000_000
+
+# a naive estimate for filter selectivity
+NAIVE_EST_FILTER_SELECTIVITY = 0.5
+
+# a naive estimate for the number of input tokens processed per record
+NAIVE_EST_NUM_INPUT_TOKENS = 1000
+
+# a naive estimate for the number of output tokens processed per record
+NAIVE_EST_NUM_OUTPUT_TOKENS = 100
+
+# a naive estimate for the number of groups returned by a group by
+NAIVE_EST_NUM_GROUPS = 3
+
+# a naive estimate for the factor of increase (loosely termed "selectivity") for one-to-many cardinality operations
+NAIVE_EST_ONE_TO_MANY_SELECTIVITY = 2
+
+# a naive estimate of the time it takes to extract the latex for an equation from an image file using Skema
+NAIVE_IMAGE_TO_EQUATION_LATEX_TIME_PER_RECORD = 10.0
+
+# a naive estimate of the time it takes to extract the text from a PDF using a PDF processor
+NAIVE_PDF_PROCESSOR_TIME_PER_RECORD = 10.0
 
 # Whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False
-
-# Resolution of the token reduction granularity
-TOKEN_REDUCTION_GRANULARITY = 0.001
-TOKEN_REDUCTION_SAMPLE = 0
 
 #### MODEL PERFORMANCE & COST METRICS ####
 # I've looked across models and grouped knowledge into commonly used categories:

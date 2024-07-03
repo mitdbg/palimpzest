@@ -93,7 +93,18 @@ class API:
             inputs.append({'name':input_field_name, 'desc':getattr(td.inputSchema,input_field_name).desc})
         outputs = [{'name':field_name, 'desc':getattr(td.outputSchema,field_name).desc}]
         return cls(name=name, inputs=inputs, outputs=outputs)
-    
+
+    @classmethod
+    def from_input_output_schemas(cls, inputSchema, outputSchema, field_name, input_fields=None):
+        name, inputs, outputs = "extraction", list(), list()
+        if input_fields is None:
+            input_fields = inputSchema.fieldNames()
+        for input_field_name in input_fields:
+            inputs.append({'name':input_field_name, 'desc':getattr(inputSchema,input_field_name).desc})
+        outputs = [{'name':field_name, 'desc':getattr(outputSchema,field_name).desc}]
+        return cls(name=name, inputs=inputs, outputs=outputs)
+
+
     @property
     def name(self):
         return self.config['name']

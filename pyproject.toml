@@ -1,6 +1,6 @@
 [project]
 name = "palimpzest"
-version = "0.1.0"
+version = "0.2.0"
 description = "Palimpzest is a system which enables anyone to process AI-powered analytical queries simply by defining them in a declarative language"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -21,7 +21,7 @@ dependencies = [
     "ipython>=8.26.0",
     "layoutparser>=0.3.4",
     "lxml-html-clean>=0.1.1",
-    "modal>=0.57.39",
+    "modal>=0.62.198",
     "ncls==0.0.68",
     "necessary>=0.3.2",
     "numpy>=1.23.2",
@@ -30,11 +30,13 @@ dependencies = [
     "pandas~=2.1.1",
     "papermage>=0.16.0",
     "pdf2image",
+    "pytest>=8.2.2",
     "python-Levenshtein",
     "pdfplumber==0.7.4",
     "pillow>=10.2.0",
     "prettytable>=3.9.0",
     "pyarrow>=13.0.0",
+    "pytest-mock>=3.14.0",
     "python-Levenshtein>=0.25.1",
     "pyyaml>=6.0.1",
     "requests>=2.25",
@@ -72,12 +74,20 @@ namespaces = false
 [tool.setuptools.package-data]
 "*" = ["*.txt", "*.rst", "*.md"]
 
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+    "ignore::ResourceWarning",
+]
+
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project.urls]
 homepage = "https://github.com/mitdbg/palimpzest/"
-repository = "https://https://github.com/mitdbg/palimpzest/"
+repository = "https://github.com/mitdbg/palimpzest/"
 # documentation = "https://readthedocs.org"
 # changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"

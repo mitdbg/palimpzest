@@ -1,5 +1,4 @@
 from palimpzest.config import Config
-from palimpzest.datamanager import DataDirectory
 
 from fastapi import status
 from typing import List, BinaryIO
@@ -202,7 +201,10 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10 ):
 # 1. Check if the text file already exists in the cache, if so, read from the cache
 # 2. If not, call the cosmos_client function to process the PDF file and cache the text file
 ##
-def get_text_from_pdf(filename, pdf_bytes, enable_file_cache = True):
+def get_text_from_pdf(filename, 
+                      pdf_bytes, 
+                      enable_file_cache = True, 
+                      file_cache_dir = "/tmp"):
     pdf_filename = filename
     file_name = os.path.basename(pdf_filename)
     file_name_without_extension = os.path.splitext(file_name)[0]
@@ -212,7 +214,7 @@ def get_text_from_pdf(filename, pdf_bytes, enable_file_cache = True):
     md5 = get_md5(pdf_bytes)
     cached_extraction_folder = f"COSMOS_{os.path.splitext(file_name)[0].replace(' ', '_')}_{md5}"
 
-    pz_file_cache_dir = os.path.join(DataDirectory().getFileCacheDir(), cached_extraction_folder)
+    pz_file_cache_dir = os.path.join(file_cache_dir, cached_extraction_folder)
     # Check if pz_file_cache_dir exists in the file system
     if enable_file_cache and os.path.exists(pz_file_cache_dir):
         print(f"Text file {text_file_name} already exists in system tmp folder {pz_file_cache_dir}, reading from cache")
@@ -237,10 +239,9 @@ def get_text_from_pdf(filename, pdf_bytes, enable_file_cache = True):
     cosmos_file_dir = file_name_without_extension.replace(' ', '_')
     # get a tmp of the system temp directory
 
-    output_dir = DataDirectory().getFileCacheDir()
     print(f"Processing {file_name} through COSMOS")
     # Call the cosmos_client function
-    cosmos_client(file_name, pdf_bytes, output_dir)
+    cosmos_client(file_name, pdf_bytes, file_cache_dir)
     text_file_path = os.path.join(pz_file_cache_dir, text_file_name)
     if not os.path.exists(text_file_path):
         raise FileNotFoundError(f"Text file {text_file_name} not found in {pz_file_cache_dir}/{text_file_name}")
