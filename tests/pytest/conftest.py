@@ -1,347 +1,103 @@
-from pathlib import Path
-import palimpzest as pz
-import os
 import pytest
 
-# TODO: in the future I will register these datasets as part of test class setup
-# DEFINITIONS
-ENRON_EVAL_TINY_TEST_DATA = "testdata/enron-eval-tiny"
-ENRON_EVAL_TINY_DATASET_ID = "enron-eval-tiny"
-REAL_ESTATE_EVAL_TINY_TEST_DATA = "testdata/real-estate-eval-tiny"
-REAL_ESTATE_EVAL_TINY_DATASET_ID = "real-estate-eval-tiny"
-BIOFABRIC_EVAL_TINY_TEST_DATA = "testdata/biofabric-tiny"
-BIOFABRIC_EVAL_TINY_DATASET_ID = "biofabric-tiny"
+# with open(".env") as f:
+#     for line in f:
+#         key, value = line.strip().split("=")
+#         os.environ[key] = value
 
-with open(".env") as f:
-    for line in f:
-        key, value = line.strip().split("=")
-        os.environ[key] = value
+pytest_plugins = [
+    "fixtures.datasets",
+    "fixtures.expected_records",
+    "fixtures.physical_plans",
+    "fixtures.schemas",
+    "fixtures.side_effects",
+    "fixtures.workloads",
+]
 
-@pytest.fixture
-def email_schema():
-    class Email(pz.TextFile):
-        """Represents an email, which in practice is usually from a text file"""
-
-        sender = pz.Field(desc="The email address of the sender", required=True)
-        subject = pz.Field(desc="The subject of the email", required=True)
-    
-    return Email
-
+# NOTE: these fixtures may grow to have long lists of arguments;
+#       the benefit of using fixtures here (which requires us to specify them
+#       as arguments) is that pytest will compute each fixture value once
+#       and cache the result. Thus, we minimize recomputation and don't
+#       need to, for example, re-register datasets for each individual test.
 
 @pytest.fixture
-def real_estate_listing_files_schema():
-    class RealEstateListingFiles(pz.Schema):
-        """The source text and image data for a real estate listing."""
-
-        listing = pz.StringField(desc="The name of the listing", required=True)
-        text_content = pz.StringField(
-            desc="The content of the listing's text description", required=True
-        )
-        image_contents = pz.ListField(
-            element_type=pz.BytesField,
-            desc="A list of the contents of each image of the listing",
-            required=True,
-        )
-
-    return RealEstateListingFiles
-
-@pytest.fixture
-def image_real_estate_listing_schema(real_estate_listing_files_schema):
-    class ImageRealEstateListing(real_estate_listing_files_schema):
-        """Represents a real estate listing with specific fields extracted from its text and images."""
-
-        is_modern_and_attractive = pz.BooleanField(
-            desc="True if the home interior design is modern and attractive and False otherwise"
-        )
-        has_natural_sunlight = pz.BooleanField(
-            desc="True if the home interior has lots of natural sunlight and False otherwise"
-        )
-
-    return ImageRealEstateListing
+def dataset(request, enron_eval_tiny, real_estate_eval_tiny):
+    dataset_id = request.param
+    dataset_id_to_dataset = {
+        "enron": enron_eval_tiny,
+        "real-estate": real_estate_eval_tiny,
+    }
+    return dataset_id_to_dataset[dataset_id]
 
 
 @pytest.fixture
-def real_estate_listing_datasource(real_estate_listing_files_schema):
-    class RealEstateListingSource(pz.UserSource):
-        def __init__(self, datasetId, listings_dir):
-            super().__init__(real_estate_listing_files_schema, datasetId)
-            self.listings_dir = listings_dir
-            self.listings = sorted(os.listdir(self.listings_dir))
-
-        def __len__(self):
-            return len(self.listings)
-
-        def getSize(self):
-            return sum(file.stat().st_size for file in Path(self.listings_dir).rglob('*'))
-
-        def getItem(self, idx: int):
-            # fetch listing
-            listing = self.listings[idx]
-
-            # create data record
-            dr = pz.DataRecord(self.schema, scan_idx=idx)
-            dr.listing = listing
-            dr.image_contents = []
-            listing_dir = os.path.join(self.listings_dir, listing)
-            for file in os.listdir(listing_dir):
-                bytes_data = None
-                with open(os.path.join(listing_dir, file), "rb") as f:
-                    bytes_data = f.read()
-                if file.endswith(".txt"):
-                    dr.text_content = bytes_data.decode("utf-8")
-                elif file.endswith(".png"):
-                    dr.image_contents.append(bytes_data)
-
-            return dr
-
-    datasetIdentifier = REAL_ESTATE_EVAL_TINY_DATASET_ID
-    datadir = pz.DataDirectory()
-    datadir.registerUserSource(
-        RealEstateListingSource(datasetIdentifier, REAL_ESTATE_EVAL_TINY_TEST_DATA), datasetIdentifier
-    )
-
-    return RealEstateListingSource
+def workload(request, enron_workload):
+    workload_id = request.param
+    workload_id_to_workload = {
+        "enron-workload": enron_workload,
+        # "real-estate-workload": real_estate_workload,
+    }
+    return workload_id_to_workload[workload_id]
 
 
 @pytest.fixture
-def case_data_schema():
-    class CaseData(pz.Schema):
-        """An individual row extracted from a table containing medical study data."""
-
-        case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-        age_at_diagnosis = pz.Field(
-            desc="The age of the patient at the time of diagnosis", required=False
-        )
-        race = pz.Field(
-            desc="An arbitrary classification of a taxonomic group that is a division of a species.",
-            required=False,
-        )
-        ethnicity = pz.Field(
-            desc="Whether an individual describes themselves as Hispanic or Latino or not.",
-            required=False,
-        )
-        gender = pz.Field(desc="Text designations that identify gender.", required=False)
-        vital_status = pz.Field(desc="The vital status of the patient", required=False)
-        ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
-        ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
-        ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
-        tumor_grade = pz.Field(desc="The tumor grade", required=False)
-        tumor_focality = pz.Field(desc="The tumor focality", required=False)
-        tumor_largest_dimension_diameter = pz.Field(
-            desc="The tumor largest dimension diameter", required=False
-        )
-        primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
-        morphology = pz.Field(desc="The morphology", required=False)
-        tissue_or_organ_of_origin = pz.Field(
-            desc="The tissue or organ of origin", required=False
-        )
-        # tumor_code = pz.Field(desc="The tumor code", required=False)
-        filename = pz.Field(
-            desc="The name of the file the record was extracted from", required=False
-        )
-        study = pz.Field(
-            desc="The last name of the author of the study, from the table name",
-            required=False,
-        )
-
-    return CaseData
-
-
-@pytest.fixture(scope="class")
-def emails_dataset():
-    datasetIdentifier = ENRON_EVAL_TINY_DATASET_ID
-    datadir = pz.DataDirectory()
-    datadir.registerLocalDirectory(ENRON_EVAL_TINY_TEST_DATA, datasetIdentifier)
-
-    return datasetIdentifier
+def physical_plan(
+    request,
+    enron_scan_only_plan,
+    enron_non_llm_filter_plan,
+    enron_llm_filter_plan,
+    enron_bonded_llm_convert_plan,
+    enron_code_synth_convert_plan,
+    enron_token_reduction_convert_plan,
+    real_estate_image_convert_plan,
+    real_estate_one_to_many_convert_plan,
+):
+    physical_plan_id = request.param
+    physical_plan_id_to_physical_plan = {
+        "enron-scan-only": enron_scan_only_plan,
+        "enron-non-llm-filter": enron_non_llm_filter_plan,
+        "enron-llm-filter": enron_llm_filter_plan,
+        "enron-bonded-llm-convert": enron_bonded_llm_convert_plan,
+        "enron-code-synth-convert": enron_code_synth_convert_plan,
+        "enron-token-reduction-convert": enron_token_reduction_convert_plan,
+        "real-estate-image-convert": real_estate_image_convert_plan,
+        "real-estate-one-to-many-convert": real_estate_one_to_many_convert_plan,
+    }
+    return physical_plan_id_to_physical_plan[physical_plan_id]
 
 
 @pytest.fixture
-def enron_eval(email_schema):
-    emails = pz.Dataset(ENRON_EVAL_TINY_DATASET_ID, schema=email_schema)
-    emails = emails.filter(
-        'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
-    )
-    emails = emails.filter(
-        "The email is not quoting from a news article or an article written by someone outside of Enron"
-    )
-    return emails
+def expected_records(
+    request,
+    enron_all_expected_records,
+    enron_filter_expected_records,
+    real_estate_all_expected_records,
+    real_estate_one_to_many_expected_records,
+):
+    records_id = request.param
+    records_id_to_expected_records = {
+        "enron-all-records": enron_all_expected_records,
+        "enron-filtered-records": enron_filter_expected_records,
+        "real-estate-all-records": real_estate_all_expected_records,
+        "real-estate-one-to-many-records": real_estate_one_to_many_expected_records,
+    }
+    return records_id_to_expected_records[records_id]
 
-### Real Estate Listing Workloads ###
-class RealEstateListingFiles(pz.Schema):
-    """The source text and image data for a real estate listing."""
-
-    listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.StringField(
-        desc="The content of the listing's text description", required=True
-    )
-    image_contents = pz.ListField(
-        element_type=pz.BytesField,
-        desc="A list of the contents of each image of the listing",
-        required=True,
-    )
-
-class TextRealEstateListing(RealEstateListingFiles):
-    """Represents a real estate listing with specific fields extracted from its text."""
-
-    address = pz.StringField(desc="The address of the property")
-    price = pz.NumericField(desc="The listed price of the property")
-
-
-class ImageRealEstateListing(RealEstateListingFiles):
-    """Represents a real estate listing with specific fields extracted from its text and images."""
-
-    is_modern_and_attractive = pz.BooleanField(
-        desc="True if the home interior design is modern and attractive and False otherwise"
-    )
-    has_natural_sunlight = pz.BooleanField(
-        desc="True if the home interior has lots of natural sunlight and False otherwise"
-    )
-
-
-# @pytest.fixture
-# def real_estate_listing_source():
-class RealEstateListingSource(pz.UserSource):
-
-    def __init__(self, datasetId, listings_dir):
-        super().__init__(RealEstateListingFiles, datasetId)
-        self.listings_dir = listings_dir
-        self.idx = 0
-        self.listings = sorted(os.listdir(self.listings_dir))
-
-    def __len__(self):
-        return len(self.listings)
-
-    def getSize(self):
-        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob('*'))
-
-    def getItem(self, idx: int):
-        # fetch listing
-        listing = self.listings[idx]
-
-        # create data record
-        dr = pz.DataRecord(self.schema, scan_idx=idx)
-        dr.listing = listing
-        dr.image_contents = []
-        listing_dir = os.path.join(self.listings_dir, listing)
-        for file in os.listdir(listing_dir):
-            bytes_data = None
-            with open(os.path.join(listing_dir, file), "rb") as f:
-                bytes_data = f.read()
-            if file.endswith(".txt"):
-                dr.text_content = bytes_data.decode("utf-8")
-            elif file.endswith(".png"):
-                dr.image_contents.append(bytes_data)
-
-        return dr
-
-# return RealEstateListingSource
 
 @pytest.fixture
-def within_two_miles_of_mit(record):
-    # NOTE: I'm using this hard-coded function so that folks w/out a
-    #       Geocoding API key from google can still run this example
-    FAR_AWAY_ADDRS = [
-        "Melcher St",
-        "Sleeper St",
-        "437 D St",
-        "Seaport Blvd",
-        "50 Liberty Dr",
-        "Telegraph St",
-        "Columbia Rd",
-        "E 6th St",
-        "E 7th St",
-        "E 5th St",
-    ]
-    try:
-        if any(
-            [
-                street.lower() in record.address.lower()
-                for street in FAR_AWAY_ADDRS
-            ]
-        ):
-            return False
-        return True
-    except:
-        return False
-
-@pytest.fixture
-def in_price_range(record):
-    try:
-        price = record.price
-        if type(price) == str:
-            price = price.strip()
-            price = int(price.replace("$", "").replace(",", ""))
-        return 6e5 < price and price <= 2e6
-    except:
-        return False
-
-@pytest.fixture
-def real_estate_eval(in_price_range, within_two_miles_of_mit):
-    pz.DataDirectory().registerUserSource(
-    RealEstateListingSource('real-estate-eval-tiny', 'testdata/real-estate-eval-tiny'), 'real-estate-eval-tiny')
-
-    listings = pz.Dataset("real-estate-eval-tiny", schema=RealEstateListingFiles)
-    listings = listings.convert(TextRealEstateListing, depends_on="text_content")
-    listings = listings.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_contents")
-    listings = listings.filter(
-        "The interior is modern and attractive, and has lots of natural sunlight",
-        depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
-    )
-    listings = listings.filter(within_two_miles_of_mit, depends_on="address")
-    listings = listings.filter(in_price_range, depends_on="price")
-    return listings
-
-### Biofabric Workloads ###
-
-class CaseData(pz.Schema):
-    """An individual row extracted from a table containing medical study data."""
-
-    case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-    age_at_diagnosis = pz.Field(
-        desc="The age of the patient at the time of diagnosis", required=False
-    )
-    race = pz.Field(
-        desc="An arbitrary classification of a taxonomic group that is a division of a species.",
-        required=False,
-    )
-    ethnicity = pz.Field(
-        desc="Whether an individual describes themselves as Hispanic or Latino or not.",
-        required=False,
-    )
-    gender = pz.Field(desc="Text designations that identify gender.", required=False)
-    vital_status = pz.Field(desc="The vital status of the patient", required=False)
-    ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
-    ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
-    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
-    tumor_grade = pz.Field(desc="The tumor grade", required=False)
-    tumor_focality = pz.Field(desc="The tumor focality", required=False)
-    tumor_largest_dimension_diameter = pz.Field(
-        desc="The tumor largest dimension diameter", required=False
-    )
-    primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
-    morphology = pz.Field(desc="The morphology", required=False)
-    tissue_or_organ_of_origin = pz.Field(
-        desc="The tissue or organ of origin", required=False
-    )
-    # tumor_code = pz.Field(desc="The tumor code", required=False)
-    filename = pz.Field(
-        desc="The name of the file the record was extracted from", required=False
-    )
-    study = pz.Field(
-        desc="The last name of the author of the study, from the table name",
-        required=False,
-    )
-
-@pytest.fixture
-def biofabric_eval():
-    xls = pz.Dataset("biofabric-medium",schema=pz.XLSFile)
-    patient_tables = xls.convert(
-        pz.Table, desc="All tables in the file", cardinality="oneToMany")
-    patient_tables = patient_tables.filter(
-        "The rows of the table contain the patient age"
-    )
-    case_data = patient_tables.convert(
-        CaseData, desc="The patient data in the table", cardinality="oneToMany"
-    )
-    return case_data
+def side_effect(
+    request,
+    enron_filter,
+    enron_convert,
+    real_estate_convert,
+    real_estate_one_to_many_convert,
+):
+    side_effect_id = request.param
+    side_effect_id_to_side_effect = {
+        None: None,
+        "enron-filter": enron_filter,
+        "enron-convert": enron_convert,
+        "real-estate-convert": real_estate_convert,
+        "real-estate-one-to-many-convert": real_estate_one_to_many_convert,
+    }
+    return side_effect_id_to_side_effect[side_effect_id]

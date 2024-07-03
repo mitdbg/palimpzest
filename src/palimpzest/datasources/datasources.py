@@ -109,7 +109,7 @@ class DirectorySource(DataSource):
     def getItem(self, idx: int):
         filepath = self.filepaths[idx]
         dr = DataRecord(self.schema, scan_idx=idx)
-        dr.filename = filepath
+        dr.filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
             dr.contents = f.read()
 

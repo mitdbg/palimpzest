@@ -5,10 +5,10 @@ import palimpzest as pz
 import pytest
 
 # TEST CLASS
-def test_call(email_schema, emails_dataset):
+def test_call(email_schema, enron_eval_tiny):
     scanOp = MarshalAndScanDataOp(
         outputSchema=email_schema,
-        datasetIdentifier=emails_dataset
+        datasetIdentifier=enron_eval_tiny
     )
 
     records, record_op_stats = scanOp()
