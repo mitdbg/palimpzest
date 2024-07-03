@@ -169,7 +169,7 @@ If you want to use parallel PDF processing at modal.com, you have to:
 
 
 ## Python Demo
-
+#### NOTE: we are in the process of refactoring our demos; please check back in a day or two
 Below are simple instructions to run pz on a test data set of enron emails that is included with the system:
 
 - Initialize the configuration by running `pz init`.
