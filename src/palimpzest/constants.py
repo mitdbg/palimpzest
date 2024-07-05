@@ -22,7 +22,15 @@ class Model(str, Enum):
 
     def __repr__(self):
         return f'{self.name}'
-    
+
+class ExecutionStrategy(str, Enum):
+    """
+    ExecutionStrategy describes the framework / setting used to execute the user's plan.
+    """
+    SINGLE_THREADED = "single-threaded"
+    PARALLEL = "parallel"
+    RAY = "ray"
+
 class PromptStrategy(str, Enum):
     """
     PromptStrategy describes the prompting technique to be used by a Generator when
@@ -47,9 +55,9 @@ class QueryStrategy(str, Enum):
     CODE_GEN = "code-gen"
     CODE_GEN_WITH_FALLBACK = "codegen-with-fallback"
 
-class CodeSynthStrategy(str, Enum):
+class CodingStrategy(str, Enum):
     """
-    CodeSynthStrategy describes the high-level approach to generating code.
+    CodingStrategy describes the high-level approach to generating code.
     in order to perform a specified task.
     """
     # DEFAULT = "single"
@@ -67,6 +75,13 @@ class PlanType(str, Enum):
     SENTINEL = "Sentinel Plan"
     FINAL = "Final Plan"
 
+IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
+PDF_EXTENSIONS = [".pdf"]
+XLS_EXTENSIONS = [".xls", ".xlsx"]
+
+# the number of seconds the parallel execution will sleep for while waiting for futures to complete
+PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.1
+
 # character limit(s) for different IDs
 MAX_OP_ID_CHARS = 6
 
@@ -77,9 +92,6 @@ RETRY_MAX_ATTEMPTS = 1
 
 # maximum number of rows to display in a table
 MAX_ROWS = 5
-
-# maximum number of updates to the token-reduction heatmap
-MAX_HEATMAP_UPDATES = 5
 
 def log_attempt_number(retry_state):
     """return the result of the last call attempt"""
@@ -137,10 +149,6 @@ NAIVE_PDF_PROCESSOR_TIME_PER_RECORD = 10.0
 
 # Whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False
-
-# Resolution of the token reduction granularity
-TOKEN_REDUCTION_GRANULARITY = 0.001
-TOKEN_REDUCTION_SAMPLE = 0
 
 #### MODEL PERFORMANCE & COST METRICS ####
 # I've looked across models and grouped knowledge into commonly used categories:

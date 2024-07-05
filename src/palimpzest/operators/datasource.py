@@ -44,6 +44,7 @@ class DataSourcePhysicalOp(PhysicalOperator):
 class MarshalAndScanDataOp(DataSourcePhysicalOp):
 
     implemented_op = logical.BaseScan
+    final = True
 
     def __init__(
         self,
@@ -144,6 +145,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
 
 class CacheScanDataOp(DataSourcePhysicalOp):
     implemented_op = logical.CacheScan
+    final = True
 
     def __init__(
         self,

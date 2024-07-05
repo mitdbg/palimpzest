@@ -8,7 +8,7 @@ from palimpzest.operators.filter import FilterOp
 from palimpzest.planner import LogicalPlanner, PhysicalPlanner, PhysicalPlan
 from palimpzest.policy import Policy
 from .cost_estimator import CostEstimator
-from .execution import SimpleExecution
+from .execution import SequentialSingleThreadExecution
 from palimpzest.sets import Set
 
 from palimpzest.dataclasses import OperatorStats, PlanStats
@@ -19,7 +19,7 @@ import os
 import shutil
 
 
-class NoSentinelExecution(SimpleExecution):
+class NoSentinelExecution(SequentialSingleThreadExecution):
     """ This class is a dummy execution engine that can be used for testing purposes. 
     It does not include sentinel plans or all that jazz."""
 
@@ -55,7 +55,6 @@ class NoSentinelExecution(SimpleExecution):
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
             useParallelOps=self.useParallelOps,
-            useStrategies=True,
         )
 
         # enumerate all possible physical plans
@@ -94,79 +93,8 @@ class NoSentinelExecution(SimpleExecution):
 
         return all_records, plan, stats
 
-    def _execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats, num_samples: Optional[int] = None):
-        """
-        Helper function which executes the physical plan. This function is overly complex for today's
-        plans which are simple cascades -- but is designed with an eye towards 
-        """
-        output_records = []
-        current_scan_idx = self.scan_start_idx
-        # execute the plan until either:
-        # 1. all records have been processed, or
-        # 2. the final limit operation has completed
-
-        for idx, operator in enumerate(plan.operators):
-            op_id = operator.get_op_id()
-            # TODO: Is it okay to have call return a list?
-            if isinstance(operator, DataSourcePhysicalOp):
-                idx=0
-                out_records, out_stats_lst = [], []
-                num_samples = num_samples if num_samples else float("inf")
-
-                ds = operator.datadir.getRegisteredDataset(plan.datasetIdentifier)
-                for filename in sorted(os.listdir(ds.path)):
-                    file_path = os.path.join(ds.path, filename)
-                    if os.path.isfile(file_path):
-                        if idx > num_samples:
-                            break
-                        datasource = (
-                            self.datadir.getRegisteredDataset(self.source_dataset_id)
-                            if isinstance(operator, MarshalAndScanDataOp)
-                            else self.datadir.getCachedResult(operator.cachedDataIdentifier)
-                        )
-                        candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
-                        candidate.idx = current_scan_idx
-                        candidate.get_item_fn = datasource.getItem
-                        candidate.cardinality = datasource.cardinality
-                        record, record_op_stats_lst = operator(candidate)
-                        out_records.extend(record)
-                        out_stats_lst.extend(record_op_stats_lst)
-                        # Incrementing here bc folder may contain subfolders
-                        idx += 1
-            else:
-                input_records = out_records
-                out_records = []
-                out_stats_lst = []
-                for idx,input_record in enumerate(input_records):
-                    if isinstance(operator, LimitScanOp) and idx == operator.limit:
-                        break
-
-                    records, record_op_stats = operator(input_record)
-                    if records is None:
-                        records = []
-                        continue
-                    elif type(records) != type([]):
-                        records = [records]
-
-                    for record in records:
-                        if isinstance(operator, FilterOp):
-                            if not record._passed_filter:
-                                continue
-                        out_records.append(record)
-                    out_stats_lst.append(record_op_stats)
-
-            # TODO code a nice __add__ function for OperatorStats and RecordOpStats
-            for record_op_stats in out_stats_lst:
-                x = plan_stats.operator_stats[op_id]
-                x.record_op_stats_lst.append(record_op_stats)
-                x.total_op_time += record_op_stats.time_per_record
-                x.total_op_cost += record_op_stats.cost_per_record
-                plan_stats.operator_stats[op_id] = x
-
-        return out_records, plan_stats
-
     # TODO The dag style execution is not really working. I am implementing a per-records execution
-    def execute_dag(self, plan: PhysicalPlan, plan_stats: PlanStats):
+    def execute_sequential(self, plan: PhysicalPlan, plan_stats: PlanStats):
         """
         Helper function which executes the physical plan. This function is overly complex for today's
         plans which are simple cascades -- but is designed with an eye towards the future.
@@ -183,7 +111,6 @@ class NoSentinelExecution(SimpleExecution):
             for op in plan.operators
             if not isinstance(op, DataSourcePhysicalOp)
         }
-
         # execute the plan until either:
         # 1. all records have been processed, or
         # 2. the final limit operation has completed
@@ -270,6 +197,7 @@ class NoSentinelExecution(SimpleExecution):
                     else:
                         output_records.append(record)
 
+
             # update finished_executing based on whether all records have been processed
             still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
             keep_scanning_source_records = (
@@ -306,7 +234,7 @@ class NoSentinelExecution(SimpleExecution):
         #       Thus, the implementation is overkill for today's plans, but hopefully this will
         #       avoid the need for a lot of refactoring in the future.
         # execute the physical plan;
-        output_records, plan_stats = self.execute_dag(plan, plan_stats)
+        output_records, plan_stats = self.execute_sequential(plan, plan_stats)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time

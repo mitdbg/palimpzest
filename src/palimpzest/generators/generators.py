@@ -3,14 +3,13 @@ My suggestion is to rename at least the base generator into LLMGenerator.
 See llm_wrapper.py for a proposed refactoring of generators.py using the class factory pattern.
 """
 from palimpzest.constants import *
-from palimpzest.elements import DataRecord
 from palimpzest.generators import (
     dspyCOT,
     gen_filter_signature_class,
     gen_qa_signature_class,
     TogetherHFAdaptor,
 )
-from palimpzest.dataclasses import RecordOpStats
+from palimpzest.dataclasses import GenerationStats, RecordOpStats
 from palimpzest.utils import API
 
 from collections import Counter
@@ -29,15 +28,8 @@ import json
 import os
 import time
 
-from palimpzest.profiler.attentive_trim import (
-    find_best_range,
-    get_trimed,
-    best_substring_match,
-    update_heatmap_json,
-)
-
 # DEFINITIONS
-GenerationOutput = Tuple[str, Dict[str, Any]]
+GenerationOutput = Tuple[str, GenerationStats]
 
 
 def get_api_key(key: str) -> str:
@@ -95,7 +87,7 @@ class CustomGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         return model
@@ -157,7 +149,7 @@ class CustomGenerator(BaseGenerator):
             token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         # get indices of the start and end token for the answer
@@ -201,22 +193,22 @@ class CustomGenerator(BaseGenerator):
         input_tokens = usage["prompt_tokens"]
         output_tokens = usage["completion_tokens"]
 
-        # NOTE: needs to match subset of keys produced by LLMConvert._create_empty_query_stats()
-        stats={
+        # create GenerationStats
+        stats = GenerationStats(**{
             "model_name": self.model_name,
             "llm_call_duration_secs": end_time - start_time,
             "fn_call_duration_secs": 0.0,
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "input_cost": input_tokens * usd_per_input_token,
-            "output_cost": output_tokens * usd_per_output_token,
+            "total_input_tokens": input_tokens,
+            "total_output_tokens": output_tokens,
+            "total_input_cost": input_tokens * usd_per_input_token,
+            "total_output_cost": output_tokens * usd_per_output_token,
             "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
-            "prompt": dspy_lm.history[-1]["prompt"],
-            "usage": usage,
-            "finish_reason": finish_reason,
-            "answer_log_probs": answer_log_probs,
-            "answer": answer,
-        }
+            # "prompt": dspy_lm.history[-1]["prompt"],
+            # "usage": usage,
+            # "finish_reason": finish_reason,
+            # "answer_log_probs": answer_log_probs,
+            # "answer": answer,
+        })
 
         if self.verbose:
             print("Prompt history:")
@@ -253,10 +245,6 @@ class DSPyGenerator(BaseGenerator):
                 f"DSPyGenerator does not support prompt_strategy: {prompt_strategy.value}"
             )
 
-    def _print_verbose(self, msg) -> None:
-        if self.verbose:
-            print(msg)
-
     def _get_model(self) -> dsp.LM:
         model = None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
@@ -282,7 +270,7 @@ class DSPyGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         return model
@@ -344,7 +332,7 @@ class DSPyGenerator(BaseGenerator):
             token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         # get indices of the start and end token for the answer
@@ -371,61 +359,17 @@ class DSPyGenerator(BaseGenerator):
         self,
         context: str,
         question: str,
-        budget: float = 1.0,
-        heatmap_json_obj: dict = None,
     ) -> GenerationOutput:
-        # initialize variables around token reduction
-        reduction, full_context = False, context
 
-        # fetch model
         dspy_lm = self._get_model()
-
-        # configure DSPy to use this model; both DSPy prompt strategies currently use COT
         dspy.settings.configure(lm=dspy_lm)
         cot = dspyCOT(self.promptSignature)
 
-        # check if the promptSignature is a QA signature, so we can match the answer to get heatmap
-        if budget < 1.0 and self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-            prompt_schema = self.promptSignature
-            if heatmap_json_obj is None:
-                # create the heatmap structure with default resolution of 0.001 and count of 0
-                buckets = int(1.0 / TOKEN_REDUCTION_GRANULARITY)
-                hist = [0] * buckets
-                heatmap_json_obj = {
-                    "prompt_schema": f"{prompt_schema}",
-                    "question": question,
-                    "resolution": TOKEN_REDUCTION_GRANULARITY,
-                    "count": 0,
-                    "heatmap": hist,
-                }
-
-            else:
-                heatmap = heatmap_json_obj["heatmap"]
-                count = heatmap_json_obj["count"]
-                self._print_verbose(f"count: {count}")
-
-                # only refer to the heatmap if the count is greater than a enough sample size
-                # TODO: only trim the context if the attention is clustered in a small region
-                if count >= TOKEN_REDUCTION_SAMPLE:
-                    si, ei = find_best_range(
-                        heatmap,
-                        int(budget / TOKEN_REDUCTION_GRANULARITY),
-                        trim_zeros=False,
-                    )
-                    sr, er = (
-                        si * TOKEN_REDUCTION_GRANULARITY,
-                        ei * TOKEN_REDUCTION_GRANULARITY,
-                    )
-                    self._print_verbose(f"start ratio: {sr} -- end ratio: {er}")
-                    context = get_trimed(context, sr, er)
-                    reduction = True
-
         # execute LLM generation
+        if self.verbose:
+            print(f"Generating -- {self.model_name}")
         start_time = time.time()
-
-        self._print_verbose(f"Generating -- {self.model_name} -- Token budget: {budget}")
         pred = cot(question, context)
-
         end_time = time.time()
 
         # extract the log probabilities for the actual result(s) which are returned
@@ -439,71 +383,39 @@ class DSPyGenerator(BaseGenerator):
         output_tokens = usage["completion_tokens"]
 
         # NOTE: needs to match subset of keys produced by LLMConvert._create_empty_query_stats()
-        stats={
+        stats= GenerationStats(
+            model_name=self.model_name,
+            llm_call_duration_secs=end_time - start_time,
+            fn_call_duration_secs=0.0,
+            total_input_tokens=input_tokens,
+            total_output_tokens=output_tokens,
+            total_input_cost=input_tokens * usd_per_input_token,
+            total_output_cost=output_tokens * usd_per_output_token,
+            cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+        )
+        # create GenerationStats
+        stats = GenerationStats(**{
             "model_name": self.model_name,
             "llm_call_duration_secs": end_time - start_time,
             "fn_call_duration_secs": 0.0,
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "input_cost": input_tokens * usd_per_input_token,
-            "output_cost": output_tokens * usd_per_output_token,
+            "total_input_tokens": input_tokens,
+            "total_output_tokens": output_tokens,
+            "total_input_cost": input_tokens * usd_per_input_token,
+            "total_output_cost": output_tokens * usd_per_output_token,
             "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
-            "prompt": dspy_lm.history[-1]["prompt"],
-            "usage": usage,
-            "finish_reason": finish_reason,
-            "answer_log_probs": answer_log_probs,
-            "answer": pred.answer,
-        }
-
-        # if reduction is enabled but the answer is None, fallback to the full context
-        if reduction and pred.answer == None:
-            # run query on full context
-            pred = cot(question, full_context)
-
-            # NOTE: in the future, we should capture each of these^ calls in two separate
-            #       GenerationStats objects, but for now we just aggregate them
-            end_time = time.time()
-
-            # extract the log probabilities for the actual result(s) which are returned
-            answer_log_probs = self._get_answer_log_probs(dspy_lm, pred.answer)
-            usage, finish_reason = self._get_usage_and_finish_reason(dspy_lm)
-
-            stats["llm_call_duration_secs"] = end_time - start_time
-            stats["prompt"] = dspy_lm.history[-1]["prompt"]
-            for k, _ in stats['usage'].items():
-                stats['usage'][k] += usage[k]
-            stats['finish_reason'] = finish_reason
-            stats['answer_log_probs'] = answer_log_probs
-            stats['answer'] = pred.answer
-
-        self._print_verbose(pred.answer)
-
-        # token reduction post processing if enabled
-        if (
-            budget < 1.0
-            and self.prompt_strategy == PromptStrategy.DSPY_COT_QA
-            and heatmap_json_obj["count"] < MAX_HEATMAP_UPDATES
-        ):
-            self._print_verbose("Reduction enabled")
-            self._print_verbose(f"answer: {pred.answer}")
-            try:
-                gsi, gei = best_substring_match(pred.answer, full_context)
-            except Exception as e:
-                print("Error in substring match:", e)
-                gsi, gei = 0, len(full_context)
-            context_len = len(full_context)
-            gsr, ger = gsi / context_len, gei / context_len
-            norm_si, norm_ei = int(gsr / TOKEN_REDUCTION_GRANULARITY), int(
-                ger / TOKEN_REDUCTION_GRANULARITY
-            )
-            self._print_verbose(f"best_start: {gsi} -- best_end: {gei}")
-            heatmap_json_obj = update_heatmap_json(heatmap_json_obj, norm_si, norm_ei)
+            # "prompt": dspy_lm.history[-1]["prompt"],
+            # "usage": usage,
+            # "finish_reason": finish_reason,
+            # "answer_log_probs": answer_log_probs,
+            # "answer": pred.answer,
+        })
 
         if self.verbose:
+            print(pred.answer)
             print("Prompt history:")
             dspy_lm.inspect_history(n=1)
 
-        return pred.answer, heatmap_json_obj, stats
+        return pred.answer, stats
 
 
 class ImageTextGenerator(BaseGenerator):
@@ -511,9 +423,10 @@ class ImageTextGenerator(BaseGenerator):
     Class for generating field descriptions for an image with a given image model.
     """
 
-    def __init__(self, model_name: str):
+    def __init__(self, model_name: str, verbose: bool = False):
         super().__init__()
         self.model_name = model_name
+        self.verbose = verbose
 
     def _decode_image(self, base64_string: str) -> bytes:
         return base64.b64decode(base64_string)
@@ -531,7 +444,7 @@ class ImageTextGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                f"Model must be one of the image models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         return client
@@ -573,7 +486,7 @@ class ImageTextGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                f"Model must be one of the image models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         return payloads
@@ -619,7 +532,7 @@ class ImageTextGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                f"Model must be one of the image models specified in palimpzest.constants.Model"
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
         return answer, finish_reason, usage, tokens, token_logprobs
@@ -652,55 +565,47 @@ class ImageTextGenerator(BaseGenerator):
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
         after=log_attempt_number,
     )
-    def generate(self, base64_images: str, prompt: str) -> GenerationOutput:
+    def generate(self, context: List[bytes], question: str) -> GenerationOutput:
+        # NOTE: context is list of base64 images and question is prompt
         # fetch model client
         client = self._get_model_client()
 
         # create payload
-        payloads = self._make_payloads(prompt, base64_images)
+        payloads = self._make_payloads(question, context)
 
         # generate response
-        print(f"Generating")
+        if self.verbose:
+            print(f"Generating")
         start_time = time.time()
         answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(
             client, payloads
         )
         end_time = time.time()
-        print(answer)
+        if self.verbose:
+            print(answer)
 
-        # extract the log probabilities for the actual result(s) which are returned
-        answer_log_probs = self._get_answer_log_probs(tokens, token_logprobs, answer)
-
-        # TODO: To simplify life for the time being, I am aggregating stats for multiple call(s)
-        #       to the Gemini vision model into a single GenerationStats object (when we have
-        #       more than one image to process). This has no effect on most of our fields --
-        #       especially since many of them are not implemented for the Gemini model -- but
-        #       we will likely want a more robust solution in the future.
         # collect statistics on prompt, usage, and timing
-        time_per_record = end_time - start_time
-        cost_per_record = 0.0
+        usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
+        usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
+        input_tokens = usage["prompt_tokens"]
+        output_tokens = usage["completion_tokens"]
 
-        record_state = {
+        # create GenerationStats
+        stats = GenerationStats(**{
             "model_name": self.model_name,
-            "llm_call_duration_secs": time_per_record,
-            "prompt": prompt,
-            "usage": usage,
-            "finish_reason": finish_reason,
-            "answer_log_probs": answer_log_probs,
-            "answer": answer,
-        }
-
-        #TODO fill in the details
-        raise NotImplementedError("Fill in the details")
-        stats = RecordOpStats(
-            record_uuid="",
-            record_parent_uuid="",
-            op_id="",
-            op_name="",
-            time_per_record=time_per_record,
-            cost_per_record=cost_per_record,
-            record_state = record_state,
-        )
+            "llm_call_duration_secs": end_time - start_time,
+            "fn_call_duration_secs": 0.0,
+            "total_input_tokens": input_tokens,
+            "total_output_tokens": output_tokens,
+            "total_input_cost": input_tokens * usd_per_input_token,
+            "total_output_cost": output_tokens * usd_per_output_token,
+            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+            # "prompt": dspy_lm.history[-1]["prompt"],
+            # "usage": usage,
+            # "finish_reason": finish_reason,
+            # "answer_log_probs": answer_log_probs,
+            # "answer": pred.answer,
+        })
 
         return answer, stats
 
@@ -708,14 +613,13 @@ class ImageTextGenerator(BaseGenerator):
 
 # TODO: refactor this to have a CodeSynthGenerator
 def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose:bool=False):
-    start_time = time.time()
     inputs = {field_name: candidate_dict[field_name] for field_name in api.inputs}
     response = api.api_execute(code, inputs)
     pred = response['response'] if response['status'] and response['response'] else None
     return pred
 
 # Temporarily set default verbose to True for debugging
-def codeEnsembleExecution(api: API, code_ensemble: List[Dict[str, str]], candidate_dict: Dict[str, Any], verbose: bool=True) -> Tuple[DataRecord, Dict]:
+def codeEnsembleExecution(api: API, code_ensemble: List[Dict[str, str]], candidate_dict: Dict[str, Any], verbose: bool=True) -> GenerationOutput:
     start_time = time.time()
     preds = list()
     for _, code in code_ensemble.items():
@@ -729,13 +633,19 @@ def codeEnsembleExecution(api: API, code_ensemble: List[Dict[str, str]], candida
     #       
     if len(preds) == 1:
         majority_response = preds[0]
-        exec_stats = {"fn_call_duration_secs": time.time() - start_time}
+        exec_stats = GenerationStats(**{
+            "fn_call_duration_secs": time.time() - start_time,
+        })
         return majority_response, exec_stats
 
     if len(preds) > 0:
         majority_response = Counter(preds).most_common(1)[0][0]
-        exec_stats = {"fn_call_duration_secs": time.time() - start_time}
+        exec_stats = GenerationStats(**{
+            "fn_call_duration_secs": time.time() - start_time,
+        })
         # return majority_response+(" (codegen)" if verbose else ""), ensemble_stats
         return majority_response, exec_stats
 
-    return None, {"fn_call_duration_secs": time.time() - start_time}
+    return None, GenerationStats(**{
+            "fn_call_duration_secs": time.time() - start_time,
+        })

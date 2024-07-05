@@ -23,6 +23,7 @@ class AggregateOp(PhysicalOperator):
 
 class ApplyGroupByOp(AggregateOp):
     implemented_op = logical.GroupByAggregate
+    final = True
 
     def __init__(
         self,
@@ -167,6 +168,7 @@ class ApplyGroupByOp(AggregateOp):
 
 class ApplyCountAggregateOp(AggregateOp):
     implemented_op = logical.ApplyCountAggregateFunction
+    final = True
 
     def __init__(
         self,
@@ -245,7 +247,8 @@ class ApplyCountAggregateOp(AggregateOp):
 
 class ApplyAverageAggregateOp(AggregateOp):
     implemented_op = logical.ApplyAverageAggregateFunction
-
+    final = True
+    
     def __init__(
         self,
         inputSchema: Schema,

@@ -1,4 +1,6 @@
-"""GV: This class is about LLM wrappers. 
+"""GV: 
+Maybe this class should be deleted? 
+This class is about LLM wrappers. 
 My suggestion is to rename at least the base generator into LLMGenerator.
 Refactoring goal: provide a single interface to "LLM Generation" where we specify the model and prompt as input.
 This class serves as a wrapper around the DSPy and OpenAI models, abstracting away vendor-specific interfaces and parsing of the generation outputs.
@@ -38,7 +40,7 @@ import time
 
 from palimpzest.profiler.attentive_trim import (
     find_best_range,
-    get_trimed,
+    trim_context,
     best_substring_match,
     update_heatmap_json,
 )
@@ -385,7 +387,7 @@ class DSPyGenerator(LLMGeneratorWrapper):
                         ei * TOKEN_REDUCTION_GRANULARITY,
                     )
                     print("start ratio:", sr, "end ratio:", er)
-                    context = get_trimed(context, sr, er)
+                    context = trim_context(context, sr, er)
                     reduction = True
 
         # execute LLM generation

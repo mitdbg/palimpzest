@@ -78,7 +78,6 @@ class LogicalPlanner(Planner):
         """
         operators = logical_plan.operators
         datasetIdentifier = logical_plan.datasetIdentifier
-        print("in compute reorderings, datasetIdentifier: ", datasetIdentifier)
         all_plans, op_idx = [], 0
         while op_idx < len(operators):
             op = operators[op_idx]
@@ -154,7 +153,6 @@ class LogicalPlanner(Planner):
             else:
                 inputSchema = dataset_nodes[idx - 1].schema
                 outputSchema = node.schema
-
                 if node._filter is not None:
                     op = pz_ops.FilteredScan(
                         inputSchema=inputSchema,
@@ -211,6 +209,10 @@ class LogicalPlanner(Planner):
             node = node._source
         dataset_nodes.append(node)
         dataset_nodes = list(reversed(dataset_nodes))
+
+        if dataset_nodes[0].schema == dataset_nodes[1].schema:
+            dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
+            dataset_nodes[1]._source = dataset_nodes[0]
 
         # construct naive logical plan
         plan = self._construct_logical_plan(dataset_nodes)

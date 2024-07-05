@@ -15,18 +15,7 @@ import json
 DataRecordsWithStats = Tuple[List[DataRecord], List[RecordOpStats]]
 
 
-class ImplementationMeta(type):
-    """
-    This metaclass is necessary to have the logic: 
-    p_op = pz.PhysicalOperator.X
-    l_op = pz.logicalOperator.Y
-    p_op.implements(l_op) # True or False
-    """
-    def implements(cls, logical_operator_class):
-        return logical_operator_class == cls.implemented_op
-
-
-class PhysicalOperator(metaclass=ImplementationMeta):
+class PhysicalOperator():
     """
     All implemented physical operators should inherit from this class, and define in the implemented_op variable
     exactly which logical operator they implement. This is necessary for the planner to be able to determine
@@ -39,6 +28,11 @@ class PhysicalOperator(metaclass=ImplementationMeta):
     implemented_op = None
     inputSchema = None
     outputSchema = None
+    final = False # This gets set to True if the operator actually is to be used
+
+    @classmethod
+    def implements(cls, logical_operator_class):
+        return logical_operator_class == cls.implemented_op and cls.final
 
     def __init__(
         self,

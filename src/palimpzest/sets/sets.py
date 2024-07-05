@@ -8,7 +8,7 @@ from palimpzest.elements import (
     UserFunction,
     GroupBySig,
 )
-from palimpzest.datasources import DataSource, DirectorySource, FileSource
+from palimpzest.datasources import *
 
 from typing import List, Optional, Union
 
@@ -97,63 +97,64 @@ class Set:
         return d
 
     def deserialize(inputObj):
-        if inputObj["version"] != Set.SET_VERSION:
-            raise Exception("Cannot deserialize Set because it is the wrong version")
+        raise Exception("Cannot deserialize Set because it is the wrong version")
 
-        # TODO: I don't believe this would actually work for the DataSources,
-        #       as inputObj["schema"] is a dict. not a Schema; also need to add
-        #       dataset_id to constructor here somehow
-        # deserialize source depending on whether it's a Set or DataSource
-        source = None
-        if "version" in inputObj["source"]:
-            source = Set.deserialize(inputObj["source"])
+        # if inputObj["version"] != Set.SET_VERSION:
+        #     raise Exception("Cannot deserialize Set because it is the wrong version")
+        # # TODO: I don't believe this would actually work for the DataSources,
+        # #       as inputObj["schema"] is a dict. not a Schema; also need to add
+        # #       dataset_id to constructor here somehow
+        # # deserialize source depending on whether it's a Set or DataSource
+        # source = None
+        # if "version" in inputObj["source"]:
+        #     source = Set.deserialize(inputObj["source"])
 
-        elif inputObj["source_type"] == "directory":
-            source = DirectorySource(inputObj["schema"])
+        # elif inputObj["source_type"] == "directory":
+        #     source = DirectoryTextFilesSource(inputObj["schema"])
 
-        elif inputObj["source_type"] == "file":
-            source = FileSource(inputObj["schema"])
+        # elif inputObj["source_type"] == "file":
+        #     source = FileSource(inputObj["schema"])
 
-        elif inputObj["source_type"] == "jsonstream":
-            raise Exception("This can't possibly work, can it?")
-            # source = JSONStreamSource(inputObj["schema"])
+        # elif inputObj["source_type"] == "jsonstream":
+        #     raise Exception("This can't possibly work, can it?")
+        #     # source = JSONStreamSource(inputObj["schema"])
 
-        # deserialize agg. function
-        aggFuncStr = inputObj.get("aggFunc", None)
-        aggFunc = (
-            None if aggFuncStr is None else AggregateFunction.deserialize(aggFuncStr)
-        )
+        # # deserialize agg. function
+        # aggFuncStr = inputObj.get("aggFunc", None)
+        # aggFunc = (
+        #     None if aggFuncStr is None else AggregateFunction.deserialize(aggFuncStr)
+        # )
 
-        # deserialize agg. function
-        groupByStr = inputObj.get("groupBy", None)
-        groupBy = None if groupByStr is None else GroupBySig.deserialize(groupByStr)
+        # # deserialize agg. function
+        # groupByStr = inputObj.get("groupBy", None)
+        # groupBy = None if groupByStr is None else GroupBySig.deserialize(groupByStr)
 
-        # deserialize limit
-        limitStr = inputObj.get("limit", None)
-        limit = None if limitStr is None else int(limitStr)
+        # # deserialize limit
+        # limitStr = inputObj.get("limit", None)
+        # limit = None if limitStr is None else int(limitStr)
 
-        fnid = inputObj.get("fnid", None)
-        cardinality = inputObj.get("cardinality", None)
-        image_conversion = inputObj.get("image_conversion", None)
-        depends_on = inputObj.get("depends_on", None)
-        num_samples = inputObj.get("num_samples", None)
-        scan_start_idx = inputObj.get("scan_start_idx", None)
+        # fnid = inputObj.get("fnid", None)
+        # cardinality = inputObj.get("cardinality", None)
+        # image_conversion = inputObj.get("image_conversion", None)
+        # depends_on = inputObj.get("depends_on", None)
+        # num_samples = inputObj.get("num_samples", None)
+        # scan_start_idx = inputObj.get("scan_start_idx", None)
 
-        return Set(
-            schema=inputObj["schema"].jsonSchema(),
-            source=source,
-            desc=inputObj["desc"],
-            filter=Filter.deserialize(inputObj["filter"]),
-            aggFunc=aggFunc,
-            fnid=fnid,
-            cardinality=cardinality,
-            image_conversion=image_conversion,
-            depends_on=depends_on,
-            num_samples=num_samples,
-            scan_start_idx=scan_start_idx,
-            limit=limit,
-            groupBy=groupBy,
-        )
+        # return Set(
+        #     schema=inputObj["schema"].jsonSchema(),
+        #     source=source,
+        #     desc=inputObj["desc"],
+        #     filter=Filter.deserialize(inputObj["filter"]),
+        #     aggFunc=aggFunc,
+        #     fnid=fnid,
+        #     cardinality=cardinality,
+        #     image_conversion=image_conversion,
+        #     depends_on=depends_on,
+        #     num_samples=num_samples,
+        #     scan_start_idx=scan_start_idx,
+        #     limit=limit,
+        #     groupBy=groupBy,
+        # )
 
     def universalIdentifier(self):
         """Return a unique identifier for this Set."""
@@ -202,26 +203,27 @@ class Dataset(Set):
             self._depends_on = [self._depends_on]
 
     def deserialize(inputObj):
-        # TODO: this deserialize operation will not work; I need to finish the deserialize impl. for Schema
-        if inputObj["version"] != Set.SET_VERSION:
-            raise Exception("Cannot deserialize Set because it is the wrong version")
+        raise Exception("Cannot deserialize Set because it is the wrong version")
+        # # TODO: this deserialize operation will not work; I need to finish the deserialize impl. for Schema
+        # if inputObj["version"] != Set.SET_VERSION:
+        #     raise Exception("Cannot deserialize Set because it is the wrong version")
 
-        # deserialize source depending on whether it's a Set or DataSource
-        source = None
-        if "version" in inputObj["source"]:
-            source = Set.deserialize(inputObj["source"])
+        # # deserialize source depending on whether it's a Set or DataSource
+        # source = None
+        # if "version" in inputObj["source"]:
+        #     source = Set.deserialize(inputObj["source"])
 
-        elif inputObj["source_type"] == "directory":
-            source = DirectorySource(inputObj["schema"])
+        # elif inputObj["source_type"] == "directory":
+        #     source = DirectoryTextFilesSource(inputObj["schema"])
 
-        elif inputObj["source_type"] == "file":
-            source = FileSource(inputObj["schema"])
+        # elif inputObj["source_type"] == "file":
+        #     source = FileSource(inputObj["schema"])
 
-        return Dataset(source, inputObj["schema"], desc=inputObj["desc"])
+        # return Dataset(source, inputObj["schema"], desc=inputObj["desc"])
 
     def filter(
         self,
-        _filter: Filter,
+        _filter: Union[str, callable],
         depends_on: Union[str, List[str]] = None,
         desc: str = "Apply filter(s)",
     ) -> Dataset:
@@ -229,10 +231,10 @@ class Dataset(Set):
         f = None
         if type(_filter) == str:
             f = Filter(_filter)
-        elif type(_filter) == callable:
+        elif callable(_filter):
             f = Filter(filterFn=_filter)
         else:
-            raise Exception("Filter type not supported.")
+            raise Exception("Filter type not supported.", type(_filter))
 
         return Dataset(
             source=self,

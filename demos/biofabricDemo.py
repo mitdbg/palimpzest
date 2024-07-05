@@ -56,7 +56,7 @@ def filtering(input_dataset, policy):
     # patient_tables = patient_tables.filter("The table contains patient biometric data")
     # patient_tables = patient_tables.filter("The table contains proteomic data")
     # patient_tables = patient_tables.filter("The table records if the patient is excluded from the study")
-    output = pz.SimpleExecution(patient_tables, policy)
+    output = pz.SequentialSingleThreadExecution(patient_tables, policy)
     output = output.executeAndOptimize(args.verbose)
 
     filtered = []
@@ -79,7 +79,7 @@ def matching(input_dataset, policy):
     patient_tables = input_dataset.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
     case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
     
-    matched_tables = pz.SimpleExecution(case_data, policy)   
+    matched_tables = pz.SequentialSingleThreadExecution(case_data, policy)   
     matched_tables = matched_tables.executeAndOptimize(args.verbose)
     
     output_rows = []
@@ -156,7 +156,7 @@ if __name__ == "__main__":
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
         
-        output_1 = pz.SimpleExecution(patient_tables, policy)
+        output_1 = pz.SequentialSingleThreadExecution(patient_tables, policy)
         output_1 = output_1.executeAndOptimize(args.verbose)
 
         filtered_tables = []
@@ -168,7 +168,7 @@ if __name__ == "__main__":
             for item in filtered_tables:
                 f.write("%s\n" % item)
 
-        output_2 = pz.SimpleExecution(case_data, policy)           
+        output_2 = pz.SequentialSingleThreadExecution(case_data, policy)           
         output_2 = output_2.executeAndOptimize(args.verbose)
         
         output_rows = []

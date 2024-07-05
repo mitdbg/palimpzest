@@ -1,40 +1,54 @@
 from __future__ import annotations
 import json 
 import time
-from typing import List
+from typing import Any, Dict, List, Tuple
 from palimpzest.constants import Model
 from .strategy import PhysicalOpStrategy
 
 
 from palimpzest.constants import *
+from palimpzest.dataclasses import GenerationStats
 from palimpzest.elements import *
 from palimpzest.operators import logical, physical, convert
 
+# TYPE DEFINITIONS
+FieldName = str
+
 class LLMBondedQueryConvert(convert.LLMConvert):
 
-    def convert(self, candidate_content,
-                fields) -> None:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def convert(self, 
+                candidate_content,
+                fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+
+        prompt = self._construct_query_prompt(fields_to_generate=fields)
 
         # generate all fields in a single query
-        final_json_objects, query_stats = self._dspy_generate_fields(fields, content=candidate_content)
+        answer, generation_stats = self._dspy_generate_fields(content=candidate_content, prompt=prompt)
+        json_answers = self.parse_answer(answer, fields)
 
         # if there was an error, execute a conventional query
-        if all([v is None for v in final_json_objects[0].values()]):
-            # generate each field one at a time
-            field_outputs = {}
-            for field_name in fields:
-                json_objects, field_stats = self._dspy_generate_fields([field_name], content = candidate_content)
+        for field, values in json_answers.items():
+            if values == []:
+                print("Falling back to conventional conversion")
+                conventional_op = type('LLMFallback',
+                                        (convert.LLMConvertConventional,),
+                                        {'model': self.model,
+                                        'prompt_strategy': self.prompt_strategy})
+            
+                field_answer, field_stats = conventional_op(
+                    inputSchema = self.inputSchema,
+                    outputSchema = self.outputSchema,
+                    shouldProfile = self.shouldProfile,
+                    query_strategy = self.query_strategy,
+                ).convert(candidate_content, field)
+                json_answers[field] = field_answer[field]
+                generation_stats += field_stats
+        
+        return json_answers, generation_stats
 
-                # update query_stats
-                for key, value in field_stats.items():
-                    if type(value) == type(dict()):
-                        for k, v in value.items():
-                            query_stats[key][k] = query_stats[key].get(k,0) + value[k]
-                    else:
-                        query_stats[key] += value
-
-                # update field_outputs
-                field_outputs[field_name] = json_objects
 
 class BondedQueryStrategy(PhysicalOpStrategy):
 
@@ -56,6 +70,7 @@ class BondedQueryStrategy(PhysicalOpStrategy):
             return_operators.append(physical_op_type)
 
         return return_operators
+
 class BondedQueryConvertStrategy(BondedQueryStrategy):
     """
     This strategy creates physical operator classes using a bonded query strategy.
