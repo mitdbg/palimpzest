@@ -24,6 +24,7 @@ class FilterOp(PhysicalOperator):
         filter: Filter,
         targetCacheId: str = None,
         shouldProfile=False,
+        verbose=False,
         max_workers=1,
         *args, **kwargs
     ):
@@ -31,6 +32,7 @@ class FilterOp(PhysicalOperator):
         super().__init__(inputSchema=inputSchema, outputSchema=outputSchema, shouldProfile=shouldProfile, *args, **kwargs)
         self.filter = filter
         self.targetCacheId = targetCacheId
+        self.verbose = verbose
         self.max_workers = max_workers
 
 
@@ -57,6 +59,7 @@ class FilterOp(PhysicalOperator):
             filter=self.filter,
             targetCacheId=self.targetCacheId,
             shouldProfile=self.shouldProfile,
+            verbose=self.verbose,
             max_workers=self.max_workers,
         )
 
@@ -185,12 +188,12 @@ class LLMFilter(FilterOp):
                 self.prompt_strategy,
                 doc_schema,
                 doc_type,
-                verbose=False, # TODO pass verbose argument
+                verbose=self.verbose,
             )
 
         else:
-            raise Exception(f"Prompt strategy {self.prompt_strategy} implemented yet")
-        
+            raise Exception(f"Prompt strategy {self.prompt_strategy} not implemented yet")
+
 
     def __eq__(self, other: LLMFilter):
         return (
@@ -211,6 +214,7 @@ class LLMFilter(FilterOp):
             filter=self.filter,
             targetCacheId=self.targetCacheId,
             shouldProfile=self.shouldProfile,
+            verbose=self.verbose,
             max_workers=self.max_workers,
         )
 

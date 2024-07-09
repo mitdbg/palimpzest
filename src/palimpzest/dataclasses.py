@@ -37,8 +37,8 @@ class GenerationStats:
     fn_call_duration_secs: float = 0.0
 
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
-#        self.raw_answers.extend(other.raw_answers)
-        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost','cost_per_record','llm_call_duration_secs', 'fn_call_duration_secs']:
+        # self.raw_answers.extend(other.raw_answers)
+        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'cost_per_record', 'llm_call_duration_secs', 'fn_call_duration_secs']:
             setattr(self, field, getattr(self, field) + getattr(other, field))
         return self
 
@@ -48,16 +48,13 @@ class GenerationStats:
         dct['model_name'] = self.model_name      
         return GenerationStats(**dct)
     
-    def __radd__(self, other: GenerationStats) -> GenerationStats:
-        return self
-    
     # Do the same as iadd and add but with division operator
     def __itruediv__(self, quotient: float) -> GenerationStats:
         if quotient == 0:
             raise ZeroDivisionError("Cannot divide by zero")
         if isinstance(quotient, int):
             quotient = float(quotient)
-        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost','cost_per_record','llm_call_duration_secs', 'fn_call_duration_secs']:
+        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'cost_per_record', 'llm_call_duration_secs', 'fn_call_duration_secs']:
             setattr(self, field, getattr(self, field) / quotient)
         return self
     
@@ -103,6 +100,9 @@ class RecordOpStats:
     ##### NOT-OPTIONAL, BUT FILLED BY EXECUTION CLASS AFTER CONSTRUCTOR CALL #####
     # the ID of the physical operation which produced the input record for this record at this operation
     source_op_id: str = ""
+
+    # the ID of the physical plan which produced this record at this operation
+    plan_id: str = ""
 
     ##### OPTIONAL FIELDS (I.E. ONLY MANDATORY FOR CERTAIN OPERATORS) #####
     # (if applicable) the name of the model used to generate the output for this record

@@ -412,8 +412,8 @@ class DSPyGenerator(BaseGenerator):
 
         if self.verbose:
             print(pred.answer)
-            print("Prompt history:")
-            dspy_lm.inspect_history(n=1)
+            # print("Prompt history:")
+            # dspy_lm.inspect_history(n=1)
 
         return pred.answer, stats
 

@@ -15,7 +15,6 @@ from palimpzest.dataclasses import GenerationStats
 from palimpzest.elements import *
 from palimpzest.operators import logical, physical, convert
 from palimpzest.prompts import EXAMPLE_PROMPT, CODEGEN_PROMPT, ADVICEGEN_PROMPT
-from palimpzest.strategies.bonded_query import LLMBondedQueryConvert
 
 # TYPE DEFINITIONS
 FieldName = str
@@ -78,19 +77,6 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
 
     def __str__(self):
         return f"{self.__class__.__name__}({str(self.outputSchema):10s}, Code Synth Strategy: {self.code_strategy.value})"
-
-    def get_op_dict(self):
-        return {
-            "operator": self.op_name(),
-            "inputSchema": str(self.inputSchema),
-            "outputSchema": str(self.outputSchema),
-            "cardinality": self.cardinality,
-            "exemplar_generation_model": self.exemplar_generation_model.value,
-            "conventional_fallback_model": self.conventional_fallback_model.value,
-            "prompt_strategy": self.prompt_strategy.value,
-            "code_synth_strategy": self.code_strategy.value,
-            "desc": str(self.desc),
-        }
 
     def _fetch_cached_code(self, fields_to_generate: List[str]) -> Tuple[Dict[CodeName, Code]]:
         # if we are allowed to cache synthesized code across plan executions, check the cache
@@ -175,7 +161,7 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         candidate_content = json.dumps(candidate_dict)
 
         bonded_op = type('LLMFallback',
-                         (LLMBondedQueryConvert,),
+                         (convert.LLMConvertBonded,),
                          {'model': self.exemplar_generation_model,
                           'prompt_strategy': self.prompt_strategy})
         field_answers, generation_stats = bonded_op(

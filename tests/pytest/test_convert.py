@@ -17,13 +17,11 @@ from palimpzest.planner import LogicalPlanner, PhysicalPlanner
 from palimpzest.operators import ConvertOp, ConvertFileToText
 from palimpzest.execution import Execute
 from utils import remove_cache, buildNestedStr
-from palimpzest.strategies.model_selection import ModelSelectionFilterStrategy
 from palimpzest.execution import SequentialSingleThreadExecution
 from palimpzest.execution.nosentinel_execution import NoSentinelExecution
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.elements.records import DataRecord
 from palimpzest.operators.convert import LLMConvertConventional
-from palimpzest.strategies.bonded_query import LLMBondedQueryConvert
 from palimpzest.operators.datasource import MarshalAndScanDataOp
 from palimpzest.constants import PromptStrategy
 

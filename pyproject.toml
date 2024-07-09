@@ -80,6 +80,7 @@ filterwarnings = [
     "error",
     "ignore::DeprecationWarning",
     "ignore::ResourceWarning",
+    "ignore::UserWarning",
 ]
 
 [build-system]

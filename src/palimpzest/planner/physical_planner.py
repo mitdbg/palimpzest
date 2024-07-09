@@ -21,13 +21,14 @@ class PhysicalPlanner(Planner):
             num_samples: Optional[int]=10,
             scan_start_idx: Optional[int]=0,
             available_models: Optional[List[Model]]=[],
-            allow_model_selection: Optional[bool]=True,
             allow_bonded_query: Optional[bool]=True,
+            allow_conventional_query: Optional[bool]=False,
+            allow_model_selection: Optional[bool]=True,
             allow_code_synth: Optional[bool]=True,
             allow_token_reduction: Optional[bool]=True,
             shouldProfile: Optional[bool]=True,
             no_cache: Optional[bool]=False,
-            useParallelOps: Optional[bool]=False,
+            verbose: Optional[bool]=False,
         *args,
         **kwargs,
     ):
@@ -37,12 +38,13 @@ class PhysicalPlanner(Planner):
         self.available_models = available_models
         self.allow_model_selection = allow_model_selection
         self.allow_bonded_query = allow_bonded_query
+        self.allow_conventional_query = allow_conventional_query
+        self.allow_model_selection = allow_model_selection
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.shouldProfile = shouldProfile
         self.no_cache = no_cache
-        self.useParallelOps = useParallelOps
-        # Ideally this gets customized by model selection, code synth, etc. etc. using strategies
+        self.verbose = verbose
         self.physical_ops = [op for op in pz_ops.PHYSICAL_OPERATORS if op.final]
 
         # This is a dictionary where the physical planner will keep track for all the logical plan operators defined,
@@ -54,10 +56,16 @@ class PhysicalPlanner(Planner):
                 if physical_op.implements(logical_op):
                     self.logical_physical_map[logical_op].append(physical_op)
 
+            # NOTE: If model selection is turned off you can not have LLMFilters b/c the only place where "final"
+            #       LLMFilters are produced is in the ModelSelectionFilterStrategy
             for strategy in physical_strategies.REGISTERED_STRATEGIES:
-                if not self.allow_model_selection and issubclass(strategy, physical_strategies.ModelSelectionStrategy):
+                if not self.allow_bonded_query and issubclass(strategy, physical_strategies.LLMBondedConvertStrategy):
                     continue
-                if not self.allow_bonded_query and issubclass(strategy, physical_strategies.BondedQueryStrategy):
+                if not self.allow_bonded_query and issubclass(strategy, physical_strategies.TokenReducedBondedConvertStrategy):
+                    continue
+                if not self.allow_conventional_query and issubclass(strategy, physical_strategies.LLMConventionalConvertStrategy):
+                    continue
+                if not self.allow_conventional_query and issubclass(strategy, physical_strategies.TokenReducedConventionalConvertStrategy):
                     continue
                 if not self.allow_token_reduction and issubclass(strategy, physical_strategies.TokenReductionStrategy):
                     continue                    
@@ -66,7 +74,7 @@ class PhysicalPlanner(Planner):
 
                 if strategy.logical_op_class == logical_op:
                     ops = strategy(available_models=self.available_models,
-                                    prompt_strategy=PromptStrategy.DSPY_COT_QA,
+                                    prompt_strategy=PromptStrategy.DSPY_COT_QA if logical_op != pz_ops.FilteredScan else PromptStrategy.DSPY_COT_BOOL,
                                     token_budgets=[0.1, 0.5, 0.9],)
                     self.logical_physical_map.get(logical_op, []).extend(ops)
 
@@ -77,169 +85,15 @@ class PhysicalPlanner(Planner):
         # print(self.logical_physical_map[pz_ops.ConvertScan])
         # print(self.logical_physical_map[pz_ops.FilteredScan])
 
-    def _createBaselinePlan(self, logical_plan: LogicalPlan, model: Model) -> PhysicalPlan:
-        """A simple wrapper around _createSentinelPlan as right now these are one and the same."""
-        return self._createSentinelPlan(logical_plan, model)
-
-    def _createSentinelPlan(self, logical_plan: LogicalPlan, model: Model) -> PhysicalPlan:
+    def _getSubPlanModel(self, subplan: PhysicalPlan) -> Optional[Model]:
         """
-        Create the sentinel plan for the given model. At least for now --- each
-        sentinel plan is a plan with a single model which follows the naive logical
-        plan implied by the user's program.
+        Returns the model used by the subplan if it is using one, otherwise returns None.
         """
-        datasetIdentifier = logical_plan.datasetIdentifier
-        physical_operators = []
-        for logical_op in logical_plan.operators:
-            op = None
-            shouldProfile = True
-            execution_parameters = {
-                "num_samples": self.num_samples,
-                "scan_start_idx": self.scan_start_idx,
-                "shouldProfile": self.shouldProfile,
-            }
+        for op in subplan.operators:
+            if getattr(op, "model", None) is not None:
+                return op.model
 
-            # TODO the goal is to simply this if else into the following loop
-            # for op in self.logical_physical_map[type(logical_op)]:
-            if isinstance(logical_op, pz_ops.ConvertScan):
-                op_class: PhysicalOperator = None
-                hardcoded_fns = [x for x in self.hardcoded_converts if x.materializes(logical_op)]
-                if len(hardcoded_fns) > 0:                                                    
-                    for op_class in hardcoded_fns:
-                        op = op_class(
-                                inputSchema=logical_op.inputSchema,
-                                outputSchema=logical_op.outputSchema,
-                                shouldProfile=shouldProfile,
-                            )
-                    # Todo not break but also try other hardcoded ops 
-                    break
-                else:
-                    # TODO This will also re-try hardcoded functions that did not pass the previous test.
-                    for op_class in self.logical_physical_map[type(logical_op)]:
-                        if not op_class.materializes(logical_op):
-                            continue
-                        op = op_class(
-                                inputSchema=logical_op.inputSchema,
-                                outputSchema=logical_op.outputSchema,
-                                image_conversion=logical_op.image_conversion,
-                                query_strategy = QueryStrategy.BONDED_WITH_FALLBACK,
-                                shouldProfile=shouldProfile,
-                            )
-
-            elif isinstance(logical_op, pz_ops.FilteredScan):
-                op_class: PhysicalOperator = None
-                for op_class in self.logical_physical_map[type(logical_op)]:
-                    if op_class.materializes(logical_op):
-                        op = op_class(
-                            inputSchema=logical_op.inputSchema,
-                            outputSchema=logical_op.outputSchema,
-                            filter=logical_op.filter,
-                            shouldProfile=shouldProfile,
-                        )
-            else:
-                op_class = self.logical_physical_map[type(logical_op)][0]
-                kw_parameters = logical_op.getParameters()
-                kw_parameters.update(execution_parameters)
-                op = op_class(**kw_parameters)
-
-            physical_operators.append(op)
-
-        return PhysicalPlan(operators=physical_operators, datasetIdentifier=datasetIdentifier)
-
-    def _createPhysicalPlans(self, logical_plan: LogicalPlan) -> List[PhysicalPlan]:
-        """
-        Given the logical plan implied by this LogicalOperator, enumerate up to `max`
-        possible physical plans and return them as a list.
-        """
-        # check that at least one llm service has been provided
-        assert (
-            len(self.available_models) > 0
-        ), "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
-        datasetIdentifier = logical_plan.datasetIdentifier
-        # determine which query strategies may be used
-        query_strategies = [QueryStrategy.BONDED_WITH_FALLBACK]
-        if self.allow_code_synth:
-            query_strategies.append(QueryStrategy.CODE_GEN_WITH_FALLBACK)
-
-        # get logical operators
-        operators = logical_plan.operators
-        execution_parameters = {
-            "num_samples": self.num_samples,
-            "scan_start_idx": self.scan_start_idx,
-            "shouldProfile": self.shouldProfile,
-        }
-        all_plans = []
-        for logical_op in operators:
-
-            if isinstance(logical_op, pz_ops.ConvertScan):
-                plans = []
-                op_alternatives = []
-                for subplan in all_plans:
-                    hardcoded_fns = [x for x in self.hardcoded_converts if x.materializes(logical_op)]
-                    if len(hardcoded_fns) > 0:                                                    
-                        for op_class in hardcoded_fns:
-                            physical_op = op_class(
-                                    inputSchema=logical_op.inputSchema,
-                                    outputSchema=logical_op.outputSchema,
-                                    shouldProfile=self.shouldProfile,
-                                )
-                            op_alternatives.append(physical_op)
-                            break
-                    else:
-                        for op_class in self.logical_physical_map[type(logical_op)]:
-                            if not op_class.materializes(logical_op):
-                                continue
-                            physical_op = op_class(
-                                inputSchema=logical_op.inputSchema,
-                                outputSchema=logical_op.outputSchema,
-                                image_conversion=logical_op.image_conversion,
-                                query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
-                                shouldProfile=self.shouldProfile,
-                            )
-                            op_alternatives.append(physical_op)
-
-                    for physical_op in op_alternatives:
-                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
-                        plans.append(new_physical_plan)                        
-
-                # update all_plans
-                all_plans = plans
-
-            elif isinstance(logical_op, pz_ops.FilteredScan):
-                plans = []
-                for subplan in all_plans:
-                    # TODO: if non-llm filter, don't iterate over all plan possibilities
-                    for op_class in self.logical_physical_map[type(logical_op)]:
-                        if not op_class.materializes(logical_op): 
-                            continue
-                        physical_op = op_class(
-                            inputSchema=logical_op.inputSchema,
-                            outputSchema=logical_op.outputSchema,
-                            filter=logical_op.filter,
-                            shouldProfile=self.shouldProfile,
-                        )
-                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
-                        plans.append(new_physical_plan)
-                # update all_plans
-                all_plans = plans
-
-            else:
-                op_class = self.logical_physical_map[type(logical_op)][0]
-                kw_parameters = logical_op.getParameters()
-                kw_parameters.update(execution_parameters)
-                physical_op = op_class(**kw_parameters)
-
-                # base case, if this operator is a BaseScan set all_plans to be the physical plan with just this operatorù
-                # This also happens if the operator is a CacheScan and all_plans is empty
-                if isinstance(logical_op, pz_ops.BaseScan) or \
-                    (isinstance(logical_op, pz_ops.CacheScan) and all_plans == []):
-                    all_plans = [PhysicalPlan(operators=[physical_op], datasetIdentifier=datasetIdentifier)]
-                else:
-                    plans = []
-                    for subplan in all_plans:
-                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
-                    all_plans = plans
-
-        return all_plans
+        return None
 
     def deduplicate_plans(self, physical_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
         """De-duplicate plans with identical estimates for runtime, cost, and quality."""
@@ -292,14 +146,38 @@ class PhysicalPlanner(Planner):
         # return the set of plans on the estimated pareto frontier
         return pareto_frontier_plans
 
-    def add_baseline_plans(self, final_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
-        # if specified, include all baseline plans in the final set of plans
-        for plan in [self._createBaselinePlan(model) for model in self.available_models]:
+    def add_baseline_plans(self, final_plans: List[PhysicalPlan], initial_logical_plan: LogicalPlan) -> List[PhysicalPlan]:
+        """
+        Generate all baseline plans and add them to the final set of plans if they do not already exist.
+        """
+        # store original parameters
+        allow_bonded_query = self.allow_bonded_query
+        allow_conventional_query = self.allow_conventional_query
+        allow_model_selection = self.allow_model_selection
+        allow_code_synth = self.allow_code_synth
+        allow_token_reduction = self.allow_token_reduction
+
+        # update parameters to construct baseline plans
+        self.allow_bonded_query = True
+        self.allow_conventional_query = False
+        self.allow_model_selection = False
+        self.allow_code_synth = False
+        self.allow_token_reduction = False
+
+        # generate baseline plans and add them to final plans
+        for plan in self.generate_plans(initial_logical_plan):
             for final_plan in final_plans:
                 if plan == final_plan:
                     continue
 
             final_plans.append(plan)
+
+        # set parameters back to original
+        self.allow_bonded_query = allow_bonded_query
+        self.allow_conventional_query = allow_conventional_query
+        self.allow_model_selection = allow_model_selection
+        self.allow_code_synth = allow_code_synth
+        self.allow_token_reduction = allow_token_reduction
 
         return final_plans
 
@@ -346,21 +224,120 @@ class PhysicalPlanner(Planner):
 
         return final_plans
 
-    def generate_plans(self, logical_plan: LogicalPlan, sentinels: bool=False) -> List[PhysicalPlan]:
-        """Return a set of possible physical plans."""
-        # only fetch sentinel plans if specified
-        if sentinels:
-            models = self.available_models
-            assert (
-                len(models) > 0
-            ), "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
-            sentinel_plans = [self._createSentinelPlan(logical_plan, model) for model in models]
-            return sentinel_plans
+    def generate_plans(self, logical_plan: LogicalPlan) -> List[PhysicalPlan]:
+        """
+        Return the set of possible physical plans for the given logical plan and planner instance.
+        """
+        # check that at least one llm service has been provided
+        assert (
+            len(self.available_models) > 0
+        ), "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
+        datasetIdentifier = logical_plan.datasetIdentifier
 
-        # compute all physical plans for this logical plan
-        physicalPlans = [
-            physicalPlan
-            for physicalPlan in self._createPhysicalPlans(logical_plan)
-        ]
-        print(f"INITIAL PLANS: {len(physicalPlans)}")
-        return physicalPlans
+        # determine which query strategies may be used
+        query_strategies = [QueryStrategy.BONDED_WITH_FALLBACK]
+        if self.allow_code_synth:
+            query_strategies.append(QueryStrategy.CODE_GEN_WITH_FALLBACK)
+
+        # get logical operators and execution parameters
+        operators = logical_plan.operators
+        execution_parameters = {
+            "num_samples": self.num_samples,
+            "scan_start_idx": self.scan_start_idx,
+            "shouldProfile": self.shouldProfile,
+        }
+
+        # construct the set of physical plans
+        all_plans = []
+        for logical_op in operators:
+
+            if isinstance(logical_op, pz_ops.ConvertScan):
+                plans = []
+                op_alternatives = []
+                for subplan in all_plans:
+                    hardcoded_fns = [x for x in self.hardcoded_converts if x.materializes(logical_op)]
+                    if len(hardcoded_fns) > 0:
+                        for op_class in hardcoded_fns:
+                            physical_op = op_class(
+                                    inputSchema=logical_op.inputSchema,
+                                    outputSchema=logical_op.outputSchema,
+                                    shouldProfile=self.shouldProfile,
+                                    verbose=self.verbose,
+                                )
+                            op_alternatives.append(physical_op)
+                            break
+                    else:
+                        for op_class in self.logical_physical_map[type(logical_op)]:
+                            if not op_class.materializes(logical_op):
+                                continue
+                            if not self.allow_model_selection and getattr(op_class, "model", None) is not None:
+                                # skip this physical op if the subplan already uses a model that is different
+                                # from the one used by this op_class
+                                subplan_model = self._getSubPlanModel(subplan)
+                                if subplan_model is not None and subplan_model != op_class.model:
+                                    continue
+                            physical_op = op_class(
+                                inputSchema=logical_op.inputSchema,
+                                outputSchema=logical_op.outputSchema,
+                                image_conversion=logical_op.image_conversion,
+                                query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
+                                shouldProfile=self.shouldProfile,
+                                verbose=self.verbose,
+                            )
+                            op_alternatives.append(physical_op)
+
+                    for physical_op in op_alternatives:
+                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                        plans.append(new_physical_plan)
+
+                # update all_plans
+                all_plans = plans
+
+            elif isinstance(logical_op, pz_ops.FilteredScan):
+                plans = []
+                for subplan in all_plans:
+                    # TODO: if non-llm filter, don't iterate over all plan possibilities
+                    for op_class in self.logical_physical_map[type(logical_op)]:
+                        if not op_class.materializes(logical_op):
+                            continue
+                        if not self.allow_model_selection and getattr(op_class, "model", None) is not None:
+                            # skip this physical op if the subplan already uses a model that is different
+                            # from the one used by this op_class
+                            subplan_model = self._getSubPlanModel(subplan)
+                            if subplan_model is not None and subplan_model != op_class.model:
+                                continue
+                        physical_op = op_class(
+                            inputSchema=logical_op.inputSchema,
+                            outputSchema=logical_op.outputSchema,
+                            filter=logical_op.filter,
+                            shouldProfile=self.shouldProfile,
+                            verbose=self.verbose,
+                        )
+                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                        plans.append(new_physical_plan)
+                # update all_plans
+                all_plans = plans
+
+            else:
+                op_class = self.logical_physical_map[type(logical_op)][0]
+                kw_parameters = logical_op.getParameters()
+                kw_parameters.update(execution_parameters)
+                physical_op = op_class(**kw_parameters)
+
+                # base case, if this operator is a BaseScan set all_plans to be the physical plan with just this operator
+                # This also happens if the operator is a CacheScan and all_plans is empty
+                if (
+                    isinstance(logical_op, pz_ops.BaseScan) or
+                    (isinstance(logical_op, pz_ops.CacheScan) and all_plans == [])
+                ):
+                    all_plans = [PhysicalPlan(operators=[physical_op], datasetIdentifier=datasetIdentifier)]
+                else:
+                    plans = []
+                    for subplan in all_plans:
+                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                    all_plans = plans
+
+        if self.verbose:
+            print(f"PHYSICAL PLANS: {len(all_plans)}")
+
+        return all_plans
