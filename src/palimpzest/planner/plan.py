@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from palimpzest.constants import MAX_UUID_CHARS
 from palimpzest.operators import FilteredScan, LogicalOperator, PhysicalOperator
 from palimpzest.operators.physical import PhysicalOperator
 
@@ -11,6 +12,7 @@ except:
 
 from typing import List
 
+import uuid
 
 
 class Plan:
@@ -84,12 +86,9 @@ class PhysicalPlan(Plan):
         self.total_cost = None
         self.quality = None
         self.datasetIdentifier = datasetIdentifier
-        # MR: Maybe we should keep the plan stats tied to the plan object for easy reference?
-        #     Even if it's just by adding a setter method which pz.Execute can call after it's
-        #     finished doing it's thing? I'm not sure what the use-case will be, but I imagine
-        #     some day in the future when people are doing crazy things w/PZ, folks may want to
-        #     just reference the plan.plan_stats (or just plan.stats) in their program.
-        # self.plan_stats = PlanStats(plan_id=self.plan_id())
+
+        # make plan_id completely random
+        self.plan_id = str(uuid.uuid4())[:MAX_UUID_CHARS]
 
     @staticmethod
     def fromOpsAndSubPlan(ops: List[PhysicalOperator], subPlan: PhysicalPlan) -> PhysicalPlan:
@@ -109,10 +108,8 @@ class PhysicalPlan(Plan):
         label = "-".join([str(op) for op in ops])
         return f"PZ-{label}"
 
-    # GV: Should we generate a unique ID for each plan in the __init__ ?
-    # MR: I think that's a good idea (also in fromOpsAndSubPlan)
-    def plan_id(self) -> str:
-        return self.__repr__()
+    def get_plan_id(self) -> str:
+        return self.plan_id
 
     def getPlanModelNames(self) -> List[str]:
         model_names = []

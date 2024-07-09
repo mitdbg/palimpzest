@@ -10,12 +10,12 @@ from palimpzest.elements import *
 from palimpzest.operators import logical, physical, filter, convert
 
 
-class ModelSelectionStrategy(PhysicalOpStrategy):
+class LLMStrategy(PhysicalOpStrategy):
 
     @staticmethod
     def __new__(cls, 
                 available_models: List[Model],
-                prompt_strategy: PromptStrategy,
+                prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_QA,
                 enable_vision: bool = True,
                 *args, **kwargs) -> List[physical.PhysicalOperator]:
 
@@ -37,7 +37,8 @@ class ModelSelectionStrategy(PhysicalOpStrategy):
 
         return return_operators
 
-class ModelSelectionFilterStrategy(ModelSelectionStrategy):
+
+class LLMFilterStrategy(LLMStrategy):
 
     logical_op_class = logical.FilteredScan
     physical_op_class = filter.LLMFilter
@@ -45,16 +46,26 @@ class ModelSelectionFilterStrategy(ModelSelectionStrategy):
     @staticmethod
     def __new__(cls, 
                 available_models: List[Model],
-                prompt_strategy: PromptStrategy,
+                prompt_strategy: PromptStrategy=PromptStrategy.DSPY_COT_BOOL,
                 *args, **kwargs) -> List[physical.PhysicalOperator]:
-        return super(cls, ModelSelectionFilterStrategy).__new__(cls, 
-                                                                available_models, 
-                                                                prompt_strategy=PromptStrategy.DSPY_COT_BOOL,
-                                                                enable_vision=False) # TODO hardcode for now 
+        return super(cls, LLMFilterStrategy).__new__(cls,
+                                                    available_models, 
+                                                    prompt_strategy,
+                                                    enable_vision=False) # TODO hardcode for now 
 
-class ModelSelectionConvertStrategy(ModelSelectionStrategy):
+
+class LLMConventionalConvertStrategy(LLMStrategy):
     """
     This strategy creates physical operator classes for the Conventional strategy 
     """
     logical_op_class = logical.ConvertScan
     physical_op_class = convert.LLMConvertConventional
+
+
+class LLMBondedConvertStrategy(LLMStrategy):
+    """
+    This strategy creates physical operator classes using a bonded query strategy.
+    It ties together several records for the same fields, possibly defaulting to a conventional conversion strategy.
+    """
+    logical_op_class = logical.ConvertScan
+    physical_op_class = convert.LLMConvertBonded

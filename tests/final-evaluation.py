@@ -736,7 +736,7 @@ def evaluate_pz_plan(sentinel_data, workload, plan_idx):
     plans = logicalTree.createPhysicalPlanCandidates(
         min=20,
         cost_estimate_sample_data=all_cost_estimate_data,
-        allow_model_selection=True,
+        allow_bonded_query=True,
         allow_codegen=True,
         allow_token_reduction=True,
         # pareto_optimal=False if opt in ["codegen", "token-reduction"] and workload == "enron" else True,
@@ -819,7 +819,7 @@ def evaluate_pz_plans(workload, dry_run=False):
     plans = logicalTree.createPhysicalPlanCandidates(
         min=20,
         cost_estimate_sample_data=all_cost_estimate_data,
-        allow_model_selection=True,
+        allow_bonded_query=True,
         allow_codegen=True,
         allow_token_reduction=True,
         # pareto_optimal=False if opt in ["codegen", "token-reduction"] and workload == "enron" else True,
@@ -945,7 +945,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
     candidatePlans = logicalTree.createPhysicalPlanCandidates(
         cost_estimate_sample_data=all_cost_estimate_data,
-        allow_model_selection=True,
+        allow_bonded_query=True,
         allow_codegen=True,
         allow_token_reduction=True,
         pareto_optimal=True,

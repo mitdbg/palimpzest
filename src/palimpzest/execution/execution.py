@@ -1,6 +1,6 @@
-from palimpzest.constants import ExecutionStrategy, Model, PlanType, PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
+from palimpzest.constants import ExecutionStrategy, Model, PlanType, MAX_UUID_CHARS, PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.corelib.schemas import SourceRecord
-from palimpzest.dataclasses import OperatorStats, PlanStats, RecordOpStats
+from palimpzest.dataclasses import ExecutionStats, OperatorStats, PlanStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import DataRecord
 from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp, PhysicalOperator
@@ -17,40 +17,11 @@ from palimpzest.dataclasses import OperatorStats, PlanStats
 from concurrent.futures import ThreadPoolExecutor, wait
 from typing import List, Optional, Union
 
+import hashlib
 import multiprocessing
 import os
 import shutil
 import time
-
-
-def _getAllowedModels(self, subplan: PhysicalPlan) -> List[Model]:
-    """
-    This function handles the logic of determining which model(s) can be used for a Convert or Filter
-    operation during physical plan construction.
-
-    The logic for determining which models can be used is as follows:
-    - If model selection is allowed --> then all models may be used
-    - If the subplan does not yet have an operator which uses a (non-vision) model --> then all models may be used
-    - If the subplan has an operator which uses a (non-vision) model --> only the subplan's model may be used
-    """
-    # return all models if model selection is allowed
-    if self.allow_model_selection:
-        return getModels()
-
-    # otherwise, get models used by subplan
-    subplan_model, vision_models = None, getVisionModels()
-    for phys_op in subplan.operators:
-        model = getattr(phys_op, "model", None)
-        if model is not None and model not in vision_models:
-            subplan_model = model
-            break
-
-    # return all models if subplan does not have any models yet
-    if subplan_model is None:
-        return getModels()
-
-    # otherwise return the subplan model
-    return [subplan_model]
 
 
 class ExecutionEngine:
@@ -62,13 +33,13 @@ class ExecutionEngine:
             min_plans: Optional[int] = None,
             verbose: bool = False,
             available_models: List[Model] = [],
-            allow_bonded_query: List[Model] = True,
+            allow_bonded_query: bool=True,
+            allow_conventional_query: bool=False,
             allow_model_selection: bool=True,
             allow_code_synth: bool=True,
             allow_token_reduction: bool=True,
             execution_strategy: bool=ExecutionStrategy.SINGLE_THREADED,
-            useParallelOps: bool=False,
-            max_workers: Optional[int]=None,
+            max_workers: int=1,
             *args, **kwargs
         ) -> None:
         self.num_samples = num_samples
@@ -81,18 +52,27 @@ class ExecutionEngine:
         if not available_models:
             self.available_models = getModels()
         print("Available models: ", self.available_models)
-        self.allow_model_selection = allow_model_selection
         self.allow_bonded_query = allow_bonded_query
+        self.allow_conventional_query = allow_conventional_query
+        self.allow_model_selection = allow_model_selection
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.execution_strategy = execution_strategy
         self.max_workers = max_workers
         if self.max_workers is None and self.execution_strategy == ExecutionStrategy.PARALLEL:
             self.max_workers = self.set_max_workers()
-        else:
-            self.max_workers = 1
         self.datadir = DataDirectory()
-        self.useParallelOps = useParallelOps
+
+    def execution_id(self) -> str:
+        """
+        Hash of the class parameters.
+        """
+        uuid_str = ""
+        for attr, value in self.__dict__.keys():
+            if not attr.startswith("_"):
+                uuid_str += f"{attr}={value},"
+
+        return hashlib.sha256(uuid_str.encode("utf-8")).hexdigest()[:MAX_UUID_CHARS]
 
     def execute_plan(self, plan: PhysicalPlan,
                      plan_type: PlanType = PlanType.FINAL,
@@ -121,10 +101,55 @@ class ExecutionEngine:
         # changing the max_workers in response to 429 errors.
         return multiprocessing.cpu_count()
 
+    def run_sentinel_plans(self, sentinel_plans: List[PhysicalPlan]):
+        # compute number of plans
+        num_sentinel_plans = len(sentinel_plans)
+
+        # results = list(map(lambda x: self.execute_plan(**x),
+        #         [{"plan": plan,
+        #           "plan_type": PlanType.SENTINEL,
+        #           "plan_idx": idx,
+        #           "max_workers": 1}
+        #          for idx, plan in enumerate(sentinel_plans)],
+        #     )
+        # )
+        sentinel_workers = min(self.max_workers, num_sentinel_plans)
+        with ThreadPoolExecutor(max_workers=sentinel_workers) as executor:
+            max_workers_per_plan = max(self.max_workers / num_sentinel_plans, 1)
+            results = list(executor.map(lambda x: self.execute_plan(**x),
+                    [{"plan": plan,
+                      "plan_type": PlanType.SENTINEL,
+                      "plan_idx": idx,
+                      "max_workers": max_workers_per_plan}
+                      for idx, plan in enumerate(sentinel_plans)],
+                )
+            )
+
+        # split results into per-plan records and plan stats
+        sentinel_records, sentinel_plan_stats = zip(*results)
+
+        # get champion model
+        champion_model_name = getChampionModelName()
+
+        # process results to get sample execution data and sentinel plan stats
+        all_sample_execution_data, return_records = [], []
+        for records, plan_stats, plan in zip(sentinel_records, sentinel_plan_stats, sentinel_plans):
+            # aggregate sentinel est. data
+            for operator_stats in plan_stats.operator_stats.values():
+                all_sample_execution_data.extend(operator_stats.record_op_stats_lst)
+
+            # find champion model plan records and add those to all_records
+            if champion_model_name in plan.getPlanModelNames():
+                return_records = records
+
+        return all_sample_execution_data, return_records, sentinel_plan_stats
+
     def execute(self,
         dataset: Set,
         policy: Policy,
     ):
+        execution_start_time = time.time()
+
         # TODO: we should be able to remove this w/our cache management
         # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
         if self.nocache:
@@ -147,37 +172,45 @@ class ExecutionEngine:
         uid = dataset.universalIdentifier()
         run_sentinels = self.nocache or not self.datadir.hasCachedAnswer(uid)
 
-        sentinel_plans, sample_execution_data, sentinel_records = [], [], []
-
-        # initialize logical and physical planner
-        # NOTE The Exeuction class MUST KNOW THE PLANNER!
-        #  if I disallow code synth for my planning, I will have to disallow it for my execution. Now, I can't do that.
-        # get sentinel plans
-        logical_planner = LogicalPlanner(self.nocache)
-        physical_planner = PhysicalPlanner(
-            num_samples=self.num_samples,
-            scan_start_idx=0,
-            available_models=self.available_models,
-            allow_bonded_query=self.allow_bonded_query,
-            allow_model_selection=self.allow_model_selection,
-            allow_code_synth=self.allow_code_synth,
-            allow_token_reduction=self.allow_token_reduction,
-            useParallelOps=self.useParallelOps,
-        )
-
+        # run sentinel plans if necessary
+        sample_execution_data, sentinel_records, sentinel_plan_stats = [], [], []
         if run_sentinels:
-            for logical_plan in logical_planner.generate_plans(dataset, sentinels=True):
-                for sentinel_plan in physical_planner.generate_plans(logical_plan, sentinels=True):
+            # initialize logical and physical planner
+            logical_planner = LogicalPlanner(self.nocache, sentinel=True, verbose=self.verbose)
+            physical_planner = PhysicalPlanner(
+                num_samples=self.num_samples,
+                scan_start_idx=0,
+                available_models=self.available_models,
+                allow_bonded_query=True,
+                allow_conventional_query=False,
+                allow_model_selection=False,
+                allow_code_synth=False,
+                allow_token_reduction=False,
+                verbose=self.verbose,
+            )
+
+            # use planners to generate sentinel plans
+            sentinel_plans = []
+            for logical_plan in logical_planner.generate_plans(dataset):
+                for sentinel_plan in physical_planner.generate_plans(logical_plan):
                     sentinel_plans.append(sentinel_plan)
 
             # run sentinel plans
-            sample_execution_data, sentinel_records = self.run_sentinel_plans(
-                sentinel_plans, self.verbose
-            )
+            sample_execution_data, sentinel_records, sentinel_plan_stats = self.run_sentinel_plans(sentinel_plans)
 
         # (re-)initialize logical and physical planner
-        scan_start_idx = self.num_samples if run_sentinels else 0
-        physical_planner.scan_start_idx = scan_start_idx
+        logical_planner = LogicalPlanner(self.nocache, verbose=self.verbose)
+        physical_planner = PhysicalPlanner(
+            num_samples=self.num_samples,
+            scan_start_idx=self.num_samples if run_sentinels else 0,
+            available_models=self.available_models,
+            allow_bonded_query=self.allow_bonded_query,
+            allow_conventional_query=self.allow_conventional_query,
+            allow_model_selection=self.allow_model_selection,
+            allow_code_synth=self.allow_code_synth,
+            allow_token_reduction=self.allow_token_reduction,
+            verbose=self.verbose,
+        )
 
         # NOTE: in the future we may use operator_estimates below to limit the number of plans
         #       that we need to consider during plan generation. I.e., we may be able to save time
@@ -215,55 +248,24 @@ class ExecutionEngine:
             final_plans = physical_planner.add_plans_closest_to_frontier(final_plans, plans, self.min_plans)
 
         # choose best plan and execute it
-        #TODO return plan_idx ?
-        plan = policy.choose(plans)
-        new_records, stats = self.execute_plan(plan=plan, 
+        final_plan = policy.choose(plans)
+        new_records, stats = self.execute_plan(plan=final_plan,
                                                plan_type=PlanType.FINAL, 
                                                plan_idx=0,
                                                max_workers=self.max_workers)
+
+        # add sentinel records and plan stats (if captured) to plan execution data
         all_records = sentinel_records + new_records
+        all_plan_stats = sentinel_plan_stats + [stats]
+        execution_stats = ExecutionStats(
+            execution_id=self.execution_id(),
+            plan_stats={plan_stats.plan_id: plan_stats for plan_stats in all_plan_stats},
+            total_execution_time=time.time() - execution_start_time,
+            total_execution_cost=sum(list(map(lambda plan_stats: plan_stats.total_plan_cost, all_plan_stats))),
+        )
 
-        return all_records, plan, stats
+        return all_records, final_plan, execution_stats
 
-    def run_sentinel_plans(
-        self, sentinel_plans: List[PhysicalPlan], verbose: bool = False
-    ):
-        # compute number of plans
-        num_sentinel_plans = len(sentinel_plans)
-
-        all_sample_execution_data, return_records = [], []
-
-        # results = list(map(lambda x:
-        #         self.execute_plan(*x),
-        #         [(plan, idx, PlanType.SENTINEL) for idx, plan in enumerate(sentinel_plans)],
-        #     )
-        # )
-        sentinel_workers = min(self.max_workers, num_sentinel_plans)
-        with ThreadPoolExecutor(max_workers=sentinel_workers) as executor:
-            max_workers_per_plan = max(self.max_workers / num_sentinel_plans, 1)
-            results = list(executor.map(lambda x: self.execute_plan(**x),
-                    [{"plan":plan, 
-                      "plan_type":PlanType.SENTINEL, 
-                      "plan_idx": idx,
-                      "max_workers":max_workers_per_plan} for idx, plan in enumerate(sentinel_plans)],
-                )
-            )
-
-        sentinel_records, sentinel_stats = zip(*results)
-        for records, plan_stats, plan in zip(sentinel_records, sentinel_stats, sentinel_plans):
-            # aggregate sentinel est. data
-            sample_execution_data = []
-            for op_id, operator_stats in plan_stats.operator_stats.items():
-                all_sample_execution_data.extend(operator_stats.record_op_stats_lst)
-
-            # set return_records to be records from champion model
-            champion_model_name = getChampionModelName()
-
-            # find champion model plan records and add those to all_records
-            if champion_model_name in plan.getPlanModelNames():
-                return_records = records
-
-        return all_sample_execution_data, return_records # TODO: make sure you capture cost of sentinel plans.
 
 class SequentialSingleThreadExecution(ExecutionEngine):
 
@@ -282,17 +284,16 @@ class SequentialSingleThreadExecution(ExecutionEngine):
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id(), plan_idx = plan_idx) # TODO move into PhysicalPlan.__init__?
+        plan_stats = PlanStats(plan_id=plan.get_plan_id(), plan_idx=plan_idx)
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
             plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
 
-        # execute the physical plan;
+        # set limit on the number of samples if this is a sentinel plan
         num_samples = self.num_samples if plan_type == PlanType.SENTINEL else float("inf")
 
         # initialize list of output records and intermediate variables
         output_records = []
-        source_records_scanned = 0
         current_scan_idx = self.scan_start_idx
 
         # get handle to DataSource and pre-compute its size
@@ -326,7 +327,7 @@ class SequentialSingleThreadExecution(ExecutionEngine):
             # initialize output records and record_op_stats_lst for this operator
             records, record_op_stats_lst = [], []
 
-            # invoke datasource operator(s) until we run out of source records
+            # invoke datasource operator(s) until we run out of source records or hit the num_samples limit
             if isinstance(operator, DataSourcePhysicalOp):
                 keep_scanning_source_records = True
                 while keep_scanning_source_records:
@@ -366,6 +367,7 @@ class SequentialSingleThreadExecution(ExecutionEngine):
             for record_op_stats in record_op_stats_lst:
                 # TODO code a nice __add__ function for OperatorStats and RecordOpStats
                 record_op_stats.source_op_id = prev_op_id
+                record_op_stats.plan_id = plan.get_plan_id()
                 op_stats.record_op_stats_lst.append(record_op_stats)
                 op_stats.total_op_time += record_op_stats.time_per_record
                 op_stats.total_op_cost += record_op_stats.cost_per_record
@@ -417,12 +419,12 @@ class PipelinedSingleThreadExecution(ExecutionEngine):
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id()) # TODO move into PhysicalPlan.__init__?
+        plan_stats = PlanStats(plan_id=plan.get_plan_id())
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
             plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
 
-        # execute the physical plan;
+        # set limit on the number of samples if this is a sentinel plan
         num_samples = self.num_samples if plan_type == PlanType.SENTINEL else float("inf")        
 
         # initialize list of output records and intermediate variables
@@ -464,7 +466,7 @@ class PipelinedSingleThreadExecution(ExecutionEngine):
                 )
                 records_processed = False
 
-                # invoke datasource operator(s) until we run out of source records
+                # invoke datasource operator(s) until we run out of source records or hit the num_samples limit
                 if isinstance(operator, DataSourcePhysicalOp):
                     if keep_scanning_source_records:
                         # construct input DataRecord for DataSourcePhysicalOp
@@ -509,6 +511,7 @@ class PipelinedSingleThreadExecution(ExecutionEngine):
                     for record_op_stats in record_op_stats_lst:
                         # TODO code a nice __add__ function for OperatorStats and RecordOpStats
                         record_op_stats.source_op_id = prev_op_id
+                        record_op_stats.plan_id = plan.get_plan_id()
                         op_stats.record_op_stats_lst.append(record_op_stats)
                         op_stats.total_op_time += record_op_stats.time_per_record
                         op_stats.total_op_cost += record_op_stats.cost_per_record
@@ -582,12 +585,12 @@ class PipelinedParallelExecution(ExecutionEngine):
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id()) # TODO move into PhysicalPlan.__init__?
+        plan_stats = PlanStats(plan_id=plan.get_plan_id())
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
             plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
 
-        # execute the physical plan;
+        # set limit on the number of samples if this is a sentinel plan
         num_samples = self.num_samples if plan_type == PlanType.SENTINEL else float("inf")  
 
         # initialize list of output records and intermediate variables
@@ -657,6 +660,7 @@ class PipelinedParallelExecution(ExecutionEngine):
                         # TODO code a nice __add__ function for OperatorStats and RecordOpStats
                         prev_operator = op_id_to_prev_operator[op_id]
                         record_op_stats.source_op_id = prev_operator.get_op_id() if prev_operator is not None else None
+                        record_op_stats.plan_id = plan.get_plan_id()
                         op_stats.record_op_stats_lst.append(record_op_stats)
                         op_stats.total_op_time += record_op_stats.time_per_record
                         op_stats.total_op_cost += record_op_stats.cost_per_record
@@ -751,6 +755,7 @@ class PipelinedParallelExecution(ExecutionEngine):
 
         return output_records, plan_stats
 
+
 class Execute:
     def __new__(
         cls,
@@ -760,13 +765,14 @@ class Execute:
         nocache: bool=False,
         include_baselines: bool=False,
         min_plans: Optional[int] = None,
+        max_workers: int=1,
         verbose: bool = False,
         available_models: Optional[List[Model]] = [],
-        allow_bonded_query: Optional[List[Model]] = [],
+        allow_bonded_query: Optional[bool]=True,
+        allow_conventional_query: Optional[bool]=False,
         allow_model_selection: Optional[bool]=True,
         allow_code_synth: Optional[bool]=True,
         allow_token_reduction: Optional[bool]=True,
-        useParallelOps: Optional[bool]=False,
         execution_engine: ExecutionEngine = SequentialSingleThreadExecution,
         *args,
         **kwargs
@@ -777,13 +783,14 @@ class Execute:
             nocache=nocache,
             include_baselines=include_baselines,
             min_plans=min_plans,
+            max_workers=max_workers,
             verbose=verbose,
             available_models=available_models,
             allow_bonded_query=allow_bonded_query,
+            allow_conventional_query=allow_conventional_query,
             allow_code_synth=allow_code_synth,
             allow_model_selection=allow_model_selection,
             allow_token_reduction=allow_token_reduction,
-            useParallelOps=useParallelOps,
             *args,
             **kwargs
         ).execute(

@@ -36,6 +36,7 @@ class ConvertOp(PhysicalOperator):
         desc: Optional[str] = None,
         targetCacheId: Optional[str] = None,
         shouldProfile: bool = False,
+        verbose: bool = False,
     ):
         super().__init__(
             inputSchema=inputSchema,
@@ -45,11 +46,11 @@ class ConvertOp(PhysicalOperator):
         self.cardinality = cardinality
         self.desc = desc
         self.targetCacheId = targetCacheId
+        self.verbose = verbose
         self.heatmap_json_obj = None
 
     def get_op_dict(self):
         return {
-            "operator": self.op_name(),
             "inputSchema": str(self.inputSchema),
             "outputSchema": str(self.outputSchema),
             "cardinality": self.cardinality.value,
@@ -72,7 +73,7 @@ class LLMConvert(ConvertOp):
     def materializes(self, logical_operator) -> bool:
         if not isinstance(logical_operator, logical.ConvertScan):
             return False
-        is_vision_model = self.model in getVisionModels()
+        is_vision_model = getattr(self, "model", None) in getVisionModels()
         if logical_operator.image_conversion:
             return is_vision_model
         else:
@@ -147,23 +148,8 @@ class LLMConvert(ConvertOp):
             desc=self.desc,
             targetCacheId=self.targetCacheId,
             shouldProfile=self.shouldProfile,
+            verbose=self.verbose,
         )
-
-    def get_op_dict(self):
-        return {
-            "operator": self.op_name(),
-            "inputSchema": str(self.inputSchema),
-            "outputSchema": str(self.outputSchema),
-            "cardinality": self.cardinality,
-            "model": self.model.value if getattr(self, "model", None) else None,
-            "prompt_strategy": (
-                self.prompt_strategy.value if getattr(self, "prompt_strategy", None) else None
-            ),
-            "query_strategy": (
-                self.query_strategy.value if getattr(self, "query_strategy", None) else None
-            ),
-            "desc": str(self.desc),
-        }
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # estimate number of input and output tokens from source
@@ -187,20 +173,14 @@ class LLMConvert(ConvertOp):
             est_num_input_tokens = self.token_budget * est_num_input_tokens
 
         # override for GPT-4V image conversion
-        if self.model == Model.GPT_4V:
+        if getattr(self, "model", None) == Model.GPT_4V:
             # 1024x1024 image is 765 tokens
             # TODO: revert / 10 after running real-estate demo
             est_num_input_tokens = 765 / 10
 
-        # if we're using a few-shot prompt strategy, the est_num_input_tokens will increase
-        # by a small factor due to the added examples; we multiply after computing the
-        # est_num_output_tokens b/c the few-shot examples likely won't affect the output length
-        if self.prompt_strategy == PromptStrategy.FEW_SHOT:
-            est_num_input_tokens *= FEW_SHOT_PROMPT_INFLATION
-
         # get est. of conversion time per record from model card;
         # NOTE: model will only be None for code synthesis, which uses GPT-3.5 as fallback
-        model_name = self.model.value if self.model is not None else Model.GPT_3_5.value
+        model_name = self.model.value if getattr(self, "model", None) is not None else Model.GPT_3_5.value
         model_conversion_time_per_record = (
             MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
         ) / self.max_workers
@@ -539,6 +519,9 @@ class LLMConvert(ConvertOp):
 
 class LLMConvertConventional(LLMConvert):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def convert(
         self, candidate_content: Union[str, List[bytes]], fields: List[str]
     ) -> Tuple[dict[List], GenerationStats]:
@@ -550,6 +533,7 @@ class LLMConvertConventional(LLMConvert):
             answer, stats = self._dspy_generate_fields(
                 content=candidate_content,
                 prompt=prompt,
+                verbose=self.verbose,
             )
             json_answer = self.parse_answer(answer, [field_name])
             fields_answers.update(json_answer)
@@ -557,3 +541,42 @@ class LLMConvertConventional(LLMConvert):
 
         generation_stats = sum(fields_stats.values())
         return fields_answers, generation_stats
+
+
+class LLMConvertBonded(LLMConvert):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def convert(self,
+                candidate_content,
+                fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+
+        prompt = self._construct_query_prompt(fields_to_generate=fields)
+
+        # generate all fields in a single query
+        answer, generation_stats = self._dspy_generate_fields(
+            content=candidate_content,
+            prompt=prompt,
+            verbose=self.verbose,
+        )
+        json_answers = self.parse_answer(answer, fields)
+
+        # if there was an error, execute a conventional query
+        for field, values in json_answers.items():
+            if values == []:
+                conventional_op = type('LLMFallback',
+                                        (LLMConvertConventional,),
+                                        {'model': self.model,
+                                        'prompt_strategy': self.prompt_strategy})
+
+                field_answer, field_stats = conventional_op(
+                    inputSchema = self.inputSchema,
+                    outputSchema = self.outputSchema,
+                    shouldProfile = self.shouldProfile,
+                    query_strategy = self.query_strategy,
+                ).convert(candidate_content, field)
+                json_answers[field] = field_answer[field]
+                generation_stats += field_stats
+
+        return json_answers, generation_stats

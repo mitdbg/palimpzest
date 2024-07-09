@@ -67,9 +67,9 @@ class PhysicalOperator():
         hash = hashlib.sha256(ordered.encode()).hexdigest()[:MAX_OP_ID_CHARS]
 
         op_id = (
-            f"{self.op_name()}_{hash}"
+            f"{hash}"
             if plan_position is None
-            else f"{self.op_name()}_{plan_position}_{hash}"
+            else f"{hash}_{plan_position}"
         )
         return op_id
 

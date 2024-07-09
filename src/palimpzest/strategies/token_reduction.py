@@ -5,7 +5,6 @@ from palimpzest.constants import Model
 from palimpzest.generators.generators import DSPyGenerator
 from .strategy import PhysicalOpStrategy
 
-from palimpzest.strategies.bonded_query import LLMBondedQueryConvert
 from palimpzest.constants import *
 from palimpzest.elements import *
 from palimpzest.operators import logical, physical, convert
@@ -203,7 +202,7 @@ class TokenReducedConvert(convert.LLMConvert):
 class TokenReducedConventionalConvert(TokenReducedConvert, convert.LLMConvertConventional):
     pass
 
-class TokenReducedBondedConvert(TokenReducedConvert, LLMBondedQueryConvert):
+class TokenReducedBondedConvert(TokenReducedConvert, convert.LLMConvertBonded):
     pass
 
 
@@ -213,6 +212,7 @@ class TokenReductionStrategy(PhysicalOpStrategy):
         QueryStrategy.CONVENTIONAL: TokenReducedConventionalConvert,
         QueryStrategy.BONDED: TokenReducedBondedConvert,
         }
+    query_strategy = None
 
     @staticmethod
     def __new__(cls, 
@@ -229,25 +229,31 @@ class TokenReductionStrategy(PhysicalOpStrategy):
                 if token_budget >= 1:
                     print("A token reduction strategy must specify a token_budget < 1!")
                     continue
-                # TODO this or query strategy as a parameter? 
-                for query_strategy in cls.query_strategy_map:
-                    op_class = cls.query_strategy_map[query_strategy] 
-                    # physical_op_type = type(cls.__name__+model.name,
-                    physical_op_type = type(op_class.__name__,
-                                            (op_class,),
-                                            {'model': model,
-                                            'prompt_strategy': prompt_strategy,
-                                            'final': True,
-                                            'token_budget': token_budget,
-                                            })
-                    return_operators.append(physical_op_type)
+
+                op_class = cls.query_strategy_map[cls.query_strategy]
+                physical_op_type = type(op_class.__name__ + model.name + str(int(100*token_budget)),
+                                        (op_class,),
+                                        {'model': model,
+                                        'prompt_strategy': prompt_strategy,
+                                        'final': True,
+                                        'token_budget': token_budget,
+                                        })
+                return_operators.append(physical_op_type)
 
         return return_operators
 
-class TokenReducedConvertStrategy(TokenReductionStrategy):
+class TokenReducedConventionalConvertStrategy(TokenReductionStrategy):
     """
-    This strategy creates physical operator classes using a bonded query strategy.
-    It ties together several records for the same fields, possibly defaulting to a conventional conversion strategy.
+    This strategy creates physical operator classes using a conventional query strategy with token reduction.
     """
     logical_op_class = logical.ConvertScan
     physical_op_class = TokenReducedConvert
+    query_strategy = QueryStrategy.CONVENTIONAL
+
+class TokenReducedBondedConvertStrategy(TokenReductionStrategy):
+    """
+    This strategy creates physical operator classes using a bonded query strategy with token reduction.
+    """
+    logical_op_class = logical.ConvertScan
+    physical_op_class = TokenReducedConvert
+    query_strategy = QueryStrategy.BONDED

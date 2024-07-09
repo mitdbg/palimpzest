@@ -12,7 +12,7 @@ from palimpzest.constants import Cardinality, GPT_4_MODEL_CARD, Model, MODEL_CAR
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.planner import PhysicalPlan
-from palimpzest.utils import getModels
+from palimpzest.utils import getChampionModelName, getModels
 
 import palimpzest as pz
 
@@ -21,13 +21,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import math
 
-# TYPE DEFINITIONS
-SampleExecutionData = Dict[str, Any] # TODO: dataclass?
-
 
 class CostEstimator:
     """
-    This class takes in a list of SampleExecutionData and exposes a function which uses this data
+    This class takes in a list of RecordOpStats and exposes a function which uses this data
     to perform cost estimation on a list of physical plans.
     """
     def __init__(self, source_dataset_id: str, sample_execution_data: List[RecordOpStats] = []):
@@ -42,14 +39,9 @@ class CostEstimator:
         )
         # df contains a column called record_state, that sometimes contain a dict
         # we want to extract the keys from the dict and create a new column for each key
-        
-
-        # TODO: come up w/solution for listing operators by name due to circular import
-        # determine the set of operators which may use a distinct model
 
         # reference to data directory
         self.datadir = DataDirectory()
-        # TODO: Are there op_ids that repeat across plans? Otherwise we can move this into estimate_plan_cost function
 
         self.operator_estimates = self._compute_operator_estimates()
 
@@ -81,9 +73,7 @@ class CostEstimator:
             model_df = op_df[op_df.model_name == model_name]
             if not model_df.empty:
                 return (
-                    (model_df["total_input_cost"] + model_df["total_output_cost"])
-                    .agg(agg=agg)
-                    .iloc[0]
+                    model_df["cost_per_record"].agg(agg=agg).iloc[0]
                 )
 
         # # adjust cost from sample model to this model
@@ -103,7 +93,7 @@ class CostEstimator:
         # # compute average combined input/output usd spent
         # return (df['adj_input_usd'] + df['adj_output_usd']).agg(agg=agg).iloc[0]
 
-        return (op_df["total_input_cost"] + op_df["total_output_cost"]).agg(agg=agg).iloc[0]
+        return op_df["cost_per_record"].agg(agg=agg).iloc[0]
 
     def _est_tokens_per_record(self,
         op_df: pd.DataFrame, model_name: Optional[str] = None, agg: str = "mean"
@@ -159,11 +149,12 @@ class CostEstimator:
                 # get subset of records that were the source to this operator
                 op_name = str(model_op_df.op_name.iloc[0])
                 num_output_records = None
-                if "filter" in op_name:
+                if "filter" in op_name.lower():
                     num_output_records = model_op_df.passed_filter.sum()
                 else:
                     op_ids = model_op_df.op_id.unique().tolist()
-                    num_output_records = df[df.source_op_id.isin(op_ids)].shape[0]
+                    plan_ids = model_op_df.plan_id.unique().tolist()
+                    num_output_records = df[df.source_op_id.isin(op_ids) & df.plan_id.isin(plan_ids)].shape[0]
 
                 return num_output_records / num_input_records
 
@@ -173,7 +164,7 @@ class CostEstimator:
         # get subset of records that were the source to this operator
         op_name = str(op_df.op_name.iloc[0])
         num_output_records = None
-        if "filter" in op_name:
+        if "filter" in op_name.lower():
             num_output_records = op_df.passed_filter.sum()
         else:
             op_ids = op_df.op_id.unique().tolist()
@@ -181,14 +172,14 @@ class CostEstimator:
 
         return num_output_records / num_input_records
 
-    def _is_correct(self, row):
-        # simple equality check suffices for filter
+    def _compute_quality(self, row):
+        # compute accuracy for filter
         if "filter" in row["op_name"].lower():
             return int(row["answer"] == row["accepted_answer"])
 
-        # otherwise, check equality on a per-key basis
+        # otherwise, compute recall on a per-key basis
         try:
-            # we'll measure recal on accepted_answer, as extraneous info is often not an issue
+            # we'll measure recall on accepted_answer, as extraneous info is often not an issue
             answer = row["answer"]
             accepted_answer = row["accepted_answer"]
             tp = 0
@@ -211,19 +202,20 @@ class CostEstimator:
         # get unique set of records
         record_uuids = op_df.record_uuid.unique()
 
-        # compute GPT-4's answer (per-record) across all models; fall-back to most common answer if GPT-4 is not present
+        # get champion model name
+        champion_model_name = getChampionModelName()
+
+        # compute champion's answer (per-record) across all models; fall-back to most common answer if champion is not present
         record_uuid_to_answer = {}
         for record_uuid in record_uuids:
-            # TODO is the fillna correct?
             record_df = op_df[op_df.record_uuid == record_uuid]
-            gpt4_most_common_answer = record_df[
-                record_df.model_name == Model.GPT_4.value
+            champion_most_common_answer = record_df[
+                record_df.model_name == champion_model_name
             ].answer.mode()
-
             all_models_most_common_answer = record_df.answer.mode()
 
-            if not gpt4_most_common_answer.empty:
-                record_uuid_to_answer[record_uuid] = gpt4_most_common_answer.iloc[0]
+            if not champion_most_common_answer.empty:
+                record_uuid_to_answer[record_uuid] = champion_most_common_answer.iloc[0]
             elif not all_models_most_common_answer.empty:
                 record_uuid_to_answer[record_uuid] = all_models_most_common_answer.iloc[0]
             else:
@@ -234,7 +226,7 @@ class CostEstimator:
         op_df.loc[:, "accepted_answer"] = op_df.record_uuid.apply(
             lambda uuid: record_uuid_to_answer[uuid]
         )
-        op_df.loc[:, "correct"] = op_df.apply(lambda row: self._is_correct(row), axis=1)
+        op_df.loc[:, "quality"] = op_df.apply(lambda row: self._compute_quality(row), axis=1)
 
         # get subset of observations for model_name and estimate quality w/fraction of answers that match accepted answer
         model_df = (
@@ -244,10 +236,10 @@ class CostEstimator:
         )
 
         est_quality = (
-            model_df.correct.sum() / model_df.shape[0]
+            model_df.quality.sum() / model_df.shape[0]
             if not model_df.empty
             else (
-                op_df.correct.sum() / op_df.shape[0]
+                op_df.quality.sum() / op_df.shape[0]
                 if not op_df.empty
                 else MODEL_CARDS[model_name]["MMLU"] / 100.0
             )
@@ -262,6 +254,7 @@ class CostEstimator:
         # if we don't have sample execution data, we cannot compute per-operator estimates
         if self.sample_execution_data_df is None:
             return None
+
         # get the set of operator ids for which we have sample data
         op_ids = self.sample_execution_data_df.op_id.unique()
 
@@ -294,8 +287,8 @@ class CostEstimator:
                     model_estimates = {
                         "time_per_record": self._est_time_per_record(op_df, model_name=model_name),
                         "cost_per_record": self._est_cost_per_record(op_df, model_name=model_name),
-                        "input_tokens": est_tokens[0],
-                        "output_tokens": est_tokens[1],
+                        "total_input_tokens": est_tokens[0],
+                        "total_output_tokens": est_tokens[1],
                         "selectivity": self._est_selectivity(self.sample_execution_data_df, op_df, model_name=model_name),
                         "quality": self._est_quality(op_df, model_name=model_name),
                     }
@@ -328,7 +321,7 @@ class CostEstimator:
 
     def estimate_plan_cost(self, physical_plan: PhysicalPlan) -> Tuple[float, float, float]:
         # initialize dictionary w/estimates for entire plan
-        plan_estimates = {"total_time": 0.0, "total_cost": 0.0, "quality": 0.0}
+        plan_estimates = {"total_time": 0.0, "total_cost": 0.0, "quality": 1.0}
         sample_op_estimates = self.operator_estimates
 
         op_estimates, source_op_estimates = None, None
@@ -412,6 +405,7 @@ class CostEstimator:
                     op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
                     op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
                     op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
+
                     # TODO: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
                     #       which would wildly mess up estimate of time and cost per-record
                     # do code synthesis adjustment
@@ -425,23 +419,20 @@ class CostEstimator:
 
                     # token reduction adjustment
                     if op.token_budget is not None and op.token_budget < 1.0:
-                        input_tokens = op.token_budget * sample_op_estimates[op_id][model_name]["input_tokens"]
-                        output_tokens = sample_op_estimates[op_id][model_name]["output_tokens"]
+                        total_input_tokens = op.token_budget * sample_op_estimates[op_id][model_name]["total_input_tokens"]
+                        total_output_tokens = sample_op_estimates[op_id][model_name]["total_output_tokens"]
                         op_estimates.cost_per_record = (
-                            MODEL_CARDS[op.model.value]["usd_per_input_token"] * input_tokens
-                            + MODEL_CARDS[op.model.value]["usd_per_output_token"] * output_tokens
+                            MODEL_CARDS[op.model.value]["usd_per_input_token"] * total_input_tokens
+                            + MODEL_CARDS[op.model.value]["usd_per_output_token"] * total_output_tokens
                         )
                         op_estimates.quality = op_estimates.quality * math.sqrt(math.sqrt(op.token_budget))
 
                 else:
                     raise Exception("Unknown operator")
 
-
-            # NOTE: a slightly more accurate thing to do would be to estimate the time_per_record based on the
-            #       *input* cardinality to the operator and multiply by the estimated input cardinality.
             # update plan estimates
-            plan_estimates["total_time"] += op_estimates.time_per_record * op_estimates.cardinality
-            plan_estimates["total_cost"] += op_estimates.cost_per_record * op_estimates.cardinality
+            plan_estimates["total_time"] += op_estimates.time_per_record * source_op_estimates.cardinality
+            plan_estimates["total_cost"] += op_estimates.cost_per_record * source_op_estimates.cardinality
             plan_estimates["quality"] *= op_estimates.quality
 
             # update source_op_estimates
@@ -453,16 +444,3 @@ class CostEstimator:
         quality = plan_estimates["quality"]
 
         return total_time, total_cost, quality
-
-    # def estimate_plan_costs(self, physical_plans: List[PhysicalPlan]) -> List[PhysicalPlan]:
-    #     """
-    #     Estimate the cost of each physical plan by making use of the sample execution data
-    #     provided to the CostEstimator. The plan cost, runtime, and quality are set as attributes
-    #     on each physical plan and the updated set of physical plans is returned.
-    #     """
-    #     operator_estimates = self._compute_operator_estimates()
-
-    #     for physical_plan in physical_plans:
-    #         self._estimate_plan_cost(physical_plan, operator_estimates)
-
-    #     return physical_plans

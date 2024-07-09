@@ -51,6 +51,7 @@ class NoSentinelExecution(SequentialSingleThreadExecution):
             scan_start_idx=0,
             available_models=self.available_models,
             allow_bonded_query=self.allow_bonded_query,
+            allow_conventional_query=self.allow_conventional_query,
             allow_model_selection=self.allow_model_selection,
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
@@ -175,6 +176,7 @@ class NoSentinelExecution(SequentialSingleThreadExecution):
                 for record_op_stats in record_op_stats_lst:
                     # TODO code a nice __add__ function for OperatorStats and RecordOpStats
                     record_op_stats.source_op_id = prev_op_id
+                    record_op_stats.plan_id = plan.get_plan_id()
                     op_stats.record_op_stats_lst.append(record_op_stats)
                     op_stats.total_op_time += record_op_stats.time_per_record
                     op_stats.total_op_cost += record_op_stats.cost_per_record
@@ -225,7 +227,7 @@ class NoSentinelExecution(SequentialSingleThreadExecution):
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id()) # TODO move into PhysicalPlan.__init__?
+        plan_stats = PlanStats(plan_id=plan.get_plan_id()) # TODO move into PhysicalPlan.__init__?
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
             plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here

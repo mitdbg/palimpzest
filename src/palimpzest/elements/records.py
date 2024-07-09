@@ -1,9 +1,7 @@
+from palimpzest.constants import MAX_UUID_CHARS
 from palimpzest.corelib import Schema
 
 import hashlib
-
-# DEFINITIONS
-MAX_UUID_CHARS = 10
 
 
 class DataRecord:

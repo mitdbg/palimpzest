@@ -199,12 +199,11 @@ def test_workload(dataset, workload, execution_engine):
     num_samples = int(0.05 * dataset_size) if dataset != "biofabric-tiny" else 1
 
     available_models = getModels(include_vision=True)
-    records, plan, stats= Execute(workload, 
+    records, plan, stats = Execute(workload, 
                                   policy=pz.MinCost(),
                                   available_models=available_models,
                                   num_samples=num_samples,
                                   nocache=True,
-                                  allow_model_selection=True,
                                   allow_bonded_query=True,
                                   allow_code_synth=False,
                                   allow_token_reduction=False,

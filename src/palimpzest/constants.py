@@ -84,6 +84,7 @@ PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.1
 
 # character limit(s) for different IDs
 MAX_OP_ID_CHARS = 6
+MAX_UUID_CHARS = 10
 
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
 RETRY_MULTIPLIER = 2

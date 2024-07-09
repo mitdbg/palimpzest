@@ -10,7 +10,7 @@ from typing import List
 
 
 class LogicalPlanner(Planner):
-    def __init__(self, no_cache: bool=False, *args, **kwargs):
+    def __init__(self, no_cache: bool=False, sentinel: bool=False, verbose: bool=False, *args, **kwargs):
         """A given planner should not have a dataset when it's being generated, since it could be used for multiple datasets.
         However, we currently cannot support this since the plans are stored within a single planner object.
         To support this, we can use a dictionary in the form [dataset -> [Plan, Plan, ...]].
@@ -19,6 +19,8 @@ class LogicalPlanner(Planner):
 
         super().__init__(*args, **kwargs)
         self.no_cache = no_cache
+        self.sentinel = sentinel
+        self.verbose = verbose
 
     @staticmethod
     def _compute_legal_permutations(
@@ -198,7 +200,7 @@ class LogicalPlanner(Planner):
 
         return LogicalPlan(operators=operators, datasetIdentifier=datasetIdentifier)
 
-    def generate_plans(self, dataset: pz.Dataset, sentinels: bool=False) -> List[LogicalPlan]:
+    def generate_plans(self, dataset: pz.Dataset) -> List[LogicalPlan]:
         """Return a set of possible logical trees of operators on Sets."""
         # Obtain ordered list of datasets
         dataset_nodes = []
@@ -210,6 +212,8 @@ class LogicalPlanner(Planner):
         dataset_nodes.append(node)
         dataset_nodes = list(reversed(dataset_nodes))
 
+        # remove unnecessary convert if output schema from data source scan matches
+        # input schema for the next operator
         if dataset_nodes[0].schema == dataset_nodes[1].schema:
             dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
             dataset_nodes[1]._source = dataset_nodes[0]
@@ -217,13 +221,15 @@ class LogicalPlanner(Planner):
         # construct naive logical plan
         plan = self._construct_logical_plan(dataset_nodes)
 
-        # at the moment, we only consider sentinels for the naive logical plan
-        if sentinels:
+        # at the moment, we only consider the naive logical plan for sentinel plans
+        if self.sentinel:
             self.plans = [plan]
             return self.plans
 
         # compute all possible logical re-orderings of this plan
         self.plans = LogicalPlanner._compute_logical_plan_reorderings(plan)
-        print(f"LOGICAL PLANS: {len(self.plans)}")
+
+        if self.verbose:
+            print(f"LOGICAL PLANS: {len(self.plans)}")
 
         return self.plans

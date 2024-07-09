@@ -1,6 +1,5 @@
 from .strategy import *
-from .model_selection import *
-from .bonded_query import *
+from .llm import *
 from .code_synthesis import *
 from .token_reduction import *
 
@@ -18,8 +17,6 @@ def classesinmodule(module):
     ]
 
 
-REGISTERED_STRATEGIES = [*classesinmodule(model_selection),
-                        *classesinmodule(bonded_query),
+REGISTERED_STRATEGIES = [*classesinmodule(llm),
                         *classesinmodule(code_synthesis),
                         *classesinmodule(token_reduction)]
-
