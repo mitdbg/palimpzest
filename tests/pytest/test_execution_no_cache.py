@@ -43,12 +43,9 @@ class TestParallelExecutionNoCache:
         # execute the plan
         _, plan_stats = execution.execute_plan(physical_plan, plan_type=PlanType.SENTINEL)
 
+        # NOTE: when we enable multi-source plans; this will need to be updated
         # get the stats from the source operator
-        source_op_stats = None
-        for op_id, op_stats in plan_stats.operator_stats.items():
-            if "MarshalAndScan" in op_id:
-                source_op_stats = op_stats
-                break
+        source_op_stats = list(plan_stats.operator_stats.values())[0]
 
         # test that we only executed plan on num_samples records
         assert len(source_op_stats.record_op_stats_lst) == self.TEST_SENTINEL_NUM_SAMPLES
