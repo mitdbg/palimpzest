@@ -39,14 +39,17 @@ class LimitScanOp(PhysicalOperator):
         )
 
     def __str__(self):
-        return (
-            f"{self.op_name()}("
-            + str(self.outputSchema)
-            + ", "
-            + "Limit: "
-            + str(self.limit)
-            + ")"
-        )
+        op = super().__str__()
+        op += f"Limit: {self._limit}\n"
+        return op
+        # return (
+            # f"{self.op_name()}("
+            # + str(self.outputSchema)
+            # + ", "
+            # + "Limit: "
+            # + str(self.limit)
+            # + ")"
+        # )
 
     def copy(self):
         return LimitScanOp(

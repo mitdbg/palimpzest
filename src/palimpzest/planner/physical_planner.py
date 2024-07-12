@@ -237,6 +237,7 @@ class PhysicalPlanner(Planner):
                     plans = []
                     for subplan in all_plans:
                         new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                        plans.append(new_physical_plan)
                     all_plans = plans
 
         return all_plans
@@ -358,9 +359,6 @@ class PhysicalPlanner(Planner):
             return sentinel_plans
 
         # compute all physical plans for this logical plan
-        physicalPlans = [
-            physicalPlan
-            for physicalPlan in self._createPhysicalPlans(logical_plan)
-        ]
+        physicalPlans = self._createPhysicalPlans(logical_plan)
         print(f"INITIAL PLANS: {len(physicalPlans)}")
         return physicalPlans

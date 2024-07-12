@@ -42,7 +42,7 @@ class Plan:
             return f"{self.__class__.__name__}: No operator tree."
 
 class LogicalPlan(Plan):
-
+    
     def __init__(self, 
                  operators: List[LogicalOperator] = [],
                  datasetIdentifier: str = None,):

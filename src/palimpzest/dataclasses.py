@@ -219,6 +219,12 @@ class PlanStats:
         self.total_plan_time = total_plan_time
         self.total_plan_cost = sum([op_stats.total_op_cost for _, op_stats in self.operator_stats.items()])
 
+    def __str__(self):
+        stats = f"Total_plan_time={self.total_plan_time} \n"
+        stats += f"Total_plan_cost={self.total_plan_cost} \n"
+        for idx, op_stats in enumerate(self.operator_stats.values()):
+            stats += f"{idx}. {op_stats.op_name} time={op_stats.total_op_time} cost={op_stats.total_op_cost} \n"
+        return stats
 
 @dataclass
 class ExecutionStats:

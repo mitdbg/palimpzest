@@ -56,8 +56,6 @@ class ConvertOp(PhysicalOperator):
             "desc": str(self.desc),
         }
 
-    def __str__(self):
-        return f"{self.model}_{self.query_strategy}"
 
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
@@ -131,11 +129,14 @@ class LLMConvert(ConvertOp):
         )
 
     def __str__(self):
-        model = getattr(self, "model", "")
-        ps = getattr(self, "prompt_strategy", "")
-        qs = getattr(self, "query_strategy", "")
-
-        return f"{self.__class__.__name__}({str(self.inputSchema):10s}->{str(self.outputSchema):10s}, Model: {model}, Prompt Strategy: {ps}, Query Strategy: {qs})"
+        op = super().__str__()
+        op += f"Prompt strategy: {self.prompt_strategy}\n"
+        op += f"Query strategy: {self.query_strategy}\n"
+        return op
+        # model = getattr(self, "model", "")
+        # ps = getattr(self, "prompt_strategy", "")
+        # qs = getattr(self, "query_strategy", "")
+        # return f"{self.__class__.__name__}({str(self.inputSchema):10s}->{str(self.outputSchema):10s}, Model: {model}, Prompt Strategy: {ps}, Query Strategy: {qs})"
 
     def copy(self):
         return self.__class__(

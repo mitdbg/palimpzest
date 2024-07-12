@@ -64,13 +64,16 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         )
 
     def __str__(self):
-        return (
-            f"{self.op_name()}("
-            + str(self.outputSchema) 
-            + ", "
-            + self.dataset_type
-            + ")"
-        )
+        op = f"{self.dataset_type} -> {self.op_name()} -> {self.outputSchema}\n"
+        op += f"({','.join(self.outputSchema.fieldNames())[:30]}) \n"
+        return op
+        # return (
+        #     f"{self.op_name()}("
+        #     + str(self.outputSchema) 
+        #     + ", "
+        #     + self.dataset_type
+        #     + ")"
+        # )
 
     def copy(self):
         return MarshalAndScanDataOp(

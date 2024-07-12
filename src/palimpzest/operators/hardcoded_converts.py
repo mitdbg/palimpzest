@@ -49,8 +49,8 @@ class HardcodedConvert(ConvertOp):
             and self.max_workers == other.max_workers
         )
 
-    def __str__(self):
-        return f"{self.__class__.__name__}({str(self.outputSchema):10s})"
+    # def __str__(self):
+        # return f"{self.__class__.__name__}({str(self.outputSchema):10s})"
 
     def copy(self):
         return self.__class__(
@@ -311,7 +311,6 @@ class ConvertFileToPDF(HardcodedConvert):
             inputSchema=self.inputSchema,
             cardinality=self.cardinality,
             desc=self.desc,
-            pdfprocessor=self.pdfprocessor,
             targetCacheId=self.targetCacheId,
             shouldProfile=self.shouldProfile,
         )

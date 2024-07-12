@@ -110,8 +110,8 @@ class NonLLMFilter(FilterOp):
             and self.outputSchema == other.outputSchema
         )
 
-    def __str__(self):
-        return f"{self.op_name()}({str(self.outputSchema)}, Filter: {str(self.filter)})"
+    # def __str__(self):
+        # return f"{self.op_name()}({str(self.outputSchema)}, Filter: {str(self.filter)})"
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate output cardinality using a constant assumption of the filter selectivity
@@ -202,7 +202,10 @@ class LLMFilter(FilterOp):
         )
 
     def __str__(self):
-        return f"{self.op_name()}({str(self.outputSchema)}, Filter: {str(self.filter)}, Model: {self.model.value}, Prompt Strategy: {str(self.prompt_strategy.value)})"
+        op = super().__str__()
+        op += f"Filter: {str(self.filter)}"
+        return op
+        # return f"{self.op_name()}({str(self.outputSchema)}, Filter: {str(self.filter)}, Model: {self.model.value}, Prompt Strategy: {str(self.prompt_strategy.value)})"
 
     def copy(self):
         return self.__class__(
