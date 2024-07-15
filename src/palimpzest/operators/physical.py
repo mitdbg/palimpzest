@@ -34,6 +34,13 @@ class PhysicalOperator():
     def implements(cls, logical_operator_class):
         return logical_operator_class == cls.implemented_op and cls.final
 
+    def __str__(self):
+        op = f"{self.inputSchema.className()} -> {self.op_name()} -> {self.outputSchema.className()}\n"
+        op += f"({','.join(self.inputSchema.fieldNames())[:30]}) -> ({','.join(self.outputSchema.fieldNames())[:30]}) \n"
+        if getattr(self, "model", None):
+            op += f"Using model: {self.model}\n"
+        return op
+
     def __init__(
         self,
         outputSchema: Schema,

@@ -197,6 +197,8 @@ class ExecutionEngine:
             for physical_plan in physical_planner.generate_plans(logical_plan):
                 all_physical_plans.append(physical_plan)
 
+        assert len(all_physical_plans) > 0, "No physical plans generated!"
+        
         # construct the CostEstimator with any sample execution data we've gathered
         cost_estimator = CostEstimator(
             source_dataset_id=self.source_dataset_id,

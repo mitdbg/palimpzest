@@ -127,8 +127,7 @@ class CostEstimator:
             op_df["total_output_tokens"].agg(agg=agg).iloc[0],
         )
 
-    def _est_cardinality(self,
-    op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
+    def _est_cardinality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the number of
         rows output by the operation.
@@ -141,7 +140,11 @@ class CostEstimator:
         For those operations, we use the `_est_selectivity` function to estimate the operator's
         selectivity, which we can apply to an est. of the operator's input cardinality.
         """
-        return op_df.shape[0] / len(op_df.plan_id.unique())
+        try:
+            return len(op_df) / len(op_df.plan_id.unique())
+        except:
+            # TODO where do we get the plan_id from?
+            return len(op_df)
 
     def _est_selectivity(self,
         df: pd.DataFrame, op_df: pd.DataFrame, model_name: Optional[str] = None

@@ -1,8 +1,10 @@
 from __future__ import annotations
 import json
+import math
 import time
 from typing import List, Tuple
 from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.utils.model_helpers import getVisionModels
 from .strategy import PhysicalOpStrategy
 
 from palimpzest.utils import (
@@ -11,7 +13,7 @@ from palimpzest.utils import (
 from palimpzest import generators
 
 from palimpzest.constants import *
-from palimpzest.dataclasses import GenerationStats
+from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.elements import *
 from palimpzest.operators import logical, physical, convert
 from palimpzest.prompts import EXAMPLE_PROMPT, CODEGEN_PROMPT, ADVICEGEN_PROMPT
@@ -60,6 +62,84 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         else:
             self.exemplars = []
         self.field_to_code_ensemble = {}
+
+    @classmethod
+    def materializes(self, logical_operator) -> bool:
+        if not isinstance(logical_operator, logical.ConvertScan):
+            return False
+        is_vision_model = self.code_synth_model in getVisionModels()
+        if logical_operator.image_conversion:
+            return is_vision_model
+        else:
+            return not is_vision_model
+        # use image model if this is an image conversion
+
+
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        # TODO double check this method to be more accurate for Code Synth
+        # estimate number of input and output tokens from source
+        est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
+        est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
+
+        if self.query_strategy == QueryStrategy.CONVENTIONAL:
+            # NOTE: this may over-estimate the number of fields that need to be generated
+            generate_field_names = []
+            for field_name in self.outputSchema.fieldNames():
+                if field_name not in self.inputSchema.fieldNames(): # and getattr(candidate, field_name, None) is None:
+                    generate_field_names.append(field_name)
+
+            num_fields_to_generate = len(generate_field_names)
+            est_num_input_tokens *= num_fields_to_generate
+            est_num_output_tokens *= num_fields_to_generate
+
+        # TODO REMOVE!
+        self.token_budget = 1.
+        if self.token_budget is not None:
+            est_num_input_tokens = self.token_budget * est_num_input_tokens
+
+        if self.prompt_strategy == PromptStrategy.FEW_SHOT:
+            est_num_input_tokens *= FEW_SHOT_PROMPT_INFLATION
+
+        # get est. of conversion time per record from model card;
+        # NOTE: model will only be None for code synthesis, which uses GPT-3.5 as fallback
+        fallback_model = self.conventional_fallback_model
+        model_conversion_time_per_record = (
+            MODEL_CARDS[fallback_model]["seconds_per_output_token"] * est_num_output_tokens
+        ) / self.max_workers
+
+        # get est. of conversion cost (in USD) per record from model card
+        model_conversion_usd_per_record = (
+            MODEL_CARDS[fallback_model]["usd_per_input_token"] * est_num_input_tokens
+            + MODEL_CARDS[fallback_model]["usd_per_output_token"] * est_num_output_tokens
+        )
+
+        # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
+        if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
+            model_conversion_time_per_record *= DSPY_TIME_INFLATION
+            model_conversion_usd_per_record *= DSPY_COST_INFLATION
+
+        # TODO: make this better after arxiv; right now codesynth is hard-coded to use GPT-4
+        # if we're using code synthesis, assume that model conversion time and cost are low
+        model_conversion_time_per_record = 1e-5
+        model_conversion_usd_per_record = 1e-4  # amortize code synth cost across records
+
+        # estimate cardinality and selectivity given the "cardinality" set by the user
+        selectivity = 1.0 if self.cardinality == "oneToOne" else NAIVE_EST_ONE_TO_MANY_SELECTIVITY
+        cardinality = selectivity * source_op_cost_estimates.cardinality
+
+        # estimate quality of output based on the strength of the model being used
+        quality = (MODEL_CARDS[self.code_synth_model]["MMLU"] / 100.0) * source_op_cost_estimates.quality
+
+        if self.token_budget is not None:
+            # for now, assume quality is proportional to sqrt(token_budget)
+            quality = quality * math.sqrt(math.sqrt(self.token_budget))  
+
+        return OperatorCostEstimates(
+            cardinality=cardinality,
+            time_per_record=model_conversion_time_per_record,
+            cost_per_record=model_conversion_usd_per_record,
+            quality=quality,
+        )
 
     def __eq__(self, other: LLMConvertCodeSynthesis):
         return (
