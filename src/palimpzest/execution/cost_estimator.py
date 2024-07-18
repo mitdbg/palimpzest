@@ -30,6 +30,9 @@ class CostEstimator:
     This class takes in a list of SampleExecutionData and exposes a function which uses this data
     to perform cost estimation on a list of physical plans.
     """
+
+    hardcoded_converts = [op.__name__ for op in pz.operators.PHYSICAL_OPERATORS if op.final and issubclass(op, pz.HardcodedConvert)]
+
     def __init__(self, source_dataset_id: str, sample_execution_data: List[RecordOpStats] = []):
         # store source dataset id to help with estimating cardinalities
         self.source_dataset_id = source_dataset_id
@@ -304,8 +307,7 @@ class CostEstimator:
                     }
                     estimates[model_name] = model_estimates
 
-            # TODO also include HarcodedConverts here?
-            elif op_name in ["NonLLMFilter"]:
+            elif op_name in (["NonLLMFilter"]+ self.hardcoded_converts):
                 est_tokens = self._est_tokens_per_record(op_df)
                 estimates = {
                     "time_per_record": self._est_time_per_record(op_df),
@@ -397,7 +399,7 @@ class CostEstimator:
                     op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
 
                 elif isinstance(op, pz.HardcodedConvert):
-                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
+                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
                     op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
 
                 elif isinstance(op, pz.LLMFilter):
