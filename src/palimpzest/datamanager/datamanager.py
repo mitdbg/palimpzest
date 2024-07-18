@@ -138,6 +138,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         """Return a dataset from the registry."""
         if not dataset_id in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
+
         entry, rock = self._registry[dataset_id]
         if entry == "dir":
             if all([ f.endswith(tuple(constants.IMAGE_EXTENSIONS))

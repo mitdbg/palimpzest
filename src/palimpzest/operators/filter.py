@@ -161,6 +161,10 @@ class NonLLMFilter(FilterOp):
         # set _passed_filter attribute and return
         setattr(candidate, "_passed_filter", result)
 
+        if self.verbose:
+            output_str = f"{self.filter.getFilterStr()}:\n{result}"
+            print(output_str)
+
         return [candidate], [record_op_stats]
 
 

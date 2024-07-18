@@ -52,8 +52,6 @@ class Set:
         cardinality: str = None,
         image_conversion: bool = None,
         depends_on: List[str] = None,
-        num_samples: int = None,
-        scan_start_idx: int = 0,
         nocache: bool = False,
     ):
         self.schema = schema
@@ -67,8 +65,6 @@ class Set:
         self._cardinality = cardinality
         self._image_conversion = image_conversion
         self._depends_on = depends_on
-        self._num_samples = num_samples
-        self._scan_start_idx = scan_start_idx
         self._nocache = nocache
 
     def __str__(self):
@@ -86,8 +82,6 @@ class Set:
             "cardinality": self._cardinality,
             "image_conversion": self._image_conversion,
             "depends_on": self._depends_on,
-            "num_samples": self._num_samples,
-            "scan_start_idx": self._scan_start_idx,
             "limit": self._limit,
             "groupBy": (
                 None if self._groupBy is None else GroupBySig.serialize(self._groupBy)
@@ -137,8 +131,6 @@ class Set:
         # cardinality = inputObj.get("cardinality", None)
         # image_conversion = inputObj.get("image_conversion", None)
         # depends_on = inputObj.get("depends_on", None)
-        # num_samples = inputObj.get("num_samples", None)
-        # scan_start_idx = inputObj.get("scan_start_idx", None)
 
         # return Set(
         #     schema=inputObj["schema"].jsonSchema(),
@@ -150,8 +142,6 @@ class Set:
         #     cardinality=cardinality,
         #     image_conversion=image_conversion,
         #     depends_on=depends_on,
-        #     num_samples=num_samples,
-        #     scan_start_idx=scan_start_idx,
         #     limit=limit,
         #     groupBy=groupBy,
         # )

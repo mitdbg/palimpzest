@@ -1,8 +1,7 @@
 from palimpzest.constants import Model, PromptStrategy, QueryStrategy
-from palimpzest.operators import PhysicalOperator
-from palimpzest.planner import LogicalPlan, PhysicalPlan
-from palimpzest.planner.planner import Planner
-from .plan import LogicalPlan, PhysicalPlan
+from palimpzest.planner import LogicalPlan, PhysicalPlan, Planner
+from palimpzest.pruning import PruningStrategy
+from palimpzest.utils import getModels
 
 import palimpzest as pz
 import palimpzest.operators as pz_ops
@@ -17,24 +16,21 @@ import palimpzest.strategies as physical_strategies
 class PhysicalPlanner(Planner):
     def __init__(
         self,
-            # I feel that num_samples is an attribute who does not belong in the planner, but in the exeuction module: because all we use it for  here is to pass it to the physical operators (which again should have no business knowing the num samples they process)
-            num_samples: Optional[int]=10,
-            scan_start_idx: Optional[int]=0,
-            available_models: Optional[List[Model]]=[],
-            allow_bonded_query: Optional[bool]=True,
-            allow_conventional_query: Optional[bool]=False,
-            allow_model_selection: Optional[bool]=True,
-            allow_code_synth: Optional[bool]=True,
-            allow_token_reduction: Optional[bool]=True,
-            shouldProfile: Optional[bool]=True,
-            no_cache: Optional[bool]=False,
-            verbose: Optional[bool]=False,
+        pruning_strategy: Optional[PruningStrategy]=None,
+        available_models: Optional[List[Model]]=[],
+        allow_bonded_query: Optional[bool]=True,
+        allow_conventional_query: Optional[bool]=False,
+        allow_model_selection: Optional[bool]=True,
+        allow_code_synth: Optional[bool]=True,
+        allow_token_reduction: Optional[bool]=True,
+        shouldProfile: Optional[bool]=True,
+        no_cache: Optional[bool]=False,
+        verbose: Optional[bool]=False,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.num_samples = num_samples
-        self.scan_start_idx = scan_start_idx
+        self.pruning_strategy = pruning_strategy
         self.available_models = available_models
         self.allow_model_selection = allow_model_selection
         self.allow_bonded_query = allow_bonded_query
@@ -90,7 +86,7 @@ class PhysicalPlanner(Planner):
         Returns the model used by the subplan if it is using one, otherwise returns None.
         """
         for op in subplan.operators:
-            if getattr(op, "model", None) is not None:
+            if getattr(op, "model", None) not in [None, Model.GPT_4V]:
                 return op.model
 
         return None
@@ -241,11 +237,7 @@ class PhysicalPlanner(Planner):
 
         # get logical operators and execution parameters
         operators = logical_plan.operators
-        execution_parameters = {
-            "num_samples": self.num_samples,
-            "scan_start_idx": self.scan_start_idx,
-            "shouldProfile": self.shouldProfile,
-        }
+        execution_parameters = {"shouldProfile": self.shouldProfile}
 
         # construct the set of physical plans
         all_plans = []
@@ -253,7 +245,6 @@ class PhysicalPlanner(Planner):
 
             if isinstance(logical_op, pz_ops.ConvertScan):
                 plans = []
-                op_alternatives = []
                 for subplan in all_plans:
                     hardcoded_fns = [x for x in self.hardcoded_converts if x.materializes(logical_op)]
                     if len(hardcoded_fns) > 0:
@@ -264,15 +255,16 @@ class PhysicalPlanner(Planner):
                                     shouldProfile=self.shouldProfile,
                                     verbose=self.verbose,
                                 )
-                            op_alternatives.append(physical_op)
+                            new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                            plans.append(new_physical_plan)
                             break
                     else:
                         for op_class in self.logical_physical_map[type(logical_op)]:
                             if not op_class.materializes(logical_op):
                                 continue
-                            if not self.allow_model_selection and getattr(op_class, "model", None) is not None:
+                            if not self.allow_model_selection and getattr(op_class, "model", None) in getModels(include_vision=False):
                                 # skip this physical op if the subplan already uses a model that is different
-                                # from the one used by this op_class
+                                # from the one used by this op_class; (we allow mixing vision models for now)
                                 subplan_model = self._getSubPlanModel(subplan)
                                 if subplan_model is not None and subplan_model != op_class.model:
                                     continue
@@ -284,11 +276,8 @@ class PhysicalPlanner(Planner):
                                 shouldProfile=self.shouldProfile,
                                 verbose=self.verbose,
                             )
-                            op_alternatives.append(physical_op)
-
-                    for physical_op in op_alternatives:
-                        new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
-                        plans.append(new_physical_plan)
+                            new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
+                            plans.append(new_physical_plan)
 
                 # update all_plans
                 all_plans = plans
@@ -300,9 +289,9 @@ class PhysicalPlanner(Planner):
                     for op_class in self.logical_physical_map[type(logical_op)]:
                         if not op_class.materializes(logical_op):
                             continue
-                        if not self.allow_model_selection and getattr(op_class, "model", None) is not None:
+                        if not self.allow_model_selection and getattr(op_class, "model", None) in getModels(include_vision=False):
                             # skip this physical op if the subplan already uses a model that is different
-                            # from the one used by this op_class
+                            # from the one used by this op_class; (we allow mixing vision models for now)
                             subplan_model = self._getSubPlanModel(subplan)
                             if subplan_model is not None and subplan_model != op_class.model:
                                 continue
@@ -315,6 +304,7 @@ class PhysicalPlanner(Planner):
                         )
                         new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
                         plans.append(new_physical_plan)
+
                 # update all_plans
                 all_plans = plans
 
@@ -336,6 +326,11 @@ class PhysicalPlanner(Planner):
                     for subplan in all_plans:
                         new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
                     all_plans = plans
+
+            # prune plans
+            if self.pruning_strategy is not None:
+                all_plans = [plan for plan in all_plans if not self.pruning_strategy.prune_plan(plan)]
+                self.pruning_strategy.clear_frontier()
 
         if self.verbose:
             print(f"PHYSICAL PLANS: {len(all_plans)}")

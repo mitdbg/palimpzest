@@ -1,7 +1,6 @@
 from conftest import *
 from palimpzest.constants import PlanType
 from palimpzest.execution import *
-from palimpzest.generators import DSPyGenerator, ImageTextGenerator
 from palimpzest.operators import LLMConvert, LLMFilter
 from palimpzest.strategies import LLMConvertCodeSynthesis, TokenReducedConvert
 
@@ -12,9 +11,9 @@ import pytest
 @pytest.mark.parametrize(
     argnames=("execution_engine",),
     argvalues=[
-        pytest.param(SequentialSingleThreadExecution, id="seq-single-thread"),
-        pytest.param(PipelinedSingleThreadExecution, id="pipe-single-thread"),
-        pytest.param(PipelinedParallelExecution, id="pipe-parallel"),
+        pytest.param(SequentialSingleThreadExecutionEngine, id="seq-single-thread"),
+        pytest.param(PipelinedSingleThreadExecutionEngine, id="pipe-single-thread"),
+        pytest.param(PipelinedParallelExecutionEngine, id="pipe-parallel"),
     ]
 )
 class TestParallelExecutionNoCache:

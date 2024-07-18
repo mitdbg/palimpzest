@@ -1,14 +1,6 @@
-"""GV have to separate cost estimator from sthe StatsProcessor because of circular dependency.
-Operators needs statprocessors, defined in stats.py
-CostEstimators needs PhysicalPlans which needs operators.py
-
-I de-statified methods within the class and made estimate_plan_cost the explicit function called on a per-plan basis by the execution engine.
-"""
-
 from __future__ import annotations
-import sys
 
-from palimpzest.constants import Cardinality, GPT_4_MODEL_CARD, Model, MODEL_CARDS, QueryStrategy
+from palimpzest.constants import Cardinality, QueryStrategy, GPT_4_MODEL_CARD, MODEL_CARDS
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.planner import PhysicalPlan
@@ -21,6 +13,14 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import math
 
+# NOTE: the answer.mode() call(s) inside of _est_quality() throw a UserWarning when there are multiple
+#       answers to a convert with the same mode. This is because pandas tries to sort the answers
+#       before returning them, but since answer is a column of dicts the '<' operator fails on dicts.
+#       For now, we can simply ignore the warning b/c we pick an answer at random anyways if their are
+#       multiple w/the same count, but in the future we may want to cast the 'dict' --> 'str' or compute
+#       the mode on a per-field basis.
+import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)
 
 class CostEstimator:
     """
@@ -192,7 +192,6 @@ class CostEstimator:
         except Exception as e:
             print(f"WARNING: error decoding answer or accepted_answer: {str(e)}")
             return 0
-            
 
     def _est_quality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
         """
@@ -392,15 +391,14 @@ class CostEstimator:
 
                 elif isinstance(op, pz.LLMFilter):
                     model_name = op.model.value
-                    # TODO: account for scenario where model_name does not have samples but another model does
                     op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
                     op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
                     op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
                     op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
                 
                 elif isinstance(op, pz.LLMConvert):
-                    model_name = op.model.value
-                    # TODO: account for scenario where model_name does not have samples but another model does
+                    # NOTE: code synthesis does not have a model attribute
+                    model_name = op.model.value if hasattr(op, "model") else None
                     op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
                     op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
                     op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]

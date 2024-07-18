@@ -72,8 +72,12 @@ class Cardinality(str, Enum):
     ONE_TO_MANY = "one-to-many"
 
 class PlanType(str, Enum):
-    SENTINEL = "Sentinel Plan"
-    FINAL = "Final Plan"
+    SENTINEL = "sentinel-plan"
+    FINAL = "final-plan"
+
+class PlanPruningStrategy(str, Enum):
+    PARETO = "pareto"
+    PARETO_PLUS_POLICY = "pareto-plus-policy"
 
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
 PDF_EXTENSIONS = [".pdf"]

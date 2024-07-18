@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from palimpzest.planner import LogicalPlan
 from .plan import LogicalPlan
 from .planner import Planner
@@ -7,6 +9,64 @@ import palimpzest.operators as pz_ops
 
 from itertools import permutations
 from typing import List
+
+
+class DependencyGraphNode:
+    def __init__(self, operator: pz_ops.LogicalOperator, op_idx: int):
+        self.operator = operator
+        self.op_idx = op_idx
+
+        # list of nodes which depend on this logical node
+        self.children = []
+
+        # list of nodes which this logical node depends on
+        self.parents = []
+
+    def add_child(self, child: DependencyGraphNode):
+        self.children.append(child)
+
+    def add_parent(self, parent: DependencyGraphNode):
+        self.parents.append(parent)
+
+    def get_ancestors(self):
+        all_ancestors = []
+        for parent in self.parents:
+            all_ancestors.append(parent.op_idx)
+            parent_ancestors = parent.get_ancestors()
+            all_ancestors.extend(parent_ancestors)
+
+        return all_ancestors
+
+    def prune_redundant_edges(self):
+        # prune edges in your children
+        for child in self.children:
+            child.prune_redundant_edges()
+
+        # prune your own edges
+        prune_nodes = []
+        for idx, prune_candidate in enumerate(self.parents):
+            for other_idx, other in enumerate(self.parents):
+                if idx == other_idx:
+                    continue
+
+                if prune_candidate.op_idx in other.get_ancestors():
+                    prune_nodes.append(prune_candidate)
+
+        prune_node_op_indices = list(map(lambda node: node.op_idx, prune_nodes))
+        self.parents = [parent for parent in self.parents if parent.op_idx not in prune_node_op_indices]
+        for node in prune_nodes:
+            node.children = [child for child in node.children if child.op_idx != self.op_idx]
+
+    def compute_upstream_subplan(self) -> List[DependencyGraphNode]:
+        """
+        We compute the upstream subplan for the given node.
+        """
+        upstream_subplan = [self]
+        for node in self.parents:
+            upstream_nodes = node.compute_upstream_subplan()
+            upstream_subplan = upstream_nodes + upstream_subplan
+
+        return upstream_subplan
 
 
 class LogicalPlanner(Planner):
@@ -23,9 +83,12 @@ class LogicalPlanner(Planner):
         self.verbose = verbose
 
     @staticmethod
-    def _compute_legal_permutations(
-        filterAndConvertOps: List[pz_ops.LogicalOperator],
-    ) -> List[List[pz_ops.LogicalOperator]]:
+    def _compute_logical_plan_reorderings(logical_plan: LogicalPlan) -> List[LogicalPlan]:
+        """
+        Given the naive logical plan, compute a set of equivalent plans with filter
+        and convert operations re-ordered. This set is not exhaustive, but it considers
+        every possible ordering of filters in order to provide plans with diverse tradeoffs.
+        """
         # There are a few rules surrounding which permutation(s) of logical operators are legal:
         # 1. if a filter depends on a field in a convert's outputSchema, it must be executed after the convert
         # 2. if a convert depends on another operation's outputSchema, it must be executed after that operation
@@ -34,103 +97,75 @@ class LogicalPlanner(Planner):
 
         # compute implicit depends_on relationships, keep in mind that operations closer to the start of the list are executed first;
         # if depends_on is not specified for a convert or filter, it implicitly depends_on all preceding converts
-        for idx, op in enumerate(filterAndConvertOps):
-            if op.depends_on is None:
-                all_prior_generated_fields = []
-                for upstreamOp in filterAndConvertOps[:idx]:
-                    if isinstance(upstreamOp, pz_ops.ConvertScan):
-                        all_prior_generated_fields.extend(upstreamOp.generated_fields)
-                op.depends_on = all_prior_generated_fields
+        dependency_graph_nodes = [DependencyGraphNode(op, idx) for idx, op in enumerate(logical_plan.operators)]
+        for idx, node in enumerate(dependency_graph_nodes):
+            for upstreamOpNode in dependency_graph_nodes[:idx]:
+                # if upstream convert generates a field which this node depends on
+                # add dependency in DependencyGraph; if we don't have a depends_on specification
+                # then we implicitly assume this node depends on the convert
+                if isinstance(upstreamOpNode.operator, pz_ops.ConvertScan):
+                    if node.operator.depends_on is not None:
+                        for field in upstreamOpNode.operator.generated_fields:
+                            if field in node.operator.depends_on:
+                                upstreamOpNode.add_child(node)
+                                node.add_parent(upstreamOpNode)
+                                break
+                    else:
+                        upstreamOpNode.add_child(node)
+                        node.add_parent(upstreamOpNode)
 
-        # compute all permutations of operators
-        opPermutations = permutations(filterAndConvertOps)
+                # if upstream node is anything other than a filter, add dependency
+                elif not isinstance(upstreamOpNode.operator, pz_ops.FilteredScan):
+                    upstreamOpNode.add_child(node)
+                    node.add_parent(upstreamOpNode)
 
-        # iterate over permutations and determine if they are legal;
-        # keep in mind that operations closer to the start of the list are executed first
-        legalOpPermutations = []
-        for opPermutation in opPermutations:
-            is_valid = True
-            for idx, op in enumerate(opPermutation):
-                # if this op is a filter, we can skip because no upstream ops will conflict with this
-                if isinstance(op, pz_ops.FilteredScan):
-                    continue
+        # prune redundant edges from the dependency graph; for example, if we have the edges:
+        # S --> C1, C1 --> F1, S --> F1
+        # then we can prune S --> F1 because F1 already depends on S through its dependency on C1
+        root_node = dependency_graph_nodes[0]
+        root_node.prune_redundant_edges()
 
-                # invalid if upstream op depends on field generated by this op
-                for upstreamOp in opPermutation[:idx]:
-                    for col in upstreamOp.depends_on:
-                        if col in op.generated_fields:
-                            is_valid = False
-                            break
-                    if is_valid is False:
-                        break
-                if is_valid is False:
-                    break
+        # get filter nodes
+        filter_nodes = [node for node in dependency_graph_nodes if isinstance(node.operator, pz_ops.FilteredScan)]
 
-            # if permutation order is valid, then add it to the list of legal permutations
-            if is_valid:
-                legalOpPermutations.append(opPermutation)
+        # compute the upstream subplan for each filter
+        filter_node_to_upstream_subplan = {node: node.compute_upstream_subplan() for node in filter_nodes}
 
-        return legalOpPermutations
+        # compute the set of nodes that are downstream from all filters
+        upstream_node_op_indices = set([
+            node.op_idx
+            for upstream_subplan in filter_node_to_upstream_subplan.values()
+            for node in upstream_subplan
+        ])
+        downstream_nodes = [node for node in dependency_graph_nodes if node.op_idx not in upstream_node_op_indices]
 
-    @staticmethod
-    def _compute_logical_plan_reorderings(logical_plan: LogicalPlan) -> List[LogicalPlan]:
-        """
-        Given the naive logical plan, compute all possible equivalent plans with filter
-        and convert operations re-ordered.
-        """
-        operators = logical_plan.operators
-        datasetIdentifier = logical_plan.datasetIdentifier
-        all_plans, op_idx = [], 0
-        while op_idx < len(operators):
-            op = operators[op_idx]
+        # permute the filters (sub-plans)
+        filter_orders = permutations(filter_node_to_upstream_subplan.keys())
 
-            # base case, if this is the first operator (currently must be a BaseScan or CacheScan)
-            # then set all_plans to be the logical plan with just this operator
-            if (isinstance(op, pz_ops.BaseScan) or isinstance(op, pz_ops.CacheScan)) and all_plans == []:
-                all_plans = [LogicalPlan(operators=[op], datasetIdentifier=datasetIdentifier)]
-                op_idx += 1
+        # for each permutation of filters, create a logical plan by ordering the upstream plans for each filter
+        logical_plans = []
+        for filter_order in filter_orders:
+            logical_plan_operators, operator_set = [], set()
+            for filter_node in filter_order:
+                # fetch the upstream subplan for this filter and add its non-redundant nodes to the plan
+                upstream_subplan = filter_node_to_upstream_subplan[filter_node]
+                for node in upstream_subplan:
+                    if node.op_idx not in operator_set:
+                        logical_plan_operators.append(node.operator)
+                        operator_set.add(node.op_idx)
 
-            # if this operator is not a FilteredScan or a ConvertScan: join op with each of the
-            # re-orderings for its source operations
-            elif not isinstance(op, pz_ops.FilteredScan) and not isinstance(op, pz_ops.ConvertScan):
-                plans = []
-                for subplan in all_plans:
-                    new_logical_plan = LogicalPlan.fromOpsAndSubPlan([op], subplan)
-                    plans.append(new_logical_plan)
+            # add nodes which are downstream from all filters
+            for node in downstream_nodes:
+                logical_plan_operators.append(node.operator)
 
-                # update all_plans and op_idx
-                all_plans = plans
-                op_idx += 1
+            # otherwise, construct the logical plan and add the operator ordering to the logical_plan_set
+            logical_plan = LogicalPlan(
+                operators=logical_plan_operators,
+                datasetIdentifier=logical_plan.datasetIdentifier,
+            )
+            logical_plans.append(logical_plan)
 
-            # otherwise, if this operator is a FilteredScan or ConvertScan, make one plan per (legal)
-            # permutation of consecutive converts and filters and recurse
-            elif isinstance(op, pz_ops.FilteredScan) or isinstance(op, pz_ops.ConvertScan):
-                # get list of consecutive converts and filters
-                filterAndConvertOps = []
-                nextOp, next_idx = op, op_idx
-                while isinstance(nextOp, pz_ops.FilteredScan) or isinstance(nextOp, pz_ops.ConvertScan):
-                    filterAndConvertOps.append(nextOp)
-                    nextOp = operators[next_idx + 1] if next_idx + 1 < len(operators) else None
-                    next_idx = next_idx + 1
-
-                # compute set of legal permutations
-                op_permutations = LogicalPlanner._compute_legal_permutations(filterAndConvertOps)
-
-                # compute cross-product of op_permutations and subTrees by linking final op w/first op in subTree
-                plans = []
-                for ops in op_permutations:
-                    for subplan in all_plans:
-                        new_logical_plan = LogicalPlan.fromOpsAndSubPlan(ops, subplan)
-                        plans.append(new_logical_plan)
-
-                # update plans and operators (so that we skip over all operators in the re-ordering)
-                all_plans = plans
-                op_idx = next_idx
-
-            else:
-                raise Exception("PZ does not support the structure of this logical plan")
-
-        return all_plans
+        return logical_plans
 
     def _construct_logical_plan(self, dataset_nodes: List[pz.Set]) -> LogicalPlan:
         operators = []
@@ -149,7 +184,7 @@ class LogicalPlanner(Planner):
             if idx == 0:
                 assert isinstance(node, pz.datasources.DataSource)
                 datasetIdentifier = uid
-                op = pz_ops.BaseScan(datasetIdentifier=uid,outputSchema=node.schema)
+                op = pz_ops.BaseScan(datasetIdentifier=uid, outputSchema=node.schema)
 
             # if the Set's source is another Set, apply the appropriate scan to the Set
             else:

@@ -439,7 +439,7 @@ class LLMConvert(ConvertOp):
                 self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
             )
         elif self.prompt_strategy == PromptStrategy.IMAGE_TO_TEXT:
-            generator = ImageTextGenerator(self.model.value)
+            generator = ImageTextGenerator(self.model.value, verbose)
         else:
             raise Exception(f"Prompt strategy not implemented: {self.prompt_strategy}")
 

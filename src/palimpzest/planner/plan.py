@@ -35,6 +35,9 @@ class Plan:
     def __len__(self):
         return len(self.operators)
 
+    def __getitem__(self, idx: int):
+        return self.operators[idx]
+
     def __str__(self):
         if self.operators:
             return f"{self.__class__.__name__}:\n" + "\n".join(

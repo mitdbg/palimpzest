@@ -411,7 +411,12 @@ class DSPyGenerator(BaseGenerator):
         })
 
         if self.verbose:
-            print(pred.answer)
+            output_str = (
+                f"{question}\n{pred.answer}"
+                if self.prompt_strategy == PromptStrategy.DSPY_COT_QA
+                else f"{question}:\n{pred.answer}"
+            )
+            print(output_str)
             # print("Prompt history:")
             # dspy_lm.inspect_history(n=1)
 

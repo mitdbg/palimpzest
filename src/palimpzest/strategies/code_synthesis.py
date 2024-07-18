@@ -67,7 +67,6 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             and self.exemplar_generation_model == other.exemplar_generation_model
             and self.conventional_fallback_model == other.conventional_fallback_model
             and self.cardinality == other.cardinality
-            and self.image_conversion == other.image_conversion
             and self.prompt_strategy == other.prompt_strategy
             and self.query_strategy == other.query_strategy
             and self.outputSchema == other.outputSchema

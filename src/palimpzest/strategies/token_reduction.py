@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import List
 from palimpzest.constants import Model
 from palimpzest.generators.generators import DSPyGenerator
-from .strategy import PhysicalOpStrategy
+from palimpzest.strategies import PhysicalOpStrategy
+from palimpzest.utils import getVisionModels
 
 from palimpzest.constants import *
 from palimpzest.elements import *
@@ -116,6 +117,17 @@ class TokenReducedConvert(convert.LLMConvert):
     MAX_HEATMAP_UPDATES: int=5
     TOKEN_REDUCTION_SAMPLE: int=0
     TOKEN_REDUCTION_GRANULARITY: float=0.001
+
+    @classmethod
+    def materializes(self, logical_operator) -> bool:
+        if not isinstance(logical_operator, logical.ConvertScan):
+            return False
+
+        # token reduction is not well-defined for image conversions (yet)
+        if logical_operator.image_conversion or self.model in getVisionModels():
+            return False
+
+        return True
 
     def __init__(self, verbose: bool=False, *args, **kwargs):
         super().__init__(*args, **kwargs)
