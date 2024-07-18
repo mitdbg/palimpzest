@@ -1,7 +1,7 @@
 from typing import Any, Dict
 
 import json
-import re
+import regex as re # Use regex instead of re to used variable length lookbehind
 
 
 def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
@@ -28,7 +28,8 @@ def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
     # Handle weird escaped values. I am not sure why the model
     # is returning these, but the JSON parser can't take them
     answer = answer.replace(r"\_", "_")
-
+    
+    # Remove https and http prefixes to not conflict with comment detection
     # Handle comments in the JSON response. Use regex from // until end of line
-    answer = re.sub(r"\/\/.*$", "", answer, flags=re.MULTILINE)
+    answer = re.sub(r"(?<!https:)\/\/.*$", "", answer, flags=re.MULTILINE)
     return json.loads(answer)

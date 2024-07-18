@@ -111,7 +111,7 @@ class PhysicalPlanner(Planner):
                                 shouldProfile=shouldProfile,
                             )
                     # Todo not break but also try other hardcoded ops 
-                    break
+                        break
                 else:
                     # TODO This will also re-try hardcoded functions that did not pass the previous test.
                     for op_class in self.logical_physical_map[type(logical_op)]:

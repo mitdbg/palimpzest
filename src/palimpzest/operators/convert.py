@@ -420,7 +420,12 @@ class LLMConvert(ConvertOp):
             assert json_answer != {}, "No output was found!"
             assert all([field in json_answer for field in fields_to_generate]), "Not all fields were generated!"
         except Exception as e:
-            print(f"Error parsing answer: {e}")
+            print(f"Error parsing LLM answer: {e}")
+            msg = str(e)
+            if "line" in msg:
+                line = int(str(msg).split("line ")[1].split(" ")[0])
+                print(f"\tAnswer snippet: {answer.splitlines()[line]}")
+
             json_answer = {field_name: [] for field_name in fields_to_generate}
 
         field_answers = {}

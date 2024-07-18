@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime
 
 import palimpzest as pz
 from palimpzest.constants import *
@@ -20,6 +21,8 @@ import pandas as pd
 import json
 import modal
 import time
+
+import requests
 
 
 class HardcodedConvert(ConvertOp):
@@ -155,7 +158,7 @@ class ConvertImageToEquation(HardcodedConvert):
         return [dr], [record_op_stats]
 
 
-class ConvertDownloadToFile(HardcodedConvert):
+class ConvertURLToFile(HardcodedConvert):
     """
     NOTE: I am happy leaving this as-is for now, but in the long(er) term I think
     we should look back at our demos and either:
@@ -168,7 +171,7 @@ class ConvertDownloadToFile(HardcodedConvert):
     implemented as a hard-coded convert (or be better generalized).
     """
 
-    inputSchema = schemas.Download
+    inputSchema = schemas.URL
     outputSchema = schemas.File
     final = True
 
@@ -179,7 +182,14 @@ class ConvertDownloadToFile(HardcodedConvert):
         # NOTE: will this generalize? if not, it should be moved into a user-specific class
         dr = DataRecord(self.outputSchema, parent_uuid=candidate._uuid)
         dr.filename = candidate.url.split("/")[-1]
-        dr.contents = candidate.content
+        dr.url = candidate.url
+        dr.timestamp = datetime.now().isoformat()
+        try:
+            contents = requests.get(candidate.url).content
+        except Exception as e:
+            print(f"Error fetching URL {candidate.url}: {e}")
+            contents = b''
+        dr.contents = contents
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
