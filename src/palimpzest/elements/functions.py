@@ -1,3 +1,4 @@
+import palimpzest as pz
 from palimpzest.corelib import URL, WebPage, Download
 from palimpzest.elements import DataRecord, Schema
 
@@ -96,7 +97,7 @@ class DownloadBinaryFunction(UserFunction):
     # fine for a dozen requests, but not for a million.
     def map(self, dr: DataRecord):
         content = requests.get(dr.url).content
-        dr2 = DataRecord(self.outputSchema, parent_uuid=dr._uuid)
+        dr2 = DataRecord(pz.File, parent_uuid=dr._uuid)
         dr2.url = dr.url
         dr2.content = content
         dr2.timestamp = datetime.datetime.now().isoformat()
