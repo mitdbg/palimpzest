@@ -285,6 +285,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--datasetid", type=str, help="The dataset id")
     parser.add_argument("--task", type=str, help="The task to run")
+    parser.add_argument('--engine', type=str, help='The engine to use', default='parallel')
     parser.add_argument(
         "--policy",
         type=str,
@@ -323,11 +324,16 @@ if __name__ == "__main__":
         print("Unknown policy")
         exit(1)
 
+    engine = args.engine
+    if engine == 'sequential':
+        engine = pz.SequentialSingleThreadExecution
+    elif engine == 'parallel':
+        engine = pz.PipelinedParallelExecution
+    elif engin == 'nosentinel':
+        engine = pz.NoSentinelExecution
+    
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
-
-    # engine = pz.PipelinedParallelExecution
-    engine = pz.SequentialSingleThreadExecution
 
     if task == "paper":
         rootSet = buildMITBatteryPaperPlan(datasetid)
