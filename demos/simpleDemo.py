@@ -285,7 +285,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--datasetid", type=str, help="The dataset id")
     parser.add_argument("--task", type=str, help="The task to run")
-    parser.add_argument('--engine', type=str, help='The engine to use', default='parallel')
+    parser.add_argument('--engine', type=str, help='The engine to use. One of sequential, parallel, nosentinel', default='parallel')
     parser.add_argument(
         "--policy",
         type=str,
