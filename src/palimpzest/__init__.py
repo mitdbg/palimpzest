@@ -1,7 +1,7 @@
 from .elements import *
-from .datamanager import *
+from .datamanager import *  # This takes a long time
 from .datasources import *
-from .operators import *
+from .operators import *    # So does this one
 from .sets import *
 from .config import *
 from .parallel import *
