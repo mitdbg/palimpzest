@@ -303,7 +303,7 @@ class ConvertFileToPDF(HardcodedConvert):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.pdfprocessor=pz.DataDirectory().current_config.get("pdfprocessing"),
+        self.pdfprocessor = pz.DataDirectory().current_config.get("pdfprocessor"),
 
     def __eq__(self, other: ConvertFileToPDF):
         return (

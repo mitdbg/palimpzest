@@ -164,7 +164,7 @@ There are a few things you need to do in order to use remote parallel services.
 If you want to use parallel LLM execution on together.ai, you have to modify the config.yaml (by default, Palimpzest uses `~/.palimpzest/config_default.yaml`) so that `llmservice: together` and `parallel: True` are set.
 
 If you want to use parallel PDF processing at modal.com, you have to:
-1. Set `pdfprocessing: modal` in the config.yaml file.
+1. Set `pdfprocessor: modal` in the config.yaml file.
 2. Run `modal deploy src/palimpzest/tools/allenpdf.py`.  This will remotely install the modal function so you can run it. (Actually, it's probably already installed there, but do this just in case.  Also do it if there's been a change to the server-side function inside that file.)
 
 

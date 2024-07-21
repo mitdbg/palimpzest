@@ -81,6 +81,8 @@ if __name__ == "__main__":
         engine = pz.SequentialSingleThreadExecution
     elif engine == 'parallel':
         engine = pz.PipelinedParallelExecution
+    elif engine == 'nosentinel':
+        engine = pz.NoSentinelExecution
 
     if no_cache:
         pz.DataDirectory().clearCache(keep_registry=True)

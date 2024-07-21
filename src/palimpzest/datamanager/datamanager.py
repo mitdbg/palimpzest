@@ -145,7 +145,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
                 return ImageFileDirectorySource(rock, dataset_id)
             elif all([ f.endswith(tuple(constants.PDF_EXTENSIONS))
                         for f in os.listdir(rock)]):
-                pdfprocessor = self.current_config.get("pdfprocessing")
+                pdfprocessor = self.current_config.get("pdfprocessor")
                 file_cache_dir = self.getFileCacheDir()
                 return PDFFileDirectorySource(path=rock, 
                                               dataset_id=dataset_id, 

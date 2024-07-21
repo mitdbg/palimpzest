@@ -190,7 +190,7 @@ class PDFFileDirectorySource(DirectorySource):
             text_content = get_text_from_pdf(dr.filename, dr.contents, file_cache_dir = self.file_cache_dir)
 
         # construct data record
-        dr = DataRecord(self.outputSchema, parent_uuid=dr._uuid)
+        dr = DataRecord(self.schema, parent_uuid=dr._uuid)
         dr.filename = pdf_filename
         dr.contents = pdf_bytes
         dr.text_contents = text_content[:10000]  # TODO Very hacky

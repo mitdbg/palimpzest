@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+""" This scripts is a demo for the biofabric data integration.
+python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usecase3-pdf
+
+"""
+from pypdf import PdfReader
+
+import streamlit as st
+from tqdm import tqdm 
+import context
+from palimpzest.constants import PZ_DIR
+import palimpzest as pz
+import pdb 
+import gradio as gr
+import numpy as np
+import pandas as pd
+
+import argparse
+import requests
+import json
+import time
+import os
+
+class ScientificPaper(pz.PDFFile):
+   """Represents a scientific research paper, which in practice is usually from a PDF file"""
+   title = pz.Field(desc="The title of the paper. This is a natural language title, not a number or letter.", required=True)
+   author = pz.Field(desc="The name of the first author of the paper", required=True)
+#    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
+#    journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
+   abstract = pz.Field(desc="A short description of the paper contributions and findings", required=False)
+#    doiURL = pz.Field(desc="The DOI URL for the paper", required=True)
+
+class Reference(pz.Schema):
+    """ Represents a reference to another paper, which is cited in a scientific paper"""
+    index = pz.Field(desc="The index of the reference in the paper", required=True)
+    title = pz.Field(desc="The title of the paper being cited", required=True)
+    author = pz.Field(desc="The author of the paper being cited", required=True)
+    snippet = pz.Field(desc="A snippet from the source paper that references the index", required=False)
+
+@st.cache_resource()
+def run_workload():
+    papers = pz.Dataset("bdf-usecase3-pdf", schema=ScientificPaper)
+    # papers = papers.filter("The paper mentions phosphorylation of PARP1")
+    references = papers.convert(Reference, desc="The references cited in the paper", cardinality="oneToMany")
+
+    output = references
+    engine = pz.PipelinedParallelExecution
+    policy = pz.MinCost()
+    output = papers
+    tables, plan, stats  =  pz.Execute(output,
+                                    policy = policy,
+                                    nocache=True,
+                                    allow_code_synth=False,
+                                    allow_token_reduction=False,
+                                    execution_engine=engine)
+
+    return tables, plan, stats
+
+
+pdfdir = "testdata/bdf-usecase3-pdf/"
+def reference_graph():
+    papers = {}
+    for file in tqdm(os.listdir(pdfdir)[:2]):
+        reader = PdfReader(os.path.join(pdfdir, file))
+        all_text = ""
+        for page in reader.pages:
+            all_text += page.extract_text() + "\n"
+    
+        papers[file] = all_text
+
+    return papers
+
+papers = paper_graph()
+
+
+
+
+if False:
+    tables, plan, stats = run_workload()
+    with st.container():
+        st.write("### Executed plan: \n")
+        # st.write(" " + str(plan).replace("\n", "  \n "))
+        for idx, op in enumerate(plan.operators):
+            strop = f"{idx+1}. {str(op)}"
+            strop = strop.replace("\n", "  \n")
+            st.write(strop)
+        
+        st.write(str(stats))
+
+    for table in tables:
+        with st.container(height=200, border=True):
+            st.write(" **Paper:** ", table.title)
+            st.write(" **Author:**" ,table.author)
+            st.write(" **Abstract:** ", table.abstract, "\n")
+
+        # st.write(table.title, table.author, table.abstract)
+
+
+    # endTime = time.time()
+    # print("Elapsed time:", endTime - startTime)
+
