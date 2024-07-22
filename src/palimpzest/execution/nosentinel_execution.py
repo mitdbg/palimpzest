@@ -166,7 +166,7 @@ class NoSentinelExecution(SequentialSingleThreadExecution):
 
                 # otherwise, process the next record in the processing queue for this operator
                 elif len(processing_queues[op_id]) > 0:
-                    print(f"Processing operator {op_id} - queue length: {len(processing_queues[op_id])}")
+                    # print(f"Processing operator {op_id} - queue length: {len(processing_queues[op_id])}")
                     input_record = processing_queues[op_id].pop(0)
                     records, record_op_stats_lst = operator(input_record)
 

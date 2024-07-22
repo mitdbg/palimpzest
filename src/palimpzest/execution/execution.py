@@ -62,6 +62,7 @@ class ExecutionEngine:
             min_plans: Optional[int] = None,
             verbose: bool = False,
             available_models: List[Model] = [],
+            allow_sentinels: bool=True,
             allow_bonded_query: List[Model] = True,
             allow_model_selection: bool=True,
             allow_code_synth: bool=True,
@@ -81,6 +82,7 @@ class ExecutionEngine:
         if not available_models:
             self.available_models = getModels()
         print("Available models: ", self.available_models)
+        self.allow_sentinels = allow_sentinels
         self.allow_model_selection = allow_model_selection
         self.allow_bonded_query = allow_bonded_query
         self.allow_code_synth = allow_code_synth
@@ -145,7 +147,10 @@ class ExecutionEngine:
         #       the sentinels even if the computation is partially cached
         # only run sentinels if there isn't a cached result already
         uid = dataset.universalIdentifier()
-        run_sentinels = self.nocache or not self.datadir.hasCachedAnswer(uid)
+        if self.allow_sentinels:
+            run_sentinels = self.nocache or not self.datadir.hasCachedAnswer(uid)
+        else:
+            run_sentinels = False
 
         sentinel_plans, sample_execution_data, sentinel_records = [], [], []
 

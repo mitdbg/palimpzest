@@ -1,63 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
 <gexf xmlns="http://www.gexf.net/1.2draft" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gexf.net/1.2draft http://www.gexf.net/1.2draft/gexf.xsd" version="1.2">
-  <meta lastmodifieddate="2024-07-21">
+  <meta lastmodifieddate="2024-07-22">
     <creator>NetworkX 3.3</creator>
   </meta>
   <graph defaultedgetype="directed" mode="static" name="">
-    <nodes>
-      <node id="HaPoly(ADP-ribose)1999" label="HaPoly(ADP-ribose)1999" />
-      <node id="Ceccaldi,Homologous-recombination-deficient2015" label="Ceccaldi,Homologous-recombination-deficient2015" />
-      <node id="Mimitou,Sae2,2008" label="Mimitou,Sae2,2008" />
-      <node id="Zhu,Sgs12008" label="Zhu,Sgs12008" />
-      <node id="Farmer,Targeting2005" label="Farmer,Targeting2005" />
-      <node id="Bryant,Specific2005" label="Bryant,Specific2005" />
-      <node id="Yousefzadeh,DNA2013" label="Yousefzadeh,DNA2013" />
-      <node id="Shima,The2004" label="Shima,The2004" />
-      <node id="Koole,A2014" label="Koole,A2014" />
-      <node id="Seki,POLQ2003" label="Seki,POLQ2003" />
-      <node id="Seki,High-efficiency2004" label="Seki,High-efficiency2004" />
-      <node id="Chiruvella,Repair2013" label="Chiruvella,Repair2013" />
-      <node id="WangA2016" label="WangA2016" />
-      <node id="YuMediation2002" label="YuMediation2002" />
-      <node id="brunyanszki2014" label="brunyanszki2014" />
-      <node id="geffen2023" label="geffen2023" />
-      <node id="bolderson2010" label="bolderson2010" />
-      <node id="ceccaldi2015" label="ceccaldi2015" />
-      <node id="Li et al., 2021" label="Li et al., 2021" />
-      <node id="references" label="references" />
-      <node id="gupte2017.pdf" label="gupte2017.pdf" />
-    </nodes>
-    <edges>
-      <edge source="brunyanszki2014" target="HaPoly(ADP-ribose)1999" id="0" />
-      <edge source="geffen2023" target="Ceccaldi,Homologous-recombination-deficient2015" id="1" />
-      <edge source="bolderson2010" target="Mimitou,Sae2,2008" id="2" />
-      <edge source="bolderson2010" target="Zhu,Sgs12008" id="3" />
-      <edge source="ceccaldi2015" target="Farmer,Targeting2005" id="4" />
-      <edge source="ceccaldi2015" target="Bryant,Specific2005" id="5" />
-      <edge source="ceccaldi2015" target="Yousefzadeh,DNA2013" id="6" />
-      <edge source="ceccaldi2015" target="Shima,The2004" id="7" />
-      <edge source="ceccaldi2015" target="Koole,A2014" id="8" />
-      <edge source="ceccaldi2015" target="Seki,POLQ2003" id="9" />
-      <edge source="ceccaldi2015" target="Seki,High-efficiency2004" id="10" />
-      <edge source="ceccaldi2015" target="Chiruvella,Repair2013" id="11" />
-      <edge source="Li et al., 2021" target="WangA2016" id="12" />
-      <edge source="Li et al., 2021" target="HaPoly(ADP-ribose)1999" id="13" />
-      <edge source="Li et al., 2021" target="YuMediation2002" id="14" />
-      <edge source="references" target="Chiruvella,Repair2013" id="15" />
-      <edge source="references" target="Seki,POLQ2003" id="16" />
-      <edge source="references" target="Yousefzadeh,DNA2013" id="17" />
-      <edge source="references" target="Koole,A2014" id="18" />
-      <edge source="references" target="Ceccaldi,Homologous-recombination-deficient2015" id="19" />
-      <edge source="references" target="Shima,The2004" id="20" />
-      <edge source="references" target="Mimitou,Sae2,2008" id="21" />
-      <edge source="references" target="Zhu,Sgs12008" id="22" />
-      <edge source="references" target="Farmer,Targeting2005" id="23" />
-      <edge source="references" target="Bryant,Specific2005" id="24" />
-      <edge source="references" target="Seki,High-efficiency2004" id="25" />
-      <edge source="gupte2017.pdf" target="Bryant,Specific2005" id="26" />
-      <edge source="gupte2017.pdf" target="Farmer,Targeting2005" id="27" />
-      <edge source="gupte2017.pdf" target="WangA2016" id="28" />
-      <edge source="gupte2017.pdf" target="YuMediation2002" id="29" />
-    </edges>
+    <nodes />
+    <edges />
   </graph>
 </gexf>
