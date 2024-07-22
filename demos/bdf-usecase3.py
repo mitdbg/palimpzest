@@ -5,6 +5,7 @@ python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usec
 """
 from pypdf import PdfReader
 
+import networkx as nx
 import streamlit as st
 from tqdm import tqdm 
 import context
@@ -14,6 +15,7 @@ import pdb
 import gradio as gr
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 import argparse
 import requests
@@ -70,10 +72,42 @@ def reference_graph():
 
     return papers
 
-papers = paper_graph()
+reference_dir = "testdata/bdf-usecase3-references/"
+references = []
+for file in os.listdir(reference_dir):
+    df = pd.read_csv(os.path.join(reference_dir, file))
+    # create first_title as the first word of the title column
+    df["first_title"] = df["title"].apply(lambda x: x.split()[0])
+    try:
+        df["first_author"] = df["authors"].apply(lambda x: x.split()[0])
+    except:
+        breakpoint()
+    df["key"] = df["first_author"] + df["first_title"] + df["year"].astype(str)
+    references.append(df)
 
+references_df = pd.concat(references)
+print(references_df)
+G = nx.DiGraph()
+G.add_nodes_from(references_df["key"].values)
+G.add_nodes_from(references_df["source"].unique())
 
+for idx, row in references_df.iterrows():
+    G.add_edge(row["source"], row["key"])
 
+# prune all nodes with no edges
+pruned_nodes = [node for node in G.nodes if G.degree(node) == 0]
+# prune all nodes with a single edge
+pruned_nodes += [node for node in G.nodes if G.degree(node) == 1]
+G.remove_nodes_from(pruned_nodes)
+
+st.title("Biofabric Data Integration")
+fig, ax = plt.subplots()
+pos = nx.random_layout(G)
+nx.draw(G,pos, with_labels=True)
+st.pyplot(fig)
+st.balloons()
+
+nx.write_gexf(G, "demos/bdf-usecase3.gexf")
 
 if False:
     tables, plan, stats = run_workload()
