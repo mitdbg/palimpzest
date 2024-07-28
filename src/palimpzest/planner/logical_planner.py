@@ -214,6 +214,9 @@ class LogicalPlanner(Planner):
             dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
             dataset_nodes[1]._source = dataset_nodes[0]
 
+        if dataset_nodes[0].schema == pz.ImageFile:
+            dataset_nodes[0].schema = pz.File
+            dataset_nodes.insert(1, pz.sets.Dataset(source=dataset_nodes[0], schema=pz.ImageFile))
         # construct naive logical plan
         plan = self._construct_logical_plan(dataset_nodes)
 

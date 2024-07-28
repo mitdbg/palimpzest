@@ -23,6 +23,7 @@ class ModelSelectionStrategy(PhysicalOpStrategy):
         for model in available_models:
             if model.value not in MODEL_CARDS:
                 raise ValueError(f"Model {model} not found in MODEL_CARDS")
+            # TODO this will cause a bug if a model is both a vision and non-vision model (e.g., GPT-4o)
             if not enable_vision and model in getVisionModels():
                 continue
             # physical_op_type = type(cls.physical_op_class.__name__+model.name,
