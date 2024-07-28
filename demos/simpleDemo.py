@@ -462,8 +462,10 @@ if __name__ == "__main__":
         # TODO
         imgs, breeds = [], []
         for record in records:
-            print("Trying to open ", record.filename)
-            img = Image.open(record.filename).resize((128, 128))
+            path = os.path.join("testdata/images-tiny/", record.filename)
+            print(record)
+            print("Trying to open ", path)
+            img = Image.open(path).resize((128, 128))
             img_arr = np.asarray(img)
             imgs.append(img_arr)
             breeds.append(record.breed)
