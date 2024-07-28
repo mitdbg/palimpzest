@@ -329,7 +329,7 @@ if __name__ == "__main__":
         engine = pz.SequentialSingleThreadExecution
     elif engine == 'parallel':
         engine = pz.PipelinedParallelExecution
-    elif engin == 'nosentinel':
+    elif engine == 'nosentinel':
         engine = pz.NoSentinelExecution
     
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
