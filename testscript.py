@@ -1,23 +1,29 @@
-from palimpzest.dataclasses import GenerationStats, RecordOpStats
+import os 
+from PyPDF2 import PdfReader, PdfWriter
 
-x = GenerationStats()
-y = GenerationStats(total_input_tokens=3)
+outdir = "testdata/bdf-usecase3-tiny/"
+refdir = "testdata/bdf-usecase3-references-pdffull/"
+pdfdir = "testdata/bdf-usecase3-pdf/"
 
-print(y,"\n")
-z = x+y
-print(z,"\n")
-x+=y
-print(x,"\n")
-total_generation_stats = x+y
+for pdffile in os.listdir(pdfdir):
+    pdfpath = os.path.join(pdfdir, pdffile)
+    outpath = os.path.join(outdir, pdffile)
+    refpath = os.path.join(refdir, pdffile)
 
-r = RecordOpStats(
-    record_uuid = "1",
-    record_parent_uuid = "2",
-    op_id = "3",
-    op_name = "4",
-    time_per_record = 5,
-    cost_per_record = 6,
-    record_state = {}
-    ,  **total_generation_stats.__dict__)
+    reader = PdfReader(pdfpath)
+    reader.getPage(0)
 
-print(r)
+
+    pdf_writer = PdfWriter()
+
+    paper_reader = PdfReader(pdfpath)
+    first_page = paper_reader.getPage(0)
+    pdf_writer.addPage(first_page)
+
+    ref_reader = PdfReader(refpath)    
+    for page_num in range(ref_reader.getNumPages()):
+        page = ref_reader.getPage(page_num)
+        pdf_writer.addPage(page)
+    
+    # Write the merged PDF to a new file
+    pdf_writer.write(outpath)

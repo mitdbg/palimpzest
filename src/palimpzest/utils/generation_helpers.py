@@ -28,8 +28,11 @@ def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
     # Handle weird escaped values. I am not sure why the model
     # is returning these, but the JSON parser can't take them
     answer = answer.replace(r"\_", "_")
+    answer = answer.replace("\\n", "\n")
     
     # Remove https and http prefixes to not conflict with comment detection
     # Handle comments in the JSON response. Use regex from // until end of line
-    answer = re.sub(r"(?<!https:)\/\/.*$", "", answer, flags=re.MULTILINE)
+    answer = re.sub(r"(?<!(http://.*?|https://.*?))\/\/.*$", "example.com", answer, flags=re.MULTILINE)
+    # Sanitize newlines in the JSON response
+    answer = answer.replace("\n", " ")
     return json.loads(answer)

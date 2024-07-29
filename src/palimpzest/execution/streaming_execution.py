@@ -172,16 +172,17 @@ class StreamingSequentialExecution(ExecutionEngine):
                 op_stats.total_op_cost += record_op_stats.cost_per_record
 
             plan_stats.operator_stats[op_id] = op_stats
-
-            if isinstance(operator, FilterOp):
-                # delete all records that did not pass the filter
-                records = [r for r in records if r._passed_filter]          
-
             self.last_record = self.current_scan_idx == datasource_len
 
             # update finished_executing based on limit
             if isinstance(operator, LimitScanOp):
                 self.last_record = (self.current_scan_idx == operator.limit)
+
+            if isinstance(operator, FilterOp):
+                # delete all records that did not pass the filter
+                records = [r for r in records if r._passed_filter]
+                if not records:
+                    break
             
         print("Iteration number: ", self.current_scan_idx, "Last record: ", self.last_record)
 
