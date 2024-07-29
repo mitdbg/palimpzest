@@ -196,7 +196,9 @@ class NoSentinelExecution(SequentialSingleThreadExecution):
                         processing_queues[next_op_id].append(record)
                     else:
                         output_records.append(record)
-
+                if next_op_id is not None:
+                    if processing_queues[next_op_id] == []:
+                        break
 
             # update finished_executing based on whether all records have been processed
             still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
