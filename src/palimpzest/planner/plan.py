@@ -105,10 +105,13 @@ class PhysicalPlan(Plan):
 
     def __repr__(self) -> str:
         """Computes a string representation for this plan."""
-        ops = [op for op in self.operators if not op.is_hardcoded()]
-        label = "-".join([str(op) for op in ops])
-        return f"PZ-{label}"
-
+        if self.operators:
+            return f"{self.__class__.__name__}:\n" + "\n".join(
+                map(str, [f"{idx}. {str(op)}" for idx, op in enumerate(self.operators)])
+            )
+        else:
+            return f"{self.__class__.__name__}: No operator tree."
+        
     # GV: Should we generate a unique ID for each plan in the __init__ ?
     # MR: I think that's a good idea (also in fromOpsAndSubPlan)
     def plan_id(self) -> str:

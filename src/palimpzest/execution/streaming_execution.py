@@ -32,6 +32,75 @@ class StreamingSequentialExecution(ExecutionEngine):
         self.plan = None
         self.plan_stats = None
 
+
+    def generate_plan(self, dataset: Set, policy: Policy):
+        dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+        if os.path.exists(dspy_cache_dir):
+            shutil.rmtree(dspy_cache_dir)
+        cache = self.datadir.getCacheService()
+        cache.rmCache()
+
+        self.set_source_dataset_id(dataset)
+        start_time = time.time()
+        # NOTE: this checks if the entire computation is cached; it will re-run
+        #       the sentinels even if the computation is partially cached
+        # only run sentinels if there isn't a cached result already
+        uid = dataset.universalIdentifier()
+        logical_planner = LogicalPlanner(no_cache=True)
+        physical_planner = PhysicalPlanner(
+            num_samples=self.num_samples,
+            scan_start_idx=0,
+            available_models=self.available_models,
+            allow_bonded_query=self.allow_bonded_query,
+            allow_model_selection=self.allow_model_selection,
+            allow_code_synth=self.allow_code_synth,
+            allow_token_reduction=self.allow_token_reduction,
+            useParallelOps=self.useParallelOps,
+        )
+
+        # enumerate all possible physical plans
+        all_physical_plans = []
+        for logical_plan in logical_planner.generate_plans(dataset):
+            for physical_plan in physical_planner.generate_plans(logical_plan):
+                all_physical_plans.append(physical_plan)
+
+        # construct the CostEstimator with any sample execution data we've gathered
+        cost_estimator = CostEstimator(source_dataset_id=self.source_dataset_id)
+
+        # estimate the cost of each plan
+        for physical_plan in all_physical_plans:
+            total_time, total_cost, quality = cost_estimator.estimate_plan_cost(physical_plan)
+            physical_plan.total_time = total_time
+            physical_plan.total_cost = total_cost
+            physical_plan.quality = quality
+
+        plans = physical_planner.deduplicate_plans(all_physical_plans)
+        final_plans = physical_planner.select_pareto_optimal_plans(plans)
+
+        # for experimental evaluation, we may want to include baseline plans
+        if self.include_baselines:
+            final_plans = physical_planner.add_baseline_plans(final_plans)
+
+        if self.min_plans is not None and len(final_plans) < self.min_plans:
+            final_plans = physical_planner.add_plans_closest_to_frontier(final_plans, plans, self.min_plans)
+
+        # choose best plan and execute it
+        self.plan = policy.choose(plans)
+
+        # TODO move into PhysicalPlan.__init__?
+        self.plan_stats = PlanStats(plan_id=self.plan.plan_id())
+        print(f"Time for planning: {time.time() - start_time}")
+        for op_idx, op in enumerate(self.plan.operators):
+            op_id = op.get_op_id()
+            self.plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) 
+
+        return self.plan
+        # if self.verbose:
+            # print("----------------------")
+            # print(f"{plan_type.value} {str(plan_idx)}:")
+            # plan.printPlan()
+            # print("---")
+
     def execute(self,
         dataset: Set,
         policy: Policy,
@@ -40,73 +109,7 @@ class StreamingSequentialExecution(ExecutionEngine):
         start_time = time.time()
         # Always delete cache
         if not self.current_scan_idx:
-            dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
-            if os.path.exists(dspy_cache_dir):
-                shutil.rmtree(dspy_cache_dir)
-            cache = self.datadir.getCacheService()
-            cache.rmCache()
-
-            self.set_source_dataset_id(dataset)
-
-            # NOTE: this checks if the entire computation is cached; it will re-run
-            #       the sentinels even if the computation is partially cached
-            # only run sentinels if there isn't a cached result already
-            uid = dataset.universalIdentifier()
-            logical_planner = LogicalPlanner(no_cache=True)
-            physical_planner = PhysicalPlanner(
-                num_samples=self.num_samples,
-                scan_start_idx=0,
-                available_models=self.available_models,
-                allow_bonded_query=self.allow_bonded_query,
-                allow_model_selection=self.allow_model_selection,
-                allow_code_synth=self.allow_code_synth,
-                allow_token_reduction=self.allow_token_reduction,
-                useParallelOps=self.useParallelOps,
-            )
-
-            # enumerate all possible physical plans
-            all_physical_plans = []
-            for logical_plan in logical_planner.generate_plans(dataset):
-                for physical_plan in physical_planner.generate_plans(logical_plan):
-                    all_physical_plans.append(physical_plan)
-
-            # construct the CostEstimator with any sample execution data we've gathered
-            cost_estimator = CostEstimator(source_dataset_id=self.source_dataset_id)
-
-            # estimate the cost of each plan
-            for physical_plan in all_physical_plans:
-                total_time, total_cost, quality = cost_estimator.estimate_plan_cost(physical_plan)
-                physical_plan.total_time = total_time
-                physical_plan.total_cost = total_cost
-                physical_plan.quality = quality
-
-            plans = physical_planner.deduplicate_plans(all_physical_plans)
-            final_plans = physical_planner.select_pareto_optimal_plans(plans)
-
-            # for experimental evaluation, we may want to include baseline plans
-            if self.include_baselines:
-                final_plans = physical_planner.add_baseline_plans(final_plans)
-
-            if self.min_plans is not None and len(final_plans) < self.min_plans:
-                final_plans = physical_planner.add_plans_closest_to_frontier(final_plans, plans, self.min_plans)
-
-            # choose best plan and execute it
-            self.plan = policy.choose(plans)
-            print(f"Time for planning: {time.time() - start_time}")
-
-            # if self.verbose:
-                # print("----------------------")
-                # print(f"{plan_type.value} {str(plan_idx)}:")
-                # plan.printPlan()
-                # print("---")
-
-            plan_start_time = time.time()
-
-            # initialize plan and operator stats
-            self.plan_stats = PlanStats(plan_id=self.plan.plan_id()) # TODO move into PhysicalPlan.__init__?
-            for op_idx, op in enumerate(self.plan.operators):
-                op_id = op.get_op_id()
-                self.plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) 
+            self.generate_plan(self, dataset, policy)
 
         while not self.last_record:
             records, stats = self.execute_stream()
@@ -114,10 +117,9 @@ class StreamingSequentialExecution(ExecutionEngine):
 
         if self.last_record:
             # finalize plan stats
-            total_plan_time = time.time() - plan_start_time
+            total_plan_time = time.time() - start_time
             self.plan_stats.finalize(total_plan_time)
         yield records, self.plan, stats
-
 
     def execute_stream(self):
         """
