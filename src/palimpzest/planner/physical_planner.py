@@ -123,6 +123,7 @@ class PhysicalPlanner(Planner):
                                 image_conversion=logical_op.image_conversion,
                                 query_strategy = QueryStrategy.BONDED_WITH_FALLBACK,
                                 shouldProfile=shouldProfile,
+                                cardinality=logical_op.cardinality,
                             )
 
             elif isinstance(logical_op, pz_ops.FilteredScan):
@@ -194,6 +195,7 @@ class PhysicalPlanner(Planner):
                                 image_conversion=logical_op.image_conversion,
                                 query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
                                 shouldProfile=self.shouldProfile,
+                                cardinality=logical_op.cardinality,
                             )
                             op_alternatives.append(physical_op)
 

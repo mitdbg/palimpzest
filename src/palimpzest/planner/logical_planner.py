@@ -183,10 +183,10 @@ class LogicalPlanner(Planner):
                         targetCacheId=uid,
                     )
                 elif not outputSchema == inputSchema:
-                    op = pz_ops.ConvertScan(
+                   op = pz_ops.ConvertScan(
                         inputSchema=inputSchema,
                         outputSchema=outputSchema,
-                        cardinality=node._cardinality,
+                        cardinality=pz.Cardinality(node._cardinality),
                         image_conversion=node._image_conversion,
                         depends_on=node._depends_on,
                         targetCacheId=uid,

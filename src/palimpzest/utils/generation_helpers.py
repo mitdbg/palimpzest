@@ -33,6 +33,7 @@ def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
     # Remove https and http prefixes to not conflict with comment detection
     # Handle comments in the JSON response. Use regex from // until end of line
     answer = re.sub(r"(?<!(http://.*?|https://.*?))\/\/.*$", "example.com", answer, flags=re.MULTILINE)
+    answer = re.sub(r",\n.*\.\.\.$", "", answer, flags=re.MULTILINE)
     # Sanitize newlines in the JSON response
     answer = answer.replace("\n", " ")
     return json.loads(answer)

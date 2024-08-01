@@ -72,6 +72,15 @@ class Cardinality(str, Enum):
     ONE_TO_ONE = "one-to-one"
     ONE_TO_MANY = "one-to-many"
 
+    @classmethod
+    def _missing_(cls, value):
+        normalized_value = ''.join([x for x in value if x.isalpha()]).lower()
+        for member in cls:
+            normalized_member = ''.join([x for x in member if x.isalpha()]).lower()
+            if normalized_member == normalized_value:
+                return member
+        return None
+
 class PlanType(str, Enum):
     SENTINEL = "Sentinel Plan"
     FINAL = "Final Plan"

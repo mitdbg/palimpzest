@@ -32,6 +32,7 @@ class ModelSelectionStrategy(PhysicalOpStrategy):
                                     {'model': model,
                                      'prompt_strategy': prompt_strategy,
                                      'final': True,
+                                     **kwargs,
                                      })
             return_operators.append(physical_op_type)
 
