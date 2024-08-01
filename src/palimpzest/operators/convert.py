@@ -302,7 +302,7 @@ class LLMConvert(ConvertOp):
         optionalOutputDesc = (
             ""
             if self.outputSchema.__doc__ is None
-            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.inputSchema.__doc__)
+            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.outputSchema.__doc__)
         )
 
         # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
