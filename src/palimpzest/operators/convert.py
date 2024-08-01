@@ -427,7 +427,6 @@ class LLMConvert(ConvertOp):
         except Exception as e:
             print(f"Error parsing LLM answer: {e}")
             print(f"\tAnswer: {answer}")
-            breakpoint()
             # msg = str(e)
             # if "line" in msg:
                 # line = int(str(msg).split("line ")[1].split(" ")[0])
@@ -555,88 +554,18 @@ class LLMConvertConventional(LLMConvert):
         self, candidate_content: Union[str, List[bytes]], fields: List[str]
     ) -> Tuple[dict[List], GenerationStats]:
 
-        # if self.cardinality == Cardinality.ONE_TO_MANY:
-        if False:
-            breakpoint()
-            # TODO here the problem is: which is the 1:N field that we are splitting the output into?
-            # do we need to know this to construct the prompt question ?
-            # for now, we will just assume there is only one list in the JSON.
-            dct = json.loads(text_content)
-            split_attribute = [att for att in dct.keys() if type(dct[att]) == list][0]
-            n_splits = len(dct[split_attribute])
+        fields_answers = {}
+        fields_stats = {}
 
-            if td.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-                # TODO Hacky to nest return and not disrupt the rest of method!!!
-                # NOTE: this is a bonded query, but we are treating it as a conventional query
-                query_stats = {}
-                drs = [] 
-                promptQuestion = _construct_query_prompt(td, doc_type, generate_field_names)
+        for field_name in fields:
+            prompt = self._construct_query_prompt(fields_to_generate=[field_name])
+            answer, stats = self._dspy_generate_fields(
+                content=candidate_content,
+                prompt=prompt,
+            )
+            json_answer = self.parse_answer(answer, [field_name])
+            fields_answers.update(json_answer)
+            fields_stats[field_name] = stats
 
-                # iterate over the length of the split attribute, and generate a new JSON for each split
-                for idx in range(n_splits):
-                    if verbose: 
-                        print(f"Processing {split_attribute} with index {idx}")
-                    new_json = {k:v for k,v in dct.items() if k != split_attribute}
-                    new_json[split_attribute] = dct[split_attribute][idx]
-
-                    text_content = json.dumps(new_json)
-                    generator = DSPyGenerator(td.model.value, td.prompt_strategy, doc_schema, doc_type, verbose)
-                    answer, record_stats = None, None
-                    try:
-                        answer, _, record_stats = generator.generate(text_content, promptQuestion, plan_idx=td.plan_idx)
-                        jsonObj = _get_JSON_from_answer(answer)["items"][0]
-                        query_stats[f"all_fields_one_to_many_conventional_{idx}"] = record_stats
-                    except IndexError as e:
-                        query_stats[f"all_fields_one_to_many_conventional_{idx}"] = record_stats
-                        print("Could not find any items in the JSON response")
-                        continue
-                    except json.JSONDecodeError as e:
-                        query_stats[f"all_fields_one_to_many_conventional_{idx}"] = record_stats
-                        print(f"Could not decode JSON response: {e}")
-                        print(answer)
-                        continue
-                    except Exception as e:
-                        query_stats[f"all_fields_one_to_many_conventional_{idx}"] = record_stats
-                        print(f"Could not decode JSON response: {e}")
-                        print(answer)
-                        continue
-
-                    dr = _create_data_record_from_json(jsonObj, td, candidate, cardinality_idx=idx)
-                    drs.append(dr)
-
-                # TODO how to stat this? I feel that we need a new Stats class for this type of query
-                # construct ConventionalQueryStats object
-                field_query_stats_lst = [FieldQueryStats(gen_stats=gen_stats, field_name=field_name) for
-                                            field_name, gen_stats in query_stats.items()]
-                conventional_query_stats = ConventionalQueryStats(
-                    field_query_stats_lst=field_query_stats_lst,
-                    input_fields=td.inputSchema.fieldNames(),
-                    generated_fields=generate_field_names,
-                )
-
-                # TODO: debug root cause
-                for dr in drs:
-                    if not hasattr(dr, 'filename'):
-                        setattr(dr, 'filename', candidate.filename)
-
-                return drs, conventional_query_stats
-
-            else:
-                raise Exception("Conventional queries cannot execute tasks with cardinality == 'oneToMany'")
-
-        else:
-            fields_answers = {}
-            fields_stats = {}
-
-            for field_name in fields:
-                prompt = self._construct_query_prompt(fields_to_generate=[field_name])
-                answer, stats = self._dspy_generate_fields(
-                    content=candidate_content,
-                    prompt=prompt,
-                )
-                json_answer = self.parse_answer(answer, [field_name])
-                fields_answers.update(json_answer)
-                fields_stats[field_name] = stats
-
-            generation_stats = sum(fields_stats.values())
-            return fields_answers, generation_stats
+        generation_stats = sum(fields_stats.values())
+        return fields_answers, generation_stats
