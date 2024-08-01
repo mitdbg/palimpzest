@@ -10,7 +10,7 @@ INPUT_FIELD = "{field_name}: {field_desc}\n"
 OUTPUT_FIELD = "{field_name}: {field_desc}\n"
 
 OPTIONAL_INPUT_DESC = "Here is a description of the input object: {desc}."
-OPTIONAL_OUTPUT_DESC = "Here is a description of the input object: {desc}."
+OPTIONAL_OUTPUT_DESC = "Here is a description of the output object: {desc}."
 
 OPTIONAL_DESC = "Keep in mind that this process is described by this text: {desc}."
 
