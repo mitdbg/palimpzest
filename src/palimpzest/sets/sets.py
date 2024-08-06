@@ -49,7 +49,7 @@ class Set:
         groupBy: GroupBySig = None,
         limit: int = None,
         fnid: str = None,
-        cardinality: str = None,
+        cardinality: str = Cardinality.ONE_TO_ONE,
         image_conversion: bool = None,
         depends_on: List[str] = None,
         num_samples: int = None,

@@ -270,7 +270,7 @@ class ConvertXLSToTable(HardcodedConvert):
             for row in dataframe.values[:100]:
                 row_record = [str(x) for x in row]
                 rows += [row_record]
-            dr.rows = rows
+            dr.rows = rows[:MAX_ROWS]
             dr.filename = candidate.filename
             dr.header = dataframe.columns.values.tolist()
             dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name

@@ -111,81 +111,86 @@ class StreamingSequentialExecution(ExecutionEngine):
         if not self.current_scan_idx:
             self.generate_plan(self, dataset, policy)
 
-        while not self.last_record:
-            records, stats = self.execute_stream()
-            yield records, self.plan, stats
+        input_records = self.get_input_records()
+        for idx, record in enumerate(input_records):
+            print("Iteration number: ", idx+1, "out of", len(input_records))
+            output_records = self.execute_opstream(record)
+            if idx == len(input_records) - 1:
+                total_plan_time = time.time() - start_time
+                self.plan_stats.finalize(total_plan_time)
 
-        if self.last_record:
-            # finalize plan stats
-            total_plan_time = time.time() - start_time
-            self.plan_stats.finalize(total_plan_time)
-        yield records, self.plan, stats
+            yield output_records, self.plan, self.plan_stats
 
-    def execute_stream(self):
-        """
-        Helper function which executes the physical plan. This function is overly complex for today's
-        plans which are simple cascades -- but is designed with an eye towards the future.
-        """
+    def get_input_records(self):
+        scan_operator = self.plan.operators[0]
+        datasource = (
+            self.datadir.getRegisteredDataset(self.source_dataset_id)
+            if isinstance(scan_operator, MarshalAndScanDataOp)
+            else self.datadir.getCachedResult(scan_operator.cachedDataIdentifier)
+        )
+        datasource_len = len(datasource)
+
+        input_records = []
+        record_op_stats = []
+        for idx in range(datasource_len):
+            candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=self.current_scan_idx)
+            candidate.idx = idx
+            candidate.get_item_fn = datasource.getItem
+            candidate.cardinality = datasource.cardinality
+            records, record_op_stats_lst = scan_operator(candidate)
+            input_records += records
+            record_op_stats += record_op_stats_lst
+        
+        self.update_plan_stats(scan_operator.get_op_id(), record_op_stats, None)
+        return input_records
+
+    def update_plan_stats(self, op_id, record_op_stats_lst, prev_op_id):
+
+        # update plan stats
+        op_stats = self.plan_stats.operator_stats[op_id]
+        for record_op_stats in record_op_stats_lst:
+            # TODO code a nice __add__ function for OperatorStats and RecordOpStats
+            record_op_stats.source_op_id = prev_op_id
+            op_stats.record_op_stats_lst.append(record_op_stats)
+            op_stats.total_op_time += record_op_stats.time_per_record
+            op_stats.total_op_cost += record_op_stats.cost_per_record
+
+        self.plan_stats.operator_stats[op_id] = op_stats           
+
+    def execute_opstream(self, plan, record):
         # initialize list of output records and intermediate variables
-        plan = self.plan
-        plan_stats = self.plan_stats
-        records = []
+        input_records = [record]
+        record_op_stats_lst = []
+
 
         for op_idx, operator in enumerate(plan.operators):
-
+            output_records = []
             op_id = operator.get_op_id()
-
             prev_op_id = (
                 plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
             )
 
             if isinstance(operator, DataSourcePhysicalOp):
-                datasource = (
-                    self.datadir.getRegisteredDataset(self.source_dataset_id)
-                    if isinstance(operator, MarshalAndScanDataOp)
-                    else self.datadir.getCachedResult(operator.cachedDataIdentifier)
-                )
-                datasource_len = len(datasource)
-
-                # construct input DataRecord for DataSourcePhysicalOp
-                candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=self.current_scan_idx)
-                candidate.idx = self.current_scan_idx
-                candidate.get_item_fn = datasource.getItem
-                candidate.cardinality = datasource.cardinality
-                records, record_op_stats_lst = operator(candidate)
-                self.current_scan_idx += 1
-
+                continue
             # only invoke aggregate operator(s) once there are no more source records and all
             # upstream operators' processing queues are empty
             elif isinstance(operator, AggregateOp):
-                records, record_op_stats_lst = operator(candidates=records)
-
-            # otherwise, process the next record in the processing queue for this operator
+                output_records, record_op_stats_lst = operator(candidates=input_records)
+            elif isinstance(operator, LimitScanOp):
+                output_records = input_records[operator.limit]
             else:
-                records, record_op_stats_lst = operator(records[0])
+                for r in input_records:
+                    record_out, stats = operator(r)
+                    output_records += record_out
+                    record_op_stats_lst += stats
 
-            # update plan stats
-            op_stats = plan_stats.operator_stats[op_id]
-            for record_op_stats in record_op_stats_lst:
-                # TODO code a nice __add__ function for OperatorStats and RecordOpStats
-                record_op_stats.source_op_id = prev_op_id
-                op_stats.record_op_stats_lst.append(record_op_stats)
-                op_stats.total_op_time += record_op_stats.time_per_record
-                op_stats.total_op_cost += record_op_stats.cost_per_record
+                if isinstance(operator, FilterOp):
+                    # delete all records that did not pass the filter
+                    output_records = [r for r in output_records if r._passed_filter]
+                    if not output_records:
+                        break
+                
+            self.update_plan_stats(op_id, record_op_stats_lst, prev_op_id)
+            input_records = output_records
 
-            plan_stats.operator_stats[op_id] = op_stats
-            self.last_record = self.current_scan_idx == datasource_len
-
-            # update finished_executing based on limit
-            if isinstance(operator, LimitScanOp):
-                self.last_record = (self.current_scan_idx == operator.limit)
-
-            if isinstance(operator, FilterOp):
-                # delete all records that did not pass the filter
-                records = [r for r in records if r._passed_filter]
-                if not records:
-                    break
-            
-        print("Iteration number: ", self.current_scan_idx, "Last record: ", self.last_record)
-
-        return records, plan_stats
+        return output_records

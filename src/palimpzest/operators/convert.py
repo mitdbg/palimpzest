@@ -556,7 +556,6 @@ class LLMConvertConventional(LLMConvert):
 
         fields_answers = {}
         fields_stats = {}
-
         for field_name in fields:
             prompt = self._construct_query_prompt(fields_to_generate=[field_name])
             answer, stats = self._dspy_generate_fields(
