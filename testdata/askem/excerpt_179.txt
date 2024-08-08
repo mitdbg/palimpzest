@@ -1,0 +1,2 @@
+id: 179
+text: ns, the human population as hosts and the pathogens. The model subdivides the total human population size at time t denoted as N(t) into susceptible S(t), exposed E(t), asymptomatic infectious IA(t), symptomatic infectiousIS(t) and the recovered as R(t). The pathogen in the environment is denoted as P(t). Hence for the human population we have N (t) = S(t) + E(t) + IA(t) + IS(t) + R(t). Studies have shown that the virus can

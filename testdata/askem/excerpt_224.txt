@@ -1,0 +1,2 @@
+id: 224
+text: J. Clin. Med. 2020, 9, 462 8 of 13 In more detail, our analysis shows that increasing quarantine rate, q, by 10 or 20 times will bring forward the peak by 6.5 or 9 days, and lead to a reduction of the peak value in terms of the number of infected individuals by 87% or 93%. This indicates that enhancing 

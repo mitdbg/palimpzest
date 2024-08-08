@@ -1,0 +1,2 @@
+id: 354
+text:  population at the start time, and the system retains only one dimensionless parameter R0 that, in conjunction with the initial conditions, completely determines the resulting behavior. For Eq. 7, theshapes of the solution curves s(τ ), i(τ ), r (τ ) do not depend on (cid:15), other than exhibiting a time shift that depends logarithmically on (cid:15) (Fig. 2). This is a universal solution for the SIR model in the limit of small (cid:15) (Fig. 3)

@@ -1,0 +1,2 @@
+id: 545
+text: nfection and the number of diagnosed cases). The discrepancy between the actual CFR (total number of deaths due to the infection, divided by the total number of people who have been infected) and the perceived CFR (number of deaths ascribed to the infection, divided by the number of people who have been diagnosed as infected) can be quantified based on this model. Therefore, the model can explain the possible discrepancy between the actual infection dynamics and the perception of the phenomenon. Misperception (either resu

@@ -1,0 +1,2 @@
+id: 337
+text: the disease does not introduce new susceptible people after recovery. The SIR model equations are R(t) = B (cid:88) k =1 rk 1{t ∈ Ik }. [3] dS dt = −β IS N, dI dt = β IS N − γI, dR dt = γI. [6] Here, Ik are intervals discretizing time, and B is the number of such intervals. The reproduction number, rk, in each interval k is determined by rk = (cid:88) ti >tj pij 1{tj ∈ Ik }/Nk, [4] where Nk is the total number of events in interval k. Fig. 1, Lower shows the estimated 

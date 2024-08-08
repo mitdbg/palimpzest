@@ -1,0 +1,2 @@
+id: 403
+text: also estimated. The data Creal and Dreal are given as sequences Creal(i) and Dreal(i) for i ¼ 0; 1; 2;... ; �T, where 0 represents the day the number of infected people in the country reached 500 and �T is the number of days of data used in the parameter estimation, which may vary for each country. All the remaining parameters are assumed constant. The estimation is carried out via a constrained optimization problem enunciated as Problem 1 p� ¼ arg min X i i¼0 �T ( � CðiÞ (cid:0) CrealðiÞ Crea

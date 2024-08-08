@@ -1,0 +1,2 @@
+id: 227
+text: season when the social contacts is the highest. Note that the serial interval is an essential factor affecting the accuracy of the likelihood function estimation. According to the current report, the incubation period of Wuhan patients with coronavirus pneumonia is about 2 to 15 days. We then assume that the serial interval follows the gamma distribution with varying mean and variance, which allows us to examine the influence on the reproduction number. With the distribution of s

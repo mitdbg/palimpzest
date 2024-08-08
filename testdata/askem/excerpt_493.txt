@@ -1,0 +1,2 @@
+id: 493
+text: (ra 2 r)/r0] 5 B (buoyancy flux), we obtain the three coupled ODEs and, by (B2): dQ dz 5 a M Q, dM dz 5 QB M, dB dz 5 Q dr a dz g r 0 5 2QN2. (A7) (A8) (A9) F 5 2 ð Vb dVgb dS dt source [ 2gbFS, (B6) 21). FS is the volume-integrated salinity flux (psu m3 sFor a chosen F we therefore obtain a corresponding FS by (B6). Then, in our simulations, we distribute FS uniformly across Vb. APPENDIX C These equations are similar but not equivalent to the correspo

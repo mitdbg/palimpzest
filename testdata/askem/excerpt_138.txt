@@ -1,0 +1,2 @@
+id: 138
+text: , due to premature relaxation of societal restrictions or some change in behavior. In (1), parameters (cid:1)t0 and (cid:1) k control the timing of such measures and the rapidity of their penetration,(cid:1) (cid:1)c, (cid:6)tjump, d controls the timing, magnitude, and duration of a resurgence. In Section 4.1, we explain that (1) forms the basis for modeling a wide variety of policies as the composite of elemental interventions, such as including social distancing, school closings, and sta

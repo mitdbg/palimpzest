@@ -1,0 +1,2 @@
+id: 436
+text: plified version of the SV2(AIR)3 model, representing only one R, symptomatic infected class; AW and virus and one vaccine type. S and SVR, susceptible class; IW, IW AW R, asymptomatic infected class;  RW and RF recovered class. Arrows denote the movement from one class to another, via infection (red arrows), vaccination (blue arrows), recovery, or loss of immunity. Rates are indicated on the arrows. β, infection rate; Ɣ, r

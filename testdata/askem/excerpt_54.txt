@@ -1,0 +1,2 @@
+id: 54
+text: e SEIR implementation and visual tool for epidemic simulations. The initial percentage of infected ( β 10 ) agents were chosen in order to represent the complete epidemic dynamics. 9 ) and immune ( β The population size parameter,α 3, is particularly concerning because it affects the execution time of the simulation. On the other hand, the Population density, defined as α 2 ), follows 3 /( α 1 α 2 https://gabgoh.github.io/COVID/ 

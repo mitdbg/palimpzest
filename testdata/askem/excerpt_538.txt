@@ -1,0 +1,2 @@
+id: 538
+text: 10. Interestingly, the model is particularly sensitive to variations in the value of α and of ε. Increasing α significantly increases all the curves (Extended Data Fig. 4). Also increasing the other transmission parameters, β, γ and δ, increases all the curves—that is, increases the values of all the variables, point by point, over time (Extended Data Figs. 5–7), although the sensitivity is smaller. All these parameters can be dec

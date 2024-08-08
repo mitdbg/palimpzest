@@ -1,0 +1,2 @@
+id: 68
+text: | A 2 | = (cid:5) (cid:4) α3 α5 5 : (3) The number of A 3 agents is calculated according to Eq. (4), con- 3, the proportion of formal and infor- sidering the population size α mal businesses, γ 2 and γ 10, respectively. (4) When a person, A 1 type, is created, it is assigned to a randomly chosen house, type A 2, or it is considered homeless according to the Homeless Rate, α 9 defines the probability o

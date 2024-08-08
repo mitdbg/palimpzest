@@ -1,0 +1,2 @@
+id: 137
+text: ons of the detection probability in countries with earlier outbreaks (Krantz and Rao 2020, Niehus et al. 2020, Wang et al. 2020). • ph is the probability that a detected case will be hospitalized and is set to 15%; see Arons et al. (2020) and Xu et al. (2020). DELPHI is fit separately in each area (country/state/ province, as applicable) and over successive "training windows" that begin when a new wave has las

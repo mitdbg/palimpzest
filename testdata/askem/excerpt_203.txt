@@ -1,0 +1,2 @@
+id: 203
+text: . The infected individuals who exhibit mild or no symptoms IA are considered to be 30% of the total infected population. The model parameters used in this simulation study are shown in Table 1. Since the symptomatic individualsIS are assumed to be more infectious than the asymptomatic IA, the transmission of COVID-19 through contacts in households, workplaces, schools, from foodstuffs, or during commute rises. This leads to a

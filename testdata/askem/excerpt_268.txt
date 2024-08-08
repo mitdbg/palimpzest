@@ -1,0 +1,2 @@
+id: 268
+text: g2, the confirmation rate of Q, is the probability that the quarantined infected are identified to be confirmatory cases by a conventional method, such as the laboratory ∈[0,1]. g2 is affected by the diagnosis, with the range g2 i

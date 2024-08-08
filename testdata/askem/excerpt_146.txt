@@ -1,0 +1,2 @@
+id: 146
+text:  as known and use the presence or absence of the aforementioned five policy categories to explain temporal changes in area-specific infection rates using the algorithm below. For each policy category i (cid:2) 1, : : :, 5 and each area j, we extract the average value of γ(t), ¯γ ij across all times for which policy i was in effect. Then we calculate the residual fraction of infection rate under policy i, pi, compared w

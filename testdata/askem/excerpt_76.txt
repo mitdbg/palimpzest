@@ -1,0 +1,2 @@
+id: 76
+text: s an in- fected person and gets infected. Each simulation considers a conta- gion distance threshold β 1, which is the minimal distance that two agents have to be to occur the viral transmission, and a probability of contagionβ 2in case of contact. The model of the medical condition evolution of the infected agents follows [60,61]. Once an agent is infected, it can be in one of these sub-states: a) asymptomatic, which includes mild symptoms wi

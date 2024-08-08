@@ -1,0 +1,2 @@
+id: 77
+text: of the agents by proximity or contact. Hence, the higher the mobility of a person, the greater the probability that he/she approaches an in- fected person and gets infected. Each simulation considers a conta- gion distance thresholdβ 1, which is the minimal distance that two agents have to be to occur the viral transmission, and a probability of contagion β 2 in case of contact. The model of the medical condition evolution of the i

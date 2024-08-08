@@ -1,0 +1,2 @@
+id: 448
+text: ptomatic infected individuals compared to symptomatic ones, mortality rate of infected individuals (μI), disease recovery rate (γ), vaccine escape rate (βV), NPI stringency (λ), dosing interval (ω2), vaccination rate (ω1). Asterisk (*) denote parameters that were varied by 50%; other parameters were varied by 5%. Red bar, parameter value increased; blue bar, decreased. Competition among VOC. Individuals who have recove

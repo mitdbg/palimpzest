@@ -1,0 +1,2 @@
+id: 113
+text:  little impact on the level of pessimism inherent in our scenarios. We then plotted simulated infections using 2×/wk testing at parameter configurations across a range of pessimism levels (Fig. 2C at test frequency multiplier = 1.0; Fig. 3C). This level of testing is sufficient to keep the number of infections below 1,000 in all but the most pessimistic parameter configurations. Still, there are some parameter configurations wh

@@ -1,0 +1,2 @@
+id: 121
+text: compartments (Figure 1(a)): • Susceptible (S): People who are susceptible to SARS-CoV-2 infection. • Exposed (E): Early-infected persons who are not yet contagious and are in the incubation period. • Infected (I): People currently infected and contagious.• Undetected (UR and (UD): Infected people who are not detected (and are not counted among the known cases) because they did not get tested. It is assumed that these compartments do not contribute to 

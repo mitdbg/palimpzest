@@ -1,0 +1,2 @@
+id: 40
+text: ,000 for the high-transmission scenario, the final epidemic predictions are 71,000 deaths in the baseline case compared with 58,000 deaths given intermediate shielding (α = 2) and 20,000 deaths given enhanced shielding (α =20). In a population of size 10,000,000 for the low-transmission scenario, the final epidemic predictions from our model are 50,000 deaths in the baseline case compared with 34,000 deaths given intermedi

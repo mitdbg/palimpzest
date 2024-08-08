@@ -1,0 +1,2 @@
+id: 410
+text: A data-driven model to describe and forecast the dynamics of COVID-19 transmission The value of R0 is of particular interest. It is expected that R0 > 1 in the first phase during the spread and R0 < 1 after the authorities take measures to control the spread. A reduction in ℓa combined with a reduction in β shows where the focus to reduce contagion is most effective: reducing social contact at all

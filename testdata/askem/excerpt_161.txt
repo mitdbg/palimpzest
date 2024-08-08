@@ -1,0 +1,2 @@
+id: 161
+text: her individuals. Instead, for each individual in the school layer we model their close and effective contacts as a subset of contacts from their school who can infect them by sampling a random set of n other individuals in their school, where n is drawn from a Poisson distribution with rate parameter λs equal to the average class size (λs = 20 as a default). 2.4.2.3 Workplaces and community. The labor force is drawn using employment rates by age, and non-teachers are assigned to workplaces using data on establishment sizes. Workers are assi

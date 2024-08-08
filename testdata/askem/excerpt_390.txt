@@ -1,0 +1,2 @@
+id: 390
+text:  we introduced a different coefficient for this rate in the generation of new infections. Assumption 3 Deceased individuals came either from class H (hospitalized) or I (infected), but not from class A (asymptomatic).Assumption 3 is made because our model parameters are estimated based on real data and the data available do not include the number of asymptomatic individuals that perish from the disease. The report

@@ -1,0 +1,2 @@
+id: 97
+text: The partial isolation level IL ∈ [0, 1] means the percentage of the population that is fulfilling the isolation, while the remaining 1 − IL is not. Then, it is possible to define that in the lockdown IL≥ 0.9, con- sidering that essential services and a few industries can not stop in order to avoid supply breakdown. On the other hand, the scenarios 0 and 1 have IL ≤ 0.1, and the scenario 4 has IL ≈ 0.2, b

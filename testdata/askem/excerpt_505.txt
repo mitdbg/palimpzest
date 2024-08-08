@@ -1,0 +1,2 @@
+id: 505
+text: i- symptomatic; minor and moderate infection) and potentially life- threatening cases (major and extreme) that require ICU admission. The total population is partitioned into eight stages of disease: S, susceptible (uninfected); I, infected (asymptomatic or pauci-symptomatic infected, undetected); D, diagnosed (asymptomatic infected, detected); A, ailing (symptomatic infected, undetected); R, recognized (symptomatic infecte

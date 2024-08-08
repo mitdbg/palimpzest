@@ -1,0 +1,2 @@
+id: 100
+text: of mandatory usage of face masks and physical distancing, but without imposing restrictions on the mobility of agents. This scenario was implemented by reducing the contagion dis- tance β1 = 0. 5 and the contagion rateβ2=0. 3 as the effect of us- ing masks and physical distancing. Fig. 12 shows a flatter I t curve when compared to scenario 5 while still keeping economic perfor- mance close to B. Notice, however, that D t 

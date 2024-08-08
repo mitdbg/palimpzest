@@ -1,0 +1,2 @@
+id: 419
+text: ge-structured implementation of the model, individuals are now identified also by their age, and the contact matrix is introduced to describe the number of contacts between susceptible individuals of age i and all of their possible infectious contacts of age j2,13 (see "Methods" for details). More specifically, we considered a transmission model with identical disease parameters across geographical locations considered in the study. The contact matrices are th

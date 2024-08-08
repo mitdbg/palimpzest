@@ -1,0 +1,2 @@
+id: 89
+text: To compare the scenarios, the response variables D t, I t will be considered, condensed in the metrics I P and T IP. The economical analysis aims to assess the evolution of wealth, represented by the W∗ S,tresponse variables. To allow the economic comparison among scenarios with respect to the same reference, a baseline scenario, B, without a pandemic was designed. It is meant to isolate the economic dynamic and can be u

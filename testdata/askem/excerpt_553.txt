@@ -1,0 +1,2 @@
+id: 553
+text: Extended Data Fig. 8 | Sensitivity analysis with respect to ε. Sensitivity analysis showing the effect of varying the testing coefficient ε, whose nominal value is ε = 0.2000, after day 50. We multiply the nominal value of ε by 0.75, 0.8, 1, 1.2, 2, and show the corresponding evolution of the model variables. Panel (a) shows the variation in the total number of cases, pan

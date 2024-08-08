@@ -1,0 +1,2 @@
+id: 480
+text: cal resolution of 4.17 m. We consider the evolution of temperature, salinity, and a passive tracer representing meltwater. Glacial meltwater escaping from underneath the ice shelf is represented as a constant buoyancy source F applied to a horizontal area of length L next to the southern edge of the domain (see Fig. 1). We conduct experiments both with varying L and with L set to a default value of 1 km, which is broadly consistent with the meltwater outflow from

@@ -1,0 +1,2 @@
+id: 383
+text: demic ends faster due to natural immunization of recovered nodes. 4.1. Comparison to real data We compare the model's output in the first 83 days with real data available from the Brazilian epidemic (up to May 18) [5,40–42], results are shown on Fig. 4(b). Using β = 0.3 causes a better fit for the real data, and this is a rather fair infection rate considering the actual scenario where most people wear masks and take increased precautions to avoid being infected. Th

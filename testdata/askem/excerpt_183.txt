@@ -1,0 +1,2 @@
+id: 183
+text: ocess of disease spread, the susceptible individual first moves to the exposed population E(t) since the host has an incubation period[5]. The exposed individual moves to either asymptomatic IA(t) or symptomaticIS(t) infectious population. P(t) is the number or quantity of pathogens present during interaction of human beings at time t. The majority of infectious individuals recovers and move to the recovered huma

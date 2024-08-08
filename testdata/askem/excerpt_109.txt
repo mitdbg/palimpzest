@@ -1,0 +1,2 @@
+id: 109
+text: vidual parameters creating uncertainties of more than 500 infections relative to a baseline of ∼250 infections. The parameters that most drive uncertainty about infections are those that influence 1) transmission of the virus, especially R0 as well as two contact tracing parameters and a parameter governing the Fig. 2. (A) The first-order effect of parameter uncertainty on predicted infections, using a linear model to estimate sensitivit

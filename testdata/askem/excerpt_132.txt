@@ -1,0 +1,2 @@
+id: 132
+text: in each area (country/state/province). The remaining are fixed to global values informed from a literature review of 174 papers, which was current when DELPHI was developed (Bertsimas et al. 2020): • (cid:1)α is the baseline infection rate. • γ(t) measures the effect of government response and is defined as γ(t) (cid:2) 1 + 2 π arctan (cid:4) (cid:5) −(t − (cid:1)t0) (cid:1) k (cid:7) +(cid:1)cexp − (cid:8), (t − (cid:6)tjump )2 (cid:1

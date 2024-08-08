@@ -1,0 +1,2 @@
+id: 102
+text: ractals 139 (2020) 110088 Fig. 14. Infection evolution for the several scenarios. Fig. 15. Death evolution for the several scenarios. the population. This scenario was implemented by using β1 = 0. 5, β2=0. 3 and IL = 0. 5. Fig. 13 shows the dynamics of this scenario. Although the D t is still above the values of scenarios 2 and 3, it presents less re- sistance from the general population. The I t is flat

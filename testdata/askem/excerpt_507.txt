@@ -1,0 +1,2 @@
+id: 507
+text: (asymptomatic or pauci-symptomatic infected, undetected); D, diagnosed (asymptomatic infected, detected); A, ailing (symptomatic infected, undetected); R, recognized (symptomatic infected, detected); T, threatened (infected with life-threatening symptoms, detected); H, healed (recovered); E, extinct (dead). Table 1 | Policy summary Background Main findings and limitations Curbing the global spread of SARS-CoV-2 requires implementation of multiple population-wide strategies; however, how the timing and 

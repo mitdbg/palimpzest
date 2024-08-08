@@ -1,0 +1,2 @@
+id: 254
+text: the limit of local clinical resources, leading to a long waiting time for confirmation, and the lowest confirmation rate of 0.0643 in Wuhan, compared with 0.1914 of Hubei (excluding Wuhan), 0.2189 of China (excluding Hubei), 0.2680 of Beijing, 0.2846 of Shanghai, 0.2871 of Guangzhou, and 0.2599 of Shenzhen. As predicted by the model, 26,810 quarantined infections haven't been confirmed in Wuhan by Feb 11, 2020. The confirmation 

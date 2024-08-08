@@ -1,0 +1,2 @@
+id: 450
+text: matic ones, mortality rate of infected individuals (μI), disease recovery rate (γ), rate of loss of immunity due to infection (ηR), vaccine escape rate (βV), NPI stringency (λ), dosing interval (ω2), vaccination rate (ω1).The baseline model assumes that 95% of the vaccines are Pfizer and 5% are AstraZeneca, consistent with Ontario vaccination statistics. What if a larger fraction of the vaccines were AstraZeneca, as is

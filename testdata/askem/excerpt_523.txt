@@ -1,0 +1,2 @@
+id: 523
+text: e total population, including deceased. Given an initial condition S(0), I(0), D(0), A(0), R(0), T(0), H(0), E(0) summing to 1, we can show that the variables converge to an equilibrium (cid:31)S ≥0; (cid:31)I 0 ¼0; (cid:31)T ¼ 0; (cid:31)H ≥0; (cid:31)E ≥0 LettersNATuRE MEDICINE

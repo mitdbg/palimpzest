@@ -36,6 +36,8 @@ class ConvertOp(PhysicalOperator):
         desc: Optional[str] = None,
         targetCacheId: Optional[str] = None,
         shouldProfile: bool = False,
+        *args,
+        **kwargs,
     ):
         super().__init__(
             inputSchema=inputSchema,
@@ -420,6 +422,7 @@ class LLMConvert(ConvertOp):
             assert json_answer != {}, "No output was found!"
             
             if self.cardinality == Cardinality.ONE_TO_MANY:
+                print(f"One to many answer: {answer}")
                 assert (isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0), "No output objects were generated for one-to-many query"               
             else:
                 assert all([field in json_answer for field in fields_to_generate]), "Not all fields were generated!"

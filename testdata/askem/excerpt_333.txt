@@ -1,0 +1,2 @@
+id: 333
+text: ere are consistent with recent analyses from public health officials in California (16) and with the original Imperial College model (3). We present examples of forecasts for viral transmission in theUnited States. Where other studies have typically developed and presented one model (choosing to fit parameters within the chosen model), our analysis compares three different forecasting models using a fitting cr

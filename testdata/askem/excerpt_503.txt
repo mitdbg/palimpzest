@@ -1,0 +1,2 @@
+id: 503
+text: CoV. According to Chinese data10, a large number of transmissions, both in nosocomial and community settings, occurred through human-to-human contact with individuals showing no or mild symptoms. The estimated basic reproduction number (R0) for SARS-CoV-2 ranges from 2.0 to 3.511–13, which seems comparable, or possibly higher, than for SARS-CoV and MERS-CoV. High viral loads of SARS-CoV-2 were found in upper respiratory specimens of patients showing little or no symptoms, wit

@@ -1,0 +1,2 @@
+id: 532
+text: mulative case counts, but to the number of currently infected cases, to avoid the pitfalls described by King and others53. that can be computed based on our model). σT ϕ ð Þ ð Þ þ dϕ  Data about the number of deaths (corresponding to E(t) in our model) appear particularly high with respect to the CFR reported in the literature; this can be largely explained by the age structure of the Italian population, which is the second oldest in the world (the

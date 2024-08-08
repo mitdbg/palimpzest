@@ -1,0 +1,2 @@
+id: 464
+text: contrast, symptomatic infections of vaccinated individuals are assumed to have a better survival rate (with a mortality rate μX V. Unvaccinated asymptomatic patients vaccinate at the same rate as the susceptible population (ω1).V < μX), and are represented as a separate infected class IX dIX dt = 1 − σ X (S + SVR) (cid:31) (cid:30) (cid:29) X=W,A,D (cid:28) βX IX total − γ X + µX IX (cid:27) (cid:31) (cid:30) (6) dIX V dt = 

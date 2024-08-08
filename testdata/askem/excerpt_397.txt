@@ -1,0 +1,2 @@
+id: 397
+text: 7 7 5 2 6 6 6 6 6 6 6 4 _x2 _x3 _x4 _x5 _xI ¼ x1 bðx3 þ 'ax4 þ 'x5Þ N (cid:0) kx2 krx2 (cid:0) ðga þ gI þ dIÞx3 kð1 (cid:0) rÞx2 (cid:0) mx4 gax3 (cid:0) ðgr þ dHÞx5 3 7 7 7 7 7 7 7 7 5 ¼ f IðxÞ; ð4Þ ½ �> are the infected states xI ¼ x2 x4 x5 x32 6 6 6 6 6 6 6 6 4 F IðxÞ ¼ x1 bðx3 þ 'ax4 þ 'x5Þ N 0 0 0 3 7 7 7 7 7 7 7 7 5 and VIðxÞ ¼ 2 6 6 6 6 6 6 6 4 kx2 (cid:0) krx2 þ ðga þ gI þ dIÞx3 (cid:0) kð1 (cid:0) rÞx2 þ mx4 (cid:0) gax3 þ ðgr þ dHÞ

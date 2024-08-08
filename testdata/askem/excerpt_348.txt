@@ -1,0 +1,2 @@
+id: 348
+text:  to below the self-sustaining level of R = 1 by the middle of February. In Italy, public health measures brought the local value of R(t) down; as of early April, however, it remained above R = 1. The estimated reproduction number in the United States as a whole stood at around 2.5. The reproduction number, however, varies notably by location. This model can be adapted to capture the long-term evothe pandemic by incorporating a prefactor that lution of Here, β is the transmissi

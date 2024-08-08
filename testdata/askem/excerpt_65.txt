@@ -1,0 +1,2 @@
+id: 65
+text: (8). All the dead agents have their positions set to zero. A 1 pos = A 2 pos + N (0, σ (5) k ) A 1 pos = A 3 pos + N (0, σ k ) A 1 pos = A 1 pos + N (0, α6 ) (6) (7) A 1 pos = A 5 pos + N (0, σ where σ k=0. 01 is the random noise variance for "Go to... " ac- 6 is the random noise variance k ) 

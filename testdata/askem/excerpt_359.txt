@@ -1,0 +1,2 @@
+id: 359
+text: on of the dimensionless SIR model (5) with R0 = 2. Upper Left shows the graphs of s (blue), i (orange), and r (gray) on the vertical axis vs. τ on Fig. 2. the horizontal axis, for different (cid:15). The corresponding values of (cid:15) from left to right are 10−4, 10−6, 10−8, 10−10, respectively. Upper Center shows the time until peak infections vs. log((cid:15)) for the values shown in Upper Left. This asymptotic tail to the left makes it challenging to fit data to SIR in the e

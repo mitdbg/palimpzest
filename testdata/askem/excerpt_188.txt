@@ -1,0 +1,2 @@
+id: 188
+text: he constants α1 and α2 which determines the rate of new infections, are shown in (c–f): α1 = 0.1, α2 = 0.1, is depicted by the continuous line, α1 = 0.05, α2 = 0.1 is depicted by the dashed line, and α1 0.1, α2 = 0.05 is depicted by the dotted line 

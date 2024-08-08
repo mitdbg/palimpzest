@@ -1,0 +1,2 @@
+id: 243
+text: ers describe some tangible properties of the target population. REINA does not need an estimate for R, i.e. the average number of people infected. Instead, R ​t ​0 by a patient at the end of illness (time point t), is an emergent outcome of the model. The model uses explicit estimates for the three quantifiable processes that are usually embedded in R, ​0 namely contacts, exposure, and infectivity. giving emp

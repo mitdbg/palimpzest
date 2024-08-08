@@ -1,0 +1,2 @@
+id: 411
+text: ers at least on a weekly basis. Reducing the basic reproduction number R0 below one is known to represent that the spread is under control. Our developed formula for R0 shows a strong influence on thehuman-to-human transmission rate β, followed by the relative transmissibility of hospitalized patients ℓ and of the asymptomatic infected ℓa. By evaluating the estimated values authorities can grasp which actions are more likely to yi

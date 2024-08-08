@@ -10,6 +10,7 @@ from palimpzest.constants import *
 from palimpzest.dataclasses import GenerationStats
 from palimpzest.elements import *
 from palimpzest.operators import logical, physical, convert
+from .. import OperatorCostEstimates
 
 # TYPE DEFINITIONS
 FieldName = str
@@ -19,12 +20,22 @@ class LLMBondedQueryConvert(convert.LLMConvert):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        if self.model == pz.Model.GPT_4:
+            mult = 1
+        else:
+            mult = 0.5
+        return OperatorCostEstimates(
+            cardinality=1,
+            time_per_record=mult,
+            cost_per_record=mult,
+            quality=mult,
+        )
     def convert(self, 
                 candidate_content,
                 fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
 
         prompt = self._construct_query_prompt(fields_to_generate=fields)
-
         # generate all fields in a single query
         answer, generation_stats = self._dspy_generate_fields(content=candidate_content, prompt=prompt)
         json_answers = self.parse_answer(answer, fields)

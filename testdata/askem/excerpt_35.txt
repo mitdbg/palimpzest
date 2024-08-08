@@ -1,0 +1,2 @@
+id: 35
+text:  distancing or case isolation interventions. The rate of transmission is reduced by a factor of 1/(Ntot + αRshields) where Ntot denotes the fraction of the population in the circulating baseline, and Rshields denotes the total number of recovered individuals between the ages of 20 and 60 years (a subset of the total recovered population). In this model, we assume that all recovered individuals have immunity, but that only a subset are able to facilitate interaction substitutions. The model assumes that the individuals in the circulati

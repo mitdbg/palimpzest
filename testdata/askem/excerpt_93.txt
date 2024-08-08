@@ -1,0 +1,2 @@
+id: 93
+text: conditionally. In the system, when the infection curve grows above a certain threshold, I t ≥ 0.05, the lock- down restrictions are activated, being released when I t ≤ 0.05. As we can see in Fig. 7, the viral spreading represented by the infection curve It is controlled, not allowing the explosion of D t curve. Economically, recession can be observed during the lock- B,t ∀ i, but as soon as the restric- down period, W i tions are released the business 

@@ -1,0 +1,2 @@
+id: 47
+text: ty dynamics in a SIR model. a, Infectious case dynamics with different levels of shielding, α. b, Final state of the system as a function of α. In both panels, β = 0.25 (transmission rate 1/days) and γ =0.1 (recovery rate 1/days). S, susceptible individuals; I, infectious individuals; R, recovered individuals. Interactions with patients in the hospital setting need to be incorporated into specific implementation scenarios with

@@ -1,0 +1,2 @@
+id: 191
+text: ximate solutions to the model equations (1) using fourth and fifth order Runge–Kutta methods which are the ode45 function in MATLAB. The initial values used are S(0) = 93000, E(0) = 1000, IA(0) = 50, IA(0) 50, IS(0) = 50, R(0) = 0, P(0) = 500. Figure 2a depicts the change in the populations as time increases from 0 to 90 days. During the first 10 days, the number of susceptible humans declines rapidly as 

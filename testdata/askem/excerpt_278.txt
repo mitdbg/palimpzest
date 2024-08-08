@@ -1,0 +1,2 @@
+id: 278
+text: (cid:7) i (cid:7) h R 0 = h ) + (βγa l + β (cid:3) (cid:7) (cid:7) p (cid:7) h h ) ρ2. For the parameters used in our simulations (see Table 1 ), one computes this basic reproduction number to obtain R0=0. 945. This means that the epidemic outbreak that has occurred in Wuhan was well controlled by the Chinese authorities. 3.2. Local stability in terms of the basic reproduction number Noting that the two la

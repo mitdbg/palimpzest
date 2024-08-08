@@ -1,0 +1,2 @@
+id: 237
+text: IR (or in simpler form SIR) models are typically described (in continuous limit) by ordinary differential equations (e.g. Wilson et al., 2020; Walters et al., 2018). A key parameter in such models is R, the average number of people a patient infects in a population. Its initial value R describes R in a situation where none of the people have immunity against the ​0 disease, so everyone is susceptible. An agent-based model has a few putative advantages over the 

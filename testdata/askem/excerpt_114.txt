@@ -1,0 +1,2 @@
+id: 114
+text: s) We refer to this difference as residential-virtual infections. The nominal scenario remains the same and corresponds to pessimism level 0.5. We obtain a new pessimistic scenario, corresponding to pessimism level 0.99. Unlike the pessimistic scenario for residential infections, this new pessimistic scenario (SI Appendix, Table S22 and Fig S15) decreases R0 relative to nominal. This is because the most likely param

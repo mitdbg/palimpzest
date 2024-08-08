@@ -1,0 +1,2 @@
+id: 405
+text: A data-driven model to describe and forecast the dynamics of COVID-19 transmission Fig 3. Cumulative number of infected individuals C and number of deceased individuals D for Italy. https://doi.org/10.1371/journal.pone.0236386.g003 Fig 4. Cumulative number of infected individuals C and number of deceased individuals D for Spain. https://doi.org/10.1371/journal.pone.0236386.g004 PLOS ONE | https://doi.org/10.1371/journal.pone.0236386 July 31, 2020 10 / 16 PLOS ONE

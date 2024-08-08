@@ -1,0 +1,2 @@
+id: 511
+text: the data). The plots in b and d distinguish between the different categories of infected patients: non-diagnosed asymptomatic (ND AS), diagnosed asymptomatic (D AS), non-diagnosed symptomatic (ND S), diagnosed symptomatic (D S) and diagnosed with life-threatening symptoms (D IC). Note that a,c and b,d have different scales. 22, a partially incomplete lockdown, of which the effectiveness was reduced by the movement of people

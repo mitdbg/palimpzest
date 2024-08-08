@@ -7,8 +7,6 @@ from pypdf import PdfReader
 
 import networkx as nx
 import streamlit as st
-from tqdm import tqdm 
-import context
 from palimpzest.constants import PZ_DIR
 import palimpzest as pz
 import pdb 
@@ -121,7 +119,7 @@ if run_pz:
                 index = ref.index
             except:
                 continue
-            ref.key = ref.first_author.split()[0] + ref.title.split()[0] + str(ref.year)
+            # ref.key = ref.first_author.split()[0] + ref.title.split()[0] + str(ref.year)
             references.append({
                 "title": ref.title,
                 "index": index,
@@ -129,7 +127,7 @@ if run_pz:
                 "year": ref.year,
                 # "snippet": ref.snippet,
                 "source": ref.filename,
-                "key": ref.key,
+                # "key": ref.key,
             })
 
             with st.container(height=200, border=True):
@@ -137,7 +135,7 @@ if run_pz:
                 st.write(" **Paper:** ", ref.title)
                 st.write(" **Author:**" ,ref.first_author)
                 st.write(" **Year:** ", ref.year)
-                st.write(" **Key:** ", ref.key)
+                # st.write(" **Key:** ", ref.key)
                 # st.write(" **Reference text:** ", ref.snippet, "\n")
     references_df = pd.DataFrame(references)
 

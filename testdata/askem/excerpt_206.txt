@@ -1,0 +1,2 @@
+id: 206
+text: rtments relevant to interventions such as quarantine, isolation and treatment. We stratified the populations as susceptible (S), exposed (E), infectious but not yet symptomatic (pre-symptomatic) (A), infectious with symptoms (I), ns as susceptible (S), exposed (E), infectious but not yet symptomatic (pre-symptomatic) (A), infectious with symptoms (I), hospitalized (H) and recovered (R) compartments, and further stratified the population to include quaran

@@ -1,0 +1,2 @@
+id: 534
+text: f the dynamics of an epidemiologic model is the CFR, which is the ratio between the number of deaths and the number of infected. Our model allows us to distinguish between the actual CFR M(t) and the perceived CFR P(t), which are defined as M t ð Þ ¼ R t 0 S ϕ ð αI Þ½ ϕ ð Þ þ βD t E ð Þ ϕ Þ þ ð γA ϕ ð Þ þ δR dϕ ϕ ð Þ P t ð Þ ¼ Taking into account that E ð θ Þ þ ð t Þ þ εI t 0½ ð ϕ R μ ϕ A ð Þ Þ dϕ S t ð Þ ¼ S 0 ð

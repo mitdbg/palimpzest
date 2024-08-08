@@ -1,0 +1,2 @@
+id: 482
+text: beneath Pine Island Glacier (Naveira Garabato et al. 2017). The buoyancy source F is implemented as a constant volumeconserving ''virtual salinity flux'' (Huang 1993; see appendix B for details). The Coriolis parameter f is set to 21.4 3 10 21, 24 s3. Results a. The simulated meltwater plume The basic behavior of the simulated glacial meltwater plume 23. As in Fig. 2, is demonstrated in Fig. 3; here, F/L 5 10 22 m3 s 23 s the initial condition i

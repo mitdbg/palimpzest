@@ -1,0 +1,2 @@
+id: 308
+text:  to the real data published by the WHO, it is an appropriate value for the restriction of movements of individu- als. As for the initial conditions, the following values have been fixed: S 0 = N − 6, E0=0, I 0 = 1, P 0 = 5, A 0 = 0, H 0 = 0, R 0 = 0, and F 0 = 0. We would like to mention that there exist gaps in the reports of the WHO at the beginning of the outbreak. For completeness, we give here th

@@ -769,7 +769,7 @@ class Execute:
         min_plans: Optional[int] = None,
         verbose: bool = False,
         available_models: Optional[List[Model]] = [],
-        allow_bonded_query: Optional[List[Model]] = [],
+        allow_bonded_query: Optional[List[Model]] = True,
         allow_model_selection: Optional[bool]=True,
         allow_code_synth: Optional[bool]=True,
         allow_token_reduction: Optional[bool]=True,

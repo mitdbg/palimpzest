@@ -1,0 +1,2 @@
+id: 520
+text: us. Analysis of the mathematical model. The SIDARTHE model (1)–(8) is a bilinear system with eight differential equations. The system is positive: all the state variables take non-negative values for t ≥ 0 if initialized at time 0 with non-negative values. Note that H(t) and E(t) are cumulative variables that depend only on the other ones and their own initial conditions. The system is compartmental an

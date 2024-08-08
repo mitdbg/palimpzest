@@ -1,0 +1,2 @@
+id: 33
+text:  of the fraction of susceptible (S), infectious (I) and recovered (R) individuals are _S _I _R ¼ ¼ ¼ β SI αR 1 � þ β SI γI αR � 1 þ γI such that when α = 0 we recover the conventional SIR model given transmission rateβ and recovery rate γ. Note that the denominator 1School of Biological Sciences, Georgia Institute of Technology, Atlanta, GA, USA. 2School of Physics, Georgia Institute of Technology, Atlanta, GA, USA

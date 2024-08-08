@@ -1,0 +1,2 @@
+id: 78
+text:  3 of the Imperial College London "on average, each case in- fected 2.6 (uncertainty range: 1.5–3.5) other people up to 18th January 2020" [58]. Following the SEIR model, in each simulation, there is an initial percentage of infected and immune people ( β 9 andβ 10, respectively), and the remaining population consists of susceptible individuals. There is also a Dead status, since part of the population dies due to the disease and its complications [59]. The poss

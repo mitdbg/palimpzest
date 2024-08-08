@@ -1,0 +1,2 @@
+id: 423
+text: ynamics of heterogeneous populations around the world. The calculation of the contact matrices can be described as follows. First, we compute the relative abundance of contacts between individuals of age i and individuals of age j in each configuration s of the setting k, ΓkðsÞ ij. i ; ijÞ ϕkðsÞ i ΓkðsÞ ij ¼ ðϕkðsÞ j (cid:2) δ νkðsÞ (cid:2) 1 is the number of individuals of age i in the configuration s

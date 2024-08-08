@@ -1,0 +1,2 @@
+id: 528
+text: sult. Proposition 2. For positive initial conditions, the limit value (cid:31)S exceed (cid:31)S* I I Proof of proposition 2. Because S(t) is monotonically decreasing and non-negative, it has a limit (cid:31)S ≥0converges to the linear system corresponding to the linearization in (cid:31)S. If, by contradiction, (cid:31)S renders this system unstable, then x(t) diverges, as the Metzler matrix F has a positive

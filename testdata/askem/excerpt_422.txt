@@ -1,0 +1,2 @@
+id: 422
+text: ct matrices can be described as follows. First, we compute the relative abundance of contacts between individuals of age i and individuals of age j in each configuration s of the setting k, ΓkðsÞ ij. i is the number of individuals of age i in the configuration s (i.e., a ϕkðsÞ specific household, school, or workplace) of setting k; δ function, which we use to omit the individual i from their own set of contacts; νk(s) is the number of individuals (of all ages) in instance s of setting k. Note that to compute ΓkðsÞ, we assume h

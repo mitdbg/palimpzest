@@ -1,0 +1,2 @@
+id: 80
+text: ransfers among agents. The main goal of social interventions is to minimize the death curve D t. It is directly related to flattening the infection curve I t, in order to keep the hospitalization I H tcases severe I S I P = max { I t | t = 1... T } (9) 

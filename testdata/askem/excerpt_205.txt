@@ -1,0 +1,2 @@
+id: 205
+text: − q, consists of individuals exposed to the virus who are missed from the contact tracing and move to the exposed compartment, E, once effectively infected or stay in compartment S otherwise. Let the transmission probability be β the exposed compartment, E, once effectively infected or stay in compartment S otherwise. Let the transmission probability be β and the contact rate be constant c. Then, the quarantined individuals, if infected (or uninfected

@@ -1,0 +1,2 @@
+id: 21
+text: te between 1.6 and 2.9 before the introduction and implementation of travel restriction. The study by Wu and collaborators (Wu et al., 2020), based on nowcasting and forecasting approach, estimated a basic reproductive number of 2.68(95% credible interval or CrI 2.47e2.86) with 75,815 individuals (95% CrI 37,304e130,330) being infected in Wuhan as of January 25th, 2020. The epidemics doubling time was found to be 6.4 days (95% Cr

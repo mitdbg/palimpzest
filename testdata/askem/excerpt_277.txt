@@ -1,0 +1,2 @@
+id: 277
+text: n- dividuals become super-spreaders while 1 − ρ1 − ρ2 is the progres- sion from exposed to asymptomatic class; γ a is the average rate at which symptomatic and super-spreaders individuals become hos- iis the recovery rate without being hospitalized γthe recovery rate of hospitalized patients; and δ h are i, δp, and δ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎨ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎪ ⎩ dS dt dE dt dI dt dP dt dA dt dH dt dR 
