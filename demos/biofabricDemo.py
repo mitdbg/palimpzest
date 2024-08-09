@@ -95,18 +95,19 @@ if __name__ == "__main__":
         policy = pz.UserChoice()
 
     if experiment == 'collection':
-        papers = pz.Dataset("biofabric-pdf", schema=ScientificPaper)
-        paperURLs = papers.convert(pz.URL, desc="The DOI url of the paper") 
+        # papers = pz.Dataset("biofabric-pdf", schema=ScientificPaper)
+        # paperURLs = papers.convert(pz.URL, desc="The DOI url of the paper") 
         # TODO this fetch should be refined to work for all papers
-        htmlDOI = paperURLs.map(pz.DownloadHTMLFunction())
-        tableURLS = htmlDOI.convert(pz.URL, desc="The URLs of the XLS tables from the page", cardinality="oneToMany")
-
-        urlFile = pz.Dataset("biofabric-urls", schema=pz.TextFile)
-        tableURLS = urlFile.convert(pz.URL, desc="The URLs of the tables")
-        binary_tables = tableURLS.convert(pz.File)
-        xls = binary_tables.convert(pz.XLSFile)
-        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
-        output = patient_tables
+        # htmlDOI = paperURLs.map(pz.DownloadHTMLFunction())
+        papers_html = pz.Dataset("biofabric-html", schema=pz.WebPage)
+        tableURLS = papers_html.convert(pz.URL, desc="The URLs of the XLS tables from the page", cardinality="oneToMany")
+        output = tableURLS
+        # urlFile = pz.Dataset("biofabric-urls", schema=pz.TextFile)
+        # tableURLS = tableURLS.convert(pz.URL, desc="The URLs of the tables")
+        # binary_tables = tableURLS.convert(pz.File)
+        # xls = binary_tables.convert(pz.XLSFile)
+        # patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        # output = patient_tables
 
     elif experiment == 'filtering':
         xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)       

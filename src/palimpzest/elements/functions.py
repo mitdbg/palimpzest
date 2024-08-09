@@ -36,8 +36,7 @@ class UserFunction(metaclass=UserFunctionSingletonMeta):
 
     def map(self, data):
         raise Exception("Not implemented")
-
-
+        
 class DownloadHTMLFunction(UserFunction):
     """DownloadHTMLFunction downloads the HTML content of a web page."""
     def __init__(self):

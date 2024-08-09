@@ -422,7 +422,7 @@ class LLMConvert(ConvertOp):
             assert json_answer != {}, "No output was found!"
             
             if self.cardinality == Cardinality.ONE_TO_MANY:
-                print(f"One to many answer: {answer}")
+                # print(f"One to many answer: {answer}")
                 assert (isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0), "No output objects were generated for one-to-many query"               
             else:
                 assert all([field in json_answer for field in fields_to_generate]), "Not all fields were generated!"
@@ -525,7 +525,12 @@ class LLMConvert(ConvertOp):
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
-        n_records = max([len(lst) for lst in field_answers.values()])
+        try:
+            n_records = max([len(lst) for lst in field_answers.values()])
+        except:
+            print(f"Error in field answers: {field_answers}. Returning empty records.")
+            breakpoint()
+            return [],[]
         records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
 
         for field_name, answer_list in field_answers.items():
