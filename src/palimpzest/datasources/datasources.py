@@ -168,6 +168,7 @@ class HTMLFileDirectorySource(DirectorySource):
         strippedHtml = self.html_to_text_with_links(textcontent)
         tokens = strippedHtml.split()[:constants.MAX_HTML_ROWS]
         dr.text = " ".join(tokens)
+
         return dr
 
 class ImageFileDirectorySource(DirectorySource):

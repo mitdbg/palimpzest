@@ -16,6 +16,7 @@ class LogicalOperator:
     - FilteredScan (scans input Set and applies filter)
     - ConvertScan (scans input Set and converts it to new Schema)
     - LimitScan (scans up to N records from a Set)
+    - MapScan (scans input Set and applies a function)
     - ApplyAggregateFunction (applies an aggregation on the Set)
 
     Every logical operator must declare the getParameters() method, which returns a dictionary of parameters that are used to implement its physical operator.

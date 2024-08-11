@@ -174,8 +174,8 @@ class PhysicalPlanner(Planner):
             if isinstance(logical_op, pz_ops.ConvertScan):
                 plans = []
                 op_alternatives = []
+                hardcoded_fns = [x for x in self.hardcoded_converts if x.materializes(logical_op)]
                 for subplan in all_plans:
-                    hardcoded_fns = [x for x in self.hardcoded_converts if x.materializes(logical_op)]
                     if len(hardcoded_fns) > 0:                                                    
                         for op_class in hardcoded_fns:
                             physical_op = op_class(
@@ -198,7 +198,6 @@ class PhysicalPlanner(Planner):
                                 cardinality=logical_op.cardinality,
                             )
                             op_alternatives.append(physical_op)
-
                     for physical_op in op_alternatives:
                         new_physical_plan = PhysicalPlan.fromOpsAndSubPlan([physical_op], subplan)
                         plans.append(new_physical_plan)                        
