@@ -13,10 +13,6 @@ class Filter():
     def serialize(self) -> Dict[str: Any]:
         return {"filterCondition": self.filterCondition, "filterFn": str(self.filterFn)}
 
-    def deserialize(d: Dict[str, Any]) -> Filter:
-        # TODO: won't work with function; we currently don't use this anywhere though
-        return Filter(d["filterCondition"])
-
     def __str__(self) -> str:
         return (
             "Filter(" + self.filterCondition + ")"

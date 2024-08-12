@@ -1,4 +1,4 @@
-from palimpzest.constants import Model, PlanPruningStrategy
+from palimpzest.constants import Model, OptimizationStrategy
 from palimpzest.execution import ExecutionEngine, PipelinedSingleThreadSentinelExecution
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
@@ -23,8 +23,7 @@ class Execute:
         allow_model_selection: Optional[bool]=True,
         allow_code_synth: Optional[bool]=True,
         allow_token_reduction: Optional[bool]=True,
-        plan_pruning_strategy: Optional[PlanPruningStrategy]=PlanPruningStrategy.PARETO,
-        confidence_interval_pruning: Optional[bool]=True,
+        optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
         execution_engine: ExecutionEngine = PipelinedSingleThreadSentinelExecution,
         *args,
         **kwargs
@@ -43,8 +42,7 @@ class Execute:
             allow_code_synth=allow_code_synth,
             allow_model_selection=allow_model_selection,
             allow_token_reduction=allow_token_reduction,
-            plan_pruning_strategy=plan_pruning_strategy,
-            confidence_interval_pruning=confidence_interval_pruning,
+            optimization_strategy=optimization_strategy,
             *args,
             **kwargs
         ).execute(

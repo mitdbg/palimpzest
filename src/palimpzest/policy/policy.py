@@ -1,332 +1,267 @@
-# from palimpzest.planner import legacy_PhysicalPlan as PhysicalPlan
-from palimpzest.planner import PhysicalPlan
-from typing import List, Tuple, Union
-
-import numpy as np
+from palimpzest.constants import PlanCost
 
 
 class Policy:
     """
-    Base class for policies that can choose a best plan from a set of
-    candidate plans based on some selection criteria.
+    Base class for a policy. Each policy has two methods: satisfies_constraint() and
+    choose(). The first method determines whether the given cost, runtime, and quality
+    for a plan (or sub-plan) satisfy the policy's constraint(s). The second method takes
+    in the (cost, runtime, quality) tuples for two plans (or subplans) and returns True
+    if the first plan is better than the second one and False otherwise.
     """
 
     def __init__(self):
         pass
 
-    def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
-        pass
+    def get_primary_metric(self) -> str:
+        """
+        Returns one of ["cost", "time", "quality"]; whichever corresponds to the
+        maximization / minimization goal of the policy.
+
+        Eventually we may make policies more general by allowing users to optimize
+        some function: f(cost, time, quality). In that case, we may deprecate this
+        method and update its callers.
+        """
+        raise NotImplementedError("Calling this method from an abstract base class.")
+
+    def constraint(self, plan: PlanCost) -> bool:
+        """
+        Return True if the given (cost, runtime, quality) for a plan (or subplan)
+        satisfy the policy's constraint(s). Otherwise, return False.
+        """
+        raise NotImplementedError("Calling this method from an abstract base class.")
+
+    def choose(self, plan: PlanCost, other_plan: PlanCost) -> float:
+        """
+        Return True if plan is better than other_plan and return False otherwise.
+        """
+        raise NotImplementedError("Calling this method from an abstract base class.")
 
 
 class MaxQuality(Policy):
     """
-    This policy selects the plan with the maximum quality along the
-    pareto-optimal curve of candidate plans.
+    This policy has no constraints and computes the best plan as the one with
+    the higher quality.
     """
 
     def __str__(self):
         return "Maximum Quality"
 
-    def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
-        return sorted(candidatePlans, key=lambda plan: plan.quality)[-1]
+    def get_primary_metric(self) -> str:
+        return "quality"
+
+    def constraint(self, plan: PlanCost) -> bool:
+        """There is no constraint."""
+        return True
+
+    def choose(self, plan: PlanCost, other_plan: PlanCost) -> float:
+        """
+        Return True if plan has higher quality than other_plan and return False otherwise.
+        Use cost and then runtime as tiebreakers.
+        """
+        if plan.quality == other_plan.quality:
+            if plan.cost == other_plan.cost:
+                return plan.time < other_plan.time
+            return plan.cost < other_plan.cost
+
+        return plan.quality > other_plan.quality
+
+
+class MinCost(Policy):
+    """
+    This policy has no constraints and computes the best plan as the one with
+    the lower cost.
+    """
+
+    def __str__(self):
+        return "Minimum Cost"
+
+    def get_primary_metric(self) -> str:
+        return "cost"
+
+    def constraint(self, plan: PlanCost) -> bool:
+        """There is no constraint."""
+        return True
+
+    def choose(self, plan: PlanCost, other_plan: PlanCost) -> float:
+        """
+        Return True if plan has lower cost than other_plan and return False otherwise.
+        Use quality and then runtime as tiebreakers.
+        """
+        if plan.cost == other_plan.cost:
+            if plan.quality == other_plan.quality:
+                return plan.time < other_plan.time
+            return plan.quality > other_plan.quality
+
+        return plan.cost < other_plan.cost
+
+
+class MinTime(Policy):
+    """
+    This policy has no constraints and computes the best plan as the one with
+    the lower runtime.
+    """
+
+    def __str__(self):
+        return "Minimum Time"
+
+    def get_primary_metric(self) -> str:
+        return "time"
+    
+    def constraint(self, plan: PlanCost) -> bool:
+        """There is no constraint."""
+        return True
+
+    def choose(self, plan: PlanCost, other_plan: PlanCost) -> float:
+        """
+        Return True if plan has lower runtime than other_plan and return False otherwise.
+        Use quality and then cost as tiebreakers.
+        """
+        if plan.time == other_plan.time:
+            if plan.quality == other_plan.quality:
+                return plan.cost < other_plan.cost
+            return plan.quality > other_plan.quality
+
+        return plan.time < other_plan.time
 
 
 class MaxQualityAtFixedCost(Policy):
+    """
+    This policy applies a constraint (upper bound) on the cost of the plan
+    and tries to maximize quality subject to that constraint.
+    """
     def __init__(self, max_cost: float):
         self.max_cost = max_cost
 
     def __str__(self):
-        return "MaxQuality@MinCost"
+        return "MaxQuality@FixedCost"
 
-    def choose(
-        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
-    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
-        best_plan, best_plan_idx, max_quality, max_quality_runtime = None, -1, 0, np.inf
-        for idx, plan in enumerate(candidatePlans):
-            # if plan is too expensive, skip
-            if plan.total_cost > self.max_cost:
-                continue
+    def get_primary_metric(self) -> str:
+        return "quality"
 
-            # if plan is above best current max quality, this is new best plan
-            if plan.quality > max_quality:
-                best_plan = plan
-                best_plan_idx = idx
-                max_quality = plan.quality
-                max_quality_runtime = plan.total_time
+    def constraint(self, plan: PlanCost) -> bool:
+        return plan.cost < self.max_cost
 
-            # if plan is tied w/current max quality -- and has lower runtime -- this is new best plan
-            elif plan.quality == max_quality and plan.total_time < max_quality_runtime:
-                best_plan = plan
-                best_plan_idx = idx
-                max_quality = plan.quality
-                max_quality_runtime = plan.total_time
+    def choose(self, plan: PlanCost, other_plan: PlanCost) -> float:
+        """
+        Return True if plan has higher quality than other_plan and return False otherwise.
+        Use cost and then runtime as a tie-breaker.
+        """
+        if plan.quality == other_plan.quality:
+            if plan.cost == other_plan.cost:
+                return plan.time < other_plan.time
+            return plan.cost < other_plan.cost
 
-        # if no plan was below fixed cost; return cheapest plan
-        if best_plan is None:
-            print("NO PLAN FOUND BELOW FIXED COST; PICKING MIN. COST PLAN INSTEAD")
-            min_cost = np.inf
-            for idx, plan in enumerate(candidatePlans):
-                if plan.total_cost < min_cost:
-                    best_plan = plan
-                    best_plan_idx = idx
-                    min_cost = plan.total_cost
-
-        return best_plan if not return_idx else (best_plan, best_plan_idx)
+        return plan.quality > other_plan.quality
 
 
-class MaxQualityAtFixedRuntime(Policy):
-    def __init__(self, max_runtime: float):
-        self.max_runtime = max_runtime
+class MaxQualityAtFixedTime(Policy):
+    """
+    This policy applies a constraint (upper bound) on the runtime of the plan
+    and tries to maximize quality subject to that constraint.
+    """
+    def __init__(self, max_time: float):
+        self.max_time = max_time
 
     def __str__(self):
-        return "MaxQuality@MinRuntime"
+        return "MaxQuality@FixedTime"
 
-    def choose(
-        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
-    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
-        best_plan, best_plan_idx, max_quality, max_quality_cost = None, -1, 0, np.inf
-        for idx, plan in enumerate(candidatePlans):
-            # if plan is too long, skip
-            if plan.total_time > self.max_runtime:
-                continue
+    def get_primary_metric(self) -> str:
+        return "quality"
 
-            # if plan is above best current max quality, this is new best plan
-            if plan.quality > max_quality:
-                best_plan = plan
-                best_plan_idx = idx
-                max_quality = plan.quality
-                max_quality_cost = plan.total_cost
+    def constraint(self, plan: PlanCost) -> bool:
+        return plan.time < self.max_time
 
-            # if plan is tied w/current max quality -- and has lower cost -- this is new best plan
-            elif plan.quality == max_quality and plan.total_cost < max_quality_cost:
-                best_plan = plan
-                best_plan_idx = idx
-                max_quality = plan.quality
-                max_quality_cost = plan.total_cost
+    def choose(self, plan: PlanCost, other_plan: PlanCost) -> float:
+        """
+        Return True if plan has higher quality than other_plan and return False otherwise.
+        Use runtime and then cost as a tie-breaker.
+        """
+        if plan.quality == other_plan.quality:
+            if plan.time == other_plan.time:
+                return plan.cost < other_plan.cost
+            return plan.time < other_plan.time
 
-        # if no plan was below fixed runtime; return shortest plan
-        if best_plan is None:
-            print("NO PLAN FOUND BELOW FIXED COST; PICKING MIN. RUNTIME PLAN INSTEAD")
-            min_runtime = np.inf
-            for idx, plan in enumerate(candidatePlans):
-                if plan.total_time < min_runtime:
-                    best_plan = plan
-                    best_plan_idx = idx
-                    min_runtime = plan.total_time
-
-        return best_plan if not return_idx else (best_plan, best_plan_idx)
+        return plan.quality > other_plan.quality
 
 
 class MinCostAtFixedQuality(Policy):
+    """
+    This policy applies a constraint (lower bound) on the quality of the plan
+    and tries to minimize cost subject to that constraint.
+    """
     def __init__(self, min_quality: float):
         self.min_quality = min_quality
 
     def __str__(self):
         return "MinCost@FixedQuality"
 
-    def choose(
-        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
-    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
-        best_plan, best_plan_idx, min_cost, min_cost_runtime = None, -1, np.inf, np.inf
-        for idx, plan in enumerate(candidatePlans):
-            # if plan is too low quality, skip
-            if plan.quality < self.min_quality:
-                continue
+    def get_primary_metric(self) -> str:
+        return "cost"
 
-            # if plan is below best current min cost, this is new best plan
-            if plan.total_cost < min_cost:
-                best_plan = plan
-                best_plan_idx = idx
-                min_cost = plan.total_cost
-                min_cost_runtime = plan.total_time
+    def constraint(self, plan: PlanCost) -> bool:
+        return plan.quality > self.min_quality
 
-            # if plan is tied w/current min cost -- and has lower runtime -- this is new best plan
-            elif plan.total_cost == min_cost and plan.total_time < min_cost_runtime:
-                best_plan = plan
-                best_plan_idx = idx
-                min_cost = plan.total_cost
-                min_cost_runtime = plan.total_time
+    def choose(self, plan: PlanCost, other_plan: PlanCost) -> float:
+        """
+        Return True if plan has lower cost than other_plan and return False otherwise.
+        Use quality and then runtime as a tie-breaker.
+        """
+        if plan.cost == other_plan.cost:
+            if plan.quality == other_plan.quality:
+                return plan.time < other_plan.time
+            return plan.quality > other_plan.quality
 
-        # if no plan was above fixed quality; return best plan
-        if best_plan is None:
-            print(
-                "NO PLAN FOUND ABOVE FIXED QUALITY; PICKING MAX. QUALITY PLAN INSTEAD"
-            )
-            max_quality = 0
-            for idx, plan in enumerate(candidatePlans):
-                if plan.quality > max_quality:
-                    best_plan = plan
-                    best_plan_idx = idx
-                    max_quality = plan.quality
-
-        return best_plan if not return_idx else (best_plan, best_plan_idx)
+        return plan.cost < other_plan.cost
 
 
-class MinRuntimeAtFixedQuality(Policy):
+class MinTimeAtFixedQuality(Policy):
+    """
+    This policy applies a constraint (lower bound) on the quality of the plan
+    and tries to minimize runtime subject to that constraint.
+    """
     def __init__(self, min_quality: float):
         self.min_quality = min_quality
 
     def __str__(self):
-        return "MinRuntime@FixedQuality"
+        return "MinTime@FixedQuality"
 
-    def choose(
-        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
-    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
-        best_plan, best_plan_idx, min_runtime, min_runtime_cost = (
-            None,
-            -1,
-            np.inf,
-            np.inf,
-        )
-        for idx, plan in enumerate(candidatePlans):
-            # if plan is too low quality, skip
-            if plan.quality < self.min_quality:
-                continue
+    def get_primary_metric(self) -> str:
+        return "time"
 
-            # if plan is below best current min cost, this is new best plan
-            if plan.total_time < min_runtime:
-                best_plan = plan
-                best_plan_idx = idx
-                min_runtime = plan.total_time
-                min_runtime_cost = plan.total_cost
+    def constraint(self, plan: PlanCost) -> bool:
+        return plan.quality > self.min_quality
 
-            # if plan is tied w/current min runtime -- and has lower cost -- this is new best plan
-            elif plan.total_time == min_runtime and plan.total_cost < min_runtime_cost:
-                best_plan = plan
-                best_plan_idx = idx
-                min_runtime = plan.total_time
-                min_runtime_cost = plan.total_cost
+    def choose(self, plan: PlanCost, other_plan: PlanCost) -> float:
+        """
+        Return True if plan has lower runtime than other_plan and return False otherwise.
+        Use quality and then cost as a tie-breaker.
+        """
+        if plan.time == other_plan.time:
+            if plan.quality == other_plan.quality:
+                return plan.cost < other_plan.cost
+            return plan.quality > other_plan.quality
 
-        # if no plan was above fixed quality; return best plan
-        if best_plan is None:
-            print(
-                "NO PLAN FOUND ABOVE FIXED QUALITY; PICKING MAX. QUALITY PLAN INSTEAD"
-            )
-            max_quality = 0
-            for idx, plan in enumerate(candidatePlans):
-                if plan.quality > max_quality:
-                    best_plan = plan
-                    best_plan_idx = idx
-                    max_quality = plan.quality
-
-        return best_plan if not return_idx else (best_plan, best_plan_idx)
+        return plan.time < other_plan.time
 
 
-class MaxQualityMinRuntime(Policy):
-    """
-    This policy selects the plan with the maximum quality along the
-    pareto-optimal curve of candidate plans. It then breaks ties by
-    selecting the plan with the minimum runtime.
-    """
+# TODO: add this back in a way which allows users to select a plan from a small pareto optimal set at the end of query optimization
+# class UserChoice(Policy):
+#     """
+#     This policy asks the user to decide which of the pareto-optimal
+#     candidate plans to execute.
+#     """
 
-    def __str__(self):
-        return "(Maximum Quality, Minimum Runtime)"
+#     def __str__(self):
+#         return "User Choice"
 
-    def choose(
-        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
-    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
-        best_plan, best_plan_idx, max_quality, max_quality_runtime = None, -1, 0, np.inf
-        for idx, plan in enumerate(candidatePlans):
-            if plan.quality > max_quality:
-                best_plan = plan
-                best_plan_idx = idx
-                max_quality = plan.quality
-                max_quality_runtime = plan.total_time
-            elif plan.quality == max_quality and plan.total_time < max_quality_runtime:
-                best_plan = plan
-                best_plan_idx = idx
-                max_quality = plan.quality
-                max_quality_runtime = plan.total_time
+#     def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
+#         user_choice = input(f"Please select a plan in [0-{len(candidatePlans) - 1}]: ")
+#         user_choice = int(user_choice)
+#         if user_choice not in range(len(candidatePlans)):
+#             print(
+#                 f"Error: user choice {user_choice} was not a number in the specified range. Please try again."
+#             )
+#             return self.choose(candidatePlans)
 
-        return best_plan if not return_idx else (best_plan, best_plan_idx)
-
-
-class MinTime(Policy):
-    """
-    This policy selects the plan with the minimal execution time along the
-    pareto-optimal curve of candidate plans.
-    """
-
-    def __str__(self):
-        return "Minimum Time"
-
-    def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
-        return sorted(candidatePlans, key=lambda plan: plan.total_time)[0]
-
-
-class MinCost(Policy):
-    """
-    This policy selects the plan with the minimal cost along the pareto-optimal
-    curve of candidate plans.
-    """
-
-    def __str__(self):
-        return "Minimum Cost"
-
-    def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
-        return sorted(candidatePlans, key=lambda plan: plan.total_cost)[0]
-
-
-class MaxHarmonicMean(Policy):
-    """
-    This policy selects the plan with the maximum harmonic mean of cost, time, and quality
-    along the pareto-optimal curve of candidate plans.
-    """
-
-    def __init__(
-        self, max_time: float = 600.0, max_cost: float = 1.0, max_quality: float = 1.0
-    ):
-        self.max_cost = max_cost
-        self.max_time = max_time
-        self.max_quality = max_quality
-
-    def __str__(self):
-        return "Maximum Harmonic Mean"
-
-    def choose(
-        self, candidatePlans: List[PhysicalPlan], return_idx: bool = False
-    ) -> Union[PhysicalPlan, Tuple[PhysicalPlan, int]]:
-        epsilon = 1e-3
-        bestPlan, bestHarmonicMean, bestPlanIdx = None, 0.0, -1
-        for idx, plan in enumerate(candidatePlans):
-            # scale time and cost into [0, 1]
-            scaled_time = (self.max_time - plan.total_time) / self.max_time
-            scaled_cost = (self.max_cost - plan.total_cost) / self.max_cost
-            scaled_quality = (plan.quality) / self.max_quality
-            scaled_time = min(max(scaled_time, 0.0), 1.0)
-            scaled_cost = min(max(scaled_cost, 0.0), 1.0)
-            scaled_quality = min(max(scaled_quality, 0.0), 1.0)
-
-            harmonicMean = 3.0 / (
-                (1.0 / (scaled_time + epsilon))
-                + (1.0 / (scaled_cost + epsilon))
-                + (1.0 / (scaled_quality + epsilon))
-            )
-
-            if harmonicMean > bestHarmonicMean:
-                bestHarmonicMean = harmonicMean
-                bestPlan = plan
-                bestPlanIdx = idx
-
-        return bestPlan if not return_idx else (bestPlan, bestPlanIdx)
-
-
-class UserChoice(Policy):
-    """
-    This policy asks the user to decide which of the pareto-optimal
-    candidate plans to execute.
-    """
-
-    def __str__(self):
-        return "User Choice"
-
-    def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
-        user_choice = input(f"Please select a plan in [0-{len(candidatePlans) - 1}]: ")
-        user_choice = int(user_choice)
-        if user_choice not in range(len(candidatePlans)):
-            print(
-                f"Error: user choice {user_choice} was not a number in the specified range. Please try again."
-            )
-            return self.choose(candidatePlans)
-
-        return candidatePlans[user_choice]
+#         return candidatePlans[user_choice]

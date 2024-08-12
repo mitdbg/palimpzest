@@ -1,5 +1,5 @@
-from palimpzest.cost_estimator import CostEstimator
-# from palimpzest.planner import PhysicalPlan
+from palimpzest.cost_model import CostModel
+# from palimpzest.optimizer import PhysicalPlan
 # from palimpzest.policy import Policy
 
 
@@ -14,9 +14,9 @@ class PruningStrategy:
 
 class ParetoPruningStrategy(PruningStrategy):
 
-    def __init__(self, cost_estimator: CostEstimator, *args, **kwargs):
+    def __init__(self, cost_model: CostModel, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.cost_estimator = cost_estimator
+        self.cost_model = cost_model
         self.frontier_plans = []
 
     def prune_plan(self, plan) -> bool:
@@ -24,7 +24,7 @@ class ParetoPruningStrategy(PruningStrategy):
         Function which returns True if the plan should be pruned and false otherwise.
         """
         # cost the plan
-        plan_total_cost, plan_total_time, plan_quality = self.cost_estimator.estimate_plan_cost(plan)
+        plan_total_cost, plan_total_time, plan_quality = self.cost_model.estimate_plan_cost(plan)
 
         # check if the plan is on the pareto frontier
         dominated_indices = set()
@@ -62,14 +62,14 @@ class ParetoPruningStrategy(PruningStrategy):
 
 class ParetoPlusPolicyPruningStrategy(PruningStrategy):
 
-    def __init__(self, cost_estimator: CostEstimator, policy, *args, **kwargs):
+    def __init__(self, cost_model: CostModel, policy, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.cost_estimator = cost_estimator
+        self.cost_model = cost_model
         self.policy = policy
         self.frontier_plans = []
 
     def prune_plan(self, plan) -> bool:
         # cost the plan
-        total_cost, total_time, quality = self.cost_estimator.estimate_plan_cost(plan)
+        total_cost, total_time, quality = self.cost_model.estimate_plan_cost(plan)
 
         raise NotImplementedError("need to finish this function")

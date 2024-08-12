@@ -1,5 +1,5 @@
-from palimpzest.constants import Model, PromptStrategy, QueryStrategy
-from palimpzest.planner import LogicalPlan, PhysicalPlan, Planner
+from palimpzest.constants import Model, PromptStrategy
+from palimpzest.optimizer import LogicalPlan, PhysicalPlan
 from palimpzest.pruning import PruningStrategy
 from palimpzest.utils import getModels
 
@@ -13,7 +13,7 @@ import numpy as np
 import palimpzest.strategies as physical_strategies
 
 
-class PhysicalPlanner(Planner):
+class PhysicalPlanner:
     def __init__(
         self,
         pruning_strategy: Optional[PruningStrategy]=None,
@@ -32,7 +32,6 @@ class PhysicalPlanner(Planner):
         super().__init__(*args, **kwargs)
         self.pruning_strategy = pruning_strategy
         self.available_models = available_models
-        self.allow_model_selection = allow_model_selection
         self.allow_bonded_query = allow_bonded_query
         self.allow_conventional_query = allow_conventional_query
         self.allow_model_selection = allow_model_selection
@@ -272,7 +271,6 @@ class PhysicalPlanner(Planner):
                                 inputSchema=logical_op.inputSchema,
                                 outputSchema=logical_op.outputSchema,
                                 image_conversion=logical_op.image_conversion,
-                                query_strategy=QueryStrategy.BONDED_WITH_FALLBACK,
                                 shouldProfile=self.shouldProfile,
                                 verbose=self.verbose,
                             )

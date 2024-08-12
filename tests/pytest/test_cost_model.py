@@ -1,13 +1,13 @@
-from palimpzest.execution import CostEstimator
+from palimpzest.execution import CostModel
 import palimpzest as pz
 
 import pytest
 
 
-class TestCostEstimator:
+class TestCostModel:
     def test_compute_operator_estimates(self, simple_plan_sample_execution_data, simple_plan_expected_operator_estimates):
         # construct estimator
-        estimator = CostEstimator(source_dataset_id=None, sample_execution_data=simple_plan_sample_execution_data)
+        estimator = CostModel(source_dataset_id=None, sample_execution_data=simple_plan_sample_execution_data)
 
         # get computed operator estimates
         operator_estimates = estimator.operator_estimates
@@ -66,14 +66,20 @@ class TestCostEstimator:
             if record_op_stats.source_op_id is not None:
                 record_op_stats.source_op_id = test_op_id_to_new_op_id[record_op_stats.source_op_id]
 
-        # construct estimator
-        estimator = CostEstimator(source_dataset_id=dataset_id, sample_execution_data=simple_plan_sample_execution_data)
+        # construct cost model
+        cost_model = CostModel(source_dataset_id=dataset_id, sample_execution_data=simple_plan_sample_execution_data)
 
-        # estimate cost of plan
-        total_time, total_cost, quality = estimator.estimate_plan_cost(physical_plan)
+        # estimate cost of plan operators
+        source_op_estimates = None
+        for op in physical_plan:
+            op_cost, op_time, op_quality, op_estimates = cost_model(op, source_op_estimates)
+            source_op_estimates = op_estimates
 
-        # check that estimated time, cost, and quality are as expected
-        expected_total_time, expected_total_cost, expected_quality = expected_cost_est_results(input_cardinality)
-        assert total_time == expected_total_time
-        assert total_cost == expected_total_cost
-        assert quality == expected_quality
+            # check that estimated time, cost, and quality are as expected
+            expected_op_cost, expected_op_time, expected_op_quality, output_cardinality = expected_cost_est_results(op, input_cardinality)
+            assert op_cost == expected_op_cost
+            assert op_time == expected_op_time
+            assert op_quality == expected_op_quality
+
+            # update input_cardinality for next operator
+            input_cardinality = output_cardinality

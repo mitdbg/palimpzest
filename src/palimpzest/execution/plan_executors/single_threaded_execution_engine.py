@@ -1,48 +1,42 @@
-from palimpzest.constants import PlanType
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements import DataRecord
 from palimpzest.execution import ExecutionEngine
 from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
-from palimpzest.planner import PhysicalPlan
+from palimpzest.optimizer import PhysicalPlan
 
 from palimpzest.dataclasses import OperatorStats, PlanStats
 
-from typing import Optional
+from typing import Optional, Union
 
 import time
 
 
-class SequentialSingleThreadExecutionEngine(ExecutionEngine):
+class SequentialSingleThreadPlanExecutor(ExecutionEngine):
     """
     This class implements the abstract execute_plan() method from the ExecutionEngine.
     This class still needs to be sub-classed by another Execution class which implements
     the higher-level execute() method.
     """
 
-    # NOTE: Adding a few optional arguments for printing, etc.
     def execute_plan(self, plan: PhysicalPlan,
-                     plan_type: PlanType = PlanType.FINAL,
-                     plan_idx: Optional[int] = None,
+                     num_samples: Union[int, float] = float("inf"),
                      max_workers: Optional[int] = None):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
-            print(f"{plan_type.value} {str(plan_idx)}:")
+            print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
             plan.printPlan()
             print("---")
 
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.get_plan_id(), plan_idx=plan_idx)
+        plan_stats = PlanStats(plan_id=plan.plan_id)
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
-
-        # set limit on the number of samples if this is a sentinel plan
-        num_samples = self.num_samples if plan_type == PlanType.SENTINEL else float("inf")
+            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
 
         # initialize list of output records and intermediate variables
         output_records = []
@@ -84,7 +78,7 @@ class SequentialSingleThreadExecutionEngine(ExecutionEngine):
                 keep_scanning_source_records = True
                 while keep_scanning_source_records:
                     # construct input DataRecord for DataSourcePhysicalOp
-                    candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
+                    candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)
                     candidate.idx = current_scan_idx
                     candidate.get_item_fn = datasource.getItem
                     candidate.cardinality = datasource.cardinality
@@ -115,16 +109,11 @@ class SequentialSingleThreadExecutionEngine(ExecutionEngine):
                     record_op_stats_lst.extend(out_record_op_stats_lst)
 
             # update plan stats
-            op_stats = plan_stats.operator_stats[op_id]
-            for record_op_stats in record_op_stats_lst:
-                # TODO code a nice __add__ function for OperatorStats and RecordOpStats
-                record_op_stats.source_op_id = prev_op_id
-                record_op_stats.plan_id = plan.get_plan_id()
-                op_stats.record_op_stats_lst.append(record_op_stats)
-                op_stats.total_op_time += record_op_stats.time_per_record
-                op_stats.total_op_cost += record_op_stats.cost_per_record
-
-            plan_stats.operator_stats[op_id] = op_stats
+            plan_stats.operator_stats[op_id].add_record_op_stats(
+                record_op_stats_lst,
+                source_op_id=prev_op_id,
+                plan_id=plan.plan_id,
+            )
 
             # add records (which are not filtered) to the cache, if allowed
             if not self.nocache:
@@ -154,35 +143,30 @@ class SequentialSingleThreadExecutionEngine(ExecutionEngine):
         return output_records, plan_stats
 
 
-class PipelinedSingleThreadExecutionEngine(ExecutionEngine):
+class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
     """
     This class implements the abstract execute_plan() method from the ExecutionEngine.
     This class still needs to be sub-classed by another Execution class which implements
     the higher-level execute() method.
     """
 
-    # NOTE: Adding a few optional arguments for printing, etc.
     def execute_plan(self, plan: PhysicalPlan,
-                     plan_type: PlanType = PlanType.FINAL,
-                     plan_idx: Optional[int] = None,
+                     num_samples: Union[int, float] = float("inf"),
                      max_workers: Optional[int] = None):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
-            print(f"{plan_type.value} {str(plan_idx)}:")
+            print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
             plan.printPlan()
             print("---")
 
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.get_plan_id())
+        plan_stats = PlanStats(plan_id=plan.plan_id)
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
-
-        # set limit on the number of samples if this is a sentinel plan
-        num_samples = self.num_samples if plan_type == PlanType.SENTINEL else float("inf")        
+            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here     
 
         # initialize list of output records and intermediate variables
         output_records = []
@@ -227,7 +211,7 @@ class PipelinedSingleThreadExecutionEngine(ExecutionEngine):
                 if isinstance(operator, DataSourcePhysicalOp):
                     if keep_scanning_source_records:
                         # construct input DataRecord for DataSourcePhysicalOp
-                        candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
+                        candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)
                         candidate.idx = current_scan_idx
                         candidate.get_item_fn = datasource.getItem
                         candidate.cardinality = datasource.cardinality
@@ -264,16 +248,11 @@ class PipelinedSingleThreadExecutionEngine(ExecutionEngine):
 
                 if records_processed:
                     # update plan stats
-                    op_stats = plan_stats.operator_stats[op_id]
-                    for record_op_stats in record_op_stats_lst:
-                        # TODO code a nice __add__ function for OperatorStats and RecordOpStats
-                        record_op_stats.source_op_id = prev_op_id
-                        record_op_stats.plan_id = plan.get_plan_id()
-                        op_stats.record_op_stats_lst.append(record_op_stats)
-                        op_stats.total_op_time += record_op_stats.time_per_record
-                        op_stats.total_op_cost += record_op_stats.cost_per_record
-
-                    plan_stats.operator_stats[op_id] = op_stats
+                    plan_stats.operator_stats[op_id].add_record_op_stats(
+                        record_op_stats_lst,
+                        source_op_id=prev_op_id,
+                        plan_id=plan.plan_id,
+                    )
 
                     # add records (which are not filtered) to the cache, if allowed
                     if not self.nocache:

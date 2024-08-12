@@ -27,13 +27,6 @@ class GroupBySig:
         }
         return out
 
-    def deserialize(d) -> GroupBySig:
-        return GroupBySig(d["groupByFields"], d["aggFuncs"], d["aggFields"])
-    
-    
-
-
-
     def __str__(self) -> str:
         return "GroupBy(" + repr(GroupBySig.serialize(self)) + ")"
 

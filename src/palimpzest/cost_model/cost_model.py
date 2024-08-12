@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from palimpzest.constants import Cardinality, QueryStrategy, GPT_4_MODEL_CARD, MODEL_CARDS
-from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
+from palimpzest.constants import Cardinality, GPT_4_MODEL_CARD, MODEL_CARDS
+from palimpzest.dataclasses import ExpressionCost, OperatorCostEstimates, RecordOpStats
 from palimpzest.datamanager import DataDirectory
-from palimpzest.planner import PhysicalPlan
+from palimpzest.operators import PhysicalOperator
 from palimpzest.utils import getChampionModelName, getModels
 
 import palimpzest as pz
@@ -11,6 +11,7 @@ import palimpzest as pz
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
+import scipy.stats as stats
 import math
 
 # NOTE: the answer.mode() call(s) inside of _est_quality() throw a UserWarning when there are multiple
@@ -22,12 +23,12 @@ import math
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)
 
-class CostEstimator:
+class CostModel:
     """
     This class takes in a list of RecordOpStats and exposes a function which uses this data
     to perform cost estimation on a list of physical plans.
     """
-    def __init__(self, source_dataset_id: str, sample_execution_data: List[RecordOpStats] = []):
+    def __init__(self, source_dataset_id: str, sample_execution_data: List[RecordOpStats] = [], confidence_level: float = 0.95):
         # store source dataset id to help with estimating cardinalities
         self.source_dataset_id = source_dataset_id
 
@@ -43,7 +44,39 @@ class CostEstimator:
         # reference to data directory
         self.datadir = DataDirectory()
 
+        # compute per-operator estimates
         self.operator_estimates = self._compute_operator_estimates()
+
+        # set confidence level for CI estimates
+        self.conf_level = confidence_level
+
+    def _compute_ci(self, sample_mean: float, n_samples: int, std_dev: float) -> Tuple[float, float]:
+        """
+        Compute confidence interval (for non-proportion quantities) given the sample mean, number of samples,
+        and sample std. deviation at the CostModel's given confidence level. We use a t-distribution for
+        computing the interval as many sample estimates in PZ may have few samples.
+        """
+        ci = stats.t.interval(
+            confidence=self.conf_level,  # Confidence level
+            df=n_samples - 1,            # Degrees of freedom
+            loc=sample_mean,             # Sample mean
+            scale=std_dev,               # Standard deviation estimate
+        )
+        return ci
+
+    def _compute_proportion_ci(self, sample_prop: float, n_samples: int) -> Tuple[float, float]:
+        """
+        Compute confidence interval for proportion quantities (i.e. selectivity) given the sample proportion
+        and the number of samples. We use the normal distribution for computing the interval here, for reasons
+        summarized by this post: https://stats.stackexchange.com/a/411727.
+        """
+        scaling_factor = math.sqrt((sample_prop * (1 - sample_prop)) / n_samples)
+        ci = stats.norm.interval(
+            confidence=self.conf_level,  # Confidence level
+            loc=sample_prop,             # Sample proportion
+            scale=scaling_factor,        # Scaling factor
+        )
+        return ci
 
     def _est_time_per_record(self,
         op_df: pd.DataFrame, model_name: Optional[str] = None, agg: str = "mean"
@@ -199,31 +232,31 @@ class CostEstimator:
         of the quality of its outputs by using GPT-4 as a champion model.
         """
         # get unique set of records
-        record_uuids = op_df.record_uuid.unique()
+        record_ids = op_df.record_id.unique()
 
         # get champion model name
         champion_model_name = getChampionModelName()
 
         # compute champion's answer (per-record) across all models; fall-back to most common answer if champion is not present
-        record_uuid_to_answer = {}
-        for record_uuid in record_uuids:
-            record_df = op_df[op_df.record_uuid == record_uuid]
+        record_id_to_answer = {}
+        for record_id in record_ids:
+            record_df = op_df[op_df.record_id == record_id]
             champion_most_common_answer = record_df[
                 record_df.model_name == champion_model_name
             ].answer.mode()
             all_models_most_common_answer = record_df.answer.mode()
 
             if not champion_most_common_answer.empty:
-                record_uuid_to_answer[record_uuid] = champion_most_common_answer.iloc[0]
+                record_id_to_answer[record_id] = champion_most_common_answer.iloc[0]
             elif not all_models_most_common_answer.empty:
-                record_uuid_to_answer[record_uuid] = all_models_most_common_answer.iloc[0]
+                record_id_to_answer[record_id] = all_models_most_common_answer.iloc[0]
             else:
-                record_uuid_to_answer[record_uuid] = None
+                record_id_to_answer[record_id] = None
 
         # compute accepted answers and clean all answers
         pd.options.mode.chained_assignment = None  # turn off copy warnings
-        op_df.loc[:, "accepted_answer"] = op_df.record_uuid.apply(
-            lambda uuid: record_uuid_to_answer[uuid]
+        op_df.loc[:, "accepted_answer"] = op_df.record_id.apply(
+            lambda id: record_id_to_answer[id]
         )
         op_df.loc[:, "quality"] = op_df.apply(lambda row: self._compute_quality(row), axis=1)
 
@@ -249,6 +282,8 @@ class CostEstimator:
     def _compute_operator_estimates(self) -> Optional[Dict[str, Any]]:
         """
         Compute per-operator estimates of runtime, cost, and quality.
+
+        TODO: include lower and upper bounds
         """
         # if we don't have sample execution data, we cannot compute per-operator estimates
         if self.sample_execution_data_df is None:
@@ -293,7 +328,7 @@ class CostEstimator:
                     }
                     estimates[model_name] = model_estimates
 
-            # TODO also include HarcodedConverts here?
+            # TODO pre-compute lists of op_names in groups
             elif op_name in ["NonLLMFilter"]:
                 est_tokens = self._est_tokens_per_record(op_df)
                 estimates = {
@@ -303,7 +338,7 @@ class CostEstimator:
                     "quality": self._est_quality(op_df, model_name=model_name),
                 }
 
-            elif op_name in ["MarshalAndScanDataOp", "CacheScanDataOp", "LimitScanOp", "ApplyCountAggregateOp", "ApplyAverageAggregateOp"]:
+            elif op_name in ["MarshalAndScanDataOp", "CacheScanDataOp", "LimitScanOp", "CountAggregateOp", "AverageAggregateOp"]:
                 estimates = {
                     "time_per_record": self._est_time_per_record(op_df),
                 }
@@ -318,127 +353,133 @@ class CostEstimator:
         
         return operator_estimates
 
-    def estimate_plan_cost(self, physical_plan: PhysicalPlan) -> Tuple[float, float, float]:
-        # initialize dictionary w/estimates for entire plan
-        plan_estimates = {"total_time": 0.0, "total_cost": 0.0, "quality": 1.0}
+    def __call__(self, operator: PhysicalOperator, source_op_estimates: Optional[OperatorCostEstimates]=None) -> ExpressionCost:
+        # get identifier for operation which is unique within sentinel plan but consistent across sentinels
+        op_id = operator.get_op_id()
+
+        # initialize estimates of operator metrics based on naive (but sometimes precise) logic
+        if isinstance(operator, pz.MarshalAndScanDataOp):
+            # get handle to DataSource and pre-compute its size (number of records)
+            datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
+            dataset_type = self.datadir.getRegisteredDatasetType(self.source_dataset_id)
+            datasource_len = len(datasource)
+            datasource_memsize = datasource.getSize()
+
+            source_op_estimates = OperatorCostEstimates(
+                cardinality=datasource_len,
+                time_per_record=0.0,
+                cost_per_record=0.0,
+                quality=1.0,
+            )
+
+            op_estimates = operator.naiveCostEstimates(source_op_estimates,
+                                                    input_cardinality=datasource.cardinality,
+                                                    input_record_size_in_bytes=datasource_memsize/datasource_len,
+                                                    dataset_type=dataset_type)
+
+        elif isinstance(operator, pz.CacheScanDataOp):
+            datasource = self.datadir.getCachedResult(operator.cachedDataIdentifier)
+            datasource_len = len(datasource)
+            datasource_memsize = datasource.getSize()
+
+            source_op_estimates = OperatorCostEstimates(
+                cardinality=datasource_len,
+                time_per_record=0.0,
+                cost_per_record=0.0,
+                quality=1.0,
+            )
+
+            op_estimates = operator.naiveCostEstimates(source_op_estimates,
+                                                    input_cardinality=Cardinality.ONE_TO_ONE,
+                                                    input_record_size_in_bytes=datasource_memsize/datasource_len)
+
+        else:
+            op_estimates = operator.naiveCostEstimates(source_op_estimates)
+
+        # if we have sample execution data, update naive estimates with more informed ones
         sample_op_estimates = self.operator_estimates
+        if sample_op_estimates is not None and op_id in sample_op_estimates:
+            if isinstance(operator, pz.MarshalAndScanDataOp) or isinstance(operator, pz.CacheScanDataOp):
+                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
+                op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
-        op_estimates, source_op_estimates = None, None
-        for op in physical_plan.operators:
-            # get identifier for operation which is unique within sentinel plan but consistent across sentinels
-            op_id = op.get_op_id()
+            elif isinstance(operator, pz.ApplyGroupByOp):
+                op_estimates.cardinality = sample_op_estimates[op_id]["cardinality"]
+                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
+                op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
-            # initialize estimates of operator metrics based on naive (but sometimes precise) logic
-            if isinstance(op, pz.MarshalAndScanDataOp):
-                # get handle to DataSource and pre-compute its size (number of records)
-                datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
-                datasource_len = len(datasource)
-                datasource_memsize = datasource.getSize()
+            elif isinstance(operator, pz.CountAggregateOp) or isinstance(operator, pz.AverageAggregateOp):
+                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
 
-                source_op_estimates = OperatorCostEstimates(
-                    cardinality=datasource_len,
-                    time_per_record=0.0,
-                    cost_per_record=0.0,
-                    quality=1.0,
-                )
+            elif isinstance(operator, pz.LimitScanOp):
+                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
 
-                op_estimates = op.naiveCostEstimates(source_op_estimates,
-                                                     input_cardinality=datasource.cardinality,
-                                                     input_record_size_in_bytes=datasource_memsize/datasource_len)
+            elif isinstance(operator, pz.NonLLMFilter):
+                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
+                op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
 
-            elif isinstance(op, pz.CacheScanDataOp):
-                datasource = self.datadir.getCachedResult(op.cachedDataIdentifier)
-                datasource_len = len(datasource)
-                datasource_memsize = datasource.getSize()
+            elif isinstance(operator, pz.LLMFilter):
+                model_name = operator.model.value
+                op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
+                op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
+                op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
+                op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
 
-                source_op_estimates = OperatorCostEstimates(
-                    cardinality=datasource_len,
-                    time_per_record=0.0,
-                    cost_per_record=0.0,
-                    quality=1.0,
-                )
+            elif isinstance(operator, pz.LLMConvert):
+                # TODO: EVEN BETTER: do similarity match (e.g. largest param intersection, more exotic techniques);
+                #       another heuristic: logical_op_id-->subclass_physical_op_id-->specific_physical_op_id-->most_param_match_physical_op_id
+                # TODO: instead of [op_id][model_name] --> [logical_op_id][physical_op_id]
+                # NOTE: code synthesis does not have a model attribute
+                model_name = operator.model.value if hasattr(operator, "model") else None
+                op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
+                op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
+                op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
+                op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
 
-                op_estimates = op.naiveCostEstimates(source_op_estimates,
-                                                     input_cardinality=Cardinality.ONE_TO_ONE,
-                                                     input_record_size_in_bytes=datasource_memsize/datasource_len)
+                # NOTE: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
+                #       which would wildly mess up estimate of time and cost per-record
+                # do code synthesis adjustment
+                if isinstance(operator, pz.CodeSynthesisConvert):
+                    op_estimates.time_per_record = 1e-5
+                    op_estimates.cost_per_record = 1e-4
+                    op_estimates.quality = op_estimates.quality * (GPT_4_MODEL_CARD["code"] / 100.0)
+
+                # token reduction adjustment
+                if isinstance(operator, pz.TokenReducedConvert):
+                    total_input_tokens = operator.token_budget * sample_op_estimates[op_id][model_name]["total_input_tokens"]
+                    total_output_tokens = sample_op_estimates[op_id][model_name]["total_output_tokens"]
+                    op_estimates.cost_per_record = (
+                        MODEL_CARDS[operator.model.value]["usd_per_input_token"] * total_input_tokens
+                        + MODEL_CARDS[operator.model.value]["usd_per_output_token"] * total_output_tokens
+                    )
+                    op_estimates.quality = op_estimates.quality * math.sqrt(math.sqrt(operator.token_budget))
 
             else:
-                op_estimates =  op.naiveCostEstimates(source_op_estimates)
+                raise Exception("Unknown operator")
 
-            # if we have sample execution data, update naive estimates with more informed ones
-            if sample_op_estimates is not None and op_id in sample_op_estimates:
-                if isinstance(op, pz.MarshalAndScanDataOp) or isinstance(op, pz.CacheScanDataOp):
-                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+        # compute estimates for this operator
+        op_time = op_estimates.time_per_record * source_op_estimates.cardinality
+        op_cost = op_estimates.cost_per_record * source_op_estimates.cardinality
+        op_quality = op_estimates.quality * source_op_estimates.quality
 
-                elif isinstance(op, pz.ApplyGroupByOp):
-                    op_estimates.cardinality = sample_op_estimates[op_id]["cardinality"]
-                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+        # compute bounds on estimates for this operator
+        op_time_lower_bound = sample_op_estimates[op_id]
 
-                elif isinstance(op, pz.ApplyCountAggregateOp) or isinstance(op, pz.ApplyAverageAggregateOp):
-                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+        # create and return ExpressionCost object
+        expr_cost_obj = ExpressionCost(
+            cost=op_cost,
+            time=op_time,
+            quality=op_quality,
+            op_estimates=op_estimates,
+            cost_lower_bound=,
+            cost_upper_bound=,
+            time_lower_bound=,
+            time_upper_bound=,
+            quality_lower_bound=,
+            quality_upper_bound=,
+        )
 
-                elif isinstance(op, pz.LimitScanOp):
-                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
-            
-                elif isinstance(op, pz.NonLLMFilter):
-                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
-                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
-                    op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
-
-                elif isinstance(op, pz.HardcodedConvert):
-                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
-                    op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
-
-                elif isinstance(op, pz.LLMFilter):
-                    model_name = op.model.value
-                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
-                    op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
-                    op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
-                    op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
-                
-                elif isinstance(op, pz.LLMConvert):
-                    # NOTE: code synthesis does not have a model attribute
-                    model_name = op.model.value if hasattr(op, "model") else None
-                    op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
-                    op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
-                    op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
-                    op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
-
-                    # TODO: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
-                    #       which would wildly mess up estimate of time and cost per-record
-                    # do code synthesis adjustment
-                    if op.query_strategy in [
-                        QueryStrategy.CODE_GEN_WITH_FALLBACK,
-                        QueryStrategy.CODE_GEN,
-                    ]:
-                        op_estimates.time_per_record = 1e-5
-                        op_estimates.cost_per_record = 1e-4
-                        op_estimates.quality = op_estimates.quality * (GPT_4_MODEL_CARD["code"] / 100.0)
-
-                    # token reduction adjustment
-                    if op.token_budget is not None and op.token_budget < 1.0:
-                        total_input_tokens = op.token_budget * sample_op_estimates[op_id][model_name]["total_input_tokens"]
-                        total_output_tokens = sample_op_estimates[op_id][model_name]["total_output_tokens"]
-                        op_estimates.cost_per_record = (
-                            MODEL_CARDS[op.model.value]["usd_per_input_token"] * total_input_tokens
-                            + MODEL_CARDS[op.model.value]["usd_per_output_token"] * total_output_tokens
-                        )
-                        op_estimates.quality = op_estimates.quality * math.sqrt(math.sqrt(op.token_budget))
-
-                else:
-                    raise Exception("Unknown operator")
-
-            # update plan estimates
-            plan_estimates["total_time"] += op_estimates.time_per_record * source_op_estimates.cardinality
-            plan_estimates["total_cost"] += op_estimates.cost_per_record * source_op_estimates.cardinality
-            plan_estimates["quality"] *= op_estimates.quality
-
-            # update source_op_estimates
-            source_op_estimates = op_estimates
-
-        # set the plan's estimates
-        total_time = plan_estimates["total_time"]
-        total_cost = plan_estimates["total_cost"]
-        quality = plan_estimates["quality"]
-
-        return total_time, total_cost, quality
+        return expr_cost_obj

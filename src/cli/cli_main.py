@@ -28,7 +28,6 @@ def _print_msg(msg: str) -> None:
     msg: str
         Message to print to the console.
     """
-    # TODO: use colorama for different color outputs to improve readability
     print(f"{msg}")
 
 

@@ -11,9 +11,6 @@ class AggregateFunction():
 
     def serialize(a) -> Dict[str, Any]:
         return {"aggFuncDesc": a.funcDesc}
-    
-    def deserialize(d) -> AggregateFunction:
-        return AggregateFunction(d["aggFuncDesc"])
 
     def __str__(self) -> str:
         return "AggregateFunction(" + self.funcDesc + ")"

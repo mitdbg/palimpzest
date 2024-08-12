@@ -10,8 +10,8 @@ def sample_op_data_factory():
             op_name,
             source_op_id,
             plan_ids,
-            record_uuids,
-            parent_record_uuids,
+            record_ids,
+            parent_record_ids,
             time_per_records,
             cost_per_records,
             total_input_tokens=None,
@@ -21,8 +21,8 @@ def sample_op_data_factory():
         ):
         sample_op_data = [
             RecordOpStats(
-                record_uuid=record_uuids[idx],
-                record_parent_uuid=parent_record_uuids[idx] if parent_record_uuids is not None else None,
+                record_id=record_ids[idx],
+                record_parent_id=parent_record_ids[idx] if parent_record_ids is not None else None,
                 record_state={},
                 op_id=op_id,
                 op_name=op_name,
@@ -51,8 +51,8 @@ def simple_plan_scan_data():
         "op_name": "MarshalAndScanDataOp",
         "source_op_id": None,
         "plan_ids": ["plan1"] * 2 + ["plan2"] * 2 + ["plan3"] * 2,
-        "record_uuids": ["scan1", "scan2"] * 3,
-        "parent_record_uuids": None,
+        "record_ids": ["scan1", "scan2"] * 3,
+        "parent_record_ids": None,
         "time_per_records": [1, 1, 2, 3, 5, 8],
         "cost_per_records": [0, 0, 0, 0, 0, 0],
         "total_input_tokens": None,
@@ -64,14 +64,14 @@ def simple_plan_scan_data():
 @pytest.fixture
 def simple_plan_convert_data(simple_plan_scan_data):
     # we simulate converting the records output by the simple plan's scan operation
-    scan_record_uuids = simple_plan_scan_data["record_uuids"]
+    scan_record_ids = simple_plan_scan_data["record_ids"]
     return {
         "op_id": "convert123",
         "op_name": "LLMConvertBonded",
         "source_op_id": "scan123",
         "plan_ids": simple_plan_scan_data["plan_ids"],
-        "record_uuids": [uuid.replace("scan", "convert") for uuid in scan_record_uuids],
-        "parent_record_uuids": scan_record_uuids,
+        "record_ids": [id.replace("scan", "convert") for id in scan_record_ids],
+        "parent_record_ids": scan_record_ids,
         "time_per_records": [1, 2, 4, 8, 16, 32],
         "cost_per_records": [2, 4, 6, 8, 10, 12],
         "total_input_tokens": [200, 400, 600, 800, 100, 1200],
@@ -83,14 +83,14 @@ def simple_plan_convert_data(simple_plan_scan_data):
 @pytest.fixture
 def simple_plan_filter_data(simple_plan_convert_data):
     # we simulate filtering the records output by the simple plan's convert operation
-    convert_record_uuids = simple_plan_convert_data["record_uuids"]
+    convert_record_ids = simple_plan_convert_data["record_ids"]
     return {
         "op_id": "filter123",
         "op_name": "LLMFilter",
         "source_op_id": "convert123",
         "plan_ids": simple_plan_convert_data["plan_ids"],
-        "record_uuids": [uuid.replace("convert", "filter") for uuid in convert_record_uuids],
-        "parent_record_uuids": convert_record_uuids,
+        "record_ids": [id.replace("convert", "filter") for id in convert_record_ids],
+        "parent_record_ids": convert_record_ids,
         "time_per_records": [1, 3, 5, 7, 9, 11],
         "cost_per_records": [1, 2, 1, 2, 1, 2],
         "total_input_tokens": [100, 200, 100, 200, 100, 200],

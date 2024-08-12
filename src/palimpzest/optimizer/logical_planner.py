@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from palimpzest.planner import LogicalPlan
+from palimpzest.optimizer import LogicalPlan
 from .plan import LogicalPlan
-from .planner import Planner
 
 import palimpzest as pz
 import palimpzest.operators as pz_ops
@@ -69,7 +68,7 @@ class DependencyGraphNode:
         return upstream_subplan
 
 
-class LogicalPlanner(Planner):
+class LogicalPlanner:
     def __init__(self, no_cache: bool=False, sentinel: bool=False, verbose: bool=False, *args, **kwargs):
         """A given planner should not have a dataset when it's being generated, since it could be used for multiple datasets.
         However, we currently cannot support this since the plans are stored within a single planner object.
@@ -206,10 +205,10 @@ class LogicalPlanner(Planner):
                         targetCacheId=uid,
                     )
                 elif node._aggFunc is not None:
-                    op = pz_ops.ApplyAggregateFunction(
+                    op = pz_ops.Aggregate(
                         inputSchema=inputSchema,
                         outputSchema=outputSchema,
-                        aggregationFunction=node._aggFunc,
+                        aggFunc=node._aggFunc,
                         targetCacheId=uid,
                     )
                 elif node._limit is not None:

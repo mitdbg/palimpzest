@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 from palimpzest.generators.generators import DSPyGenerator
-from palimpzest.utils.model_helpers import getVisionModels
 from .physical import PhysicalOperator, DataRecordsWithStats
 
 from palimpzest.constants import *
 from palimpzest.dataclasses import GenerationStats, RecordOpStats
-from palimpzest.corelib import Schema
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.elements import DataRecord, Filter
-from palimpzest.operators import logical
 
 from typing import List
 
@@ -17,32 +14,16 @@ import time
 
 
 class FilterOp(PhysicalOperator):
-    def __init__(
-        self,
-        inputSchema: Schema,
-        outputSchema: Schema,
-        filter: Filter,
-        targetCacheId: str = None,
-        shouldProfile=False,
-        verbose=False,
-        max_workers=1,
-        *args, **kwargs
-    ):
-        assert inputSchema == outputSchema, "Input and output schemas must match for FilterOp"
-        super().__init__(inputSchema=inputSchema, outputSchema=outputSchema, shouldProfile=shouldProfile, *args, **kwargs)
+    def __init__(self, filter: Filter, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert self.inputSchema == self.outputSchema, "Input and output schemas must match for FilterOp"
         self.filter = filter
-        self.targetCacheId = targetCacheId
-        self.verbose = verbose
-        self.max_workers = max_workers
 
-
-    def get_op_dict(self):
+    def get_op_params(self):
         return {
-            "operator": self.op_name(),
             "outputSchema": str(self.outputSchema),
             "filter": str(self.filter),
         }
-
 
     def __eq__(self, other: FilterOp):
         return (
@@ -63,48 +44,8 @@ class FilterOp(PhysicalOperator):
             max_workers=self.max_workers,
         )
 
-    def __iter__(self):
-        # TODO GV Why is this logic in the __iter__ method and not in execution?
-        #      MR: this logic will be moved to plan.execute(); top of my TODO list tomorrow
-        shouldCache = self.datadir.openCache(self.targetCacheId)
-
-        @self.profile(name="filter", shouldProfile=self.shouldProfile)
-        def iteratorFn():
-            for nextCandidate in self.source:
-                resultRecord = self.__call__(nextCandidate)
-                if resultRecord._passed_filter:
-                    if shouldCache:
-                        self.datadir.appendCache(self.targetCacheId, resultRecord)
-                    yield resultRecord
-
-                # if we're profiling, then we still need to yield candidate for the profiler to compute its stats;
-                # the profiler will check the resultRecord._passed_filter field to see if it needs to be dropped
-                elif self.shouldProfile:
-                    yield resultRecord
-
-            if shouldCache:
-                self.datadir.closeCache(self.targetCacheId)
-
-        return iteratorFn()
-
 
 class NonLLMFilter(FilterOp):
-    implemented_op = logical.FilteredScan
-    final = True
-
-    @classmethod
-    def implements(cls, logical_operator_class):
-        if not logical_operator_class == cls.implemented_op:
-            return False
-        # logical_operator is a class
-        if isinstance(logical_operator_class, type): 
-            return logical_operator_class == cls.implemented_op
-
-    @classmethod
-    def materializes(cls, logical_operator: logical.LogicalOperator):
-        if not isinstance(logical_operator, cls.implemented_op):
-            return False
-        return logical_operator.filter.filterFn is not None
 
     def __eq__(self, other: NonLLMFilter):
         return (
@@ -145,8 +86,8 @@ class NonLLMFilter(FilterOp):
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_uuid=candidate._uuid,
-            record_parent_uuid=candidate._parent_uuid,
+            record_id=candidate._id,
+            record_parent_id=candidate._parent_id,
             record_state=candidate._asDict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),
@@ -169,20 +110,17 @@ class NonLLMFilter(FilterOp):
 
 
 class LLMFilter(FilterOp):
-    implemented_op = logical.FilteredScan
-    model = None
-    prompt_strategy = PromptStrategy.DSPY_COT_BOOL
-   
-    @classmethod
-    def materializes(cls, logical_operator: logical.LogicalOperator):
-        if not isinstance(logical_operator, cls.implemented_op):
-            return False
-        if cls.model in getVisionModels():
-            return False
-        return logical_operator.filter.filterCondition is not None
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        model: Model,
+        prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_BOOL,
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
+        self.model = model
+        self.prompt_strategy = prompt_strategy
 
         doc_schema = str(self.inputSchema)
         doc_type = self.inputSchema.className()
@@ -198,6 +136,11 @@ class LLMFilter(FilterOp):
         else:
             raise Exception(f"Prompt strategy {self.prompt_strategy} not implemented yet")
 
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        op_params = {"model": self.model, **op_params}
+
+        return op_params
 
     def __eq__(self, other: LLMFilter):
         return (
@@ -215,6 +158,8 @@ class LLMFilter(FilterOp):
         return self.__class__(
             inputSchema=self.inputSchema,
             outputSchema=self.outputSchema,
+            model=self.model,
+            prompt_strategy=self.prompt_strategy,
             filter=self.filter,
             targetCacheId=self.targetCacheId,
             shouldProfile=self.shouldProfile,
@@ -230,12 +175,6 @@ class LLMFilter(FilterOp):
         # number of output tokens to be ~1.25
         est_num_output_tokens = 1.25
 
-        # if we're using a few-shot prompt strategy, the est_num_input_tokens will increase
-        # by a small factor due to the added examples; we multiply after computing the
-        # est_num_output_tokens b/c the few-shot examples likely won't affect the output length
-        if self.prompt_strategy == PromptStrategy.FEW_SHOT:
-            est_num_input_tokens *= FEW_SHOT_PROMPT_INFLATION
-
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
             MODEL_CARDS[self.model.value]["seconds_per_output_token"]
@@ -247,11 +186,6 @@ class LLMFilter(FilterOp):
             MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
             + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
         )
-
-        # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
-        if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
-            model_conversion_time_per_record *= DSPY_TIME_INFLATION
-            model_conversion_usd_per_record *= DSPY_COST_INFLATION
 
         # estimate output cardinality using a constant assumption of the filter selectivity
         selectivity = NAIVE_EST_FILTER_SELECTIVITY
@@ -290,8 +224,8 @@ class LLMFilter(FilterOp):
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_uuid=candidate._uuid,
-            record_parent_uuid=candidate._parent_uuid,
+            record_id=candidate._id,
+            record_parent_id=candidate._parent_id,
             record_state=candidate._asDict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),

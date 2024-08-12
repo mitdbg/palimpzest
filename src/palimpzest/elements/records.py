@@ -1,4 +1,4 @@
-from palimpzest.constants import MAX_UUID_CHARS
+from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.corelib import Schema
 
 import hashlib
@@ -10,29 +10,34 @@ class DataRecord:
     def __init__(
         self,
         schema: Schema,
-        parent_uuid: str = None,
+        parent_id: str = None,
         scan_idx: int = None,
         cardinality_idx: int = None,
     ):
         # schema for the data record
         self.schema = schema
 
-        # TODO: this uuid should be a hash of the parent_uuid and/or the record index in the current operator
-        #       this way we can compare records across plans (e.g. for determining majority answer when gathering
-        #       samples from plans in parallel)
+        # NOTE: Record ids are hashed based on:
+        # 0. their schema (keys)
+        # 1. their parent record id(s) (or scan_idx if there is no parent record)
+        # 2. their index in the fan out (if this is in a one-to-many operation)
+        #
+        # We currently do NOT hash just based on record content (i.e. schema (key, value) pairs)
+        # because multiple DISTINCT outputs for a given operation may have the exact same
+        # schema (key, value) pairs.
+        # 
+        # We may revisit this hashing scheme in the future.
+
         # unique identifier for the record
-        # self._uuid = str(uuid.uuid4())[:MAX_UUID_CHARS]
-        uuid_str = (
-            str(schema) + (parent_uuid if parent_uuid is not None else str(scan_idx))
+        id_str = (
+            str(schema) + (parent_id if parent_id is not None else str(scan_idx))
             if cardinality_idx is None
             else str(schema)
             + str(cardinality_idx)
-            + (parent_uuid if parent_uuid is not None else str(scan_idx))
+            + (parent_id if parent_id is not None else str(scan_idx))
         )
-        self._uuid = hashlib.sha256(uuid_str.encode("utf-8")).hexdigest()[
-            :MAX_UUID_CHARS
-        ]
-        self._parent_uuid = parent_uuid
+        self._id = hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+        self._parent_id = parent_id
 
     def __getitem__(self, key):
         return super().__getattr__(key)

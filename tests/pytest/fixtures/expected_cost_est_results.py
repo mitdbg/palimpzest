@@ -1,4 +1,5 @@
 from palimpzest.constants import Model
+from palimpzest.operators import ConvertOp, FilterOp, MarshalAndScanDataOp
 from palimpzest.utils import getModels
 
 import pytest
@@ -123,41 +124,43 @@ def simple_plan_expected_results_factory(simple_plan_expected_operator_estimates
     def expected_results_generator(convert_model, filter_model):
         # the generator returns a function which is parameterized by the input_cardinality,
         # because the input_cardinality is provided at test time by the test class
-        def expected_results_fn(input_cardinality):
-            # compute expected time, cost, and quality for scan operation
-            scan_time_per_record = simple_plan_expected_operator_estimates["scan123"]["time_per_record"]
-            expected_scan_time = scan_time_per_record * input_cardinality
-            expected_scan_cost = 0.0
-            expected_scan_quality = 1.0
-            scan_selectivity = 1.0
+        def expected_results_fn(physical_op, input_cardinality):
+            expected_op_time, expected_op_cost, expected_op_quality, output_cardinality = None, None, None, None
 
-            # compute expected time, cost, and quality for convert operation
-            input_cardinality = scan_selectivity * input_cardinality
-            convert_time_per_record = simple_plan_expected_operator_estimates["convert123"][convert_model]["time_per_record"]
-            expected_convert_time = convert_time_per_record * input_cardinality
+            # compute expected cost, time, and quality for different operations
+            if isinstance(physical_op, MarshalAndScanDataOp):
+                scan_time_per_record = simple_plan_expected_operator_estimates["scan123"]["time_per_record"]
+                expected_op_time = scan_time_per_record * input_cardinality
+                expected_op_cost = 0.0
+                expected_op_quality = 1.0
+                scan_selectivity = 1.0
+                output_cardinality = scan_selectivity * input_cardinality
 
-            convert_cost_per_record = simple_plan_expected_operator_estimates["convert123"][convert_model]["cost_per_record"]
-            expected_convert_cost = convert_cost_per_record * input_cardinality
+            # compute expected cost, time, and quality for convert operation
+            elif isinstance(physical_op, ConvertOp):
+                convert_time_per_record = simple_plan_expected_operator_estimates["convert123"][convert_model]["time_per_record"]
+                expected_op_time = convert_time_per_record * input_cardinality
 
-            expected_convert_quality = simple_plan_expected_operator_estimates["convert123"][convert_model]["quality"]
-            convert_selectivity = simple_plan_expected_operator_estimates["convert123"][convert_model]["selectivity"]
+                convert_cost_per_record = simple_plan_expected_operator_estimates["convert123"][convert_model]["cost_per_record"]
+                expected_op_cost = convert_cost_per_record * input_cardinality
 
-            # compute expected time, cost, and quality for filter operation
-            input_cardinality = convert_selectivity * input_cardinality
-            filter_time_per_record = simple_plan_expected_operator_estimates["filter123"][filter_model]["time_per_record"]
-            expected_filter_time = filter_time_per_record * input_cardinality
+                expected_op_quality = simple_plan_expected_operator_estimates["convert123"][convert_model]["quality"]
+                convert_selectivity = simple_plan_expected_operator_estimates["convert123"][convert_model]["selectivity"]
+                output_cardinality = convert_selectivity * input_cardinality
 
-            filter_cost_per_record = simple_plan_expected_operator_estimates["filter123"][filter_model]["cost_per_record"]
-            expected_filter_cost = filter_cost_per_record * input_cardinality
+            # compute expected cost, time, and quality for filter operation
+            elif isinstance(physical_op, FilterOp):
+                filter_time_per_record = simple_plan_expected_operator_estimates["filter123"][filter_model]["time_per_record"]
+                expected_op_time = filter_time_per_record * input_cardinality
 
-            expected_filter_quality = simple_plan_expected_operator_estimates["filter123"][filter_model]["quality"]
+                filter_cost_per_record = simple_plan_expected_operator_estimates["filter123"][filter_model]["cost_per_record"]
+                expected_op_cost = filter_cost_per_record * input_cardinality
 
-            # compute aggregate time, cost, and quality
-            total_time = expected_scan_time + expected_convert_time + expected_filter_time
-            total_cost = expected_scan_cost + expected_convert_cost + expected_filter_cost
-            quality = expected_scan_quality * expected_convert_quality * expected_filter_quality
+                expected_op_quality = simple_plan_expected_operator_estimates["filter123"][filter_model]["quality"]
+                filter_selectivity = simple_plan_expected_operator_estimates["filter123"][filter_model]["selectivity"]
+                output_cardinality = filter_selectivity * input_cardinality
 
-            return total_time, total_cost, quality
+            return expected_op_cost, expected_op_time, expected_op_quality, output_cardinality
         
         return expected_results_fn
 

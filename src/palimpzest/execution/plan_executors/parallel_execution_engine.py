@@ -1,10 +1,10 @@
-from palimpzest.constants import PlanType, PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
+from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements import DataRecord
 from palimpzest.execution import ExecutionEngine
 from palimpzest.operators import AggregateOp, LimitScanOp, MarshalAndScanDataOp, PhysicalOperator
-from palimpzest.planner import PhysicalPlan
+from palimpzest.optimizer import PhysicalPlan
 
 from palimpzest.dataclasses import OperatorStats, PlanStats
 
@@ -14,12 +14,15 @@ from typing import List, Optional, Union
 import time
 
 
-class PipelinedParallelExecutionEngine(ExecutionEngine):
+class PipelinedParallelPlanExecutor(ExecutionEngine):
     """
     This class implements the abstract execute_plan() method from the ExecutionEngine.
     This class still needs to be sub-classed by another Execution class which implements
     the higher-level execute() method.
     """
+    def __init__(self, *args, **kwargs):
+        super.__init__(*args, **kwargs)
+        self.max_workers = self.get_parallel_max_workers()
 
     @staticmethod
     def execute_op_wrapper(operator: PhysicalOperator, op_input: Union[DataRecord, List[DataRecord]]):
@@ -33,26 +36,22 @@ class PipelinedParallelExecutionEngine(ExecutionEngine):
         return records, record_op_stats_lst, operator
 
     def execute_plan(self, plan: PhysicalPlan,
-                     plan_type: PlanType = PlanType.FINAL,
-                     plan_idx: Optional[int] = None,
+                     num_samples: Union[int, float] = float("inf"),
                      max_workers: Optional[int] = None):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
-            print(f"{plan_type.value} {str(plan_idx)}:")
+            print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
             plan.printPlan()
             print("---")
 
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.get_plan_id())
+        plan_stats = PlanStats(plan_id=plan.plan_id)
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(op_idx=op_idx, op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
-
-        # set limit on the number of samples if this is a sentinel plan
-        num_samples = self.num_samples if plan_type == PlanType.SENTINEL else float("inf")  
+            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
 
         # initialize list of output records and intermediate variables
         output_records = []
@@ -89,11 +88,11 @@ class PipelinedParallelExecutionEngine(ExecutionEngine):
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # create initial set of futures to read first source file;
             # construct input DataRecord for DataSourcePhysicalOp
-            candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
+            candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)
             candidate.idx = current_scan_idx
             candidate.get_item_fn = datasource.getItem
             candidate.cardinality = datasource.cardinality
-            futures.append(executor.submit(PipelinedParallelExecutionEngine.execute_op_wrapper, source_operator, candidate))
+            futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
             op_id_to_futures_in_flight[source_op_id] += 1
             current_scan_idx += 1   
 
@@ -116,17 +115,12 @@ class PipelinedParallelExecutionEngine(ExecutionEngine):
                     op_id_to_futures_in_flight[op_id] -= 1
 
                     # update plan stats
-                    op_stats = plan_stats.operator_stats[op_id]
-                    for record_op_stats in record_op_stats_lst:
-                        # TODO code a nice __add__ function for OperatorStats and RecordOpStats
-                        prev_operator = op_id_to_prev_operator[op_id]
-                        record_op_stats.source_op_id = prev_operator.get_op_id() if prev_operator is not None else None
-                        record_op_stats.plan_id = plan.get_plan_id()
-                        op_stats.record_op_stats_lst.append(record_op_stats)
-                        op_stats.total_op_time += record_op_stats.time_per_record
-                        op_stats.total_op_cost += record_op_stats.cost_per_record
-
-                    plan_stats.operator_stats[op_id] = op_stats
+                    prev_operator = op_id_to_prev_operator[op_id]
+                    plan_stats.operator_stats[op_id].add_record_op_stats(
+                        record_op_stats_lst,
+                        source_op_id=prev_operator.get_op_id() if prev_operator is not None else None,
+                        plan_id=plan.plan_id,
+                    )
 
                     # process each record output by the future's operator
                     for record in records:
@@ -152,11 +146,11 @@ class PipelinedParallelExecutionEngine(ExecutionEngine):
                         # scan next record if we can still draw records from source
                         if source_records_scanned < num_samples and current_scan_idx < datasource_len:
                             # construct input DataRecord for DataSourcePhysicalOp
-                            candidate = DataRecord(schema=SourceRecord, parent_uuid=None, scan_idx=current_scan_idx)
+                            candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)
                             candidate.idx = current_scan_idx
                             candidate.get_item_fn = datasource.getItem
                             candidate.cardinality = datasource.cardinality
-                            new_futures.append(executor.submit(PipelinedParallelExecutionEngine.execute_op_wrapper, source_operator, candidate))
+                            new_futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
                             op_id_to_futures_in_flight[source_op_id] += 1
                             current_scan_idx += 1
 
@@ -187,7 +181,7 @@ class PipelinedParallelExecutionEngine(ExecutionEngine):
                         if upstream_ops_are_finished:
                             candidates = list(filter(lambda tup: tup[0].get_op_id() == op_id, processing_queue))
                             candidates = list(map(lambda tup: tup[1], candidates))
-                            future = executor.submit(PipelinedParallelExecutionEngine.execute_op_wrapper, operator, candidates)
+                            future = executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, operator, candidates)
                             new_futures.append(future)
                             op_id_to_futures_in_flight[op_id] += 1
                             processing_queue = list(filter(lambda tup: tup[0].get_op_id() != op_id, processing_queue))
@@ -195,7 +189,7 @@ class PipelinedParallelExecutionEngine(ExecutionEngine):
                     # otherwise, process all the records in the processing queue
                     else:
                         for operator, candidate in processing_queue:
-                            future = executor.submit(PipelinedParallelExecutionEngine.execute_op_wrapper, operator, candidate)
+                            future = executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, operator, candidate)
                             new_futures.append(future)
                             op_id_to_futures_in_flight[op_id] += 1
 

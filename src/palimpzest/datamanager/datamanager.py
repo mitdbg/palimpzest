@@ -1,15 +1,9 @@
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
 from palimpzest.datasources import *
-from palimpzest.elements import (
-    DownloadBinaryFunction,
-    DownloadHTMLFunction,
-    UserFunction,
-)
 
 import os
 import pickle
-import sys
 import yaml
 from threading import Lock
 

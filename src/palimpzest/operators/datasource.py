@@ -4,7 +4,7 @@ from palimpzest.constants import *
 from palimpzest.corelib import Schema
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.elements import DataRecord
-from palimpzest.operators import logical, DataRecordsWithStats, PhysicalOperator
+from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
 
 from typing import List, Union
 
@@ -17,6 +17,9 @@ class DataSourcePhysicalOp(PhysicalOperator):
     in order to accurately compute naive cost estimates. Thus, we use a slightly
     modified abstract base class for these operators.
     """
+    def get_op_params(self):
+        return {"outputSchema": str(self.outputSchema)}
+
     def naiveCostEstimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
@@ -31,7 +34,7 @@ class DataSourcePhysicalOp(PhysicalOperator):
         - cost_per_record
         - quality
     
-        For the implemented operator. These will be used by the CostEstimator
+        For the implemented operator. These will be used by the CostModel
         when PZ does not have sample execution data -- and it will be necessary
         in some cases even when sample execution data is present. (For example,
         the cardinality of each operator cannot be estimated based on sample
@@ -43,53 +46,31 @@ class DataSourcePhysicalOp(PhysicalOperator):
 
 class MarshalAndScanDataOp(DataSourcePhysicalOp):
 
-    implemented_op = logical.BaseScan
-    final = True
-
-    def __init__(
-        self,
-        outputSchema: Schema,
-        dataset_type: str,
-        shouldProfile=False,
-        *args, **kwargs
-    ):
-        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
-        self.dataset_type = dataset_type
-
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
             and self.outputSchema == other.outputSchema
-            and self.dataset_type == other.dataset_type
         )
 
     def __str__(self):
         return (
             f"{self.op_name()}("
             + str(self.outputSchema) 
-            + ", "
-            + self.dataset_type
             + ")"
         )
 
     def copy(self):
         return MarshalAndScanDataOp(
             self.outputSchema,
-            self.dataset_type,
             self.shouldProfile,
         )
-
-    def get_op_dict(self):
-        return {
-            "operator": self.op_name(),
-            "outputSchema": str(self.outputSchema),
-        }
 
     def naiveCostEstimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
         input_cardinality: Union[int, float],
         input_record_size_in_bytes: Union[int, float],
+        dataset_type: str,
     ) -> OperatorCostEstimates:
         # get inputs needed for naive cost estimation
         # TODO: we should rename cardinality --> "multiplier" or "selectivity" one-to-one / one-to-many
@@ -98,7 +79,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         perRecordSizeInKb = input_record_size_in_bytes / 1024.0
         timePerRecord = (
             LOCAL_SCAN_TIME_PER_KB * perRecordSizeInKb
-            if self.dataset_type in ["dir", "file"]
+            if dataset_type in ["dir", "file"]
             else MEMORY_SCAN_TIME_PER_KB * perRecordSizeInKb
         )
 
@@ -131,8 +112,8 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         record_op_stats_lst = []
         for record in records:
             record_op_stats = RecordOpStats(
-                record_uuid=record._uuid,
-                record_parent_uuid=record._parent_uuid,
+                record_id=record._id,
+                record_parent_id=record._parent_id,
                 record_state=record._asDict(include_bytes=False),
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),
@@ -144,16 +125,14 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         return records, record_op_stats_lst
 
 class CacheScanDataOp(DataSourcePhysicalOp):
-    implemented_op = logical.CacheScan
-    final = True
 
     def __init__(
         self,
-        outputSchema: Schema,
         cachedDataIdentifier: str,
-        shouldProfile=False,
+        *args,
+        **kwargs,
     ):
-        super().__init__(outputSchema=outputSchema, shouldProfile=shouldProfile)
+        super().__init__(*args, **kwargs)
         self.cachedDataIdentifier = cachedDataIdentifier
 
     def __eq__(self, other: PhysicalOperator):
@@ -179,12 +158,11 @@ class CacheScanDataOp(DataSourcePhysicalOp):
             self.shouldProfile,
         )
 
-    def get_op_dict(self):
-        return {
-            "operator": self.op_name(),
-            "outputSchema": str(self.outputSchema),
-            "cachedDataIdentifier": self.cachedDataIdentifier,
-        }
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        op_params = {"cachedDataIdentifier": self.cachedDataIdentifier, **op_params}
+
+        return op_params
 
     def naiveCostEstimates(
         self, 
@@ -224,8 +202,8 @@ class CacheScanDataOp(DataSourcePhysicalOp):
         record_op_stats_lst = []
         for record in records:
             record_op_stats = RecordOpStats(
-                record_uuid=record._uuid,
-                record_parent_uuid=record._parent_uuid,
+                record_id=record._id,
+                record_parent_id=record._parent_id,
                 record_state=record._asDict(include_bytes=False),
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),

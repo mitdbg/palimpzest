@@ -3,32 +3,16 @@ from __future__ import annotations
 from palimpzest.corelib import Schema
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.elements import DataRecord
-from palimpzest.operators import logical, PhysicalOperator, DataRecordsWithStats
+from palimpzest.operators import PhysicalOperator, DataRecordsWithStats
 
 from typing import List
 
 
 class LimitScanOp(PhysicalOperator):
-    implemented_op = logical.LimitScan
-    final = True
 
-    def __init__(
-        self,
-        outputSchema: Schema,
-        inputSchema: Schema,
-        limit: int,
-        targetCacheId: str = None,
-        shouldProfile=False,
-        *args,
-        **kwargs,
-    ):
-        super().__init__(
-            inputSchema=inputSchema,
-            outputSchema=outputSchema,
-            shouldProfile=shouldProfile,
-        )
+    def __init__(self, limit: int, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.limit = limit
-        self.targetCacheId = targetCacheId
 
     def __eq__(self, other: PhysicalOperator):
         return (
@@ -57,9 +41,8 @@ class LimitScanOp(PhysicalOperator):
             shouldProfile=self.shouldProfile,
         )
 
-    def get_op_dict(self):
+    def get_op_params(self):
         return {
-            "operator": self.op_name(),
             "outputSchema": str(self.outputSchema),
             "limit": self.limit,
         }
@@ -78,8 +61,8 @@ class LimitScanOp(PhysicalOperator):
         #       records are returned to the user by this operator.
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_uuid=candidate._uuid,
-            record_parent_uuid=candidate._parent_uuid,
+            record_id=candidate._id,
+            record_parent_id=candidate._parent_id,
             record_state=candidate._asDict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),

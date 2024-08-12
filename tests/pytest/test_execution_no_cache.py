@@ -1,8 +1,6 @@
 from conftest import *
-from palimpzest.constants import PlanType
 from palimpzest.execution import *
-from palimpzest.operators import LLMConvert, LLMFilter
-from palimpzest.strategies import LLMConvertCodeSynthesis, TokenReducedConvert
+from palimpzest.operators import LLMConvert, LLMFilter, CodeSynthesisConvert
 
 import time
 import pytest
@@ -29,8 +27,8 @@ class TestParallelExecutionNoCache:
     @pytest.mark.parametrize(
         argnames=("workload", "physical_plan"),
         argvalues=[
-            pytest.param("enron-workload", "enron-scan-only", id="scan-only"),
-            pytest.param("enron-workload", "enron-non-llm-filter", id="non-llm-filter"),
+            pytest.param("enron-workload", "scan-only", id="scan-only"),
+            pytest.param("enron-workload", "non-llm-filter", id="non-llm-filter"),
         ],
         indirect=True,
     )
@@ -40,7 +38,7 @@ class TestParallelExecutionNoCache:
         execution.set_source_dataset_id(workload)
 
         # execute the plan
-        _, plan_stats = execution.execute_plan(physical_plan, plan_type=PlanType.SENTINEL)
+        _, plan_stats = execution.execute_plan(physical_plan, num_samples=self.TEST_SENTINEL_NUM_SAMPLES)
 
         # NOTE: when we enable multi-source plans; this will need to be updated
         # get the stats from the source operator
@@ -52,14 +50,14 @@ class TestParallelExecutionNoCache:
     @pytest.mark.parametrize(
         argnames=("dataset", "physical_plan", "expected_records", "side_effect"),
         argvalues=[
-            pytest.param("enron-eval-tiny", "enron-scan-only", "enron-all-records", None, id="scan-only"),
-            pytest.param("enron-eval-tiny", "enron-non-llm-filter", "enron-filtered-records", None, id="non-llm-filter"),
-            pytest.param("enron-eval-tiny", "enron-llm-filter", "enron-filtered-records", "enron-filter", id="llm-filter"),
-            pytest.param("enron-eval-tiny", "enron-bonded-llm-convert", "enron-all-records", "enron-convert", id="bonded-llm-convert"),
-            pytest.param("enron-eval-tiny", "enron-code-synth-convert", "enron-all-records", "enron-convert", id="code-synth-convert"),
-            pytest.param("enron-eval-tiny", "enron-token-reduction-convert", "enron-all-records", "enron-convert", id="token-reduction-convert"),
-            pytest.param("real-estate-eval-tiny", "real-estate-image-convert", "real-estate-all-records", "real-estate-convert", id="image-convert"),
-            pytest.param("real-estate-eval-tiny", "real-estate-one-to-many-convert", "real-estate-one-to-many-records", "real-estate-one-to-many-convert", id="one-to-many-convert"),
+            pytest.param("enron-eval-tiny", "scan-only", "enron-all-records", None, id="scan-only"),
+            pytest.param("enron-eval-tiny", "non-llm-filter", "enron-filtered-records", None, id="non-llm-filter"),
+            pytest.param("enron-eval-tiny", "llm-filter", "enron-filtered-records", "enron-filter", id="llm-filter"),
+            pytest.param("enron-eval-tiny", "bonded-llm-convert", "enron-all-records", "enron-convert", id="bonded-llm-convert"),
+            pytest.param("enron-eval-tiny", "code-synth-convert", "enron-all-records", "enron-convert", id="code-synth-convert"),
+            pytest.param("enron-eval-tiny", "token-reduction-convert", "enron-all-records", "enron-convert", id="token-reduction-convert"),
+            pytest.param("real-estate-eval-tiny", "image-convert", "real-estate-all-records", "real-estate-convert", id="image-convert"),
+            pytest.param("real-estate-eval-tiny", "one-to-many-convert", "real-estate-one-to-many-records", "real-estate-one-to-many-convert", id="one-to-many-convert"),
         ],
         indirect=True,
     )
@@ -78,11 +76,10 @@ class TestParallelExecutionNoCache:
         # mock out calls to generators used by the plans which parameterize this test
         mocker.patch.object(LLMFilter, "__call__", side_effect=side_effect)
         mocker.patch.object(LLMConvert, "__call__", side_effect=side_effect)
-        mocker.patch.object(LLMConvertCodeSynthesis, "__call__", side_effect=side_effect)
-        mocker.patch.object(TokenReducedConvert, "__call__", side_effect=side_effect)
+        mocker.patch.object(CodeSynthesisConvert, "__call__", side_effect=side_effect)
 
         # execute the plan
-        output_records, plan_stats = execution.execute_plan(physical_plan, plan_type=PlanType.SENTINEL)
+        output_records, plan_stats = execution.execute_plan(physical_plan, num_samples=self.TEST_SENTINEL_NUM_SAMPLES)
         plan_stats.finalize(time.time() - start_time)
 
         # check that we get the expected set of output records
