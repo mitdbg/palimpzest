@@ -113,7 +113,7 @@ class StreamingSequentialExecution(ExecutionEngine):
 
         input_records = self.get_input_records()
         for idx, record in enumerate(input_records):
-            print("Iteration number: ", idx+1, "out of", len(input_records))
+            # print("Iteration number: ", idx+1, "out of", len(input_records))
             output_records = self.execute_opstream(self.plan, record)
             if idx == len(input_records) - 1:
                 total_plan_time = time.time() - start_time
