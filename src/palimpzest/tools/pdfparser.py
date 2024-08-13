@@ -220,11 +220,11 @@ def get_text_from_pdf(filename,
 
     if pdfprocessor == "pypdf":
         pdf = PdfReader(io.BytesIO(pdf_bytes))
-        # all_text = ""
-        # for page in pdf.pages:
-            # all_text += page.extract_text() + "\n"
-        # return all_text[:5000]
-        return pdf.pages[0].extract_text() # TODO we can only return first page
+        all_text = ""
+        for page in pdf.pages:
+            all_text += page.extract_text() + "\n"
+        return all_text
+        # return pdf.pages[0].extract_text() # TODO we can only return first page
     else:
         # Get md5 of the pdf_bytes
         md5 = get_md5(pdf_bytes)

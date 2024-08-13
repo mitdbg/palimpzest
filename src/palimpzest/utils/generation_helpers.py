@@ -36,4 +36,15 @@ def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
     answer = re.sub(r",\n.*\.\.\.$", "", answer, flags=re.MULTILINE)
     # Sanitize newlines in the JSON response
     answer = answer.replace("\n", " ")
-    return json.loads(answer)
+    try:
+        response = json.loads(answer)
+    except Exception as e:
+        if "items" in answer: # If we are in one to many
+            # Find the last dictionary item not closed
+            last_idx = answer.rfind("},")
+            # Close the last dictionary item
+            answer = answer[:last_idx+1] + "]}"
+            response = json.loads(answer)
+        else:
+            raise e
+    return response
