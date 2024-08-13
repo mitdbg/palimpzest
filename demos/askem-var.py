@@ -32,6 +32,7 @@ class Papersnippet(pz.TextFile):
 
 class Variable(pz.Schema):
     """ Represents a variable of scientific model in a scientific paper"""
+    excerptid = pz.Field(desc="The unique identifier for the excerpt", required=True)
     name = pz.Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
     description = pz.Field(desc="A description of the variable, optional, set 'null' if not found", required=False)
     value = pz.Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
@@ -127,18 +128,15 @@ if __name__ == "__main__":
                     continue
                 variables.append({
                     "id": index,
+                    "excerptid": var.excerptid,
                     "name": var.name,
                     "description": var.description,
                     "value": var.value,
                 })
 
-                # write variables into json file with readable format for every 10 variables
-                if index % 10 == 0:
-                    with open(f"askem-variables-{dataset}.json", "w") as f:
-                        json.dump(variables, f, indent=4)
-
                 with st.container(height=200, border=True):
                     st.write("**id:** ", index)
+                    st.write(" **excerptid:** ", var.excerptid)
                     st.write(" **name:** ", var.name)
                     st.write(" **description:** ", var.description)
                     st.write(" **value:** ", var.value, "\n")
