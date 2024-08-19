@@ -45,7 +45,7 @@ class PhysicalOperator:
 
     def op_name(self) -> str:
         """Name of the physical operator."""
-        return self.__class__.__name__
+        return str(self.__class__.__name__)
 
     def get_op_params(self):
         """
@@ -71,6 +71,7 @@ class PhysicalOperator:
         # compute, set, and return the op_id
         op_name = self.op_name()
         op_params = self.get_op_params()
+        op_params = {k: str(v) for k, v in op_params.items()}
         hash_str = json.dumps({"op_name": op_name, **op_params}, sort_keys=True)
         self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 

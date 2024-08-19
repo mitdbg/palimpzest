@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from palimpzest.constants import MAX_ID_CHARS, PlanCost
+from palimpzest.constants import MAX_ID_CHARS
+from palimpzest.dataclasses import PlanCost
 from palimpzest.operators import PhysicalOperator
 
 # backwards compatability for users who are still on Python 3.9
@@ -50,9 +51,7 @@ class PhysicalPlan(Plan):
 
     def __init__(self, operators: List[PhysicalOperator], plan_cost: Optional[PlanCost] = None):
         self.operators = operators
-        self.total_time = plan_cost.time if plan_cost is not None else 0.0
-        self.total_cost = plan_cost.cost if plan_cost is not None else 0.0
-        self.quality = plan_cost.quality if plan_cost is not None else 1.0
+        self.plan_cost = plan_cost if plan_cost is not None else PlanCost(cost=0.0, time=0.0, quality=1.0)
         self.plan_id = self.compute_plan_id()
 
     def compute_plan_id(self) -> str:
@@ -71,7 +70,7 @@ class PhysicalPlan(Plan):
         return int(self.plan_id, 16)
 
     @staticmethod
-    def fromOpsAndSubPlan(ops: List[PhysicalOperator], plan_cost: PlanCost, subPlan: PhysicalPlan) -> PhysicalPlan:
+    def fromOpsAndSubPlan(ops: List[PhysicalOperator], ops_plan_cost: PlanCost, subPlan: PhysicalPlan) -> PhysicalPlan:
         # create copies of all logical operators
         copySubPlan = [op.copy() for op in subPlan.operators]
         copyOps = [op.copy() for op in ops]
@@ -80,21 +79,16 @@ class PhysicalPlan(Plan):
         copySubPlan.extend(copyOps)
 
         # aggregate cost of ops and subplan
-        full_plan_cost = subPlan.total_cost + plan_cost.cost
-        full_plan_time = subPlan.total_time + plan_cost.time
-        full_plan_quality = subPlan.quality * plan_cost.quality
-        full_plan_cost_tuple = PlanCost(full_plan_cost, full_plan_time, full_plan_quality, None)
+        full_plan_cost = subPlan.plan_cost + ops_plan_cost
+        full_plan_cost.op_estimates = ops_plan_cost.op_estimates
 
         # return the PhysicalPlan
-        return PhysicalPlan(operators=copySubPlan, plan_cost=full_plan_cost_tuple)
+        return PhysicalPlan(operators=copySubPlan, plan_cost=full_plan_cost)
 
     def __repr__(self) -> str:
         """Computes a string representation for this plan."""
         label = "-".join([str(op) for op in self.operators])
         return f"PZ-{label}"
-
-    def get_plan_cost_tuple(self) -> PlanCost:
-        return PlanCost(self.total_cost, self.total_time, self.quality, None)
 
     def getPlanModelNames(self) -> List[str]:
         model_names = []

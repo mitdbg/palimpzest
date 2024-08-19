@@ -21,8 +21,8 @@ class FilterOp(PhysicalOperator):
 
     def get_op_params(self):
         return {
-            "outputSchema": str(self.outputSchema),
-            "filter": str(self.filter),
+            "outputSchema": self.outputSchema,
+            "filter": self.filter,
         }
 
     def __eq__(self, other: FilterOp):

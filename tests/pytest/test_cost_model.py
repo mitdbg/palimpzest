@@ -34,14 +34,14 @@ class TestCostModel:
         argnames=("physical_plan", "expected_cost_est_results"),
         argvalues=[
             pytest.param("cost-est-simple-plan-gpt4-gpt4", "cost-est-simple-plan-gpt4-gpt4", id="gpt4-gpt4"),
-            # pytest.param("cost-est-simple-plan-gpt4-gpt35", "cost-est-simple-plan-gpt4-gpt35", id="gpt4-gpt35"),
-            # pytest.param("cost-est-simple-plan-gpt4-mixtral", "cost-est-simple-plan-gpt4-mixtral", id="gpt4-mixtral"),
-            # pytest.param("cost-est-simple-plan-gpt35-gpt4", "cost-est-simple-plan-gpt35-gpt4", id="gpt35-gpt4"),
-            # pytest.param("cost-est-simple-plan-gpt35-gpt35", "cost-est-simple-plan-gpt35-gpt35", id="gpt35-gpt35"),
-            # pytest.param("cost-est-simple-plan-gpt35-mixtral", "cost-est-simple-plan-gpt35-mixtral", id="gpt35-mixtral"),
-            # pytest.param("cost-est-simple-plan-mixtral-gpt4", "cost-est-simple-plan-mixtral-gpt4", id="mixtral-gpt4"),
-            # pytest.param("cost-est-simple-plan-mixtral-gpt35", "cost-est-simple-plan-mixtral-gpt35", id="mixtral-gpt35"),
-            # pytest.param("cost-est-simple-plan-mixtral-mixtral", "cost-est-simple-plan-mixtral-mixtral", id="mixtral-mixtral"),
+            pytest.param("cost-est-simple-plan-gpt4-gpt35", "cost-est-simple-plan-gpt4-gpt35", id="gpt4-gpt35"),
+            pytest.param("cost-est-simple-plan-gpt4-mixtral", "cost-est-simple-plan-gpt4-mixtral", id="gpt4-mixtral"),
+            pytest.param("cost-est-simple-plan-gpt35-gpt4", "cost-est-simple-plan-gpt35-gpt4", id="gpt35-gpt4"),
+            pytest.param("cost-est-simple-plan-gpt35-gpt35", "cost-est-simple-plan-gpt35-gpt35", id="gpt35-gpt35"),
+            pytest.param("cost-est-simple-plan-gpt35-mixtral", "cost-est-simple-plan-gpt35-mixtral", id="gpt35-mixtral"),
+            pytest.param("cost-est-simple-plan-mixtral-gpt4", "cost-est-simple-plan-mixtral-gpt4", id="mixtral-gpt4"),
+            pytest.param("cost-est-simple-plan-mixtral-gpt35", "cost-est-simple-plan-mixtral-gpt35", id="mixtral-gpt35"),
+            pytest.param("cost-est-simple-plan-mixtral-mixtral", "cost-est-simple-plan-mixtral-mixtral", id="mixtral-mixtral"),
         ],
         indirect=True,
     )
@@ -72,14 +72,14 @@ class TestCostModel:
         # estimate cost of plan operators
         source_op_estimates = None
         for op in physical_plan:
-            op_cost, op_time, op_quality, op_estimates = cost_model(op, source_op_estimates)
-            source_op_estimates = op_estimates
+            op_plan_cost = cost_model(op, source_op_estimates)
+            source_op_estimates = op_plan_cost.op_estimates
 
             # check that estimated time, cost, and quality are as expected
-            expected_op_cost, expected_op_time, expected_op_quality, output_cardinality = expected_cost_est_results(op, input_cardinality)
-            assert op_cost == expected_op_cost
-            assert op_time == expected_op_time
-            assert op_quality == expected_op_quality
+            op_cost, op_time, op_quality, output_cardinality = expected_cost_est_results(op, input_cardinality)
+            assert op_plan_cost.cost == op_cost
+            assert op_plan_cost.time == op_time
+            assert op_plan_cost.quality == op_quality
 
             # update input_cardinality for next operator
             input_cardinality = output_cardinality

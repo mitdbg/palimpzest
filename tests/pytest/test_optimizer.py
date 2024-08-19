@@ -77,7 +77,8 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
         )
-        physical_plan = optimizer.optimize(plan)
+        physical_plans = optimizer.optimize(plan)
+        physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 1
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
@@ -93,7 +94,8 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
         )
-        physical_plan = optimizer.optimize(plan)
+        physical_plans = optimizer.optimize(plan)
+        physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 2
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
@@ -111,7 +113,8 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
         )
-        physical_plan = optimizer.optimize(plan)
+        physical_plans = optimizer.optimize(plan)
+        physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 2
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
@@ -128,7 +131,8 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
         )
-        physical_plan = optimizer.optimize(plan)
+        physical_plans = optimizer.optimize(plan)
+        physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 2
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
@@ -146,7 +150,8 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
         )
-        physical_plan = optimizer.optimize(plan)
+        physical_plans = optimizer.optimize(plan)
+        physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 3
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
@@ -166,7 +171,8 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
         )
-        physical_plan = optimizer.optimize(plan)
+        physical_plans = optimizer.optimize(plan)
+        physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 4
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
@@ -186,7 +192,8 @@ class TestOptimizer:
             allow_token_reduction=False,
             allow_code_synth=False,
         )
-        physical_plan = optimizer.optimize(real_estate_workload)
+        physical_plans = optimizer.optimize(real_estate_workload)
+        physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 6
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)  # RealEstateListingFiles
@@ -214,7 +221,8 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL, Model.GPT_4V],
         )
-        physical_plan = optimizer.optimize(plan)
+        physical_plans = optimizer.optimize(plan)
+        physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 9
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)

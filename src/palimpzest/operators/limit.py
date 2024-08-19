@@ -43,7 +43,7 @@ class LimitScanOp(PhysicalOperator):
 
     def get_op_params(self):
         return {
-            "outputSchema": str(self.outputSchema),
+            "outputSchema": self.outputSchema,
             "limit": self.limit,
         }
 

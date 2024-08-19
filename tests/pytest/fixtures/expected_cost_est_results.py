@@ -61,15 +61,15 @@ def simple_plan_expected_operator_estimates(simple_plan_scan_data, simple_plan_c
         elif model_name == Model.GPT_3_5.value:
             model_start_idx = 2
             model_end_idx = 4
-            expected_quality = ((1.0 / 2.0) + (1.0 / 2.0)) / 2.0  # avg. recall (per-key)
+            expected_quality = (2.0 / 4.0)  # correct answers / total keys 
         elif model_name == Model.MIXTRAL.value:
             model_start_idx = 4
             model_end_idx = 6
-            expected_quality = ((1.0 / 2.0) + (0.0 / 2.0)) / 2.0  # avg. recall (per-key)
+            expected_quality = (1.0 / 4.0)  # correct answers / total keys 
         else:
             model_start_idx = 0
             model_end_idx = 6
-            expected_quality = ((2.0 / 2.0) + (2.0 / 2.0) + (1.0 / 2.0) + (1.0 / 2.0) + (1.0 / 2.0) + (0.0 / 2.0)) / 6.0 # avg. recall (per-key)
+            expected_quality = 7.0 / 12.0  # correct answers / total keys 
 
         num_samples = model_end_idx - model_start_idx
         expected_operator_estimates[convert_op_id][model_name]["time_per_record"] = sum(convert_time_per_records[model_start_idx:model_end_idx])/num_samples

@@ -57,7 +57,8 @@ class NoSentinelExecutionEngine(ExecutionEngine):
             records, plan_stats = self.execute_confidence_interval_strategy(dataset, optimizer)
 
         elif self.optimization_strategy == OptimizationStrategy.PARETO_OPTIMAL:
-            records, plan_stats = self.execute_pareto_optimal_strategy(dataset, optimizer)
+            # records, plan_stats = self.execute_pareto_optimal_strategy(dataset, optimizer)
+            raise NotImplementedError("Future work")
 
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)
@@ -67,7 +68,7 @@ class NoSentinelExecutionEngine(ExecutionEngine):
             execution_id=self.execution_id(),
             plan_stats=aggregate_plan_stats,
             total_execution_time=time.time() - execution_start_time,
-            total_execution_cost=sum(list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats))),
+            total_execution_cost=sum(list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats.values()))),
         )
 
         return records, execution_stats

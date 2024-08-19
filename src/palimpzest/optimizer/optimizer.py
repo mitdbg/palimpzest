@@ -334,17 +334,17 @@ class Optimizer:
         # if this expression has no inputs (i.e. it is a BaseScan or CacheScan),
         # create and return the physical plan
         if len(best_phys_expr.input_group_ids) == 0:
-            return PhysicalPlan(operators=[best_phys_expr.operator], plan_cost=best_phys_expr.plan_cost_tuple)
+            return PhysicalPlan(operators=[best_phys_expr.operator], plan_cost=best_phys_expr.plan_cost)
 
         # TODO: need to handle joins
         # get the best physical plan(s) for this group's inputs
         best_phys_subplan = PhysicalPlan(operators=[])
         for input_group_id in best_phys_expr.input_group_ids:
             input_best_phys_plan = self.get_optimal_physical_plan(input_group_id)
-            best_phys_subplan = PhysicalPlan.fromOpsAndSubPlan(best_phys_subplan.operators, best_phys_subplan.get_plan_cost_tuple(), input_best_phys_plan)
+            best_phys_subplan = PhysicalPlan.fromOpsAndSubPlan(best_phys_subplan.operators, best_phys_subplan.plan_cost, input_best_phys_plan)
 
         # add this operator to best physical plan and return
-        return PhysicalPlan.fromOpsAndSubPlan([best_phys_expr.operator], best_phys_expr.plan_cost_tuple, best_phys_subplan)
+        return PhysicalPlan.fromOpsAndSubPlan([best_phys_expr.operator], best_phys_expr.plan_cost, best_phys_subplan)
 
 
     def get_confidence_interval_optimal_plans(self, group_id: int) -> List[PhysicalPlan]:
@@ -366,7 +366,7 @@ class Optimizer:
             # if this expression has no inputs (i.e. it is a BaseScan or CacheScan),
             # create the physical plan and append it to the best_plans for this group
             if len(phys_expr.input_group_ids) == 0:
-                plan = PhysicalPlan(operators=[phys_expr.operator], plan_cost=phys_expr.plan_cost_tuple)
+                plan = PhysicalPlan(operators=[phys_expr.operator], plan_cost=phys_expr.plan_cost)
                 best_plans.append(plan)
 
             # otherwise, get the best physical plan(s) for this group's inputs
@@ -376,14 +376,14 @@ class Optimizer:
                 for input_group_id in phys_expr.input_group_ids:
                     input_best_phys_plans = self.get_confidence_interval_optimal_plans(input_group_id)
                     best_phys_subplans = [
-                        PhysicalPlan.fromOpsAndSubPlan(subplan.operators, subplan.get_plan_cost_tuple(), input_subplan)
+                        PhysicalPlan.fromOpsAndSubPlan(subplan.operators, subplan.plan_cost, input_subplan)
                         for subplan in best_phys_subplans
                         for input_subplan in input_best_phys_plans
                     ]
 
                 # add this operator to best physical plan and return
                 for subplan in best_phys_subplans:
-                    plan = PhysicalPlan.fromOpsAndSubPlan([phys_expr.operator], phys_expr.plan_cost_tuple, subplan)
+                    plan = PhysicalPlan.fromOpsAndSubPlan([phys_expr.operator], phys_expr.plan_cost, subplan)
                     best_plans.append(plan)
 
         return best_plans
@@ -400,7 +400,7 @@ class Optimizer:
 
         This function computes the cross-product of all such expressions across all groups.
         """
-        return []
+        raise NotImplementedError("Future work")
 
 
     def optimize(self, query_plan: QueryPlan) -> List[PhysicalPlan]:
@@ -430,6 +430,6 @@ class Optimizer:
             plans = self.get_confidence_interval_optimal_plans(final_group_id)
 
         elif self.optimization_strategy == OptimizationStrategy.PARETO_OPTIMAL:
-            plans = self.get_pareto_optimal_plans(final_group_id)
+            raise NotImplementedError("Future work")
 
         return plans

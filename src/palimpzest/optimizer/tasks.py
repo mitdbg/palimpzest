@@ -1,6 +1,6 @@
 from __future__ import annotations
-from palimpzest.constants import OptimizationStrategy, PlanCost
-from palimpzest.dataclasses import ExpressionCost
+from palimpzest.constants import OptimizationStrategy
+from palimpzest.dataclasses import PlanCost
 from palimpzest.cost_model import CostModel
 from palimpzest.optimizer.primitives import Expression, Group
 from palimpzest.optimizer.rules import TransformationRule, ImplementationRule, Rule
@@ -222,11 +222,11 @@ class OptimizePhysicalExpression(Task):
         """
         # get the PlanCosts for the current best expression and this physical expression
         best_plan_cost = (
-            group.best_physical_expression.plan_cost_tuple
+            group.best_physical_expression.plan_cost
             if group.best_physical_expression is not None
             else None
         )
-        expr_plan_cost = self.physical_expression.plan_cost_tuple
+        expr_plan_cost = self.physical_expression.plan_cost
 
         # pre-compute whether or not this physical expression satisfies the policy constraint
         expr_satisfies_constraint = policy.constraint(expr_plan_cost)
@@ -264,12 +264,7 @@ class OptimizePhysicalExpression(Task):
         policy_metric = policy.get_primary_metric()
 
         # get the PlanCosts for the current best expression and this physical expression
-        best_plan_cost = (
-            group.best_physical_expression.plan_cost_tuple
-            if group.best_physical_expression is not None
-            else None
-        )
-        expr_plan_cost = self.physical_expression.plan_cost_tuple
+        expr_plan_cost = self.physical_expression.plan_cost
 
         # pre-compute whether or not this physical expression satisfies the policy constraint
         expr_satisfies_constraint = policy.constraint(expr_plan_cost)
@@ -277,48 +272,97 @@ class OptimizePhysicalExpression(Task):
         # attribute names for lower and upper bounds
         lower_bound = f"{policy_metric}_lower_bound"
         upper_bound = f"{policy_metric}_upper_bound"
-        
+
+        # get the expression and plan's upper and lower bounds on the metric of interest
+        expr_lower_bound = getattr(expr_plan_cost, lower_bound)
+        expr_upper_bound = getattr(expr_plan_cost, upper_bound)
+        group_lower_bound = getattr(group, lower_bound)
+
         # if the CI best physical expressions is empty, add this expression
         if group.ci_best_physical_expressions == []:
             group.ci_best_physical_expressions = [self.physical_expression]
             group.satisfies_constraint = expr_satisfies_constraint
-            setattr(group, lower_bound, getattr(expr_plan_cost, lower_bound))
-            setattr(group, upper_bound, getattr(expr_plan_cost, upper_bound))
+            setattr(group, lower_bound, expr_lower_bound)
+            setattr(group, upper_bound, expr_upper_bound)
 
         # if the group currently satisfies the constraint, only update the CI best physical expressions
         # if this expression also satisfies the constraint and has an upper bound on the policy metric
         # above the group's lower bound on the policy metric
-        if (
+        elif (
             group.satisfies_constraint
             and expr_satisfies_constraint
-            and getattr(expr_plan_cost, upper_bound) > getattr(group, lower_bound)
+            and expr_upper_bound > group_lower_bound
         ):
-            group.ci_best_physical_expressions.append(self.physical_expression)
-            if getattr(expr_plan_cost, lower_bound) < getattr(group, lower_bound):
-                setattr(group, lower_bound, getattr(expr_plan_cost, lower_bound))
-            if getattr(expr_plan_cost, upper_bound) > getattr(group, upper_bound):
-                setattr(group, upper_bound, getattr(expr_plan_cost, upper_bound))
+            # filter out any current best expressions whose upper bound is below the lower bound of this expression
+            group.ci_best_physical_expressions = [
+                curr_expr for curr_expr in group.ci_best_physical_expressions
+                if not getattr(curr_expr, upper_bound) < expr_lower_bound
+            ]
 
-        # finally 
+            # add this expression to the CI best physical expressions
+            group.ci_best_physical_expressions.append(self.physical_expression)
+
+            # compute the upper and lower bounds for the group
+            new_group_upper_bound = max(map(lambda expr: getattr(expr, upper_bound), group.ci_best_physical_expressions))
+            new_group_lower_bound = max(map(lambda expr: getattr(expr, lower_bound), group.ci_best_physical_expressions))
+
+            # set the new upper and lower bounds for the group
+            setattr(group, lower_bound, new_group_lower_bound)
+            setattr(group, upper_bound, new_group_upper_bound)
+
+        # if the group does not satisfy the constraint and the expression does satisfy the constraint,
+        # set the CI best physical expressions to be this expression
+        elif not group.satisfies_constraint and expr_satisfies_constraint:
+            group.ci_best_physical_expressions = [self.physical_expression]
+            group.satisfies_constraint = expr_satisfies_constraint
+            setattr(group, lower_bound, expr_lower_bound)
+            setattr(group, upper_bound, expr_upper_bound)
+
+        # finally, update the CI best physical expressions if the group does not satisfy the constraint
+        # and the expression does not satisfy the constraint, but the expression has an upper bound on the
+        # policy metric above the group's lower bound on the policy metric
+        elif (
+            not group.satisfies_constraint
+            and not expr_satisfies_constraint
+            and expr_upper_bound > group_lower_bound
+        ):
+            # filter out any current best expressions whose upper bound is below the lower bound of this expression
+            group.ci_best_physical_expressions = [
+                curr_expr for curr_expr in group.ci_best_physical_expressions
+                if not getattr(curr_expr, upper_bound) < expr_lower_bound
+            ]
+
+            # add this expression to the CI best physical expressions
+            group.ci_best_physical_expressions.append(self.physical_expression)
+
+            # compute the upper and lower bounds for the group
+            new_group_upper_bound = max(map(lambda expr: getattr(expr, upper_bound), group.ci_best_physical_expressions))
+            new_group_lower_bound = max(map(lambda expr: getattr(expr, lower_bound), group.ci_best_physical_expressions))
+
+            # set the new upper and lower bounds for the group
+            setattr(group, lower_bound, new_group_lower_bound)
+            setattr(group, upper_bound, new_group_upper_bound)
+        
+        return group
+
 
     def perform(self, cost_model: CostModel, groups: Dict[int, Group], policy: Policy, context: Dict[str, Any]={}) -> List[Task]:
-        # TODO: will we ever need to update the physical expression's plan cost tuple?
         # return if we've already computed the cost of this physical expression
-        if self.physical_expression.plan_cost_tuple is not None:
+        if self.physical_expression.plan_cost is not None:
             return []
 
         # compute the cumulative cost of the input groups
         new_tasks = []
-        total_input_cost_obj = ExpressionCost(cost=0, time=0, quality=1)
+        total_input_plan_cost = PlanCost(cost=0, time=0, quality=1)
         source_op_estimates = None
         for input_group_id in self.physical_expression.input_group_ids:
             group = groups[input_group_id]
             if group.best_physical_expression is not None:
-                expr_cost_obj = group.best_physical_expression.expression_cost_object
+                expr_plan_cost = group.best_physical_expression.plan_cost
                 # TODO: apply policy constraint here
                 # NOTE: assumes sequential execution of input groups
-                total_input_cost_obj += expr_cost_obj
-                source_op_estimates = expr_cost_obj.op_estimates # TODO: this needs to be handled correctly for joins w/multiple inputs
+                total_input_plan_cost += expr_plan_cost
+                source_op_estimates = expr_plan_cost.op_estimates # TODO: this needs to be handled correctly for joins w/multiple inputs
             else:
                 task = OptimizeGroup(input_group_id)
                 new_tasks.append(task)
@@ -327,15 +371,14 @@ class OptimizePhysicalExpression(Task):
         if len(new_tasks) > 0:
             return [self] + new_tasks
 
-        # TODO: return ExpressionCost w/upper & lower bounds
         # otherwise, compute the cost of this operator
-        op_expr_cost_obj = cost_model(self.physical_expression.operator, source_op_estimates)
+        op_plan_cost = cost_model(self.physical_expression.operator, source_op_estimates)
 
-        # compute the total cost for this physical expression by summing its operator's ExpressionCost
-        # with the input groups' total ExpressionCost; also set the op_estimates for this expression's operator
-        full_expr_cost_obj = op_expr_cost_obj + total_input_cost_obj
-        full_expr_cost_obj.op_estimates = op_expr_cost_obj.op_estimates
-        self.physical_expression.expression_cost_object = full_expr_cost_obj
+        # compute the total cost for this physical expression by summing its operator's PlanCost
+        # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
+        full_plan_cost = op_plan_cost + total_input_plan_cost
+        full_plan_cost.op_estimates = op_plan_cost.op_estimates
+        self.physical_expression.plan_cost = full_plan_cost
 
         group = groups[self.physical_expression.group_id]
         if context['optimization_strategy'] == OptimizationStrategy.OPTIMAL:
@@ -347,6 +390,6 @@ class OptimizePhysicalExpression(Task):
             groups[self.physical_expression.group_id] = group
 
         elif context['optimization_strategy'] == OptimizationStrategy.PARETO_OPTIMAL:
-            pass
+            raise NotImplementedError("Future work")
 
         return []

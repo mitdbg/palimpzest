@@ -18,7 +18,7 @@ class DataSourcePhysicalOp(PhysicalOperator):
     modified abstract base class for these operators.
     """
     def get_op_params(self):
-        return {"outputSchema": str(self.outputSchema)}
+        return {"outputSchema": self.outputSchema}
 
     def naiveCostEstimates(
         self,

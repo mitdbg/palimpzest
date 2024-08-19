@@ -137,11 +137,11 @@ def score_plan(dataset, records, policy_str=None, reopt=False) -> float:
     preds, targets = None, None
     if "enron" in dataset:
         preds = records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
-        gt_df = pd.read_csv("testdata/groundtruth/enron-eval.csv")
+        gt_df = pd.read_csv("testdata/groundtruth/enron-eval-tiny.csv")
         targets = list(gt_df[gt_df.label == 1].filename)
     elif "real-estate" in dataset:
         preds = list(records_df.listing)
-        gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval-100.csv")
+        gt_df = pd.read_csv("testdata/groundtruth/real-estate-eval-tiny.csv")
         targets = list(gt_df[gt_df.label == 1].listing)
 
     # compute true and false positives
@@ -191,18 +191,20 @@ def test_workload(dataset, workload, execution_engine):
     num_samples = int(0.05 * dataset_size) if dataset != "biofabric-tiny" else 1
 
     available_models = getModels(include_vision=True)
-    records, plan, stats = Execute(workload, 
-                                  policy=pz.MinCost(),
-                                  available_models=available_models,
-                                  num_samples=num_samples,
-                                  nocache=True,
-                                  allow_bonded_query=True,
-                                  allow_code_synth=False,
-                                  allow_token_reduction=False,
-                                  execution_engine=execution_engine)
+    records, stats = Execute(workload, 
+                            policy=pz.MinCost(),
+                            available_models=available_models,
+                            num_samples=num_samples,
+                            nocache=True,
+                            allow_bonded_query=True,
+                            allow_code_synth=False,
+                            allow_token_reduction=False,
+                            execution_engine=execution_engine)
     
+    # NOTE: f1 score calculation will be low for biofabric b/c the
+    #       evaluation function still checks against the full dataset's labels
     # print(f"Plan: {result_dict['plan_info']['plan_label']}")
     f1_score = score_plan(dataset=dataset, records=records)
     print(f"  F1: {f1_score}")
-    print(f"  rt: {stats.total_plan_time}")
-    print(f"  $$: {stats.total_plan_cost}")
+    print(f"  rt: {stats.total_execution_time}")
+    print(f"  $$: {stats.total_execution_cost}")

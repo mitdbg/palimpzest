@@ -21,7 +21,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
     the higher-level execute() method.
     """
     def __init__(self, *args, **kwargs):
-        super.__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.max_workers = self.get_parallel_max_workers()
 
     @staticmethod

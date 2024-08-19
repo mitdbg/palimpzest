@@ -3,10 +3,6 @@ from .plan import *
 from .rules import *
 from .tasks import *
 
-# TODO: remove
-from .logical_planner import *
-from .physical_planner import *
-
 # TODO repeated function find a place to move it to
 # https://stackoverflow.com/a/21563930
 def classesinmodule(module):

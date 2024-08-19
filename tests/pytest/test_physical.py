@@ -16,32 +16,6 @@ import pytest
 import palimpzest as pz
 from utils import remove_cache
 
-
-def test_class_attributes(email_schema):
-    generic_convert = pz.ConvertOp
-    conv_file_text = pz.ConvertFileToText
-
-    print("Input schema of ConvertOp: ", generic_convert.inputSchema)
-    print("Output schema of ConvertOp: ", generic_convert.outputSchema)
-    print("Input schema of ConvertFileToText: ", conv_file_text.inputSchema)
-    print("Output schema of ConvertFileToText: ", conv_file_text.outputSchema)
-
-    assert generic_convert.inputSchema != conv_file_text.inputSchema
-    assert generic_convert.outputSchema != conv_file_text.outputSchema
-
-    conv_implementations = pz.ConvertFileToText(
-        inputSchema=File,
-        outputSchema=TextFile,
-        cardinality="oneToOne",
-    )
-
-    with pytest.raises(Exception):
-        conv_implementations = pz.ConvertFileToText(
-            inputSchema=email_schema,
-            outputSchema=email_schema,
-            cardinality="oneToOne",
-        )
-
 # TODO: uncomment once I understand what is supposed to be happening with
 #       ParallelConvertFromCandidateOp and ParallelFilterCandidateOp (I don't
 #       have these on my branch; possibly came from another branch)

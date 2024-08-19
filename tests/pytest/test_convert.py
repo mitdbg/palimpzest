@@ -3,7 +3,6 @@ What it does is consider one of the demo scenarios and test whether we can obtai
 """
 
 import sys
-import pdb
 import pytest
 
 sys.path.append("./tests/")
@@ -13,7 +12,7 @@ import context
 import palimpzest as pz
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.elements.records import DataRecord
-from palimpzest.operators import ConvertFileToText, LLMConvertConventional, LLMConvertBonded
+from palimpzest.operators import LLMConvertConventional, LLMConvertBonded
 from palimpzest.operators.datasource import MarshalAndScanDataOp
 from palimpzest.constants import PromptStrategy
 
@@ -21,8 +20,7 @@ from palimpzest.constants import PromptStrategy
 def test_convert(convert_op, email_schema):
     """Test whether convert operators"""
     model = pz.Model.GPT_4
-    scanOp = MarshalAndScanDataOp(outputSchema=pz.File, shouldProfile=True)
-    hardcodedOp = ConvertFileToText(inputSchema=pz.File, outputSchema=pz.TextFile, shouldProfile=True)
+    scanOp = MarshalAndScanDataOp(outputSchema=pz.TextFile, shouldProfile=True)
     convertOp = convert_op(
         inputSchema=pz.File,
         outputSchema=email_schema,
@@ -41,8 +39,7 @@ def test_convert(convert_op, email_schema):
     outputs = []
     records, _ = scanOp(candidate)
     for record in records:
-        record, _ = hardcodedOp(record)
-        output, _ = convertOp(record[0])
+        output, _ = convertOp(record)
         outputs.extend(output)
 
     for record in outputs:

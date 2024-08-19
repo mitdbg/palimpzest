@@ -68,7 +68,7 @@ class ExecutionEngine:
         Hash of the class parameters.
         """
         id_str = ""
-        for attr, value in self.__dict__.keys():
+        for attr, value in self.__dict__.items():
             if not attr.startswith("_"):
                 id_str += f"{attr}={value},"
 

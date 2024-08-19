@@ -9,9 +9,9 @@ import pytest
 @pytest.mark.parametrize(
     argnames=("execution_engine",),
     argvalues=[
-        pytest.param(SequentialSingleThreadExecutionEngine, id="seq-single-thread"),
-        pytest.param(PipelinedSingleThreadExecutionEngine, id="pipe-single-thread"),
-        pytest.param(PipelinedParallelExecutionEngine, id="pipe-parallel"),
+        pytest.param(SequentialSingleThreadSentinelExecution, id="seq-single-thread"),
+        pytest.param(PipelinedSingleThreadSentinelExecution, id="pipe-single-thread"),
+        pytest.param(PipelinedParallelSentinelExecution, id="pipe-parallel"),
     ]
 )
 class TestParallelExecutionNoCache:
@@ -34,7 +34,7 @@ class TestParallelExecutionNoCache:
     )
     def test_execute_sentinel_plan(self, execution_engine, workload, physical_plan):
         # create execution instance
-        execution = execution_engine(num_samples=self.TEST_SENTINEL_NUM_SAMPLES, nocache=True)
+        execution = execution_engine(nocache=True)
         execution.set_source_dataset_id(workload)
 
         # execute the plan
@@ -79,7 +79,7 @@ class TestParallelExecutionNoCache:
         mocker.patch.object(CodeSynthesisConvert, "__call__", side_effect=side_effect)
 
         # execute the plan
-        output_records, plan_stats = execution.execute_plan(physical_plan, num_samples=self.TEST_SENTINEL_NUM_SAMPLES)
+        output_records, plan_stats = execution.execute_plan(physical_plan)
         plan_stats.finalize(time.time() - start_time)
 
         # check that we get the expected set of output records

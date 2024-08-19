@@ -34,10 +34,10 @@ class ConvertOp(PhysicalOperator):
         self.desc = desc
         self.heatmap_json_obj = None
 
-    def get_op_dict(self):
+    def get_op_params(self):
         return {
-            "inputSchema": str(self.inputSchema),
-            "outputSchema": str(self.outputSchema),
+            "inputSchema": self.inputSchema,
+            "outputSchema": self.outputSchema,
             "cardinality": self.cardinality.value,
             "udf": self.udf,
         }
@@ -69,6 +69,7 @@ class NonLLMConvert(ConvertOp):
             outputSchema=self.outputSchema,
             inputSchema=self.inputSchema,
             cardinality=self.cardinality,
+            udf=self.udf,
             desc=self.desc,
             targetCacheId=self.targetCacheId,
             shouldProfile=self.shouldProfile,
@@ -102,6 +103,7 @@ class NonLLMConvert(ConvertOp):
             drs = self.udf(candidate)
         except Exception as e:
             print(f"Error invoking user-defined function for convert: {e}")
+            raise e
 
         # time spent executing the UDF function
         fn_call_duration_secs = time.time() - start_time
@@ -179,7 +181,7 @@ class LLMConvert(ConvertOp):
         op_params = {
             "model": self.model,
             "prompt_strategy": self.prompt_strategy,
-            "image_conversion": self.image_conversion
+            "image_conversion": self.image_conversion,
             **op_params,
         }
 
@@ -399,14 +401,19 @@ class LLMConvert(ConvertOp):
 
         field_answers = {}
         if self.cardinality == Cardinality.ONE_TO_MANY:
-            assert (
-                isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0
-            ), "No output objects were generated for one-to-many query"
-            # json_answer["items"] is a list of dictionaries, each of which contains the generated fields
-            for field in fields_to_generate:
-                field_answers[field] = []
-                for item in json_answer["items"]:
-                    field_answers[field].append(item[field])
+            try:
+                assert (
+                    isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0
+                ), "No output objects were generated for one-to-many query"
+                # json_answer["items"] is a list of dictionaries, each of which contains the generated fields
+                for field in fields_to_generate:
+                    field_answers[field] = []
+                    for item in json_answer["items"]:
+                        field_answers[field].append(item[field])
+            except Exception as e:
+                print(f"Error parsing one-to-many answer: {e}")
+                field_answers = {field: [] for field in fields_to_generate}
+
         else:
             field_answers = {
                 field: [json_answer[field]] for field in fields_to_generate
@@ -601,7 +608,7 @@ class LLMConvertBonded(LLMConvert):
                     shouldProfile=self.shouldProfile,
                 )
 
-                field_answer, field_stats = conventional_op.convert(candidate_content, field)
+                field_answer, field_stats = conventional_op.convert(candidate_content, [field])
                 json_answers[field] = field_answer[field]
                 generation_stats += field_stats
 

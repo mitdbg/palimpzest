@@ -284,29 +284,52 @@ class OperatorCostEstimates:
     # (estimated) quality of the output from this operator
     quality: float
 
-    # lower bound (95% CI) on time_per_record
+    # lower bound on cardinality
+    cardinality_lower_bound: float = None
+
+    # upper bound on cardinality
+    cardinality_upper_bound: float = None
+
+    # lower bound on time_per_record
     time_per_record_lower_bound: float = None
 
-    # upper bound (95% CI) on time_per_record
+    # upper bound on time_per_record
     time_per_record_upper_bound: float = None
 
-    # lower bound (95% CI) on cost_per_record
+    # lower bound on cost_per_record
     cost_per_record_lower_bound: float = None
 
-    # upper bound (95% CI) on cost_per_record
+    # upper bound on cost_per_record
     cost_per_record_upper_bound: float = None
 
-    # lower bound (95% CI) on quality
+    # lower bound on quality
     quality_lower_bound: float = None
 
-    # upper bound (95% CI) on quality
+    # upper bound on quality
     quality_upper_bound: float = None
+
+    def __post_init__(self):
+        if self.cardinality_lower_bound is None and self.cardinality_upper_bound is None:
+            self.cardinality_lower_bound = self.cardinality
+            self.cardinality_upper_bound = self.cardinality
+
+        if self.time_per_record_lower_bound is None and self.time_per_record_upper_bound is None:
+            self.time_per_record_lower_bound = self.time_per_record
+            self.time_per_record_upper_bound = self.time_per_record
+
+        if self.cost_per_record_lower_bound is None and self.cost_per_record_upper_bound is None:
+            self.cost_per_record_lower_bound = self.cost_per_record
+            self.cost_per_record_upper_bound = self.cost_per_record
+
+        if self.quality_lower_bound is None and self.quality_upper_bound is None:
+            self.quality_lower_bound = self.quality
+            self.quality_upper_bound = self.quality
 
 
 @dataclass
-class ExpressionCost:
+class PlanCost:
     """
-    Dataclass for storing the (cost, time, quality) estimates of expressions and their upper and lower bounds.
+    Dataclass for storing the (cost, time, quality) estimates of (sub)-plans and their upper and lower bounds.
     """
     # the expression cost
     cost: float
@@ -338,25 +361,40 @@ class ExpressionCost:
     # upper bound on the expression quality
     quality_upper_bound: float = None
 
-    def __iadd__(self, expr_cost_obj: ExpressionCost):
+    def __post_init__(self):
+        if self.time_lower_bound is None and self.time_upper_bound is None:
+            self.time_lower_bound = self.time
+            self.time_upper_bound = self.time
+
+        if self.cost_lower_bound is None and self.cost_upper_bound is None:
+            self.cost_lower_bound = self.cost
+            self.cost_upper_bound = self.cost
+
+        if self.quality_lower_bound is None and self.quality_upper_bound is None:
+            self.quality_lower_bound = self.quality
+            self.quality_upper_bound = self.quality
+
+    def __iadd__(self, other: PlanCost) -> PlanCost:
         """
         NOTE: we currently assume the updating of the op_estimates are handled by the caller
         as there is not a universally correct meaning of addition of op_estiamtes.
         """
-        self.cost += expr_cost_obj.cost
-        self.time += expr_cost_obj.time
-        self.quality *= expr_cost_obj.quality
+        self.cost += other.cost
+        self.time += other.time
+        self.quality *= other.quality
         for field in ["cost_lower_bound", "cost_upper_bound", "time_lower_bound", "time_upper_bound"]:
-            if getattr(self, field) is not None and getattr(expr_cost_obj, field) is not None:
-                summation = getattr(self, field) + getattr(expr_cost_obj, field)
+            if getattr(self, field) is not None and getattr(other, field) is not None:
+                summation = getattr(self, field) + getattr(other, field)
                 setattr(self, field, summation)
-        
-        for field in ["quality_lower_bound", "quality_upper_bound"]:
-            if getattr(self, field) is not None and getattr(expr_cost_obj, field) is not None:
-                product = getattr(self, field) * getattr(expr_cost_obj, field)
-                setattr(self, field, product)
 
-    def __add__(self, other: ExpressionCost) -> ExpressionCost:
+        for field in ["quality_lower_bound", "quality_upper_bound"]:
+            if getattr(self, field) is not None and getattr(other, field) is not None:
+                product = getattr(self, field) * getattr(other, field)
+                setattr(self, field, product)
+        
+        return self
+
+    def __add__(self, other: PlanCost) -> PlanCost:
         """
         NOTE: we currently assume the updating of the op_estimates are handled by the caller
         as there is not a universally correct meaning of addition of op_estiamtes.
@@ -368,4 +406,4 @@ class ExpressionCost:
         for field in ["quality", "quality_lower_bound", "quality_upper_bound"]:
             dct[field] = getattr(self, field) * getattr(other, field)
         
-        return ExpressionCost(**dct)
+        return PlanCost(**dct)

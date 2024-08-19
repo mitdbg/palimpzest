@@ -1,4 +1,5 @@
 import pytest
+import palimpzest as pz
 from palimpzest.corelib import File
 from palimpzest.operators import *
 from palimpzest.optimizer import PhysicalPlan
@@ -37,8 +38,7 @@ def llm_filter_plan():
 
 @pytest.fixture
 def bonded_llm_convert_plan(email_schema):
-    scanOp = MarshalAndScanDataOp(outputSchema=File, shouldProfile=True)
-    convertOpHardcoded = ConvertFileToText(inputSchema=File, outputSchema=TextFile, shouldProfile=True)
+    scanOp = MarshalAndScanDataOp(outputSchema=TextFile, shouldProfile=True)
     convertOpLLM = LLMConvertBonded(
         inputSchema=TextFile,
         outputSchema=email_schema,
@@ -46,13 +46,12 @@ def bonded_llm_convert_plan(email_schema):
         targetCacheId="abc123",
         shouldProfile=True,
     )
-    plan = PhysicalPlan(operators=[scanOp, convertOpHardcoded, convertOpLLM])
+    plan = PhysicalPlan(operators=[scanOp, convertOpLLM])
     return plan
 
 @pytest.fixture
 def code_synth_convert_plan(email_schema):
-    scanOp = MarshalAndScanDataOp(outputSchema=File, shouldProfile=True)
-    convertOpHardcoded = ConvertFileToText(inputSchema=File, outputSchema=TextFile, shouldProfile=True)
+    scanOp = MarshalAndScanDataOp(outputSchema=TextFile, shouldProfile=True)
     convertOpLLM = CodeSynthesisConvertSingle(
         inputSchema=TextFile,
         outputSchema=email_schema,
@@ -63,13 +62,12 @@ def code_synth_convert_plan(email_schema):
         shouldProfile=True,
         cache_across_plans=False,
     )
-    plan = PhysicalPlan(operators=[scanOp, convertOpHardcoded, convertOpLLM])
+    plan = PhysicalPlan(operators=[scanOp, convertOpLLM])
     return plan
 
 @pytest.fixture
 def token_reduction_convert_plan(email_schema):
-    scanOp = MarshalAndScanDataOp(outputSchema=File, shouldProfile=True)
-    convertOpHardcoded = ConvertFileToText(inputSchema=File, outputSchema=TextFile, shouldProfile=True)
+    scanOp = MarshalAndScanDataOp(outputSchema=TextFile, shouldProfile=True)
     convertOpLLM = TokenReducedConvertBonded(
         inputSchema=TextFile,
         outputSchema=email_schema,
@@ -78,7 +76,7 @@ def token_reduction_convert_plan(email_schema):
         targetCacheId="abc123",
         shouldProfile=True,
     )
-    plan = PhysicalPlan(operators=[scanOp, convertOpHardcoded, convertOpLLM])
+    plan = PhysicalPlan(operators=[scanOp, convertOpLLM])
     return plan
 
 @pytest.fixture

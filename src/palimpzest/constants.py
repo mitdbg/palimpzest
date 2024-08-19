@@ -1,5 +1,4 @@
 ### This file contains constants used by Palimpzest ###
-from collections import namedtuple
 from enum import Enum
 
 import os
@@ -53,9 +52,6 @@ class AggFunc(str, Enum):
 class Cardinality(str, Enum): 
     ONE_TO_ONE = "one-to-one"
     ONE_TO_MANY = "one-to-many"
-
-# NAMEDTUPLES
-PlanCost = namedtuple("PlanCost", ["cost", "time", "quality", "op_estimates"])
 
 # CONSTANTS
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
