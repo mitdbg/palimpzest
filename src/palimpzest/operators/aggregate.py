@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
-from palimpzest.corelib import Number, Schema
+from palimpzest.corelib import Number
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.elements import AggregateFunction, DataRecord, GroupBySig
-from palimpzest.operators import logical, PhysicalOperator, DataRecordsWithStats
+from palimpzest.elements import DataRecord, GroupBySig
+from palimpzest.operators import PhysicalOperator, DataRecordsWithStats
 
 from typing import List
 

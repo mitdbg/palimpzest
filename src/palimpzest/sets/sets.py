@@ -4,7 +4,6 @@ from palimpzest.datamanager import DataDirectory
 from palimpzest.constants import AggFunc
 from palimpzest.corelib import Number, Schema
 from palimpzest.elements import (
-    AggregateFunction,
     Filter,
     UserFunction,
     GroupBySig,
@@ -47,7 +46,7 @@ class Set:
         desc: str = None,
         filter: Filter = None,
         udf: Callable = None,
-        aggFunc: AggregateFunction = None,
+        aggFunc: AggFunc = None,
         groupBy: GroupBySig = None,
         limit: int = None,
         fnid: str = None,

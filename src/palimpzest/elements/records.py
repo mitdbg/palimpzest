@@ -23,7 +23,7 @@ class DataRecord:
         # 2. their index in the fan out (if this is in a one-to-many operation)
         #
         # We currently do NOT hash just based on record content (i.e. schema (key, value) pairs)
-        # because multiple DISTINCT outputs for a given operation may have the exact same
+        # because multiple outputs for a given operation may have the exact same
         # schema (key, value) pairs.
         # 
         # We may revisit this hashing scheme in the future.

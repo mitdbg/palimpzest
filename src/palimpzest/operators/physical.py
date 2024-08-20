@@ -49,8 +49,7 @@ class PhysicalOperator:
 
     def get_op_params(self):
         """
-        You should implement get_op_params with op-specific parameters that are general
-        
+        You should implement get_op_params with op-specific parameters.
         """
         raise NotImplementedError("Calling get_op_params on abstract method")
 
