@@ -42,9 +42,6 @@ class ConvertOp(PhysicalOperator):
             "udf": self.udf,
         }
 
-    def __str__(self):
-        return f"{self.__class__.__name__}[({self.inputSchema}) --> ({self.outputSchema})]"
-
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
 
@@ -62,7 +59,9 @@ class NonLLMConvert(ConvertOp):
         )
 
     def __str__(self):
-        return f"{self.__class__.__name__}({str(self.inputSchema):10s}->{str(self.outputSchema):10s}, UDF: {str(self.udf)})"
+        op = super().__str__()
+        op += f"UDF: {str(self.udf)}\n"
+        return op
 
     def copy(self):
         return self.__class__(
@@ -157,10 +156,9 @@ class LLMConvert(ConvertOp):
         )
 
     def __str__(self):
-        model = getattr(self, "model", "")
-        ps = getattr(self, "prompt_strategy", "")
-
-        return f"{self.__class__.__name__}({str(self.inputSchema):10s}->{str(self.outputSchema):10s}, Model: {model}, Prompt Strategy: {ps})"
+        op = super().__str__()
+        op += f"Prompt strategy: {self.prompt_strategy}\n"
+        return op
 
     def copy(self):
         return self.__class__(
@@ -278,7 +276,7 @@ class LLMConvert(ConvertOp):
         optionalOutputDesc = (
             ""
             if self.outputSchema.__doc__ is None
-            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.inputSchema.__doc__)
+            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.outputSchema.__doc__)
         )
 
         # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
@@ -396,7 +394,12 @@ class LLMConvert(ConvertOp):
             assert json_answer != {}, "No output was found!"
             assert all([field in json_answer for field in fields_to_generate]), "Not all fields were generated!"
         except Exception as e:
-            print(f"Error parsing answer: {e}")
+            print(f"Error parsing LLM answer: {e}")
+            msg = str(e)
+            # if "line" in msg:
+            #    line = int(str(msg).split("line ")[1].split(" ")[0])
+            #    print(f"\tAnswer snippet: {answer.splitlines()[line]}")
+
             json_answer = {field_name: [] for field_name in fields_to_generate}
 
         field_answers = {}

@@ -256,6 +256,9 @@ class MinTimeAtFixedQuality(Policy):
 #         return "User Choice"
 
 #     def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
+#         print("Please select a plan from the following options:")
+#         for idx, plan in enumerate(candidatePlans):
+#             print(f"[{idx}] {plan}")
 #         user_choice = input(f"Please select a plan in [0-{len(candidatePlans) - 1}]: ")
 #         user_choice = int(user_choice)
 #         if user_choice not in range(len(candidatePlans)):

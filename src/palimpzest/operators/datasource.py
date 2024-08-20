@@ -17,6 +17,11 @@ class DataSourcePhysicalOp(PhysicalOperator):
     in order to accurately compute naive cost estimates. Thus, we use a slightly
     modified abstract base class for these operators.
     """
+    def __str__(self):
+        op = f"{self.op_name()} -> {self.outputSchema}\n"
+        op += f"({','.join(self.outputSchema.fieldNames())[:30]})\n"
+        return op
+
     def get_op_params(self):
         return {"outputSchema": self.outputSchema}
 
@@ -50,13 +55,6 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         return (
             isinstance(other, self.__class__)
             and self.outputSchema == other.outputSchema
-        )
-
-    def __str__(self):
-        return (
-            f"{self.op_name()}("
-            + str(self.outputSchema) 
-            + ")"
         )
 
     def copy(self):
@@ -135,20 +133,16 @@ class CacheScanDataOp(DataSourcePhysicalOp):
         super().__init__(*args, **kwargs)
         self.cachedDataIdentifier = cachedDataIdentifier
 
+    def __str__(self):
+        op = super().__str__()
+        op += f"Cache ID: {str(self.cachedDataIdentifier)}\n"
+        return op
+
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
             and self.cachedDataIdentifier == other.cachedDataIdentifier
             and self.outputSchema == other.outputSchema
-        )
-
-    def __str__(self):
-        return (
-            f"{self.op_name()}("
-            + str(self.outputSchema)
-            + ", "
-            + self.cachedDataIdentifier
-            + ")"
         )
 
     def copy(self):

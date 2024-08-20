@@ -228,6 +228,7 @@ class LLMConvertRule(ImplementationRule):
             # skip this model if:
             # 1. this is an image model and we're not doing an image conversion, or
             # 2. this is not an image model and we're doing an image conversion
+            # TODO: make sure this logic can handle models like GPT-4o which are both vision and not-vision
             is_vision_model = model in getVisionModels()
             is_image_conversion = op_kwargs['image_conversion']
             image_model_xor = is_vision_model != is_image_conversion

@@ -39,8 +39,6 @@ class DataRecord:
         self._id = hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
         self._parent_id = parent_id
 
-    def __getitem__(self, key):
-        return super().__getattr__(key)
 
     def _asJSONStr(self, include_bytes: bool = True, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""

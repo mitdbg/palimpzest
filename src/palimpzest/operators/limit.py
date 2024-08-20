@@ -14,22 +14,17 @@ class LimitScanOp(PhysicalOperator):
         super().__init__(*args, **kwargs)
         self.limit = limit
 
+    def __str__(self):
+        op = super().__str__()
+        op += f"Limit: {self.limit}\n"
+        return op
+
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
             and self.limit == other.limit
             and self.outputSchema == other.outputSchema
             and self.inputSchema == other.inputSchema
-        )
-
-    def __str__(self):
-        return (
-            f"{self.op_name()}("
-            + str(self.outputSchema)
-            + ", "
-            + "Limit: "
-            + str(self.limit)
-            + ")"
         )
 
     def copy(self):

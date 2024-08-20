@@ -91,7 +91,9 @@ class CodeSynthesisConvert(LLMConvert):
         )
 
     def __str__(self):
-        return f"{self.__class__.__name__}({str(self.outputSchema):10s}, Code Synth Strategy: {self.__class__.__name__})"
+        op = super().__str__()
+        op += f"Code Synth Strategy: {self.__class__.__name__}\n"
+        return op
 
     def get_op_params(self):
         op_params = super().get_op_params()

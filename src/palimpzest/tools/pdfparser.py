@@ -35,6 +35,8 @@ class PdfParser:
         return self.pages
 
 def get_md5(file_bytes: bytes) -> str:
+    if type(file_bytes) is not bytes:
+        file_bytes = file_bytes.encode()
     return hashlib.md5(file_bytes).hexdigest()
 
 ##

@@ -43,11 +43,9 @@ class TokenReducedConvert(LLMConvert):
         )
 
     def __str__(self):
-        model = getattr(self, "model", "")
-        ps = getattr(self, "prompt_strategy", "")
-        tb = self.token_budget
-
-        return f"{self.__class__.__name__}({str(self.inputSchema):10s}->{str(self.outputSchema):10s}, Model: {model}, Prompt Strategy: {ps}, Token Budget: {tb})"
+        op = super().__str__()
+        op += f"Token Budget: {str(self.token_budget)}\n"
+        return op
 
     def get_op_params(self):
         op_params = super().get_op_params()

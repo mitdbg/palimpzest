@@ -49,17 +49,7 @@ class CaseData(pz.Schema):
     study = pz.Field(desc="The last name of the author of the study, from the table name", required=False)
 
 
-def filtering(input_dataset, policy):
-    patient_tables = input_dataset.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
-    patient_tables = patient_tables.filter("The rows of the table contain the patient age")
-    # patient_tables = patient_tables.filter("The table explains the meaning of attributes")
-    # patient_tables = patient_tables.filter("The table contains patient biometric data")
-    # patient_tables = patient_tables.filter("The table contains proteomic data")
-    # patient_tables = patient_tables.filter("The table records if the patient is excluded from the study")
-    output = pz.SequentialSingleThreadExecution(patient_tables, policy)
-    output = output.executeAndOptimize(args.verbose)
-
-    filtered = []
+def print_table(output):
     for table in output:
         header = table.header
         subset_rows = table.rows[:3]
@@ -69,27 +59,6 @@ def filtering(input_dataset, policy):
         for row in subset_rows:
             print(" | ".join(row)[:100], "...")
         print()
-        
-        filtered.append(table.name)
-
-    return filtered, output
-
-
-def matching(input_dataset, policy):
-    patient_tables = input_dataset.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
-    case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
-    
-    matched_tables = pz.SequentialSingleThreadExecution(case_data, policy)   
-    matched_tables = matched_tables.executeAndOptimize(args.verbose)
-    
-    output_rows = []
-    for output_table in matched_tables:
-        # print([k+":"+str(v)+"\n" for k,v in output_table._asDict().items()])
-        # print("------------------------------")
-        output_rows.append(output_table._asDict()) 
-
-    output_df = pd.DataFrame(output_rows)
-    return output_df, matched_tables
 
 if __name__ == "__main__":
     startTime = time.time()
@@ -99,6 +68,7 @@ if __name__ == "__main__":
     parser.add_argument('--from_xls', action='store_true', help='Start from pre-downloaded excel files', default=False)
     parser.add_argument('--experiment', type=str, help='The experiment to run', default='matching')
     parser.add_argument('--policy', type=str, help='The policy to use', default='cost')
+    parser.add_argument('--engine', type=str, help='The engine to use', default='parallel')
 
     args = parser.parse_args()
     no_cache = args.no_cache
@@ -106,6 +76,11 @@ if __name__ == "__main__":
     from_xls = args.from_xls
     policy = args.policy
     experiment = args.experiment
+    engine = args.engine
+    if engine == 'sequential':
+        engine = pz.SequentialSingleThreadExecution
+    elif engine == 'parallel':
+        engine = pz.PipelinedParallelExecution
 
     if no_cache:
         pz.DataDirectory().clearCache(keep_registry=True)
@@ -120,67 +95,50 @@ if __name__ == "__main__":
     if experiment == 'collection':
         papers = pz.Dataset("biofabric-pdf", schema=ScientificPaper)
         paperURLs = papers.convert(pz.URL, desc="The DOI url of the paper") 
-
         # TODO this fetch should be refined to work for all papers
         htmlDOI = paperURLs.map(pz.DownloadHTMLFunction())
         tableURLS = htmlDOI.convert(pz.URL, desc="The URLs of the XLS tables from the page", cardinality="oneToMany")
+
         urlFile = pz.Dataset("biofabric-urls", schema=pz.TextFile)
         tableURLS = urlFile.convert(pz.URL, desc="The URLs of the tables")
-        binary_tables = tableURLS.map(pz.DownloadBinaryFunction())
-        tables = binary_tables.convert(pz.File)
-        xls = tables.convert(pz.XLSFile)
-
+        binary_tables = tableURLS.convert(pz.File)
+        xls = binary_tables.convert(pz.XLSFile)
+        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        output = patient_tables
 
     elif experiment == 'filtering':
         xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)       
-        filtered_tables, _ = filtering(xls, policy)
-        
-        with open("results/biofabric/filtered_tables.txt", "w") as f:
-            for item in filtered_tables:
-                f.write("%s\n" % item)
-        print("Filtered tables:" ,"\n".join(filtered_tables))
+        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
+        # patient_tables = patient_tables.filter("The table explains the meaning of attributes")
+        # patient_tables = patient_tables.filter("The table contains patient biometric data")
+        # patient_tables = patient_tables.filter("The table contains proteomic data")
+        # patient_tables = patient_tables.filter("The table records if the patient is excluded from the study")
+        output = patient_tables
 
     elif experiment == 'matching':
         xls = pz.Dataset('biofabric-matching', schema=pz.XLSFile)
-            
-        output_df, matched_tables = matching(xls, policy)
-
-        output_df, _ = matching(xls, policy)
-        print("Matched table:", output_df)
-        out_path = "results/biofabric/"
-        output_df.to_csv(out_path+"matched.csv", index=False)
+        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
+        output = case_data
     
     elif experiment == "endtoend":
         xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)
         patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
-        
-        output_1 = pz.SequentialSingleThreadExecution(patient_tables, policy)
-        output_1 = output_1.executeAndOptimize(args.verbose)
+        output = case_data        
 
-        filtered_tables = []
-        for table in output_1:            
-            filtered_tables.append(table.name)
+    tables, plan, stats  =  pz.Execute(output,
+                                    policy = policy,
+                                    nocache=True,
+                                    allow_code_synth=False,
+                                    allow_token_reduction=False,
+                                    execution_engine=engine)
 
-        out_path = "results/biofabric/"
-        with open(out_path+"filtered_tables_endtoend.txt", "w") as f:
-            for item in filtered_tables:
-                f.write("%s\n" % item)
-
-        output_2 = pz.SequentialSingleThreadExecution(case_data, policy)           
-        output_2 = output_2.executeAndOptimize(args.verbose)
-        
-        output_rows = []
-        for output_table in output_2:
-            output_rows.append(output_table._asDict()) 
-        output_df = pd.DataFrame(output_rows)
-
-        output_df.to_csv(out_path+"matched_endtoend.csv", index=False)
-
-        print("Filtered tables:" ,"\n".join(filtered_tables))
-        print("Matched table:", output_df)
-
+    print_table(tables)
+    print(plan)
+    print(stats)
 
     endTime = time.time()
     print("Elapsed time:", endTime - startTime)

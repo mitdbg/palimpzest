@@ -1,11 +1,6 @@
-from palimpzest.config import Config
-from palimpzest.constants import PZ_DIR
-
 from click_aliases import ClickAliasedGroup
 from prettytable import PrettyTable
 from typing import Tuple
-
-import palimpzest as pz
 
 import click
 import os
@@ -93,6 +88,9 @@ def init() -> None:
     Initialize data directory for PZ.
     """
     # set directory and initialize it for PZ
+    import palimpzest as pz
+    from palimpzest.constants import PZ_DIR
+
     pz.DataDirectory()
     _print_msg(f"Palimpzest system initialized in: {PZ_DIR}")
 
@@ -103,6 +101,7 @@ def ls_data() -> None:
     Print a table listing the datasets registered with PZ.
     """
     # fetch list of registered datasets
+    import palimpzest as pz
     ds = pz.DataDirectory().listRegisteredDatasets()
 
     # construct table for printing
@@ -133,6 +132,7 @@ def synthesize_data(name: str, count: int) -> None:
     count: int
         The nunber of values to synthesize
     """
+    import palimpzest as pz
     name = name.strip()
     
     vals = []
@@ -158,6 +158,7 @@ def register_data(path: str, name: str) -> None:
     name: str
         Name to register the data file / directory with.
     """
+    import palimpzest as pz
     # parse path and name
     path = path.strip()
     name = name.strip()
@@ -188,6 +189,7 @@ def rm_data(name: str) -> None:
     name: str
         Name of the dataset to unregister.
     """
+    import palimpzest as pz
     # parse name
     name = name.strip()
 
@@ -202,6 +204,7 @@ def clear_cache() -> None:
     """
     Clear the Palimpzest cache.
     """
+    import palimpzest as pz
     pz.DataDirectory().clearCache(keep_registry=True)
     _print_msg(f"Cache cleared")
 
@@ -211,6 +214,7 @@ def print_config() -> None:
     """
     Print the current config that Palimpzest is using.
     """
+    import palimpzest as pz
     # load config yaml file
     config = pz.DataDirectory().getConfig()
 
@@ -240,6 +244,9 @@ def create_config(name: str, llmservice: str, parallel: bool, set: bool) -> None
         If this flag is present, it will set the created config to be
         the current config.
     """
+    from palimpzest.config import Config
+    from palimpzest.constants import PZ_DIR
+
     # check that config name is unique
     if os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
         raise InvalidCommandException(f"Config with name {name} already exists.")
@@ -266,6 +273,9 @@ def rm_config(name: str) -> None:
     name: str
         Name of the config to remove.
     """
+    from palimpzest.config import Config
+    from palimpzest.constants import PZ_DIR
+
     # check that config exists
     if not os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
         raise InvalidCommandException(f"Config with name {name} does not exist.")
@@ -289,6 +299,9 @@ def set_config(name: str) -> None:
     name: str
         Name of the config to set as the current config.
     """
+    from palimpzest.config import Config
+    from palimpzest.constants import PZ_DIR
+
     # check that config exists
     if not os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
         raise InvalidCommandException(f"Config with name {name} does not exist.")

@@ -131,6 +131,11 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
                 else:
                     output_records.append(record)
 
+            # if we've filtered out all records, terminate early
+            if next_op_id is not None:
+                if processing_queues[next_op_id] == []:
+                    break
+
         # if caching was allowed, close the cache
         if not self.nocache:
             for operator in plan.operators:

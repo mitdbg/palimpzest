@@ -19,6 +19,11 @@ class FilterOp(PhysicalOperator):
         assert self.inputSchema == self.outputSchema, "Input and output schemas must match for FilterOp"
         self.filter = filter
 
+    def __str__(self):
+        op = super().__str__()
+        op += f"Filter: {str(self.filter)}\n"
+        return op
+
     def get_op_params(self):
         return {
             "outputSchema": self.outputSchema,
@@ -53,9 +58,6 @@ class NonLLMFilter(FilterOp):
             and self.filter == other.filter
             and self.outputSchema == other.outputSchema
         )
-
-    def __str__(self):
-        return f"{self.op_name()}({str(self.outputSchema)}, Filter: {str(self.filter)})"
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate output cardinality using a constant assumption of the filter selectivity
@@ -150,9 +152,6 @@ class LLMFilter(FilterOp):
             and self.prompt_strategy == other.prompt_strategy
             and self.outputSchema == other.outputSchema
         )
-
-    def __str__(self):
-        return f"{self.op_name()}({str(self.outputSchema)}, Filter: {str(self.filter)}, Model: {self.model.value}, Prompt Strategy: {str(self.prompt_strategy.value)})"
 
     def copy(self):
         return self.__class__(

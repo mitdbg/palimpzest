@@ -35,7 +35,9 @@ class ApplyGroupByOp(AggregateOp):
         )
 
     def __str__(self):
-        return f"{self.op_name()}({str(self.gbySig)})"
+        op = super().__str__()
+        op += f"Group-by Signature: {str(self.gbySig)}\n"
+        return op
 
     def copy(self):
         return ApplyGroupByOp(
@@ -167,14 +169,9 @@ class CountAggregateOp(AggregateOp):
         )
 
     def __str__(self):
-        return (
-            f"{self.op_name()}("
-            + str(self.outputSchema)
-            + ", "
-            + "Function: "
-            + str(self.aggFunc)
-            + ")"
-        )
+        op = super().__str__()
+        op += f"Function: {str(self.aggFunc)}\n"
+        return op
 
     def copy(self):
         return CountAggregateOp(
@@ -240,14 +237,9 @@ class AverageAggregateOp(AggregateOp):
         )
 
     def __str__(self):
-        return (
-            f"{self.op_name()}("
-            + str(self.outputSchema)
-            + ", "
-            + "Function: "
-            + str(self.aggFunc)
-            + ")"
-        )
+        op = super().__str__()
+        op += f"Function: {str(self.aggFunc)}\n"
+        return op
 
     def copy(self):
         return AverageAggregateOp(
