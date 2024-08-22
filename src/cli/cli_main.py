@@ -80,6 +80,8 @@ def help() -> None:
     """
     Print the help message for PZ.
     """
+    # Display the help message to the user using the helper function
+   
     _print_msg(_help())
 
 
@@ -88,11 +90,15 @@ def init() -> None:
     """
     Initialize data directory for PZ.
     """
-    # set directory and initialize it for PZ
+ # Import Palimpzest library and constants for directory management
+
     import palimpzest as pz
     from palimpzest.constants import PZ_DIR
-
+ # Create and initialize the data directory where datasets and configurations will be stored
+  
     pz.DataDirectory()
+    # Notify the user about the initialization with the directory path
+    
     _print_msg(f"Palimpzest system initialized in: {PZ_DIR}")
 
 
@@ -103,6 +109,8 @@ def ls_data() -> None:
     """
     # fetch list of registered datasets
     import palimpzest as pz
+    # Retrieve all datasets currently registered in the system
+    
     ds = pz.DataDirectory().listRegisteredDatasets()
 
     # construct table for printing
@@ -110,10 +118,11 @@ def ls_data() -> None:
     for path, descriptor in ds:
         table.append([path, descriptor[0], descriptor[1]])
 
-    # print table of registered datasets
+    # Use PrettyTable to format and display the dataset information in a table format
+    
     t = PrettyTable(table[0])
     t.add_rows(table[1:])
-    _print_msg(t)
+    _print_msg(t)      # Print additional information, like the total number of datasets
     _print_msg("")
     _print_msg(f"Total datasets: {len(table) - 1}")
 
@@ -135,12 +144,13 @@ def synthesize_data(name: str, count: int) -> None:
     """
     import palimpzest as pz
     name = name.strip()
-    
+    # Generate synthetic values (as an example, we're just creating a list of integers)
+   
     vals = []
     for i in range(0, count):
         vals.append(i)
-    pz.DataDirectory().registerDataset(vals, name)
-    
+    pz.DataDirectory().registerDataset(vals, name) # Register the generated dataset using Palimpzest's directory management
+        # Notify the user that the dataset has been registered
     _print_msg(f"Registered {name}")
 
 
@@ -164,17 +174,21 @@ def register_data(path: str, name: str) -> None:
     path = path.strip()
     name = name.strip()
 
-    # register dataset
+     # Check if the path is a valid file or directory and register it
+   
     if os.path.isfile(path):     
         pz.DataDirectory().registerLocalFile(os.path.abspath(path), name)
-
+# If the path is a directory, register it as a directory dataset
     elif os.path.isdir(path):
         pz.DataDirectory().registerLocalDirectory(os.path.abspath(path), name)
-
-    else:
+ # If neither a file nor directory, raise an exception
+    else:  
+        # Raise an exception if the path is neither a file nor a directory
+        
         raise InvalidCommandException(
             f"Path {path} is invalid. Does not point to a file or directory."
         )
+    # Notify the user that the dataset has been successfully registered
 
     _print_msg(f"Registered {name}")
 
@@ -196,7 +210,8 @@ def rm_data(name: str) -> None:
 
     # remove dataset from registry
     pz.DataDirectory().rmRegisteredDataset(name)
-
+# Notify the user that the dataset has been deleted
+    
     _print_msg(f"Deleted {name}")
 
 
@@ -206,7 +221,8 @@ def clear_cache() -> None:
     Clear the Palimpzest cache.
     """
     import palimpzest as pz
-    pz.DataDirectory().clearCache(keep_registry=True)
+    pz.DataDirectory().clearCache(keep_registry=True)    # Clear cached data while retaining registered datasets
+        # Notify the user that the cache has been cleared
     _print_msg(f"Cache cleared")
 
 
