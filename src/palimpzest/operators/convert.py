@@ -287,7 +287,7 @@ class LLMConvert(ConvertOp):
         else:
             targetOutputDescriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
             outputSingleOrPlural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
-            appendixInstruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION
+            appendixInstruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
 
         # construct promptQuestion
         optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
