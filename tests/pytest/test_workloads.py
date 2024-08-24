@@ -200,7 +200,7 @@ def test_workload(dataset, workload, execution_engine):
                             allow_code_synth=False,
                             allow_token_reduction=False,
                             execution_engine=execution_engine)
-    
+
     # NOTE: f1 score calculation will be low for biofabric b/c the
     #       evaluation function still checks against the full dataset's labels
     # print(f"Plan: {result_dict['plan_info']['plan_label']}")

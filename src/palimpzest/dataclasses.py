@@ -1,9 +1,7 @@
 from __future__ import annotations
-
-from palimpzest.elements import DataRecord
-from dataclasses import dataclass, asdict, field
-
+from dataclasses import dataclass, field, fields
 from typing import Any, Dict, List, Optional, Union
+
 
 @dataclass
 class GenerationStats:
@@ -144,21 +142,12 @@ class RecordOpStats:
     # (if applicable) the time (in seconds) spent executing a UDF or calling an external api
     fn_call_duration_secs: float = 0.0
 
-    # @staticmethod
-    # def from_record_and_kwargs(record: DataRecord, **kwargs: Dict[str, Any]) -> RecordOpStats:
-    #     return RecordOpStats(
-    #         record_id=record._id,
-    #         record_parent_id=record._parent_id,
-    #         op_id=kwargs['op_id'],
-    #         op_name=kwargs['op_name'],
-    #         time_per_record=kwargs['time_per_record'],
-    #         cost_per_record=kwargs['cost_per_record'],
-    #         record_state=record._asDict(include_bytes=False),
-    #         record_details=kwargs.get('record_details', None),
-    #     )
+    def to_json(self):
+        return {
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+        }
 
-    # def to_dict(self):
-    #     return asdict(self)
 
 @dataclass
 class OperatorStats:
@@ -207,8 +196,18 @@ class OperatorStats:
         self.total_op_cost += op_stats.total_op_cost
         self.record_op_stats_lst.extend(op_stats.record_op_stats_lst)
 
-    # def to_dict(self):
-    #     return asdict(self)
+    def to_json(self):
+        return {
+            "op_id": self.op_id,
+            "op_name": self.op_name,
+            "total_op_time": self.total_op_time,
+            "total_op_cost": self.total_op_cost,
+            "record_op_stats_lst": [
+                record_op_stats.to_json()
+                for record_op_stats in self.record_op_stats_lst
+            ],
+            "op_details": self.op_details,
+        }
 
 
 @dataclass
@@ -255,6 +254,18 @@ class PlanStats:
             stats += f"{idx}. {op_stats.op_name} time={op_stats.total_op_time} cost={op_stats.total_op_cost} \n"
         return stats
 
+    def to_json(self):
+        return {
+            "plan_id": self.plan_id,
+            "operator_stats": {
+                op_id: op_stats.to_json()
+                for op_id, op_stats in self.operator_stats.items()
+            },
+            "total_plan_time": self.total_plan_time,
+            "total_plan_cost": self.total_plan_cost,
+        }
+
+
 @dataclass
 class ExecutionStats:
     """
@@ -271,6 +282,17 @@ class ExecutionStats:
 
     # total cost for a call to pz.Execute
     total_execution_cost: float = 0.0
+
+    def to_json(self):
+        return {
+            "execution_id": self.execution_id,
+            "plan_stats": {
+                plan_id: plan_stats.to_json()
+                for plan_id, plan_stats in self.plan_stats.items()
+            },
+            "total_execution_time": self.total_execution_time,
+            "total_execution_cost": self.total_execution_cost,
+        }
 
 
 @dataclass
