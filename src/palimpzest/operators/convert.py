@@ -283,7 +283,7 @@ class LLMConvert(ConvertOp):
         if self.cardinality == Cardinality.ONE_TO_MANY:
             targetOutputDescriptor = prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
             outputSingleOrPlural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
-            appendixInstruction = prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION
+            appendixInstruction = prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
         else:
             targetOutputDescriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
             outputSingleOrPlural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
