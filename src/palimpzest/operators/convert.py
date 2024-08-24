@@ -589,7 +589,6 @@ class LLMConvertBonded(LLMConvert):
     def convert(self,
                 candidate_content,
                 fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
-        import pdb; pdb.set_trace()
         prompt = self._construct_query_prompt(fields_to_generate=fields)
 
         # generate all fields in a single query

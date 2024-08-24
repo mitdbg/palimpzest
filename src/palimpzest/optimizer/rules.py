@@ -178,6 +178,7 @@ class NonLLMConvertRule(ImplementationRule):
         op_kwargs = logical_op.get_op_params()
         op_kwargs.update({
             "shouldProfile": physical_op_params['shouldProfile'],
+            "verbose": physical_op_params['verbose'],
             "logical_op_id": logical_op.get_op_id(),
         })
 
@@ -220,6 +221,7 @@ class LLMConvertRule(ImplementationRule):
         op_kwargs = logical_op.get_op_params()
         op_kwargs.update({
             "shouldProfile": physical_op_params['shouldProfile'],
+            "verbose": physical_op_params['verbose'],
             "logical_op_id": logical_op.get_op_id(),
         })
 
@@ -291,6 +293,7 @@ class TokenReducedConvertRule(ImplementationRule):
         op_kwargs = logical_op.get_op_params()
         op_kwargs.update({
             "shouldProfile": physical_op_params['shouldProfile'],
+            "verbose": physical_op_params['verbose'],
             "logical_op_id": logical_op.get_op_id(),
         })
 
@@ -361,6 +364,7 @@ class CodeSynthesisConvertRule(ImplementationRule):
         op_kwargs = logical_op.get_op_params()
         op_kwargs.update({
             "shouldProfile": physical_op_params['shouldProfile'],
+            "verbose": physical_op_params['verbose'],
             "logical_op_id": logical_op.get_op_id(),
         })
 
@@ -407,6 +411,7 @@ class NonLLMFilterRule(ImplementationRule):
         op_kwargs = logical_op.get_op_params()
         op_kwargs.update({
             "shouldProfile": physical_op_params['shouldProfile'],
+            "verbose": physical_op_params['verbose'],
             "logical_op_id": logical_op.get_op_id(),
         })
         op = NonLLMFilter(**op_kwargs)
@@ -438,6 +443,7 @@ class LLMFilterRule(ImplementationRule):
         op_kwargs = logical_op.get_op_params()
         op_kwargs.update({
             "shouldProfile": physical_op_params['shouldProfile'],
+            "verbose": physical_op_params['verbose'],
             "logical_op_id": logical_op.get_op_id(),
         })
         physical_expressions = []
@@ -478,6 +484,7 @@ class AggregateRule(ImplementationRule):
         op_kwargs = logical_op.get_op_params()
         op_kwargs.update({
             "shouldProfile": physical_op_params['shouldProfile'],
+            "verbose": physical_op_params['verbose'],
             "logical_op_id": logical_op.get_op_id(),
         })
 
@@ -522,6 +529,7 @@ class BasicSubstitutionRule(ImplementationRule):
         op_kwargs = logical_op.get_op_params()
         op_kwargs.update({
             "shouldProfile": physical_op_params['shouldProfile'],
+            "verbose": physical_op_params['verbose'],
             "logical_op_id": logical_op.get_op_id(),
         })
         physical_op_class = cls.LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP[logical_op.__class__]

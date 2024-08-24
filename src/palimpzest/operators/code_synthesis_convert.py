@@ -191,11 +191,11 @@ class CodeSynthesisConvert(LLMConvert):
                 code_ensemble_cache_id = "_".join([self.get_op_id(), field_name])
                 cache.putCachedData("codeEnsembles", code_ensemble_cache_id, code_ensemble)
 
-            # TODO: if verbose
-            for code_name, code in code_ensemble.items():
-                print(f"CODE NAME: {code_name}")
-                print("-----------------------")
-                print(code)
+            if self.verbose:
+                for code_name, code in code_ensemble.items():
+                    print(f"CODE NAME: {code_name}")
+                    print("-----------------------")
+                    print(code)
 
         # set field_to_code_ensemble and code_synthesized to True
         return field_to_code_ensemble, generation_stats
@@ -301,7 +301,8 @@ class CodeSynthesisConvert(LLMConvert):
                 field_outputs[field_name] = answer
             else:
                 # if there is a failure, run a conventional query
-                print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
+                if self.verbose:
+                    print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
                 candidate_content = json.dumps(candidate_dict)
                 conventional_op = LLMConvertConventional(
                     inputSchema=self.inputSchema,
@@ -378,9 +379,10 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
             'advice': f"Hint: {advice}" if advice else "",
         }
         prompt = CODEGEN_PROMPT.format(**context)
-        print("PROMPT")
-        print("-------")
-        print(f"{prompt}")
+        if self.verbose:
+            print("PROMPT")
+            print("-------")
+            print(f"{prompt}")
         # invoke the champion model to generate the code
         pred, stats = self.code_champion_generator.generate(prompt=prompt)
         ordered_keys = [
@@ -394,10 +396,11 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
                 code = pred.split(key)[1].split('```')[0].strip()
                 break
 
-        print("-------")
-        print("SYNTHESIZED CODE")
-        print("---------------")
-        print(f"{code}")
+        if self.verbose:
+            print("-------")
+            print("SYNTHESIZED CODE")
+            print("---------------")
+            print(f"{code}")
 
         return code, stats
 

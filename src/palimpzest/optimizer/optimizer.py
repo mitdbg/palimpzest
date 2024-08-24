@@ -66,6 +66,7 @@ class Optimizer:
             allow_code_synth: bool=True,
             allow_token_reduction: bool=True,
             optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
+            max_sentinel_plans: Optional[int]=None,
             shouldProfile: bool=True,
         ):
         # store the policy
@@ -96,6 +97,7 @@ class Optimizer:
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.optimization_strategy = optimization_strategy
+        self.max_sentinel_plans = max_sentinel_plans
         self.shouldProfile = shouldProfile
 
         # prune implementation rules based on boolean flags
@@ -129,6 +131,7 @@ class Optimizer:
     def get_physical_op_params(self):
         return {
             "shouldProfile": self.shouldProfile,
+            "verbose": self.verbose,
             "available_models": self.available_models,
             "champion_model": getChampionModel(),
             "code_champion_model": getCodeChampionModel(),
@@ -279,26 +282,11 @@ class Optimizer:
 
         return final_group_id
 
-    # def heuristic_optimization(self, group_id: int) -> None:
-    #     """
-    #     Compute the optimal ordering of filters based on the optimization metric and cost model.
-    #     """
-    #     # NOTE: groups are the wrong vessel for this; the last filter will have all
-    #     #       the upstream filters + converts etc. in its group -- we only want to
-    #     #       compute the cost of each filter's ancestors in its dependency graph.
-    #     #
-    #     # compute cost metric for every initial group with a filter operator
-    #     filter_group_id_to_metric = []
-    #     for group_id, group in self.groups.items():
-    #         if isinstance(list(group.logical_expressions)[0].operator, FilteredScan):
-    #             metric = self.compute_group_cost_metric(group)
-    #             filter_group_id_to_metric.append((group_id, metric))
-
-    #     # sort filter groups by min metric
-    #     ordered_filter_group_ids = sorted(filter_group_id_to_metric, key=lambda tup: tup[1])
-
-    #     # re-construct initial group tree
-        
+    def heuristic_optimization(self, group_id: int) -> None:
+        """
+        Apply universally desirable transformations (e.g. filter/projection push-down).
+        """
+        pass
 
     def search_optimization_space(self, group_id: int) -> None:
         # begin the search for an optimal plan with a task to optimize the final group
@@ -322,6 +310,13 @@ class Optimizer:
                 new_tasks = task.perform(self.cost_model, self.groups, self.policy, context=context)
 
             self.tasks_stack.extend(new_tasks)
+
+
+    def get_sentinel_plans(self, group_id: int) -> List[PhysicalPlan]:
+        """
+        Return the set of sentinel plans.
+        """
+        pass
 
 
     def get_optimal_physical_plan(self, group_id: int) -> PhysicalPlan:
@@ -419,11 +414,12 @@ class Optimizer:
         # search the optimization space by applying logical and physical transformations to the initial group tree
         self.search_optimization_space(final_group_id)
 
-        # TODO: OptimizationStrategy.SENTINEL
-
         # construct the optimal physical plan(s) by traversing the memo table
         plans = []
-        if self.optimization_strategy == OptimizationStrategy.OPTIMAL:
+        if self.optimization_strategy == OptimizationStrategy.SENTINEL:
+            plans = self.get_sentinel_plans(final_group_id)
+
+        elif self.optimization_strategy == OptimizationStrategy.OPTIMAL:
             plans = [self.get_optimal_physical_plan(final_group_id)]
 
         elif self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
