@@ -233,6 +233,8 @@ if __name__ == "__main__":
 
     datasetid = args.datasetid
     workload = args.workload
+    verbose = args.verbose
+    shouldProfile = args.profile
     policy = pz.MaxQuality()
     if args.policy == "mincost":
         policy = pz.MinCost()
@@ -316,6 +318,8 @@ if __name__ == "__main__":
         nocache=True,
         optimization_strategy=pz.OptimizationStrategy.OPTIMAL,
         execution_engine=execution_engine,
+        shouldProfile=shouldProfile,
+        verbose=verbose,
     )
 
     # save statistics
