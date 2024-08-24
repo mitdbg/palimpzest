@@ -357,7 +357,7 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
     def _shouldSynthesize(self, num_exemplars: int=1, *args, **kwargs) -> bool:
         """ This function determines whether code synthesis 
         should be performed based on the strategy and the number of exemplars available. """
-        if len(self.exemplars) <= num_exemplars:
+        if len(self.exemplars) < num_exemplars:
             return False
         return not self.code_synthesized
 
@@ -411,7 +411,7 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
 class CodeSynthesisConvertExampleEnsemble(CodeSynthesisConvert):
 
     def _shouldSynthesize(self, num_exemplars: int=1, *args, **kwargs) -> bool:
-        if len(self.exemplars) <= num_exemplars:
+        if len(self.exemplars) < num_exemplars:
             return False
         return not self.code_synthesized
 
