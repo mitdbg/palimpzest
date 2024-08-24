@@ -46,7 +46,7 @@ class ExecutionEngine:
         self.verbose = verbose
         self.available_models = available_models
         if not available_models:
-            self.available_models = getModels()
+            self.available_models = getModels(include_vision=True)
         if self.verbose:
             print("Available models: ", self.available_models)
         self.allow_bonded_query = allow_bonded_query
