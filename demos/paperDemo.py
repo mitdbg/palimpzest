@@ -308,12 +308,12 @@ if __name__ == "__main__":
 
     elif workload == "medical-schema-matching":
         # datasetid="biofabric-medium" for paper evaluation
-        xls = pz.Dataset(datasetid, schema=pz.XLSFile)
-        patient_tables = xls.convert(pz.Table, udf=lambda record: xls_to_tables(record), cardinality=pz.Cardinality.ONE_TO_MANY)
-        patient_tables = patient_tables.filter(
+        plan = pz.Dataset(datasetid, schema=pz.XLSFile)
+        plan = plan.convert(pz.Table, udf=lambda record: xls_to_tables(record), cardinality=pz.Cardinality.ONE_TO_MANY)
+        plan = plan.filter(
             "The rows of the table contain the patient age"
         )
-        case_data = patient_tables.convert(
+        plan = plan.convert(
             CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY
         )
 
