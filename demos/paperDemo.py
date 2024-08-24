@@ -291,7 +291,7 @@ if __name__ == "__main__":
         data_filepath = f"testdata/{datasetid}"
         user_dataset_id = f"{datasetid}-user"
         pz.DataDirectory().registerUserSource(
-            src=RealEstateListingSource(user_dataset_id, "testdata/real-estate-eval-tiny"),
+            src=RealEstateListingSource(user_dataset_id, data_filepath),
             dataset_id=user_dataset_id,
         )
         plan = pz.Dataset(user_dataset_id, schema=RealEstateListingFiles)
