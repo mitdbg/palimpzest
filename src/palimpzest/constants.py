@@ -4,6 +4,7 @@ from enum import Enum
 import os
 
 
+# TODO: add GPT-4o, GPT-4o-mini; update vision
 # ENUMS
 class Model(str, Enum):
     """
@@ -15,7 +16,7 @@ class Model(str, Enum):
     LLAMA3 = "meta-llama/Llama-3-8b-chat-hf"
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
     GPT_3_5 = "gpt-3.5-turbo-0125"
-    GPT_4 = "gpt-4-0125-preview"
+    GPT_4 = "gpt-4o-mini" # TODO: revert, just getting results for distribution of tokens
     GPT_4V = "gpt-4-vision-preview"
     GEMINI_1 = "gemini-1.0-pro-001"
     GEMINI_1V = "gemini-1.0-pro-vision-latest"
