@@ -357,9 +357,9 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
     def _shouldSynthesize(self, num_exemplars: int=1, *args, **kwargs) -> bool:
         """ This function determines whether code synthesis 
         should be performed based on the strategy and the number of exemplars available. """
-        # The code is the same for ExampleEnsemble EXCEPT the >= should be strictly >
-        # TODO is this intended or an oversight?
-        return not self.code_synthesized and len(self.exemplars) >= num_exemplars
+        if len(self.exemplars) <= num_exemplars:
+            return False
+        return not self.code_synthesized
 
     def _code_synth_single(self, api: API, output_field_name: str, exemplars: List[Exemplar]=list(), advice: str=None, language='Python'):
         context = {
