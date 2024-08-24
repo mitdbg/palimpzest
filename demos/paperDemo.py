@@ -294,7 +294,7 @@ if __name__ == "__main__":
             src=RealEstateListingSource(user_dataset_id, "testdata/real-estate-eval-tiny"),
             dataset_id=user_dataset_id,
         )
-        plan = pz.Dataset(datasetid, schema=RealEstateListingFiles)
+        plan = pz.Dataset(user_dataset_id, schema=RealEstateListingFiles)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
         plan = plan.convert(
             ImageRealEstateListing, image_conversion=True, depends_on="image_contents"
