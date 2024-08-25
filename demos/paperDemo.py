@@ -234,7 +234,7 @@ if __name__ == "__main__":
     datasetid = args.datasetid
     workload = args.workload
     verbose = args.verbose
-    shouldProfile = args.profile
+    profile = args.profile
     policy = pz.MaxQuality()
     if args.policy == "mincost":
         policy = pz.MinCost()
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     elif args.policy == "maxquality":
         policy = pz.MaxQuality()
     else:
-        print("Unknown policy")
+        print("Policy not supported for this demo")
         exit(1)
 
     execution_engine = None
@@ -324,12 +324,12 @@ if __name__ == "__main__":
         nocache=True,
         optimization_strategy=pz.OptimizationStrategy.OPTIMAL,
         execution_engine=execution_engine,
-        shouldProfile=shouldProfile,
         verbose=verbose,
     )
 
     # save statistics
-    stats_path = f"profiling-data/{workload}-profiling.json"
-    execution_stats_dict = execution_stats.to_json()
-    with open(stats_path, "w") as f:
-        json.dump(execution_stats_dict, f)
+    if profile:
+        stats_path = f"profiling-data/{workload}-profiling.json"
+        execution_stats_dict = execution_stats.to_json()
+        with open(stats_path, "w") as f:
+            json.dump(execution_stats_dict, f)

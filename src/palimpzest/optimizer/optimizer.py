@@ -67,7 +67,6 @@ class Optimizer:
             allow_token_reduction: bool=True,
             optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
             max_sentinel_plans: Optional[int]=None,
-            shouldProfile: bool=True,
         ):
         # store the policy
         self.policy = policy
@@ -98,7 +97,6 @@ class Optimizer:
         self.allow_token_reduction = allow_token_reduction
         self.optimization_strategy = optimization_strategy
         self.max_sentinel_plans = max_sentinel_plans
-        self.shouldProfile = shouldProfile
 
         # prune implementation rules based on boolean flags
         if not self.allow_bonded_query:
@@ -130,7 +128,6 @@ class Optimizer:
 
     def get_physical_op_params(self):
         return {
-            "shouldProfile": self.shouldProfile,
             "verbose": self.verbose,
             "available_models": self.available_models,
             "champion_model": getChampionModel(),

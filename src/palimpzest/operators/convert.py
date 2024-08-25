@@ -34,6 +34,15 @@ class ConvertOp(PhysicalOperator):
         self.desc = desc
         self.heatmap_json_obj = None
 
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {
+            "cardinality": self.cardinality,
+            "udf": self.udf,
+            "desc": self.desc,
+            **copy_kwargs
+        }
+
     def get_op_params(self):
         return {
             "inputSchema": self.inputSchema,
@@ -62,18 +71,6 @@ class NonLLMConvert(ConvertOp):
         op = super().__str__()
         op += f"    UDF: {str(self.udf)}\n"
         return op
-
-    def copy(self):
-        return self.__class__(
-            outputSchema=self.outputSchema,
-            inputSchema=self.inputSchema,
-            cardinality=self.cardinality,
-            udf=self.udf,
-            desc=self.desc,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-            verbose=self.verbose,
-        )
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
@@ -160,19 +157,14 @@ class LLMConvert(ConvertOp):
         op += f"    Prompt Strategy: {self.prompt_strategy}\n"
         return op
 
-    def copy(self):
-        return self.__class__(
-            outputSchema=self.outputSchema,
-            inputSchema=self.inputSchema,
-            model=self.model,
-            cardinality=self.cardinality,
-            image_conversion=self.image_conversion,
-            prompt_strategy=self.prompt_strategy,
-            desc=self.desc,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-            verbose=self.verbose,
-        )
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {
+            "model": self.model,
+            "prompt_strategy": self.prompt_strategy,
+            "image_conversion": self.image_conversion,
+            **copy_kwargs
+        }
 
     def get_op_params(self):
         op_params = super().get_op_params()
@@ -613,7 +605,6 @@ class LLMConvertBonded(LLMConvert):
                     outputSchema=self.outputSchema,
                     model=self.model,
                     prompt_strategy=self.prompt_strategy,
-                    shouldProfile=self.shouldProfile,
                     verbose=self.verbose,
                 )
 

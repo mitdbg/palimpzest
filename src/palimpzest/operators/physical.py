@@ -27,7 +27,6 @@ class PhysicalOperator:
         outputSchema: Schema,
         inputSchema: Optional[Schema] = None,
         logical_op_id: Optional[str] = None,
-        shouldProfile: bool = False,
         max_workers: int = 1,
         targetCacheId: Optional[str] = None,
         verbose: bool = False,
@@ -36,7 +35,6 @@ class PhysicalOperator:
         self.outputSchema = outputSchema
         self.inputSchema = inputSchema
         self.datadir = DataDirectory()
-        self.shouldProfile = shouldProfile
         self.max_workers = max_workers
         self.targetCacheId = targetCacheId
         self.verbose = verbose
@@ -49,6 +47,17 @@ class PhysicalOperator:
         if getattr(self, "model", None):
             op += f"    Model: {self.model}\n"
         return op
+
+    def get_copy_kwargs(self):
+        """Return kwargs to assist sub-classes w/copy() calls."""
+        return {
+            "outputSchema": self.outputSchema,
+            "inputSchema": self.inputSchema,
+            "logical_op_id": self.logical_op_id,
+            "max_workers": self.max_workers,
+            "targetCacheId": self.targetCacheId,
+            "verbose": self.verbose,
+        }
 
     def op_name(self) -> str:
         """Name of the physical operator."""
@@ -89,8 +98,9 @@ class PhysicalOperator:
     def __hash__(self):
         return int(self.op_id, 16)
 
-    def copy(self) -> PhysicalOperator:
-        raise NotImplementedError("Calling copy on abstract method")
+    def copy(self):
+        copy_kwargs = self.get_copy_kwargs()
+        return self.__class__(**copy_kwargs)
 
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         raise NotImplementedError("Calling __call__ from abstract method")

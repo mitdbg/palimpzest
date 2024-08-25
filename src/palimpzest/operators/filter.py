@@ -26,6 +26,10 @@ class FilterOp(PhysicalOperator):
         op += f"    Filter: {str(self.filter)}\n"
         return op
 
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"filter": self.filter, **copy_kwargs}
+
     def get_op_params(self):
         return {
             "outputSchema": self.outputSchema,
@@ -38,17 +42,6 @@ class FilterOp(PhysicalOperator):
             and self.filter == other.filter
             and self.inputSchema == other.outputSchema
             and self.outputSchema == other.outputSchema
-        )
-
-    def copy(self):
-        return self.__class__(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
-            filter=self.filter,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-            verbose=self.verbose,
-            max_workers=self.max_workers,
         )
 
 
@@ -145,6 +138,15 @@ class LLMFilter(FilterOp):
         else:
             raise Exception(f"Prompt strategy {self.prompt_strategy} not implemented yet")
 
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {
+            "model": self.model,
+            "prompt_strategy": self.prompt_strategy,
+            "image_filter": self.image_filter,
+            **copy_kwargs
+        }
+
     def get_op_params(self):
         op_params = super().get_op_params()
         op_params = {"model": self.model, **op_params}
@@ -159,20 +161,6 @@ class LLMFilter(FilterOp):
             and self.prompt_strategy == other.prompt_strategy
             and self.image_filter == other.image_filter
             and self.outputSchema == other.outputSchema
-        )
-
-    def copy(self):
-        return self.__class__(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
-            model=self.model,
-            prompt_strategy=self.prompt_strategy,
-            image_filter=self.image_filter,
-            filter=self.filter,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-            verbose=self.verbose,
-            max_workers=self.max_workers,
         )
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates):

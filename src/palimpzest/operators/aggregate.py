@@ -24,7 +24,7 @@ class AggregateOp(PhysicalOperator):
 class ApplyGroupByOp(AggregateOp):
 
     def __init__(self, gbySig: GroupBySig, *args, **kwargs):
-        super().__init__(outputSchema=gbySig.outputSchema(), *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.gbySig = gbySig
 
     def __eq__(self, other: PhysicalOperator):
@@ -38,11 +38,10 @@ class ApplyGroupByOp(AggregateOp):
         op = super().__str__()
         op += f"    Group-by Signature: {str(self.gbySig)}\n"
         return op
-
-    def copy(self):
-        return ApplyGroupByOp(
-            self.inputSchema, self.gbySig, self.targetCacheId, self.shouldProfile
-        )
+    
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"gbySig": self.gbySig, **copy_kwargs}
 
     def get_op_params(self):
         """
@@ -51,7 +50,7 @@ class ApplyGroupByOp(AggregateOp):
         """
         return {
             "outputSchema": self.outputSchema,
-            "gbySig": str(GroupBySig.serialize(self.gbySig)),
+            "gbySig": str(self.gbySig.serialize()),
         }
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
@@ -173,15 +172,11 @@ class CountAggregateOp(AggregateOp):
         op += f"    Function: {str(self.aggFunc)}\n"
         return op
 
-    def copy(self):
-        return CountAggregateOp(
-            inputSchema=self.inputSchema,
-            aggFunc=self.aggFunc,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-        )
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"aggFunc": self.aggFunc, **copy_kwargs}
 
-    def get_op_dict(self):
+    def get_op_params(self):
         """
         We identify the operation by its aggregation function.
         inputSchema is ignored as it depends on how the Optimizer orders operations.
@@ -241,15 +236,11 @@ class AverageAggregateOp(AggregateOp):
         op += f"    Function: {str(self.aggFunc)}\n"
         return op
 
-    def copy(self):
-        return AverageAggregateOp(
-            inputSchema=self.inputSchema,
-            aggFunc=self.aggFunc,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-        )
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"aggFunc": self.aggFunc, **copy_kwargs}
 
-    def get_op_dict(self):
+    def get_op_params(self):
         """
         We identify the operation by its aggregation function.
         inputSchema is ignored as it depends on how the Optimizer orders operations.

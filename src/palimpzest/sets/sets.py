@@ -87,7 +87,7 @@ class Set:
             "depends_on": self._depends_on,
             "limit": self._limit,
             "groupBy": (
-                None if self._groupBy is None else GroupBySig.serialize(self._groupBy)
+                None if self._groupBy is None else self._groupBy.serialize()
             ),
         }
 

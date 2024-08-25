@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from palimpzest.corelib import Schema
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.elements import DataRecord
 from palimpzest.operators import PhysicalOperator, DataRecordsWithStats
@@ -19,6 +18,16 @@ class LimitScanOp(PhysicalOperator):
         op += f"    Limit: {self.limit}\n"
         return op
 
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"limit": self.limit, **copy_kwargs}
+
+    def get_op_params(self):
+        return {
+            "outputSchema": self.outputSchema,
+            "limit": self.limit,
+        }
+
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
@@ -26,21 +35,6 @@ class LimitScanOp(PhysicalOperator):
             and self.outputSchema == other.outputSchema
             and self.inputSchema == other.inputSchema
         )
-
-    def copy(self):
-        return LimitScanOp(
-            outputSchema=self.outputSchema,
-            inputSchema=self.inputSchema,
-            limit=self.limit,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-        )
-
-    def get_op_params(self):
-        return {
-            "outputSchema": self.outputSchema,
-            "limit": self.limit,
-        }
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the limit takes negligible additional time (and no cost in USD)

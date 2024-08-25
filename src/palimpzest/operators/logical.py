@@ -314,7 +314,7 @@ class GroupByAggregate(LogicalOperator):
         self.targetCacheId = targetCacheId
 
     def __str__(self):
-        return f"GroupBy({GroupBySig.serialize(self.gbySig)})"
+        return f"GroupBy({self.gbySig.serialize()})"
 
     def __eq__(self, other: LogicalOperator) -> bool:
         return (

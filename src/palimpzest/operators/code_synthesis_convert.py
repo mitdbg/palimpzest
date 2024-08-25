@@ -30,11 +30,10 @@ class CodeSynthesisConvert(LLMConvert):
         exemplar_generation_model: Model = Model.GPT_4,
         code_synth_model: Model = Model.GPT_4,
         conventional_fallback_model: Model = Model.GPT_3_5,
-        prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_QA,
         cache_across_plans: bool = True,
         *args, **kwargs
     ):
-        super().__init__(model=None, prompt_strategy=prompt_strategy, *args, **kwargs)
+        super().__init__(model=None, *args, **kwargs)
         self.exemplar_generation_model = exemplar_generation_model
         self.code_synth_model = code_synth_model
         self.conventional_fallback_model = conventional_fallback_model
@@ -73,29 +72,26 @@ class CodeSynthesisConvert(LLMConvert):
             and self.cache_across_plans == other.cache_across_plans
         )
 
-    def copy(self):
-        return self.__class__(
-            outputSchema=self.outputSchema,
-            inputSchema=self.inputSchema,
-            exemplar_generation_model=self.exemplar_generation_model,
-            code_synth_model=self.code_synth_model,
-            conventional_fallback_model=self.conventional_fallback_model,
-            cardinality=self.cardinality,
-            image_conversion=self.image_conversion,
-            prompt_strategy=self.prompt_strategy,
-            desc=self.desc,
-            targetCacheId=self.targetCacheId,
-            cache_across_plans=self.cache_across_plans,
-            shouldProfile=self.shouldProfile,
-            verbose=self.verbose,
-        )
-
     def __str__(self):
         op = super().__str__()
         op += f"    Code Synth Strategy: {self.__class__.__name__}\n"
         return op
 
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {
+            "exemplar_generation_model": self.exemplar_generation_model,
+            "code_synth_model": self.code_synth_model,
+            "conventional_fallback_model": self.conventional_fallback_model,
+            "cache_across_plans": self.cache_across_plans,
+            **copy_kwargs
+        }
+
     def get_op_params(self):
+        """
+        NOTE: we do not include self.cache_across_plans because (for now) get_op_params()
+        is only supposed to return hyperparameters which affect operator performance.
+        """
         op_params = super().get_op_params()
         op_params = {
             "exemplar_generation_model": self.exemplar_generation_model,
@@ -210,7 +206,6 @@ class CodeSynthesisConvert(LLMConvert):
             outputSchema=self.outputSchema,
             model=self.exemplar_generation_model,
             prompt_strategy=self.prompt_strategy,
-            shouldProfile=self.shouldProfile,
         )
         field_answers, generation_stats = bonded_op.convert(candidate_content, fields_to_generate)
 
@@ -309,7 +304,6 @@ class CodeSynthesisConvert(LLMConvert):
                     outputSchema=self.outputSchema,
                     model=self.conventional_fallback_model,
                     prompt_strategy=self.prompt_strategy,
-                    shouldProfile=self.shouldProfile,
                 )
 
                 json_answers, field_stats = conventional_op.convert(candidate_content, [field_name])

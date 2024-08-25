@@ -14,6 +14,8 @@ from typing import List, Optional
 
 import hashlib
 
+from palimpzest.operators import ApplyGroupByOp
+
 
 class Plan:
     """A generic Plan is a graph of nodes (#TODO a list for now).
@@ -86,9 +88,8 @@ class PhysicalPlan(Plan):
         return PhysicalPlan(operators=copySubPlan, plan_cost=full_plan_cost)
 
     def __repr__(self) -> str:
-        """Computes a string representation for this plan."""
-        label = "-".join([str(op) for op in self.operators])
-        return f"PZ-{label}"
+        """Returns the string representation for this plan."""
+        return str(self)
 
     def getPlanModelNames(self) -> List[str]:
         model_names = []

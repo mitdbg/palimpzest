@@ -70,7 +70,7 @@ class VLDBPaperListing(pz.Schema):
     pdfLink = pz.Field(desc="The link to the PDF of the paper", required=True)
 
 
-def downloadVLDBPapers(vldbListingPageURLsId, outputDir, shouldProfile=False):
+def downloadVLDBPapers(vldbListingPageURLsId, outputDir, profile=False):
     """This function downloads a bunch of VLDB papers from an online listing and saves them to disk.  It also saves a CSV file of the paper listings."""
     policy = pz.MaxQuality()
 
@@ -114,7 +114,7 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, shouldProfile=False):
             writer.writerow(record._asDict())
 
     # if profiling was turned on; capture statistics
-    if shouldProfile:
+    if profile:
         with open("profiling-data/vldb1-profiling.json", "w") as f:
             json.dump(stats.to_dict(), f)
 
@@ -124,14 +124,13 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, shouldProfile=False):
     #     policy,
     #     title="VLDB paper dump",
     #     verbose=True,
-    #     shouldProfile=shouldProfile,
     # )
     # for idx, r in enumerate(physicalTree2):
     #     with open(os.path.join(outputDir, str(idx) + ".pdf"), "wb") as f:
     #         f.write(r.content)
 
     # # if profiling was turned on; capture statistics
-    # if shouldProfile:
+    # if profile:
     #     profiling_data = physicalTree2.getProfilingData()
     #     sp = StatsProcessor(profiling_data)
 
@@ -245,7 +244,7 @@ def buildImageAggPlan(datasetId):
     return groupedDogImages
 
 
-def printTable(records, cols=None, gradio=False, query=None, plan=None):
+def printTable(records, cols=None, gradio=False, query=None, plan_str=None):
     records = [
         {
             key: record.__dict__[key]
@@ -264,15 +263,12 @@ def printTable(records, cols=None, gradio=False, query=None, plan=None):
         with gr.Blocks() as demo:
             gr.Dataframe(records_df[print_cols])
 
-            if plan is not None:
-                plan_str = str(plan)
+            if plan_str is not None:
                 gr.Textbox(value=plan_str, info="Query Plan")
 
         demo.launch()
 
-#
-# Get battery papers and emit!
-#
+# TODO: clean up script; remove UserFunctions
 if __name__ == "__main__":
     # parse arguments
     startTime = time.time()
@@ -285,11 +281,22 @@ if __name__ == "__main__":
     )
     parser.add_argument("--datasetid", type=str, help="The dataset id")
     parser.add_argument("--task", type=str, help="The task to run")
-    parser.add_argument('--engine', type=str, help='The engine to use. One of sequential, parallel, nosentinel', default='parallel')
+    parser.add_argument(
+        "--engine",
+        type=str,
+        help='The engine to use. One of sentinel, nosentinel',
+        default='sentinel',
+    )
+    parser.add_argument(
+        "--executor",
+        type=str,
+        help='The plan executor to use. One of sequential, pipelined, parallel',
+        default='parallel',
+    )
     parser.add_argument(
         "--policy",
         type=str,
-        help="One of 'user', 'mincost', 'mintime', 'maxquality', 'harmonicmean'",
+        help="One of 'mincost', 'mintime', 'maxquality'",
         default='mincost',
     )
 
@@ -309,28 +316,43 @@ if __name__ == "__main__":
 
     datasetid = args.datasetid
     task = args.task
-    policy = pz.MaxHarmonicMean()
-    if args.policy == "user":
-        policy = pz.UserChoice()
-    elif args.policy == "mincost":
+    verbose = args.verbose
+    policy = pz.MaxQuality()
+    if args.policy == "mincost":
         policy = pz.MinCost()
     elif args.policy == "mintime":
         policy = pz.MinTime()
     elif args.policy == "maxquality":
         policy = pz.MaxQuality()
-    elif args.policy == "harmonicmean":
-        policy = pz.MaxHarmonicMean()
     else:
-        print("Unknown policy")
+        print("Policy not supported for this demo")
         exit(1)
 
-    engine = args.engine
-    if engine == 'sequential':
-        engine = pz.SequentialSingleThreadExecution
-    elif engine == 'parallel':
-        engine = pz.PipelinedParallelExecution
-    elif engine == 'nosentinel':
-        engine = pz.NoSentinelExecution
+    execution_engine = None
+    engine, executor = args.engine, args.executor
+    if engine == "sentinel":
+        if executor == "sequential":
+            execution_engine = pz.SequentialSingleThreadSentinelExecution
+        elif executor == "pipelined":
+            execution_engine = pz.PipelinedSingleThreadSentinelExecution
+        elif executor == "parallel":
+            execution_engine = pz.PipelinedParallelSentinelExecution
+        else:
+            print("Unknown executor")
+            exit(1)
+    elif engine == "nosentinel":
+        if executor == "sequential":
+            execution_engine = pz.SequentialSingleThreadNoSentinelExecution
+        elif executor == "pipelined":
+            execution_engine = pz.PipelinedSingleThreadNoSentinelExecution
+        elif executor == "parallel":
+            execution_engine = pz.PipelinedParallelNoSentinelExecution
+        else:
+            print("Unknown executor")
+            exit(1)
+    else:
+        print("Unknown engine")
+        exit(1)
     
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
@@ -432,7 +454,7 @@ if __name__ == "__main__":
         stats_path = "profiling-data/image-profiling.json"
 
     elif task == "vldb":
-        downloadVLDBPapers(datasetid, "vldbPapers", shouldProfile=args.profile)
+        downloadVLDBPapers(datasetid, "vldbPapers", profile=args.profile)
 
     elif task == "limit":
         rootSet = enronLimitPlan(datasetid, 5)
@@ -443,23 +465,26 @@ if __name__ == "__main__":
         print("Unknown task")
         exit(1)
 
-    records, plan, stats = pz.Execute(rootSet, 
+    records, execution_stats = pz.Execute(rootSet, 
                                     policy = policy,
                                     nocache=True,
                                     allow_token_reduction=False,
                                     allow_code_synth=False,
-                                    execution_engine=engine)
+                                    execution_engine=execution_engine,
+                                    verbose=verbose)
 
     print(f"Policy is: {str(policy)}")
     print("Executed plan:")
-    print(plan)
-    print(stats)
+    plan_str = list(execution_stats.plan_strs.values())[0]
+    print(plan_str)
+    endTime = time.time()
+    print("Elapsed time:", endTime - startTime)
+
     if args.profile:
         with open(stat_path, "w") as f:
-            json.dump(stats.to_dict(), f)
+            json.dump(execution_stats.to_json(), f)
 
     if task == 'image':
-        # TODO
         imgs, breeds = [], []
         for record in records:
             path = os.path.join("testdata/images-tiny/", record.filename)
@@ -479,17 +504,13 @@ if __name__ == "__main__":
                     with gr.Column():
                         breed_blocks.append(gr.Textbox(value=breed))
 
-            plan_str = str(plan)
             gr.Textbox(value=plan_str, info="Query Plan")
 
         demo.launch()
+
     elif task == 'pdftest':
         records = [pz.Number() for r in records] 
         records = [setattr(number, "value", idx) for idx, number in enumerate(records)]
-        printTable(records, cols=cols, gradio=True, plan=plan)        
+        printTable(records, cols=cols, gradio=True, plan_str=plan_str)        
     else:
-        printTable(records, cols=cols, gradio=False, plan=plan)
-
-
-    endTime = time.time()
-    print("Elapsed time:", endTime - startTime)
+        printTable(records, cols=cols, gradio=False, plan_str=plan_str)

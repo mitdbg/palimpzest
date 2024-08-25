@@ -30,6 +30,21 @@ class TokenReducedConvert(LLMConvert):
         self.resolution = self.TOKEN_REDUCTION_GRANULARITY
         self.first_execution = True
 
+    def __str__(self):
+        op = super().__str__()
+        op += f"    Token Budget: {str(self.token_budget)}\n"
+        return op
+
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"token_budget": self.token_budget, **copy_kwargs}
+
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        op_params = {"token_budget": self.token_budget, **op_params}
+
+        return op_params
+
     def __eq__(self, other: TokenReducedConvert):
         return (
             isinstance(other, self.__class__)
@@ -41,33 +56,6 @@ class TokenReducedConvert(LLMConvert):
             and self.inputSchema == other.inputSchema
             and self.max_workers == other.max_workers
         )
-
-    def __str__(self):
-        op = super().__str__()
-        op += f"    Token Budget: {str(self.token_budget)}\n"
-        return op
-
-    def get_op_params(self):
-        op_params = super().get_op_params()
-        op_params = {"token_budget": self.token_budget, **op_params}
-
-        return op_params
-
-    def copy(self):
-        return self.__class__(
-            outputSchema=self.outputSchema,
-            inputSchema=self.inputSchema,
-            model=self.model,
-            token_budget=self.token_budget,
-            cardinality=self.cardinality,
-            image_conversion=self.image_conversion,
-            prompt_strategy=self.prompt_strategy,
-            desc=self.desc,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-            verbose=self.verbose,
-        )
-
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """

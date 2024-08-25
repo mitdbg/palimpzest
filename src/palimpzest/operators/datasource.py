@@ -57,12 +57,6 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
             and self.outputSchema == other.outputSchema
         )
 
-    def copy(self):
-        return MarshalAndScanDataOp(
-            self.outputSchema,
-            self.shouldProfile,
-        )
-
     def naiveCostEstimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
@@ -145,18 +139,13 @@ class CacheScanDataOp(DataSourcePhysicalOp):
             and self.outputSchema == other.outputSchema
         )
 
-    def copy(self):
-        return CacheScanDataOp(
-            self.outputSchema,
-            self.cachedDataIdentifier,
-            self.shouldProfile,
-        )
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"cachedDataIdentifier": self.cachedDataIdentifier, **copy_kwargs}
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        op_params = {"cachedDataIdentifier": self.cachedDataIdentifier, **op_params}
-
-        return op_params
+        return {"cachedDataIdentifier": self.cachedDataIdentifier, **op_params}
 
     def naiveCostEstimates(
         self, 
