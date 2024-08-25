@@ -383,7 +383,7 @@ class DSPyGenerator(BaseGenerator):
         output_tokens = usage["completion_tokens"]
 
         # NOTE: needs to match subset of keys produced by LLMConvert._create_empty_query_stats()
-        stats= GenerationStats(
+        stats = GenerationStats(
             model_name=self.model_name,
             llm_call_duration_secs=end_time - start_time,
             fn_call_duration_secs=0.0,
@@ -411,14 +411,16 @@ class DSPyGenerator(BaseGenerator):
         })
 
         if self.verbose:
-            output_str = (
-                f"{question}\n{pred.answer}"
-                if self.prompt_strategy == PromptStrategy.DSPY_COT_QA
-                else f"{question}:\n{pred.answer}"
-            )
-            print(output_str)
-            # print("Prompt history:")
-            # dspy_lm.inspect_history(n=1)
+            print("Prompt history:")
+            dspy_lm.inspect_history(n=1)
+            # output_str = (
+            #     f"{question}\n{pred.answer}"
+            #     if self.prompt_strategy == PromptStrategy.DSPY_COT_QA
+            #     else f"{question}:\n{pred.answer}"
+            # )
+            # print(output_str)
+            print("---")
+            print(f"{pred.answer}")
 
         return pred.answer, stats
 
