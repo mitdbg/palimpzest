@@ -6,8 +6,6 @@ from palimpzest.execution import ExecutionEngine
 from palimpzest.operators import AggregateOp, LimitScanOp, MarshalAndScanDataOp, PhysicalOperator
 from palimpzest.optimizer import PhysicalPlan
 
-from palimpzest.dataclasses import OperatorStats, PlanStats
-
 from concurrent.futures import ThreadPoolExecutor, wait
 from typing import List, Optional, Union
 
@@ -48,7 +46,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         plan_start_time = time.time()
 
         # initialize plan and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id)
+        plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
             plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here

@@ -16,7 +16,7 @@ class LimitScanOp(PhysicalOperator):
 
     def __str__(self):
         op = super().__str__()
-        op += f"Limit: {self.limit}\n"
+        op += f"    Limit: {self.limit}\n"
         return op
 
     def __eq__(self, other: PhysicalOperator):

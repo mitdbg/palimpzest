@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from palimpzest.generators.generators import DSPyGenerator
+from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
 from .physical import PhysicalOperator, DataRecordsWithStats
 
 from palimpzest.constants import *
 from palimpzest.dataclasses import GenerationStats, RecordOpStats
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.elements import DataRecord, Filter
+from palimpzest.prompts import IMAGE_FILTER_PROMPT
 
 from typing import List
 
+import base64
 import time
 
 
@@ -21,7 +23,7 @@ class FilterOp(PhysicalOperator):
 
     def __str__(self):
         op = super().__str__()
-        op += f"Filter: {str(self.filter)}\n"
+        op += f"    Filter: {str(self.filter)}\n"
         return op
 
     def get_op_params(self):
@@ -117,23 +119,28 @@ class LLMFilter(FilterOp):
         self,
         model: Model,
         prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_BOOL,
+        image_filter: bool = False,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.model = model
         self.prompt_strategy = prompt_strategy
+        self.image_filter = image_filter
 
         doc_schema = str(self.inputSchema)
         doc_type = self.inputSchema.className()
         if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
-            self.generator = DSPyGenerator(
-                self.model.value,
-                self.prompt_strategy,
-                doc_schema,
-                doc_type,
-                verbose=self.verbose,
-            )
+            if not self.image_filter:
+                self.generator = DSPyGenerator(
+                    self.model.value,
+                    self.prompt_strategy,
+                    doc_schema,
+                    doc_type,
+                    verbose=self.verbose,
+                )
+            else:
+                self.generator = ImageTextGenerator(self.model.value, self.verbose)
 
         else:
             raise Exception(f"Prompt strategy {self.prompt_strategy} not implemented yet")
@@ -150,6 +157,7 @@ class LLMFilter(FilterOp):
             and self.model == other.model
             and self.filter == other.filter
             and self.prompt_strategy == other.prompt_strategy
+            and self.image_filter == other.image_filter
             and self.outputSchema == other.outputSchema
         )
 
@@ -159,6 +167,7 @@ class LLMFilter(FilterOp):
             outputSchema=self.outputSchema,
             model=self.model,
             prompt_strategy=self.prompt_strategy,
+            image_filter=self.image_filter,
             filter=self.filter,
             targetCacheId=self.targetCacheId,
             shouldProfile=self.shouldProfile,
@@ -169,7 +178,11 @@ class LLMFilter(FilterOp):
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
+        if self.image_filter:
+            est_num_input_tokens = 765 / 10 # 1024x1024 image is 765 tokens
 
+        # NOTE: in truth, the DSPy COT output often generates an entire reasoning sentence,
+        #       thus the true value may be higher
         # the filter operation's LLM call should only output TRUE or FALSE, thus we expect its
         # number of output tokens to be ~1.25
         est_num_output_tokens = 1.25
@@ -191,7 +204,11 @@ class LLMFilter(FilterOp):
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.model.value]["reasoning"] / 100.0)
+        quality = (
+            (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * source_op_cost_estimates.quality
+            if self.image_filter
+            else (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * source_op_cost_estimates.quality
+        )
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -203,14 +220,33 @@ class LLMFilter(FilterOp):
     def __call__(self, candidate: DataRecord) -> DataRecordsWithStats:
         start_time = time.time()
 
+        # parse the content from the candidate record
+        content = None
+        if self.image_filter:
+            base64_images = []
+            if hasattr(candidate, "contents"):
+                # TODO: should address this now; we need a way to infer (or have the programmer declare) what fields contain image content
+                base64_images = [
+                    base64.b64encode(candidate.contents).decode("utf-8")  
+                ]
+            else:
+                base64_images = [
+                    base64.b64encode(image).decode("utf-8")
+                    for image in candidate.image_contents  # TODO: (see note above)
+                ]
+            content = base64_images
+        else:
+            content = candidate._asJSONStr(include_bytes=False)
+
+        # construct the prompt; for image filters we need to wrap the filter condition in an instruction 
+        prompt = self.filter.filterCondition
+        if self.image_filter:
+            prompt = IMAGE_FILTER_PROMPT.format(filter_condition=self.filter.filterCondition)
+
         # invoke LLM to generate filter decision (True or False)
-        text_content = candidate._asJSONStr(include_bytes=False)
         response, gen_stats = None, GenerationStats()
         try:
-            response, gen_stats = self.generator.generate(
-                context=text_content,
-                question=self.filter.filterCondition,
-            )
+            response, gen_stats = self.generator.generate(context=content, question=prompt)
         except Exception as e:
             print(f"Error invoking LLM for filter: {e}")
 

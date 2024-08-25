@@ -104,7 +104,7 @@ class ConvertScan(LogicalOperator):
         super().__init__(*args, **kwargs)
         self.cardinality = cardinality
         self.udf = udf
-        self.image_conversion = image_conversion or (self.outputSchema == ImageFile and self.inputSchema == File)
+        self.image_conversion = image_conversion or (self.inputSchema == ImageFile)
         self.depends_on = depends_on
         self.desc = desc
         self.targetCacheId = targetCacheId
@@ -254,6 +254,7 @@ class FilteredScan(LogicalOperator):
     def __init__(
         self,
         filter: Filter,
+        image_filter: bool = False,
         depends_on: List[str] = [],
         targetCacheId: str = None,
         *args,
@@ -261,6 +262,7 @@ class FilteredScan(LogicalOperator):
     ):
         super().__init__(*args, **kwargs)
         self.filter = filter
+        self.image_filter = image_filter or (self.inputSchema == ImageFile)
         self.depends_on = depends_on
         self.targetCacheId = targetCacheId
 
@@ -273,6 +275,7 @@ class FilteredScan(LogicalOperator):
             and self.inputSchema == other.inputSchema
             and self.outputSchema == other.outputSchema
             and self.filter == other.filter
+            and self.image_filter == other.image_filter
         )
 
     def copy(self):
@@ -280,6 +283,7 @@ class FilteredScan(LogicalOperator):
             inputSchema=self.inputSchema,
             outputSchema=self.outputSchema,
             filter=self.filter,
+            image_filter=self.image_filter,
             depends_on=self.depends_on,
             targetCacheId=self.targetCacheId,
         )
@@ -289,6 +293,7 @@ class FilteredScan(LogicalOperator):
             "inputSchema": self.inputSchema,
             "outputSchema": self.outputSchema,
             "filter": self.filter,
+            "image_filter": self.image_filter,
             "targetCacheId": self.targetCacheId,
         }
 

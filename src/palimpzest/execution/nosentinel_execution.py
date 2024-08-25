@@ -26,7 +26,7 @@ class NoSentinelExecutionEngine(ExecutionEngine):
 
         # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
         if self.nocache:
-            self.clear_cache()
+            self.clear_cached_responses_and_examples()
 
         # set the source dataset id
         self.set_source_dataset_id(dataset)
@@ -69,6 +69,7 @@ class NoSentinelExecutionEngine(ExecutionEngine):
             plan_stats=aggregate_plan_stats,
             total_execution_time=time.time() - execution_start_time,
             total_execution_cost=sum(list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats.values()))),
+            plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 
         return records, execution_stats

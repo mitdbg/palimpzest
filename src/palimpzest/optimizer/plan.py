@@ -101,7 +101,7 @@ class PhysicalPlan(Plan):
 
     def printPlan(self) -> None:
         """Print the physical plan."""
-        print_ops = self.operators[1:]
+        print_ops = self.operators
         start = print_ops[0]
         print(f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n")
 

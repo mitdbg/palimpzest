@@ -46,6 +46,17 @@ Here is every output field name and a description:
 {appendixInstruction}
 {optional_desc}"""
 
+IMAGE_FILTER_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and:
+- Output TRUE if the given image satisfies the filter condition
+- Output FALSE if the given image does not satisfy the condition
+
+Your answer must be TRUE or FALSE.
+
+FILTER CONDITION: {filter_condition}
+
+ANSWER: 
+"""
+
 
 ### CODE SYNTHESIS PROMPTS ###
 EXAMPLE_PROMPT = """Example{idx}:

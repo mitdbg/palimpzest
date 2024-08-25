@@ -19,7 +19,7 @@ class DataSourcePhysicalOp(PhysicalOperator):
     """
     def __str__(self):
         op = f"{self.op_name()} -> {self.outputSchema}\n"
-        op += f"({','.join(self.outputSchema.fieldNames())[:30]})\n"
+        op += f"    ({', '.join(self.outputSchema.fieldNames())[:30]})\n"
         return op
 
     def get_op_params(self):
@@ -135,7 +135,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
 
     def __str__(self):
         op = super().__str__()
-        op += f"Cache ID: {str(self.cachedDataIdentifier)}\n"
+        op += f"    Cache ID: {str(self.cachedDataIdentifier)}\n"
         return op
 
     def __eq__(self, other: PhysicalOperator):

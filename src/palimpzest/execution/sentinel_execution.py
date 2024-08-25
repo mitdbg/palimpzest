@@ -26,10 +26,9 @@ class SentinelExecutionEngine(ExecutionEngine):
     def execute(self, dataset: Set, policy: Policy):
         execution_start_time = time.time()
 
-        # TODO?: we should be able to remove this w/our cache management?
         # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
         if self.nocache:
-            self.clear_cache()
+            self.clear_cached_responses_and_examples()
 
         # set the source dataset id
         self.set_source_dataset_id(dataset)
@@ -113,6 +112,7 @@ class SentinelExecutionEngine(ExecutionEngine):
             plan_stats=aggregate_plan_stats,
             total_execution_time=time.time() - execution_start_time,
             total_execution_cost=sum(list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats.values()))),
+            plan_strs={plan_stats.plan_id: plan_stats.plan_str for plan_stats in aggregate_plan_stats.items()},
         )
 
         return all_records, execution_stats

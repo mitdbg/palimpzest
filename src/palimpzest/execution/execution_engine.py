@@ -75,7 +75,7 @@ class ExecutionEngine:
         return hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
 
-    def clear_cache(self):
+    def clear_cached_responses_and_examples(self):
         """
         Clear cached LLM responses and codegen samples.
         """

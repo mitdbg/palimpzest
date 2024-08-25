@@ -92,7 +92,7 @@ class CodeSynthesisConvert(LLMConvert):
 
     def __str__(self):
         op = super().__str__()
-        op += f"Code Synth Strategy: {self.__class__.__name__}\n"
+        op += f"    Code Synth Strategy: {self.__class__.__name__}\n"
         return op
 
     def get_op_params(self):

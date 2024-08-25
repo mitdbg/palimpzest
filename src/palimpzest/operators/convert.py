@@ -60,7 +60,7 @@ class NonLLMConvert(ConvertOp):
 
     def __str__(self):
         op = super().__str__()
-        op += f"UDF: {str(self.udf)}\n"
+        op += f"    UDF: {str(self.udf)}\n"
         return op
 
     def copy(self):
@@ -157,7 +157,7 @@ class LLMConvert(ConvertOp):
 
     def __str__(self):
         op = super().__str__()
-        op += f"Prompt strategy: {self.prompt_strategy}\n"
+        op += f"    Prompt Strategy: {self.prompt_strategy}\n"
         return op
 
     def copy(self):

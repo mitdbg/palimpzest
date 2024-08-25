@@ -9,7 +9,7 @@ from palimpzest.generators import (
     gen_qa_signature_class,
     TogetherHFAdaptor,
 )
-from palimpzest.dataclasses import GenerationStats, RecordOpStats
+from palimpzest.dataclasses import GenerationStats
 from palimpzest.utils import API
 
 from collections import Counter
@@ -24,7 +24,6 @@ import base64
 import dsp
 import dspy
 import io
-import json
 import os
 import time
 
@@ -413,14 +412,14 @@ class DSPyGenerator(BaseGenerator):
         if self.verbose:
             print("Prompt history:")
             dspy_lm.inspect_history(n=1)
+            print("---")
+            print(f"{pred.answer}")
             # output_str = (
             #     f"{question}\n{pred.answer}"
             #     if self.prompt_strategy == PromptStrategy.DSPY_COT_QA
             #     else f"{question}:\n{pred.answer}"
             # )
             # print(output_str)
-            print("---")
-            print(f"{pred.answer}")
 
         return pred.answer, stats
 

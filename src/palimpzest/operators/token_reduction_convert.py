@@ -44,7 +44,7 @@ class TokenReducedConvert(LLMConvert):
 
     def __str__(self):
         op = super().__str__()
-        op += f"Token Budget: {str(self.token_budget)}\n"
+        op += f"    Token Budget: {str(self.token_budget)}\n"
         return op
 
     def get_op_params(self):

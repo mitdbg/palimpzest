@@ -448,8 +448,14 @@ class LLMFilterRule(ImplementationRule):
         })
         physical_expressions = []
         for model in physical_op_params['available_models']:
-            # skip this model if it is an image model (we currently do not support directly filtering on images)
-            if model in getVisionModels():
+            # skip this model if:
+            # 1. this is an image model and we're not doing an image filter, or
+            # 2. this is not an image model and we're doing an image filter
+            # TODO: make sure this logic can handle models like GPT-4o which are both vision and not-vision
+            is_vision_model = model in getVisionModels()
+            is_image_filter = op_kwargs['image_filter']
+            image_model_xor = is_vision_model != is_image_filter
+            if image_model_xor:
                 continue
 
             # construct multi-expression

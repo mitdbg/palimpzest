@@ -215,8 +215,11 @@ class PlanStats:
     """
     Dataclass for storing statistics captured for an entire plan.
     """
-    # string for identifying the physical plan
+    # id for identifying the physical plan
     plan_id: str
+
+    # string representation of the physical plan
+    plan_str: str = None
 
     # dictionary of OperatorStats objects (one for each operator)
     operator_stats: Dict[str, OperatorStats] = field(default_factory=dict)
@@ -257,6 +260,7 @@ class PlanStats:
     def to_json(self):
         return {
             "plan_id": self.plan_id,
+            "plan_str": self.plan_str,
             "operator_stats": {
                 op_id: op_stats.to_json()
                 for op_id, op_stats in self.operator_stats.items()
@@ -283,6 +287,9 @@ class ExecutionStats:
     # total cost for a call to pz.Execute
     total_execution_cost: float = 0.0
 
+    # dictionary of plan strings; useful for printing executed plans in demos
+    plan_strs: Dict[str, str] = field(default_factory=dict)
+
     def to_json(self):
         return {
             "execution_id": self.execution_id,
@@ -292,6 +299,7 @@ class ExecutionStats:
             },
             "total_execution_time": self.total_execution_time,
             "total_execution_cost": self.total_execution_cost,
+            "plan_strs": self.plan_strs,
         }
 
 
