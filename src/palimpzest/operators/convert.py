@@ -311,24 +311,43 @@ class LLMConvert(ConvertOp):
         fields: List[str],
         generation_stats: GenerationStats,
         total_time: float,
+        parent_id: Optional[str] = None,
     ) -> List[RecordOpStats]:
         """
         Construct list of RecordOpStats objects (one for each DataRecord).
         """
         record_op_stats_lst = []
-        per_record_stats = generation_stats / len(records)
+
+        # compute variables
+        successful_convert = (len(records) > 0)
+        num_records = len(records) if successful_convert else 1
+        per_record_stats = generation_stats / num_records
         model = getattr(self, "model", None)
-        for dr in records:
+
+        # NOTE: in some cases, we may generate outputs which fail to parse correctly,
+        #       thus `records` is an empty list, but we still want to capture the
+        #       the cost of the failed generation; in this case, we set num_records = 1
+        #       and compute a RecordOpStats with some fields None'd out and failed_convert=True
+        for idx in range(num_records):
+            # compute variables which depend on data record
+            record_id, record_parent_id, record_state, answer = None, parent_id, None, None
+            if successful_convert:
+                dr = records[idx]
+                record_id = dr._id
+                record_parent_id = dr._parent_id
+                record_state = dr._asDict(include_bytes=False)
+                answer = {field_name: getattr(dr, field_name) for field_name in fields}
+
             record_op_stats = RecordOpStats(
-                record_id=dr._id,
-                record_parent_id=dr._parent_id,
-                record_state=dr._asDict(include_bytes=False),
+                record_id=record_id,
+                record_parent_id=record_parent_id,
+                record_state=record_state,
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),
-                time_per_record=total_time / len(records),
+                time_per_record=total_time / num_records,
                 cost_per_record=per_record_stats.cost_per_record,
                 model_name=model.value if model else None,
-                answer={field_name: getattr(dr, field_name) for field_name in fields},
+                answer=answer,
                 input_fields=self.inputSchema.fieldNames(),
                 generated_fields=fields,
                 total_input_tokens=per_record_stats.total_input_tokens,
@@ -337,6 +356,7 @@ class LLMConvert(ConvertOp):
                 total_output_cost=per_record_stats.total_output_cost,
                 llm_call_duration_secs=per_record_stats.llm_call_duration_secs,
                 fn_call_duration_secs=per_record_stats.fn_call_duration_secs,
+                failed_convert=(not successful_convert),
             )
             record_op_stats_lst.append(record_op_stats)
 
@@ -511,6 +531,7 @@ class LLMConvert(ConvertOp):
             fields=fields_to_generate,
             generation_stats=generation_stats,
             total_time=total_time,
+            parent_id=candidate._id,
         )
 
         return drs, record_op_stats_lst

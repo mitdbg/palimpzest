@@ -142,6 +142,9 @@ class RecordOpStats:
     # (if applicable) the time (in seconds) spent executing a UDF or calling an external api
     fn_call_duration_secs: float = 0.0
 
+    # (if applicable) a boolean indicating whether this is the statistics captured from a failed convert operation
+    failed_convert: Optional[bool] = None
+
     def to_json(self):
         return {
             field.name: getattr(self, field.name)

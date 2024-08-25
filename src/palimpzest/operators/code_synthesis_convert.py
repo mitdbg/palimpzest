@@ -232,6 +232,7 @@ class CodeSynthesisConvert(LLMConvert):
             fields=fields_to_generate,
             generation_stats=generation_stats,
             total_time=total_time,
+            parent_id=candidate._id,
         )
 
         # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
@@ -331,6 +332,7 @@ class CodeSynthesisConvert(LLMConvert):
             fields=fields_to_generate,
             generation_stats=generation_stats,
             total_time=time.time() - start_time,
+            parent_id=candidate._id,
         )
 
         return drs, record_op_stats_lst

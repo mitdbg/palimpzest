@@ -382,15 +382,10 @@ if __name__ == "__main__":
         cols=["average(count(sender))"]
         stat_path = "profiling-data/e-profiling.json"
 
-    elif task == "enronoptimize":
-        rootSet = buildEnronPlan(datasetid)
-        cols = ["sender", "subject"]
-        stat_path = "profiling-data/eo-profiling.json"
-
     elif task == "enronmap":
         rootSet = computeEnronStats(datasetid)
-        cols = None
-        stats_path = "profiling-data/emap-profiling.json"
+        cols = ["subject", "sender", "value"]
+        stat_path = "profiling-data/emap-profiling.json"
 
     elif task == "pdftest":
         rootSet = buildTestPDFPlan(datasetid)
