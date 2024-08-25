@@ -390,9 +390,19 @@ class LLMConvert(ConvertOp):
         This functions gets a string answer and parses it into an iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
         # """
         try:
+            # parse json from answer string
             json_answer = getJsonFromAnswer(answer)
+
+            # sanity check validity of parsed json
             assert json_answer != {}, "No output was found!"
-            assert all([field in json_answer for field in fields_to_generate]), "Not all fields were generated!"
+            if self.cardinality == Cardinality.ONE_TO_MANY:
+                assert "items" in json_answer, "\"items\" key missing from one-to-many JSON"
+                assert (
+                    isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0
+                ), "No output objects were generated for one-to-many query"
+            else:
+                assert all([field in json_answer for field in fields_to_generate]), "Not all fields were generated!"
+
         except Exception as e:
             print(f"Error parsing LLM answer: {e}")
             msg = str(e)
@@ -404,18 +414,14 @@ class LLMConvert(ConvertOp):
 
         field_answers = {}
         if self.cardinality == Cardinality.ONE_TO_MANY:
-            try:
-                assert (
-                    isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0
-                ), "No output objects were generated for one-to-many query"
-                # json_answer["items"] is a list of dictionaries, each of which contains the generated fields
-                for field in fields_to_generate:
-                    field_answers[field] = []
-                    for item in json_answer["items"]:
+            # json_answer["items"] is a list of dictionaries, each of which contains the generated fields
+            for field in fields_to_generate:
+                field_answers[field] = []
+                for item in json_answer["items"]:
+                    try:
                         field_answers[field].append(item[field])
-            except Exception as e:
-                print(f"Error parsing one-to-many answer: {e}")
-                field_answers = {field: [] for field in fields_to_generate}
+                    except Exception as e:
+                        print(f"Error parsing field {field} in one-to-many answer: {item}")
 
         else:
             field_answers = {
@@ -599,7 +605,7 @@ class LLMConvertBonded(LLMConvert):
         )
         json_answers = self.parse_answer(answer, fields)
 
-        # if there was an error, execute a conventional query
+        # if there was an error for any field, execute a conventional query on that field
         for field, values in json_answers.items():
             if values == []:
                 conventional_op = LLMConvertConventional(
@@ -608,6 +614,7 @@ class LLMConvertBonded(LLMConvert):
                     model=self.model,
                     prompt_strategy=self.prompt_strategy,
                     shouldProfile=self.shouldProfile,
+                    verbose=self.verbose,
                 )
 
                 field_answer, field_stats = conventional_op.convert(candidate_content, [field])
