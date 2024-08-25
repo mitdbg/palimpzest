@@ -1,7 +1,7 @@
 from __future__ import annotations
 from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.operators import LogicalOperator, PhysicalOperator
-from typing import List, Optional, Set, Union
+from typing import Dict, List, Optional, Set, Union
 
 import hashlib
 
@@ -60,16 +60,18 @@ class Group:
     Represents the execution of an un-ordered set of logical operators.
     Maintains a set of logical multi-expressions and physical multi-expressions.
     """
-    def __init__(self, logical_expressions: List[Expression], fields: Set[str], filter_strs: Set[str]):
+    def __init__(self, logical_expressions: List[Expression], fields: Set[str], properties: Dict[str, Set[str]]):
         self.logical_expressions = set(logical_expressions)
         self.physical_expressions = set()
         self.fields = fields
-        self.filter_strs = filter_strs
-        self.properties = None  # eventually, we may have support for e.g. SORT which would require storing group properties
         self.explored = False
         self.best_physical_expression: PhysicalExpression = None
         self.ci_best_physical_expressions: List[PhysicalExpression] = []
         self.satisfies_constraint = False
+
+        # properties of the Group which distinguish it from groups w/identical fields,
+        # e.g. which filters, limits have been applied; is the output sorted, etc.
+        self.properties = properties
 
         # compute the group id
         self.group_id = self.compute_group_id()
@@ -78,9 +80,14 @@ class Group:
         self.explored = True
 
     def compute_group_id(self) -> int:
+        # sort fields
         sorted_fields = sorted(self.fields)
-        sorted_filter_strs = sorted(self.filter_strs)
 
-        hash_str = str(tuple(sorted_fields + sorted_filter_strs))
+        # sort properties
+        sorted_properties = []
+        for key in sorted(self.properties.keys()):
+            sorted_properties.extend(sorted(self.properties[key]))
+
+        hash_str = str(tuple(sorted_fields + sorted_properties))
         hash_id = int(hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS], 16)
         return hash_id

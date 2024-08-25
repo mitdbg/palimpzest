@@ -158,7 +158,8 @@ class CountAggregateOp(AggregateOp):
     # NOTE: we don't actually need / use aggFunc here (yet)
 
     def __init__(self, aggFunc: AggFunc, *args, **kwargs):
-        super().__init__(outputSchema=Number, *args, **kwargs)
+        kwargs["outputSchema"] = Number
+        super().__init__(*args, **kwargs)
         self.aggFunc = aggFunc
 
     def __eq__(self, other: PhysicalOperator):
@@ -218,7 +219,8 @@ class AverageAggregateOp(AggregateOp):
     # NOTE: we don't actually need / use aggFunc here (yet)
 
     def __init__(self, aggFunc: AggFunc, *args, **kwargs):
-        super().__init__(outputSchema=Number, *args, **kwargs)
+        kwargs["outputSchema"] = Number
+        super().__init__(*args, **kwargs)
         self.aggFunc = aggFunc
 
         if not self.inputSchema == Number:

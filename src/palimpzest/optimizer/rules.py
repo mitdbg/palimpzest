@@ -3,7 +3,8 @@ from palimpzest.operators import *
 from palimpzest.optimizer.primitives import Group, Expression, LogicalExpression, PhysicalExpression
 from palimpzest.utils.model_helpers import getVisionModels
 
-from typing import Any, Set
+from copy import deepcopy
+from typing import Set
 
 
 class Rule:
@@ -79,22 +80,10 @@ class PushDownFilter(TransformationRule):
                 if any([field in expr.generated_fields for field in filter_operator.depends_on]):
                     continue
 
-                # compute the inputs to our new filter expression
+                # create new logical expression with filter pushed down to the input group's logical expression
                 new_input_group_ids = expr.input_group_ids.copy()
                 new_input_fields = expr.input_fields.copy()
                 new_generated_fields = logical_expression.generated_fields.copy()
-
-                # compute the attributes for the group
-                all_fields = new_input_fields.union(new_generated_fields)
-                all_filter_strs = set([filter_operator.filter.getFilterStr()])
-                input_filter_strs = (
-                    input_group.filter_strs.copy()
-                    if isinstance(expr.operator, ConvertScan)
-                    else set([filter_str for filter_str in input_group.filter_strs if filter_str != expr.operator.filter.getFilterStr()])
-                )
-                all_filter_strs = all_filter_strs.union(input_filter_strs)
-
-                # create new logical expression with filter pushed down to the input group's logical expression
                 new_filter_expr = LogicalExpression(
                     filter_operator,
                     input_group_ids=new_input_group_ids,
@@ -102,6 +91,9 @@ class PushDownFilter(TransformationRule):
                     generated_fields=new_generated_fields,
                     group_id=None,
                 )
+
+                # add new_filter_expr to set of new expressions
+                new_logical_expressions.add(new_filter_expr)
 
                 # get or compute the group_id and group for this new expression
                 group_id, group = None, None
@@ -114,17 +106,33 @@ class PushDownFilter(TransformationRule):
 
                 # otherwise, lookup or create expression's group and add it to the new expressions
                 else:
+                    # first, compute the fields for the group
+                    all_fields = new_input_fields.union(new_generated_fields)
+
+                    # next, compute the properties; the properties will be identical to those of the input group
+                    # EXCEPT for the filters which will change as a result of our swap
+                    new_group_properties = deepcopy(input_group.properties)
+
+                    # if the expression we're swapping with is a FilteredScan, we need to remove its filter from the input group properties
+                    if isinstance(expr.operator, FilteredScan):
+                        filter_str = expr.operator.filter.getFilterStr()                            
+                        new_group_properties["filters"].remove(filter_str)
+
+                    # finally, add the pushed-down filter to the new group's properties
+                    filter_str = filter_operator.filter.getFilterStr()
+                    if "filters" in new_group_properties:
+                        new_group_properties["filters"].add(filter_str)
+                    else:
+                        new_group_properties["filters"] = set([filter_str])
+
                     # create group for this new filter expression
                     group = Group(
                         logical_expressions=[new_filter_expr],
                         fields=all_fields,
-                        filter_strs=all_filter_strs,
+                        properties=new_group_properties,
                     )
                     group_id = group.group_id
                     new_filter_expr.set_group_id(group_id)
-
-                    # add new_filter_expr to set of new expressions
-                    new_logical_expressions.add(new_filter_expr)
 
                     # if the group already exists, add the expression to that group
                     if group_id in groups:

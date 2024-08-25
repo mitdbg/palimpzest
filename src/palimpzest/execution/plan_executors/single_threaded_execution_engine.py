@@ -106,6 +106,9 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
                     records.extend(out_records)
                     record_op_stats_lst.extend(out_record_op_stats_lst)
 
+                    if isinstance(operator, LimitScanOp) and len(records) == operator.limit:
+                        break
+
             # update plan stats
             plan_stats.operator_stats[op_id].add_record_op_stats(
                 record_op_stats_lst,

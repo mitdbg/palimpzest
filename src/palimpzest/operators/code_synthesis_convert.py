@@ -33,7 +33,8 @@ class CodeSynthesisConvert(LLMConvert):
         cache_across_plans: bool = True,
         *args, **kwargs
     ):
-        super().__init__(model=None, *args, **kwargs)
+        kwargs["model"] = None
+        super().__init__(*args, **kwargs)
         self.exemplar_generation_model = exemplar_generation_model
         self.code_synth_model = code_synth_model
         self.conventional_fallback_model = conventional_fallback_model

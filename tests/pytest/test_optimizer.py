@@ -51,15 +51,21 @@ class TestPrimitives:
             generated_fields=set([]),
             group_id=None,
         )
+        g1_properties = {
+            "filter_strs": set([filter1_op.filter.getFilterStr(), filter2_op.filter.getFilterStr()]),
+        }
         g1 = Group(
             logical_expressions=[convert_expr],
-            fields=['sender', 'subject', 'contents', 'filename'],
-            filter_strs=[filter1_op.filter.getFilterStr(), filter2_op.filter.getFilterStr()],
+            fields=set(['sender', 'subject', 'contents', 'filename']),
+            properties=g1_properties,
         )
+        g2_properties = {
+            "filter_strs": set([filter2_op.filter.getFilterStr(), filter1_op.filter.getFilterStr()]),
+        }
         g2 = Group(
             logical_expressions=[filter2_expr],
-            fields=['sender', 'subject', 'contents', 'filename'],
-            filter_strs=[filter2_op.filter.getFilterStr(), filter1_op.filter.getFilterStr()],
+            fields=set(['sender', 'subject', 'contents', 'filename']),
+            properties=g2_properties,
         )
         assert g1.group_id == g2.group_id
 

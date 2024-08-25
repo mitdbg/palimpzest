@@ -48,9 +48,7 @@ def buildSciPaperPlan(datasetId):
 
 def buildTestPDFPlan(datasetId):
     """This tests whether we can process a PDF file"""
-    pdfPapers = pz.Dataset(datasetId, schema=pz.PDFFile)
-
-    return pdfPapers
+    return pz.Dataset(datasetId, schema=pz.PDFFile)
 
 
 def buildMITBatteryPaperPlan(datasetId):
@@ -239,7 +237,7 @@ def buildImageAggPlan(datasetId):
     ops = ["count"]
     fields = ["breed"]
     groupbyfields = ["breed"]
-    gbyDesc = GroupBySig(dogImages, groupbyfields, ops, fields)
+    gbyDesc = GroupBySig(groupbyfields, ops, fields)
     groupedDogImages = dogImages.groupby(gbyDesc)
     return groupedDogImages
 
@@ -359,44 +357,45 @@ if __name__ == "__main__":
 
     if task == "paper":
         rootSet = buildMITBatteryPaperPlan(datasetid)
-        stat_path = "profiling-data/paper-profiling.json"
         cols = ["title", "publicationYear", "author", "institution", "journal", "fundingAgency"]
+        stat_path = "profiling-data/paper-profiling.json"
 
     elif task == "enron":
         rootSet = buildEnronPlan(datasetid)
+        cols = ["sender", "subject"]
         stat_path = "profiling-data/enron-profiling.json"
-        cols=["sender", "subject"]
 
     elif task == "enronGby":
         rootSet = enronGbyPlan(datasetid)
-        cols=["sender", "count(sender)"]
+        cols = ["sender", "count(sender)"]
         stat_path = "profiling-data/egby-profiling.json"
 
     elif task in ("enronCount", "count"):
         rootSet = enronCountPlan(datasetid)
-        cols=["count(sender)"]
+        cols = ["count(sender)"]
         stat_path = "profiling-data/ecount-profiling.json"
 
     elif task in ("enronAvgCount", "average"):
         rootSet = enronAverageCountPlan(datasetid)
-        cols=["average(count(sender))"]
+        cols = ["average(count(sender))"]
         stat_path = "profiling-data/e-profiling.json"
 
     elif task == "enronmap":
         rootSet = computeEnronStats(datasetid)
-        cols = ["subject", "sender", "value"]
+        cols = ["sender", "subject", "value"]
         stat_path = "profiling-data/emap-profiling.json"
 
     elif task == "pdftest":
         rootSet = buildTestPDFPlan(datasetid)
-        cols = None
+        cols = ["filename"]
         stat_path = "profiling-data/pdftest-profiling.json"
 
     elif task == "scitest":
         rootSet = buildSciPaperPlan(datasetid)
-        cols = ["title", "author", "institution", "journal", "fundingAgency"],
+        cols = ["title", "author", "institution", "journal", "fundingAgency"]
         stat_path = "profiling-data/scitest-profiling.json"
 
+    # TODO
     elif task == "streaming":
         # register the ephemeral dataset
         datasetid = "githubtest"
@@ -439,21 +438,21 @@ if __name__ == "__main__":
         stat_path = "profiling-data/streaming-profiling.json"
 
     elif task == "gbyImage":
-        # TODO: integrate w/profiling
         rootSet = buildImageAggPlan(datasetid)
-        cols = None
+        cols = ["breed", "count(breed)"]
         stat_path = "profiling-data/gbyImage-profiling.json"
-        
+
     elif task == "image":
         rootSet = buildImagePlan(datasetid)
-        stats_path = "profiling-data/image-profiling.json"
+        stat_path = "profiling-data/image-profiling.json"
 
+    # TODO
     elif task == "vldb":
         downloadVLDBPapers(datasetid, "vldbPapers", profile=args.profile)
 
     elif task == "limit":
         rootSet = enronLimitPlan(datasetid, 5)
-        cols = None
+        cols = ["sender", "subject"]
         stat_path = "profiling-data/limit-profiling.json"
 
     else:

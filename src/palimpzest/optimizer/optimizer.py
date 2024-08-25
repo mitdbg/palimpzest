@@ -17,6 +17,7 @@ from palimpzest.policy import Policy
 from palimpzest.sets import Dataset, Set
 from palimpzest.utils import getChampionModel, getCodeChampionModel, getConventionalFallbackModel
 
+from copy import deepcopy
 from typing import List
 
 # DEFINITIONS
@@ -135,7 +136,7 @@ class Optimizer:
             "conventional_fallback_model": getConventionalFallbackModel(),
         }
 
-    def construct_group_tree(self, dataset_nodes: List[Set]) -> Tuple[List[int], Set[str], Set[str]]:
+    def construct_group_tree(self, dataset_nodes: List[Set]) -> Tuple[List[int], Set[str], Dict[str, Set[str]]]:
         # get node, outputSchema, and inputSchema(if applicable)
         node = dataset_nodes[-1]
         outputSchema = node.schema
@@ -200,10 +201,10 @@ class Optimizer:
             raise NotImplementedError("No logical operator exists for the specified dataset construction.")
 
         # compute the input group ids and fields for this node
-        input_group_ids, input_group_fields, input_group_filter_strs = (
+        input_group_ids, input_group_fields, input_group_properties = (
             self.construct_group_tree(dataset_nodes[:-1])
             if len(dataset_nodes) > 1
-            else ([], set(), set())
+            else ([], set(), {})
         )
 
         # compute the fields added by this operation and all fields
@@ -213,10 +214,23 @@ class Optimizer:
         ])
         all_fields = new_fields.union(input_group_fields)
 
-        # compute all filters including this operation
-        all_filter_strs = input_group_filter_strs.copy()
+        # compute all properties including this operations'
+        all_properties = deepcopy(input_group_properties)
         if isinstance(op, FilteredScan):
-            all_filter_strs.update(set([op.filter.getFilterStr()]))
+            # NOTE: we could use op.get_op_id() here, but storing filter strings makes
+            #       debugging a bit easier as you can read which filters are in the Group
+            op_filter_str = op.filter.getFilterStr()
+            if "filters" in all_properties:
+                all_properties["filters"].add(op_filter_str)
+            else:
+                all_properties["filters"] = set([op_filter_str])
+
+        elif isinstance(op, LimitScan):
+            op_limit_str = op.get_op_id()
+            if "limits" in all_properties:
+                all_properties["limits"].add(op_limit_str)
+            else:
+                all_properties["limits"] = set([op_limit_str])
 
         # construct the logical expression and group
         logical_expression = LogicalExpression(
@@ -229,7 +243,7 @@ class Optimizer:
         group = Group(
             logical_expressions=[logical_expression],
             fields=all_fields,
-            filter_strs=all_filter_strs,
+            properties=all_properties,
         )
         logical_expression.set_group_id(group.group_id)
 
@@ -237,7 +251,7 @@ class Optimizer:
         self.expressions[logical_expression.get_expr_id()] = logical_expression
         self.groups[group.group_id] = group
 
-        return [group.group_id], all_fields, all_filter_strs
+        return [group.group_id], all_fields, all_properties
 
 
     def convert_query_plan_to_group_tree(self, query_plan: QueryPlan) -> str:
