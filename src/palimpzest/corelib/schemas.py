@@ -282,7 +282,6 @@ class Table(Schema):
         for i, row in enumerate(record_dict["rows"][:MAX_ROWS]):
             rows += [",".join(map(str, row)) + "\n"]
         record_dict["rows"] = rows
-        record_dict["rows"] = ""
         header = ",".join(record_dict["header"])
         record_dict["header"] = header
 
