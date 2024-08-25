@@ -410,7 +410,7 @@ class LLMConvert(ConvertOp):
             #    line = int(str(msg).split("line ")[1].split(" ")[0])
             #    print(f"\tAnswer snippet: {answer.splitlines()[line]}")
 
-            json_answer = {field_name: [] for field_name in fields_to_generate}
+            return {field_name: [] for field_name in fields_to_generate}
 
         field_answers = {}
         if self.cardinality == Cardinality.ONE_TO_MANY:
