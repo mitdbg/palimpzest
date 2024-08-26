@@ -237,13 +237,20 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
                 elif isinstance(operator, AggregateOp):
                     upstream_ops_are_finished = True
                     for upstream_op_idx in range(op_idx):
+                        # datasources do not have processing queues
+                        if isinstance(plan.operators[upstream_op_idx], DataSourcePhysicalOp):
+                            continue
+
+                        # check upstream ops which do have a processing queue
                         upstream_op_id = plan.operators[upstream_op_idx].get_op_id()
                         upstream_ops_are_finished = (
                             upstream_ops_are_finished
                             and len(processing_queues[upstream_op_id]) == 0
                         )
+
                     if not keep_scanning_source_records and upstream_ops_are_finished:
                         records, record_op_stats_lst = operator(candidates=processing_queues[op_id])
+                        processing_queues[op_id] = []
                         records_processed = True
 
                 # otherwise, process the next record in the processing queue for this operator

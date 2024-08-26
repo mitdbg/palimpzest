@@ -5,7 +5,6 @@ from palimpzest.constants import AggFunc
 from palimpzest.corelib import Number, Schema
 from palimpzest.elements import (
     Filter,
-    UserFunction,
     GroupBySig,
 )
 from palimpzest.datasources import *
@@ -182,20 +181,6 @@ class Dataset(Set):
             depends_on=depends_on,
             desc=desc,
             nocache=self._nocache,
-        )
-
-    def map(self, fn: UserFunction) -> Dataset:
-        """Convert the Set to a new schema."""
-        if not fn.inputSchema == self.schema:
-            raise Exception(
-                "Input schema of function ("
-                + str(fn.inputSchema.getDesc())
-                + ") does not match schema of input Set ("
-                + str(self.schema.getDesc())
-                + ")"
-            )
-        return Dataset(
-            source=self, schema=fn.outputSchema, fnid=fn.udfid, nocache=self._nocache
         )
 
     def count(self) -> Dataset:

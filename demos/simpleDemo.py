@@ -124,11 +124,13 @@ def download_html(candidate: DataRecord):
     return dr
 
 def download_pdf(candidate: DataRecord):
+    print(f"DOWNLOADING: {candidate.pdfLink}")
     content = requests.get(candidate.pdfLink).content
     dr = DataRecord(pz.File, parent_id=candidate._id)
     dr.url = candidate.pdfLink
     dr.content = content
     dr.timestamp = datetime.datetime.now().isoformat()
+    time.sleep(1)
     return dr
 
 def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profile=False):
@@ -301,7 +303,7 @@ def buildImageAggPlan(datasetId):
     return groupedDogImages
 
 
-def printTable(records, cols=None, gradio=False, query=None, plan_str=None):
+def printTable(records, cols=None, gradio=False, plan_str=None):
     records = [
         {
             key: record.__dict__[key]
@@ -312,20 +314,22 @@ def printTable(records, cols=None, gradio=False, query=None, plan_str=None):
     ]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
+    final_df = records_df[print_cols] if not records_df.empty else pd.DataFrame(columns=print_cols)
 
     if not gradio:
-        print(tabulate(records_df[print_cols], headers="keys", tablefmt="psql"))
+        
+        print(tabulate(final_df, headers="keys", tablefmt="psql"))
 
     else:
         with gr.Blocks() as demo:
-            gr.Dataframe(records_df[print_cols])
+            gr.Dataframe(final_df)
 
             if plan_str is not None:
                 gr.Textbox(value=plan_str, info="Query Plan")
 
         demo.launch()
 
-# TODO: clean up script; remove UserFunctions
+
 if __name__ == "__main__":
     # parse arguments
     startTime = time.time()
@@ -481,6 +485,9 @@ if __name__ == "__main__":
 
                     params["page"] += 1
                     time.sleep(1)
+                
+                # to make the demo go faster
+                self.commits = self.commits[:10]
 
             def __len__(self):
                 return len(self.commits)
@@ -512,7 +519,7 @@ if __name__ == "__main__":
         rootSet = buildImagePlan(datasetid)
         stat_path = "profiling-data/image-profiling.json"
 
-    # TODO
+    # NOTE: VLDB seems to rate limit downloads; causing the program to hang
     elif task == "vldb":
         downloadVLDBPapers(datasetid, "vldbPapers", execution_engine, profile=args.profile)
 
@@ -567,10 +574,6 @@ if __name__ == "__main__":
             gr.Textbox(value=plan_str, info="Query Plan")
 
         demo.launch()
-
-    elif task == 'pdftest':
-        records = [pz.Number() for r in records] 
-        records = [setattr(number, "value", idx) for idx, number in enumerate(records)]
-        printTable(records, cols=cols, gradio=True, plan_str=plan_str)        
+     
     else:
         printTable(records, cols=cols, gradio=False, plan_str=plan_str)
