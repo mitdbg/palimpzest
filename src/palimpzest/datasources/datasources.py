@@ -220,7 +220,7 @@ class FileSource(DataSource):
     def serialize(self) -> Dict[str, Any]:
         return {
             "schema": self.schema.jsonSchema(),
-            "path": self.path,
+            "path": self.filepath,
             "source_type": "file",
         }
 

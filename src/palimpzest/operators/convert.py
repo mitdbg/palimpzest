@@ -97,6 +97,8 @@ class NonLLMConvert(ConvertOp):
         start_time = time.time()
         try:
             drs = self.udf(candidate)
+            if isinstance(drs, DataRecord):
+                drs = [drs]
         except Exception as e:
             print(f"Error invoking user-defined function for convert: {e}")
             raise e

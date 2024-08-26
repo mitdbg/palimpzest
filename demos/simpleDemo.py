@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 import palimpzest as pz
 
-from tabulate import tabulate
-from PIL import Image
+from palimpzest.constants import Cardinality
+from palimpzest.elements import DataRecord, GroupBySig
 
-from palimpzest.elements import GroupBySig
+from bs4 import BeautifulSoup
+from PIL import Image
+from requests_html import HTMLSession # for downloading JavaScript content
+from tabulate import tabulate
 
 import gradio as gr
 import numpy as np
 import pandas as pd
 
 import argparse
-import requests
-import json
-import time
-import os
 import csv
+import datetime
+import json
+import os
+import requests
+import sys
+import time
 
 
 class ScientificPaper(pz.PDFFile):
@@ -67,11 +72,67 @@ class VLDBPaperListing(pz.Schema):
     authors = pz.Field(desc="The authors of the paper", required=True)
     pdfLink = pz.Field(desc="The link to the PDF of the paper", required=True)
 
+def vldb_text_file_to_url(candidate: DataRecord):
+    url_records = []
+    with open(candidate.filename, 'r') as f:
+        for line in f:
+            dr = DataRecord(pz.URL, parent_id=candidate._id)
+            dr.url = line.strip()
+            url_records.append(dr)
 
-def downloadVLDBPapers(vldbListingPageURLsId, outputDir, profile=False):
+    return url_records
+
+def html_to_text_with_links(html):
+    # Parse the HTML content
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    # Find all hyperlink tags
+    for a in soup.find_all('a'):
+        # Check if the hyperlink tag has an 'href' attribute
+        if a.has_attr('href'):
+            # Replace the hyperlink with its text and URL in parentheses
+            a.replace_with(f"{a.text} ({a['href']})")
+    
+    # Extract text from the modified HTML
+    text = soup.get_text(separator='\n', strip=True)        
+    return text
+
+def get_page_text(url):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
+    }
+
+    session = HTMLSession()
+    response = session.get(url, headers=headers)
+    return response.text
+
+def download_html(candidate: DataRecord):
+    textcontent = get_page_text(candidate.url)
+    dr = DataRecord(pz.WebPage, parent_id=candidate._id)
+    dr.url = candidate.url
+
+    html = textcontent
+    tokens = html.split()[:5000]
+    dr.html = " ".join(tokens)
+
+    strippedHtml = html_to_text_with_links(textcontent)
+    tokens = strippedHtml.split()[:5000]
+    dr.text = " ".join(tokens)
+
+    # get current timestamp, in nice ISO format
+    dr.timestamp = datetime.datetime.now().isoformat()
+    return dr
+
+def download_pdf(candidate: DataRecord):
+    content = requests.get(candidate.pdfLink).content
+    dr = DataRecord(pz.File, parent_id=candidate._id)
+    dr.url = candidate.pdfLink
+    dr.content = content
+    dr.timestamp = datetime.datetime.now().isoformat()
+    return dr
+
+def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profile=False):
     """This function downloads a bunch of VLDB papers from an online listing and saves them to disk.  It also saves a CSV file of the paper listings."""
-    policy = pz.MaxQuality()
-
     # 1. Grab the input VLDB listing page(s) and scrape them for paper metadata
     tfs = pz.Dataset(
         vldbListingPageURLsId,
@@ -79,61 +140,59 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, profile=False):
         desc="A file full of URLs of VLDB journal pages",
     )
     urls = tfs.convert(
-        pz.URL, desc="The actual URLs of the VLDB pages", cardinality="oneToMany"
-    )  # oneToMany=True would be nice here.
-    htmlContent = urls.map(pz.DownloadHTMLFunction())
+        outputSchema=pz.URL,
+        udf=vldb_text_file_to_url,
+        desc="The actual URLs of the VLDB pages",
+        cardinality=Cardinality.ONE_TO_MANY,  # one_to_many=True
+    )
+    htmlContent = urls.convert(outputSchema=pz.WebPage, udf=download_html)
     vldbPaperListings = htmlContent.convert(
-        VLDBPaperListing,
+        outputSchema=VLDBPaperListing,
         desc="The actual listings for each VLDB paper",
-        cardinality="oneToMany",
+        cardinality=Cardinality.ONE_TO_MANY,
     )
 
-    # 2. Get the PDF URL for each paper that's listed and download it
-    vldbPaperURLs = vldbPaperListings.convert(
-        pz.URL, desc="The URLs of the PDFs of the VLDB papers"
-    )
-    pdfContent = vldbPaperURLs.map(pz.DownloadBinaryFunction())
+    listing_records, listing_execution_stats = pz.Execute(vldbPaperListings, 
+                                policy=pz.MaxQuality(),
+                                nocache=True,
+                                allow_token_reduction=False,
+                                allow_code_synth=False,
+                                execution_engine=execution_engine,
+                                verbose=True)
 
-    # 3. Save the paper listings to a CSV file and the PDFs to disk
-    if not os.path.exists(outputDir):
-        os.makedirs(outputDir)
+    # save the paper listings to a CSV file
+    os.makedirs(outputDir, exist_ok=True)
     outputPath = os.path.join(outputDir, "vldbPaperListings.csv")
 
-    engine = pz.PipelinedParallelExecution
-    listingRecords, plan, stats = pz.Execute(rootSet, 
-                                policy = policy,
-                                nocache=True,
-                                execution_engine=engine)
-
     with open(outputPath, "w", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=listingRecords[0].__dict__.keys())
+        writer = csv.DictWriter(csvfile, fieldnames=listing_records[0].__dict__.keys())
         writer.writeheader()
-        for record in listingRecords:
+        for record in listing_records:
             writer.writerow(record._asDict())
 
-    # if profiling was turned on; capture statistics
     if profile:
         with open("profiling-data/vldb1-profiling.json", "w") as f:
-            json.dump(stats.to_dict(), f)
+            json.dump(listing_execution_stats.to_json(), f)
 
-    # TODO
-    # physicalTree2 = emitDataset(
-    #     pdfContent,
-    #     policy,
-    #     title="VLDB paper dump",
-    #     verbose=True,
-    # )
-    # for idx, r in enumerate(physicalTree2):
-    #     with open(os.path.join(outputDir, str(idx) + ".pdf"), "wb") as f:
-    #         f.write(r.content)
+    # 2. Get the PDF URL for each paper that's listed and download it
+    pdfContent = vldbPaperListings.convert(outputSchema=pz.Download, udf=download_pdf)
 
-    # # if profiling was turned on; capture statistics
-    # if profile:
-    #     profiling_data = physicalTree2.getProfilingData()
-    #     sp = StatsProcessor(profiling_data)
+    # 3. Save the paper listings to a CSV file and the PDFs to disk
+    pdf_records, download_execution_stats = pz.Execute(pdfContent, 
+                                policy=pz.MaxQuality(),
+                                nocache=True,
+                                allow_token_reduction=False,
+                                allow_code_synth=False,
+                                execution_engine=execution_engine,
+                                verbose=True)
 
-    #     with open("profiling-data/vldb2-profiling.json", "w") as f:
-    #         json.dump(sp.profiling_data.to_dict(), f)
+    for idx, pdf_record in enumerate(pdf_records):
+        with open(os.path.join(outputDir, str(idx) + ".pdf"), "wb") as f:
+            f.write(pdf_record.content)
+
+    if profile:
+        with open("profiling-data/vldb2-profiling.json", "w") as f:
+            json.dump(download_execution_stats.to_json(), f)
 
 
 class GitHubUpdate(pz.Schema):
@@ -153,7 +212,7 @@ class GitHubUpdate(pz.Schema):
     )
 
 
-def testStreaming(datasetId: str):
+def testUserSource(datasetId: str):
     return pz.Dataset(datasetId, schema=GitHubUpdate)
 
 
@@ -395,8 +454,7 @@ if __name__ == "__main__":
         cols = ["title", "author", "institution", "journal", "fundingAgency"]
         stat_path = "profiling-data/scitest-profiling.json"
 
-    # TODO
-    elif task == "streaming":
+    elif task == "usersource":
         # register the ephemeral dataset
         datasetid = "githubtest"
         owner = "mikecafarella"
@@ -407,10 +465,9 @@ if __name__ == "__main__":
         class GitHubCommitSource(pz.UserSource):
             def __init__(self, datasetId):
                 super().__init__(pz.RawJSONObject, datasetId)
-
-            def userImplementedIterator(self):
                 per_page = 100
                 params = {"per_page": per_page, "page": 1}
+                self.commits = []
                 while True:
                     response = requests.get(url, params=params)
                     commits = response.json()
@@ -418,24 +475,33 @@ if __name__ == "__main__":
                     if not commits or response.status_code != 200:
                         break
 
-                    for commit in commits:
-                        # Process each commit here
-                        commitStr = json.dumps(commit)
-                        dr = pz.DataRecord(self.schema)
-                        dr.json = commitStr
-                        yield dr
-
+                    self.commits.extend(commits)
                     if len(commits) < per_page:
                         break
 
                     params["page"] += 1
                     time.sleep(1)
 
+            def __len__(self):
+                return len(self.commits)
+
+            def getSize(self):
+                return sum(map(lambda commit: sys.getsizeof(commit), self.commits))
+
+            def getItem(self, idx: int):
+                # NOTE: we can make this a streaming demo again by modifying this getItem function
+                commit = self.commits[idx]
+                commitStr = json.dumps(commit)
+                dr = pz.DataRecord(self.schema)
+                dr.json = commitStr
+
+                return dr
+
         pz.DataDirectory().registerUserSource(GitHubCommitSource(datasetid), datasetid)
 
-        rootSet = testStreaming(datasetid)
-        cols = None
-        stat_path = "profiling-data/streaming-profiling.json"
+        rootSet = testUserSource(datasetid)
+        cols = ["commitId", "reponame", "commit_message"]
+        stat_path = "profiling-data/usersource-profiling.json"
 
     elif task == "gbyImage":
         rootSet = buildImageAggPlan(datasetid)
@@ -448,7 +514,7 @@ if __name__ == "__main__":
 
     # TODO
     elif task == "vldb":
-        downloadVLDBPapers(datasetid, "vldbPapers", profile=args.profile)
+        downloadVLDBPapers(datasetid, "vldbPapers", execution_engine, profile=args.profile)
 
     elif task == "limit":
         rootSet = enronLimitPlan(datasetid, 5)
