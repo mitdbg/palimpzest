@@ -58,6 +58,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         # initialize data structures to help w/processing DAG
         processing_queue = []
         op_id_to_futures_in_flight = {op.get_op_id(): 0 for op in plan.operators}
+        op_id_to_operator = {op.get_op_id(): op for op in plan.operators}
         op_id_to_prev_operator = {
             op.get_op_id(): plan.operators[idx - 1] if idx > 0 else None
             for idx, op in enumerate(plan.operators)
@@ -66,6 +67,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
             op.get_op_id(): plan.operators[idx + 1] if idx + 1 < len(plan.operators) else None
             for idx, op in enumerate(plan.operators)
         }
+        op_id_to_op_idx = {op.get_op_id(): idx for idx, op in enumerate(plan.operators)}
 
         # get handle to DataSource and pre-compute its op_id and size
         source_operator = plan.operators[0]
@@ -77,14 +79,14 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         source_op_id = source_operator.get_op_id()
         datasource_len = len(datasource)
 
-        # compute op_id and limit of final limit operator (if one exists)
+        # get limit of final limit operator (if one exists)
         final_limit = plan.operators[-1].limit if isinstance(plan.operators[-1], LimitScanOp) else None
 
         # create thread pool w/max workers
         futures = []
         current_scan_idx = self.scan_start_idx
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # create initial set of futures to read first source file;
+            # create initial (set of) future(s) to read first source record;
             # construct input DataRecord for DataSourcePhysicalOp
             candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)
             candidate.idx = current_scan_idx
@@ -158,40 +160,52 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                         futures = []
                         break
 
-                    # only invoke aggregate operator(s) once all upstream operators' processing queues are empty
-                    # and their in-flight futures are finished
-                    if isinstance(operator, AggregateOp):
-                        this_op_idx = 0
-                        while op_id != plan.operators[this_op_idx].get_op_id():
-                            this_op_idx += 1
-
-                        upstream_ops_are_finished = True
-                        for upstream_op_idx in range(this_op_idx):
-                            upstream_op_id = plan.operators[upstream_op_idx].get_op_id()
-                            upstream_op_id_queue = list(filter(lambda tup: tup[0].get_op_id() == upstream_op_id, processing_queue))
-
-                            upstream_ops_are_finished = (
-                                upstream_ops_are_finished
-                                and len(upstream_op_id_queue) == 0
-                                and op_id_to_futures_in_flight[upstream_op_id] == 0
-                            )
-
-                        if upstream_ops_are_finished:
-                            candidates = list(filter(lambda tup: tup[0].get_op_id() == op_id, processing_queue))
-                            candidates = list(map(lambda tup: tup[1], candidates))
-                            future = executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, operator, candidates)
-                            new_futures.append(future)
-                            op_id_to_futures_in_flight[op_id] += 1
-                            processing_queue = list(filter(lambda tup: tup[0].get_op_id() != op_id, processing_queue))
-
-                    # otherwise, process all the records in the processing queue
+                # process all records in the processing queue which are ready to be executed
+                temp_processing_queue = []
+                for operator, candidate in processing_queue:
+                    # if the candidate is not an input to an aggregate, execute it right away
+                    if not isinstance(operator, AggregateOp):
+                        future = executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, operator, candidate)
+                        new_futures.append(future)
+                        op_id_to_futures_in_flight[operator.get_op_id()] += 1
+                    
+                    # otherwise, put it back on the queue
                     else:
-                        for operator, candidate in processing_queue:
-                            future = executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, operator, candidate)
-                            new_futures.append(future)
-                            op_id_to_futures_in_flight[op_id] += 1
+                        temp_processing_queue.append((operator, candidate))
 
-                        processing_queue = []
+                # any remaining candidates are inputs to aggregate operators; for each aggregate operator
+                # determine if it is ready to execute -- and execute all of its candidates if so
+                processing_queue = []
+                agg_op_ids = set([operator.get_op_id() for operator, _ in temp_processing_queue])
+                for agg_op_id in agg_op_ids:
+                    agg_op_idx = op_id_to_op_idx[agg_op_id]
+
+                    # compute if all upstream operators' processing queues are empty and their in-flight futures are finished
+                    upstream_ops_are_finished = True
+                    for upstream_op_idx in range(agg_op_idx):
+                        upstream_op_id = plan.operators[upstream_op_idx].get_op_id()
+                        upstream_op_id_queue = list(filter(lambda tup: tup[0].get_op_id() == upstream_op_id, temp_processing_queue))
+
+                        upstream_ops_are_finished = (
+                            upstream_ops_are_finished
+                            and len(upstream_op_id_queue) == 0
+                            and op_id_to_futures_in_flight[upstream_op_id] == 0
+                        )
+
+                    # get the subset of candidates for this aggregate operator
+                    candidate_tuples = list(filter(lambda tup: tup[0].get_op_id() == agg_op_id, temp_processing_queue))
+
+                    # execute the operator on the candidates if it's ready
+                    if upstream_ops_are_finished:
+                        operator = op_id_to_operator[agg_op_id]
+                        candidates = list(map(lambda tup: tup[1], candidate_tuples))
+                        future = executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, operator, candidates)
+                        new_futures.append(future)
+                        op_id_to_futures_in_flight[operator.get_op_id()] += 1
+
+                    # otherwise, add the candidates back to the processing queue
+                    else:
+                        processing_queue.extend(candidate_tuples)
 
                 # update list of futures
                 not_done_futures.extend(new_futures)

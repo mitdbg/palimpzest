@@ -19,7 +19,7 @@ import shutil
 
 class ExecutionEngine:
     def __init__(self,
-            num_samples: int=20,
+            num_samples: int=float("inf"),
             scan_start_idx: int=0,
             nocache: bool=True,  # NOTE: until we properly implement caching, let's set the default to True
             include_baselines: bool=False,
