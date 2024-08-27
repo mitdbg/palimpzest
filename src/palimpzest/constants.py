@@ -43,7 +43,6 @@ class OptimizationStrategy(str, Enum):
     """
     OPTIMAL = "optimal"
     CONFIDENCE_INTERVAL = "confidence-interval"
-    PARETO_OPTIMAL = "pareto-optimal"
     SENTINEL = "sentinel"
 
 class AggFunc(str, Enum):

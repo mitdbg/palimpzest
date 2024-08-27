@@ -97,12 +97,6 @@ class SentinelExecutionEngine(ExecutionEngine):
             all_records.extend(records)
             all_plan_stats.extend(plan_stats)
 
-        elif self.optimization_strategy == OptimizationStrategy.PARETO_OPTIMAL:
-            # records, plan_stats = self.execute_pareto_optimal_strategy(dataset, optimizer)
-            # all_records.extend(records)
-            # all_plan_stats.extend(plan_stats)
-            raise NotImplementedError("Future work")
-
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(all_plan_stats)
 

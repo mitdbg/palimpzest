@@ -238,7 +238,7 @@ class Optimizer:
             input_group_ids=input_group_ids,
             input_fields=input_group_fields,
             generated_fields=new_fields,
-            group_id=None
+            group_id=None,
         )
         group = Group(
             logical_expressions=[logical_expression],
@@ -393,20 +393,6 @@ class Optimizer:
                     best_plans.append(plan)
 
         return best_plans
-
-
-    def get_pareto_optimal_plans(self, group_id: int) -> List[PhysicalPlan]:
-        """
-        Return all physical plans who are on the pareto frontier, regardless of whether or not they
-        satisfy the policy constraint.
-
-        The OptimizePhysicalExpression task guarantees that each group's `pareto_optimal_physical_expressions`
-        maintains a list of expressions with overlapping CI's on the primary policy metric (while also
-        satisfying the policy constraint).
-
-        This function computes the cross-product of all such expressions across all groups.
-        """
-        raise NotImplementedError("Future work")
 
 
     def optimize(self, query_plan: QueryPlan) -> List[PhysicalPlan]:

@@ -40,7 +40,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         if self.verbose:
             print("----------------------")
             print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
-            plan.printPlan()
+            print(plan)
             print("---")
 
         plan_start_time = time.time()
@@ -71,12 +71,12 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
         # get handle to DataSource and pre-compute its op_id and size
         source_operator = plan.operators[0]
+        source_op_id = source_operator.get_op_id()
         datasource = (
             self.datadir.getRegisteredDataset(self.source_dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
             else self.datadir.getCachedResult(source_operator.cachedDataIdentifier)
         )
-        source_op_id = source_operator.get_op_id()
         datasource_len = len(datasource)
 
         # get limit of final limit operator (if one exists)

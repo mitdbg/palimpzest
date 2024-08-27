@@ -4,17 +4,9 @@ from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.dataclasses import PlanCost
 from palimpzest.operators import PhysicalOperator
 
-# backwards compatability for users who are still on Python 3.9
-try:
-    from itertools import pairwise
-except:
-    from more_itertools import pairwise # type: ignore
-
 from typing import List, Optional
 
 import hashlib
-
-from palimpzest.operators import ApplyGroupByOp
 
 
 class Plan:
@@ -41,12 +33,13 @@ class Plan:
         return self.operators[idx]
 
     def __str__(self):
-        if self.operators:
-            return f"{self.__class__.__name__}:\n" + "\n".join(
-                map(str, [f"{idx}. {str(op)}" for idx, op in enumerate(self.operators)])
-            )
-        else:
-            return f"{self.__class__.__name__}: No operator tree."
+        start = self.operators[0]
+        plan_str = f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n\n"
+
+        for idx, operator in enumerate(self.operators[1:]):
+            plan_str += f" {idx+1}. {str(operator)}\n"
+
+        return plan_str
 
 
 class PhysicalPlan(Plan):
@@ -99,36 +92,3 @@ class PhysicalPlan(Plan):
                 model_names.append(model.value)
 
         return model_names
-
-    def printPlan(self) -> None:
-        """Print the physical plan."""
-        print_ops = self.operators
-        start = print_ops[0]
-        print(f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n")
-
-        for idx, (left, right) in enumerate(pairwise(print_ops)):
-            in_schema = left.outputSchema
-            out_schema = right.outputSchema
-            print(
-                f" {idx+1}. {in_schema.__name__} -> {type(right).__name__} -> {out_schema.__name__} ",
-                end="",
-            )
-            # if right.desc is not None:
-            #     print(f" ({right.desc})", end="")
-            # check if right has a model attribute
-            if hasattr(right, "model"):
-                print(f"\n    Using {right.model}", end="")
-                if hasattr(right, "filter"):
-                    filter_str = (
-                        right.filter.filterCondition
-                        if right.filter.filterCondition is not None
-                        else str(right.filter.filterFn)
-                    )
-                    print(f'\n    Filter: "{filter_str}"', end="")
-                if hasattr(right, "token_budget"):
-                    print(f"\n    Token budget: {right.token_budget}", end="")
-            print()
-            print(
-                f"    ({','.join(in_schema.fieldNames())[:15]}...) -> ({','.join(out_schema.fieldNames())[:15]}...)"
-            )
-            print()

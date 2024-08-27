@@ -32,7 +32,6 @@ class ExecutionEngine:
             allow_code_synth: bool=True,
             allow_token_reduction: bool=True,
             optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
-            pareto_strategy_min_trials: int=2,
             max_workers: int=1,
             num_workers_per_thread: int=1,
             inter_plan_parallelism: bool=True,
@@ -55,7 +54,6 @@ class ExecutionEngine:
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.optimization_strategy = optimization_strategy
-        self.pareto_strategy_min_trials = pareto_strategy_min_trials
         self.max_workers = max_workers
         self.num_workers_per_thread = num_workers_per_thread
         self.inter_plan_parallelism = inter_plan_parallelism
@@ -109,7 +107,7 @@ class ExecutionEngine:
         # Doing this "right" may require considering their logical, physical plan,
         # and tier status with LLM providers. It may also be worth dynamically
         # changing the max_workers in response to 429 errors.
-        return multiprocessing.cpu_count()
+        return max(int(0.8 * multiprocessing.cpu_count()), 1)
 
 
     def get_max_quality_plan_id(self, plans: List[PhysicalPlan]) -> str:
@@ -218,10 +216,13 @@ class ExecutionEngine:
         # initialize output records and plan stats
         records, plan_stats = [], []
 
+        # get total number of input records in the datasource
+        datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
+        datasource_len = len(datasource)
+
         # get the initial set of optimal plans according to the optimizer
         plans = optimizer.optimize(dataset)
-        still_processing = True
-        while len(plans) > 1 and still_processing:
+        while len(plans) > 1 and self.scan_start_idx < datasource_len:
             # identify the plan with the highest quality in the set
             max_quality_plan_id = self.get_max_quality_plan_id(plans)
 
@@ -230,11 +231,7 @@ class ExecutionEngine:
             records.extend(new_records)
             plan_stats.extend(new_plan_stats)
 
-            # set still processing to False if there are no new records
-            if new_records == []:
-                still_processing = False
-
-            if still_processing:
+            if self.scan_start_idx + self.num_samples < datasource_len:
                 # update cost model and optimizer
                 execution_data.extend(new_execution_data)
                 cost_model = CostModel(
@@ -246,74 +243,18 @@ class ExecutionEngine:
                 # get new set of plans
                 plans = optimizer.optimize(dataset)
 
-        # execute final plan until end
-        final_plan = plans[0]
-        new_records, new_plan_stats = self.execute_plan(
-            plan=final_plan,
-            max_workers=self.max_workers,
-        )
-        records.extend(new_records)
-        plan_stats.append(new_plan_stats)
+                # update scan start idx
+                self.scan_start_idx += self.num_samples
 
-        # return the final set of records and plan stats
-        return records, plan_stats
-
-
-    def execute_pareto_optimal_strategy(
-            self,
-            dataset: Set,
-            optimizer: Optimizer,
-            execution_data: List[RecordOpStats]=[],
-        ) -> Tuple[List[DataRecord], List[PlanStats]]:
-        # initialize output records and plan stats
-        records, plan_stats = [], []
-
-        # get the initial set of optimal plans according to the optimizer
-        plans = optimizer.optimize(dataset)
-        plan_set, prev_plan_set = set([plan.plan_id for plan in plans]), None
-        trials = 1
-        still_processing = True
-        while (
-            (trials < self.pareto_strategy_min_trials or plan_set != prev_plan_set)
-            and still_processing
-        ):
-            # identify the plan with the highest quality in the set
-            max_quality_plan_id = self.get_max_quality_plan_id(plans)
-
-            # execute the set of plans for a fixed number of samples
-            new_execution_data, new_records, new_plan_stats = self.execute_plans(list(plans), max_quality_plan_id, self.num_samples)
+        if self.scan_start_idx < datasource_len:
+            # execute final plan until end
+            final_plan = plans[0]
+            new_records, new_plan_stats = self.execute_plan(
+                plan=final_plan,
+                max_workers=self.max_workers,
+            )
             records.extend(new_records)
-            plan_stats.extend(new_plan_stats)
-
-            # set still processing to False if there are no new records
-            if new_records == []:
-                still_processing = False
-
-            if still_processing:
-                # update cost model and optimizer
-                execution_data.extend(new_execution_data)
-                cost_model = CostModel(
-                    source_dataset_id=self.source_dataset_id,
-                    sample_execution_data=execution_data,
-                )
-                optimizer.update_cost_model(cost_model)
-
-                # get new set of plans
-                plans = optimizer.optimize(dataset)
-
-                # update plan set and trials
-                prev_plan_set = plan_set
-                plan_set = set([plan.plan_id for plan in plans])
-                trials += 1
-
-        # execute final plan until end
-        final_plan = plans[0]
-        new_records, new_plan_stats = self.execute_plan(
-            plan=final_plan,
-            max_workers=self.max_workers,
-        )
-        records.extend(new_records)
-        plan_stats.append(new_plan_stats)
+            plan_stats.append(new_plan_stats)
 
         # return the final set of records and plan stats
         return records, plan_stats

@@ -56,10 +56,6 @@ class NoSentinelExecutionEngine(ExecutionEngine):
         elif self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
             records, plan_stats = self.execute_confidence_interval_strategy(dataset, optimizer)
 
-        elif self.optimization_strategy == OptimizationStrategy.PARETO_OPTIMAL:
-            # records, plan_stats = self.execute_pareto_optimal_strategy(dataset, optimizer)
-            raise NotImplementedError("Future work")
-
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)
 
