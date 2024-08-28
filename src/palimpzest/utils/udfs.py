@@ -3,34 +3,29 @@ This scripts collects a sample of useful UDFs to convert schemata.
 """
 import io
 import palimpzest as pz
-from palimpzest.elements.records import DataRecord
 import pandas as pd
-
 from datetime import datetime
 
 import palimpzest as pz
 from palimpzest.constants import *
-from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.elements import DataRecord
-from palimpzest.operators import logical
-from palimpzest.operators.convert import ConvertOp
 from palimpzest.tools.pdfparser import get_text_from_pdf
-from palimpzest.tools.skema_tools import equations_to_latex
-
-import palimpzest.corelib.schemas as schemas
-
 from papermage import Document
-from typing import Optional
-
 import pandas as pd
-
 import json
 import modal
-import time
-
 import requests
-from requests_html import HTMLSession
 
+def url_to_file(candidate):
+    """ Function used to convert a DataRecord instance of URL to a File DataRecord. """
+    candidate.filename = candidate.url.split("/")[-1]
+    candidate.timestamp = datetime.now().isoformat()
+    try:
+        contents = requests.get(candidate.url).content
+    except Exception as e:
+        print(f"Error fetching URL {candidate.url}: {e}")
+        contents = b''
+    candidate.contents = contents
+    return [candidate]
 
 def file_to_pdf(candidate):
     pdfprocessor = pz.DataDirectory().current_config.get("pdfprocessor")
@@ -84,7 +79,7 @@ def xls_to_tables(candidate):
         for row in dataframe.values[:100]:
             row_record = [str(x) for x in row]
             rows += [row_record]
-        dr.rows = rows[pz.MAX_ROWS]
+        dr.rows = rows[:pz.MAX_ROWS]
         dr.filename = candidate.filename
         dr.header = dataframe.columns.values.tolist()
         dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
