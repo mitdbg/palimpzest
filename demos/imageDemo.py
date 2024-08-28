@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 """ This scripts is a demo for image processing, it is simply an abridged version of simpleDemo.py """
 import context
-from palimpzest.constants import PZ_DIR
 import palimpzest as pz
 
-from tabulate import tabulate
 from PIL import Image
 
 import gradio as gr
 import numpy as np
-import pandas as pd
 
 import argparse
-import requests
-import json
 import time
 import os
 
@@ -34,14 +29,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     no_cache = args.no_cache
-    if no_cache:
-        print("WARNING: Removing cache, this will result in API calls")
-        cachedir = PZ_DIR + "/data/cache/"
-        for f in os.listdir(cachedir):
-            if f.endswith(".cached"):
-                os.remove(os.path.join(cachedir, f))
-
-    verbose = True
     datasetid = "images-tiny"
     if not datasetid in pz.DataDirectory().listRegisteredDatasets():
         pz.DataDirectory().registerLocalDirectory(
@@ -51,16 +38,16 @@ if __name__ == "__main__":
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     print("Starting image task")
-    policy = pz.UserChoice()
-    rootSet = buildImagePlan(datasetid)
-    engine = pz.PipelinedParallelExecution
-    records, plan, stats = pz.Execute(rootSet, 
-                                    policy = policy,
-                                    nocache=True,
-                                    execution_engine=engine)
+    policy = pz.MaxQuality()
+    plan = buildImagePlan(datasetid)
+    engine = pz.PipelinedParallelNoSentinelExecution
+    records, execution_stats = pz.Execute(plan, 
+                                    policy=policy,
+                                    nocache=no_cache,
+                                    execution_engine=engine,
+                                    verbose=True)
 
     print("Obtained records", records)
-    print(stats)
     imgs, breeds = [], []
     for record in records:
         print("Trying to open ", record.filename)
@@ -79,7 +66,8 @@ if __name__ == "__main__":
                 with gr.Column():
                     breed_blocks.append(gr.Textbox(value=breed))
 
-        gr.Textbox(value=str(plan), info="Query Plan")
+        plan_str = list(execution_stats.plan_strs.values())[0]
+        gr.Textbox(value=plan_str, info="Query Plan")
 
     endTime = time.time()
     print("Elapsed time:", endTime - startTime)

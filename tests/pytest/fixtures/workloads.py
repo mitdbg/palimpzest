@@ -1,5 +1,8 @@
+from io import BytesIO
+
 import pytest
 import palimpzest as pz
+import pandas as pd
 
 ### UDFs ###
 def within_two_miles_of_mit(record):
@@ -62,11 +65,37 @@ def real_estate_workload(
     listings = listings.filter(in_price_range, depends_on="price")
     return listings
 
+def xls_to_tables(candidate):
+    xls_bytes = candidate.contents
+    sheet_names = candidate.sheet_names
+
+    records = []
+    for sheet_name in sheet_names:
+        dataframe = pd.read_excel(
+            BytesIO(xls_bytes), sheet_name=sheet_name, engine="openpyxl"
+        )
+
+        # TODO extend number of rows with dynamic sizing of context length
+        # construct data record
+        dr = pz.DataRecord(pz.Table, parent_id=candidate._id)
+        rows = []
+        for row in dataframe.values[:100]:
+            row_record = [str(x) for x in row]
+            rows += [row_record]
+        dr.rows = rows
+        dr.filename = candidate.filename
+        dr.header = dataframe.columns.values.tolist()
+        dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
+        records.append(dr)
+
+    return records
+
 @pytest.fixture
 def biofabric_workload(biofabric_tiny, case_data_schema):
     xls = pz.Dataset(biofabric_tiny, schema=pz.XLSFile)
-    patient_tables = xls.convert(
-        pz.Table, desc="All tables in the file", cardinality=pz.Cardinality.ONE_TO_MANY)
+    # patient_tables = xls.convert(
+    #     pz.Table, desc="All tables in the file", cardinality=pz.Cardinality.ONE_TO_MANY)
+    patient_tables = xls.convert(pz.Table, udf=lambda record: xls_to_tables(record), cardinality=pz.Cardinality.ONE_TO_MANY)
     patient_tables = patient_tables.filter(
         "The rows of the table contain the patient age"
     )

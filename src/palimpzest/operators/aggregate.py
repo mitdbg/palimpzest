@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from palimpzest.constants import NAIVE_EST_NUM_GROUPS
-from palimpzest.corelib import Number, Schema
+from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
+from palimpzest.corelib import Number
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.elements import AggregateFunction, DataRecord, GroupBySig
-from palimpzest.operators import logical, PhysicalOperator, DataRecordsWithStats
+from palimpzest.elements import DataRecord, GroupBySig
+from palimpzest.operators import PhysicalOperator, DataRecordsWithStats
 
 from typing import List
 
@@ -22,47 +22,35 @@ class AggregateOp(PhysicalOperator):
 
 
 class ApplyGroupByOp(AggregateOp):
-    implemented_op = logical.GroupByAggregate
-    final = True
 
-    def __init__(
-        self,
-        inputSchema: Schema,
-        gbySig: GroupBySig,
-        targetCacheId: str = None,
-        shouldProfile=False,
-        *args, **kwargs,
-    ):
-        super().__init__(
-            inputSchema=inputSchema,
-            outputSchema=gbySig.outputSchema(),
-            shouldProfile=shouldProfile,
-        )
-        self.inputSchema = inputSchema
+    def __init__(self, gbySig: GroupBySig, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.gbySig = gbySig
-        self.targetCacheId = targetCacheId
-        self.shouldProfile = shouldProfile
 
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
             and self.gbySig == other.gbySig
             and self.outputSchema == other.outputSchema
-            and self.inputSchema == other.inputSchema
         )
 
     def __str__(self):
-        return f"{self.op_name()}({str(self.gbySig)})"
+        op = super().__str__()
+        op += f"    Group-by Signature: {str(self.gbySig)}\n"
+        return op
+    
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"gbySig": self.gbySig, **copy_kwargs}
 
-    def copy(self):
-        return ApplyGroupByOp(
-            self.inputSchema, self.gbySig, self.targetCacheId, self.shouldProfile
-        )
-
-    def get_op_dict(self):
+    def get_op_params(self):
+        """
+        We identify the operation by its outputSchema and group by signature.
+        inputSchema is ignored as it depends on how the Optimizer orders operations.
+        """
         return {
-            "operator": self.op_name(),
-            "gbySig": str(GroupBySig.serialize(self.gbySig)),
+            "outputSchema": self.outputSchema,
+            "gbySig": str(self.gbySig.serialize()),
         }
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
@@ -153,8 +141,8 @@ class ApplyGroupByOp(AggregateOp):
         record_op_stats_lst = []
         for dr in drs:
             record_op_stats = RecordOpStats(
-                record_uuid=dr._uuid,
-                record_parent_uuid=dr._parent_uuid,
+                record_id=dr._id,
+                record_parent_id=dr._parent_id,
                 record_state=dr._asDict(include_bytes=False),
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),
@@ -166,53 +154,35 @@ class ApplyGroupByOp(AggregateOp):
         return drs, record_op_stats_lst
 
 
-class ApplyCountAggregateOp(AggregateOp):
-    implemented_op = logical.ApplyCountAggregateFunction
-    final = True
+class CountAggregateOp(AggregateOp):
+    # NOTE: we don't actually need / use aggFunc here (yet)
 
-    def __init__(
-        self,
-        inputSchema: Schema,
-        aggFunction: AggregateFunction,
-        targetCacheId: str = None,
-        shouldProfile=False,
-    ):
-        super().__init__(
-            inputSchema=inputSchema, outputSchema=Number, shouldProfile=shouldProfile
-        )
-        self.aggFunction = aggFunction
-        self.targetCacheId = targetCacheId
+    def __init__(self, aggFunc: AggFunc, *args, **kwargs):
+        kwargs["outputSchema"] = Number
+        super().__init__(*args, **kwargs)
+        self.aggFunc = aggFunc
 
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
-            and self.aggFunction == other.aggFunction
-            and self.inputSchema == other.inputSchema
+            and self.aggFunc == other.aggFunc
         )
 
     def __str__(self):
-        return (
-            f"{self.op_name()}("
-            + str(self.outputSchema)
-            + ", "
-            + "Function: "
-            + str(self.aggFunction)
-            + ")"
-        )
+        op = super().__str__()
+        op += f"    Function: {str(self.aggFunc)}\n"
+        return op
 
-    def copy(self):
-        return ApplyCountAggregateOp(
-            inputSchema=self.inputSchema,
-            aggFunction=self.aggFunction,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-        )
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"aggFunc": self.aggFunc, **copy_kwargs}
 
-    def get_op_dict(self):
-        return {
-            "operator": self.op_name(),
-            "aggFunction": str(self.aggFunction)
-        }
+    def get_op_params(self):
+        """
+        We identify the operation by its aggregation function.
+        inputSchema is ignored as it depends on how the Optimizer orders operations.
+        """
+        return {"aggFunc": str(self.aggFunc)}
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
@@ -226,15 +196,15 @@ class ApplyCountAggregateOp(AggregateOp):
     def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
         start_time = time.time()
 
-        # NOTE: this will set the parent_uuid to be the uuid of the final source record;
-        #       in the near future we may want to have parent_uuid accept a list of uuids
-        dr = DataRecord(Number, parent_uuid=candidates[-1]._uuid)
+        # NOTE: this will set the parent_id to be the id of the final source record;
+        #       in the near future we may want to have parent_id accept a list of ids
+        dr = DataRecord(Number, parent_id=candidates[-1]._id)
         dr.value = len(candidates)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_uuid=dr._uuid,
-            record_parent_uuid=dr._parent_uuid,
+            record_id=dr._id,
+            record_parent_id=dr._parent_id,
             record_state=dr._asDict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),
@@ -245,57 +215,39 @@ class ApplyCountAggregateOp(AggregateOp):
         return [dr], [record_op_stats]
 
 
-class ApplyAverageAggregateOp(AggregateOp):
-    implemented_op = logical.ApplyAverageAggregateFunction
-    final = True
-    
-    def __init__(
-        self,
-        inputSchema: Schema,
-        aggFunction: AggregateFunction,
-        targetCacheId: str = None,
-        shouldProfile=False,
-    ):
-        super().__init__(
-            inputSchema=inputSchema, outputSchema=Number, shouldProfile=shouldProfile
-        )
-        self.aggFunction = aggFunction
-        self.targetCacheId = targetCacheId
+class AverageAggregateOp(AggregateOp):
+    # NOTE: we don't actually need / use aggFunc here (yet)
 
-        if not inputSchema == Number:
+    def __init__(self, aggFunc: AggFunc, *args, **kwargs):
+        kwargs["outputSchema"] = Number
+        super().__init__(*args, **kwargs)
+        self.aggFunc = aggFunc
+
+        if not self.inputSchema == Number:
             raise Exception("Aggregate function AVERAGE is only defined over Numbers")
 
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
-            and self.aggFunction == other.aggFunction
+            and self.aggFunc == other.aggFunc
             and self.outputSchema == other.outputSchema
-            and self.inputSchema == other.inputSchema
         )
 
     def __str__(self):
-        return (
-            f"{self.op_name()}("
-            + str(self.outputSchema)
-            + ", "
-            + "Function: "
-            + str(self.aggFunction)
-            + ")"
-        )
+        op = super().__str__()
+        op += f"    Function: {str(self.aggFunc)}\n"
+        return op
 
-    def copy(self):
-        return ApplyAverageAggregateOp(
-            inputSchema=self.inputSchema,
-            aggFunction=self.aggFunction,
-            targetCacheId=self.targetCacheId,
-            shouldProfile=self.shouldProfile,
-        )
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"aggFunc": self.aggFunc, **copy_kwargs}
 
-    def get_op_dict(self):
-        return {
-            "operator": self.op_name(),
-            "aggFunction": str(self.aggFunction)
-        }
+    def get_op_params(self):
+        """
+        We identify the operation by its aggregation function.
+        inputSchema is ignored as it depends on how the Optimizer orders operations.
+        """
+        return {"aggFunc": str(self.aggFunc)}
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
@@ -309,15 +261,15 @@ class ApplyAverageAggregateOp(AggregateOp):
     def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
         start_time = time.time()
 
-        # NOTE: this will set the parent_uuid to be the uuid of the final source record;
-        #       in the near future we may want to have parent_uuid accept a list of uuids
-        dr = DataRecord(Number, parent_uuid=candidates[-1]._uuid)
+        # NOTE: this will set the parent_id to be the id of the final source record;
+        #       in the near future we may want to have parent_id accept a list of ids
+        dr = DataRecord(Number, parent_id=candidates[-1]._id)
         dr.value = sum(list(map(lambda c: float(c.value), candidates))) / len(candidates)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_uuid=dr._uuid,
-            record_parent_uuid=dr._parent_uuid,
+            record_id=dr._id,
+            record_parent_id=dr._parent_id,
             record_state=dr._asDict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),

@@ -225,8 +225,7 @@ def compute_label(physicalTree, label_idx):
     label = buildNestedStr(physicalOps)
     # print(f"LABEL {label_idx}: {label}")
 
-    flat = flatten_nested_tuples(physicalOps)
-    ops = [op for op in flat if not op.is_hardcoded()]
+    ops = flatten_nested_tuples(physicalOps)
     label = "-".join([
         f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
         for op in ops
@@ -241,7 +240,7 @@ def score_biofabric_plans(
     Computes the results of all biofabric plans
     """
     # parse records
-    # exclude_keys = ["filename", "op_id", "uuid", "parent_uuid", "stats"]
+    # exclude_keys = ["filename", "op_id", "id", "parent_id", "stats"]
     include_keys = [
         "age_at_diagnosis",
         "ajcc_pathologic_n",
@@ -736,7 +735,7 @@ def evaluate_pz_plan(sentinel_data, workload, plan_idx):
     plans = logicalTree.createPhysicalPlanCandidates(
         min=20,
         cost_estimate_sample_data=all_cost_estimate_data,
-        allow_model_selection=True,
+        allow_bonded_query=True,
         allow_codegen=True,
         allow_token_reduction=True,
         # pareto_optimal=False if opt in ["codegen", "token-reduction"] and workload == "enron" else True,
@@ -819,7 +818,7 @@ def evaluate_pz_plans(workload, dry_run=False):
     plans = logicalTree.createPhysicalPlanCandidates(
         min=20,
         cost_estimate_sample_data=all_cost_estimate_data,
-        allow_model_selection=True,
+        allow_bonded_query=True,
         allow_codegen=True,
         allow_token_reduction=True,
         # pareto_optimal=False if opt in ["codegen", "token-reduction"] and workload == "enron" else True,
@@ -895,11 +894,11 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
                 fixed_cost=workload_to_fixed_cost[workload]
             )
         elif policy_str == "max-quality-at-fixed-runtime":
-            policy = pz.MaxQualityAtFixedRuntime(
+            policy = pz.MaxQualityAtFixedTime(
                 fixed_runtime=workload_to_fixed_runtime[workload]
             )
         elif policy_str == "min-runtime-at-fixed-quality":
-            policy = pz.MinRuntimeAtFixedQuality(
+            policy = pz.MinTimeAtFixedQuality(
                 fixed_quality=workload_to_fixed_quality[workload]
             )
         elif policy_str == "min-cost-at-fixed-quality":
@@ -945,7 +944,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
     candidatePlans = logicalTree.createPhysicalPlanCandidates(
         cost_estimate_sample_data=all_cost_estimate_data,
-        allow_model_selection=True,
+        allow_bonded_query=True,
         allow_codegen=True,
         allow_token_reduction=True,
         pareto_optimal=True,

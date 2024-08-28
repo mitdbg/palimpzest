@@ -1,23 +1,18 @@
 from __future__ import annotations
-import json
-import math
-import time
-from typing import List, Tuple
-from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.utils.model_helpers import getVisionModels
-from .strategy import PhysicalOpStrategy
 
-from palimpzest.utils import (
-    API, getChampionModel, getCodeChampionModel, getConventionalFallbackModel
-)
 from palimpzest import generators
-
 from palimpzest.constants import *
 from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.elements import *
-from palimpzest.operators import logical, physical, convert
+from palimpzest.operators import LLMConvert, LLMConvertBonded, LLMConvertConventional
 from palimpzest.prompts import EXAMPLE_PROMPT, CODEGEN_PROMPT, ADVICEGEN_PROMPT
-from palimpzest.strategies.bonded_query import LLMBondedQueryConvert
+from palimpzest.utils import API
+
+from typing import List, Tuple
+
+import json
+import time
 
 # TYPE DEFINITIONS
 FieldName = str
@@ -26,21 +21,23 @@ Code = str
 DataRecordDict = Dict[str, Any]
 Exemplar = Tuple[DataRecordDict, DataRecordDict]
 CodeEnsemble = Dict[CodeName, Code]
-StatsDict = Dict[str, Any]
 
-class LLMConvertCodeSynthesis(convert.LLMConvert):
 
-    code_strategy: CodingStrategy # Default is CodingStrategy.SINGLE,
-    prompt_strategy: PromptStrategy
-    exemplar_generation_model: Model
-    code_synth_model: Model
-    conventional_fallback_model: Model
+class CodeSynthesisConvert(LLMConvert):
 
-    def __init__(self, 
-                cache_across_plans: bool = True,
-                 *args, **kwargs):
+    def __init__(
+        self,
+        exemplar_generation_model: Model = Model.GPT_4,
+        code_synth_model: Model = Model.GPT_4,
+        conventional_fallback_model: Model = Model.GPT_3_5,
+        cache_across_plans: bool = True,
+        *args, **kwargs
+    ):
+        kwargs["model"] = None
         super().__init__(*args, **kwargs)
-
+        self.exemplar_generation_model = exemplar_generation_model
+        self.code_synth_model = code_synth_model
+        self.conventional_fallback_model = conventional_fallback_model
         self.cache_across_plans = cache_across_plans
 
         # initialize optimization-specific parameters
@@ -63,114 +60,65 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             self.exemplars = []
         self.field_to_code_ensemble = {}
 
-    @classmethod
-    def materializes(self, logical_operator) -> bool:
-        if not isinstance(logical_operator, logical.ConvertScan):
-            return False
-        is_vision_model = self.code_synth_model in getVisionModels()
-        if logical_operator.image_conversion:
-            return is_vision_model
-        else:
-            return not is_vision_model
-        # use image model if this is an image conversion
-
-
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
-        # TODO double check this method to be more accurate for Code Synth
-        # estimate number of input and output tokens from source
-        est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
-        est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
-
-        if self.query_strategy == QueryStrategy.CONVENTIONAL:
-            # NOTE: this may over-estimate the number of fields that need to be generated
-            generate_field_names = []
-            for field_name in self.outputSchema.fieldNames():
-                if field_name not in self.inputSchema.fieldNames(): # and getattr(candidate, field_name, None) is None:
-                    generate_field_names.append(field_name)
-
-            num_fields_to_generate = len(generate_field_names)
-            est_num_input_tokens *= num_fields_to_generate
-            est_num_output_tokens *= num_fields_to_generate
-
-        # TODO REMOVE!
-        self.token_budget = 1.
-        if self.token_budget is not None:
-            est_num_input_tokens = self.token_budget * est_num_input_tokens
-
-        if self.prompt_strategy == PromptStrategy.FEW_SHOT:
-            est_num_input_tokens *= FEW_SHOT_PROMPT_INFLATION
-
-        # get est. of conversion time per record from model card;
-        # NOTE: model will only be None for code synthesis, which uses GPT-3.5 as fallback
-        fallback_model = self.conventional_fallback_model
-        model_conversion_time_per_record = (
-            MODEL_CARDS[fallback_model]["seconds_per_output_token"] * est_num_output_tokens
-        ) / self.max_workers
-
-        # get est. of conversion cost (in USD) per record from model card
-        model_conversion_usd_per_record = (
-            MODEL_CARDS[fallback_model]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[fallback_model]["usd_per_output_token"] * est_num_output_tokens
-        )
-
-        # If we're using DSPy, use a crude estimate of the inflation caused by DSPy's extra API calls
-        if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-            model_conversion_time_per_record *= DSPY_TIME_INFLATION
-            model_conversion_usd_per_record *= DSPY_COST_INFLATION
-
-        # TODO: make this better after arxiv; right now codesynth is hard-coded to use GPT-4
-        # if we're using code synthesis, assume that model conversion time and cost are low
-        model_conversion_time_per_record = 1e-5
-        model_conversion_usd_per_record = 1e-4  # amortize code synth cost across records
-
-        # estimate cardinality and selectivity given the "cardinality" set by the user
-        selectivity = 1.0 if self.cardinality == "oneToOne" else NAIVE_EST_ONE_TO_MANY_SELECTIVITY
-        cardinality = selectivity * source_op_cost_estimates.cardinality
-
-        # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.code_synth_model]["MMLU"] / 100.0) * source_op_cost_estimates.quality
-
-        if self.token_budget is not None:
-            # for now, assume quality is proportional to sqrt(token_budget)
-            quality = quality * math.sqrt(math.sqrt(self.token_budget))  
-
-        return OperatorCostEstimates(
-            cardinality=cardinality,
-            time_per_record=model_conversion_time_per_record,
-            cost_per_record=model_conversion_usd_per_record,
-            quality=quality,
-        )
-
-    def __eq__(self, other: LLMConvertCodeSynthesis):
+    def __eq__(self, other: CodeSynthesisConvert):
         return (
             isinstance(other, self.__class__)
-            and self.code_strategy == other.code_strategy
             and self.exemplar_generation_model == other.exemplar_generation_model
+            and self.code_synth_model == other.code_synth_model
             and self.conventional_fallback_model == other.conventional_fallback_model
             and self.cardinality == other.cardinality
-            and self.image_conversion == other.image_conversion
             and self.prompt_strategy == other.prompt_strategy
-            and self.query_strategy == other.query_strategy
             and self.outputSchema == other.outputSchema
-            and self.inputSchema == other.inputSchema
             and self.max_workers == other.max_workers
+            and self.cache_across_plans == other.cache_across_plans
         )
 
     def __str__(self):
-        return f"{self.__class__.__name__}({str(self.outputSchema):10s}, Code Synth Strategy: {self.code_strategy.value})"
+        op = super().__str__()
+        op += f"    Code Synth Strategy: {self.__class__.__name__}\n"
+        return op
 
-    def get_op_dict(self):
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
         return {
-            "operator": self.op_name(),
-            "inputSchema": str(self.inputSchema),
-            "outputSchema": str(self.outputSchema),
-            "cardinality": self.cardinality,
-            "exemplar_generation_model": self.exemplar_generation_model.value,
-            "conventional_fallback_model": self.conventional_fallback_model.value,
-            "prompt_strategy": self.prompt_strategy.value,
-            "code_synth_strategy": self.code_strategy.value,
-            "desc": str(self.desc),
+            "exemplar_generation_model": self.exemplar_generation_model,
+            "code_synth_model": self.code_synth_model,
+            "conventional_fallback_model": self.conventional_fallback_model,
+            "cache_across_plans": self.cache_across_plans,
+            **copy_kwargs
         }
+
+    def get_op_params(self):
+        """
+        NOTE: we do not include self.cache_across_plans because (for now) get_op_params()
+        is only supposed to return hyperparameters which affect operator performance.
+        """
+        op_params = super().get_op_params()
+        op_params = {
+            "exemplar_generation_model": self.exemplar_generation_model,
+            "code_synth_model": self.code_synth_model,
+            "conventional_fallback_model": self.conventional_fallback_model,
+            **op_params,
+        }
+
+        return op_params
+
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        """
+        Currently we are using GPT-4 to generate code which we can then invoke on subsequent
+        inputs to this operator. To reflect this in our naive cost estimates, we assume that
+        the time_per_record is low (about the time it takes to execute a cheap python function)
+        and that the cost_per_record is also low (we amortize the cost of code generation across
+        all records). For our quality estimate, we naively assume some degredation in quality.
+        In practice, this naive quality estimate will be overwritten by the CostModel's estimate
+        once it executes a few code generated examples.
+        """
+        naive_op_cost_estimates = super().naiveCostEstimates(source_op_cost_estimates)
+        naive_op_cost_estimates.time_per_record = 1e-5
+        naive_op_cost_estimates.cost_per_record = 1e-4 # amortize code synth cost across records
+        naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * (GPT_4_MODEL_CARD["code"] / 100.0)
+
+        return naive_op_cost_estimates
 
     def _fetch_cached_code(self, fields_to_generate: List[str]) -> Tuple[Dict[CodeName, Code]]:
         # if we are allowed to cache synthesized code across plan executions, check the cache
@@ -240,11 +188,11 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
                 code_ensemble_cache_id = "_".join([self.get_op_id(), field_name])
                 cache.putCachedData("codeEnsembles", code_ensemble_cache_id, code_ensemble)
 
-            # TODO: if verbose
-            for code_name, code in code_ensemble.items():
-                print(f"CODE NAME: {code_name}")
-                print("-----------------------")
-                print(code)
+            if self.verbose:
+                for code_name, code in code_ensemble.items():
+                    print(f"CODE NAME: {code_name}")
+                    print("-----------------------")
+                    print(code)
 
         # set field_to_code_ensemble and code_synthesized to True
         return field_to_code_ensemble, generation_stats
@@ -254,16 +202,13 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
         candidate_dict = candidate._asDict(include_bytes=False)
         candidate_content = json.dumps(candidate_dict)
 
-        bonded_op = type('LLMFallback',
-                         (LLMBondedQueryConvert,),
-                         {'model': self.exemplar_generation_model,
-                          'prompt_strategy': self.prompt_strategy})
-        field_answers, generation_stats = bonded_op(
-            inputSchema = self.inputSchema,
-            outputSchema = self.outputSchema,
-            shouldProfile = self.shouldProfile,
-            query_strategy = QueryStrategy.BONDED_WITH_FALLBACK,
-        ).convert(candidate_content, fields_to_generate)
+        bonded_op = LLMConvertBonded(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            model=self.exemplar_generation_model,
+            prompt_strategy=self.prompt_strategy,
+        )
+        field_answers, generation_stats = bonded_op.convert(candidate_content, fields_to_generate)
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
@@ -288,6 +233,7 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             fields=fields_to_generate,
             generation_stats=generation_stats,
             total_time=total_time,
+            parent_id=candidate._id,
         )
 
         # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
@@ -352,19 +298,17 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
                 field_outputs[field_name] = answer
             else:
                 # if there is a failure, run a conventional query
-                print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
+                if self.verbose:
+                    print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
                 candidate_content = json.dumps(candidate_dict)
-                conventional_op = type('LLMFallback',
-                                    (convert.LLMConvertConventional,),
-                                    {'model': self.conventional_fallback_model,
-                                     'prompt_strategy': self.prompt_strategy})
+                conventional_op = LLMConvertConventional(
+                    inputSchema=self.inputSchema,
+                    outputSchema=self.outputSchema,
+                    model=self.conventional_fallback_model,
+                    prompt_strategy=self.prompt_strategy,
+                )
 
-                json_answers, field_stats = conventional_op(
-                    inputSchema = self.inputSchema,
-                    outputSchema = self.outputSchema,
-                    shouldProfile = self.shouldProfile,
-                    query_strategy = QueryStrategy.CONVENTIONAL,
-                ).convert(candidate_content, [field_name])
+                json_answers, field_stats = conventional_op.convert(candidate_content, [field_name])
 
                 # include code execution time in field_stats
                 field_stats.fn_call_duration_secs += exec_stats.fn_call_duration_secs
@@ -389,12 +333,13 @@ class LLMConvertCodeSynthesis(convert.LLMConvert):
             fields=fields_to_generate,
             generation_stats=generation_stats,
             total_time=time.time() - start_time,
+            parent_id=candidate._id,
         )
 
         return drs, record_op_stats_lst
 
-class LLMConvertCodeSynthesisNone(LLMConvertCodeSynthesis):
-    code_strategy = CodingStrategy.NONE
+
+class CodeSynthesisConvertNone(CodeSynthesisConvert):
 
     def _shouldSynthesize(self, *args, **kwargs):
         return False
@@ -404,15 +349,15 @@ class LLMConvertCodeSynthesisNone(LLMConvertCodeSynthesis):
         code_ensemble = {"{api.name}_v0": code}
         return code_ensemble, GenerationStats()
 
-class LLMConvertCodeSynthesisSingle(LLMConvertCodeSynthesis):
-    code_strategy = CodingStrategy.SINGLE
+
+class CodeSynthesisConvertSingle(CodeSynthesisConvert):
 
     def _shouldSynthesize(self, num_exemplars: int=1, *args, **kwargs) -> bool:
         """ This function determines whether code synthesis 
         should be performed based on the strategy and the number of exemplars available. """
-        # The code is the same for ExampleEnsemble EXCEPT the >= should be strictly >
-        # TODO is this intended or an oversight?
-        return not self.code_synthesized and len(self.exemplars) >= num_exemplars
+        if len(self.exemplars) < num_exemplars:
+            return False
+        return not self.code_synthesized
 
     def _code_synth_single(self, api: API, output_field_name: str, exemplars: List[Exemplar]=list(), advice: str=None, language='Python'):
         context = {
@@ -431,9 +376,10 @@ class LLMConvertCodeSynthesisSingle(LLMConvertCodeSynthesis):
             'advice': f"Hint: {advice}" if advice else "",
         }
         prompt = CODEGEN_PROMPT.format(**context)
-        print("PROMPT")
-        print("-------")
-        print(f"{prompt}")
+        if self.verbose:
+            print("PROMPT")
+            print("-------")
+            print(f"{prompt}")
         # invoke the champion model to generate the code
         pred, stats = self.code_champion_generator.generate(prompt=prompt)
         ordered_keys = [
@@ -447,10 +393,11 @@ class LLMConvertCodeSynthesisSingle(LLMConvertCodeSynthesis):
                 code = pred.split(key)[1].split('```')[0].strip()
                 break
 
-        print("-------")
-        print("SYNTHESIZED CODE")
-        print("---------------")
-        print(f"{code}")
+        if self.verbose:
+            print("-------")
+            print("SYNTHESIZED CODE")
+            print("---------------")
+            print(f"{code}")
 
         return code, stats
 
@@ -459,12 +406,12 @@ class LLMConvertCodeSynthesisSingle(LLMConvertCodeSynthesis):
         code_ensemble = {f"{api.name}_v0" : code}
         return code_ensemble, generation_stats
 
+
 # NOTE A nicer truly class based approach would re-implement the code_synth_single method with calls to __super__ and then only re-implement the differences instead of having the code in the superclass know about the subclass-specific parameters (i.e., advice).
-class LLMConvertCodeSynthesisExampleEnsemble(LLMConvertCodeSynthesisSingle):
-    code_strategy = CodingStrategy.EXAMPLE_ENSEMBLE
+class CodeSynthesisConvertExampleEnsemble(CodeSynthesisConvert):
 
     def _shouldSynthesize(self, num_exemplars: int=1, *args, **kwargs) -> bool:
-        if len(self.exemplars) <= num_exemplars:
+        if len(self.exemplars) < num_exemplars:
             return False
         return not self.code_synthesized
 
@@ -484,8 +431,8 @@ class LLMConvertCodeSynthesisExampleEnsemble(LLMConvertCodeSynthesisSingle):
 
         return code_ensemble, generation_stats
 
-class LLMConvertCodeSynthesisAdviceEnsemble(LLMConvertCodeSynthesisSingle):
-    code_strategy = CodingStrategy.ADVICE_ENSEMBLE
+
+class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvert):
 
     def _shouldSynthesize(self, *args, **kwargs):
         return False
@@ -556,8 +503,8 @@ class LLMConvertCodeSynthesisAdviceEnsemble(LLMConvertCodeSynthesisSingle):
                 output_stats[key] += stats[key]
         return code_ensemble, output_stats
 
-class LLMConvertCodeSynthesisAdviceEnsembleValidation(LLMConvertCodeSynthesisSingle):
-    code_strategy = CodingStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION
+
+class CodeSynthesisConvertAdviceEnsembleValidation(CodeSynthesisConvert):
 
     def _shouldSynthesize(self, code_regenerate_frequency:int = 200, *args, **kwargs):
         return len(self.exemplars) % code_regenerate_frequency == 0
@@ -565,56 +512,3 @@ class LLMConvertCodeSynthesisAdviceEnsembleValidation(LLMConvertCodeSynthesisSin
     def _synthesize_field_code(self, api:API, output_field_name:str, exemplars:List[Exemplar]=list(), *args, **kwargs):
         # TODO this was not implemented ? 
         raise Exception("not implemented yet")
-
-class CodeSynthesisConvertStrategy(PhysicalOpStrategy):
-    """
-    This strategy creates physical operator classes that convert records to one schema to another using code synthesis.
-
-    """
-
-    logical_op_class = logical.ConvertScan
-    physical_op_class = LLMConvertCodeSynthesis
-
-    code_strategy_map = {
-        CodingStrategy.NONE: LLMConvertCodeSynthesisNone,
-        CodingStrategy.SINGLE: LLMConvertCodeSynthesisSingle,
-        CodingStrategy.EXAMPLE_ENSEMBLE: LLMConvertCodeSynthesisExampleEnsemble,
-        CodingStrategy.ADVICE_ENSEMBLE: LLMConvertCodeSynthesisAdviceEnsemble,
-        CodingStrategy.ADVICE_ENSEMBLE_WITH_VALIDATION: LLMConvertCodeSynthesisAdviceEnsembleValidation
-    }
-
-    @staticmethod
-    def __new__(cls, 
-                exemplar_generation_models: List[Model] = None,
-                code_synth_models: List[Model] = None,
-                conventional_fallback_models: List[Model] = None,
-                prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_QA,
-                code_synth_strategy: CodingStrategy = CodingStrategy.SINGLE,
-                *args, **kwargs) -> List[physical.PhysicalOperator]:
-
-
-        if exemplar_generation_models is None:
-            exemplar_generation_models = [getChampionModel()]
-        if code_synth_models is None:
-            code_synth_models = [getCodeChampionModel()]
-        if conventional_fallback_models is None:
-            conventional_fallback_models = [getConventionalFallbackModel()]
-        
-        op_class = cls.code_strategy_map[code_synth_strategy]
-        # physical_op_type = type(op_class.__name__+model.name,
-        return_operators = []
-        for exemplar_generation_model in exemplar_generation_models:
-            for code_synth_model in code_synth_models:
-                for conventional_fallback_model in conventional_fallback_models:
-                    physical_op_type = type(op_class.__name__,
-                                            (op_class,),
-                                            {'code_synth_strategy': code_synth_strategy,
-                                            'prompt_strategy': prompt_strategy,
-                                            'exemplar_generation_model': exemplar_generation_model,
-                                            'code_synth_model': code_synth_model,
-                                            'conventional_fallback_model': conventional_fallback_model,
-                                            'final': True,}
-                                            )
-                    return_operators.append(physical_op_type)
-
-        return return_operators

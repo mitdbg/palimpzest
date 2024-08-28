@@ -3,48 +3,33 @@ What it does is consider one of the demo scenarios and test whether we can obtai
 """
 
 import sys
-import pdb
 import pytest
-from palimpzest.strategies.token_reduction import *
-from palimpzest.strategies.token_reduction import TokenReducedConventionalConvert, TokenReducedBondedConvert
 
 sys.path.append("./tests/")
 sys.path.append("./tests/refactor-tests/")
 import context
 
 import palimpzest as pz
-from palimpzest.planner import LogicalPlanner, PhysicalPlanner
-from palimpzest.operators import ConvertOp, ConvertFileToText
-from palimpzest.execution import Execute
-from utils import remove_cache, buildNestedStr
-from palimpzest.strategies.model_selection import ModelSelectionFilterStrategy
-from palimpzest.execution import SequentialSingleThreadExecution
-from palimpzest.execution.nosentinel_execution import NoSentinelExecution
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.elements.records import DataRecord
-from palimpzest.operators.convert import LLMConvertConventional
-from palimpzest.strategies.bonded_query import LLMBondedQueryConvert
+from palimpzest.operators import LLMConvertConventional, LLMConvertBonded
 from palimpzest.operators.datasource import MarshalAndScanDataOp
 from palimpzest.constants import PromptStrategy
 
-@pytest.mark.parametrize("convert_op", [TokenReducedBondedConvert])
-@pytest.mark.parametrize("convert_op", [LLMConvertConventional])
+@pytest.mark.parametrize("convert_op", [LLMConvertBonded, LLMConvertConventional])
 def test_convert(convert_op, email_schema):
     """Test whether convert operators"""
     model = pz.Model.GPT_4
-    scanOp = MarshalAndScanDataOp(outputSchema=pz.File, dataset_type="dir", shouldProfile=True)
-    hardcodedOp = ConvertFileToText(inputSchema=pz.File, outputSchema=pz.TextFile, shouldProfile=True)
-    op_class = type('LLMConvert', 
-                    (convert_op,), 
-                    {'model': model, 
-                     "prompt_strategy": PromptStrategy.DSPY_COT_QA})
-    convertOp = op_class(
-        inputSchema=pz.File, 
+    scanOp = MarshalAndScanDataOp(outputSchema=pz.TextFile)
+    convertOp = convert_op(
+        inputSchema=pz.File,
         outputSchema=email_schema,
-        shouldProfile=True)
+        model=model,
+        prompt_strategy=PromptStrategy.DSPY_COT_QA,
+    )
  
     datasource = DataDirectory().getRegisteredDataset("enron-eval-tiny")
-    candidate = DataRecord(schema=pz.File, parent_uuid=None, scan_idx=0)
+    candidate = DataRecord(schema=pz.File, parent_id=None, scan_idx=0)
     candidate.idx = 0
     candidate.get_item_fn = datasource.getItem
     candidate.cardinality = datasource.cardinality
@@ -53,8 +38,7 @@ def test_convert(convert_op, email_schema):
     outputs = []
     records, _ = scanOp(candidate)
     for record in records:
-        record, _ = hardcodedOp(record)
-        output, _ = convertOp(record[0])
+        output, _ = convertOp(record)
         outputs.extend(output)
 
     for record in outputs:

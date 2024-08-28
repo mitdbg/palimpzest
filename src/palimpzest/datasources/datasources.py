@@ -198,10 +198,9 @@ class PDFFileDirectorySource(DirectorySource):
 
     def getItem(self, idx: int):
         filepath = self.filepaths[idx]
-        dr = DataRecord(self.schema, scan_idx=idx)
-        dr.filename = os.path.basename(filepath)
+        pdf_filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
-            dr.contents = f.read()
+            pdf_bytes = f.read()
 
         if self.pdfprocessor == "modal":
             print("handling PDF processing remotely")
@@ -210,10 +209,6 @@ class PDFFileDirectorySource(DirectorySource):
             )
         else:
             remoteFunc = None
-
-        # parse PDF variables
-        pdf_bytes = dr.contents
-        pdf_filename = dr.filename
 
         # generate text_content from PDF
         if remoteFunc is not None:
@@ -224,10 +219,10 @@ class PDFFileDirectorySource(DirectorySource):
             for p in doc.pages:
                 text_content += p.text
         else:
-            text_content = get_text_from_pdf(dr.filename, dr.contents, file_cache_dir = self.file_cache_dir)
+            text_content = get_text_from_pdf(pdf_filename, pdf_bytes, file_cache_dir = self.file_cache_dir)
 
         # construct data record
-        dr = DataRecord(self.schema, parent_uuid=dr._uuid)
+        dr = DataRecord(self.schema, scan_idx=idx)
         dr.filename = pdf_filename
         dr.contents = pdf_bytes
         dr.text_contents = text_content[:15000]  # TODO Very hacky
@@ -262,7 +257,7 @@ class FileSource(DataSource):
     def serialize(self) -> Dict[str, Any]:
         return {
             "schema": self.schema.jsonSchema(),
-            "path": self.path,
+            "path": self.filepath,
             "source_type": "file",
         }
 
@@ -300,5 +295,5 @@ class UserSource(DataSource):
     def getSize(self):
         raise NotImplementedError("User may optionally implement this method.")
 
-    def getItem(self):
+    def getItem(self, idx: int):
         raise NotImplementedError("User needs to implement this method.")

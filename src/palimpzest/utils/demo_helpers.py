@@ -36,18 +36,13 @@ def createPlanStr(flatten_ops):
       in_schema = left.outputSchema
       out_schema = right.outputSchema
       plan_str += f" {idx+1}. {in_schema.__name__} -> {type(right).__name__} -> {out_schema.__name__} "
-
-      if right.is_hardcoded():
-          plan_str += f"\n    Using hardcoded function"
-      elif hasattr(right, 'model'):
-          plan_str += f"\n    Using {right.model}"
-          if hasattr(right, 'filter'):
-              filter_str = right.filter.filterCondition if right.filter.filterCondition is not None else str(right.filter.filterFn)
-              plan_str += f'\n    Filter: "{filter_str}"'
-          if hasattr(right, 'token_budget'):
-              plan_str += f'\n    Token budget: {right.token_budget}'
-          if hasattr(right, 'query_strategy'):
-              plan_str += f'\n    Query strategy: {right.query_strategy}'
+      if hasattr(right, 'model'):
+        plan_str += f"\n    Using {right.model}"
+        if hasattr(right, 'filter'):
+            filter_str = right.filter.filterCondition if right.filter.filterCondition is not None else str(right.filter.filterFn)
+            plan_str += f'\n    Filter: "{filter_str}"'
+        if hasattr(right, 'token_budget'):
+            plan_str += f'\n    Token budget: {right.token_budget}'
       plan_str += "\n"
       plan_str += f"    ({','.join(in_schema.fieldNames())[:15]}...) -> ({','.join(out_schema.fieldNames())[:15]}...)"
       plan_str += "\n\n"

@@ -19,33 +19,24 @@ class GroupBySig:
                 return (False, "Supplied schema has no field " + f)
         return (True, None)
 
-    def serialize(a) -> Dict[str, Any]:
+    def serialize(self) -> Dict[str, Any]:
         out = {
-            "groupByFields": a.gbyFields,
-            "aggFuncs": a.aggFuncs,
-            "aggFields": a.aggFields,
+            "groupByFields": self.gbyFields,
+            "aggFuncs": self.aggFuncs,
+            "aggFields": self.aggFields,
         }
         return out
 
-    def deserialize(d) -> GroupBySig:
-        return GroupBySig(d["groupByFields"], d["aggFuncs"], d["aggFields"])
-    
-    
-
-
-
     def __str__(self) -> str:
-        return "GroupBy(" + repr(GroupBySig.serialize(self)) + ")"
+        return "GroupBy(" + repr(self.serialize()) + ")"
 
     def __hash__(self) -> int:
         # custom hash function
-        return hash(repr(GroupBySig.serialize(self)))
+        return hash(repr(self.serialize()))
 
     def __eq__(self, other: GroupBySig) -> bool:
         # __eq__ should be defined for consistency with __hash__
-        return isinstance(other, GroupBySig) and GroupBySig.serialize(
-            self
-        ) == GroupBySig.serialize(other)
+        return isinstance(other, GroupBySig) and self.serialize() == other.serialize()
 
     def getAggFieldNames(self) -> list[str]:
         ops = []

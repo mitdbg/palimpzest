@@ -34,7 +34,7 @@ class SchemaMetaclass(type):
 
         return hash(ordered.encode())
 
-    def fieldNames(cls) -> List[Any]:
+    def fieldNames(cls) -> List[str]:
         """Return a list of the fields in this Schema"""
         attributes = dir(cls)
         attributes = [attr for attr in attributes if not attr.startswith("__")]
@@ -83,7 +83,6 @@ class SchemaMetaclass(type):
         return schema
 
 
-# TODO: how does deserialize actually work with Schema?
 # TODO: should we put the SchemaMetaclass functionality into Schema and make it a @dataclass?
 class Schema(metaclass=SchemaMetaclass):
     """

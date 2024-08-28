@@ -1,9 +1,7 @@
 from __future__ import annotations
-
-from palimpzest.elements import DataRecord
-from dataclasses import dataclass, asdict, field
-
+from dataclasses import dataclass, field, fields
 from typing import Any, Dict, List, Optional, Union
+
 
 @dataclass
 class GenerationStats:
@@ -37,8 +35,8 @@ class GenerationStats:
     fn_call_duration_secs: float = 0.0
 
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
-#        self.raw_answers.extend(other.raw_answers)
-        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost','cost_per_record','llm_call_duration_secs', 'fn_call_duration_secs']:
+        # self.raw_answers.extend(other.raw_answers)
+        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'cost_per_record', 'llm_call_duration_secs', 'fn_call_duration_secs']:
             setattr(self, field, getattr(self, field) + getattr(other, field))
         return self
 
@@ -48,16 +46,13 @@ class GenerationStats:
         dct['model_name'] = self.model_name      
         return GenerationStats(**dct)
     
-    def __radd__(self, other: GenerationStats) -> GenerationStats:
-        return self
-    
     # Do the same as iadd and add but with division operator
     def __itruediv__(self, quotient: float) -> GenerationStats:
         if quotient == 0:
             raise ZeroDivisionError("Cannot divide by zero")
         if isinstance(quotient, int):
             quotient = float(quotient)
-        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost','cost_per_record','llm_call_duration_secs', 'fn_call_duration_secs']:
+        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'cost_per_record', 'llm_call_duration_secs', 'fn_call_duration_secs']:
             setattr(self, field, getattr(self, field) / quotient)
         return self
     
@@ -79,16 +74,16 @@ class RecordOpStats:
     Dataclass for storing statistics about the execution of an operator on a single record.
     """
     ##### REQUIRED FIELDS #####
-    # record id; a unique identifier for this record
-    record_uuid: str
+    # record id; an identifier for this record
+    record_id: str
 
-    # unique identifier for the parent of this record
-    record_parent_uuid: str
+    # identifier for the parent of this record
+    record_parent_id: str
 
     # a dictionary with the record state after being processed by the operator
     record_state: Dict[str, Any]
 
-    # operation id; a unique identifier for this operation
+    # operation id; an identifier for this operation
     op_id: str
 
     # operation name
@@ -103,6 +98,9 @@ class RecordOpStats:
     ##### NOT-OPTIONAL, BUT FILLED BY EXECUTION CLASS AFTER CONSTRUCTOR CALL #####
     # the ID of the physical operation which produced the input record for this record at this operation
     source_op_id: str = ""
+
+    # the ID of the physical plan which produced this record at this operation
+    plan_id: str = ""
 
     ##### OPTIONAL FIELDS (I.E. ONLY MANDATORY FOR CERTAIN OPERATORS) #####
     # (if applicable) the name of the model used to generate the output for this record
@@ -144,30 +142,21 @@ class RecordOpStats:
     # (if applicable) the time (in seconds) spent executing a UDF or calling an external api
     fn_call_duration_secs: float = 0.0
 
-    # @staticmethod
-    # def from_record_and_kwargs(record: DataRecord, **kwargs: Dict[str, Any]) -> RecordOpStats:
-    #     return RecordOpStats(
-    #         record_uuid=record._uuid,
-    #         record_parent_uuid=record._parent_uuid,
-    #         op_id=kwargs['op_id'],
-    #         op_name=kwargs['op_name'],
-    #         time_per_record=kwargs['time_per_record'],
-    #         cost_per_record=kwargs['cost_per_record'],
-    #         record_state=record._asDict(include_bytes=False),
-    #         record_details=kwargs.get('record_details', None),
-    #     )
+    # (if applicable) a boolean indicating whether this is the statistics captured from a failed convert operation
+    failed_convert: Optional[bool] = None
 
-    # def to_dict(self):
-    #     return asdict(self)
+    def to_json(self):
+        return {
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+        }
+
 
 @dataclass
 class OperatorStats:
     """
     Dataclass for storing statistics captured within a given operator.
     """
-    # the index of the operator in the plan
-    op_idx: int
-
     # the ID of the physical operation in which these stats were collected
     op_id: str
 
@@ -186,13 +175,42 @@ class OperatorStats:
     # an OPTIONAL dictionary with more detailed information about this operation;
     op_details: Dict[str, Any] = field(default_factory=dict)
 
-    def __iadd__(self, record_op_stats: RecordOpStats):
-        self.total_op_time += record_op_stats.time_per_record
-        self.total_op_cost += record_op_stats.cost_per_record
-        self.record_op_stats_lst.append(record_op_stats)
+    def add_record_op_stats(
+            self,
+            record_op_stats_lst: Union[RecordOpStats, List[RecordOpStats]],
+            source_op_id: str,
+            plan_id: str,
+        ):
+        # convert individual record into list
+        if type(record_op_stats_lst) != type([]):
+            record_op_stats_lst = [record_op_stats_lst]
 
-    # def to_dict(self):
-    #     return asdict(self)
+        # update op stats
+        for record_op_stats in record_op_stats_lst:
+            record_op_stats.source_op_id = source_op_id
+            record_op_stats.plan_id = plan_id
+            self.record_op_stats_lst.append(record_op_stats)
+            self.total_op_time += record_op_stats.time_per_record
+            self.total_op_cost += record_op_stats.cost_per_record
+
+    def __iadd__(self, op_stats: OperatorStats):
+        """NOTE: we assume the execution layer guarantees these op_stats belong to the same operator."""
+        self.total_op_time += op_stats.total_op_time
+        self.total_op_cost += op_stats.total_op_cost
+        self.record_op_stats_lst.extend(op_stats.record_op_stats_lst)
+
+    def to_json(self):
+        return {
+            "op_id": self.op_id,
+            "op_name": self.op_name,
+            "total_op_time": self.total_op_time,
+            "total_op_cost": self.total_op_cost,
+            "record_op_stats_lst": [
+                record_op_stats.to_json()
+                for record_op_stats in self.record_op_stats_lst
+            ],
+            "op_details": self.op_details,
+        }
 
 
 @dataclass
@@ -200,8 +218,11 @@ class PlanStats:
     """
     Dataclass for storing statistics captured for an entire plan.
     """
-    # string for identifying the physical plan
+    # id for identifying the physical plan
     plan_id: str
+
+    # string representation of the physical plan
+    plan_str: str = None
 
     # dictionary of OperatorStats objects (one for each operator)
     operator_stats: Dict[str, OperatorStats] = field(default_factory=dict)
@@ -212,8 +233,21 @@ class PlanStats:
     # total cost for plan
     total_plan_cost: float = 0.0
 
-    # Human-readable index for the plan, do not use for identification
-    plan_idx: int = 0
+    def __iadd__(self, plan_stats: PlanStats):
+        """
+        NOTE: we assume the execution layer guarantees:
+        1. these plan_stats belong to the same plan
+        2. these plan_stats come from sequential (non-overlapping) executions of the same plan
+
+        The latter criteria implies it is okay for this method to sum the plan (and operator) runtimes.
+        """
+        self.total_plan_time += plan_stats.total_plan_time
+        self.total_plan_cost += plan_stats.total_plan_cost
+        for op, op_stats in plan_stats.operator_stats.items():
+            if op in self.operator_stats:
+                self.operator_stats[op] += op_stats
+            else:
+                self.operator_stats[op] = op_stats
 
     def finalize(self, total_plan_time: float):
         self.total_plan_time = total_plan_time
@@ -225,6 +259,19 @@ class PlanStats:
         for idx, op_stats in enumerate(self.operator_stats.values()):
             stats += f"{idx}. {op_stats.op_name} time={op_stats.total_op_time} cost={op_stats.total_op_cost} \n"
         return stats
+
+    def to_json(self):
+        return {
+            "plan_id": self.plan_id,
+            "plan_str": self.plan_str,
+            "operator_stats": {
+                op_id: op_stats.to_json()
+                for op_id, op_stats in self.operator_stats.items()
+            },
+            "total_plan_time": self.total_plan_time,
+            "total_plan_cost": self.total_plan_cost,
+        }
+
 
 @dataclass
 class ExecutionStats:
@@ -243,6 +290,21 @@ class ExecutionStats:
     # total cost for a call to pz.Execute
     total_execution_cost: float = 0.0
 
+    # dictionary of plan strings; useful for printing executed plans in demos
+    plan_strs: Dict[str, str] = field(default_factory=dict)
+
+    def to_json(self):
+        return {
+            "execution_id": self.execution_id,
+            "plan_stats": {
+                plan_id: plan_stats.to_json()
+                for plan_id, plan_stats in self.plan_stats.items()
+            },
+            "total_execution_time": self.total_execution_time,
+            "total_execution_cost": self.total_execution_cost,
+            "plan_strs": self.plan_strs,
+        }
+
 
 @dataclass
 class OperatorCostEstimates:
@@ -260,3 +322,127 @@ class OperatorCostEstimates:
 
     # (estimated) quality of the output from this operator
     quality: float
+
+    # lower bound on cardinality
+    cardinality_lower_bound: float = None
+
+    # upper bound on cardinality
+    cardinality_upper_bound: float = None
+
+    # lower bound on time_per_record
+    time_per_record_lower_bound: float = None
+
+    # upper bound on time_per_record
+    time_per_record_upper_bound: float = None
+
+    # lower bound on cost_per_record
+    cost_per_record_lower_bound: float = None
+
+    # upper bound on cost_per_record
+    cost_per_record_upper_bound: float = None
+
+    # lower bound on quality
+    quality_lower_bound: float = None
+
+    # upper bound on quality
+    quality_upper_bound: float = None
+
+    def __post_init__(self):
+        if self.cardinality_lower_bound is None and self.cardinality_upper_bound is None:
+            self.cardinality_lower_bound = self.cardinality
+            self.cardinality_upper_bound = self.cardinality
+
+        if self.time_per_record_lower_bound is None and self.time_per_record_upper_bound is None:
+            self.time_per_record_lower_bound = self.time_per_record
+            self.time_per_record_upper_bound = self.time_per_record
+
+        if self.cost_per_record_lower_bound is None and self.cost_per_record_upper_bound is None:
+            self.cost_per_record_lower_bound = self.cost_per_record
+            self.cost_per_record_upper_bound = self.cost_per_record
+
+        if self.quality_lower_bound is None and self.quality_upper_bound is None:
+            self.quality_lower_bound = self.quality
+            self.quality_upper_bound = self.quality
+
+
+@dataclass
+class PlanCost:
+    """
+    Dataclass for storing the (cost, time, quality) estimates of (sub)-plans and their upper and lower bounds.
+    """
+    # the expression cost
+    cost: float
+
+    # the expression runtime
+    time: float
+
+    # the expression quality
+    quality: float
+
+    # operator-specific cost estimates
+    op_estimates: OperatorCostEstimates = None
+
+    # lower bound on the expression cost
+    cost_lower_bound: float = None
+
+    # upper bound on the expression cost
+    cost_upper_bound: float = None
+
+    # lower bound on the expression time
+    time_lower_bound: float = None
+
+    # upper bound on the expression time
+    time_upper_bound: float = None
+
+    # lower bound on the expression quality
+    quality_lower_bound: float = None
+
+    # upper bound on the expression quality
+    quality_upper_bound: float = None
+
+    def __post_init__(self):
+        if self.time_lower_bound is None and self.time_upper_bound is None:
+            self.time_lower_bound = self.time
+            self.time_upper_bound = self.time
+
+        if self.cost_lower_bound is None and self.cost_upper_bound is None:
+            self.cost_lower_bound = self.cost
+            self.cost_upper_bound = self.cost
+
+        if self.quality_lower_bound is None and self.quality_upper_bound is None:
+            self.quality_lower_bound = self.quality
+            self.quality_upper_bound = self.quality
+
+    def __iadd__(self, other: PlanCost) -> PlanCost:
+        """
+        NOTE: we currently assume the updating of the op_estimates are handled by the caller
+        as there is not a universally correct meaning of addition of op_estiamtes.
+        """
+        self.cost += other.cost
+        self.time += other.time
+        self.quality *= other.quality
+        for field in ["cost_lower_bound", "cost_upper_bound", "time_lower_bound", "time_upper_bound"]:
+            if getattr(self, field) is not None and getattr(other, field) is not None:
+                summation = getattr(self, field) + getattr(other, field)
+                setattr(self, field, summation)
+
+        for field in ["quality_lower_bound", "quality_upper_bound"]:
+            if getattr(self, field) is not None and getattr(other, field) is not None:
+                product = getattr(self, field) * getattr(other, field)
+                setattr(self, field, product)
+        
+        return self
+
+    def __add__(self, other: PlanCost) -> PlanCost:
+        """
+        NOTE: we currently assume the updating of the op_estimates are handled by the caller
+        as there is not a universally correct meaning of addition of op_estiamtes.
+        """
+        dct = {
+            field: getattr(self, field) + getattr(other, field)
+            for field in ["cost", "cost_lower_bound", "cost_upper_bound", "time", "time_lower_bound", "time_upper_bound"]
+        }
+        for field in ["quality", "quality_lower_bound", "quality_upper_bound"]:
+            dct[field] = getattr(self, field) * getattr(other, field)
+        
+        return PlanCost(**dct)
