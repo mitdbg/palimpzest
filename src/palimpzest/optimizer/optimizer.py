@@ -1,5 +1,5 @@
 from __future__ import annotations
-from palimpzest.constants import OptimizationStrategy
+from palimpzest.constants import OptimizationStrategy, Cardinality
 from palimpzest.cost_model import CostModel
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import DataSource
@@ -190,7 +190,7 @@ class Optimizer:
             op = ConvertScan(
                 inputSchema=inputSchema,
                 outputSchema=outputSchema,
-                cardinality=node._cardinality,
+                cardinality=Cardinality(node._cardinality),
                 udf=node._udf,
                 image_conversion=node._image_conversion,
                 depends_on=node._depends_on,
