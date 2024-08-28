@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 from palimpzest.datamanager import DataDirectory
+from palimpzest.constants import AggFunc
 from palimpzest.corelib import Number, Schema
 from palimpzest.elements import (
-    AggregateFunction,
     Filter,
-    UserFunction,
     GroupBySig,
 )
 from palimpzest.datasources import *
 
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 import hashlib
 import json
@@ -45,21 +44,21 @@ class Set:
         source: Union[Set, DataSource],
         desc: str = None,
         filter: Filter = None,
-        aggFunc: AggregateFunction = None,
+        udf: Callable = None,
+        aggFunc: AggFunc = None,
         groupBy: GroupBySig = None,
         limit: int = None,
         fnid: str = None,
-        cardinality: str = None,
+        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool = None,
-        depends_on: List[str] = None,
-        num_samples: int = None,
-        scan_start_idx: int = 0,
+        depends_on: List[str] = [],
         nocache: bool = False,
     ):
         self.schema = schema
         self._source = source
         self._desc = desc
         self._filter = filter
+        self._udf = udf
         self._aggFunc = aggFunc
         self._groupBy = groupBy
         self._limit = limit
@@ -67,12 +66,10 @@ class Set:
         self._cardinality = cardinality
         self._image_conversion = image_conversion
         self._depends_on = depends_on
-        self._num_samples = num_samples
-        self._scan_start_idx = scan_start_idx
         self._nocache = nocache
 
     def __str__(self):
-        return f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, filter={str(self._filter)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
+        return f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, filter={str(self._filter)}, udf={str(self._udf)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
 
     def serialize(self):
         d = {
@@ -81,80 +78,19 @@ class Set:
             "source": self._source.serialize(),
             "desc": repr(self._desc),
             "filter": None if self._filter is None else self._filter.serialize(),
+            "udf": None if self._udf is None else str(self._udf),
             "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(),
             "fnid": self._fnid,
             "cardinality": self._cardinality,
             "image_conversion": self._image_conversion,
             "depends_on": self._depends_on,
-            "num_samples": self._num_samples,
-            "scan_start_idx": self._scan_start_idx,
             "limit": self._limit,
             "groupBy": (
-                None if self._groupBy is None else GroupBySig.serialize(self._groupBy)
+                None if self._groupBy is None else self._groupBy.serialize()
             ),
         }
 
         return d
-
-    def deserialize(inputObj):
-        raise Exception("Cannot deserialize Set because it is the wrong version")
-
-        # if inputObj["version"] != Set.SET_VERSION:
-        #     raise Exception("Cannot deserialize Set because it is the wrong version")
-        # # TODO: I don't believe this would actually work for the DataSources,
-        # #       as inputObj["schema"] is a dict. not a Schema; also need to add
-        # #       dataset_id to constructor here somehow
-        # # deserialize source depending on whether it's a Set or DataSource
-        # source = None
-        # if "version" in inputObj["source"]:
-        #     source = Set.deserialize(inputObj["source"])
-
-        # elif inputObj["source_type"] == "directory":
-        #     source = DirectoryTextFilesSource(inputObj["schema"])
-
-        # elif inputObj["source_type"] == "file":
-        #     source = FileSource(inputObj["schema"])
-
-        # elif inputObj["source_type"] == "jsonstream":
-        #     raise Exception("This can't possibly work, can it?")
-        #     # source = JSONStreamSource(inputObj["schema"])
-
-        # # deserialize agg. function
-        # aggFuncStr = inputObj.get("aggFunc", None)
-        # aggFunc = (
-        #     None if aggFuncStr is None else AggregateFunction.deserialize(aggFuncStr)
-        # )
-
-        # # deserialize agg. function
-        # groupByStr = inputObj.get("groupBy", None)
-        # groupBy = None if groupByStr is None else GroupBySig.deserialize(groupByStr)
-
-        # # deserialize limit
-        # limitStr = inputObj.get("limit", None)
-        # limit = None if limitStr is None else int(limitStr)
-
-        # fnid = inputObj.get("fnid", None)
-        # cardinality = inputObj.get("cardinality", None)
-        # image_conversion = inputObj.get("image_conversion", None)
-        # depends_on = inputObj.get("depends_on", None)
-        # num_samples = inputObj.get("num_samples", None)
-        # scan_start_idx = inputObj.get("scan_start_idx", None)
-
-        # return Set(
-        #     schema=inputObj["schema"].jsonSchema(),
-        #     source=source,
-        #     desc=inputObj["desc"],
-        #     filter=Filter.deserialize(inputObj["filter"]),
-        #     aggFunc=aggFunc,
-        #     fnid=fnid,
-        #     cardinality=cardinality,
-        #     image_conversion=image_conversion,
-        #     depends_on=depends_on,
-        #     num_samples=num_samples,
-        #     scan_start_idx=scan_start_idx,
-        #     limit=limit,
-        #     groupBy=groupBy,
-        # )
 
     def universalIdentifier(self):
         """Return a unique identifier for this Set."""
@@ -202,29 +138,10 @@ class Dataset(Set):
         if type(self._depends_on) == str:
             self._depends_on = [self._depends_on]
 
-    def deserialize(inputObj):
-        raise Exception("Cannot deserialize Set because it is the wrong version")
-        # # TODO: this deserialize operation will not work; I need to finish the deserialize impl. for Schema
-        # if inputObj["version"] != Set.SET_VERSION:
-        #     raise Exception("Cannot deserialize Set because it is the wrong version")
-
-        # # deserialize source depending on whether it's a Set or DataSource
-        # source = None
-        # if "version" in inputObj["source"]:
-        #     source = Set.deserialize(inputObj["source"])
-
-        # elif inputObj["source_type"] == "directory":
-        #     source = DirectoryTextFilesSource(inputObj["schema"])
-
-        # elif inputObj["source_type"] == "file":
-        #     source = FileSource(inputObj["schema"])
-
-        # return Dataset(source, inputObj["schema"], desc=inputObj["desc"])
-
     def filter(
         self,
         _filter: Union[str, callable],
-        depends_on: Union[str, List[str]] = None,
+        depends_on: Union[str, List[str]] = [],
         desc: str = "Apply filter(s)",
     ) -> Dataset:
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
@@ -245,20 +162,20 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    # TODO: here we should update the schema to be the incrementally-grown schema
-    #       NOTE we would need to change this if/when we do logical re-ordering
     def convert(
         self,
-        newSchema: Schema,
-        cardinality: str = None,
+        outputSchema: Schema,
+        udf: Optional[Callable] = None,
+        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool = False,
-        depends_on: Union[str, List[str]] = None,
+        depends_on: Union[str, List[str]] = [],
         desc: str = "Convert to new schema",
     ) -> Dataset:
         """Convert the Set to a new schema."""
         return Dataset(
             source=self,
-            schema=newSchema,
+            schema=outputSchema,
+            udf=udf,
             cardinality=cardinality,
             image_conversion=image_conversion,
             depends_on=depends_on,
@@ -266,27 +183,23 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def map(self, fn: UserFunction) -> Dataset:
-        """Convert the Set to a new schema."""
-        if not fn.inputSchema == self.schema:
-            raise Exception(
-                "Input schema of function ("
-                + str(fn.inputSchema.getDesc())
-                + ") does not match schema of input Set ("
-                + str(self.schema.getDesc())
-                + ")"
-            )
-        return Dataset(
-            source=self, schema=fn.outputSchema, fnid=fn.udfid, nocache=self._nocache
-        )
-
-    def aggregate(self, aggFuncDesc: str) -> Dataset:
-        """Apply an aggregate function to this set"""
+    def count(self) -> Dataset:
+        """Apply a count aggregation to this set"""
         return Dataset(
             source=self,
             schema=Number,
-            desc="Aggregate results",
-            aggFunc=AggregateFunction(aggFuncDesc),
+            desc="Count results",
+            aggFunc=AggFunc.COUNT,
+            nocache=self._nocache,
+        )
+
+    def average(self) -> Dataset:
+        """Apply an average aggregation to this set"""
+        return Dataset(
+            source=self,
+            schema=Number,
+            desc="Average results",
+            aggFunc=AggFunc.AVERAGE,
             nocache=self._nocache,
         )
 

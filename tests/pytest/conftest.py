@@ -1,3 +1,5 @@
+from palimpzest.constants import Model
+
 import pytest
 
 # with open(".env") as f:
@@ -6,7 +8,9 @@ import pytest
 #         os.environ[key] = value
 
 pytest_plugins = [
+    "fixtures.cost_est_data",
     "fixtures.datasets",
+    "fixtures.expected_cost_est_results",
     "fixtures.expected_records",
     "fixtures.physical_plans",
     "fixtures.schemas",
@@ -50,25 +54,35 @@ def workload(
 @pytest.fixture
 def physical_plan(
     request,
-    enron_scan_only_plan,
-    enron_non_llm_filter_plan,
-    enron_llm_filter_plan,
-    enron_bonded_llm_convert_plan,
-    enron_code_synth_convert_plan,
-    enron_token_reduction_convert_plan,
-    real_estate_image_convert_plan,
-    real_estate_one_to_many_convert_plan,
+    scan_only_plan,
+    non_llm_filter_plan,
+    llm_filter_plan,
+    bonded_llm_convert_plan,
+    code_synth_convert_plan,
+    token_reduction_convert_plan,
+    image_convert_plan,
+    one_to_many_convert_plan,
+    simple_plan_factory,
 ):
     physical_plan_id = request.param
     physical_plan_id_to_physical_plan = {
-        "enron-scan-only": enron_scan_only_plan,
-        "enron-non-llm-filter": enron_non_llm_filter_plan,
-        "enron-llm-filter": enron_llm_filter_plan,
-        "enron-bonded-llm-convert": enron_bonded_llm_convert_plan,
-        "enron-code-synth-convert": enron_code_synth_convert_plan,
-        "enron-token-reduction-convert": enron_token_reduction_convert_plan,
-        "real-estate-image-convert": real_estate_image_convert_plan,
-        "real-estate-one-to-many-convert": real_estate_one_to_many_convert_plan,
+        "scan-only": scan_only_plan,
+        "non-llm-filter": non_llm_filter_plan,
+        "llm-filter": llm_filter_plan,
+        "bonded-llm-convert": bonded_llm_convert_plan,
+        "code-synth-convert": code_synth_convert_plan,
+        "token-reduction-convert": token_reduction_convert_plan,
+        "image-convert": image_convert_plan,
+        "one-to-many-convert": one_to_many_convert_plan,
+        "cost-est-simple-plan-gpt4-gpt4": simple_plan_factory(convert_model=Model.GPT_4, filter_model=Model.GPT_4),
+        "cost-est-simple-plan-gpt4-gpt35": simple_plan_factory(convert_model=Model.GPT_4, filter_model=Model.GPT_3_5),
+        "cost-est-simple-plan-gpt4-mixtral": simple_plan_factory(convert_model=Model.GPT_4, filter_model=Model.MIXTRAL),
+        "cost-est-simple-plan-gpt35-gpt4": simple_plan_factory(convert_model=Model.GPT_3_5, filter_model=Model.GPT_4),
+        "cost-est-simple-plan-gpt35-gpt35": simple_plan_factory(convert_model=Model.GPT_3_5, filter_model=Model.GPT_3_5),
+        "cost-est-simple-plan-gpt35-mixtral": simple_plan_factory(convert_model=Model.GPT_3_5, filter_model=Model.MIXTRAL),
+        "cost-est-simple-plan-mixtral-gpt4": simple_plan_factory(convert_model=Model.MIXTRAL, filter_model=Model.GPT_4),
+        "cost-est-simple-plan-mixtral-gpt35": simple_plan_factory(convert_model=Model.MIXTRAL, filter_model=Model.GPT_3_5),
+        "cost-est-simple-plan-mixtral-mixtral": simple_plan_factory(convert_model=Model.MIXTRAL, filter_model=Model.MIXTRAL),
     }
     return physical_plan_id_to_physical_plan[physical_plan_id]
 
@@ -108,3 +122,24 @@ def side_effect(
         "real-estate-one-to-many-convert": real_estate_one_to_many_convert,
     }
     return side_effect_id_to_side_effect[side_effect_id]
+
+
+@pytest.fixture
+def expected_cost_est_results(
+    request,
+    simple_plan_expected_results_factory,
+):
+    cost_est_results_id = request.param
+    cost_est_results_id_to_cost_est_results = {
+        "cost-est-simple-plan-gpt4-gpt4": simple_plan_expected_results_factory(convert_model=Model.GPT_4, filter_model=Model.GPT_4),
+        "cost-est-simple-plan-gpt4-gpt35": simple_plan_expected_results_factory(convert_model=Model.GPT_4, filter_model=Model.GPT_3_5),
+        "cost-est-simple-plan-gpt4-mixtral": simple_plan_expected_results_factory(convert_model=Model.GPT_4, filter_model=Model.MIXTRAL),
+        "cost-est-simple-plan-gpt35-gpt4": simple_plan_expected_results_factory(convert_model=Model.GPT_3_5, filter_model=Model.GPT_4),
+        "cost-est-simple-plan-gpt35-gpt35": simple_plan_expected_results_factory(convert_model=Model.GPT_3_5, filter_model=Model.GPT_3_5),
+        "cost-est-simple-plan-gpt35-mixtral": simple_plan_expected_results_factory(convert_model=Model.GPT_3_5, filter_model=Model.MIXTRAL),
+        "cost-est-simple-plan-mixtral-gpt4": simple_plan_expected_results_factory(convert_model=Model.MIXTRAL, filter_model=Model.GPT_4),
+        "cost-est-simple-plan-mixtral-gpt35": simple_plan_expected_results_factory(convert_model=Model.MIXTRAL, filter_model=Model.GPT_3_5),
+        "cost-est-simple-plan-mixtral-mixtral": simple_plan_expected_results_factory(convert_model=Model.MIXTRAL, filter_model=Model.MIXTRAL),
+    }
+
+    return cost_est_results_id_to_cost_est_results[cost_est_results_id]

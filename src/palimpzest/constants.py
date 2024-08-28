@@ -4,6 +4,7 @@ from enum import Enum
 import os
 
 
+# TODO: add GPT-4o, GPT-4o-mini; update vision
 # ENUMS
 class Model(str, Enum):
     """
@@ -15,21 +16,13 @@ class Model(str, Enum):
     LLAMA3 = "meta-llama/Llama-3-8b-chat-hf"
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
     GPT_3_5 = "gpt-3.5-turbo-0125"
-    GPT_4 = "gpt-4-0125-preview"
+    GPT_4 = "gpt-4o-mini" # TODO: revert, just getting results for distribution of tokens
     GPT_4V = "gpt-4-vision-preview"
     GEMINI_1 = "gemini-1.0-pro-001"
     GEMINI_1V = "gemini-1.0-pro-vision-latest"
 
     def __repr__(self):
         return f'{self.name}'
-
-class ExecutionStrategy(str, Enum):
-    """
-    ExecutionStrategy describes the framework / setting used to execute the user's plan.
-    """
-    SINGLE_THREADED = "single-threaded"
-    PARALLEL = "parallel"
-    RAY = "ray"
 
 class PromptStrategy(str, Enum):
     """
@@ -43,38 +36,25 @@ class PromptStrategy(str, Enum):
     DSPY_COT_QA = "dspy-chain-of-thought-question"
     CODE_GEN_BOOL = "code-gen-bool"
 
-class QueryStrategy(str, Enum):
+class OptimizationStrategy(str, Enum):
     """
-    QueryStrategy describes the high-level approach to querying a Model (or generated code)
-    in order to perform a specified task.
+    OptimizationStrategy determines which (set of) plan(s) the Optimizer
+    will return to the Execution layer.
     """
-    # DEFAULT = "bonded-with-fallback" # "codegen-with-fallback"
-    CONVENTIONAL = "conventional"
-    BONDED = "bonded"
-    BONDED_WITH_FALLBACK = "bonded-with-fallback"
-    CODE_GEN = "code-gen"
-    CODE_GEN_WITH_FALLBACK = "codegen-with-fallback"
+    OPTIMAL = "optimal"
+    CONFIDENCE_INTERVAL = "confidence-interval"
+    PARETO_OPTIMAL = "pareto-optimal"
+    SENTINEL = "sentinel"
 
-class CodingStrategy(str, Enum):
-    """
-    CodingStrategy describes the high-level approach to generating code.
-    in order to perform a specified task.
-    """
-    # DEFAULT = "single"
-    NONE = "none"
-    SINGLE = "single"
-    EXAMPLE_ENSEMBLE = "example-ensemble"
-    ADVICE_ENSEMBLE = "advice-ensemble"
-    ADVICE_ENSEMBLE_WITH_VALIDATION = "advice-ensemble-with-validation"
+class AggFunc(str, Enum):
+    COUNT = "count"
+    AVERAGE = "average"
 
 class Cardinality(str, Enum): 
     ONE_TO_ONE = "one-to-one"
     ONE_TO_MANY = "one-to-many"
 
-class PlanType(str, Enum):
-    SENTINEL = "Sentinel Plan"
-    FINAL = "Final Plan"
-
+# CONSTANTS
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
 PDF_EXTENSIONS = [".pdf"]
 XLS_EXTENSIONS = [".xls", ".xlsx"]
@@ -82,8 +62,8 @@ XLS_EXTENSIONS = [".xls", ".xlsx"]
 # the number of seconds the parallel execution will sleep for while waiting for futures to complete
 PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.1
 
-# character limit(s) for different IDs
-MAX_OP_ID_CHARS = 6
+# character limit for various IDs
+MAX_ID_CHARS = 10
 
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
 RETRY_MULTIPLIER = 2
@@ -108,20 +88,6 @@ MEMORY_SCAN_TIME_PER_KB = 1 / (float(30) * 1024 * 1024)
 
 # Rough conversion from # of bytes --> # of tokens; assumes 1 token ~= 4 chars and 1 char == 1 byte
 BYTES_TO_TOKENS = 0.25
-
-# TODO: make this much more of a science than a terrible guess
-# Using DSPy as a prompt strategy can lead to increases in cost and time due to the
-# fact that DSPy -- when provided with a validation metric -- makes some additional
-# API calls to find the optimal prompt(s). For now we will just apply a horrendously
-# imprecise and innacurate multiple to our cost and time estimates for generation with
-# the DSPy prompt strategy. In the near future we may want to make this much more exact.
-DSPY_COST_INFLATION = 2.0
-DSPY_TIME_INFLATION = 2.0
-
-# Similar to the DSPY_*_INFLATION variables, we make a crude estimate of the additional
-# input token size due to using a few-shot prompt strategy, which can mildly increase the
-# size of the input.
-FEW_SHOT_PROMPT_INFLATION = 1.25
 
 # a naive estimate for the input record size
 NAIVE_EST_SOURCE_RECORD_SIZE_IN_BYTES = 1_000_000

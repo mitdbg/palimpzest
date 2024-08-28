@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from palimpzest.constants import MAX_OP_ID_CHARS
+from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.corelib import Schema
 from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
 from palimpzest.datamanager import DataDirectory
@@ -15,82 +15,95 @@ import json
 DataRecordsWithStats = Tuple[List[DataRecord], List[RecordOpStats]]
 
 
-class PhysicalOperator():
+class PhysicalOperator:
     """
-    All implemented physical operators should inherit from this class, and define in the implemented_op variable
-    exactly which logical operator they implement. This is necessary for the planner to be able to determine
-    which physical operators can be used to implement a given logical operator.
+    All implemented physical operators should inherit from this class.
+    In order for the Optimizer to consider using a physical operator for a
+    given logical operation, the user must also write an ImplementationRule.
     """
-
-    LOCAL_PLAN = "LOCAL"
-    REMOTE_PLAN = "REMOTE"
-
-    implemented_op = None
-    inputSchema = None
-    outputSchema = None
-    final = False # This gets set to True if the operator actually is to be used
-
-    @classmethod
-    def implements(cls, logical_operator_class):
-        return logical_operator_class == cls.implemented_op and cls.final
-
-    def __str__(self):
-        op = f"{self.inputSchema.className()} -> {self.op_name()} -> {self.outputSchema.className()}\n"
-        op += f"({','.join(self.inputSchema.fieldNames())[:30]}) -> ({','.join(self.outputSchema.fieldNames())[:30]}) \n"
-        if getattr(self, "model", None):
-            op += f"Using model: {self.model}\n"
-        return op
 
     def __init__(
         self,
         outputSchema: Schema,
         inputSchema: Optional[Schema] = None,
-        shouldProfile: bool = False,
+        logical_op_id: Optional[str] = None,
         max_workers: int = 1,
+        targetCacheId: Optional[str] = None,
+        verbose: bool = False,
         *args, **kwargs
     ) -> None:
         self.outputSchema = outputSchema
         self.inputSchema = inputSchema
         self.datadir = DataDirectory()
-        self.shouldProfile = shouldProfile
         self.max_workers = max_workers
+        self.targetCacheId = targetCacheId
+        self.verbose = verbose
+        self.logical_op_id = logical_op_id
+        self.op_id = None
+
+    def __str__(self):
+        op = f"{self.inputSchema.className()} -> {self.op_name()} -> {self.outputSchema.className()}\n"
+        op += f"    ({', '.join(self.inputSchema.fieldNames())[:30]}) -> ({', '.join(self.outputSchema.fieldNames())[:30]})\n"
+        if getattr(self, "model", None):
+            op += f"    Model: {self.model}\n"
+        return op
+
+    def get_copy_kwargs(self):
+        """Return kwargs to assist sub-classes w/copy() calls."""
+        return {
+            "outputSchema": self.outputSchema,
+            "inputSchema": self.inputSchema,
+            "logical_op_id": self.logical_op_id,
+            "max_workers": self.max_workers,
+            "targetCacheId": self.targetCacheId,
+            "verbose": self.verbose,
+        }
+
+    def op_name(self) -> str:
+        """Name of the physical operator."""
+        return str(self.__class__.__name__)
+
+    def get_op_params(self):
+        """
+        You should implement get_op_params with op-specific parameters.
+        """
+        raise NotImplementedError("Calling get_op_params on abstract method")
+
+    def get_op_id(self):
+        """
+        NOTE: We do not call this in the __init__() method as subclasses may set parameters
+              returned by self.get_op_params() after they call to super().__init__().
+
+        NOTE: This is NOT a universal ID.
+        
+        Two different PhysicalOperator instances with the identical returned values
+        from the call to self.get_op_params() will have equivalent op_ids.
+        """
+        # return self.op_id if we've computed it before
+        if self.op_id is not None:
+            return self.op_id
+
+        # compute, set, and return the op_id
+        op_name = self.op_name()
+        op_params = self.get_op_params()
+        op_params = {k: str(v) for k, v in op_params.items()}
+        hash_str = json.dumps({"op_name": op_name, **op_params}, sort_keys=True)
+        self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+
+        return self.op_id
 
     def __eq__(self, other: PhysicalOperator) -> bool:
         raise NotImplementedError("Calling __eq__ on abstract method")
 
-    def op_name(self) -> str:
-        """Name of the physical operator."""
-        return self.__class__.__name__
+    def __hash__(self):
+        return int(self.op_id, 16)
 
-    def get_op_dict(self):
-        raise NotImplementedError("You should implement get_op_dict with op specific parameters")
-    
-    def get_op_id(self, plan_position: Optional[int] = None) -> str:
-        op_dict = self.get_op_dict()
-        if plan_position is not None:
-            op_dict["plan_position"] = plan_position
-
-        ordered = json.dumps(op_dict, sort_keys=True)
-        hash = hashlib.sha256(ordered.encode()).hexdigest()[:MAX_OP_ID_CHARS]
-
-        op_id = (
-            f"{self.op_name()}_{hash}"
-            if plan_position is None
-            else f"{self.op_name()}_{plan_position}_{hash}"
-        )
-        return op_id
-
-    def is_hardcoded(self) -> bool:
-        """ By default, operators are not hardcoded.
-        In those that implement HardcodedConvert or HardcodedFilter, this will return True."""
-        return False
-        
-
-    def copy(self) -> PhysicalOperator:
-        raise NotImplementedError("__copy___ on abstract class")
+    def copy(self):
+        copy_kwargs = self.get_copy_kwargs()
+        return self.__class__(**copy_kwargs)
 
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
-        raise NotImplementedError("Using __call__ from abstract method")
+        raise NotImplementedError("Calling __call__ from abstract method")
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
@@ -103,7 +116,7 @@ class PhysicalOperator():
         The function takes an argument which contains the OperatorCostEstimates
         of the physical operator whose output is the input to this operator.
     
-        For the implemented operator. These will be used by the CostEstimator
+        For the implemented operator. These will be used by the CostModel
         when PZ does not have sample execution data -- and it will be necessary
         in some cases even when sample execution data is present. (For example,
         the cardinality of each operator cannot be estimated based on sample

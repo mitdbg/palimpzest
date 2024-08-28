@@ -17,12 +17,12 @@ OPTIONAL_DESC = "Keep in mind that this process is described by this text: {desc
 ### ONE TO ONE ###
 ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR = "an output JSON object that describes an object of type {doc_type}."
 ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL = "the output object"
-ONE_TO_ONE_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only"
+ONE_TO_ONE_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The dictionary should only have the output fields: {fields}."
 
 ### ONE_TO_MANY ###
 ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR = "an output array of zero or more JSON objects that describe objects of type {doc_type}."
 ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL = "the output objects"
-ONE_TO_MANY_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields described above. You must decide the correct number of output objects."
+ONE_TO_MANY_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields {fields}. You must decide the correct number of output objects."
 
 STRUCTURED_CONVERT_PROMPT = """I would like you to create {targetOutputDescriptor}
 You will use the information in an input JSON object that I will provide. The input object has type {input_type}.
@@ -45,6 +45,17 @@ Here is every output field name and a description:
 {multilineOutputFieldDescription}
 {appendixInstruction}
 {optional_desc}"""
+
+IMAGE_FILTER_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and:
+- Output TRUE if the given image satisfies the filter condition
+- Output FALSE if the given image does not satisfy the condition
+
+Your answer must be TRUE or FALSE.
+
+FILTER CONDITION: {filter_condition}
+
+ANSWER: 
+"""
 
 
 ### CODE SYNTHESIS PROMPTS ###

@@ -9,7 +9,7 @@ from palimpzest.generators import (
     gen_qa_signature_class,
     TogetherHFAdaptor,
 )
-from palimpzest.dataclasses import GenerationStats, RecordOpStats
+from palimpzest.dataclasses import GenerationStats
 from palimpzest.utils import API
 
 from collections import Counter
@@ -24,7 +24,6 @@ import base64
 import dsp
 import dspy
 import io
-import json
 import os
 import time
 
@@ -383,7 +382,7 @@ class DSPyGenerator(BaseGenerator):
         output_tokens = usage["completion_tokens"]
 
         # NOTE: needs to match subset of keys produced by LLMConvert._create_empty_query_stats()
-        stats= GenerationStats(
+        stats = GenerationStats(
             model_name=self.model_name,
             llm_call_duration_secs=end_time - start_time,
             fn_call_duration_secs=0.0,
@@ -411,9 +410,16 @@ class DSPyGenerator(BaseGenerator):
         })
 
         if self.verbose:
-            print(pred.answer)
             print("Prompt history:")
             dspy_lm.inspect_history(n=1)
+            print("---")
+            print(f"{pred.answer}")
+            # output_str = (
+            #     f"{question}\n{pred.answer}"
+            #     if self.prompt_strategy == PromptStrategy.DSPY_COT_QA
+            #     else f"{question}:\n{pred.answer}"
+            # )
+            # print(output_str)
 
         return pred.answer, stats
 
