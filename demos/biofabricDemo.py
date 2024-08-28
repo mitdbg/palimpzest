@@ -4,6 +4,7 @@ Make sure to run:
 python src/cli/cli_main.py reg --path testdata/biofabric-urls/ --name biofabric-urls
 
 """
+from palimpzest.utils import udfs
 import context
 from palimpzest.constants import PZ_DIR
 import palimpzest as pz
@@ -104,14 +105,14 @@ if __name__ == "__main__":
         output = tableURLS
         # urlFile = pz.Dataset("biofabric-urls", schema=pz.TextFile)
         # tableURLS = tableURLS.convert(pz.URL, desc="The URLs of the tables")
-        # binary_tables = tableURLS.convert(pz.File)
-        # xls = binary_tables.convert(pz.XLSFile)
-        # patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        # tables = tableURLS.convert(pz.File, udf=udfs.url_to_file)
+        # xls = tables.convert(pz.XLSFile, udf = udfs.file_to_xls)
+        # patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         # output = patient_tables
 
     elif experiment == 'filtering':
         xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)       
-        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         # patient_tables = patient_tables.filter("The table explains the meaning of attributes")
         # patient_tables = patient_tables.filter("The table contains patient biometric data")
@@ -121,13 +122,13 @@ if __name__ == "__main__":
 
     elif experiment == 'matching':
         xls = pz.Dataset('biofabric-matching', schema=pz.XLSFile)
-        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
         output = case_data
     
     elif experiment == "endtoend":
         xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)
-        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
         output = case_data        

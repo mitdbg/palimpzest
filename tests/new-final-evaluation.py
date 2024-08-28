@@ -4,7 +4,7 @@ import palimpzest as pz
 from palimpzest.execution import (
     PipelinedSingleThreadSentinelExecution
 )
-from palimpzest.utils import getModels
+from palimpzest.utils import getModels, udfs
 
 from pathlib import Path
 from PIL import Image
@@ -254,9 +254,7 @@ def get_workload_for_eval_dataset(dataset):
 
     if dataset == "biofabric":
         xls = pz.Dataset(dataset, schema=pz.XLSFile)
-        patient_tables = xls.convert(
-            pz.Table, desc="All tables in the file", cardinality="oneToMany"
-        )
+        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter(
             "The rows of the table contain the patient age"
         )

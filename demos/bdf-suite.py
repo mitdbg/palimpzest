@@ -5,6 +5,7 @@ python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usec
 """
 
 import palimpzest as pz
+from palimpzest.utils import udfs
 import pandas as pd
 import time
 import os
@@ -75,10 +76,9 @@ def extract_supplemental(engine, policy):
     tableURLS = htmlDOI.convert(pz.URL, desc="The URLs of the XLS tables from the page", cardinality="oneToMany")
     # urlFile = pz.Dataset("biofabric-urls", schema=pz.TextFile)
     # tableURLS = urlFile.convert(pz.URL, desc="The URLs of the tables")
-    binary_tables = tableURLS.map(pz.DownloadBinaryFunction())
-    tables = binary_tables.convert(pz.File)
-    xls = tables.convert(pz.XLSFile)
-    patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+    tables = tableURLS.convert(pz.File, udf=udfs.url_to_file)
+    xls = tables.convert(pz.XLSFile, udf = udfs.file_to_xls)
+    patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
 
     output = patient_tables
     iterable  =  pz.Execute(patient_tables,
@@ -100,7 +100,7 @@ def extract_supplemental(engine, policy):
 @st.cache_resource()
 def integrate_tables(engine, policy):
     xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)
-    patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+    patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
     patient_tables = patient_tables.filter("The table contains biometric information about the patient")
     case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
 

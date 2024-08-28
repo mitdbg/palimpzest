@@ -3,6 +3,7 @@
 python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usecase3-pdf
 
 """
+import context
 from pypdf import PdfReader
 
 import networkx as nx

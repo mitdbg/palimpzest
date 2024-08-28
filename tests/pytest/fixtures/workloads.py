@@ -71,7 +71,7 @@ def biofabric_workload(biofabric_tiny, case_data_schema):
     xls = pz.Dataset(biofabric_tiny, schema=pz.XLSFile)
     # patient_tables = xls.convert(
     #     pz.Table, desc="All tables in the file", cardinality=pz.Cardinality.ONE_TO_MANY)
-    patient_tables = xls.convert(pz.Table, udf=lambda record: udfs.xls_to_tables(record), cardinality=pz.Cardinality.ONE_TO_MANY)
+    patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
     patient_tables = patient_tables.filter(
         "The rows of the table contain the patient age"
     )
