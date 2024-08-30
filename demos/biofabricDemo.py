@@ -4,6 +4,7 @@ Make sure to run:
 python src/cli/cli_main.py reg --path testdata/biofabric-urls/ --name biofabric-urls
 
 """
+from palimpzest.utils import udfs
 import context
 from palimpzest.constants import PZ_DIR
 import palimpzest as pz
@@ -78,9 +79,11 @@ if __name__ == "__main__":
     experiment = args.experiment
     engine = args.engine
     if engine == 'sequential':
-        engine = pz.SequentialSingleThreadExecution
+        engine = pz.SequentialSingleThreadSentinelExecution
     elif engine == 'parallel':
-        engine = pz.PipelinedParallelExecution
+        engine = pz.PipelinedParallelSentinelExecution
+    elif engine == 'nosentinel':
+        engine = pz.SequentialSingleThreadNoSentinelExecution
 
     if no_cache:
         pz.DataDirectory().clearCache(keep_registry=True)
@@ -93,22 +96,23 @@ if __name__ == "__main__":
         policy = pz.UserChoice()
 
     if experiment == 'collection':
-        papers = pz.Dataset("biofabric-pdf", schema=ScientificPaper)
-        paperURLs = papers.convert(pz.URL, desc="The DOI url of the paper") 
+        # papers = pz.Dataset("biofabric-pdf", schema=ScientificPaper)
+        # paperURLs = papers.convert(pz.URL, desc="The DOI url of the paper") 
         # TODO this fetch should be refined to work for all papers
-        htmlDOI = paperURLs.map(pz.DownloadHTMLFunction())
-        tableURLS = htmlDOI.convert(pz.URL, desc="The URLs of the XLS tables from the page", cardinality="oneToMany")
-
-        urlFile = pz.Dataset("biofabric-urls", schema=pz.TextFile)
-        tableURLS = urlFile.convert(pz.URL, desc="The URLs of the tables")
-        binary_tables = tableURLS.convert(pz.File)
-        xls = binary_tables.convert(pz.XLSFile)
-        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
-        output = patient_tables
+        # htmlDOI = paperURLs.map(pz.DownloadHTMLFunction())
+        papers_html = pz.Dataset("biofabric-html", schema=pz.WebPage)
+        tableURLS = papers_html.convert(pz.URL, desc="The URLs of the XLS tables from the page", cardinality=pz.Cardinality.ONE_TO_MANY)
+        output = tableURLS
+        # urlFile = pz.Dataset("biofabric-urls", schema=pz.TextFile)
+        # tableURLS = tableURLS.convert(pz.URL, desc="The URLs of the tables")
+        # tables = tableURLS.convert(pz.File, udf=udfs.url_to_file)
+        # xls = tables.convert(pz.XLSFile, udf = udfs.file_to_xls)
+        # patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+        # output = patient_tables
 
     elif experiment == 'filtering':
         xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)       
-        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         # patient_tables = patient_tables.filter("The table explains the meaning of attributes")
         # patient_tables = patient_tables.filter("The table contains patient biometric data")
@@ -118,13 +122,13 @@ if __name__ == "__main__":
 
     elif experiment == 'matching':
         xls = pz.Dataset('biofabric-matching', schema=pz.XLSFile)
-        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
         output = case_data
     
     elif experiment == "endtoend":
         xls = pz.Dataset('biofabric-tiny', schema=pz.XLSFile)
-        patient_tables = xls.convert(pz.Table, desc="All tables in the file", cardinality="oneToMany")
+        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(CaseData, desc="The patient data in the table",cardinality="oneToMany")
         output = case_data        

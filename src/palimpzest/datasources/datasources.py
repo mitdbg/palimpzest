@@ -1,3 +1,4 @@
+from bs4 import BeautifulSoup
 from palimpzest.constants import Cardinality
 from palimpzest.corelib import File, Number, Schema
 from palimpzest.elements import DataRecord
@@ -7,7 +8,7 @@ import os
 import sys
 
 from palimpzest import constants
-from palimpzest.corelib.schemas import ImageFile, PDFFile, TextFile, XLSFile
+from palimpzest.corelib.schemas import ImageFile, PDFFile, TextFile, XLSFile, WebPage
 
 from palimpzest.tools.pdfparser import get_text_from_pdf
 from papermage import Document
@@ -133,6 +134,42 @@ class TextFileDirectorySource(DirectorySource):
             dr.contents = f.read()
         return dr
 
+class HTMLFileDirectorySource(DirectorySource):
+    def __init__(self, path: str, dataset_id: str) -> None:
+        super().__init__(path=path, dataset_id=dataset_id, schema=WebPage)
+        assert all([filename.endswith(tuple(constants.HTML_EXTENSIONS)) for filename in self.filepaths])
+
+    def html_to_text_with_links(self, html):
+        # Parse the HTML content
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # Find all hyperlink tags
+        for a in soup.find_all('a'):
+            # Check if the hyperlink tag has an 'href' attribute
+            if a.has_attr('href'):
+                # Replace the hyperlink with its text and URL in parentheses
+                a.replace_with(f"{a.text} ({a['href']})")
+        
+        # Extract text from the modified HTML
+        text = soup.get_text(separator='\n', strip=True)        
+        return text
+
+    def getItem(self, idx: int):
+        filepath = self.filepaths[idx]
+        dr = DataRecord(self.schema, scan_idx=idx)
+        dr.filename = os.path.basename(filepath)
+        with open(filepath, "r") as f:
+            textcontent = f.read()
+
+        html = textcontent
+        tokens = html.split()[:constants.MAX_HTML_ROWS]
+        dr.html = " ".join(tokens)
+
+        strippedHtml = self.html_to_text_with_links(textcontent)
+        tokens = strippedHtml.split()[:constants.MAX_HTML_ROWS]
+        dr.text = " ".join(tokens)
+
+        return dr
 
 class ImageFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
@@ -188,7 +225,7 @@ class PDFFileDirectorySource(DirectorySource):
         dr = DataRecord(self.schema, scan_idx=idx)
         dr.filename = pdf_filename
         dr.contents = pdf_bytes
-        dr.text_contents = text_content[:10000]  # TODO Very hacky
+        dr.text_contents = text_content[:15000]  # TODO Very hacky
 
         return dr
 

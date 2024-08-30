@@ -34,12 +34,14 @@ class SchemaMetaclass(type):
 
         return hash(ordered.encode())
 
-    def fieldNames(cls) -> List[str]:
-        """Return a list of the fields in this Schema"""
+    def fieldNames(cls, unique = False, id = "") -> List[str]:
+        """Return a list of the fields in this Schema
+        The unique argument is used to determine if the class name should be prefixed to the field name for unique identification
+        The id argument is used to provide a unique identifier for the class name"""
         attributes = dir(cls)
         attributes = [attr for attr in attributes if not attr.startswith("__")]
-        fields = [attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
-
+        prefix = f"{cls.__name__}{id}." if unique else ""
+        fields = [prefix+attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
         return fields
 
     def getDesc(cls) -> str:
@@ -240,7 +242,7 @@ class Download(Schema):
 class WebPage(Schema):
     """A web page is a URL and the contents of the page."""
 
-    url = StringField(desc="The URL of the web page", required=True)
+    # url = StringField(desc="The URL of the web page", required=True)
     text = StringField(desc="The text contents of the web page", required=True)
     html = StringField(desc="The html contents of the web page", required=True)
     timestamp = StringField(desc="The timestamp of the download", required=True)

@@ -1,4 +1,6 @@
+import palimpzest as pz
 from palimpzest.config import Config
+from pypdf import PdfReader
 
 from fastapi import status
 from typing import List, BinaryIO
@@ -207,24 +209,36 @@ def get_text_from_pdf(filename,
                       pdf_bytes, 
                       enable_file_cache = True, 
                       file_cache_dir = "/tmp"):
+    
+    pdfprocessor = pz.DataDirectory().current_config.get("pdfprocessor")
+
     pdf_filename = filename
     file_name = os.path.basename(pdf_filename)
     file_name_without_extension = os.path.splitext(file_name)[0]
     text_file_name = f"{file_name_without_extension}.txt"
 
-    # Get md5 of the pdf_bytes
-    md5 = get_md5(pdf_bytes)
-    cached_extraction_folder = f"COSMOS_{os.path.splitext(file_name)[0].replace(' ', '_')}_{md5}"
 
-    pz_file_cache_dir = os.path.join(file_cache_dir, cached_extraction_folder)
-    # Check if pz_file_cache_dir exists in the file system
-    if enable_file_cache and os.path.exists(pz_file_cache_dir):
-        print(f"Text file {text_file_name} already exists in system tmp folder {pz_file_cache_dir}, reading from cache")
-        text_file_path = os.path.join(pz_file_cache_dir, text_file_name)
-        with open(text_file_path, 'r') as file:
-            text_content = file.read()
-            return text_content
+    if pdfprocessor == "pypdf":
+        pdf = PdfReader(io.BytesIO(pdf_bytes))
+        all_text = ""
+        for page in pdf.pages:
+            all_text += page.extract_text() + "\n"
+        return all_text
+        # return pdf.pages[0].extract_text() # TODO we can only return first page
+    else:
+        # Get md5 of the pdf_bytes
+        md5 = get_md5(pdf_bytes)
+        cached_extraction_folder = f"COSMOS_{os.path.splitext(file_name)[0].replace(' ', '_')}_{md5}"
+        # Check if pz_file_cache_dir exists in the file system
+        pz_file_cache_dir = os.path.join(file_cache_dir, cached_extraction_folder)
+        if enable_file_cache and os.path.exists(pz_file_cache_dir):
+            print(f"Text file {text_file_name} already exists in system tmp folder {pz_file_cache_dir}, reading from cache")
+            text_file_path = os.path.join(pz_file_cache_dir, text_file_name)
+            with open(text_file_path, 'r') as file:
+                text_content = file.read()
+                return text_content
 
+ 
     #
     # CHUNWEI: This code has a bug
     # It checks to see if the text file name is in the registry, but there are two things wrong here.
@@ -238,19 +252,19 @@ def get_text_from_pdf(filename,
 #        with open(text_file_path, 'r') as file:
 #            text_content = file.read()
 #            return text_content
-    cosmos_file_dir = file_name_without_extension.replace(' ', '_')
-    # get a tmp of the system temp directory
+        cosmos_file_dir = file_name_without_extension.replace(' ', '_')
+        # get a tmp of the system temp directory
 
-    print(f"Processing {file_name} through COSMOS")
-    # Call the cosmos_client function
-    cosmos_client(file_name, pdf_bytes, file_cache_dir)
-    text_file_path = os.path.join(pz_file_cache_dir, text_file_name)
-    if not os.path.exists(text_file_path):
-        raise FileNotFoundError(f"Text file {text_file_name} not found in {pz_file_cache_dir}/{text_file_name}")
-    # DataDirectory().registerLocalFile(text_file_path, text_file_name)
-    with open(text_file_path, 'r') as file:
-        text_content = file.read()
-        return text_content
+        print(f"Processing {file_name} through COSMOS")
+        # Call the cosmos_client function
+        cosmos_client(file_name, pdf_bytes, file_cache_dir)
+        text_file_path = os.path.join(pz_file_cache_dir, text_file_name)
+        if not os.path.exists(text_file_path):
+            raise FileNotFoundError(f"Text file {text_file_name} not found in {pz_file_cache_dir}/{text_file_name}")
+        # DataDirectory().registerLocalFile(text_file_path, text_file_name)
+        with open(text_file_path, 'r') as file:
+            text_content = file.read()
+            return text_content
 
 
 

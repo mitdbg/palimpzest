@@ -1,5 +1,5 @@
 from __future__ import annotations
-from palimpzest.constants import OptimizationStrategy
+from palimpzest.constants import OptimizationStrategy, Cardinality
 from palimpzest.cost_model import CostModel
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import DataSource
@@ -209,7 +209,7 @@ class Optimizer:
 
         # compute the fields added by this operation and all fields
         new_fields = set([
-            field for field in op.outputSchema.fieldNames()
+            field for field in op.outputSchema.fieldNames(unique=True, id=uid)
             if (field not in input_group_fields) or (node._udf is not None)
         ])
         all_fields = new_fields.union(input_group_fields)
@@ -281,7 +281,7 @@ class Optimizer:
             # otherwise, make the node depend on all upstream nodes
             node._depends_on = set()
             for upstream_node in dataset_nodes[:node_idx]:
-                node._depends_on.update(upstream_node.schema.fieldNames())
+                node._depends_on.update(upstream_node.schema.fieldNames(unique=True, id=node.universalIdentifier()))
             node._depends_on = list(node._depends_on)
 
         # construct tree of groups

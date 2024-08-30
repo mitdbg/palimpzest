@@ -95,6 +95,7 @@ class Set:
     def universalIdentifier(self):
         """Return a unique identifier for this Set."""
         d = self.serialize()
+        d["depends_on"] = list(d["depends_on"]) # if d["depends_on"] is a set, it will not be hashable
         ordered = json.dumps(d, sort_keys=True)
         result = hashlib.sha256(ordered.encode()).hexdigest()
         return result
