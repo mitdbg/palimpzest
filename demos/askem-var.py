@@ -45,7 +45,7 @@ if __name__ == "__main__":
         # reference, plan, stats = run_workload()
         excerpts = pz.Dataset(dataset, schema=pz.TextFile)
         output = excerpts.convert(Variable, desc="A variable used or introduced in the paper snippet",
-                                  cardinality="oneToMany")
+                                  cardinality=pz.Cardinality.ONE_TO_MANY)
 
         engine = pz.StreamingSequentialExecution
         # policy = pz.MinCost()
@@ -54,7 +54,6 @@ if __name__ == "__main__":
         #                         policy = policy,
         #                         nocache=True,
         #                         verbose=True,
-        #                         allow_sentinels = False,
         #                         allow_code_synth=False,
         #                         allow_token_reduction=False,
         #                         allow_bonded_query=True,
@@ -64,7 +63,6 @@ if __name__ == "__main__":
             policy=policy,
             nocache=True,
             verbose=True,
-            allow_sentinels=False,
             allow_code_synth=False,
             allow_token_reduction=False,
             allow_bonded_query=True,

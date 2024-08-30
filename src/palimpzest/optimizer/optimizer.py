@@ -190,7 +190,7 @@ class Optimizer:
             op = ConvertScan(
                 inputSchema=inputSchema,
                 outputSchema=outputSchema,
-                cardinality=Cardinality(node._cardinality),
+                cardinality=node._cardinality,
                 udf=node._udf,
                 image_conversion=node._image_conversion,
                 depends_on=node._depends_on,

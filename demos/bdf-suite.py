@@ -72,8 +72,8 @@ class CaseData(pz.Schema):
 def extract_supplemental(engine, policy):
     papers = pz.Dataset("biofabric-pdf", schema=ScientificPaper)
     paperURLs = papers.convert(pz.URL, desc="The DOI url of the paper") 
-    htmlDOI = paperURLs.map(pz.DownloadHTMLFunction())
-    tableURLS = htmlDOI.convert(pz.URL, desc="The URLs of the XLS tables from the page", cardinality="oneToMany")
+    htmlDOI = paperURLs.convert(pz.File, udf=udfs.url_to_file)
+    tableURLS = htmlDOI.convert(pz.URL, desc="The URLs of the XLS tables from the page", cardinality=pz.Cardinality.ONE_TO_MANY)
     # urlFile = pz.Dataset("biofabric-urls", schema=pz.TextFile)
     # tableURLS = urlFile.convert(pz.URL, desc="The URLs of the tables")
     tables = tableURLS.convert(pz.File, udf=udfs.url_to_file)
@@ -130,7 +130,6 @@ def extract_references(engine, policy):
     iterable  =  pz.Execute(output,
                             policy = policy,
                             nocache=True,
-                            allow_sentinels = False,
                             allow_code_synth=False,
                             allow_token_reduction=False,
                             execution_engine=engine)
@@ -162,7 +161,7 @@ if run_pz:
     # reference, plan, stats = run_workload()
     papers = pz.Dataset(dataset, schema=ScientificPaper)
     papers = papers.filter("The paper mentions phosphorylation of Exo1")
-    output = papers.convert(Reference, desc="The references cited in the paper", cardinality="oneToMany")
+    output = papers.convert(Reference, desc="The references cited in the paper", cardinality=pz.Cardinality.ONE_TO_MANY)
 
     # output = references
     # engine = pz.NoSentinelExecution
@@ -172,7 +171,6 @@ if run_pz:
     iterable  =  pz.Execute(output,
                             policy = policy,
                             nocache=True,
-                            allow_sentinels = False,
                             allow_code_synth=False,
                             allow_token_reduction=False,
                             execution_engine=engine)

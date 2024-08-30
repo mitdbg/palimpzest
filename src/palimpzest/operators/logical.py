@@ -21,7 +21,6 @@ class LogicalOperator:
     - FilteredScan (scans input Set and applies filter)
     - ConvertScan (scans input Set and converts it to new Schema)
     - LimitScan (scans up to N records from a Set)
-    - MapScan (scans input Set and applies a function)
     - GroupByAggregate (applies a group by on the Set)
     - Aggregate (applies an aggregation on the Set)
 

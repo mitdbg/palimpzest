@@ -43,7 +43,7 @@ class Reference(pz.Schema):
 def run_workload():
     papers = pz.Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
     # papers = papers.filter("The paper mentions phosphorylation of Exo1")
-    references = papers.convert(Reference, desc="A paper cited in the reference section", cardinality="oneToMany")
+    references = papers.convert(Reference, desc="A paper cited in the reference section", cardinality=pz.Cardinality.ONE_TO_MANY)
 
     output = references
     # engine = pz.NoSentinelExecution
@@ -52,7 +52,6 @@ def run_workload():
     iterable  =  pz.Execute(output,
                             policy = policy,
                             nocache=True,
-                            allow_sentinels = False,
                             allow_code_synth=False,
                             allow_token_reduction=False,
                             execution_engine=engine)
@@ -94,7 +93,6 @@ if run_pz:
     iterable  =  pz.Execute(output,
                             policy = policy,
                             nocache=True,
-                            allow_sentinels = False,
                             allow_code_synth=False,
                             allow_token_reduction=False,
                             execution_engine=engine)

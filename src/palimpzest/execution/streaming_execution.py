@@ -31,11 +31,7 @@ class StreamingSequentialExecution(ExecutionEngine):
 
 
     def generate_plan(self, dataset: Set, policy: Policy):
-        dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
-        if os.path.exists(dspy_cache_dir):
-            shutil.rmtree(dspy_cache_dir)
-        cache = self.datadir.getCacheService()
-        cache.rmCache()
+        self.clear_cached_responses_and_examples()
 
         self.set_source_dataset_id(dataset)
         start_time = time.time()
@@ -72,7 +68,7 @@ class StreamingSequentialExecution(ExecutionEngine):
 
         start_time = time.time()
         # Always delete cache
-        if not self.current_scan_idx:
+        if self.current_scan_idx == 0:
             self.generate_plan(dataset, policy)
 
         input_records = self.get_input_records()

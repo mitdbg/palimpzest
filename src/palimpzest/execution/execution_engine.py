@@ -26,7 +26,6 @@ class ExecutionEngine:
             min_plans: Optional[int] = None,
             verbose: bool = False,
             available_models: List[Model] = [],
-            allow_sentinels: bool=True,
             allow_bonded_query: bool=True,
             allow_conventional_query: bool=False,
             allow_model_selection: bool=True,
@@ -50,7 +49,6 @@ class ExecutionEngine:
             self.available_models = getModels(include_vision=True)
         if self.verbose:
             print("Available models: ", self.available_models)
-        self.allow_sentinels = allow_sentinels
         self.allow_bonded_query = allow_bonded_query
         self.allow_conventional_query = allow_conventional_query
         self.allow_model_selection = allow_model_selection
