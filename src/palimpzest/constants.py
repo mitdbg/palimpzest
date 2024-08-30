@@ -74,6 +74,7 @@ class PickOutputStrategy(str, Enum):
 
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
 PDF_EXTENSIONS = [".pdf"]
+CSV_EXTENSIONS = [".csv", ".tsv"]
 XLS_EXTENSIONS = [".xls", ".xlsx"]
 HTML_EXTENSIONS = [".html", ".htm"]
 
@@ -90,6 +91,8 @@ RETRY_MAX_ATTEMPTS = 1
 
 # maximum number of rows to display in a table
 MAX_ROWS = 5
+# maximum number of rows to parse from a CSV
+MAX_CSV_ROWS = 10
 
 # maximum number of rows to parse from an HTML
 MAX_HTML_ROWS = 10000

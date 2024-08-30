@@ -24,7 +24,7 @@ if not os.environ.get("OPENAI_API_KEY"):
 #         "output_schema": email_schema,
 #         "input_schema": File,
 #         "model": pz.Model.GPT_4o_MINI,
-#         "cardinality": "oneToOne",
+#         "cardinality": pz.Cardinality.ONE_TO_MANY,
 #     }
 
 #     # simpleConvert = pz.Convert(**params)

@@ -1,3 +1,4 @@
+
 import os
 import pickle
 from threading import Lock
@@ -161,7 +162,9 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
                 )
             elif all([f.endswith(tuple(constants.XLS_EXTENSIONS)) for f in os.listdir(rock)]):
                 return XLSFileDirectorySource(rock, dataset_id)
-            elif all([f.endswith(tuple(constants.HTML_EXTENSIONS)) for f in os.listdir(rock)]):
+            elif all([ f.endswith(tuple(constants.CSV_EXTENSIONS))
+                        for f in os.listdir(rock)]):
+                return CSVFileDirectorySource(rock, dataset_id)
                 return HTMLFileDirectorySource(rock, dataset_id)
             else:
                 return TextFileDirectorySource(rock, dataset_id)
