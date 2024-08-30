@@ -28,7 +28,8 @@ class StreamingSequentialExecution(ExecutionEngine):
         self.current_scan_idx = 0
         self.plan = None
         self.plan_stats = None
-
+        self.plan_generated = False
+        self.records_count = 0
 
     def generate_plan(self, dataset: Set, policy: Policy):
         self.clear_cached_responses_and_examples()
@@ -56,9 +57,12 @@ class StreamingSequentialExecution(ExecutionEngine):
         self.plan = plans[0]
         self.plan_stats = PlanStats(plan_id=self.plan.plan_id)
         for op in self.plan.operators:
+            if isinstance(op, AggregateOp):
+                raise Exception("You cannot have a Streaming Execution if there is an Aggregation Operator")
             op_id = op.get_op_id()
             self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) 
         print("Time for planning: ", time.time() - start_time)
+        self.plan_generated = True
         return self.plan
 
     def execute(self,
@@ -68,7 +72,7 @@ class StreamingSequentialExecution(ExecutionEngine):
 
         start_time = time.time()
         # Always delete cache
-        if self.current_scan_idx == 0:
+        if not self.plan_generated:
             self.generate_plan(dataset, policy)
 
         input_records = self.get_input_records()
@@ -126,10 +130,11 @@ class StreamingSequentialExecution(ExecutionEngine):
                 continue
             # only invoke aggregate operator(s) once there are no more source records and all
             # upstream operators' processing queues are empty
-            elif isinstance(operator, AggregateOp):
-                output_records, record_op_stats_lst = operator(candidates=input_records)
+            # elif isinstance(operator, AggregateOp):
+                # output_records, record_op_stats_lst = operator(candidates=input_records)
             elif isinstance(operator, LimitScanOp):
-                output_records = input_records[:operator.limit]
+                if len(self.records_count) >= operator.limit:
+                    break
             else:
                 for r in input_records:
                     record_out, stats = operator(r)
@@ -148,5 +153,6 @@ class StreamingSequentialExecution(ExecutionEngine):
                 plan_id=plan.plan_id,
             )
             input_records = output_records
+            self.records_count += len(output_records)
 
         return output_records

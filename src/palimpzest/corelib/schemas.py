@@ -34,12 +34,13 @@ class SchemaMetaclass(type):
 
         return hash(ordered.encode())
 
-    def fieldNames(cls, unique = False) -> List[str]:
+    def fieldNames(cls, unique = False, id = "") -> List[str]:
         """Return a list of the fields in this Schema
-        The unique argument is used to determine if the class name should be prefixed to the field name for unique identification"""
+        The unique argument is used to determine if the class name should be prefixed to the field name for unique identification
+        The id argument is used to provide a unique identifier for the class name"""
         attributes = dir(cls)
         attributes = [attr for attr in attributes if not attr.startswith("__")]
-        prefix = cls.__name__ if unique else ""
+        prefix = f"{cls.__name__}{id}." if unique else ""
         fields = [prefix+attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
         return fields
 
