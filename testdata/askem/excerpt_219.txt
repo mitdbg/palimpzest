@@ -1,2 +1,0 @@
-id: 219
-text: To examine the possible impact of enhanced interventions on disease infections, we plotted the number of infected individuals (I(t)) and the predicted cumulative number of reported cases with varying quarantine rate q Parameter 𝑞 𝑞 5𝑞 10𝑞 15𝑞 20𝑞 Peak time 19.3 days 15.1 days 12.8 days 11.4 days 10.3 days Value of 𝐼 at peak time 1.63×105 3.76×104 1.98×104 1.38×104 1.08×104 Note that the baseline values are (c, q) = (14.78, 1.8

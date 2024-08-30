@@ -1,2 +1,0 @@
-id: 334
-text: Epidemics naturally exhibit exponential behavior in the early stages of an outbreak, when the number of infections is already substantial but recoveries and deaths are still negligible. If at a given time t there are I (t) infected individuals and α is the rate constant at which they infect others, then at early times (neglecting recovered individuals), I (t) = I0e αt. The time it takes to double the nu

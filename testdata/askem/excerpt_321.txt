@@ -1,2 +1,0 @@
-id: 321
-text: 274 W.C. Roda et al. / Infectious Disease Modelling 5 (2020) 271e281 PðqjDÞ ¼ PðDjqÞPðqÞ PðDÞ Z ¼ PðDjqÞPðqÞ PðDjqÞPðqÞdq f LðqÞPðqÞ ¼ pðqjDÞ; U R where U is the parameter space of q and LðqÞ is the likelihood function. Constant PðDÞ ¼ UPðDjqÞPðqÞdq is used to normalize the posterior distribution PðqjDÞ (Chen, Shao, & Ibrahim, 2000). The unnormalized posterior distribution is given by pðqjDÞ ¼ LðqÞPðqÞ: The Bayesia

@@ -1,2 +1,0 @@
-id: 8
-text: 250 B. Tang et al. / Infectious Disease Modelling 5 (2020) 248e255 cðtÞ ¼ ðc0 (cid:2) cb Þe (cid:2)r1t þ cb ; where c0 is the contact rate at the initial time (i.e. January 23rd, 2020), cb is the minimum contact rate under the current control strategies, and r1 is the exponential decreasing rate of the contact rate. Definitely, there are cð0Þ ¼ c0 and lim t/∞ < c0. This is basically to assume the contacts are decreasing and the change rate per conta

@@ -1,2 +1,0 @@
-id: 276
-text: vidual leaves the exposed class by becoming infec- tious (symptomatic, super-spreaders or asymptomatic); ρ 1 is the proportion of progression from exposed class E to symptomatic in- fectious class I; ρ 2is a relative very low rate at which exposed individuals become super-spreaders while 1− ρ1− ρ2is the progression from exposed to asymptomatic class; γ a is the average rate at which symptomatic and super-spreaders individuals become hos- i is the recovery rate without being hospitalized; γ r is pitalized; γ the recovery rate of hospitalized pati

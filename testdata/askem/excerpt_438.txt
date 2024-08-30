@@ -1,2 +1,0 @@
-id: 438
-text: -ϵPZ)ω1 ω2,AZ AZ V1 AZ V2 σW βX S X β AD ID IA IW V and IW Figure 1. Panel (A), schematic diagram for a simplified version of the SV2(AIR)3 model, representing only one R, symptomatic infected class;  AW and AW R,asymptomatic infected class; RW and RF recovered class. Arrows denote the movement from one class to another, via infection (red arrows), vaccination (blue arrows), recovery, or loss of immunity. Rates are indicated on the arro

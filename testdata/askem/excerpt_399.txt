@@ -1,2 +1,0 @@
-id: 399
-text: Parameter estimation The parameters are estimated in order to match the total number of cases C and deceased D obtained from the model with the available data for each country, herein termed Creal andDreal, respectively. The cumulative number of infected individuals C at time t is obtained as follows: Z t CðtÞ ¼ krEðtÞ dt; 0 ð11Þ where the integrand is the positive part of _I in (1), which represents t

@@ -1,2 +1,0 @@
-id: 178
-text: en in Table 1. The model culminates to a six-dimensional system of ordinary differential equations as follows. Fig. 1 SEIR-P model of COVID-19 transmission. Depicting a human (SEIR, yellow shade) and pathogen (P, green shade) compartmental model 

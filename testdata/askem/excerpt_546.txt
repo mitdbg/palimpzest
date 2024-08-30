@@ -1,2 +1,0 @@
-id: 546
-text: reak in Italy if, after day 22, social-distancing countermeasures had been: absent (panels a and b), mild (panels c and d), strong (panels e and f) and very strong (panels g and h). In all cases, the actual Case Fatality Rate is around 7.2%, while the perceived CFR is around 9.0%. Panels (a), (c), (e), (g) show the difference between the actual (real cases) and the perceived (diagnosed cases) evolution of the epidemics, while panels (b), (d), (f), (h) distinguish between the 

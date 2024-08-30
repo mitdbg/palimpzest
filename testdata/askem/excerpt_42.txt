@@ -1,2 +1,0 @@
-id: 42
-text: es 0.1% total prevalence (10,000 individuals infected out of a population of 10,000,000, at which point a shielding strategy is implemented). Outbreak scenarios differ in transmission rates, with and 2.33 in the low-transmission and high-transmission scenarios, respectively. Early estimates of from Wuhan are consistent with a 95% confidence interval (CI) of between 2.1 and 4.5 (ref. 30), putting our h

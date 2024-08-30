@@ -1,2 +1,0 @@
-id: 446
-text: ctions. In contrast, the spread of Alpha or Delta has no effect on wild-type. That is because by the time either Alpha or Delta became rampant, the number of new wild-type cases has become negligible. βW R (natural immunity against the wild-type strain, acquired from a Alpha or Delta infection) has essentially no effect because during the spread of the wild-type virus, no one has recovered from a different variant. In contrast, lowering the natural immunity acquired from recovery from a dif

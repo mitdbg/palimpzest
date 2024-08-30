@@ -1,2 +1,0 @@
-id: 75
-text: β 8, respectively. The hospitalization cases re- quire medical infrastructure, which is limited. It varies from coun- try to country, but is always less than the total population. In each simulation, a critical limitβ 11is considered, it represents the per- centage of the population that the healthcare system is capable to handle simultaneously. As a consequence, if the number of hospi- talizations and severe cases increase above this limit, there are no beds in hospitals to manage the demand. 

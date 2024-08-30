@@ -1,2 +1,0 @@
-id: 435
-text: ty of model predictions to variations in key model parameters. We first conduct a sensitivity analysis in a simplified model that represents only the wild-type SARS-CoV-2, for the year 2020, but with infectivity βW elevated Scientific Reports | (2022) 12:2114 | https://doi.org/10.1038/s41598-022-06159-x 2 Vol:.(1234567890)www.nature.com/scientificreports/

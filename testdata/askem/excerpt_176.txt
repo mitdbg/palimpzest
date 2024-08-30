@@ -1,2 +1,0 @@
-id: 176
-text: R) compartmental mathematical model for prediction of COVID-19 epidemic dynamics incorporating pathogen in the environment and interventions. The next generation matrix approach was used to determine the basic reproduction numberR0. The model equations are solved numerically using fourth and fifth order Runge–Kutta methods. Results: We found an R0 of 2.03, implying that the pandemic will persist in the human population in the a

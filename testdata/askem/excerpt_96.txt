@@ -1,2 +1,0 @@
-id: 96
-text: t IL ← 0.5 is not enough for effective epidemiological control, and a level of isolation greater than that is recommended. The impact of different isolation levels can be seen in Figs. 10 and 11, for IL∈[0.3, 0.9], which represents the response of epi- demiological and economical curves for increasing IL. In Fig. 10 it is possible to see how the infection curve I t flattens as the isolation level increases from no isolation towards lockdown. Fig. 11 shows that as the value of IL increases, wealth los

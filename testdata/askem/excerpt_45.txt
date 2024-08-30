@@ -1,2 +1,0 @@
-id: 45
-text:  given that control measures reduce transmission19, our low-transmission sce (95% CI, 1.14–1.63) nario is consistent with estimates of in China from 24 January to 3 February after travel restrictions R0 ¼ I 1:362:38 and other measures were implemented. Figure 3 shows the results of comparing shielding interventions to the baseline outbreak. As in the simple SIR model, shielding on its own could potentially d

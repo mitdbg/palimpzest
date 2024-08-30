@@ -1,2 +1,0 @@
-id: 110
-text: s (Fig. 2A). This is visualized in SI Appendix, Fig. S15. To understand the impact of the assumption of linearity used when creating these scenarios, we compared the median number of infections under q pessimistic scenarios against the q quantile of median infections, drawing parameters from the prior (SI Appendix, section 3.B), for varying q. We found strong agreement (SI Appendix, Fig. S16), suggesting that the linearity assumption had little impact on the leve

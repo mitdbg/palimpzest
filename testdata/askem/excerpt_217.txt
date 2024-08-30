@@ -1,2 +1,0 @@
-id: 217
-text: es Likelihood-based estimation of Rc during the outbreak in Wuhan gives a mean value of 6.39 with mean and variance of generation time of 6 and 2 days on the basis of a revised data series (dataRev1).The reproduction number based on likelihood-based estimation ranges from 1.66 to 10 and it follows from Table 2 that Rc is sensitive to changes in mean generation intervals. Fitting to the other revised data series (dataRev2) gives a mean value of 6.32 with mean and variance of gener

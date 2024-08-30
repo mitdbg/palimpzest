@@ -1,2 +1,0 @@
-id: 529
-text: We observe that, therefore, we are well justified to define the basic, which proves the result. 1=G 0 ð Þ ¼ reproduction parameter α R0 : δ ηε= r2r4 ð ð r1 and stability of the equilibrium occurs for (cid:31)SR0 < 1. βε=r2 þ γζ=r3 þ 1 S* ¼ þ ¼ ζθ= r3r4 ð Þ Þ Þ þ. I (Notice also that R0 = G(0) is the H∞ norm of the transfer function G(s).) QED The threshold (cid:31)S* I is of fundamental importance. Because, asy

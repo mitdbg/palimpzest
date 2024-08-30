@@ -1,2 +1,0 @@
-id: 531
-text: on, the parameters have been updated based on the successive measures, of increasing strength, adopted by policymakers. In particular, the fraction of the population in each stage at day 1 is set as: I = 200/60e6, D = 20/60e6, A = 1/60e6, R = 2/60e6, T = 0, H = 0, E = 0; S = 1 – I – D – A – R – T – H – E. The parameters are set as α = 0.570, β = δ = 0.011, γ = 0.456, ε = 0.171, θ = 0.371, ζ = η = 0.125, μ = 0.017, ν = 0.027, τ = 0.01

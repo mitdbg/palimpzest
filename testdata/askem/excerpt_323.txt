@@ -1,2 +1,0 @@
-id: 323
-text: transfer diagrams for both models are shown in Fig. 1. The biological meaning of all model parameters are given in Table 1 and Table 2. A key assumption in both models is that deaths occurring in the S, E, and I compartments are negligible during the period of model predictions. (4 months). Since we use the newly confirmed case data for model calibration, which is matched to the rI term in both models, the death term in t

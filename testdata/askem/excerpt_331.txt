@@ -1,2 +1,0 @@
-id: 331
-text: ries. The goal of these measures was to reduce transmissions within family clusters and residential compounds. These measures have a direct impact on two parameters in our SIR model (2): reducing the transmission rate b and increasing the diagnosis rate r: It is difficult to estimate the exact impacts on these parameters by these measures. We incorporated several likely scenarios of the effects of these measures by adjusting our baseline estimates of 

@@ -1,2 +1,0 @@
-id: 484
-text: st by the Coriolis force, and eventually reenters the domain at the eastern boundary. Our model domain follows the schematic in Fig. 1. The horizontal widths Ly and Lx are both set to 5 km, while the depth of the ice shelf front Lz is set equal to 400 m (approximately consistent with Pine Island Glacier; see Jenkins et al. 2010). The domain is reentrant in the zonal x direction; free-slip and nonormal-flow conditions apply at the other boundaries. We use 512 grid cells in each horizontal direction a

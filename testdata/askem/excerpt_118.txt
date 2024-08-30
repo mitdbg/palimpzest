@@ -1,2 +1,0 @@
-id: 118
-text: (y (cid:3))), that is, the probability under the prior of seeing a parameter configuration whose outcomes (under the linear model) are no worse than those in A(y). We refer to this probability as the "pessimism level." It ranges from zero to one, with larger values corresponding to representative parameter configurations that are more pessimistic. For details, see SI Appendix, section 3.A. Retrospective Parameter Estimation and Model Calibra

@@ -1,2 +1,0 @@
-id: 298
-text:  J.J. Nieto et al. / Chaos, Solitons and Fractals 135 (2020) 109846 Table 2 Sensitivity of R 0 evaluated for the parameter values given in Table 1. Parameter Sensitivity index β l β (cid:3) κ ρ 1 ρ 2 γ a 0.418 −0.061 −0.395 −0.699 −0.027 −0.238 Theorem 1. The disease free equilibrium of system (1), that is, ( N, 0, 0 < 1 and unstable 0, 0, 0, 0, 0, 0), is locally asymptotically stable if R if R 0 > 1. Next

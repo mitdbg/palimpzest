@@ -1,2 +1,0 @@
-id: 281
-text: 135 (2020) 109846 3 Table 1 Values of the model parameters corresponding to the situation of Wuhan, as discussed in Section 5, for which R 0 = 0. 945. Name Description β l β (cid:3) κ ρ 1 ρ 2 γ a γ i γ r Recovery rate of hospitalized patients 0.5 3.5 1 0.3 Units day −1 dimensionless day −1 day −1 dimensionless dimensionless day −1 day −1 day −1 day −1 day −1 day −1 The basic reproduction number R 0 is obtained as the spectral radius of F · V 

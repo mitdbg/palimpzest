@@ -1,2 +1,0 @@
-id: 272
-text: - als. Moreover, we consider a fatality compartment, related to death due to the virus infection. In doing so, the constant total popula- tion size N is subdivided into eight epidemiological classes: susceptible class ( S ), exposed class ( E ), symptomatic and infectious class ( I ), super-spreaders class ( P ), infectious but asymptomatic class ( A ), hospitalized ( H ), recovery class ( R ), and fatality class ( F ).

@@ -1,2 +1,0 @@
-id: 165
-text: interventions that are dynamically "triggered" based on the current or past state of the simulation. 2.5.1 Physical distancing, masks, and hygiene. The most basic intervention in Covasim is to reduce transmissibility (β) starting on a given day. This can be used to reflect both (a) reductions in transmissibility per contact, such as through mask wearing, personal protective equipment, hand-washing, and maintaining ph

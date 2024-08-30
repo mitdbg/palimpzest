@@ -1,2 +1,0 @@
-id: 63
-text: d standard deviation σ. k ) The simulation is performed in a squared bi-dimensional envi- ronment shared by all types of agents. Ai agents, i ∈ {2, 3, 4, 5}, The number of A 1 agents is controlled by the variable popula- tion size, that is| A 1 |=α3. The number of houses ( A 2 agents) is 

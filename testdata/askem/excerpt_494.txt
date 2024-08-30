@@ -1,2 +1,0 @@
-id: 494
-text: rce on the dynamics (e.g., strengthening the jet in Fig. 3), but it is unclear to what extent this would affect the meltwater settling depth; we leave this as a question for future work. Defining the buoyancy source volume as Vb, we can write ð dV db dt source 5 F, Vb (B2) d dz (Dw2) 5 D g r 0 (r a 2 r). (A4) where db/dtsource refers only to the term within the full buoyancy conservation equation that comes from the external

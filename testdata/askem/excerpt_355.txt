@@ -1,2 +1,0 @@
-id: 355
-text: rol and Prevention playing a coordinating role and offering guidance (49). Nationally, policy Fig. 3. Scenarios for the impact of short-term social distancing: fraction of population vs. date. (Left) California SIR model based on mortality data with parameters from Table 1 (R0 = 2.7, γ =.12, I0 =.1) under two scenarios: R0 constant in time (light blue) and R0 cut in half from 27 March (1 wk from the start of the California shutdown) to 5 May but then returned to its original value, to r

@@ -1,2 +1,0 @@
-id: 472
-text: elves, as it is a consequence of a typical sub-iceshelf circulation (e.g., Grosfeld et al. 1997; Losch 2008). We investigate the dynamics of such a meltwater outflow by idealizing it as a prescribed, constant buoyancy source F, with width L, applied to the bottom of our model domain. In the real world, this buoyancy source is a function of complex melting and mixing processes beneath the ice shelf cavity; explicit consider

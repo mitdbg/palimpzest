@@ -1,2 +1,0 @@
-id: 142
-text: d ensures close data fit. We next discuss three key characteristics of the DELPHI model that allow it to flexibly fit a wide range of time-series of observed data. by using the auxiliary compartments UR, UD (for undetected patients), DHR, DHD (for the hospitalized), and DQR, DQD (for detected patients), which were described earlier. Figure 1, (b) and (c), explains how this is achieved. In Figure 1(b), the outflow from the I compartment is 2.1. Accounting for Underdetection Only a subset of the SARS-

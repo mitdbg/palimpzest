@@ -1,2 +1,0 @@
-id: 127
-text:  pandemic (before July the model assumed (cid:1)c (cid:2) 0). The 2 π constant normalizes the arctan function. For example, before July 2020, during the first wave, (cid:1)c (cid:2) 0 (no resurgence),γ(t) had range [0, 2], and γ(t) (cid:2) 1 when t (cid:2) t0. • rd is the detection rate. This equals to log 2 Td, where Td is the median time to detection (fixed to be 2 days); see Wang et al. (2020). • β is the rate of inf

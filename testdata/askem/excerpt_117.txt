@@ -1,2 +1,0 @@
-id: 117
-text: uring any interaction. The contact matrix is estimated using prepandemic measurements of age-based socialization patterns. The probability of transmission is calibrated to match external estimates of R0 (2.5 for the nominal scenario). Transmission is modeled as stochastic, and the number of new infections in each group has a Poisson distribution with a mean determined by the product of the contact matrix and the transmission proba

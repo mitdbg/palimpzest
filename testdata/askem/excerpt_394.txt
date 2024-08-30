@@ -1,2 +1,0 @@
-id: 394
-text: ð3Þ This nonlinear dynamic may have equilibrium points, i.e., points xeq such that f(xeq) = 0. Particularly interesting is the so-called disease-free equilibrium point in Definition 1. Definition 1 A disease-free equilibrium point (DFE) �x is an equilibrium point of the dynamic(3) such that �x1 ¼ S ¼ N and �xi ¼ 0, i > 1. It is easy to verify that (1) has a DFE. Fig 1. Block diagram representation of the model (1). https://doi.org/10.1371/journal.pone.0236386.g001 PLOS ONE 

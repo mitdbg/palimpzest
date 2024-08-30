@@ -1,2 +1,0 @@
-id: 497
-text: : its value is 28C at y 5 0 m and 18C at y 5 160 m. For clarity, in the buoyancy source region: dT dt 5 (other terms) 1 l[Tr(y) 2 T], (C1) 21. This experiment is conducted twice, once where l 5 1/20 s21 24 s f 5 21.4 3 10(no rotation). We then conduct an additional set of simulations using a constant buoyancy source, which is set to approximately yield the same settling depth. Figure 9 shows the vertical distribution 

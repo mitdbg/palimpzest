@@ -1,2 +1,0 @@
-id: 470
-text: ses was first developed by Morton et al. (1956). For plumes originating from a point source, far from any walls, this theory has yielded robust scaling laws for the plume's rise height in terms of thebuoyancy source F and the ambient stratification N. These scaling laws have been repeatedly confirmed in laboratory and experimental work (Turner 1986; Helfrich and Battisti (1) (2) 1991; Speer and Marshall 1995; Fabr

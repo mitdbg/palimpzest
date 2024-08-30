@@ -1,2 +1,0 @@
-id: 554
-text: Extended Data Fig. 9 | Sensitivity analysis with respect to θ. Sensitivity analysis showing the effect of varying the testing coefficient θ, whose nominal value is θ = 0.3705, after day 50. We multiply the nominal value of θ by 0.5, 0.8, 1, 1.2, 2, and show the corresponding evolution of the model variables. Panel (a) shows the variation in the total number of cases, pane

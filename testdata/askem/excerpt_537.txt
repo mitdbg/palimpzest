@@ -1,2 +1,0 @@
-id: 537
-text: . Distinguishing between diagnosed and not diagnosed cases allows us to highlight the perceived distortion in disease statistics, such as the number of infected individuals, the transmission rate and the CFR (the ratio between the number of deaths ascribed to the infection and the number of diagnosed cases). The discrepancy between the actual CFR (total number of deaths due to the infection, divided by the total number of people who have been infected) and the perceived CFR (number of deaths ascribed to

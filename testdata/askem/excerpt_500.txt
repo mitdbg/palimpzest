@@ -1,2 +1,0 @@
-id: 500
-text: a temperature Tr(y), which is set following a linear gradient: its value is 28C at y 5 0 m and 18C at y 5 160 m. For clarity, in the buoyancy source region: dT dt 5 (other terms) 1 l[Tr(y) 2 T], (C1) 21 l 5 1/20 s21 (realistic rotation) and once with f 5 0 24 s with f 5 21.4 3 10 (no rotation). We then conduct an additional set of simulations using a constant buoyancy source, which is set to approximately yiel

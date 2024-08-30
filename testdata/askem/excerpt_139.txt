@@ -1,2 +1,0 @@
-id: 139
-text: casionally lead to overfitting issues (see, e.g., Lourenc¸o et al. 2020). In sensitivity analyses (Section 3.3), we show that predictions of detected cases and deaths are robust to moderate deviations(cid:2) 20%. pdtion probability as functions of observable data, such as the number of tests that were administered over time in a country, but this did not improve the out-ofsample empirical performance of the mode

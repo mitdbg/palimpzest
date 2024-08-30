@@ -1,2 +1,0 @@
-id: 404
-text: 0.050 0.036 0.302 0.003 0.002 2.47 0.91 USA 51 0.303 0.130 0.851 0.851 4.090 0.820 1.330 1.010 0.055 0.296 0.018 0.828 0.00029 0.023 2.90 1.26 https://doi.org/10.1371/journal.pone.0236386.t003 Fig 2. Cumulative number of infected individuals C and number of deceased individuals D for China. https://doi.org/10.1371/journal.pone.0236386.g002 PLOS ONE | https://doi.org/10.1371/journal.pone.0236386 July 31, 2020 9 / 16 PLOS ONE

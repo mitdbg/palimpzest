@@ -1,2 +1,0 @@
-id: 271
-text: r a fatality compartment, related to death due to the virus infection. In doing so, the constant total popula- tion size N is subdivided into eight epidemiological classes: sus- ceptible class ( S ), exposed class ( E ), symptomatic and infectious class ( I ), super-spreaders class ( P ), infectious but asymptomatic class ( A ), hospitalized ( H ), recovery class ( R ), and fatality class ( F ). The model takes the following form: ⎧ = −β I N S − lβ H = β 

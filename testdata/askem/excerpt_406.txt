@@ -1,2 +1,0 @@
-id: 406
-text: A data-driven model to describe and forecast the dynamics of COVID-19 transmission Fig 5. Cumulative number of infected individuals C and number of deceased individuals D for France. https://doi.org/10.1371/journal.pone.0236386.g005 Fig 6. Cumulative number of infected individuals C and number of deceased individuals D for Germany. https://doi.org/10.1371/journal.pone.0236386.g006 PLOS ONE | https://doi.org/10.1371/journal.pone.0236386 July 31, 2020 11 / 16 PLOS ONE

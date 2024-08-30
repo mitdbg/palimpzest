@@ -1,2 +1,0 @@
-id: 25
-text: 48e255 253 Fig. 3. Best fitting of the model to the data of cumulative confirmed cases between January 23rd and February 1st, 2020: the projected number of infected (A), quarantined infected (B), and cumulative confirmed cases (C).on the level of infectiousness, the reproduction number varied in the range of 1.6e2.9. Finally, assuming that the novel virus would cause more mild-to-moderate cases than the SARS virus, the reproduc

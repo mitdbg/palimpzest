@@ -1,2 +1,0 @@
-id: 130
-text: tion of time (cid:4) ) 1 + 2 + µ − µ π arctan(− (cid:1)rm t) (cid:1)µ(t) (cid:2) ((cid:9)µ 0 min, min (cid:5) where (cid:9)µ 0 is the initial probability of death (at the time min is its minimum, and (cid:1)rm is a daily decay rate for mortality. In most areas, mortality is monotonically decreasing ( (cid:1)rm > 0), reflecting improvements in patient management. A negative decay rate would correspond to a worsening of the probability of deat

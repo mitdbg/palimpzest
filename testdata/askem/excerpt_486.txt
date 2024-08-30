@@ -1,2 +1,0 @@
-id: 486
-text: hward-moving meltwater is deflected to the left by the Coriolis force, a strong zonal jet develops (Fig. 3); centrifugal instability can occur if the resulting anticyclonic vorticity is large enough (z/f, 21; Haine and Marshall 1998), promoting lateral export and mixing of the meltwater. In their two-dimensional simulations, Naveira Garabato et al. (2017), observed over the same timeframe of 1 day that s

@@ -1,2 +1,0 @@
-id: 427
-text: bes the average frequency of contact between a given individual of age i and individuals of age j in setting k. We focus on 4 social settings: the households (H), schools (S), workplaces (W), and the general community (C). Specifically, here we adopt the frequency-dependent (mass action) transmission model, with the implicit assumption that an increased population density has no effect on the per capita contact rate be

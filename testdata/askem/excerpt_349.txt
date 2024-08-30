@@ -1,2 +1,0 @@
-id: 349
-text: y and highlights the need for extensive disease testing within the population to more accurately track the epidemic curve. After the surge in infections, the model asymptotes to an end state in which r approaches the end value r∞ and s approaches 1 − r∞ and the infected population approaches 0. The value r∞ satisfies a well-known transcendental equation (46–48). A phase diagram of the universal solutions for several R0 values 

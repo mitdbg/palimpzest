@@ -1,2 +1,0 @@
-id: 267
-text: onfirmed with some additional tests. If no other special approaches used, (cid:2) is set to 0. Combing two sources of confirmation approaches β ¼ g2 Þ(cid:2) is the total confirmation rate. þ ð1 – g2 δ is the confirmation rate of the un-quarantined infected who can be identified as confirmed infections without being quarantined. We thus set up a set of ODE equations to model the dynamics of an infectious disease and the control by artificial factors (Eq.1). In the model, U goes directly to C, or go through Q indirectly. Act

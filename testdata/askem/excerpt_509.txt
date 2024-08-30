@@ -1,2 +1,0 @@
-id: 509
-text: on-wide testing, to contain SARS-CoV-2. The model parameters have been updated over time to reflect the progressive introduction of increased restrictions. On day 1, the basic reproduction number was R0 = 2.38, which resulted in a substantial outbreak. On day 4, R0 = 1.66 as a result of the introduction of basic social distancing, awareness of the epidemic, hygiene and behavioral recommendations, and early

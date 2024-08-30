@@ -1,2 +1,0 @@
-id: 157
-text: loping symptoms; psev: probability of developing severe symptoms (i.e., sufficient to justify hospitalization); pcri: probability of developing into a critical case (i.e., sufficient to require ICU); pdea: probability of death (i.e., infection fatality ratio). Relative susceptibility values are derived from odds ratios presented in Zhang et al. [47]. Mortality rates are based on O'Driscoll et al. [48] for ages <90 and Brazeau et al. [49] for ages >90. All o

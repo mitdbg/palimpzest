@@ -1,2 +1,0 @@
-id: 492
-text: nstant buoyancy sources may exaggerate the effect of rotation on the settling depth. settling depths is that these one-dimensional parameterizations can only output a single meltwater settling depth [B(z) 5 0]. Meanwhile, observed vertical meltwater distributions can have complex, possibly multimodal shapes. Short of explicitly resolving the small-scale fluid dynamics of the meltwater plume next to and be

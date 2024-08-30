@@ -1,2 +1,0 @@
-id: 208
-text: l SEIR-type epidemiological model, which incorporates appropriate compartments relevant to interventions such as quarantine, isolation and treatment. We stratified the populations as susceptible (S), exposed (E), s such as quarantine, isolation and treatment. We stratified the populations as susceptible (S), exposed (E), infectious but not yet symptomatic (pre-symptomatic) (A), infectious with symptoms (I), hospitalized (

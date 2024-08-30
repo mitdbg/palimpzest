@@ -1,2 +1,0 @@
-id: 547
-text: k of immunity (hence, the possibility of reinfection) after day 50: recovered individuals can become susceptible again, so we add a term +χH(t) in equation (1) and a term −χH(t) in equation (7), where χ represents the rate at which immunity is lost. We show the evolution of the various model variables when χ = 0, χ = 0.1, χ = 0.8. Panel (a) shows the variation in the total number of cases, panel (b) in the number of recovered individuals (green) and deaths (black), panel (c) in the total number of currently infected individua

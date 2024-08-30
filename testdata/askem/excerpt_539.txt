@@ -1,2 +1,0 @@
-id: 539
-text: who need intensive care reaches its peak, almost 16.5% of the population, after 107 days. Extended Data Fig. 1c,d shows that, with social-distancing countermeasures after day 22 having a mild effect, α = 0.285 and γ = 0.171, hence R0 = 1.13, still larger than 1. Hence, the peak is delayed (and reduced in amplitude), because the increase in the number of new infected is reduced. Over a 500-day horizon, as s

@@ -1,2 +1,0 @@
-id: 58
-text: tions are described in Table 1. The model is an iterative procedure, with T representing the number of iterations. The model takes an input parameter set P, listed in Table 2, and produces a response Y t (observable variables), related to epidemiological or economic effects of the pandemic. Its internal state (cid:3)t ( t = 1... T ) consists of the union of the internal states of the agents θ i t, where i = 1... n and n is the number of (cid:2) n i =1 θ i agents, such that (cid:3)t = t.

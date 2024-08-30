@@ -1,2 +1,0 @@
-id: 264
-text: n the dynamics of the epidemic system. The model comprises the following independent parameters: α is the infection rate, the mean number of new infected caused by an un-quarantined infected per day. α∈[0,1Þ.g1 is the quarantine rate for an un-quarantined infected ∈[0,1]. The being quarantined, with the range g1 quarantines can be centralized isolation, self isolation, hospitalization and so on. It is a p

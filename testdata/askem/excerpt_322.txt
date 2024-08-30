@@ -1,2 +1,0 @@
-id: 322
-text: l for the observed count data in our study was assumed to a normal distribution with mean given by rI and variance given by 1= t. There are four parameters to be estimated in the SIR model from data: transmission rate b, diagnosis rate r, the initial population size I0 for the compartment I on January 21, 2019 (t ¼ 0), and the variance q ¼ 1=t for the noise distribution in the Fig. 1. Transfer diagrams for an SIR and an SEIR model for COVID-19 in Wuhan. 

@@ -1,2 +1,0 @@
-id: 29
-text:  proposed dynamics transmission model to the data available until January 29th, 2020 and re-estimated the daily reproduction number, which implies the evolving transmission risk. We observed that the effective daily reproduction ratio has already fallen below 1, therefore while the epidemics will continue to grow, the epidemic will peak soon. Accurately near-casting the epidemic trend and projecting the peak time require real-time information of the data an

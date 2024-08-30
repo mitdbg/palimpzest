@@ -1,2 +1,0 @@
-id: 490
-text: an ''break source is larger (F/L 5 10 22 m3 s Unauthenticated | Downloaded 12/01/23 03:49 PM UTC FIG. 5. The horizontally averaged vertical meltwater distribution after 6 h of simulation, for varying buoyancy source F, varying stratification N, and varying outflow width L. For the case of varying F, we have also estimated a lower bound on the corresponding mass loss due to melt (see text). On top of the distributions we plot the settling depths predicted by the simple

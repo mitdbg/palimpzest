@@ -1,2 +1,0 @@
-id: 28
-text: k to infer time-calibrated phylogeny from 33 available genomic sequences, found that the time of the most recent common ancestor (MRCA) was December 17th, 2019 (95% highest posterior density interval from December 7th, 2019 to December 23rd, 2019) and that the value of the reproduction number oscillated between 1.1 and 1.6. These different findings may be due to several methodological issues, including different assumptions and choice of parameters, utilized models (stochastic versus deterministic, compartmental versus

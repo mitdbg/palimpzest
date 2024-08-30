@@ -1,2 +1,0 @@
-id: 468
-text:  from the variant that they were infected with, but may be infected by a different variant at rate βY R, where Y ≠ X, and βY R, which like IX V are associated with a better survival rate (μX R < μX). Recovered individuals lose their partial immunity and enter SVRat a rate ofηR. Four recovered classes are represented, one for each virus type (RW, RA, RD) and also RF who has recovered from two infections. For simplicity, we assume that RF is fully immune to all three viruses

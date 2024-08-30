@@ -1,2 +1,0 @@
-id: 133
-text: ction for a training period of T days is defined as (cid:3)T (cid:3)T (cid:10) (cid:12) (cid:10) (cid:11) DT(t) − DT(t) 2 · + λ2 · · (cid:13) DD(t) − DD(t) (cid:12) 2, t2 T2 t(cid:2)1 t2 T2 t(cid:2)1 (cid:11) DT(t) and (cid:13) DD(t) are predicted detected cases and deaths, respectively. The factor t2 T2 gives more prominence to more recent data, because recent errors are more likely to propagate into future errors. The (cid:15) (cid:14) lambda factor λ (cid:2) min DT(

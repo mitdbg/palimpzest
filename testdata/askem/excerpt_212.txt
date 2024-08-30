@@ -1,2 +1,0 @@
-id: 212
-text: Sq) at a rate of βcq (or (1 − β)cq). Those who are not quarantined, if infected, will move to the compartment E at a rate of βc(1 − q). The infected individuals can be detected and then isolated at a rate dI artment E at a rate of βc(1−𝑞). The infected individuals can be detected and then isolated at a rate 𝑑𝐼 and can also move to the compartment R due to recovery. The transmission dynamics are governed by t

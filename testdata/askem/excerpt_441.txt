@@ -1,2 +1,0 @@
-id: 441
-text: n the above analysis, we also considered two parameters that mediate VOC interactions: βX R, rate of infection of individuals with partial immunity from having recovered from a different variant, and ηR,rate of loss of immunity due to infection. Some of these parameters have distinct values for each of the variants. Simulations were conducted by varying each of the parameter values for individual variants separately. Specifically, βX (X = W

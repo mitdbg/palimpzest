@@ -1,2 +1,0 @@
-id: 92
-text: n be used to assess the impacts of the different interventions in the economy. For comparison among scenarios, the increase in wealth, (cid:10)W i S, for the group of agents, i ∈ { A 1, A 3, A 4}, in scenario S is computed as follows: W i (11) (cid:10)W i S = S,T − W i B,T W i B,T where W i ulation time step, T, of B. B,T is the wealth of the group of agents, i, at the final sim- In the following section, t

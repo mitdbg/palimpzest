@@ -1,2 +1,0 @@
-id: 185
-text: se IA = IS = P = 0, which implies that E = 0 and R = 0 too. Hence we have: (1) 0 = b − µS =⇒ S = b µ. (2) Therefore DFE is given by (cid:31), 0, 0, 0, 0, 0 b µ (cid:30). The basic reproduction number The basic reproduction number, usually denoted as R0defines the average number of secondary infections caused by an individual in an entirely susceptible population. This number indicates whether the infection will spread through the population or not. The next generation matrix approach is used to obtain R0. Let x = (E, IA, IS, P)T then the model can be written 

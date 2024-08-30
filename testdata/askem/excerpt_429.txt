@@ -1,2 +1,0 @@
-id: 429
-text:  population, the level of introduced uncertainty becomes comparable with the one for diary-based contact studies (see Supplementary Information). The average number of contacts. The average number of contacts 〈c〉 can be computed as hci ¼ 1 N X X N i Mij i j where N = ∑ Therefore, iNi is the total number of individuals in the population. hci ¼ ¼ ¼ ¼ ¼ ¼ X X X 1 N 1 N 1 N i X i X Ni Ni ω k k X 1 N X ω k X k ω k

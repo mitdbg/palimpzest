@@ -1,2 +1,0 @@
-id: 195
-text: µ + σ + γA. The reproduction number, R0, is the spectral radius of the product which is given by; FV−1 C2 = µ + σ + γS Page 4 of 5 (6) R0 = Rh 0 + (cid:31)(cid:30)Rh 0(cid:29) 2 2 + 4Rp 0 Notice that the basic reproduction numberR0 consists of two parts, representing the two modes of transmission of the coronavirus. β2bδω µC1C2 + β2b(1−δ)ω µC1C3 + (cid:31)(cid:30) β2bδω µC1C2 R0 = 2 + β2b(1−δ)ω µC1C3 (cid:29) 2 + 4β1b µµP (cid:

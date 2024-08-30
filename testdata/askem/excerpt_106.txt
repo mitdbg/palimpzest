@@ -1,2 +1,0 @@
-id: 106
-text: that cannot. If the set of plausible input parameters are contained within the set of safe parameters, then we can be highly confident, although never certain, that the epidemic can be controlled. At Cornell in summer 2020, we demonstrated this to the university administration for a suite of interventions available with in-person instruction: frequent asymptomatic screening, testing students on arrival t

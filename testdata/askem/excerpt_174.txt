@@ -1,2 +1,0 @@
-id: 174
-text: zations, deaths, and number of tests conducted) and the model predictions. Since most data being calibrated to are time series count data, this function is defined as: L à wsf cs;t d ; cs;t m Ü Ö s X d and cs;t cs;t m are the counts from the data and model, respectively, for this time series at this time index; and f is the loss, objective, or goodness-of-fit function (e.g., normalized absolute error, mean absolute error, mean squared error, or the Poisson test stat

@@ -1,2 +1,0 @@
-id: 57
-text: tialization of in- ternal states in line 1, discussed in Section 3.2, creates the agents. The simulation dynamics starts in line 2, discussed in Section 3.3, and depends on the type of the agent, the parameter P and the current iteration t (discrete time). As mentioned before, each type of agent has its own set of actions in different time frames (hourly, daily, weekly or monthly). At each iteration, it checks if there was contact between any pair of a

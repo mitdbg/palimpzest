@@ -1,2 +1,0 @@
-id: 510
-text: ll occur on around day 50 at 0.19% of the population, while the peak of concurrently diagnosed infected individuals will occur later (around day 56) and amounts to 0.17% of the population. The actual case fatality rate (CFR) is 9.8% and the perceived CFR is 13%. Figure 2d shows that each infected subpopulation reaches its peak at a different time. Extended Data Fig. 1 shows how the situation could have evolved if milder or stron

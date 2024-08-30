@@ -1,2 +1,0 @@
-id: 207
-text: pidemiological model, which incorporates appropriate compartments relevant to interventions such as quarantine, isolation and treatment. We stratified the populations as susceptible (S), exposed (E), infectious but not yet symptomatic (pre-symptomatic) (A) rantine, isolation and treatment. Westratified the populations as susceptible (S), exposed (E), infectious but not yet symptomatic (pre-symptomatic) (A), infectious with symptoms (I), hospitalized (H) and recovered (R) compartments, and further stratified th

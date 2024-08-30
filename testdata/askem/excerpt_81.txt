@@ -1,2 +1,0 @@
-id: 81
-text: A 2, A 3 and A 4 agents due to its severe cash impact and wealth transfers among agents. The main goal of social interventions is to minimize the death curve D t. It is directly related to flattening the infection curve I t, in order to keep the hospitalization I H t cases below the critical limit of the healthcare system β 11. Flattening the I t curve means minimizing the infection peak I P, defined in Eq. (9), and ex- tending the time T IP spent to reach this

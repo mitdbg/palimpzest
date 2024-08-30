@@ -1,2 +1,0 @@
-id: 70
-text: eck Check Contagiong g Contagion Fig. 1. A1 agent activity cycle. Yes No Contact ? calculated using Eq. (3) considering the average family size α | A 2 | = (cid:5) (cid:4) α3 α5 5 : (3) The number of A 3 agents is calculated according to Eq. (4), con- 3, the proportion of formal and infor- sidering the population size α mal businesses, γ 2 and γ | A 3 | = (cid:8) α3 γ2 + α3 γ10 (cid:9) 10, respectively. (4)

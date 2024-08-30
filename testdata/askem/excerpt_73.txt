@@ -1,2 +1,0 @@
-id: 73
-text: ution γ 1, listed in the Table 4, meaning the slice of the wealth represented by the GDP parameter γ 3. The social stratum of agents is sampled such that Ai st rat um ∼ U (1, 5), for i = { 1, 2, 3 }. The total wealth of the simulation, represented by γ 3, is shared among agents, according to public, business and personal percent- ages defined by γ 5 and γ 4, γ 6. After the creation of all agents the simulation model starts its iteration loop, which r

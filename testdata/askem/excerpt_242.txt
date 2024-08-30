@@ -1,2 +1,0 @@
-id: 242
-text: ture or an age-specific contact matrix. Also the model can be improved more easily when the parameters describe some tangible properties of the target population. REINA does not need an estimate for R, i.e. the average number of people infected R t by a patient at the end of illness (time point t), is an emergent outcome of the model. The model uses explicit estimates for the three quantifiable processes that are usually embedded in R, ​0 namely contacts, exposure, and infectivi

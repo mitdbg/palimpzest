@@ -1,2 +1,0 @@
-id: 186
-text: born into the susceptible population at a rate b. The terms β1SP and β2S(IA + IS) describes the rate at which susceptible individuals S(t) gets infected by pathogens in the environment, P(t) and from infectious humansIA(t) and IS(t) respectively. Health experts and governments have been advising people, during this outbreak, to minimize contact with infectious individuals through social distancing. Therefore in our mod

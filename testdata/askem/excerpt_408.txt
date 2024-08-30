@@ -1,2 +1,0 @@
-id: 408
-text: A data-driven model to describe and forecast the dynamics of COVID-19 transmission Fig 7. Cumulative number of infected individuals C and number of deceased individuals D for the United States of America. https://doi.org/10.1371/journal.pone.0236386.g007 In these figures, data from the last 21 days are used as testing data, in order to allow a comparison between the mo

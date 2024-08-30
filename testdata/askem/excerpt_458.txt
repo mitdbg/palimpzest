@@ -1,2 +1,0 @@
-id: 458
-text: ses based on their health and vaccination status. Two "susceptible" populations are tracked: the original susceptible individuals (denoted 'S'), who are unvaccinated and have never been infected, and those who become susceptible again after losing their immunity from either vaccination or infection (denoted 'SVR'; more about loss of immunity M class. Two below). The original susceptible population (S, but not SVR) vaccinate at a rate of ω1 and enter the V1 vaccine types are represented, Pfizer-BioNTech (M = 

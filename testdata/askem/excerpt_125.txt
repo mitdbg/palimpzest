@@ -1,2 +1,0 @@
-id: 125
-text: pdphI(t) (cid:2) (cid:1)τ(DHD(t) + DQD(t)) (cid:2) rdpdI(t) (cid:2) σ(UR(t) + DQR(t)) + κDHR(t) (cid:2) (cid:1)τ(UD(t) + DQD(t) + DHD(t)): At the beginning of the epidemic, the system above starts at t (cid:2) 0 with the initial condition S(0) (cid:2) N − (cid:1) k1 − k2, E(0) (cid:2) (cid:1) k1, I(0) (cid:2) (cid:1) (cid:1) k2, and all other compartments start(cid:1) (cid:1) k2 country-specific fitted param

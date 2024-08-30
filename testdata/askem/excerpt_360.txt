@@ -1,2 +1,0 @@
-id: 360
-text: solution to the SIR model in Eq. 6. Furthermore, for an exponential kernel w(t) in the HawkesN model in Eq. 5 with parameter γ and constant reproduction number (R0), then E[λI(t)] = λH(t) where µ = 0,β = R0γ (ref. 35 has further details). Fitting the SIR, SEIR, and Branching Process Models. The parameters for SIR and SEIR in Table 1 were found using maximum Poisson likelihood regression (as in ref. 43 fo

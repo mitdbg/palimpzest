@@ -1,2 +1,0 @@
-id: 478
-text: e of buoyancy forcings F/L. Here, the ambient 21, a realistic value for Pine Island stratification N 5 3 3 10 Bay. Values used for the entrainment coefficient vary across the literature; here, we use a 5 0.15, which is consistent with effective entrainment coefficients calculated from past numerical simulations of hydrothermal plumes (Jiang and Breier 2014; Fabregat Tomàs et al. 2016). We integrate our mo

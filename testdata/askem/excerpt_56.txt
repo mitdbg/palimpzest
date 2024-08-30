@@ -1,2 +1,0 @@
-id: 56
-text: in Table 3 correspond to those produced by a SEIR model. For that purpose the Epidemic Calculator 2 was employed – this is an open-source SEIR implementation and visual tool for epidemic simulations. The initial percentage of infected ( β 9 ) and immune ( β The population size parameter, α 3, is particularly concerning because it affects the execution time of the simulation. On the other hand, the Population density, defined as α 2 ), fol

@@ -1,2 +1,0 @@
-id: 341
-text: ol closings, social distancing, closures of nonessential businesses, isolation, and quarantine). The distribution of interevent times w (ti − tj ) is a gamma or Weibull distribution (11, 33, 34) with shape parameter k and scale parameter b. Finally, the parameter µ allows for exogenous infection cases. The point process in Eq. 1 is an approximation to the common SIR model of infectious diseases (described later) d
