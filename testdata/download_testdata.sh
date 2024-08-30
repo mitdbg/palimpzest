@@ -3,6 +3,8 @@
 # Usage: bash testdata/download.sh
 # Requirements: wget, tar
 
+# Move to the testdata directory
+pushd testdata
 # Download the test data
 echo "Downloading the test data..."
 wget https://people.csail.mit.edu/gerarvit/PalimpzestData/askem.tar.gz
@@ -43,4 +45,5 @@ for f in *.tar.gz; do
   tar -xzf $f
 done
 rm *.tar.gz
+popd
 echo "Done!"
