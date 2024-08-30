@@ -163,7 +163,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
         if self.verbose:
             print("----------------------")
             print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
-            plan.printPlan()
+            print(plan)
             print("---")
 
         plan_start_time = time.time()
