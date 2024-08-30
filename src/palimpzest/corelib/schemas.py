@@ -1,3 +1,4 @@
+
 import json
 from typing import Any as TypingAny
 from typing import Dict, List
@@ -267,7 +268,6 @@ class XLSFile(File):
         desc="The names of the sheets in the Excel file",
         required=True,
     )
-
 
 # Third-level Schemas
 class EquationImage(ImageFile):

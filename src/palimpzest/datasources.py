@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 from papermage import Document
 
 from palimpzest import constants
-from palimpzest.corelib.schemas import File, ImageFile, Number, PDFFile, Schema, TextFile, WebPage, XLSFile
+from palimpzest.corelib.schemas import File, ImageFile, Number, PDFFile, Schema, TextFile, WebPage, XLSFile, Table
 from palimpzest.elements.records import DataRecord
 from palimpzest.tools.pdfparser import get_text_from_pdf
 
@@ -267,6 +267,24 @@ class PDFFileDirectorySource(DirectorySource):
         dr.contents = pdf_bytes
         dr.text_contents = text_content[:15000]  # TODO Very hacky
 
+        return dr
+
+class CSVFileDirectorySource(DirectorySource):
+    def __init__(self, path: str, dataset_id: str) -> None:
+        super().__init__(path=path, dataset_id=dataset_id, schema=Table)
+        assert all([filename.endswith(tuple(constants.CSV_EXTENSIONS)) for filename in self.filepaths])
+
+    def getItem(self, idx: int):
+        filepath = self.filepaths[idx]
+        dr = DataRecord(Table, scan_idx=idx)
+        dr.filename = os.path.basename(filepath)
+        with open(filepath, "rb") as f:
+            dr.contents = f.read()
+
+        table = pd.read_csv(BytesIO(dr.contents), nrows=constants.MAX_CSV_ROWS)
+        dr.name = dr.filename
+        dr.header = table.columns.tolist()
+        dr.rows = table.values.tolist()
         return dr
 
 
