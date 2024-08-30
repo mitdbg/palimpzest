@@ -3,6 +3,7 @@ from __future__ import annotations
 from palimpzest.constants import Cardinality, GPT_4_MODEL_CARD, MODEL_CARDS
 from palimpzest.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
 from palimpzest.datamanager import DataDirectory
+from palimpzest.elements import DataRecord
 from palimpzest.operators import PhysicalOperator
 from palimpzest.utils import getChampionModelName, getModels
 
@@ -23,10 +24,47 @@ import math
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)
 
-class CostModel:
+class BaseCostModel:
     """
-    This class takes in a list of RecordOpStats and exposes a function which uses this data
-    to perform cost estimation on a list of physical plans.
+    This base class contains the interface/abstraction that every CostModel must implement
+    in order to work with the Optimizer. In brief, the Optimizer expects the CostModel to
+    make a prediction about the runtime, cost, and quality of a physical operator.
+    """
+    def __init__(self):
+        """
+        CostModel constructor; the arguments for individual CostModels may vary depending
+        on the assumptions they make about the prevalance of historical execution data
+        and online vs. batch execution settings.
+        """
+        pass
+
+    def __call__(self, operator: PhysicalOperator) -> PlanCost:
+        """
+        The interface exposed by the CostModel to the Optimizer. Subclasses may require
+        additional arguments in order to make their predictions.
+        """
+        raise NotImplementedError("Calling __call__ from abstract method")
+
+
+class MatrixCompletionWithValidationCostModel:
+    """
+
+    """
+    def __init__(self, val_execution_data: List[RecordOpStats], val_exemplars: List[DataRecord]):
+        # compute the quality of each record as judged by the validation exemplars
+        pass
+
+        # construct the observation matrices for the cost per record, runtime per record, and quality
+        pass
+
+    def __call__(self, operator: PhysicalOperator) -> PlanCost:
+        pass
+
+class CostModel(BaseCostModel):
+    """
+    This class takes in a list of RecordOpStats and performs cost estimation on a given operator
+    by taking the average of any sample execution that the CostModel has for that operator. If no
+    such data exists, it returns a naive estimate.
     """
     def __init__(self, source_dataset_id: str, sample_execution_data: List[RecordOpStats] = [], confidence_level: float = 0.90):
         # store source dataset id to help with estimating cardinalities
@@ -475,10 +513,6 @@ class CostModel:
                 op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
                 op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
                 op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
-
-                op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
-                op_estimates.cost_per_record_lower_bound = sample_op_estimates[op_id]["cost_per_record_lower_bound"]
-                op_estimates.cost_per_record_upper_bound = sample_op_estimates[op_id]["cost_per_record_upper_bound"]
 
             elif isinstance(operator, pz.LLMFilter):
                 model_name = operator.model.value
