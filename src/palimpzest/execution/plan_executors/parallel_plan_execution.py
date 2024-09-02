@@ -20,7 +20,11 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.max_workers = self.get_parallel_max_workers()
+        self.max_workers = (
+            self.get_parallel_max_workers()
+            if self.max_workers is None
+            else self.max_workers
+        )
 
     @staticmethod
     def execute_op_wrapper(operator: PhysicalOperator, op_input: Union[DataRecord, List[DataRecord]]):
@@ -35,7 +39,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
     def execute_plan(self, plan: PhysicalPlan,
                      num_samples: Union[int, float] = float("inf"),
-                     max_workers: Optional[int] = None):
+                     plan_workers: int = 1):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
@@ -85,7 +89,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         # create thread pool w/max workers
         futures = []
         current_scan_idx = self.scan_start_idx
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=plan_workers) as executor:
             # create initial (set of) future(s) to read first source record;
             # construct input DataRecord for DataSourcePhysicalOp
             candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)

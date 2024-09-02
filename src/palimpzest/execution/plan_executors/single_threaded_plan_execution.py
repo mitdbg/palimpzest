@@ -17,10 +17,13 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
     This class still needs to be sub-classed by another Execution class which implements
     the higher-level execute() method.
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_workers = 1 if self.max_workers is None else self.max_workers
 
     def execute_plan(self, plan: PhysicalPlan,
                      num_samples: Union[int, float] = float("inf"),
-                     max_workers: Optional[int] = None):
+                     plan_workers: int = 1):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
@@ -155,10 +158,13 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
     This class still needs to be sub-classed by another Execution class which implements
     the higher-level execute() method.
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_workers = 1 if self.max_workers is None else self.max_workers
 
     def execute_plan(self, plan: PhysicalPlan,
                      num_samples: Union[int, float] = float("inf"),
-                     max_workers: Optional[int] = None):
+                     plan_workers: int = 1):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
