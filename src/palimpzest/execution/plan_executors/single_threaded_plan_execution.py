@@ -8,6 +8,7 @@ from palimpzest.operators.aggregate import AggregateOp
 from palimpzest.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
 from palimpzest.operators.limit import LimitScanOp
+from palimpzest.operators.join import JoinOp
 from palimpzest.optimizer.plan import PhysicalPlan
 
 
@@ -40,22 +41,26 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
 
         # initialize list of output records and intermediate variables
         output_records = []
-        current_scan_idx = self.scan_start_idx
 
         # get handle to DataSource and pre-compute its size
-        source_operator = plan.operators[0]
-        datasource = (
+        processing_queues = {}
+        for op in plan.operators:
+            op_id = op.get_op_id()
+            if isinstance(op, DataSourcePhysicalOp):
+                datasource = (
             self.datadir.get_registered_dataset(source_operator.dataset_id)
-            if isinstance(source_operator, MarshalAndScanDataOp)
+                    if isinstance(op, MarshalAndScanDataOp)
             else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
-        datasource_len = len(datasource)
-
-        # initialize processing queues for each operation
+                )
+                op.get_item_fn = datasource.getItem
+                op.cardinality = datasource.cardinality
+                op.datasource_len = len(datasource)
         processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, DataSourcePhysicalOp)}
 
         # execute the plan one operator at a time
         for op_idx, operator in enumerate(plan.operators):
+            print(processing_queues)
+            breakpoint()
             op_id = operator.get_op_id()
             prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
             next_op_id = plan.operators[op_idx + 1].get_op_id() if op_idx + 1 < len(plan.operators) else None
@@ -65,8 +70,9 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
 
             # invoke datasource operator(s) until we run out of source records or hit the num_samples limit
             if isinstance(operator, DataSourcePhysicalOp):
-                keep_scanning_source_records = True
-                while keep_scanning_source_records:
+                current_scan_idx = self.scan_start_idx # TODO this means every datasource starts from the beginning
+
+                while len(records) < num_samples and not operator.finished:
                     # construct input DataRecord for DataSourcePhysicalOp
                     # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
                     #       it is simply a vessel to inform the scan_operator which record to fetch
@@ -82,11 +88,10 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
                     # update the current scan index
                     current_scan_idx += 1
 
-                    # update whether to keep scanning source records
                     keep_scanning_source_records = current_scan_idx < datasource_len and len(records) < num_samples
 
             # aggregate operators accept all input records at once
-            elif isinstance(operator, AggregateOp):
+            elif isinstance(operator, AggregateOp) or isinstance(operator, JoinOp):
                 record_set = operator(candidates=processing_queues[op_id])
                 records = record_set.data_records
                 record_op_stats = record_set.record_op_stats

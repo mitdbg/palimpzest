@@ -405,3 +405,52 @@ class RetrieveScan(LogicalOperator):
         }
 
         return logical_op_params
+
+class Join(LogicalOperator):
+    """
+    Join is a logical operator that takes as input two input sets and returns a single sets obtained combining them on a given condition.
+    """
+
+    def __init__(
+        self,
+        left: Schema,
+        right: Schema,
+        on: Field,
+        targetCacheId: str = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.left = left
+        self.right = right
+        self.on = on
+        self.outputSchema = left+right
+        self.targetCacheId = targetCacheId
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(function: {str(self.aggFunc.value)})"
+
+    def __eq__(self, other: LogicalOperator) -> bool:
+        return (
+            isinstance(other, Join)
+            and self.left == other.left
+            and self.right == other.right
+            and self.on == other.on
+        )
+
+    def copy(self):
+        return self.__class__(
+            left=self.left,
+            right=self.right,
+            on=self.on,
+            targetCacheId=self.targetCacheId,
+        )
+
+    def get_op_params(self) -> dict:
+        return {
+            "outputSchema": self.outputSchema,
+            "left": self.left,
+            "right": self.right,
+            "on": self.on,
+            "targetCacheId": self.targetCacheId,
+        }

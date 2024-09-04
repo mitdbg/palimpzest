@@ -483,7 +483,6 @@ class LLMConvert(ConvertOp):
             #     print(f"\tAnswer snippet: {answer.splitlines()[line]}")
             return {field_name: [] for field_name in fields_to_generate}
 
-        breakpoint()
         field_answers = {}
         if self.cardinality == Cardinality.ONE_TO_MANY:
             # json_answer["items"] is a list of dictionaries, each of which contains the generated fields
@@ -573,6 +572,17 @@ class LLMConvert(ConvertOp):
         except Exception as e:
             print(f"DSPy generation error: {e}")
             return "", GenerationStats()
+
+        # try:
+        #     assert answer != {}, "No answer was generated!" 
+        #     if self.cardinality == Cardinality.ONE_TO_MANY:
+        #         assert "items" in answer, "\"items\" key missing from one-to-many JSON"
+        #         assert (
+        #             isinstance(answer["items"], list) and len(answer["items"]) > 0
+        #         ), "No output objects were generated for one-to-many query"
+        # except Exception as e:
+        #     print(e)
+        #     breakpoint()
 
         return answer, query_stats
 
