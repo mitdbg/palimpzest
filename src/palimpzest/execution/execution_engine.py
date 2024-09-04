@@ -1,3 +1,4 @@
+
 import hashlib
 import multiprocessing
 import os
@@ -86,6 +87,23 @@ class ExecutionEngine:
             shutil.rmtree(dspy_cache_dir)
         cache = self.datadir.get_cache_service()
         cache.rm_cache()
+
+
+    def set_source_dataset_id(self, dataset: Set) -> str:
+        """
+        Sets the dataset_id of the DataSource for the given dataset.
+        """
+        # iterate until we reach DataSource
+        while isinstance(dataset, Set):
+            dataset = dataset._source[0]
+        # TODO joins will disrupt this logic
+
+        # throw an exception if datasource is not registered with PZ
+        _ = self.datadir.getRegisteredDataset(dataset.dataset_id)
+
+        # set the source dataset id
+        self.source_dataset_id = dataset.dataset_id
+
 
     def get_parallel_max_workers(self):
         # for now, return the number of system CPUs;

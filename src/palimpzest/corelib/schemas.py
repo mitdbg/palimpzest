@@ -92,6 +92,22 @@ class SchemaMetaclass(type):
                 schema["required"].append(k)
         return schema
 
+    def __add__(self, other):
+        """
+        Sum function which returns a new Schema that has the attributes from both Schemas.
+        """
+        # get the fields from both schemas
+        fields = {}
+        for f in SchemaMetaclass.fieldNames(self):
+            fields[f] = getattr(self, f)
+        for f in SchemaMetaclass.fieldNames(other):
+            fields[f] = getattr(other, f)
+
+        # create a new class with the fields
+        new_class = type(self.__name__ + other.__name__, 
+                         (Schema,),
+                         fields)
+        return new_class
 
 # TODO: should we put the SchemaMetaclass functionality into Schema and make it a @dataclass?
 class Schema(metaclass=SchemaMetaclass):

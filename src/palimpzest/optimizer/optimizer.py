@@ -12,6 +12,7 @@ from palimpzest.operators.logical import (
     ConvertScan,
     FilteredScan,
     GroupByAggregate,
+    Join,
     LimitScan,
     LogicalOperator,
     RetrieveScan,
@@ -179,7 +180,16 @@ class Optimizer:
         # get node, output_schema, and input_schema(if applicable)
         node = dataset_nodes[-1]
         output_schema = node.schema
-        input_schema = dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
+        
+        if len(node._source) == 1:
+            input_schema = node._source[0].schema
+        elif len(node._source) == 2:
+            input_schema = node._source[0].schema + node._source[1].schema # TODO implement __radd__ for sum(schemata)
+        elif len(dataset_nodes) > 1:
+            # NOTE: is this catching different cases than the above?
+            input_schema = dataset_nodes[-2].schema 
+        else:
+            input_schema = None
 
         ### convert node --> Group ###
         uid = node.universal_identifier()
@@ -219,7 +229,6 @@ class Optimizer:
                 limit=node._limit,
                 target_cache_id=uid,
             )
-
         elif node._index is not None:
             op = RetrieveScan(
                 input_schema=input_schema,
@@ -230,7 +239,14 @@ class Optimizer:
                 k=node._k,
                 target_cache_id=uid
             )
-
+        elif node._on is not None:
+            op = Join(
+                inputSchema=input_schema,
+                outputSchema=output_schema,
+                left=node._source[0].schema,
+                right=node._source[1].schema,
+                on=node._on,
+                )
         elif output_schema != input_schema:
             op = ConvertScan(
                 input_schema=input_schema,
@@ -307,18 +323,31 @@ class Optimizer:
         dataset_nodes = []
         node = query_plan.copy()
 
-        while isinstance(node, Dataset):
+        processing_queue = [node]
+        while len(processing_queue) > 0:
+            node = processing_queue.pop(0)
             dataset_nodes.append(node)
-            node = node._source
-        dataset_nodes.append(node)
+            try:
+                processing_queue.extend(node._source)
+            # Dataset sources will not be iterable
+            except TypeError:
+                processing_queue.append(node._source)
+            # The first node in the query plan will not have a _source attribute
+            except AttributeError:
+                pass
+        # dataset_nodes.append(node)
         dataset_nodes = list(reversed(dataset_nodes))
 
+        # TODO this won't work for joins
         # remove unnecessary convert if output schema from data source scan matches
         # input schema for the next operator
-        if len(dataset_nodes) > 1 and dataset_nodes[0].schema == dataset_nodes[1].schema:
-            dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
-            if len(dataset_nodes) > 1:
-                dataset_nodes[1]._source = dataset_nodes[0]
+        # try:
+            # if len(dataset_nodes) > 1 and dataset_nodes[0].schema == dataset_nodes[1].schema:
+                # dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
+                # if len(dataset_nodes) > 1:
+                    # dataset_nodes[1]._source = [dataset_nodes[0]]
+        # except AttributeError:
+            # breakpoint()
 
         # compute depends_on field for every node
         short_to_full_field_name = {}
@@ -342,11 +371,13 @@ class Optimizer:
                 node._depends_on = list(map(lambda field: short_to_full_field_name[field], node._depends_on))
                 continue
 
-            # otherwise, make the node depend on all upstream nodes
-            node._depends_on = set()
-            for upstream_node in dataset_nodes[:node_idx]:
-                node._depends_on.update(upstream_node.schema.field_names(unique=True, id=upstream_node.universal_identifier()))
-            node._depends_on = list(node._depends_on)
+            else:
+                # otherwise, make the node depend on all upstream nodes
+                node._depends_on = set()
+                for upstream_node in dataset_nodes[:node_idx]:
+                    node._depends_on.update(upstream_node.schema.field_names(unique=True, id=upstream_node.universal_identifier()))
+                    # node._depends_on.update(upstream_node._depends_on) #NOTE GV: I Had this as well, is it safe to comment out ?
+                node._depends_on = list(node._depends_on)
 
         # construct tree of groups
         final_group_id, _, _ = self.construct_group_tree(dataset_nodes)
