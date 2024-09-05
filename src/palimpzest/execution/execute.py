@@ -1,9 +1,10 @@
 from palimpzest.constants import Model, OptimizationStrategy
+from palimpzest.datasources import DataSource
 from palimpzest.execution import ExecutionEngine, PipelinedSingleThreadSentinelExecution
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
-from typing import List, Optional
+from typing import List, Optional, Union
 
 
 class Execute:
@@ -23,6 +24,7 @@ class Execute:
         allow_model_selection: Optional[bool]=True,
         allow_code_synth: Optional[bool]=True,
         allow_token_reduction: Optional[bool]=True,
+        validation_data_source: Optional[Union[str, DataSource]]=None,
         optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
         execution_engine: ExecutionEngine = PipelinedSingleThreadSentinelExecution,
         *args,
@@ -42,6 +44,7 @@ class Execute:
             allow_code_synth=allow_code_synth,
             allow_model_selection=allow_model_selection,
             allow_token_reduction=allow_token_reduction,
+            validation_data_source=validation_data_source,
             optimization_strategy=optimization_strategy,
             *args,
             **kwargs

@@ -2,6 +2,7 @@ from palimpzest.constants import Model, OptimizationStrategy, MAX_ID_CHARS
 from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import RecordOpStats, PlanStats
 from palimpzest.datamanager import DataDirectory
+from palimpzest.datasources import DataSource
 from palimpzest.elements import DataRecord
 from palimpzest.optimizer import Optimizer, PhysicalPlan
 from palimpzest.policy import Policy
@@ -31,10 +32,10 @@ class ExecutionEngine:
             allow_model_selection: bool=True,
             allow_code_synth: bool=True,
             allow_token_reduction: bool=True,
+            validation_data_source: Optional[Union[str, DataSource]]=None,
             optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
-            max_workers: int=1,
-            num_workers_per_thread: int=1,
-            inter_plan_parallelism: bool=True,
+            max_workers: Optional[int]=None,
+            num_workers_per_plan: int=1,
             *args, **kwargs
         ) -> None:
         self.num_samples = num_samples
@@ -55,10 +56,16 @@ class ExecutionEngine:
         self.allow_token_reduction = allow_token_reduction
         self.optimization_strategy = optimization_strategy
         self.max_workers = max_workers
-        self.num_workers_per_thread = num_workers_per_thread
-        self.inter_plan_parallelism = inter_plan_parallelism
-        
+        self.num_workers_per_plan = num_workers_per_plan
+
         self.datadir = DataDirectory()
+
+        # convert source (str) -> source (DataSource) if need be
+        self.validation_data_source = (
+            self.datadir.getRegisteredDataset(validation_data_source)
+            if isinstance(validation_data_source, str)
+            else validation_data_source
+        )
 
 
     def execution_id(self) -> str:
@@ -143,30 +150,39 @@ class ExecutionEngine:
 
     def execute_plans(self, plans: List[PhysicalPlan], max_quality_plan_id: str, num_samples: Union[int, float] = float("inf")):
         """
-        Execute a given list of plans for num_samples records each, using whatever parallelism is available.
+        Execute a given list of plans for num_samples records each. Plans are executed in parallel.
+        If any workers are unused, then additional workers are distributed evenly among plans.
         """
         # compute number of plans
         num_plans = len(plans)
 
-        # execute plans using any parallelism provided by the user or system
-        max_workers = (
-            self.max_workers
-            if not self.inter_plan_parallelism
-            else max(self.max_workers, self.get_parallel_max_workers())
-        )
-        max_workers = min(max_workers, num_plans)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # set plan_parallel_workers and workers_per_plan;
+        # - plan_parallel_workers controls how many plans are executed in parallel
+        # - workers_per_plan controls how many threads are assigned to executing each plan
+        plan_parallel_workers, workers_per_plan = None, None
+        if self.max_workers <= num_plans:
+            plan_parallel_workers = self.max_workers
+            workers_per_plan = [1 for _ in range(num_plans)]
+        else:
+            plan_parallel_workers = num_plans
+            workers_per_plan = [(self.max_workers // num_plans) for _ in range(num_plans)]
+            idx = 0
+            while sum(workers_per_plan) < self.max_workers:
+                workers_per_plan[idx] += 1
+                idx += 1
+
+        with ThreadPoolExecutor(max_workers=plan_parallel_workers) as executor:
             results = list(executor.map(lambda x: self.execute_plan(**x),
                     [{"plan": plan,
                       "num_samples": num_samples,
-                      "max_workers": self.num_workers_per_thread}
-                      for plan in plans],
+                      "plan_workers": plan_workers}
+                      for plan, plan_workers in zip(plans, workers_per_plan)],
                 )
             )
         # results = list(map(lambda x: self.execute_plan(**x),
         #         [{"plan": plan,
         #             "num_samples": num_samples,
-        #             "max_workers": 1}
+        #             "plan_workers": 1}
         #             for plan in plans],
         #     )
         # )
@@ -262,7 +278,7 @@ class ExecutionEngine:
 
     def execute_plan(self, plan: PhysicalPlan,
                      num_samples: Union[int, float] = float("inf"),
-                     max_workers: Optional[int] = None):
+                     plan_workers: int = 1):
         """Execute the given plan and return the output records and plan stats."""
         raise NotImplementedError("Abstract method to be overwritten by sub-classes")
 

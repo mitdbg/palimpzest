@@ -1,13 +1,12 @@
 from palimpzest.constants import OptimizationStrategy
 from palimpzest.cost_model import CostModel
-from palimpzest.dataclasses import ExecutionStats
+from palimpzest.dataclasses import ExecutionStats, RecordOpStats
 from palimpzest.execution import (
     ExecutionEngine,
-    PipelinedParallelPlanExecutor,
-    PipelinedSingleThreadPlanExecutor,
-    SequentialSingleThreadPlanExecutor,
+    PipelinedParallelSentinelPlanExecutor,
+    SequentialSingleThreadSentinelPlanExecutor,
 )
-from palimpzest.optimizer import Optimizer
+from palimpzest.optimizer import Optimizer, SentinelPlan
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
@@ -22,6 +21,52 @@ class SentinelExecutionEngine(ExecutionEngine):
     This class still needs to be sub-classed by another Execution class which implements
     the higher-level execute_plan() method.
     """
+    def __init__(self, rank: int = 4, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rank = rank
+
+
+    def execute_sentinel_plan(self, plan: SentinelPlan):
+        """
+        """
+        # TODO
+        pass
+
+
+    def generate_sample_observations(self, dataset: Set):
+        """
+        This function is responsible for generating sample observation data which can be
+        consumed by the CostModel. For each physical optimization and each operator, our
+        goal is to capture `rank + 1` samples per optimization, where `rank` is the presumed
+        low-rank of the observation matrix.
+
+        To accomplish this, we construct a special sentinel plan using the Optimizer which is
+        capable of executing any valid physical implementation of a Filter or Convert operator
+        on each record.
+        """
+        # initialize the optimizer
+        optimizer = Optimizer(
+            policy=None,
+            cost_model=None,
+            no_cache=True,
+            verbose=self.verbose,
+            available_models=self.available_models,
+            allow_bonded_query=True,
+            allow_conventional_query=True,
+            allow_code_synth=True,
+            allow_token_reduction=True,
+            optimization_strategy=OptimizationStrategy.SENTINEL,
+            sentinel_low_rank=self.rank,
+        )
+
+        # use optimizer to generate sentinel plans
+        sentinel_plan = optimizer.optimize(dataset)
+
+        # run sentinel plan
+        execution_data, records, plan_stats = self.execute_sentinel_plan(sentinel_plan)
+
+        return execution_data, records, plan_stats
+
 
     def execute(self, dataset: Set, policy: Policy):
         execution_start_time = time.time()
@@ -42,28 +87,8 @@ class SentinelExecutionEngine(ExecutionEngine):
         uid = dataset.universalIdentifier()
         run_sentinels = self.nocache or not self.datadir.hasCachedAnswer(uid)    
         if run_sentinels:
-            # construct the CostModel
-            cost_model = CostModel(source_dataset_id=self.source_dataset_id)
-
-            # initialize the optimizer
-            optimizer = Optimizer(
-                policy=policy,
-                cost_model=cost_model,
-                no_cache=self.nocache,
-                verbose=self.verbose,
-                available_models=self.available_models,
-                allow_bonded_query=True,
-                allow_conventional_query=False,
-                allow_code_synth=False,
-                allow_token_reduction=False,
-                optimization_strategy=OptimizationStrategy.SENTINEL,
-            )
- 
-            # use optimizer to generate sentinel plans
-            sentinel_plans = optimizer.optimize(dataset)
-
-            # run sentinel plans
-            all_execution_data, all_records, all_plan_stats = self.execute_plans(sentinel_plans)
+            all_execution_data, all_records, all_plan_stats = self.generate_sample_observations(dataset, policy)
+            # TODO: if the above is validation data: do not return as part of results; if it is sample data: do return;
 
         # construct the CostModel with any sample execution data we've gathered
         cost_model = CostModel(
@@ -112,21 +137,14 @@ class SentinelExecutionEngine(ExecutionEngine):
         return all_records, execution_stats
 
 
-class SequentialSingleThreadSentinelExecution(SentinelExecutionEngine, SequentialSingleThreadPlanExecutor):
+class SequentialSingleThreadSentinelExecution(SentinelExecutionEngine, SequentialSingleThreadSentinelPlanExecutor):
     """
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
     """
     pass
 
 
-class PipelinedSingleThreadSentinelExecution(SentinelExecutionEngine, PipelinedSingleThreadPlanExecutor):
-    """
-    This class performs sentinel execution while executing plans in a pipelined, single-threaded fashion.
-    """
-    pass
-
-
-class PipelinedParallelSentinelExecution(SentinelExecutionEngine, PipelinedParallelPlanExecutor):
+class PipelinedParallelSentinelExecution(SentinelExecutionEngine, PipelinedParallelSentinelPlanExecutor):
     """
     This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
     """
