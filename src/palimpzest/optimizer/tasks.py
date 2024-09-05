@@ -386,10 +386,12 @@ class OptimizePhysicalExpression(Task):
             groups[self.physical_expression.group_id] = group
 
         elif context['optimization_strategy'] == OptimizationStrategy.CONFIDENCE_INTERVAL:
+            group = self.update_best_physical_expression(group, policy)
             group = self.update_ci_best_physical_expressions(group, policy)
             groups[self.physical_expression.group_id] = group
 
-        elif context['optimization_strategy'] == OptimizationStrategy.PARETO_OPTIMAL:
-            raise NotImplementedError("Future work")
+        elif context['optimization_strategy'] == OptimizationStrategy.SENTINEL:
+            group = self.update_best_physical_expression(group, policy)
+            groups[self.physical_expression.group_id] = group
 
         return []

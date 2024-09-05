@@ -45,7 +45,7 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
         datasource = (
             self.datadir.getRegisteredDataset(self.source_dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(source_operator.cachedDataIdentifier)
+            else self.datadir.getCachedResult(source_operator.dataset_id)
         )
         datasource_len = len(datasource)
 
@@ -184,7 +184,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
         datasource = (
             self.datadir.getRegisteredDataset(self.source_dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(source_operator.cachedDataIdentifier)
+            else self.datadir.getCachedResult(source_operator.dataset_id)
         )
         datasource_len = len(datasource)
 

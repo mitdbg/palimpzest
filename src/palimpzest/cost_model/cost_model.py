@@ -415,7 +415,7 @@ class CostModel:
                                                     dataset_type=dataset_type)
 
         elif isinstance(operator, pz.CacheScanDataOp):
-            datasource = self.datadir.getCachedResult(operator.cachedDataIdentifier)
+            datasource = self.datadir.getCachedResult(operator.dataset_id)
             datasource_len = len(datasource)
             datasource_memsize = datasource.getSize()
 

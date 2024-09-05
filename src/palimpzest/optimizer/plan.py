@@ -4,7 +4,7 @@ from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.dataclasses import PlanCost
 from palimpzest.operators import PhysicalOperator
 
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import hashlib
 
@@ -40,6 +40,9 @@ class Plan:
             plan_str += f" {idx+1}. {str(operator)}\n"
 
         return plan_str
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class PhysicalPlan(Plan):
@@ -80,15 +83,51 @@ class PhysicalPlan(Plan):
         # return the PhysicalPlan
         return PhysicalPlan(operators=copySubPlan, plan_cost=full_plan_cost)
 
-    def __repr__(self) -> str:
-        """Returns the string representation for this plan."""
-        return str(self)
 
-    def getPlanModelNames(self) -> List[str]:
-        model_names = []
-        for op in self.operators:
-            model = getattr(op, "model", None)
-            if model is not None:
-                model_names.append(model.value)
+class SentinelPlan(Plan):
+    def __init__(self, operator_sets: List[Set[PhysicalOperator]]):
+        self.operator_sets = operator_sets
+        self.plan_id = self.compute_plan_id()
 
-        return model_names
+    def compute_plan_id(self) -> str:
+        """
+        NOTE: This is NOT a universal ID.
+
+        Two different SentinelPlan instances with the identical operator_sets will have equivalent plan_ids.
+        """
+        hash_str = str(tuple(op.get_op_id() for op_set in self.operator_sets for op in op_set))
+        return hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+
+    def __eq__(self, other: PhysicalPlan):
+        return self.operator_sets == other.operator_sets
+
+    def __hash__(self):
+        return int(self.plan_id, 16)
+
+    def __str__(self):
+        # making the assumption that first operator_set can only be a scan
+        start = list(self.operator_sets[0])[0]
+        plan_str = f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n\n"
+
+        for idx, operator_set in enumerate(self.operator_sets[1:]):
+            if len(operator_set) == 1:
+                operator = list(operator_set)[0]
+                plan_str += f" {idx+1}. {str(operator)}\n"
+
+            else:
+                for inner_idx, operator in enumerate(operator_set):
+                    plan_str += f" {idx+1}.{inner_idx+1}. {str(operator)}\n"
+
+        return plan_str
+
+    @staticmethod
+    def fromOpsAndSubPlan(op_sets: List[Set[PhysicalOperator]], subPlan: SentinelPlan) -> SentinelPlan:
+        # create copies of all logical operators
+        copySubPlan = [{op.copy() for op in op_set} for op_set in subPlan.operator_sets]
+        copyOps = [{op.copy() for op in op_set} for op_set in op_sets]
+
+        # construct full set of operators
+        copySubPlan.extend(copyOps)
+
+        # return the SentinelPlan
+        return SentinelPlan(operator_sets=copySubPlan)

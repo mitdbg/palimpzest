@@ -474,7 +474,7 @@ class LLMConvert(ConvertOp):
         
         return answer, query_stats
 
-    def convert(self, candidate_content: Union[str,List[bytes]] , fields: List[str]) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+    def convert(self, candidate_content: Union[str,List[bytes]], fields: List[str]) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
         """ This function is responsible for the LLM conversion process. 
         Different strategies may/should reimplement this function and leave the __call__ function untouched.
         The input is ...

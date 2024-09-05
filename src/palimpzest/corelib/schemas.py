@@ -40,7 +40,7 @@ class SchemaMetaclass(type):
         The id argument is used to provide a unique identifier for the class name"""
         attributes = dir(cls)
         attributes = [attr for attr in attributes if not attr.startswith("__")]
-        prefix = f"{cls.__name__}{id}." if unique else ""
+        prefix = f"{cls.__name__}.{id}." if unique else ""
         fields = [prefix+attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
         return fields
 

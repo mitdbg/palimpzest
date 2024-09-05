@@ -20,7 +20,7 @@ from palimpzest.constants import PromptStrategy
 def test_convert(convert_op, email_schema):
     """Test whether convert operators"""
     model = pz.Model.GPT_4
-    scanOp = MarshalAndScanDataOp(outputSchema=pz.TextFile)
+    scanOp = MarshalAndScanDataOp(outputSchema=pz.TextFile, dataset_id="enron-eval-tiny")
     convertOp = convert_op(
         inputSchema=pz.File,
         outputSchema=email_schema,

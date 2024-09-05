@@ -86,6 +86,69 @@ class LogicalOperator:
         return int(self.op_id, 16)
 
 
+class BaseScan(LogicalOperator):
+    """A BaseScan is a logical operator that represents a scan of a particular data source."""
+
+    def __init__(self, dataset_id: str, *args, **kwargs):
+        kwargs["inputSchema"] = None
+        super().__init__(*args, **kwargs)
+        self.dataset_id = dataset_id
+
+    def __str__(self):
+        return f"BaseScan({self.dataset_id},{str(self.outputSchema)})"
+
+    def __eq__(self, other: LogicalOperator) -> bool:
+        return (
+            isinstance(other, BaseScan)
+            and self.inputSchema == other.inputSchema
+            and self.outputSchema == other.outputSchema
+            and self.dataset_id == other.dataset_id
+        )
+
+    def copy(self):
+        return BaseScan(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            dataset_id=self.dataset_id,
+        )
+
+    def get_op_params(self) -> dict:
+        return {"outputSchema": self.outputSchema, "dataset_id": self.dataset_id}
+
+
+class CacheScan(LogicalOperator):
+    """A CacheScan is a logical operator that represents a scan of a cached Set."""
+
+    def __init__(self, dataset_id: str, *args, **kwargs):
+        kwargs["inputSchema"] = None
+
+        super().__init__(None, *args, **kwargs)
+        self.dataset_id = dataset_id
+
+    def __str__(self):
+        return f"CacheScan({str(self.outputSchema)},{str(self.dataset_id)})"
+
+    def __eq__(self, other: LogicalOperator) -> bool:
+        return (
+            isinstance(other, CacheScan)
+            and self.inputSchema == other.inputSchema
+            and self.outputSchema == other.outputSchema
+            and self.dataset_id == other.dataset_id
+        )
+
+    def copy(self):
+        return CacheScan(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            dataset_id=self.dataset_id,
+        )
+
+    def get_op_params(self):
+        return {
+            "outputSchema": self.outputSchema,
+            "dataset_id": self.dataset_id,
+        }
+
 
 class ConvertScan(LogicalOperator):
     """A ConvertScan is a logical operator that represents a scan of a particular data source, with conversion applied."""
@@ -147,107 +210,6 @@ class ConvertScan(LogicalOperator):
         }
 
 
-class CacheScan(LogicalOperator):
-    """A CacheScan is a logical operator that represents a scan of a cached Set."""
-
-    def __init__(self, cachedDataIdentifier: str, *args, **kwargs):
-        kwargs["inputSchema"] = None
-
-        super().__init__(None, *args, **kwargs)
-        self.cachedDataIdentifier = cachedDataIdentifier
-
-    def __str__(self):
-        return f"CacheScan({str(self.outputSchema)},{str(self.cachedDataIdentifier)})"
-
-    def __eq__(self, other: LogicalOperator) -> bool:
-        return (
-            isinstance(other, CacheScan)
-            and self.inputSchema == other.inputSchema
-            and self.outputSchema == other.outputSchema
-            and self.cachedDataIdentifier == other.cachedDataIdentifier
-        )
-
-    def copy(self):
-        return CacheScan(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
-            cachedDataIdentifier=self.cachedDataIdentifier,
-        )
-
-    def get_op_params(self):
-        return {
-            "outputSchema": self.outputSchema,
-            "cachedDataIdentifier": self.cachedDataIdentifier,
-        }
-
-# TODO: for now, datasetIdentifier is not needed in the logical operator (and has been removed
-#       from the physical operator); however, once we introduce joins then the Optimizer will
-#       need a way to reason about the cost of scanning different data sources, at which point
-#       it will almost certainly need to be added back to the physical operator
-class BaseScan(LogicalOperator):
-    """A BaseScan is a logical operator that represents a scan of a particular data source."""
-
-    def __init__(self, datasetIdentifier: str, *args, **kwargs):
-        kwargs["inputSchema"] = None
-        super().__init__(*args, **kwargs)
-        self.datasetIdentifier = datasetIdentifier
-
-    def __str__(self):
-        return f"BaseScan({self.datasetIdentifier},{str(self.outputSchema)})"
-
-    def __eq__(self, other: LogicalOperator) -> bool:
-        return (
-            isinstance(other, BaseScan)
-            and self.inputSchema == other.inputSchema
-            and self.outputSchema == other.outputSchema
-            and self.datasetIdentifier == other.datasetIdentifier
-        )
-
-    def copy(self):
-        return BaseScan(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
-            datasetIdentifier=self.datasetIdentifier,
-        )
-
-    def get_op_params(self) -> dict:
-        return {"outputSchema": self.outputSchema}
-
-
-class LimitScan(LogicalOperator):
-    def __init__(self, limit: int, targetCacheId: str = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.limit = limit
-        self.targetCacheId = targetCacheId
-
-    def __str__(self):
-        return f"LimitScan({str(self.inputSchema)}, {str(self.outputSchema)})"
-
-    def copy(self):
-        return LimitScan(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
-            limit=self.limit,
-            targetCacheId=self.targetCacheId,
-        )
-
-    def __eq__(self, other: LogicalOperator) -> bool:
-        return (
-            isinstance(other, LimitScan)
-            and self.inputSchema == other.inputSchema
-            and self.outputSchema == other.outputSchema
-            and self.limit == other.limit
-        )
-
-    def get_op_params(self) -> dict:
-        return {
-            "inputSchema": self.inputSchema,
-            "outputSchema": self.outputSchema,
-            "limit": self.limit,
-            "targetCacheId": self.targetCacheId,
-        }
-
-
 class FilteredScan(LogicalOperator):
     """A FilteredScan is a logical operator that represents a scan of a particular data source, with filters applied."""
 
@@ -294,6 +256,40 @@ class FilteredScan(LogicalOperator):
             "outputSchema": self.outputSchema,
             "filter": self.filter,
             "image_filter": self.image_filter,
+            "targetCacheId": self.targetCacheId,
+        }
+
+
+class LimitScan(LogicalOperator):
+    def __init__(self, limit: int, targetCacheId: str = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.limit = limit
+        self.targetCacheId = targetCacheId
+
+    def __str__(self):
+        return f"LimitScan({str(self.inputSchema)}, {str(self.outputSchema)})"
+
+    def copy(self):
+        return LimitScan(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            limit=self.limit,
+            targetCacheId=self.targetCacheId,
+        )
+
+    def __eq__(self, other: LogicalOperator) -> bool:
+        return (
+            isinstance(other, LimitScan)
+            and self.inputSchema == other.inputSchema
+            and self.outputSchema == other.outputSchema
+            and self.limit == other.limit
+        )
+
+    def get_op_params(self) -> dict:
+        return {
+            "inputSchema": self.inputSchema,
+            "outputSchema": self.outputSchema,
+            "limit": self.limit,
             "targetCacheId": self.targetCacheId,
         }
 
