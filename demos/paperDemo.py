@@ -1,5 +1,5 @@
 import palimpzest as pz
-
+from palimpzest.utils import udfs
 from io import BytesIO
 from pathlib import Path
 
@@ -48,32 +48,6 @@ def in_price_range(record):
         return 6e5 < price and price <= 2e6
     except:
         return False
-
-def xls_to_tables(candidate):
-    xls_bytes = candidate.contents
-    sheet_names = candidate.sheet_names
-
-    records = []
-    for sheet_name in sheet_names:
-        dataframe = pd.read_excel(
-            BytesIO(xls_bytes), sheet_name=sheet_name, engine="openpyxl"
-        )
-
-        # TODO extend number of rows with dynamic sizing of context length
-        # construct data record
-        dr = pz.DataRecord(pz.Table, parent_id=candidate._id)
-        rows = []
-        for row in dataframe.values[:100]:
-            row_record = [str(x) for x in row]
-            rows += [row_record]
-        dr.rows = rows
-        dr.filename = candidate.filename
-        dr.header = dataframe.columns.values.tolist()
-        dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
-        records.append(dr)
-
-    return records
-
 
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
@@ -309,13 +283,9 @@ if __name__ == "__main__":
     elif workload == "medical-schema-matching":
         # datasetid="biofabric-medium" for paper evaluation
         plan = pz.Dataset(datasetid, schema=pz.XLSFile)
-        plan = plan.convert(pz.Table, udf=lambda record: xls_to_tables(record), cardinality=pz.Cardinality.ONE_TO_MANY)
-        plan = plan.filter(
-            "The rows of the table contain the patient age"
-        )
-        plan = plan.convert(
-            CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY
-        )
+        plan = plan.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+        plan = plan.filter("The rows of the table contain the patient age")
+        plan = plan.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
 
     # execute pz plan
     records, execution_stats = pz.Execute(

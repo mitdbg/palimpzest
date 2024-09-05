@@ -3,6 +3,10 @@ build/*
 dist/*
 .vscode/*
 
+# testdata folders and archive files
+testdata/*/
+testdata/*.tar.gz
+
 # python artifacts
 *.egg-info
 **/__pycache__/

@@ -17,13 +17,28 @@ class DataSourcePhysicalOp(PhysicalOperator):
     in order to accurately compute naive cost estimates. Thus, we use a slightly
     modified abstract base class for these operators.
     """
+    def __init__(self, dataset_id: str, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dataset_id = dataset_id
+
     def __str__(self):
-        op = f"{self.op_name()} -> {self.outputSchema}\n"
+        op = f"{self.op_name()}({self.dataset_id}) -> {self.outputSchema}\n"
         op += f"    ({', '.join(self.outputSchema.fieldNames())[:30]})\n"
         return op
 
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"dataset_id": self.dataset_id, **copy_kwargs}
+
     def get_op_params(self):
-        return {"outputSchema": self.outputSchema}
+        return {"outputSchema": self.outputSchema, "dataset_id": self.dataset_id}
+
+    def __eq__(self, other: PhysicalOperator):
+        return (
+            isinstance(other, self.__class__)
+            and self.outputSchema == other.outputSchema
+            and self.dataset_id == other.dataset_id
+        )
 
     def naiveCostEstimates(
         self,
@@ -50,12 +65,6 @@ class DataSourcePhysicalOp(PhysicalOperator):
 
 
 class MarshalAndScanDataOp(DataSourcePhysicalOp):
-
-    def __eq__(self, other: PhysicalOperator):
-        return (
-            isinstance(other, self.__class__)
-            and self.outputSchema == other.outputSchema
-        )
 
     def naiveCostEstimates(
         self,
@@ -117,35 +126,6 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         return records, record_op_stats_lst
 
 class CacheScanDataOp(DataSourcePhysicalOp):
-
-    def __init__(
-        self,
-        cachedDataIdentifier: str,
-        *args,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.cachedDataIdentifier = cachedDataIdentifier
-
-    def __str__(self):
-        op = super().__str__()
-        op += f"    Cache ID: {str(self.cachedDataIdentifier)}\n"
-        return op
-
-    def __eq__(self, other: PhysicalOperator):
-        return (
-            isinstance(other, self.__class__)
-            and self.cachedDataIdentifier == other.cachedDataIdentifier
-            and self.outputSchema == other.outputSchema
-        )
-
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {"cachedDataIdentifier": self.cachedDataIdentifier, **copy_kwargs}
-
-    def get_op_params(self):
-        op_params = super().get_op_params()
-        return {"cachedDataIdentifier": self.cachedDataIdentifier, **op_params}
 
     def naiveCostEstimates(
         self, 

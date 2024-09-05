@@ -29,8 +29,8 @@ def getModels(include_vision: Optional[bool] = False) -> List[Model]:
     if os.getenv("TOGETHER_API_KEY") is not None:
         models.extend([Model.MIXTRAL])
 
-    if os.getenv("GOOGLE_API_KEY") is not None:
-        models.extend([Model.GEMINI_1])
+    # if os.getenv("GOOGLE_API_KEY") is not None:
+    #     models.extend([Model.GEMINI_1])
 
     if include_vision:
         vision_models = getVisionModels()

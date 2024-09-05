@@ -419,11 +419,11 @@ class LLMConvert(ConvertOp):
 
         except Exception as e:
             print(f"Error parsing LLM answer: {e}")
-            msg = str(e)
+            print(f"\tAnswer: {answer}")
+            # msg = str(e)
             # if "line" in msg:
-            #    line = int(str(msg).split("line ")[1].split(" ")[0])
-            #    print(f"\tAnswer snippet: {answer.splitlines()[line]}")
-
+                # line = int(str(msg).split("line ")[1].split(" ")[0])
+                # print(f"\tAnswer snippet: {answer.splitlines()[line]}")
             return {field_name: [] for field_name in fields_to_generate}
 
         field_answers = {}
@@ -474,7 +474,7 @@ class LLMConvert(ConvertOp):
         
         return answer, query_stats
 
-    def convert(self, candidate_content: Union[str,List[bytes]] , fields: List[str]) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+    def convert(self, candidate_content: Union[str,List[bytes]], fields: List[str]) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
         """ This function is responsible for the LLM conversion process. 
         Different strategies may/should reimplement this function and leave the __call__ function untouched.
         The input is ...
@@ -512,7 +512,12 @@ class LLMConvert(ConvertOp):
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
-        n_records = max([len(lst) for lst in field_answers.values()])
+        try:
+            n_records = max([len(lst) for lst in field_answers.values()])
+        except:
+            print(f"Error in field answers: {field_answers}. Returning empty records.")
+            breakpoint()
+            return [],[]
         records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
 
         for field_name, answer_list in field_answers.items():
@@ -589,7 +594,6 @@ class LLMConvertConventional(LLMConvert):
     ) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
         fields_answers = {}
         fields_stats = {}
-
         for field_name in fields:
             prompt = self._construct_query_prompt(fields_to_generate=[field_name])
             answer, stats = self._dspy_generate_fields(

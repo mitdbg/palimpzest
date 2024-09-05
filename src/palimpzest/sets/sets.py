@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from palimpzest.datamanager import DataDirectory
-from palimpzest.constants import AggFunc
+from palimpzest.constants import AggFunc, Cardinality, MAX_ID_CHARS
 from palimpzest.corelib import Number, Schema
 from palimpzest.elements import (
     Filter,
     GroupBySig,
 )
-from palimpzest.datasources import *
+from palimpzest.datasources import DataSource
 
 from typing import Callable, List, Optional, Union
 
@@ -72,6 +72,10 @@ class Set:
         return f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, filter={str(self._filter)}, udf={str(self._udf)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
 
     def serialize(self):
+        # NOTE: I needed to remove depends_on from the serialization dictionary because
+        # the optimizer changes the name of the depends_on fields to be their "full" name.
+        # This created an issue with the node.universalIdentifier() not being consistent
+        # after changing the field to its full name.
         d = {
             "version": Set.SET_VERSION,
             "schema": self.schema.jsonSchema(),
@@ -83,7 +87,6 @@ class Set:
             "fnid": self._fnid,
             "cardinality": self._cardinality,
             "image_conversion": self._image_conversion,
-            "depends_on": self._depends_on,
             "limit": self._limit,
             "groupBy": (
                 None if self._groupBy is None else self._groupBy.serialize()
@@ -97,14 +100,7 @@ class Set:
         d = self.serialize()
         ordered = json.dumps(d, sort_keys=True)
         result = hashlib.sha256(ordered.encode()).hexdigest()
-        return result
-
-    def dataSourceId(self) -> Optional[str]:
-        """
-        Return the dataset_id of the DataSource if this Set's source is a DataSource.
-        Otherwise return None.
-        """
-        return self._source.dataset_id if isinstance(self._source, DataSource) else None
+        return result[:MAX_ID_CHARS]
 
     def jsonSchema(self):
         """Return the JSON schema for this Set."""

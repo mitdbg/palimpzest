@@ -7,6 +7,7 @@ from palimpzest.operators import ConvertFromCandidateOp
 
 from pathlib import Path
 from PIL import Image
+from palimpzest.utils import udfs
 from sklearn.metrics import precision_recall_fscore_support
 from tabulate import tabulate
 
@@ -562,9 +563,7 @@ def get_logical_tree(
             num_samples=num_samples,
             scan_start_idx=scan_start_idx,
         )
-        patient_tables = xls.convert(
-            pz.Table, desc="All tables in the file", cardinality="oneToMany"
-        )
+        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter(
             "The rows of the table contain the patient age"
         )

@@ -8,7 +8,7 @@ import yaml
 from threading import Lock
 
 from palimpzest import constants
-from palimpzest.datasources.datasources import ImageFileDirectorySource, PDFFileDirectorySource, TextFileDirectorySource, XLSFileDirectorySource
+from palimpzest.datasources.datasources import ImageFileDirectorySource, PDFFileDirectorySource, TextFileDirectorySource, XLSFileDirectorySource, HTMLFileDirectorySource
 
 
 class DataDirectorySingletonMeta(type):
@@ -140,7 +140,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
                 return ImageFileDirectorySource(rock, dataset_id)
             elif all([ f.endswith(tuple(constants.PDF_EXTENSIONS))
                         for f in os.listdir(rock)]):
-                pdfprocessor = self.current_config.get("pdfprocessing")
+                pdfprocessor = self.current_config.get("pdfprocessor")
                 file_cache_dir = self.getFileCacheDir()
                 return PDFFileDirectorySource(path=rock, 
                                               dataset_id=dataset_id, 
@@ -150,6 +150,9 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             elif all([ f.endswith(tuple(constants.XLS_EXTENSIONS))
                         for f in os.listdir(rock)]):
                 return XLSFileDirectorySource(rock, dataset_id)
+            elif all([ f.endswith(tuple(constants.HTML_EXTENSIONS))
+                        for f in os.listdir(rock)]):
+                return HTMLFileDirectorySource(rock, dataset_id)
             else:
                 return TextFileDirectorySource(rock, dataset_id)
             

@@ -53,10 +53,20 @@ class Cardinality(str, Enum):
     ONE_TO_ONE = "one-to-one"
     ONE_TO_MANY = "one-to-many"
 
-# CONSTANTS
+    @classmethod
+    def _missing_(cls, value):
+        if value:
+            normalized_value = ''.join([x for x in value if x.isalpha()]).lower()
+            for member in cls:
+                normalized_member = ''.join([x for x in member if x.isalpha()]).lower()
+                if normalized_member == normalized_value:
+                    return member
+        return cls.ONE_TO_ONE
+
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
 PDF_EXTENSIONS = [".pdf"]
 XLS_EXTENSIONS = [".xls", ".xlsx"]
+HTML_EXTENSIONS = [".html", ".htm"]
 
 # the number of seconds the parallel execution will sleep for while waiting for futures to complete
 PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.1
@@ -71,6 +81,9 @@ RETRY_MAX_ATTEMPTS = 1
 
 # maximum number of rows to display in a table
 MAX_ROWS = 5
+
+# maximum number of rows to parse from an HTML
+MAX_HTML_ROWS = 10000
 
 def log_attempt_number(retry_state):
     """return the result of the last call attempt"""
