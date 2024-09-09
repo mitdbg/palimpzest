@@ -7,7 +7,7 @@ from palimpzest.operators import AggregateOp, LimitScanOp, MarshalAndScanDataOp,
 from palimpzest.optimizer import PhysicalPlan
 
 from concurrent.futures import ThreadPoolExecutor, wait
-from typing import List, Optional, Union
+from typing import List, Union
 
 import time
 
@@ -53,7 +53,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
+            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name())
 
         # initialize list of output records and intermediate variables
         output_records = []
@@ -77,7 +77,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         source_operator = plan.operators[0]
         source_op_id = source_operator.get_op_id()
         datasource = (
-            self.datadir.getRegisteredDataset(self.source_dataset_id)
+            self.datadir.getRegisteredDataset(source_operator.dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
             else self.datadir.getCachedResult(source_operator.dataset_id)
         )

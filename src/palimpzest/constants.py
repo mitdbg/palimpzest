@@ -63,6 +63,10 @@ class Cardinality(str, Enum):
                     return member
         return cls.ONE_TO_ONE
 
+class PickOutputStrategy(str, Enum):
+    CHAMPION = "champion"
+    ENSEMBLE = "ensemble"
+
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
 PDF_EXTENSIONS = [".pdf"]
 XLS_EXTENSIONS = [".xls", ".xlsx"]

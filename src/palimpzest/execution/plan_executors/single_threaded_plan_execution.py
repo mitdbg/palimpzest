@@ -6,7 +6,7 @@ from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp,
 from palimpzest.operators.filter import FilterOp
 from palimpzest.optimizer import PhysicalPlan
 
-from typing import Optional, Union
+from typing import Union
 
 import time
 
@@ -37,7 +37,7 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
+            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name())
 
         # initialize list of output records and intermediate variables
         output_records = []
@@ -46,7 +46,7 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
         datasource = (
-            self.datadir.getRegisteredDataset(self.source_dataset_id)
+            self.datadir.getRegisteredDataset(source_operator.dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
             else self.datadir.getCachedResult(source_operator.dataset_id)
         )
@@ -178,7 +178,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here     
+            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name())     
 
         # initialize list of output records and intermediate variables
         output_records = []
@@ -188,7 +188,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
         datasource = (
-            self.datadir.getRegisteredDataset(self.source_dataset_id)
+            self.datadir.getRegisteredDataset(source_operator.dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
             else self.datadir.getCachedResult(source_operator.dataset_id)
         )

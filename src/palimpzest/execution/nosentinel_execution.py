@@ -13,7 +13,9 @@ from palimpzest.sets import Set
 
 import time
 
-
+# TODO: we've removed the dataset_id; now we need this execution engine to:
+#       - run on validation data (if present); otherwise run on first num_samples
+#           - this should also be true for other execution engines
 class NoSentinelExecutionEngine(ExecutionEngine):
     """
     This class implements the abstract execute() method from the ExecutionEngine.
@@ -24,15 +26,15 @@ class NoSentinelExecutionEngine(ExecutionEngine):
     def execute(self, dataset: Set, policy: Policy):
         execution_start_time = time.time()
 
+        # initialize the datasource
+        self.init_datasource(dataset)
+
         # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
         if self.nocache:
             self.clear_cached_responses_and_examples()
 
-        # set the source dataset id
-        self.set_source_dataset_id(dataset)
-
         # construct the CostModel
-        cost_model = CostModel(source_dataset_id=self.source_dataset_id)
+        cost_model = CostModel()
 
         # initialize the optimizer
         optimizer = Optimizer(

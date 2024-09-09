@@ -1,20 +1,27 @@
-from palimpzest.constants import OptimizationStrategy
+from palimpzest.constants import OptimizationStrategy, PickOutputStrategy
 from palimpzest.cost_model import CostModel
-from palimpzest.dataclasses import ExecutionStats, RecordOpStats
+from palimpzest.dataclasses import ExecutionStats
 from palimpzest.execution import (
     ExecutionEngine,
     PipelinedParallelSentinelPlanExecutor,
+    PipelinedSingleThreadSentinelPlanExecutor,
     SequentialSingleThreadSentinelPlanExecutor,
 )
 from palimpzest.optimizer import Optimizer, SentinelPlan
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
-from typing import List
+from concurrent.futures import ThreadPoolExecutor
 
 import time
+import warnings
 
-
+# TODO: we've removed the dataset_id; now we need this execution engine to:
+#       - run on validation data (if present); otherwise run on first num_samples
+#           - this should also be true for other execution engines
+#       - have generate_sample_observations return records if there's no validation data (and only return observations otherwise)
+#       - have execute_sentinel_plan mimic execute_plans; but handle copying the sentinel plan, and possibly passing a list of (record, col) --> plan
+#           - then have it call the sentinel plan executor
 class SentinelExecutionEngine(ExecutionEngine):
     """
     This class implements the abstract execute() method from the ExecutionEngine.
@@ -25,15 +32,75 @@ class SentinelExecutionEngine(ExecutionEngine):
         super().__init__(*args, **kwargs)
         self.rank = rank
 
+        # check that user either provided validation data or set a finite number of samples
+        self.using_validation_data = self.validation_data_source is not None
+        assert self.using_validation_data or self.num_samples != float("inf"), "Must provide validation data or specify a finite number of samples"
 
-    def execute_sentinel_plan(self, plan: SentinelPlan):
+        # TODO: relax this constraint once we've implemented an end-to-end working version of sentinel execution
+        # check that the user provided at least 3 validation samples
+        num_val_records = len(self.validation_data_source) if self.using_validation_data else self.num_samples
+        assert num_val_records >= 3, "Number of validation examples (or samples) must be >= 3 to allow for low-rank approximation."
+
+        # check that we have enough records for the specified rank
+        if num_val_records < self.rank + 1:
+            warnings.warn(f"Samples (n={num_val_records}) must be >= rank + 1 (r={self.rank}); Decreasing rank to {num_val_records - 1}")
+            self.rank = num_val_records - 1
+
+    def execute_sentinel_plan(self, plan: SentinelPlan, num_samples: int):
         """
         """
+        # set plan_parallel_workers to be max workers and create one sentinel plan per worker
+        plan_parallel_workers = min(self.max_workers, num_samples)
+        plans = [plan.copy() for _ in range(plan_parallel_workers)]
+
+        # split records across plans in contiguous (num_samples / plan_parallel_workers) sized chunks
+        plan_record_indices = []
+        for idx in range(plan_parallel_workers):
+            start_idx = int(num_samples * (idx / plan_parallel_workers))
+            end_idx = int(num_samples * ((idx + 1) / plan_parallel_workers))
+            plan_record_indices.append((start_idx, end_idx))
+
         # TODO
-        pass
+        # if we're not using validation data; pass flag into execute_plan to
+        # sample champion model for every record
+
+        # divide records evenly among plans and execute
+        # with ThreadPoolExecutor(max_workers=plan_parallel_workers) as executor:
+            # results = list(executor.map(lambda x: self.execute_plan(**x),
+            #         [{"plan": plan,
+            #           "scan_start_idx": start_idx,
+            #           "scan_end_idx": end_idx,
+            #           "plan_workers": 1,
+            #           }
+            #           for plan, (start_idx, end_idx) in zip(plans, plan_record_indices)],
+            #     )
+            # )
+        results = list(map(lambda x: self.execute_plan(**x),
+                [{"plan": plan,
+                  "scan_start_idx": start_idx,
+                  "scan_end_idx": end_idx,
+                  "plan_workers": 1}
+                  for plan, (start_idx, end_idx) in zip(plans, plan_record_indices)],
+            )
+        )
+        # split results into per-plan records and plan stats
+        all_records, all_plan_stats = zip(*results)
+
+        # process results to get sample execution data and sentinel plan stats
+        all_sample_execution_data, return_records = [], None
+        for records, plan_stats, plan in zip(all_records, all_plan_stats, plans):
+            # aggregate sentinel est. data
+            for operator_stats in plan_stats.operator_stats.values():
+                all_sample_execution_data.extend(operator_stats.record_op_stats_lst)
+
+            # if we're not using validation data; return results from the champion model or ensemble
+            if not self.using_validation_data:
+                return_records = records
+
+        return all_sample_execution_data, return_records, all_plan_stats
 
 
-    def generate_sample_observations(self, dataset: Set):
+    def generate_sample_observations(self, dataset: Set, policy: Policy):
         """
         This function is responsible for generating sample observation data which can be
         consumed by the CostModel. For each physical optimization and each operator, our
@@ -46,24 +113,42 @@ class SentinelExecutionEngine(ExecutionEngine):
         """
         # initialize the optimizer
         optimizer = Optimizer(
-            policy=None,
-            cost_model=None,
+            policy=policy,
+            cost_model=CostModel(),
             no_cache=True,
             verbose=self.verbose,
             available_models=self.available_models,
             allow_bonded_query=True,
-            allow_conventional_query=True,
+            allow_conventional_query=False,
             allow_code_synth=True,
             allow_token_reduction=True,
             optimization_strategy=OptimizationStrategy.SENTINEL,
-            sentinel_low_rank=self.rank,
         )
 
+        # if validation data is present, swap out the dataset's source with the validation source
+        if self.using_validation_data:
+            self.set_datasource(dataset, self.validation_data_source)
+
         # use optimizer to generate sentinel plans
-        sentinel_plan = optimizer.optimize(dataset)
+        sentinel_plans = optimizer.optimize(dataset)
+        sentinel_plan = sentinel_plans[0]
 
         # run sentinel plan
-        execution_data, records, plan_stats = self.execute_sentinel_plan(sentinel_plan)
+        num_samples = (
+            len(self.validation_data_source)
+            if self.using_validation_data
+            else min(self.num_samples, len(self.datasource))
+        )
+
+        execution_data, records, plan_stats = self.execute_sentinel_plan(sentinel_plan, num_samples)
+
+        # if we ran on validation data, swap back to the original source
+        if self.using_validation_data:
+            self.set_datasource(dataset, self.datasource)
+        
+        # otherwise, advance the scan_start_idx
+        else:
+            self.scan_start_idx += num_samples
 
         return execution_data, records, plan_stats
 
@@ -71,12 +156,12 @@ class SentinelExecutionEngine(ExecutionEngine):
     def execute(self, dataset: Set, policy: Policy):
         execution_start_time = time.time()
 
+        # initialize the datasource
+        self.init_datasource(dataset)
+
         # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
         if self.nocache:
             self.clear_cached_responses_and_examples()
-
-        # set the source dataset id
-        self.set_source_dataset_id(dataset)
 
         # initialize execution data, records, and plan stats
         all_execution_data, all_records, all_plan_stats = [], [], []
@@ -87,16 +172,22 @@ class SentinelExecutionEngine(ExecutionEngine):
         uid = dataset.universalIdentifier()
         run_sentinels = self.nocache or not self.datadir.hasCachedAnswer(uid)    
         if run_sentinels:
-            all_execution_data, all_records, all_plan_stats = self.generate_sample_observations(dataset, policy)
-            # TODO: if the above is validation data: do not return as part of results; if it is sample data: do return;
+            all_execution_data, records, all_plan_stats = self.generate_sample_observations(dataset, policy)
 
+            # if we did not use validation data; set the record outputs to be those from the champion model
+            if not self.using_validation_data:
+                all_records = records
+        
+            import json
+            with open('tmp-execution-data.json', 'w') as f:
+                all_execution_data = [rec_op_stats.to_json() for rec_op_stats in all_execution_data]
+                json.dump(all_execution_data, f)
+                exit(0)
+
+        # TODO: pass in groundtruth answers to cost model as well (whether they are from validation source or champion sentinel)
         # construct the CostModel with any sample execution data we've gathered
-        cost_model = CostModel(
-            source_dataset_id=self.source_dataset_id,
-            sample_execution_data=all_execution_data,
-        )
+        cost_model = CostModel(sample_execution_data=all_execution_data)
 
-        # NOTE: if we change sentinel execution to run a diverse set of plans, we may only need to update_cost_model here
         # (re-)initialize the optimizer
         optimizer = Optimizer(
             policy=policy,
@@ -140,6 +231,13 @@ class SentinelExecutionEngine(ExecutionEngine):
 class SequentialSingleThreadSentinelExecution(SentinelExecutionEngine, SequentialSingleThreadSentinelPlanExecutor):
     """
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
+    """
+    pass
+
+
+class PipelinedSingleThreadSentinelExecution(SentinelExecutionEngine, PipelinedSingleThreadSentinelPlanExecutor):
+    """
+    This class performs sentinel execution while executing plans in a pipelined, single-threaded fashion.
     """
     pass
 

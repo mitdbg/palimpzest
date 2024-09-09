@@ -7,7 +7,7 @@ import pytest
 class TestCostModel:
     def test_compute_operator_estimates(self, simple_plan_sample_execution_data, simple_plan_expected_operator_estimates):
         # construct estimator
-        estimator = CostModel(source_dataset_id=None, sample_execution_data=simple_plan_sample_execution_data)
+        estimator = CostModel(sample_execution_data=simple_plan_sample_execution_data)
 
         # get computed operator estimates
         operator_estimates = estimator.operator_estimates
@@ -67,7 +67,7 @@ class TestCostModel:
                 record_op_stats.source_op_id = test_op_id_to_new_op_id[record_op_stats.source_op_id]
 
         # construct cost model
-        cost_model = CostModel(source_dataset_id=dataset_id, sample_execution_data=simple_plan_sample_execution_data)
+        cost_model = CostModel(sample_execution_data=simple_plan_sample_execution_data)
 
         # estimate cost of plan operators
         source_op_estimates = None

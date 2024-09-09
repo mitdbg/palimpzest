@@ -19,11 +19,6 @@ class TestParallelExecutionNoCache:
     # the number of sentinel samples to be drawn for each execution of test_execute_sentinel_plan
     TEST_SENTINEL_NUM_SAMPLES: int = 3
 
-    def test_set_source_dataset_id(self, execution_engine, enron_workload, enron_eval_tiny):
-        simple_execution = execution_engine()
-        simple_execution.set_source_dataset_id(enron_workload)
-        assert simple_execution.source_dataset_id == enron_eval_tiny
-
     @pytest.mark.parametrize(
         argnames=("workload", "physical_plan"),
         argvalues=[
@@ -35,7 +30,6 @@ class TestParallelExecutionNoCache:
     def test_execute_sentinel_plan(self, execution_engine, workload, physical_plan):
         # create execution instance
         execution = execution_engine(nocache=True)
-        execution.set_source_dataset_id(workload)
 
         # execute the plan
         _, plan_stats = execution.execute_plan(physical_plan, num_samples=self.TEST_SENTINEL_NUM_SAMPLES)

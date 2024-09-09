@@ -39,6 +39,17 @@ class DataRecord:
         self._id = hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
         self._parent_id = parent_id
 
+    def copy(self):
+        # set data record's _id and _parent_id directly (rather than storing scan_idx and cardinality_idx)
+        dr = DataRecord(self.schema)
+        dr._id = self._id
+        dr._parent_id = self._parent_id
+
+        # set all additional record attributes
+        for key, value in self._asDict().items():
+            setattr(dr, key, value)
+
+        return dr
 
     def _asJSONStr(self, include_bytes: bool = True, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
@@ -63,6 +74,9 @@ class DataRecord:
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
+
+    def __hash__(self):
+        return hash(self._asJSONStr())
 
     # NOTE: the method is called _getFields instead of getFields to avoid it being picked up as a data record attribute;
     #       in the future we will come up with a less ugly fix -- but for now do not remove the _ even though it's not private

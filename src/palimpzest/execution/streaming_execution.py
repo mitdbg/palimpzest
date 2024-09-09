@@ -11,11 +11,6 @@ from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
 
-
-import os
-import shutil
-
-
 class StreamingSequentialExecution(ExecutionEngine):
     """ This class can be used for a streaming, record-based execution.
     Results are returned as an iterable that can be consumed by the caller."""
@@ -33,12 +28,9 @@ class StreamingSequentialExecution(ExecutionEngine):
 
     def generate_plan(self, dataset: Set, policy: Policy):
         self.clear_cached_responses_and_examples()
-
-        self.set_source_dataset_id(dataset)
         start_time = time.time()
 
-        cost_model = CostModel(source_dataset_id=self.source_dataset_id)
-
+        cost_model = CostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
@@ -69,6 +61,8 @@ class StreamingSequentialExecution(ExecutionEngine):
         dataset: Set,
         policy: Policy,
     ):
+        # initialize the datasource
+        self.init_datasource(dataset)
 
         start_time = time.time()
         # Always delete cache
@@ -88,9 +82,9 @@ class StreamingSequentialExecution(ExecutionEngine):
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
         datasource = (
-            self.datadir.getRegisteredDataset(self.source_dataset_id)
+            self.datadir.getRegisteredDataset(scan_operator.dataset_id)
             if isinstance(scan_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(scan_operator.cachedDataIdentifier)
+            else self.datadir.getCachedResult(scan_operator.dataset_id)
         )
         datasource_len = len(datasource)
 

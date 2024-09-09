@@ -68,7 +68,6 @@ class Optimizer:
             allow_code_synth: bool=True,
             allow_token_reduction: bool=True,
             optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
-            sentinel_low_rank: Optional[int]=None,
         ):
         # store the policy
         self.policy = policy
@@ -98,7 +97,6 @@ class Optimizer:
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.optimization_strategy = optimization_strategy
-        self.sentinel_low_rank = sentinel_low_rank
 
         # prune implementation rules based on boolean flags
         if not self.allow_bonded_query:
@@ -352,7 +350,7 @@ class Optimizer:
         """
         # get all the physical expressions for this group
         phys_exprs = self.groups[group_id].physical_expressions
-        phys_op_set = set([expr.operator for expr in phys_exprs])
+        phys_op_set = [expr.operator for expr in phys_exprs]
 
         # if this expression has no inputs (i.e. it is a BaseScan or CacheScan),
         # create and return the physical plan
@@ -364,7 +362,7 @@ class Optimizer:
         # get the best physical plan(s) for this group's inputs
         best_phys_subplan = SentinelPlan(operator_sets=[])
         for input_group_id in best_phys_expr.input_group_ids:
-            input_best_phys_plan = self.get_sentinel_plans(input_group_id)
+            input_best_phys_plan = self.get_sentinel_plan(input_group_id)
             best_phys_subplan = SentinelPlan.fromOpsAndSubPlan(best_phys_subplan.operator_sets, input_best_phys_plan)
 
         # add this operator set to best physical plan and return

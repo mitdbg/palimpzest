@@ -67,6 +67,9 @@ class ExecutionEngine:
             else validation_data_source
         )
 
+        # datasource; should be set by execute() with call to get_datasource()
+        self.datasource = None
+
 
     def execution_id(self) -> str:
         """
@@ -91,19 +94,29 @@ class ExecutionEngine:
         cache.rmCache()
 
 
-    def set_source_dataset_id(self, dataset: Set) -> str:
+    def init_datasource(self, dataset: Set) -> str:
         """
-        Sets the dataset_id of the DataSource for the given dataset.
+        Gets the DataSource for the given dataset.
         """
         # iterate until we reach DataSource
         while isinstance(dataset, Set):
             dataset = dataset._source
 
         # throw an exception if datasource is not registered with PZ
-        _ = self.datadir.getRegisteredDataset(dataset.dataset_id)
+        self.datasource = self.datadir.getRegisteredDataset(dataset.dataset_id)
 
-        # set the source dataset id
-        self.source_dataset_id = dataset.dataset_id
+
+    def set_datasource(self, dataset: Set, source: DataSource):
+        """
+        Sets the DataSource for the dataset; can be used to switch between executing
+        on validation data vs. workload data.
+        """
+        # iterate until we reach DataSource
+        while isinstance(dataset, Set):
+            dataset = dataset._source
+
+        # set the source for the dataset
+        dataset._source = source
 
 
     def get_parallel_max_workers(self):
@@ -200,7 +213,7 @@ class ExecutionEngine:
             if plan.plan_id == max_quality_plan_id:
                 return_records = records
 
-        return all_sample_execution_data, return_records, plan_stats
+        return all_sample_execution_data, return_records, all_plan_stats
 
 
     def execute_optimal_strategy(
@@ -232,13 +245,9 @@ class ExecutionEngine:
         # initialize output records and plan stats
         records, plan_stats = [], []
 
-        # get total number of input records in the datasource
-        datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
-        datasource_len = len(datasource)
-
         # get the initial set of optimal plans according to the optimizer
         plans = optimizer.optimize(dataset)
-        while len(plans) > 1 and self.scan_start_idx < datasource_len:
+        while len(plans) > 1 and self.scan_start_idx < len(self.datasource):
             # identify the plan with the highest quality in the set
             max_quality_plan_id = self.get_max_quality_plan_id(plans)
 
@@ -247,13 +256,10 @@ class ExecutionEngine:
             records.extend(new_records)
             plan_stats.extend(new_plan_stats)
 
-            if self.scan_start_idx + self.num_samples < datasource_len:
+            if self.scan_start_idx + self.num_samples < len(self.datasource):
                 # update cost model and optimizer
                 execution_data.extend(new_execution_data)
-                cost_model = CostModel(
-                    source_dataset_id=self.source_dataset_id,
-                    sample_execution_data=execution_data,
-                )
+                cost_model = CostModel(sample_execution_data=execution_data)
                 optimizer.update_cost_model(cost_model)
 
                 # get new set of plans
@@ -262,7 +268,7 @@ class ExecutionEngine:
                 # update scan start idx
                 self.scan_start_idx += self.num_samples
 
-        if self.scan_start_idx < datasource_len:
+        if self.scan_start_idx < len(self.datasource):
             # execute final plan until end
             final_plan = plans[0]
             new_records, new_plan_stats = self.execute_plan(

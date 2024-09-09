@@ -4,7 +4,7 @@ from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.dataclasses import PlanCost
 from palimpzest.operators import PhysicalOperator
 
-from typing import List, Optional, Set
+from typing import List, Optional
 
 import hashlib
 
@@ -85,9 +85,10 @@ class PhysicalPlan(Plan):
 
 
 class SentinelPlan(Plan):
-    def __init__(self, operator_sets: List[Set[PhysicalOperator]]):
+    def __init__(self, operator_sets: List[List[PhysicalOperator]]):
         self.operator_sets = operator_sets
         self.plan_id = self.compute_plan_id()
+        self.sample_matrices = [None] * len(operator_sets)
 
     def compute_plan_id(self) -> str:
         """
@@ -98,7 +99,7 @@ class SentinelPlan(Plan):
         hash_str = str(tuple(op.get_op_id() for op_set in self.operator_sets for op in op_set))
         return hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
-    def __eq__(self, other: PhysicalPlan):
+    def __eq__(self, other: SentinelPlan):
         return self.operator_sets == other.operator_sets
 
     def __hash__(self):
@@ -106,12 +107,12 @@ class SentinelPlan(Plan):
 
     def __str__(self):
         # making the assumption that first operator_set can only be a scan
-        start = list(self.operator_sets[0])[0]
+        start = self.operator_sets[0][0]
         plan_str = f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n\n"
 
         for idx, operator_set in enumerate(self.operator_sets[1:]):
             if len(operator_set) == 1:
-                operator = list(operator_set)[0]
+                operator = operator_set[0]
                 plan_str += f" {idx+1}. {str(operator)}\n"
 
             else:
@@ -120,11 +121,14 @@ class SentinelPlan(Plan):
 
         return plan_str
 
+    def copy(self):
+        return SentinelPlan(self.operator_sets)
+
     @staticmethod
-    def fromOpsAndSubPlan(op_sets: List[Set[PhysicalOperator]], subPlan: SentinelPlan) -> SentinelPlan:
+    def fromOpsAndSubPlan(op_sets: List[List[PhysicalOperator]], subPlan: SentinelPlan) -> SentinelPlan:
         # create copies of all logical operators
-        copySubPlan = [{op.copy() for op in op_set} for op_set in subPlan.operator_sets]
-        copyOps = [{op.copy() for op in op_set} for op_set in op_sets]
+        copySubPlan = [[op.copy() for op in op_set] for op_set in subPlan.operator_sets]
+        copyOps = [[op.copy() for op in op_set] for op_set in op_sets]
 
         # construct full set of operators
         copySubPlan.extend(copyOps)

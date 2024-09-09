@@ -46,9 +46,25 @@ class BaseCostModel:
         raise NotImplementedError("Calling __call__ from abstract method")
 
 
-class MatrixCompletionWithValidationCostModel:
+class MatrixCompletionCostModel:
     """
+    TODO: for some common benchmark datasets; see if you can:
+    1) write a PZ program to solve them
+    2) run the PZ program and score the outputs
+    3) confirm that the cost, runtime, quality(, selectivity) matrices are in fact low rank
+        a) and approximately what is that low rank?
 
+    For starters, let's focus on the real-estate and enron datasets
+    - Fever dataset, Wiki-QA might also be good choices in the future
+
+    We need to:
+    1) finish sentinel plan executor using champion model selection for output record(s)
+    2) compute full cost, runtime, quality, selectivity matrices
+    3) perform PCA on these matrices and visualize how much of their variance is explained by first K principal components
+    4) If K@90% is "low" (i.e. <=5 for convert, <=3 for filter), we are in business
+
+    if low-rank test comes back positive:
+    1) implement initial MatrixCompletionCostModel with the code from Berkeley (see comments below for steps)
     """
     def __init__(self, val_execution_data: List[RecordOpStats], val_exemplars: List[DataRecord]):
         # compute the quality of each record as judged by the validation exemplars
@@ -57,8 +73,17 @@ class MatrixCompletionWithValidationCostModel:
         # construct the observation matrices for the cost per record, runtime per record, and quality
         pass
 
-    def __call__(self, operator: PhysicalOperator) -> PlanCost:
+        # START WITH THE SLOW ASS CODE THAT YOU HAVE; WE CAN MAKE IT FASTER LATER IF WE NEED TO
+        # complete the observation matrices
         pass
+
+    def __call__(self, operator: PhysicalOperator) -> PlanCost:
+        # get dictionary mapping op (column) to avg. value from matrix for each matrix
+        pass
+
+        # construct and return op estimates
+        pass
+
 
 class CostModel(BaseCostModel):
     """
@@ -66,10 +91,7 @@ class CostModel(BaseCostModel):
     by taking the average of any sample execution that the CostModel has for that operator. If no
     such data exists, it returns a naive estimate.
     """
-    def __init__(self, source_dataset_id: str, sample_execution_data: List[RecordOpStats] = [], confidence_level: float = 0.90):
-        # store source dataset id to help with estimating cardinalities
-        self.source_dataset_id = source_dataset_id
-
+    def __init__(self, sample_execution_data: List[RecordOpStats] = [], confidence_level: float = 0.90):
         # construct full dataset of samples
         self.sample_execution_data_df = (
             pd.DataFrame(sample_execution_data)
@@ -435,8 +457,8 @@ class CostModel(BaseCostModel):
         # initialize estimates of operator metrics based on naive (but sometimes precise) logic
         if isinstance(operator, pz.MarshalAndScanDataOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
-            dataset_type = self.datadir.getRegisteredDatasetType(self.source_dataset_id)
+            datasource = self.datadir.getRegisteredDataset(operator.dataset_id)
+            dataset_type = self.datadir.getRegisteredDatasetType(operator.dataset_id)
             datasource_len = len(datasource)
             datasource_memsize = datasource.getSize()
 
