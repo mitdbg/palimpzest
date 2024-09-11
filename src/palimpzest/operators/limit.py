@@ -58,7 +58,7 @@ class LimitScanOp(PhysicalOperator):
             op_name=self.op_name(),
             time_per_record=0.0,
             cost_per_record=0.0,
-            op_details={k: v for k, v in self.get_op_params() if not isinstance(v, Schema)},
+            op_details={k: v for k, v in self.get_op_params().items() if not isinstance(v, Schema)},
         )
 
         return [candidate], [record_op_stats]

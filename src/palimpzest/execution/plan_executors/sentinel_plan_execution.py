@@ -163,7 +163,7 @@ class SequentialSingleThreadSentinelPlanExecutor(ExecutionEngine):
             op_set_str = ",".join([op.op_name() for op in op_set])
             op_set_name = f"OpSet({op_set_str})"
             op_set_details = {
-                op.op_name(): {k: v for k, v in op.get_op_params() if not isinstance(v, Schema)}
+                op.op_name(): {k: v for k, v in op.get_op_params().items() if not isinstance(v, Schema)}
                 for op in op_set
             }
             plan_stats.operator_stats[op_set_id] = OperatorStats(op_id=op_set_id, op_name=op_set_name, op_details=op_set_details)
@@ -326,7 +326,7 @@ class PipelinedParallelSentinelPlanExecutor(ExecutionEngine):
             for op in op_set:
                 op_id = op.get_op_id()
                 op_name = op.op_name()
-                op_details = {k: v for k, v in op.get_op_params() if not isinstance(v, Schema)} # TODO
+                op_details = {k: v for k, v in op.get_op_params().items() if not isinstance(v, Schema)} # TODO
                 plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name(), op_details=op.get_op_params())
 
         # initialize list of output records and intermediate variables

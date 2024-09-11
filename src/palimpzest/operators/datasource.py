@@ -120,7 +120,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
                 op_name=self.op_name(),
                 time_per_record=(end_time - start_time) / len(records),
                 cost_per_record=0.0,
-                op_details={k: v for k, v in self.get_op_params() if not isinstance(v, Schema)},
+                op_details={k: v for k, v in self.get_op_params().items() if not isinstance(v, Schema)},
             )
             record_op_stats_lst.append(record_op_stats)
 
@@ -173,7 +173,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
                 op_name=self.op_name(),
                 time_per_record=(end_time - start_time) / len(records),
                 cost_per_record=0.0,
-                op_details={k: v for k, v in self.get_op_params() if not isinstance(v, Schema)},
+                op_details={k: v for k, v in self.get_op_params().items() if not isinstance(v, Schema)},
             )
             record_op_stats_lst.append(record_op_stats)
 
