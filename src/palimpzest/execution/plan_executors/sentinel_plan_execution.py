@@ -1,5 +1,5 @@
 from palimpzest.constants import MAX_ID_CHARS, PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, PickOutputStrategy
-from palimpzest.corelib.schemas import SourceRecord
+from palimpzest.corelib.schemas import Schema, SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats, RecordOpStats
 from palimpzest.elements import DataRecord
 from palimpzest.execution import ExecutionEngine
@@ -160,9 +160,13 @@ class SequentialSingleThreadSentinelPlanExecutor(ExecutionEngine):
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
         for op_set in plan.operator_sets:
             op_set_id = self.compute_op_set_id(op_set)
-            op_name = ",".join([op.op_name() for op in op_set])
-            op_details = {op.op_name(): op.get_op_params() for op in op_set}
-            plan_stats.operator_stats[op_set_id] = OperatorStats(op_id=op_set_id, op_name=f"OpSet({op_name})", op_details=op_details)
+            op_set_str = ",".join([op.op_name() for op in op_set])
+            op_set_name = f"OpSet({op_set_str})"
+            op_set_details = {
+                op.op_name(): {k: v for k, v in op.get_op_params() if not isinstance(v, Schema)}
+                for op in op_set
+            }
+            plan_stats.operator_stats[op_set_id] = OperatorStats(op_id=op_set_id, op_name=op_set_name, op_details=op_set_details)
 
         # initialize list of output records and intermediate variables
         output_records = []
@@ -321,6 +325,8 @@ class PipelinedParallelSentinelPlanExecutor(ExecutionEngine):
         for op_set in plan.operator_sets:
             for op in op_set:
                 op_id = op.get_op_id()
+                op_name = op.op_name()
+                op_details = {k: v for k, v in op.get_op_params() if not isinstance(v, Schema)} # TODO
                 plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name(), op_details=op.get_op_params())
 
         # initialize list of output records and intermediate variables

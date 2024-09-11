@@ -1,5 +1,5 @@
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
-from palimpzest.corelib.schemas import SourceRecord
+from palimpzest.corelib.schemas import Schema, SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements import DataRecord
 from palimpzest.execution import ExecutionEngine
@@ -53,7 +53,9 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name(), op_details=op.get_op_params())
+            op_name = op.op_name()
+            op_details = {k: v for k, v in op.get_op_params() if not isinstance(v, Schema)}
+            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details)
 
         # initialize list of output records and intermediate variables
         output_records = []

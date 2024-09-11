@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from palimpzest.corelib import Schema
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.elements import DataRecord
 from palimpzest.operators import PhysicalOperator, DataRecordsWithStats
@@ -57,7 +58,7 @@ class LimitScanOp(PhysicalOperator):
             op_name=self.op_name(),
             time_per_record=0.0,
             cost_per_record=0.0,
-            op_details=self.get_op_params(),
+            op_details={k: v for k, v in self.get_op_params() if not isinstance(v, Schema)},
         )
 
         return [candidate], [record_op_stats]

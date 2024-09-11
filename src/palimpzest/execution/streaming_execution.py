@@ -1,5 +1,5 @@
 import time
-from palimpzest.corelib.schemas import SourceRecord
+from palimpzest.corelib.schemas import Schema, SourceRecord
 from palimpzest.cost_model.cost_model import CostModel
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements import DataRecord
@@ -52,7 +52,9 @@ class StreamingSequentialExecution(ExecutionEngine):
             if isinstance(op, AggregateOp):
                 raise Exception("You cannot have a Streaming Execution if there is an Aggregation Operator")
             op_id = op.get_op_id()
-            self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name(), op_details=op.get_op_params()) 
+            op_name = op.op_name()
+            op_details = {k: v for k, v in op.get_op_params() if not isinstance(v, Schema)}
+            self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details) 
         print("Time for planning: ", time.time() - start_time)
         self.plan_generated = True
         return self.plan
