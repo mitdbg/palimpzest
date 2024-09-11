@@ -94,6 +94,7 @@ class NonLLMFilter(FilterOp):
             passed_filter=result,
             fn_call_duration_secs=fn_call_duration_secs,
             answer=result,
+            op_details=self.get_op_params(),
         )
 
         # set _passed_filter attribute and return
@@ -263,6 +264,7 @@ class LLMFilter(FilterOp):
             llm_call_duration_secs=gen_stats.llm_call_duration_secs,
             answer=response,
             passed_filter=passed_filter,
+            op_details=self.get_op_params(),
         )
 
         # set _passed_filter attribute and return

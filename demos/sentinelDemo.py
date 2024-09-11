@@ -209,6 +209,7 @@ if __name__ == "__main__":
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     # create pz plan
+    num_samples = None
     if workload == "enron":
         # datasetid="enron-eval" for paper evaluation
         plan = pz.Dataset(datasetid, schema=Email)
@@ -218,6 +219,7 @@ if __name__ == "__main__":
         plan = plan.filter(
             'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
         )
+        num_samples = 250
 
     elif workload == "real-estate":
         # datasetid="real-estate-eval-100" for paper evaluation
@@ -238,6 +240,7 @@ if __name__ == "__main__":
         )
         plan = plan.filter(within_two_miles_of_mit, depends_on="address")
         plan = plan.filter(in_price_range, depends_on="price")
+        num_samples = 100
 
     elif workload == "medical-schema-matching":
         # datasetid="biofabric-medium" for paper evaluation
@@ -254,6 +257,7 @@ if __name__ == "__main__":
         optimization_strategy=pz.OptimizationStrategy.OPTIMAL,
         execution_engine=pz.SequentialSingleThreadSentinelExecution,
         verbose=verbose,
+        num_samples=num_samples,
     )
 
     # save statistics

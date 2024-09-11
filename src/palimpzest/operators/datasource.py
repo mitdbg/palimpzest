@@ -120,6 +120,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
                 op_name=self.op_name(),
                 time_per_record=(end_time - start_time) / len(records),
                 cost_per_record=0.0,
+                op_details=self.get_op_params(),
             )
             record_op_stats_lst.append(record_op_stats)
 
@@ -172,6 +173,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
                 op_name=self.op_name(),
                 time_per_record=(end_time - start_time) / len(records),
                 cost_per_record=0.0,
+                op_details=self.get_op_params(),
             )
             record_op_stats_lst.append(record_op_stats)
 

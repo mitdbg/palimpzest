@@ -148,6 +148,7 @@ class ApplyGroupByOp(AggregateOp):
                 op_name=self.op_name(),
                 time_per_record=total_time / len(drs),
                 cost_per_record=0.0,
+                op_details=self.get_op_params(),
             )
             record_op_stats_lst.append(record_op_stats)
 
@@ -210,6 +211,7 @@ class CountAggregateOp(AggregateOp):
             op_name=self.op_name(),
             time_per_record=time.time() - start_time,
             cost_per_record=0.0,
+            op_details=self.get_op_params(),
         )
 
         return [dr], [record_op_stats]
@@ -275,6 +277,7 @@ class AverageAggregateOp(AggregateOp):
             op_name=self.op_name(),
             time_per_record=time.time() - start_time,
             cost_per_record=0.0,
+            op_details=self.get_op_params(),
         )
 
         return [dr], [record_op_stats]

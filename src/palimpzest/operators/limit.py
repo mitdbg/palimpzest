@@ -57,6 +57,7 @@ class LimitScanOp(PhysicalOperator):
             op_name=self.op_name(),
             time_per_record=0.0,
             cost_per_record=0.0,
+            op_details=self.get_op_params(),
         )
 
         return [candidate], [record_op_stats]

@@ -145,6 +145,9 @@ class RecordOpStats:
     # (if applicable) a boolean indicating whether this is the statistics captured from a failed convert operation
     failed_convert: Optional[bool] = None
 
+    # an OPTIONAL dictionary with more detailed information about this operation;
+    op_details: Dict[str, Any] = field(default_factory=dict)
+
     def to_json(self):
         return {
             field.name: getattr(self, field.name)

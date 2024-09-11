@@ -118,10 +118,10 @@ class SentinelExecutionEngine(ExecutionEngine):
             no_cache=True,
             verbose=self.verbose,
             available_models=self.available_models,
-            allow_bonded_query=True,
-            allow_conventional_query=False,
-            allow_code_synth=True,
-            allow_token_reduction=True,
+            allow_bonded_query=self.allow_bonded_query,
+            allow_conventional_query=self.allow_conventional_query,
+            allow_code_synth=self.allow_code_synth,
+            allow_token_reduction=self.allow_token_reduction,
             optimization_strategy=OptimizationStrategy.SENTINEL,
         )
 
