@@ -121,7 +121,7 @@ class NonLLMConvert(ConvertOp):
                 input_fields=self.inputSchema.fieldNames(),
                 generated_fields=self.outputSchema.fieldNames(),
                 fn_call_duration_secs=fn_call_duration_secs / len(drs),
-                op_details={k: v for k, v in self.get_op_params().items() if not isinstance(v, Schema)},
+                op_details={k: v for k, v in self.get_op_params().items() if k not in ["inputSchema", "outputSchema"]},
             )
             record_op_stats_lst.append(record_op_stats)
 
@@ -360,7 +360,7 @@ class LLMConvert(ConvertOp):
                 llm_call_duration_secs=per_record_stats.llm_call_duration_secs,
                 fn_call_duration_secs=per_record_stats.fn_call_duration_secs,
                 failed_convert=(not successful_convert),
-                op_details={k: v for k, v in self.get_op_params().items() if not isinstance(v, Schema)},
+                op_details={k: v for k, v in self.get_op_params().items() if k not in ["inputSchema", "outputSchema"]},
             )
             record_op_stats_lst.append(record_op_stats)
 
