@@ -39,7 +39,7 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
             op_name = op.op_name()
-            op_details = {k: v for k, v in op.get_op_params().items() if k not in ["inputSchema", "outputSchema"]}
+            op_details = {k: str(v) for k, v in op.get_op_params().items()}
             plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details)
 
         # initialize list of output records and intermediate variables
@@ -182,7 +182,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
             op_name = op.op_name()
-            op_details = {k: v for k, v in op.get_op_params().items() if k not in ["inputSchema", "outputSchema"]}
+            op_details = {k: str(v) for k, v in op.get_op_params().items()}
             plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details)
 
         # initialize list of output records and intermediate variables

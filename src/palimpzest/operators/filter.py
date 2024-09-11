@@ -95,7 +95,7 @@ class NonLLMFilter(FilterOp):
             passed_filter=result,
             fn_call_duration_secs=fn_call_duration_secs,
             answer=result,
-            op_details={k: v for k, v in self.get_op_params().items() if k not in ["inputSchema", "outputSchema"]},
+            op_details={k: str(v) for k, v in self.get_op_params().items()},
         )
 
         # set _passed_filter attribute and return
@@ -265,7 +265,7 @@ class LLMFilter(FilterOp):
             llm_call_duration_secs=gen_stats.llm_call_duration_secs,
             answer=response,
             passed_filter=passed_filter,
-            op_details={k: v for k, v in self.get_op_params().items() if k not in ["inputSchema", "outputSchema"]},
+            op_details={k: str(v) for k, v in self.get_op_params().items()},
         )
 
         # set _passed_filter attribute and return
