@@ -346,7 +346,7 @@ if __name__ == "__main__":
         "--engine",
         type=str,
         help='The engine to use. One of sentinel, nosentinel',
-        default='sentinel',
+        default='nosentinel',
     )
     parser.add_argument(
         "--executor",
