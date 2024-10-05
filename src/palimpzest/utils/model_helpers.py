@@ -11,9 +11,10 @@ def getVisionModels() -> List[Model]:
     """
     models = []
     if os.getenv("OPENAI_API_KEY") is not None:
-        models.extend([Model.GPT_4V])
+        models.extend([Model.GPT_4o_V, Model.GPT_4o_MINI_V])
 
-    # NOTE: not using free Gemini vision model at the moment due to quality issues
+    if os.getenv("TOGETHER_API_KEY") is not None:
+        models.extend([Model.LLAMA3_V])
 
     return models
 
@@ -24,13 +25,10 @@ def getModels(include_vision: Optional[bool] = False) -> List[Model]:
     """
     models = []
     if os.getenv("OPENAI_API_KEY") is not None:
-        models.extend([Model.GPT_3_5, Model.GPT_4])
+        models.extend([Model.GPT_4o, Model.GPT_4o_MINI])
 
     if os.getenv("TOGETHER_API_KEY") is not None:
-        models.extend([Model.MIXTRAL])
-
-    # if os.getenv("GOOGLE_API_KEY") is not None:
-    #     models.extend([Model.GEMINI_1])
+        models.extend([Model.LLAMA3, Model.MIXTRAL])
 
     if include_vision:
         vision_models = getVisionModels()
@@ -38,35 +36,42 @@ def getModels(include_vision: Optional[bool] = False) -> List[Model]:
 
     return models
 
-def getChampionModel():
+
+def getChampionModel(available_models, vision=False):
     champion_model = None
-    if os.environ.get("OPENAI_API_KEY", None) is not None:
-        champion_model = Model.GPT_4
-    elif os.environ.get("TOGETHER_API_KEY", None) is not None:
+
+    # non-vision
+    if not vision and Model.GPT_4o in available_models:
+        champion_model = Model.GPT_4o
+    elif not vision and Model.GPT_4o_MINI in available_models:
+        champion_model = Model.GPT_4o_MINI
+    elif not vision and Model.LLAMA3 in available_models:
+        champion_model = Model.LLAMA3
+    elif not vision and Model.MIXTRAL in available_models:
         champion_model = Model.MIXTRAL
-    elif os.environ.get("GOOGLE_API_KEY", None) is not None:
-        champion_model = Model.GEMINI_1
+
+    # vision
+    elif vision and Model.GPT_4o_V in available_models:
+        champion_model = Model.GPT_4o_V
+    elif vision and Model.GPT_4o_MINI_V in available_models:
+        champion_model = Model.GPT_4o_MINI_V
+    elif vision and Model.LLAMA3_V in available_models:
+        champion_model = Model.LLAMA3_V
+
     else:
-        raise Exception("No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]")
+        raise Exception(f"No models available to create physical plans! available_models: {available_models}")
 
     return champion_model
 
-def getConventionalFallbackModel():
-    fallback_model = None
-    if os.environ.get("OPENAI_API_KEY", None) is not None:
-        fallback_model = Model.GPT_3_5
-    elif os.environ.get("TOGETHER_API_KEY", None) is not None:
-        fallback_model = Model.MIXTRAL
-    elif os.environ.get("GOOGLE_API_KEY", None) is not None:
-        fallback_model = Model.GEMINI_1
-    else:
-        raise Exception("No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]")
 
-    return fallback_model
+def getConventionalFallbackModel(available_models, vision=False):
+    return getChampionModel(available_models, vision)
 
-def getCodeChampionModel():
+
+def getCodeChampionModel(available_models):
     # NOTE: for now, assume same champion as getChampionModel()
-    return getChampionModel()
+    return getChampionModel(available_models, vision=False)
 
-def getChampionModelName():
-    return getChampionModel().value
+
+def getChampionModelName(available_models, vision=False):
+    return getChampionModel(available_models, vision=vision).value

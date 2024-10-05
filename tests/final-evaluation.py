@@ -170,7 +170,7 @@ class RealEstateListingSource(pz.UserSource):
         listing = self.listings[idx]
 
         # create data record
-        dr = pz.DataRecord(self.schema, scan_idx=idx)
+        dr = pz.DataRecord(self.schema, source_id=listing)
         dr.listing = listing
         dr.image_contents = []
         listing_dir = os.path.join(self.listings_dir, listing)

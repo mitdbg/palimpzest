@@ -9,7 +9,7 @@ from collections import Counter
 import json
 import time
 
-llm = CustomGenerator(model_name=Model.GPT_4.value)
+llm = CustomGenerator(model_name=Model.GPT_4o.value)
 def run_codegen(prompt, language='Python'):
     pred, stats = llm.generate(prompt=prompt)
     ordered_keys = [

@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from palimpzest.corelib import Schema
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.elements import DataRecord
-from palimpzest.operators import PhysicalOperator, DataRecordsWithStats
-
-from typing import List
+from palimpzest.elements import DataRecord, DataRecordSet
+from palimpzest.operators import PhysicalOperator
 
 
 class LimitScanOp(PhysicalOperator):
@@ -46,19 +43,24 @@ class LimitScanOp(PhysicalOperator):
             quality=1.0,
         )
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
         # NOTE: execution layer ensures that no more than self.limit
         #       records are returned to the user by this operator.
+        # create new DataRecord
+        dr = DataRecord.fromParent(schema=candidate.schema, parent_record=candidate)
+
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=candidate._id,
-            record_parent_id=candidate._parent_id,
-            record_state=candidate._asDict(include_bytes=False),
+            record_id=dr._id,
+            record_parent_id=dr._parent_id,
+            record_source_id=dr._source_id,
+            record_state=dr._asDict(include_bytes=False),
             op_id=self.get_op_id(),
+            logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=0.0,
             cost_per_record=0.0,
             op_details={k: str(v) for k, v in self.get_op_params().items()},
         )
 
-        return [candidate], [record_op_stats]
+        return DataRecordSet([dr], [record_op_stats])

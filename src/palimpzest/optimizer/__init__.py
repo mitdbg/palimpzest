@@ -2,6 +2,7 @@ from .primitives import *
 from .plan import *
 from .rules import *
 from .tasks import *
+from .cost_model import *
 
 # TODO repeated function find a place to move it to
 # https://stackoverflow.com/a/21563930

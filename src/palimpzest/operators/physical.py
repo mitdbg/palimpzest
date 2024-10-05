@@ -2,17 +2,14 @@ from __future__ import annotations
 
 from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.corelib import Schema
-from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
+from palimpzest.dataclasses import OperatorCostEstimates
 from palimpzest.datamanager import DataDirectory
-from palimpzest.elements import DataRecord
+from palimpzest.elements import DataRecord, DataRecordSet
 
-from typing import List, Tuple, Optional
+from typing import Optional
 
 import hashlib
 import json
-
-# TYPE DEFINITIONS
-DataRecordsWithStats = Tuple[List[DataRecord], List[RecordOpStats]]
 
 
 class PhysicalOperator:
@@ -40,6 +37,11 @@ class PhysicalOperator:
         self.verbose = verbose
         self.logical_op_id = logical_op_id
         self.op_id = None
+
+        # sets __hash__() for each child Operator to be the base class' __hash__() method;
+        # by default, if a subclass defines __eq__() but not __hash__() Python will set that
+        # class' __hash__ to None
+        self.__class__.__hash__ = PhysicalOperator.__hash__
 
     def __str__(self):
         op = f"{self.inputSchema.className()} -> {self.op_name()} -> {self.outputSchema.className()}\n"
@@ -102,7 +104,7 @@ class PhysicalOperator:
         copy_kwargs = self.get_copy_kwargs()
         return self.__class__(**copy_kwargs)
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
         raise NotImplementedError("Calling __call__ from abstract method")
 
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:

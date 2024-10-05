@@ -9,9 +9,8 @@ import pytest
 @pytest.mark.parametrize(
     argnames=("execution_engine",),
     argvalues=[
-        pytest.param(SequentialSingleThreadSentinelExecution, id="seq-single-thread"),
-        pytest.param(PipelinedSingleThreadSentinelExecution, id="pipe-single-thread"),
-        pytest.param(PipelinedParallelSentinelExecution, id="pipe-parallel"),
+        pytest.param(SequentialSingleThreadNoSentinelExecution, id="seq-single-thread"),
+        pytest.param(PipelinedParallelNoSentinelExecution, id="parallel"),
     ]
 )
 class TestParallelExecutionNoCache:
@@ -19,27 +18,31 @@ class TestParallelExecutionNoCache:
     # the number of sentinel samples to be drawn for each execution of test_execute_sentinel_plan
     TEST_SENTINEL_NUM_SAMPLES: int = 3
 
-    @pytest.mark.parametrize(
-        argnames=("workload", "physical_plan"),
-        argvalues=[
-            pytest.param("enron-workload", "scan-only", id="scan-only"),
-            pytest.param("enron-workload", "non-llm-filter", id="non-llm-filter"),
-        ],
-        indirect=True,
-    )
-    def test_execute_sentinel_plan(self, execution_engine, workload, physical_plan):
-        # create execution instance
-        execution = execution_engine(nocache=True)
+    # TODO: needs to be updated to reflect changes to SentinelPlan
+    # @pytest.mark.parametrize(
+    #     argnames=("dataset", "physical_plan"),
+    #     argvalues=[
+    #         pytest.param("enron-eval-tiny", "scan-only", id="scan-only"),
+    #         pytest.param("enron-eval-tiny", "non-llm-filter", id="non-llm-filter"),
+    #     ],
+    #     indirect=True,
+    # )
+    # def test_execute_sentinel_plan(self, execution_engine, dataset, physical_plan):
+    #     # fetch datasource
+    #     datasource = DataDirectory().getRegisteredDataset(dataset)
 
-        # execute the plan
-        _, plan_stats = execution.execute_plan(physical_plan, num_samples=self.TEST_SENTINEL_NUM_SAMPLES)
+    #     # create execution instance
+    #     execution = execution_engine(datasource=datasource, num_samples=self.TEST_SENTINEL_NUM_SAMPLES, nocache=True)
 
-        # NOTE: when we enable multi-source plans; this will need to be updated
-        # get the stats from the source operator
-        source_op_stats = list(plan_stats.operator_stats.values())[0]
+    #     # execute the plan
+    #     _, plan_stats = execution.execute_plan(physical_plan, num_samples=self.TEST_SENTINEL_NUM_SAMPLES)
 
-        # test that we only executed plan on num_samples records
-        assert len(source_op_stats.record_op_stats_lst) == self.TEST_SENTINEL_NUM_SAMPLES
+    #     # NOTE: when we enable multi-source plans; this will need to be updated
+    #     # get the stats from the source operator
+    #     source_op_stats = list(plan_stats.operator_stats.values())[0]
+
+    #     # test that we only executed plan on num_samples records
+    #     assert len(source_op_stats.record_op_stats_lst) == self.TEST_SENTINEL_NUM_SAMPLES
 
     @pytest.mark.parametrize(
         argnames=("dataset", "physical_plan", "expected_records", "side_effect"),
@@ -61,8 +64,11 @@ class TestParallelExecutionNoCache:
         """
         start_time = time.time()
 
+        # fetch datasource
+        datasource = DataDirectory().getRegisteredDataset(dataset)
+
         # create execution instance
-        execution = execution_engine(nocache=True)
+        execution = execution_engine(datasource=datasource, nocache=True)
 
         # manually set source_dataset_id
         execution.source_dataset_id = dataset

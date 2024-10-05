@@ -57,7 +57,7 @@ def real_estate_workload(
 ):
     listings = pz.Dataset(real_estate_eval_tiny, schema=real_estate_listing_files_schema)
     listings = listings.convert(text_real_estate_listing_schema, depends_on="text_content")
-    listings = listings.convert(image_real_estate_listing_schema, image_conversion=True, depends_on="image_contents")
+    listings = listings.convert(image_real_estate_listing_schema, image_conversion=True, depends_on="image_filepaths")
     listings = listings.filter(
         "The interior is modern and attractive, and has lots of natural sunlight",
         depends_on=["is_modern_and_attractive", "has_natural_sunlight"],

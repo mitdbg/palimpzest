@@ -48,7 +48,6 @@ class Set:
         aggFunc: AggFunc = None,
         groupBy: GroupBySig = None,
         limit: int = None,
-        fnid: str = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool = None,
         depends_on: List[str] = [],
@@ -62,7 +61,6 @@ class Set:
         self._aggFunc = aggFunc
         self._groupBy = groupBy
         self._limit = limit
-        self._fnid = fnid
         self._cardinality = cardinality
         self._image_conversion = image_conversion
         self._depends_on = depends_on
@@ -84,7 +82,6 @@ class Set:
             "filter": None if self._filter is None else self._filter.serialize(),
             "udf": None if self._udf is None else str(self._udf),
             "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(),
-            "fnid": self._fnid,
             "cardinality": self._cardinality,
             "image_conversion": self._image_conversion,
             "limit": self._limit,
@@ -133,6 +130,24 @@ class Dataset(Set):
 
         if type(self._depends_on) == str:
             self._depends_on = [self._depends_on]
+
+    def copy(self) -> Dataset:
+        source_copy = self._source.copy()
+        dataset_copy = Dataset(
+            schema=self.schema,
+            source=source_copy,
+            desc=self._desc,
+            filter=self._filter,
+            udf=self._udf,
+            aggFunc=self._aggFunc,
+            groupBy=self._groupBy,
+            limit=self._limit,
+            cardinality=self._cardinality,
+            image_conversion=self._image_conversion,
+            depends_on=self._depends_on,
+            nocache=self._nocache,
+        )
+        return dataset_copy
 
     def filter(
         self,

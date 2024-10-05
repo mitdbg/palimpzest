@@ -54,11 +54,11 @@ def simple_plan_expected_operator_estimates(simple_plan_scan_data, simple_plan_c
     convert_total_output_tokens = simple_plan_convert_data["total_output_tokens"]
     for model_name in all_model_names:
         model_start_idx, model_end_idx, expected_quality = None, None, None
-        if model_name == Model.GPT_4.value:
+        if model_name == Model.GPT_4o.value:
             model_start_idx = 0
             model_end_idx = 2
             expected_quality = 1.0
-        elif model_name == Model.GPT_3_5.value:
+        elif model_name == Model.GPT_4o_MINI.value:
             model_start_idx = 2
             model_end_idx = 4
             expected_quality = (2.0 / 4.0)  # correct answers / total keys 
@@ -86,12 +86,12 @@ def simple_plan_expected_operator_estimates(simple_plan_scan_data, simple_plan_c
     filter_total_output_tokens = simple_plan_filter_data["total_output_tokens"]
     for model_name in all_model_names:
         model_start_idx, model_end_idx, expected_selectivity, expected_quality = None, None, None, None
-        if model_name == Model.GPT_4.value:
+        if model_name == Model.GPT_4o.value:
             model_start_idx = 0
             model_end_idx = 2
             expected_selectivity = 0.5
             expected_quality = 1.0
-        elif model_name == Model.GPT_3_5.value:
+        elif model_name == Model.GPT_4o_MINI.value:
             model_start_idx = 2
             model_end_idx = 4
             expected_selectivity = 0.5

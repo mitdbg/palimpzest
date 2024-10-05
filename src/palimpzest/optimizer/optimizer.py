@@ -1,6 +1,5 @@
 from __future__ import annotations
-from palimpzest.constants import OptimizationStrategy, Cardinality
-from palimpzest.cost_model import CostModel
+from palimpzest.constants import OptimizationStrategy
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import DataSource
 from palimpzest.operators import *
@@ -14,6 +13,7 @@ from palimpzest.optimizer import (
 )
 from palimpzest.optimizer.rules import *
 from palimpzest.optimizer.tasks import *
+from palimpzest.optimizer.cost_model import *
 from palimpzest.policy import Policy
 from palimpzest.sets import Dataset, Set
 from palimpzest.utils import getChampionModel, getCodeChampionModel, getConventionalFallbackModel
@@ -48,12 +48,10 @@ class Optimizer:
     Notably, this optimization framework has served as the backbone of Microsoft SQL Server, CockroachDB,
     and a few other important DBMS systems.
 
-    NOTE: the optimizer currently makes the following assumptions:
-    1. unique field names across schemas --> this must currently be enforced by the programmer,
-      but we should quickly move to standardizing field names to be "[{source_name}.]{schema_name}.{field_name}"
-      - this^ would relax our assumption to be that fields are unique for a given (source, schema), which
-        I believe is very reasonable
-    
+    NOTE: the optimizer currently assumes that field names are unique across schemas; we do try to enforce
+          this by rewriting field names underneath-the-hood to be "{schema_name}.{field_name}", but this still
+          does not solve a situation in which -- for example -- a user uses the pz.URL schema twice in the same
+          program. In order to address that situation, we will need to augment our renaming scheme.
     """
 
     def __init__(
@@ -87,6 +85,19 @@ class Optimizer:
         # the lists of implementation and transformation rules that the optimizer can apply
         self.implementation_rules = IMPLEMENTATION_RULES
         self.transformation_rules = TRANSFORMATION_RULES
+
+        # if we are doing SENTINEL / NONE optimization; remove transformation rules
+        if optimization_strategy in [OptimizationStrategy.SENTINEL, OptimizationStrategy.NONE]:
+            self.transformation_rules = []
+
+        # if we are not performing optimization, set available models to be single model
+        # and remove all optimizations (except for bonded queries)
+        if optimization_strategy == OptimizationStrategy.NONE:
+            self.allow_bonded_query = True
+            self.allow_conventional_query = False
+            self.allow_code_synth = False
+            self.allow_token_reduction = False
+            self.available_models = [available_models[0]]
 
         # store optimization hyperparameters
         self.no_cache = no_cache
@@ -130,9 +141,9 @@ class Optimizer:
         return {
             "verbose": self.verbose,
             "available_models": self.available_models,
-            "champion_model": getChampionModel(),
-            "code_champion_model": getCodeChampionModel(),
-            "conventional_fallback_model": getConventionalFallbackModel(),
+            "champion_model": getChampionModel(self.available_models),
+            "code_champion_model": getCodeChampionModel(self.available_models),
+            "conventional_fallback_model": getConventionalFallbackModel(self.available_models),
         }
 
     def construct_group_tree(self, dataset_nodes: List[Set]) -> Tuple[List[int], Set[str], Dict[str, Set[str]]]:
@@ -257,7 +268,7 @@ class Optimizer:
     def convert_query_plan_to_group_tree(self, query_plan: QueryPlan) -> str:
         # Obtain ordered list of datasets
         dataset_nodes = []
-        node = query_plan # TODO: copy
+        node = query_plan.copy()
 
         while isinstance(node, Dataset):
             dataset_nodes.append(node)
@@ -317,13 +328,10 @@ class Optimizer:
         """
         pass
 
-    def search_optimization_space(self, group_id: int, include_transformations: bool=True) -> None:
+    def search_optimization_space(self, group_id: int) -> None:
         # begin the search for an optimal plan with a task to optimize the final group
         initial_task = OptimizeGroup(group_id)
         self.tasks_stack.append(initial_task)
-
-        # use transformation rules if specified
-        transformation_rules = self.transformation_rules if include_transformations else []
 
         # TODO: conditionally stop when X number of tasks have been executed to limit exhaustive search
         while len(self.tasks_stack) > 0:
@@ -334,7 +342,7 @@ class Optimizer:
             elif isinstance(task, ExpandGroup):
                 new_tasks = task.perform(self.groups)
             elif isinstance(task, OptimizeLogicalExpression):
-                new_tasks = task.perform(transformation_rules, self.implementation_rules)
+                new_tasks = task.perform(self.transformation_rules, self.implementation_rules)
             elif isinstance(task, ApplyRule):
                 new_tasks = task.perform(self.groups, self.expressions, **self.get_physical_op_params())
             elif isinstance(task, OptimizePhysicalExpression):
@@ -439,19 +447,15 @@ class Optimizer:
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
         """
-
         # compute the initial group tree for the user plan
         final_group_id = self.convert_query_plan_to_group_tree(query_plan)
-
-        # use transformation rules if we're not doing sentinel optimization
-        include_transformations = self.optimization_strategy != OptimizationStrategy.SENTINEL
 
         # TODO
         # # do heuristic based pre-optimization
         # self.heuristic_optimization(final_group_id)
 
         # search the optimization space by applying logical and physical transformations to the initial group tree
-        self.search_optimization_space(final_group_id, include_transformations)
+        self.search_optimization_space(final_group_id)
 
         # construct the optimal physical plan(s) by traversing the memo table
         plans = []
@@ -463,5 +467,8 @@ class Optimizer:
 
         elif self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
             plans = self.get_confidence_interval_optimal_plans(final_group_id)
+
+        elif self.optimization_strategy == OptimizationStrategy.NONE:
+            plans = [self.get_optimal_physical_plan(final_group_id)]
 
         return plans

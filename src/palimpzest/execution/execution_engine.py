@@ -1,10 +1,9 @@
 from palimpzest.constants import Model, OptimizationStrategy, MAX_ID_CHARS
-from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import RecordOpStats, PlanStats
 from palimpzest.datamanager import DataDirectory
-from palimpzest.datasources import DataSource
+from palimpzest.datasources import DataSource, ValidationDataSource
 from palimpzest.elements import DataRecord
-from palimpzest.optimizer import Optimizer, PhysicalPlan
+from palimpzest.optimizer import CostModel, Optimizer, PhysicalPlan
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 from palimpzest.utils import getModels
@@ -20,6 +19,7 @@ import shutil
 
 class ExecutionEngine:
     def __init__(self,
+            datasource: DataSource,
             num_samples: int=float("inf"),
             scan_start_idx: int=0,
             nocache: bool=True,  # NOTE: until we properly implement caching, let's set the default to True
@@ -32,7 +32,6 @@ class ExecutionEngine:
             allow_model_selection: bool=True,
             allow_code_synth: bool=True,
             allow_token_reduction: bool=True,
-            validation_data_source: Optional[Union[str, DataSource]]=None,
             optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
             max_workers: Optional[int]=None,
             num_workers_per_plan: int=1,
@@ -60,15 +59,9 @@ class ExecutionEngine:
 
         self.datadir = DataDirectory()
 
-        # convert source (str) -> source (DataSource) if need be
-        self.validation_data_source = (
-            self.datadir.getRegisteredDataset(validation_data_source)
-            if isinstance(validation_data_source, str)
-            else validation_data_source
-        )
-
         # datasource; should be set by execute() with call to get_datasource()
-        self.datasource = None
+        self.datasource = datasource
+        self.using_validation_data = isinstance(self.datasource, ValidationDataSource)
 
 
     def execution_id(self) -> str:
@@ -94,29 +87,17 @@ class ExecutionEngine:
         cache.rmCache()
 
 
-    def init_datasource(self, dataset: Set) -> str:
-        """
-        Gets the DataSource for the given dataset.
-        """
-        # iterate until we reach DataSource
-        while isinstance(dataset, Set):
-            dataset = dataset._source
+    # def set_datasource(self, dataset: Set, source: DataSource):
+    #     """
+    #     Sets the DataSource for the dataset; can be used to switch between executing
+    #     on validation data vs. workload data.
+    #     """
+    #     # iterate until we reach DataSource
+    #     while isinstance(dataset._source, Set):
+    #         dataset = dataset._source
 
-        # throw an exception if datasource is not registered with PZ
-        self.datasource = self.datadir.getRegisteredDataset(dataset.dataset_id)
-
-
-    def set_datasource(self, dataset: Set, source: DataSource):
-        """
-        Sets the DataSource for the dataset; can be used to switch between executing
-        on validation data vs. workload data.
-        """
-        # iterate until we reach DataSource
-        while isinstance(dataset, Set):
-            dataset = dataset._source
-
-        # set the source for the dataset
-        dataset._source = source
+    #     # set the source for the dataset
+    #     dataset._source = source
 
 
     def get_parallel_max_workers(self):
@@ -215,8 +196,7 @@ class ExecutionEngine:
 
         return all_sample_execution_data, return_records, all_plan_stats
 
-
-    def execute_optimal_strategy(
+    def execute_naive_strategy(
             self,
             dataset: Set,
             optimizer: Optimizer,
@@ -229,7 +209,27 @@ class ExecutionEngine:
         # execute the plan
         records, plan_stats = self.execute_plan(
             plan=final_plan,
-            max_workers=self.max_workers,
+            plan_workers=self.max_workers,
+        )
+
+        # return the output records and plan stats
+        return records, [plan_stats]
+
+    def execute_optimal_strategy(
+            self,
+            dataset: Set,
+            optimizer: Optimizer,
+            execution_data: List[RecordOpStats]=[],
+        ) -> Tuple[List[DataRecord], List[PlanStats]]:
+        # get the optimal plan according to the optimizer
+        plans = optimizer.optimize(dataset)
+        final_plan = plans[0]
+
+        # execute the plan
+        # TODO: for some reason this is not picking up change to self.max_workers from PipelinedParallelPlanExecutor.__init__()
+        records, plan_stats = self.execute_plan(
+            plan=final_plan,
+            plan_workers=self.max_workers,
         )
 
         # return the output records and plan stats
@@ -273,7 +273,7 @@ class ExecutionEngine:
             final_plan = plans[0]
             new_records, new_plan_stats = self.execute_plan(
                 plan=final_plan,
-                max_workers=self.max_workers,
+                plan_workers=self.max_workers,
             )
             records.extend(new_records)
             plan_stats.append(new_plan_stats)

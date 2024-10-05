@@ -1,5 +1,4 @@
 from palimpzest.constants import OptimizationStrategy
-from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import ExecutionStats
 from palimpzest.execution import (
     ExecutionEngine,
@@ -7,7 +6,7 @@ from palimpzest.execution import (
     PipelinedSingleThreadPlanExecutor,
     SequentialSingleThreadPlanExecutor,
 )
-from palimpzest.optimizer import Optimizer
+from palimpzest.optimizer import CostModel, Optimizer
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
@@ -25,9 +24,6 @@ class NoSentinelExecutionEngine(ExecutionEngine):
 
     def execute(self, dataset: Set, policy: Policy):
         execution_start_time = time.time()
-
-        # initialize the datasource
-        self.init_datasource(dataset)
 
         # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
         if self.nocache:
@@ -57,6 +53,9 @@ class NoSentinelExecutionEngine(ExecutionEngine):
 
         elif self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
             records, plan_stats = self.execute_confidence_interval_strategy(dataset, optimizer)
+        
+        elif self.optimization_strategy == OptimizationStrategy.NONE:
+            records, plan_stats = self.execute_naive_strategy(dataset, optimizer)
 
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)
@@ -77,18 +76,24 @@ class SequentialSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, Seque
     """
     This class performs non-sample based execution while executing plans in a sequential, single-threaded fashion.
     """
-    pass
+    def __init__(self, *args, **kwargs):
+        NoSentinelExecutionEngine.__init__(self, *args, **kwargs)
+        SequentialSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
 
 
 class PipelinedSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, PipelinedSingleThreadPlanExecutor):
     """
     This class performs non-sample based execution while executing plans in a pipelined, single-threaded fashion.
     """
-    pass
+    def __init__(self, *args, **kwargs):
+        NoSentinelExecutionEngine.__init__(self, *args, **kwargs)
+        PipelinedSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
 
 
 class PipelinedParallelNoSentinelExecution(NoSentinelExecutionEngine, PipelinedParallelPlanExecutor):
     """
     This class performs non-sample based execution while executing plans in a pipelined, parallel fashion.
     """
-    pass
+    def __init__(self, *args, **kwargs):
+        NoSentinelExecutionEngine.__init__(self, *args, **kwargs)
+        PipelinedParallelPlanExecutor.__init__(self, *args, **kwargs)

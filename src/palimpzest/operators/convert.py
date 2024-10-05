@@ -6,9 +6,11 @@ from palimpzest.corelib import *
 from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.elements import *
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
+from palimpzest.operators import PhysicalOperator
 from palimpzest.utils import getJsonFromAnswer
 
+from io import BytesIO
+from PIL import Image
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import base64
@@ -51,7 +53,7 @@ class ConvertOp(PhysicalOperator):
             "udf": self.udf,
         }
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
 
 
@@ -92,13 +94,17 @@ class NonLLMConvert(ConvertOp):
             quality=1.0,
         )
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
+        """
+        NOTE: if the UDF throws an exception we immediately raise it to the user. This way computation
+              (and money) are not wasted on a workload which will fail to execute correctly.
+
+              If the UDF outputs None or an empty list, then we will treat this as a failed convert.
+        """
         # apply UDF to input record
         start_time = time.time()
         try:
             drs = self.udf(candidate)
-            if isinstance(drs, DataRecord):
-                drs = [drs]
         except Exception as e:
             print(f"Error invoking user-defined function for convert: {e}")
             raise e
@@ -106,26 +112,53 @@ class NonLLMConvert(ConvertOp):
         # time spent executing the UDF function
         fn_call_duration_secs = time.time() - start_time
 
+        # determine whether or not the convert was successful
+        successful_convert = drs is not None and drs != []
+
+        # if drs is a single record output, wrap it in a list
+        if successful_convert and isinstance(drs, DataRecord):
+            drs = [drs]
+
+        # compute the total number of records we need to create RecordOpStats for;
+        # we still create an object even if the convert fails
+        num_records = len(drs) if successful_convert else 1
+
         # construct RecordOpStats
         record_op_stats_lst = []
-        for dr in drs:
+        for idx in range(num_records):
+            # compute variables which depend on data record
+            record_id, record_parent_id, record_source_id, record_state, answer = None, candidate._id, candidate._source_id, None, None
+            if successful_convert:
+                dr = drs[idx]
+                record_id = dr._id
+                record_parent_id = dr._parent_id
+                record_source_id = dr._source_id
+                record_state = dr._asDict(include_bytes=False)
+                answer = {field_name: getattr(dr, field_name) for field_name in self.outputSchema.fieldNames()},
+
             record_op_stats = RecordOpStats(
-                record_id=dr._id,
-                record_parent_id=dr._parent_id,
-                record_state=dr._asDict(include_bytes=False),
+                record_id=record_id,
+                record_parent_id=record_parent_id,
+                record_source_id=record_source_id,
+                record_state=record_state,
                 op_id=self.get_op_id(),
+                logical_op_id=self.logical_op_id,
                 op_name=self.op_name(),
                 time_per_record=fn_call_duration_secs / len(drs),
                 cost_per_record=0.0,
-                answer={field_name: getattr(dr, field_name) for field_name in self.outputSchema.fieldNames()},
+                answer=answer,
                 input_fields=self.inputSchema.fieldNames(),
                 generated_fields=self.outputSchema.fieldNames(),
                 fn_call_duration_secs=fn_call_duration_secs / len(drs),
+                failed_convert=(not successful_convert),
                 op_details={k: str(v) for k, v in self.get_op_params().items()},
             )
             record_op_stats_lst.append(record_op_stats)
 
-        return drs, record_op_stats_lst
+        # construct record set
+        record_set = DataRecordSet(drs, record_op_stats_lst)
+
+        return record_set
 
 
 class LLMConvert(ConvertOp):
@@ -196,7 +229,7 @@ class LLMConvert(ConvertOp):
 
         # get est. of conversion time per record from model card;
         # NOTE: model will only be None for code synthesis, which uses GPT-3.5 as fallback
-        model_name = self.model.value if getattr(self, "model", None) is not None else Model.GPT_3_5.value
+        model_name = self.model.value if getattr(self, "model", None) is not None else Model.GPT_4o_MINI.value
         model_conversion_time_per_record = (
             MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
         ) / self.max_workers
@@ -212,7 +245,7 @@ class LLMConvert(ConvertOp):
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[model_name]["MMLU"] / 100.0) * source_op_cost_estimates.quality
+        quality = (MODEL_CARDS[model_name]["overall"] / 100.0) * source_op_cost_estimates.quality
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -308,14 +341,14 @@ class LLMConvert(ConvertOp):
 
         return prompt_question
 
-    def _create_record_op_stats_lst(
+    def _create_record_set(
         self,
         records: List[DataRecord],
         fields: List[str],
         generation_stats: GenerationStats,
         total_time: float,
-        parent_id: Optional[str] = None,
-    ) -> List[RecordOpStats]:
+        parent_record: Optional[DataRecord] = None,
+    ) -> DataRecordSet:
         """
         Construct list of RecordOpStats objects (one for each DataRecord).
         """
@@ -328,24 +361,27 @@ class LLMConvert(ConvertOp):
         model = getattr(self, "model", None)
 
         # NOTE: in some cases, we may generate outputs which fail to parse correctly,
-        #       thus `records` is an empty list, but we still want to capture the
+        #       thus `record_set` contains an empty list, but we still want to capture the
         #       the cost of the failed generation; in this case, we set num_records = 1
         #       and compute a RecordOpStats with some fields None'd out and failed_convert=True
         for idx in range(num_records):
             # compute variables which depend on data record
-            record_id, record_parent_id, record_state, answer = None, parent_id, None, None
+            record_id, record_parent_id, record_source_id, record_state, answer = None, parent_record._id, parent_record._source_id, None, None
             if successful_convert:
                 dr = records[idx]
                 record_id = dr._id
                 record_parent_id = dr._parent_id
+                record_source_id = dr._source_id
                 record_state = dr._asDict(include_bytes=False)
                 answer = {field_name: getattr(dr, field_name) for field_name in fields}
 
             record_op_stats = RecordOpStats(
                 record_id=record_id,
                 record_parent_id=record_parent_id,
+                record_source_id=record_source_id,
                 record_state=record_state,
                 op_id=self.get_op_id(),
+                logical_op_id=self.logical_op_id,
                 op_name=self.op_name(),
                 time_per_record=total_time / num_records,
                 cost_per_record=per_record_stats.cost_per_record,
@@ -360,11 +396,15 @@ class LLMConvert(ConvertOp):
                 llm_call_duration_secs=per_record_stats.llm_call_duration_secs,
                 fn_call_duration_secs=per_record_stats.fn_call_duration_secs,
                 failed_convert=(not successful_convert),
+                image_operation=self.image_conversion,
                 op_details={k: str(v) for k, v in self.get_op_params().items()},
             )
             record_op_stats_lst.append(record_op_stats)
 
-        return record_op_stats_lst
+        # create and return the DataRecordSet
+        record_set = DataRecordSet(records, record_op_stats_lst)
+
+        return record_set
 
     def _create_data_record_from_json(
         self,
@@ -373,9 +413,7 @@ class LLMConvert(ConvertOp):
         cardinality_idx: int = None,
     ) -> DataRecord:
         # initialize data record
-        dr = DataRecord(
-            self.outputSchema, parent_id=candidate._id, cardinality_idx=cardinality_idx
-        )
+        dr = DataRecord.fromParent(self.outputSchema, parent_record=candidate, cardinality_idx=cardinality_idx)
 
         # TODO: This inherits all pre-computed fields in an incremental fashion. The positive / pros of this approach is that it enables incremental schema computation, which tends to feel more natural for the end-user. The downside is it requires us to support an explicit projection to eliminate unwanted input / intermediate computation.
         #
@@ -407,7 +445,7 @@ class LLMConvert(ConvertOp):
         # """
         try:
             # parse json from answer string
-            json_answer = getJsonFromAnswer(answer)
+            json_answer = getJsonFromAnswer(answer, self.model)
 
             # sanity check validity of parsed json
             assert json_answer != {}, "No output was found!"
@@ -473,7 +511,7 @@ class LLMConvert(ConvertOp):
         except Exception as e:
             print(f"DSPy generation error: {e}")
             return "", GenerationStats()
-        
+
         return answer, query_stats
 
     def convert(self, candidate_content: Union[str,List[bytes]], fields: List[str]) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
@@ -486,7 +524,7 @@ class LLMConvert(ConvertOp):
         """
         raise NotImplementedError("This is an abstract class. Use a subclass instead!")
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
         start_time = time.time()
         fields_to_generate = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
 
@@ -498,11 +536,40 @@ class LLMConvert(ConvertOp):
                 base64_images = [
                     base64.b64encode(candidate.contents).decode("utf-8")  
                 ]
-            else:
-                base64_images = [
-                    base64.b64encode(image).decode("utf-8")
-                    for image in candidate.image_contents  # TODO: (see note above)
-                ]
+            elif self.model in [Model.GPT_4o_V, Model.GPT_4o_MINI_V]:
+                for image_file in candidate.image_filepaths:  # TODO: (see note above)
+                    image = Image.open(image_file)
+                    buffered = BytesIO()
+                    image.save(buffered, format=image.format)
+                    base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                    base64_images.append(base64_image)
+
+            # for LLAMA vision model, we must concatenate images into a single image
+            elif self.model in [Model.LLAMA3_V]:
+                # load images, get their dimensions, and create new image to fit them horizontally
+                images = [Image.open(image_file) for image_file in candidate.image_filepaths]
+                widths, heights = zip(*(img.size for img in images))
+                total_width, max_height = sum(widths), max(heights)
+                new_image = Image.new(images[0].mode, (total_width, max_height))
+
+                # construct new image by pasting images side-by-side
+                x_offset = 0
+                for img in images:
+                    new_image.paste(img, (x_offset,0))
+                    x_offset += img.size[0]
+
+                # crop new image to adhere to max size processed by LLAMA; I'm not sure
+                # what the exact max size allowed by Together is, but 900x900 seems to work
+                crop_height = 900
+                crop_width = 900
+                new_image = new_image.crop((0, 0, crop_width, crop_height))
+
+                # encode new image in base64
+                buffered = BytesIO()
+                new_image.save(buffered, format=images[0].format)
+                base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                base64_images.append(base64_image)
+
             content = base64_images
         else:
             content = candidate._asJSONStr(include_bytes=False)
@@ -518,15 +585,16 @@ class LLMConvert(ConvertOp):
             n_records = max([len(lst) for lst in field_answers.values()])
         except:
             print(f"Error in field answers: {field_answers}. Returning empty records.")
-            breakpoint()
-            return [],[]
-        records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
+            n_records = 0
+            field_answers = {}
 
+        # build up list of final record dictionaries
+        records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
         for field_name, answer_list in field_answers.items():
             for idx, output in enumerate(answer_list):
-                record = records_json[idx]
-                record[field_name] = output
+                records_json[idx][field_name] = output
 
+        # construct list of data records
         drs = [
             self._create_data_record_from_json(
                 jsonObj=js, candidate=candidate, cardinality_idx=idx
@@ -534,16 +602,16 @@ class LLMConvert(ConvertOp):
             for idx, js in enumerate(records_json)
         ]
 
-        total_time = time.time() - start_time
-        record_op_stats_lst = self._create_record_op_stats_lst(
+        # construct and return DataRecordSet
+        record_set = self._create_record_set(
             records=drs,
             fields=fields_to_generate,
             generation_stats=generation_stats,
-            total_time=total_time,
-            parent_id=candidate._id,
+            total_time=time.time() - start_time,
+            parent_record=candidate,
         )
 
-        return drs, record_op_stats_lst
+        return record_set
 
 
 class LLMConvertConventional(LLMConvert):
@@ -629,13 +697,7 @@ class LLMConvertBonded(LLMConvert):
         # if there was an error for any field, execute a conventional query on that field
         for field, values in json_answers.items():
             if values == []:
-                conventional_op = LLMConvertConventional(
-                    inputSchema=self.inputSchema,
-                    outputSchema=self.outputSchema,
-                    model=self.model,
-                    prompt_strategy=self.prompt_strategy,
-                    verbose=self.verbose,
-                )
+                conventional_op = LLMConvertConventional(**self.get_copy_kwargs())
 
                 field_answer, field_stats = conventional_op.convert(candidate_content, [field])
                 json_answers[field] = field_answer[field]

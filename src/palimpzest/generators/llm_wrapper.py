@@ -127,21 +127,21 @@ class LLMGeneratorFactory:
         This method returns the appropriate LLM wrapper for a given model name
         """
 
-        if model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+        if model_name in [Model.GPT_4o.value, Model.GPT_4o_MINI.value]:
             api_key = get_api_key("OPENAI_API_KEY")
             return OpenAIWrapper(model_name, api_key)
-        elif model_name in [Model.GEMINI_1.value]:
-            api_key = get_api_key("GOOGLE_API_KEY")
-            return GoogleWrapper(model_name, api_key)
-        elif model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
+        # elif model_name in [Model.GEMINI_1.value]:
+        #     api_key = get_api_key("GOOGLE_API_KEY")
+        #     return GoogleWrapper(model_name, api_key)
+        elif model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
             api_key = get_api_key("TOGETHER_API_KEY")
             return TogetherWrapper(model_name, api_key)
-        elif model_name in [Model.GPT_4V.value]:
+        elif model_name in [Model.GPT_4o_V.value, Model.GPT_4o_MINI_V.value]:
             api_key = get_api_key("OPENAI_API_KEY")
             return OpenAIVisionWrapper()
-        elif model_name in [Model.GEMINI_1V.value]:
-            api_key = get_api_key("GOOGLE_API_KEY")
-            return GeminiVisionWrapper()
+        # elif model_name in [Model.GEMINI_1V.value]:
+        #     api_key = get_api_key("GOOGLE_API_KEY")
+        #     return GeminiVisionWrapper()
         else:
             raise ValueError(
                 "Model must be one of the language models specified in palimpzest.constants.Model"

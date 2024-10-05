@@ -1,14 +1,21 @@
+from palimpzest.constants import Model
 from typing import Any, Dict
 
 import json
 import regex as re # Use regex instead of re to used variable length lookbehind
 
 
-def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
+def getJsonFromAnswer(answer: str, model: Model) -> Dict[str, Any]:
     """
     This function parses an LLM response which is supposed to output a JSON object
     and optimistically searches for the substring containing the JSON object.
     """
+    # model-specific trimming for LLAMA3 responses
+    if model in [Model.LLAMA3, Model.LLAMA3_V]:
+        answer = answer.split("---")[0]
+        answer = answer.replace("True", "true")
+        answer = answer.replace("False", "false")
+
     if not answer.strip().startswith("{"):
         # Find the start index of the actual JSON string
         # assuming the prefix is followed by the JSON object/array
@@ -35,6 +42,7 @@ def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
     answer = re.sub(r",\n.*\.\.\.$", "", answer, flags=re.MULTILINE)
     # Sanitize newlines in the JSON response
     answer = answer.replace("\n", " ")
+
     try:
         response = json.loads(answer)
     except Exception as e:

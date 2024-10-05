@@ -1,23 +1,21 @@
-from bs4 import BeautifulSoup
-from palimpzest.constants import Cardinality
+from __future__ import annotations
+from palimpzest import constants
 from palimpzest.corelib import File, Number, Schema
+from palimpzest.corelib.schemas import ImageFile, PDFFile, TextFile, XLSFile, WebPage
 from palimpzest.elements import DataRecord
+from palimpzest.tools.pdfparser import get_text_from_pdf
+
+from bs4 import BeautifulSoup
+from io import BytesIO
+from papermage import Document
 from typing import Any, Dict, List, Union
 
-import os
-import sys
-
-from palimpzest import constants
-from palimpzest.corelib.schemas import ImageFile, PDFFile, TextFile, XLSFile, WebPage
-
-from palimpzest.tools.pdfparser import get_text_from_pdf
-from papermage import Document
-
+import pandas as pd
 
 import json
 import modal
-import pandas as pd
-from io import BytesIO
+import os
+import sys
 
 
 class AbstractDataSource:
@@ -44,6 +42,9 @@ class AbstractDataSource:
     def __len__(self) -> int:
         raise NotImplementedError(f"You are calling this method from an abstract class.")
 
+    def copy(self) -> AbstractDataSource:
+        raise NotImplementedError(f"You are calling this method from an abstract class.")
+
     def serialize(self) -> Dict[str, Any]:
         return {"schema": self.schema.jsonSchema()}
 
@@ -58,10 +59,9 @@ class AbstractDataSource:
 
 
 class DataSource(AbstractDataSource):
-    def __init__(self, schema: Schema, dataset_id: str, cardinality: Cardinality = Cardinality.ONE_TO_ONE) -> None:
+    def __init__(self, schema: Schema, dataset_id: str) -> None:
         super().__init__(schema)
         self.dataset_id = dataset_id
-        self.cardinality = cardinality
 
     def universalIdentifier(self):
         """Return a unique identifier for this Set."""
@@ -79,15 +79,18 @@ class MemorySource(DataSource):
         super().__init__(Number, dataset_id)
         self.vals = vals
 
+    def copy(self):
+        return MemorySource(self.vals, self.dataset_id)
+
     def __len__(self):
         return len(self.vals)
 
     def getSize(self):
         return sum([sys.getsizeof(self.getItem(idx)) for idx in range(len(self))])
 
-    def getItem(self, idx: int):
+    def getItem(self, idx: int) -> DataRecord:
         value = self.vals[idx]
-        dr = DataRecord(self.schema, scan_idx=idx)
+        dr = DataRecord(self.schema, source_id=idx)
         dr.value = value
 
         return dr
@@ -126,9 +129,12 @@ class TextFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=TextFile)
 
-    def getItem(self, idx: int):
+    def copy(self):
+        return TextFileDirectorySource(self.path, self.dataset_id)
+
+    def getItem(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
-        dr = DataRecord(self.schema, scan_idx=idx)
+        dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath, "r") as f:
             dr.contents = f.read()
@@ -138,6 +144,9 @@ class HTMLFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=WebPage)
         assert all([filename.endswith(tuple(constants.HTML_EXTENSIONS)) for filename in self.filepaths])
+
+    def copy(self):
+        return HTMLFileDirectorySource(self.path, self.dataset_id)
 
     def html_to_text_with_links(self, html):
         # Parse the HTML content
@@ -154,9 +163,9 @@ class HTMLFileDirectorySource(DirectorySource):
         text = soup.get_text(separator='\n', strip=True)        
         return text
 
-    def getItem(self, idx: int):
+    def getItem(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
-        dr = DataRecord(self.schema, scan_idx=idx)
+        dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath, "r") as f:
             textcontent = f.read()
@@ -176,9 +185,12 @@ class ImageFileDirectorySource(DirectorySource):
         super().__init__(path=path, dataset_id=dataset_id, schema=ImageFile)
         assert all([filename.endswith(tuple(constants.IMAGE_EXTENSIONS)) for filename in self.filepaths])
 
-    def getItem(self, idx: int):
+    def copy(self):
+        return ImageFileDirectorySource(self.path, self.dataset_id)
+
+    def getItem(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
-        dr = DataRecord(self.schema, scan_idx=idx)
+        dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
             dr.contents = f.read()
@@ -196,7 +208,10 @@ class PDFFileDirectorySource(DirectorySource):
         self.pdfprocessor = pdfprocessor
         self.file_cache_dir = file_cache_dir
 
-    def getItem(self, idx: int):
+    def copy(self):
+        return PDFFileDirectorySource(self.path, self.dataset_id)
+
+    def getItem(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
         pdf_filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
@@ -222,7 +237,7 @@ class PDFFileDirectorySource(DirectorySource):
             text_content = get_text_from_pdf(pdf_filename, pdf_bytes, file_cache_dir = self.file_cache_dir)
 
         # construct data record
-        dr = DataRecord(self.schema, scan_idx=idx)
+        dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = pdf_filename
         dr.contents = pdf_bytes
         dr.text_contents = text_content[:15000]  # TODO Very hacky
@@ -234,9 +249,12 @@ class XLSFileDirectorySource(DirectorySource):
         super().__init__(path=path, dataset_id=dataset_id, schema=XLSFile)
         assert all([filename.endswith(tuple(constants.XLS_EXTENSIONS)) for filename in self.filepaths])
 
-    def getItem(self, idx: int):
+    def copy(self):
+        return XLSFileDirectorySource(self.path, self.dataset_id)
+
+    def getItem(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
-        dr = DataRecord(self.schema, scan_idx=idx)
+        dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
             dr.contents = f.read()
@@ -254,6 +272,9 @@ class FileSource(DataSource):
         super().__init__(File, dataset_id)
         self.filepath = path
 
+    def copy(self):
+        return FileSource(self.filepath, self.dataset_id)
+
     def serialize(self) -> Dict[str, Any]:
         return {
             "schema": self.schema.jsonSchema(),
@@ -268,8 +289,8 @@ class FileSource(DataSource):
         # Get the memory size of the filepath
         return os.path.getsize(self.filepath)
 
-    def getItem(self, idx: int):
-        dr = DataRecord(self.schema, scan_idx=idx)
+    def getItem(self, idx: int) -> DataRecord:
+        dr = DataRecord(self.schema, source_id=self.filepath)
         dr.filename = self.filepath
         with open(self.filepath, "rb") as f:
             dr.contents = f.read()
@@ -280,8 +301,8 @@ class FileSource(DataSource):
 class UserSource(DataSource):
     """UserSource is a DataSource that is created by the user and not loaded from a file"""
 
-    def __init__(self, schema: Schema, dataset_id: str, cardinality: Cardinality = Cardinality.ONE_TO_ONE) -> None:
-        super().__init__(schema, dataset_id, cardinality)
+    def __init__(self, schema: Schema, dataset_id: str) -> None:
+        super().__init__(schema, dataset_id)
 
     def serialize(self) -> Dict[str, Any]:
         return {
@@ -295,5 +316,33 @@ class UserSource(DataSource):
     def getSize(self):
         raise NotImplementedError("User may optionally implement this method.")
 
-    def getItem(self, idx: int):
+    def getItem(self, idx: int) -> DataRecord:
+        raise NotImplementedError("User needs to implement this method.")
+
+
+class ValidationDataSource(UserSource):
+    """
+    A validation data source is a subclass of UserSource which enforces that the user provides
+    DataRecords for validation examples in addition to regular source DataRecords. Specifically,
+    the user will implement the `getValLength()` and `getValItem(idx)` methods.
+
+    The `getValLength()` method will return the length of the validation dataset.
+
+    The `getValItem(idx)` method will return an instance of a validation DataRecord, which
+    will contain the expected (set of) output record(s) for the source DataRecord with the
+    same `source_id`.
+
+    The __len__() and getItem() methods (which are inherited from UserSource) will return the length
+    and items of the source records per usual. However, the user does need to ensure that the
+    `source_id`s for the source records correspond correctly to the `source_id`s in
+    the validation data.
+
+    TODO: If the PZ program contains a join, then the `id` for the `outputSchema` should be a list
+    of ids representing the input records which should be joined.
+    """
+
+    def getValLength(self) -> int:
+        raise NotImplementedError("User needs to implement this method.")
+
+    def getValItem(self, idx: int) -> List[DataRecord]:
         raise NotImplementedError("User needs to implement this method.")

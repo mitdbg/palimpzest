@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
-from .physical import PhysicalOperator, DataRecordsWithStats
+from .physical import PhysicalOperator
 
 from palimpzest.constants import *
-from palimpzest.corelib import Schema
-from palimpzest.dataclasses import GenerationStats, RecordOpStats
-from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.elements import DataRecord, Filter
+from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
+from palimpzest.elements import DataRecord, DataRecordSet, Filter
 from palimpzest.prompts import IMAGE_FILTER_PROMPT
 
-from typing import List
+from io import BytesIO
+from PIL import Image
 
 import base64
 import time
@@ -71,7 +70,7 @@ class NonLLMFilter(FilterOp):
             quality=1.0,
         )
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
         # apply filter to input record
         start_time = time.time()
         try:
@@ -82,12 +81,18 @@ class NonLLMFilter(FilterOp):
         # time spent executing the filter function
         fn_call_duration_secs = time.time() - start_time
 
-        # create RecordOpStats object
+        # create copy of candidate and set _passed_filter attribute
+        dr = DataRecord.fromParent(candidate.schema, parent_record=candidate)
+        dr._passed_filter = result
+
+        # create RecordOpStats object and return
         record_op_stats = RecordOpStats(
-            record_id=candidate._id,
-            record_parent_id=candidate._parent_id,
-            record_state=candidate._asDict(include_bytes=False),
+            record_id=dr._id,
+            record_parent_id=dr._parent_id,
+            record_source_id=dr._source_id,
+            record_state=dr._asDict(include_bytes=False),
             op_id=self.get_op_id(),
+            logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=fn_call_duration_secs,
             cost_per_record=0.0,
@@ -98,14 +103,11 @@ class NonLLMFilter(FilterOp):
             op_details={k: str(v) for k, v in self.get_op_params().items()},
         )
 
-        # set _passed_filter attribute and return
-        setattr(candidate, "_passed_filter", result)
-
         if self.verbose:
             output_str = f"{self.filter.getFilterStr()}:\n{result}"
             print(output_str)
 
-        return [candidate], [record_op_stats]
+        return DataRecordSet([dr], [record_op_stats])
 
 
 class LLMFilter(FilterOp):
@@ -194,11 +196,7 @@ class LLMFilter(FilterOp):
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate quality of output based on the strength of the model being used
-        quality = (
-            (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * source_op_cost_estimates.quality
-            if self.image_filter
-            else (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * source_op_cost_estimates.quality
-        )
+        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0) * source_op_cost_estimates.quality
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -207,7 +205,7 @@ class LLMFilter(FilterOp):
             quality=quality,
         )
 
-    def __call__(self, candidate: DataRecord) -> DataRecordsWithStats:
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
         start_time = time.time()
 
         # parse the content from the candidate record
@@ -219,11 +217,34 @@ class LLMFilter(FilterOp):
                 base64_images = [
                     base64.b64encode(candidate.contents).decode("utf-8")  
                 ]
-            else:
-                base64_images = [
-                    base64.b64encode(image).decode("utf-8")
-                    for image in candidate.image_contents  # TODO: (see note above)
-                ]
+            elif self.model in [Model.GPT_4o_V, Model.GPT_4o_MINI_V]:
+                for image_file in candidate.image_filepaths:  # TODO: (see note above)
+                    image = Image.open(image_file)
+                    buffered = BytesIO()
+                    image.save(buffered, format=image.format)
+                    base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                    base64_images.append(base64_image)
+
+            # for LLAMA vision model, we must concatenate images into a single image
+            elif self.model in [Model.LLAMA3_V]:
+                # load images, get their dimensions, and create new image to fit them horizontally
+                images = [Image.open(image_file) for image_file in candidate.image_filepaths]
+                widths, heights = zip(*(img.size for img in images))
+                total_width, max_height = sum(widths), max(heights)
+                new_image = Image.new(images[0].mode, (total_width, max_height))
+
+                # construct new image by pasting images side-by-side
+                x_offset = 0
+                for img in images:
+                    new_image.paste(img, (x_offset,0))
+                    x_offset += img.size[0]
+
+                # encode new image in base64
+                buffered = BytesIO()
+                new_image.save(buffered, format=images[0].format)
+                base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                base64_images.append(base64_image)
+
             content = base64_images
         else:
             content = candidate._asJSONStr(include_bytes=False)
@@ -247,12 +268,18 @@ class LLMFilter(FilterOp):
             else False
         )
 
+        # create new DataRecord and set _passed_filter attribute
+        dr = DataRecord.fromParent(candidate.schema, parent_record=candidate)
+        dr._passed_filter = passed_filter
+
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=candidate._id,
-            record_parent_id=candidate._parent_id,
-            record_state=candidate._asDict(include_bytes=False),
+            record_id=dr._id,
+            record_parent_id=dr._parent_id,
+            record_source_id=dr._source_id,
+            record_state=dr._asDict(include_bytes=False),
             op_id=self.get_op_id(),
+            logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=time.time() - start_time,
             cost_per_record=gen_stats.cost_per_record,
@@ -265,10 +292,8 @@ class LLMFilter(FilterOp):
             llm_call_duration_secs=gen_stats.llm_call_duration_secs,
             answer=response,
             passed_filter=passed_filter,
+            image_operation=self.image_filter,
             op_details={k: str(v) for k, v in self.get_op_params().items()},
         )
 
-        # set _passed_filter attribute and return
-        setattr(candidate, "_passed_filter", passed_filter)
-
-        return [candidate], [record_op_stats]
+        return DataRecordSet([dr], [record_op_stats])

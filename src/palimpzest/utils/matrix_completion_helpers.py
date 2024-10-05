@@ -1,18 +1,34 @@
+from palimpzest.corelib import SourceRecord
 import numpy as np
 
 
-def create_sample_matrix(num_rows: int, num_cols: int, rank: int):
+def create_sample_matrix(records: list, physical_ops: list, rank: int):
     """
     Compute the observation matrix which will determine which optimizations (cols)
     are applied to which records (rows).
     """
-    # if there is a single physical operator for this operation, then every
-    # sentinel plan must execute this operation
-    if num_cols == 1:
-        return np.ones((num_rows, 1))
+    # compute the number of rows and columns
+    num_rows = len(records)
+    num_cols = len(physical_ops)
 
-    # TODO: remove after running low-rank experiment
-    return np.ones((num_rows, num_cols))
+    # create mappings from (record_id --> matrix row) and (physical_op_id --> matrix col)
+    record_to_row_map = {}
+    for row_idx, record in enumerate(records):
+        # NOTE: for scan records only, we need to use record._source_id instead of record._id
+        # because the DataSource.getItem method will swap out the input record with a newly
+        # constructed record. Thus, one way to ensure that the first operator after the scan
+        # will lookup the correct parent record is to simply use the source
+        record_id = record._id if record.schema != SourceRecord else record._source_id
+        record_to_row_map[record_id] = row_idx
+
+    phys_op_to_col_map = {}
+    for col_idx, physical_op in enumerate(physical_ops):
+        phys_op_to_col_map[physical_op.op_id] = col_idx
+
+    # if there are fewer physical operators than the rank + 1 for this operation, then every
+    # operation must execute on every record
+    if num_cols <= rank + 1:
+        return np.ones((num_rows, num_cols)), record_to_row_map, phys_op_to_col_map
 
     # otherwise, we construct an observation matrix which is guaranteed to
     # have rank + 1 samples per column and per row
@@ -40,5 +56,75 @@ def create_sample_matrix(num_rows: int, num_cols: int, rank: int):
                 sample_matrix[row, col] = 1
                 row_sum += 1
             col = (col + 1) % num_cols
+
+    return sample_matrix, record_to_row_map, phys_op_to_col_map
+
+# def gradient_descent(init, steps, grad, proj=lambda x: x, num_to_keep=None):
+#     """Projected gradient descent.
     
-    return sample_matrix
+#     Parameters
+#     ----------
+#         initial : array
+#             starting point
+#         steps : list of floats
+#             step size schedule for the algorithm
+#         grad : function
+#             mapping arrays to arrays of same shape
+#         proj : function, optional
+#             mapping arrays to arrays of same shape
+#         num_to_keep : integer, optional
+#             number of points to keep
+        
+#     Returns
+#     -------
+#         List of points computed by projected gradient descent. Length of the
+#         list is determined by `num_to_keep`.
+#     """
+#     xs = [init]
+#     for step in steps:
+#         xs.append(proj(xs[-1] - step * grad(xs[-1])))
+#         if num_to_keep:
+#             xs = xs[-num_to_keep:]
+#     return xs
+
+
+# def update_right(A, S, X):
+#     """Update right factor for matrix completion objective."""
+#     m, n = A.shape
+#     _, k = X.shape
+#     Y = np.zeros((n, k))
+#     # For each row, solve a k-dimensional regression problem
+#     # only over the nonzero projection entries. Note that the
+#     # projection changes the least-squares matrix siX so we
+#     # cannot vectorize the outer loop.
+#     for i in range(n):
+#         si = S[:, i]
+#         sia = A[si, i]
+#         siX = X[si]
+#         Y[i,:] = np.linalg.lstsq(siX, sia, rcond=None)[0]
+#     return Y
+
+
+# def update_left(A, S, Y):
+#     return update_right(A.T, S.T, Y)
+
+
+# def alternating_minimization(left, right, update_left, update_right, num_updates):
+#     """Alternating minimization."""
+#     iterates = [(left, right)]
+#     for _ in range(num_updates):
+#         left = update_left(right)
+#         right = update_right(left)
+#         iterates.append((left, right))
+#     return iterates[-1]
+
+
+# def altmin(A, S, rank, num_updates):
+#     """Toy implementation of alternating minimization."""
+#     m, n = A.shape
+#     X = np.random.normal(0, 1, (m, rank))
+#     Y = np.random.normal(0, 1, (n, rank))
+#     return alternating_minimization(X, Y, 
+#                                     lambda Y: update_left(A, S, Y), 
+#                                     lambda X: update_right(A, S, X),
+#                                     num_updates)

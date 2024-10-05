@@ -27,7 +27,7 @@ from utils import remove_cache
 #     params = {
 #         "outputSchema": email_schema,
 #         "inputSchema": File,
-#         "model": pz.Model.GPT_3_5,
+#         "model": pz.Model.GPT_4o_MINI,
 #         "cardinality": "oneToOne",
 #     }
 

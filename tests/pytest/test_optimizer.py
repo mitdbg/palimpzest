@@ -1,6 +1,5 @@
 from palimpzest.constants import Model
-from palimpzest.cost_model import CostModel
-from palimpzest.optimizer import LogicalExpression, Group, Optimizer
+from palimpzest.optimizer import CostModel, LogicalExpression, Group, Optimizer
 from palimpzest.operators import *
 from palimpzest.policy import *
 import palimpzest as pz
@@ -75,13 +74,13 @@ class TestOptimizer:
     def test_basic_functionality(self, enron_eval_tiny):
         plan = pz.Dataset(enron_eval_tiny, schema=pz.TextFile)
         policy = MaxQuality()
-        cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
+        cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
             no_cache=True,
             verbose=True,
-            available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -92,13 +91,13 @@ class TestOptimizer:
     def test_simple_max_quality_convert(self, enron_eval_tiny, email_schema):
         plan = pz.Dataset(enron_eval_tiny, schema=email_schema)
         policy = MaxQuality()
-        cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
+        cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
             no_cache=True,
             verbose=True,
-            available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -106,18 +105,18 @@ class TestOptimizer:
         assert len(physical_plan) == 2
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
         assert isinstance(physical_plan[1], LLMConvertBonded)
-        assert physical_plan[1].model == Model.GPT_4
+        assert physical_plan[1].model == Model.GPT_4o
 
     def test_simple_min_cost_convert(self, enron_eval_tiny, email_schema):
         plan = pz.Dataset(enron_eval_tiny, schema=email_schema)
         policy = MinCost()
-        cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
+        cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
             no_cache=True,
             verbose=True,
-            available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -129,13 +128,13 @@ class TestOptimizer:
     def test_simple_min_time_convert(self, enron_eval_tiny, email_schema):
         plan = pz.Dataset(enron_eval_tiny, schema=email_schema)
         policy = MinTime()
-        cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
+        cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
             no_cache=True,
             verbose=True,
-            available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -148,13 +147,13 @@ class TestOptimizer:
         plan = pz.Dataset(enron_eval_tiny, schema=email_schema)
         plan = plan.filter("some text filter", depends_on=["contents"])
         policy = MinCost()
-        cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
+        cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
             no_cache=True,
             verbose=True,
-            available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -169,13 +168,13 @@ class TestOptimizer:
         plan = plan.filter("some text filter", depends_on=["contents"])
         plan = plan.filter("another text filter", depends_on=["contents"])
         policy = MinCost()
-        cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
+        cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
             no_cache=True,
             verbose=True,
-            available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -188,13 +187,13 @@ class TestOptimizer:
 
     def test_real_estate_logical_reorder(self, real_estate_eval_tiny, real_estate_workload):
         policy = MinCost()
-        cost_model = CostModel(real_estate_eval_tiny, sample_execution_data=[])
+        cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
             no_cache=True,
             verbose=True,
-            available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL, Model.GPT_4V],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
             allow_token_reduction=False,
             allow_code_synth=False,
         )
@@ -219,13 +218,13 @@ class TestOptimizer:
         plan = plan.filter("filter6", depends_on=["contents"])
         plan = plan.filter("filter7", depends_on=["contents"])
         policy = MinCost()
-        cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
+        cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
             no_cache=True,
             verbose=True,
-            available_models=[Model.GPT_4, Model.GPT_3_5, Model.MIXTRAL, Model.GPT_4V],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]

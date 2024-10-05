@@ -19,7 +19,7 @@ from palimpzest.constants import PromptStrategy
 @pytest.mark.parametrize("convert_op", [LLMConvertBonded, LLMConvertConventional])
 def test_convert(convert_op, email_schema):
     """Test whether convert operators"""
-    model = pz.Model.GPT_4
+    model = pz.Model.GPT_4o
     scanOp = MarshalAndScanDataOp(outputSchema=pz.TextFile, dataset_id="enron-eval-tiny")
     convertOp = convert_op(
         inputSchema=pz.File,
@@ -29,17 +29,16 @@ def test_convert(convert_op, email_schema):
     )
  
     datasource = DataDirectory().getRegisteredDataset("enron-eval-tiny")
-    candidate = DataRecord(schema=pz.File, parent_id=None, scan_idx=0)
+    candidate = DataRecord(schema=pz.File, source_id=0)
     candidate.idx = 0
     candidate.get_item_fn = datasource.getItem
-    candidate.cardinality = datasource.cardinality
     # run DataSourcePhysicalOp on record
 
     outputs = []
-    records, _ = scanOp(candidate)
-    for record in records:
-        output, _ = convertOp(record)
-        outputs.extend(output)
+    record_set = scanOp(candidate)
+    for record in record_set:
+        output = convertOp(record)
+        outputs.extend(output.data_records)
 
     for record in outputs:
         print(record.sender, record.subject)

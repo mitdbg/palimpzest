@@ -80,11 +80,17 @@ class RecordOpStats:
     # identifier for the parent of this record
     record_parent_id: str
 
+    # idenifier for the source of this record
+    record_source_id: str
+
     # a dictionary with the record state after being processed by the operator
     record_state: Dict[str, Any]
 
-    # operation id; an identifier for this operation
+    # operation id; an identifier for this operation's physical op id
     op_id: str
+
+    # logical operation id; the logical op id for this physical op
+    logical_op_id: str
 
     # operation name
     op_name: str
@@ -101,6 +107,9 @@ class RecordOpStats:
 
     # the ID of the physical plan which produced this record at this operation
     plan_id: str = ""
+
+    ##### OPTIONAL, BUT FILLED BY COST MODEL AFTER SAMPLE DATA EXECUTION #####
+    quality: Optional[float] = None
 
     ##### OPTIONAL FIELDS (I.E. ONLY MANDATORY FOR CERTAIN OPERATORS) #####
     # (if applicable) the name of the model used to generate the output for this record
@@ -144,6 +153,9 @@ class RecordOpStats:
 
     # (if applicable) a boolean indicating whether this is the statistics captured from a failed convert operation
     failed_convert: Optional[bool] = None
+
+    # (if applicable) a boolean indicating whether this is an image convert/filter operation
+    image_operation: Optional[bool] = None
 
     # an OPTIONAL dictionary with more detailed information about this operation;
     op_details: Dict[str, Any] = field(default_factory=dict)
@@ -286,6 +298,9 @@ class ExecutionStats:
 
     # dictionary of PlanStats objects (one for each plan run during execution)
     plan_stats: Dict[str, PlanStats] = field(default_factory=dict)
+
+    # total time spent optimizing
+    total_optimization_time: float = 0.0
 
     # total runtime for a call to pz.Execute
     total_execution_time: float = 0.0

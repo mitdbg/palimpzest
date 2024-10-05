@@ -1,13 +1,13 @@
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
-from palimpzest.corelib.schemas import Schema, SourceRecord
+from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
-from palimpzest.elements import DataRecord
+from palimpzest.elements import DataRecord, DataRecordSet
 from palimpzest.execution import ExecutionEngine
 from palimpzest.operators import AggregateOp, LimitScanOp, MarshalAndScanDataOp, PhysicalOperator
 from palimpzest.optimizer import PhysicalPlan
 
 from concurrent.futures import ThreadPoolExecutor, wait
-from typing import List, Union
+from typing import List, Tuple, Union
 
 import time
 
@@ -27,15 +27,15 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         )
 
     @staticmethod
-    def execute_op_wrapper(operator: PhysicalOperator, op_input: Union[DataRecord, List[DataRecord]]):
+    def execute_op_wrapper(operator: PhysicalOperator, op_input: Union[DataRecord, List[DataRecord]]) -> Tuple[DataRecordSet, PhysicalOperator]:
         """
         Wrapper function around operator execution which also and returns the operator.
         This is useful in the parallel setting(s) where operators are executed by a worker pool,
         and it is convenient to return the op_id along with the computation result.
         """
-        records, record_op_stats_lst = operator(op_input)
+        record_set = operator(op_input)
 
-        return records, record_op_stats_lst, operator
+        return record_set, operator
 
     def execute_plan(self, plan: PhysicalPlan,
                      num_samples: Union[int, float] = float("inf"),
@@ -49,9 +49,9 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
         plan_start_time = time.time()
 
-        # initialize plan and operator stats
+        # initialize plan stats and operator stats
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
-        for op_idx, op in enumerate(plan.operators):
+        for op in plan.operators:
             op_id = op.get_op_id()
             op_name = op.op_name()
             op_details = {k: str(v) for k, v in op.get_op_params().items()}
@@ -94,13 +94,14 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         with ThreadPoolExecutor(max_workers=plan_workers) as executor:
             # create initial (set of) future(s) to read first source record;
             # construct input DataRecord for DataSourcePhysicalOp
-            candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)
+            # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
+            #       it is simply a vessel to inform the scan_operator which record to fetch
+            candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
             candidate.idx = current_scan_idx
             candidate.get_item_fn = datasource.getItem
-            candidate.cardinality = datasource.cardinality
             futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
             op_id_to_futures_in_flight[source_op_id] += 1
-            current_scan_idx += 1   
+            current_scan_idx += 1
 
             # iterate until we have processed all operators on all records or come to an early stopping condition
             while len(futures) > 0:
@@ -114,7 +115,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                 new_futures = []
                 for future in done_futures:
                     # get the result
-                    records, record_op_stats_lst, operator = future.result()
+                    record_set, operator = future.result()
                     op_id = operator.get_op_id()
 
                     # decrement future from mapping of futures in-flight
@@ -123,13 +124,13 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                     # update plan stats
                     prev_operator = op_id_to_prev_operator[op_id]
                     plan_stats.operator_stats[op_id].add_record_op_stats(
-                        record_op_stats_lst,
+                        record_set.record_op_stats,
                         source_op_id=prev_operator.get_op_id() if prev_operator is not None else None,
                         plan_id=plan.plan_id,
                     )
 
                     # process each record output by the future's operator
-                    for record in records:
+                    for record in record_set:
                         # skip records which are filtered out
                         if not getattr(record, "_passed_filter", True):
                             continue
@@ -147,15 +148,16 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
                     # if this operator was a source scan, update the number of source records scanned
                     if op_id == source_op_id:
-                        source_records_scanned += len(records)
+                        source_records_scanned += len(record_set)
 
                         # scan next record if we can still draw records from source
                         if source_records_scanned < num_samples and current_scan_idx < datasource_len:
                             # construct input DataRecord for DataSourcePhysicalOp
-                            candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)
+                            # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
+                            #       it is simply a vessel to inform the scan_operator which record to fetch
+                            candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
                             candidate.idx = current_scan_idx
                             candidate.get_item_fn = datasource.getItem
-                            candidate.cardinality = datasource.cardinality
                             new_futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
                             op_id_to_futures_in_flight[source_op_id] += 1
                             current_scan_idx += 1

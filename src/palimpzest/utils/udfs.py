@@ -74,7 +74,7 @@ def xls_to_tables(candidate):
 
         # TODO extend number of rows with dynamic sizing of context length
         # construct data record
-        dr = pz.DataRecord(pz.Table, parent_id=candidate._id)
+        dr = pz.DataRecord.fromParent(pz.Table, parent_record=candidate)
         rows = []
         for row in dataframe.values[:100]:
             row_record = [str(x) for x in row]

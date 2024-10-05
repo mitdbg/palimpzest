@@ -1,12 +1,11 @@
 import time
-from palimpzest.corelib.schemas import Schema, SourceRecord
-from palimpzest.cost_model.cost_model import CostModel
+from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements import DataRecord
 from palimpzest.execution.execution_engine import ExecutionEngine
 from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
-from palimpzest.optimizer.optimizer import Optimizer
+from palimpzest.optimizer.optimizer import CostModel, Optimizer
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
@@ -63,9 +62,6 @@ class StreamingSequentialExecution(ExecutionEngine):
         dataset: Set,
         policy: Policy,
     ):
-        # initialize the datasource
-        self.init_datasource(dataset)
-
         start_time = time.time()
         # Always delete cache
         if not self.plan_generated:
@@ -93,10 +89,11 @@ class StreamingSequentialExecution(ExecutionEngine):
         input_records = []
         record_op_stats = []
         for idx in range(datasource_len):
-            candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=idx)
+            # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
+            #       it is simply a vessel to inform the scan_operator which record to fetch
+            candidate = DataRecord(schema=SourceRecord, source_id=idx)
             candidate.idx = idx
             candidate.get_item_fn = datasource.getItem
-            candidate.cardinality = datasource.cardinality
             records, record_op_stats_lst = scan_operator(candidate)
             input_records += records
             record_op_stats += record_op_stats_lst

@@ -29,8 +29,8 @@ class Plan:
     def __len__(self):
         return len(self.operators)
 
-    def __getitem__(self, idx: int):
-        return self.operators[idx]
+    def __getitem__(self, slice):
+        return self.operators[slice]
 
     def __str__(self):
         start = self.operators[0]
@@ -88,7 +88,7 @@ class SentinelPlan(Plan):
     def __init__(self, operator_sets: List[List[PhysicalOperator]]):
         self.operator_sets = operator_sets
         self.plan_id = self.compute_plan_id()
-        self.sample_matrices = [None] * len(operator_sets)
+        self.sample_matrices = {SentinelPlan.compute_op_set_id(op_set): None for op_set in self.operator_sets}
 
     def compute_plan_id(self) -> str:
         """
@@ -123,6 +123,11 @@ class SentinelPlan(Plan):
 
     def copy(self):
         return SentinelPlan(self.operator_sets)
+
+    @staticmethod
+    def compute_op_set_id(op_set: List[PhysicalOperator]):
+        hash_str = str(tuple(op.get_op_id() for op in op_set))
+        return hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
     @staticmethod
     def fromOpsAndSubPlan(op_sets: List[List[PhysicalOperator]], subPlan: SentinelPlan) -> SentinelPlan:

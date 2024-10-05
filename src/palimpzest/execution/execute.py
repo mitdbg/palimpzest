@@ -1,6 +1,7 @@
 from palimpzest.constants import Model, OptimizationStrategy
+from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import DataSource
-from palimpzest.execution import ExecutionEngine, PipelinedSingleThreadSentinelExecution
+from palimpzest.execution import ExecutionEngine, SequentialSingleThreadSentinelExecution
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
@@ -8,6 +9,18 @@ from typing import List, Optional, Union
 
 
 class Execute:
+    @classmethod
+    def get_datasource(cls, dataset: Union[Set, DataSource]) -> str:
+        """
+        Gets the DataSource for the given dataset.
+        """
+        # iterate until we reach DataSource
+        while isinstance(dataset, Set):
+            dataset = dataset._source
+
+        # this will throw an exception if datasource is not registered with PZ
+        return DataDirectory().getRegisteredDataset(dataset.dataset_id)
+
     def __new__(
         cls,
         dataset: Set,
@@ -24,14 +37,14 @@ class Execute:
         allow_model_selection: Optional[bool]=True,
         allow_code_synth: Optional[bool]=True,
         allow_token_reduction: Optional[bool]=True,
-        validation_data_source: Optional[Union[str, DataSource]]=None,
         optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
-        execution_engine: ExecutionEngine = PipelinedSingleThreadSentinelExecution,
+        execution_engine: ExecutionEngine = SequentialSingleThreadSentinelExecution,
         *args,
         **kwargs
     ):
 
         return execution_engine(
+            datasource=cls.get_datasource(dataset),
             num_samples=num_samples,
             nocache=nocache,
             include_baselines=include_baselines,
@@ -44,7 +57,6 @@ class Execute:
             allow_code_synth=allow_code_synth,
             allow_model_selection=allow_model_selection,
             allow_token_reduction=allow_token_reduction,
-            validation_data_source=validation_data_source,
             optimization_strategy=optimization_strategy,
             *args,
             **kwargs

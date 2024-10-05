@@ -27,16 +27,19 @@ class CodeSynthesisConvert(LLMConvert):
 
     def __init__(
         self,
-        exemplar_generation_model: Model = Model.GPT_4,
-        code_synth_model: Model = Model.GPT_4,
-        conventional_fallback_model: Model = Model.GPT_3_5,
+        exemplar_generation_model: Model = Model.GPT_4o,
+        code_synth_model: Model = Model.GPT_4o,
+        conventional_fallback_model: Model = Model.GPT_4o_MINI,
         cache_across_plans: bool = True,
         *args, **kwargs
     ):
         kwargs["model"] = None
         super().__init__(*args, **kwargs)
         self.exemplar_generation_model = exemplar_generation_model
-        self.code_synth_model = code_synth_model
+        # TODO: revert later -- but for now, code_synth_model can only be GPT-4o b/c CustomGenerator's
+        #       response parsing is coded against this model's output json structure
+        # self.code_synth_model = code_synth_model
+        self.code_synth_model = Model.GPT_4o
         self.conventional_fallback_model = conventional_fallback_model
         self.cache_across_plans = cache_across_plans
 
@@ -116,7 +119,7 @@ class CodeSynthesisConvert(LLMConvert):
         naive_op_cost_estimates = super().naiveCostEstimates(source_op_cost_estimates)
         naive_op_cost_estimates.time_per_record = 1e-5
         naive_op_cost_estimates.cost_per_record = 1e-4 # amortize code synth cost across records
-        naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * (GPT_4_MODEL_CARD["code"] / 100.0)
+        naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * (GPT_4o_MODEL_CARD["code"] / 100.0) * 0.7
 
         return naive_op_cost_estimates
 
@@ -219,28 +222,27 @@ class CodeSynthesisConvert(LLMConvert):
             for idx, answer in enumerate(field_answer_lst):
                 records_json[idx][field_name] = answer
 
-        # create data records and record op stats
-        drs = [
+        # create set of data records and record op stats
+        records = [
             self._create_data_record_from_json(
                 jsonObj=js, candidate=candidate, cardinality_idx=idx
             )
             for idx, js in enumerate(records_json)
         ]
 
-        total_time = time.time() - start_time
-        record_op_stats_lst = self._create_record_op_stats_lst(
-            records=drs,
+        # construct DataRecordSet object
+        record_set = self._create_record_set(
+            records=records,
             fields=fields_to_generate,
             generation_stats=generation_stats,
-            total_time=total_time,
-            parent_id=candidate._id,
+            total_time=time.time() - start_time,
+            parent_record=candidate,
         )
 
         # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
         #       keep an eye out for a regression in code synth performance and revert if necessary
         # update operator's set of exemplars
-        
-        exemplars = [(candidate_dict, dr._asDict(include_bytes=False)) for dr in drs]
+        exemplars = [(candidate_dict, dr._asDict(include_bytes=False)) for dr in record_set]
         self.exemplars.extend(exemplars)
 
         # if we are allowed to cache exemplars across plan executions, add exemplars to cache
@@ -249,7 +251,7 @@ class CodeSynthesisConvert(LLMConvert):
             exemplars_cache_id = self.get_op_id()
             cache.putCachedData(f"codeExemplars", exemplars_cache_id, exemplars)
 
-        return drs, record_op_stats_lst
+        return record_set
 
     def __call__(self, candidate):
         "This code is used for codegen with a fallback to default"
@@ -321,22 +323,23 @@ class CodeSynthesisConvert(LLMConvert):
                 # update field_outputs
                 field_outputs[field_name] = json_answers[field_name][0]
 
-        drs = [
+        # create set of data records
+        records = [
             self._create_data_record_from_json(
                 jsonObj=field_outputs, candidate=candidate, cardinality_idx=0
             )
         ]
 
-        # compute the record_op_stats for each data record and return
-        record_op_stats_lst = self._create_record_op_stats_lst(
-            records=drs,
+        # create and return DataRecordSet
+        record_set = self._create_record_set(
+            records=records,
             fields=fields_to_generate,
             generation_stats=generation_stats,
             total_time=time.time() - start_time,
-            parent_id=candidate._id,
+            parent_record=candidate,
         )
 
-        return drs, record_op_stats_lst
+        return record_set
 
 
 class CodeSynthesisConvertNone(CodeSynthesisConvert):

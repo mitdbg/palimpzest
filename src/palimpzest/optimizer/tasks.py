@@ -1,7 +1,7 @@
 from __future__ import annotations
 from palimpzest.constants import OptimizationStrategy
 from palimpzest.dataclasses import PlanCost
-from palimpzest.cost_model import CostModel
+from palimpzest.optimizer.cost_model import BaseCostModel, MatrixCompletionCostModel
 from palimpzest.optimizer.primitives import Expression, Group
 from palimpzest.optimizer.rules import TransformationRule, ImplementationRule, Rule
 from palimpzest.policy import Policy
@@ -346,7 +346,7 @@ class OptimizePhysicalExpression(Task):
         return group
 
 
-    def perform(self, cost_model: CostModel, groups: Dict[int, Group], policy: Policy, context: Dict[str, Any]={}) -> List[Task]:
+    def perform(self, cost_model: BaseCostModel, groups: Dict[int, Group], policy: Policy, context: Dict[str, Any]={}) -> List[Task]:
         # return if we've already computed the cost of this physical expression
         if self.physical_expression.plan_cost is not None:
             return []
@@ -381,16 +381,11 @@ class OptimizePhysicalExpression(Task):
         self.physical_expression.plan_cost = full_plan_cost
 
         group = groups[self.physical_expression.group_id]
-        if context['optimization_strategy'] == OptimizationStrategy.OPTIMAL:
-            group = self.update_best_physical_expression(group, policy)
-            groups[self.physical_expression.group_id] = group
-
-        elif context['optimization_strategy'] == OptimizationStrategy.CONFIDENCE_INTERVAL:
+        if context['optimization_strategy'] == OptimizationStrategy.CONFIDENCE_INTERVAL:
             group = self.update_best_physical_expression(group, policy)
             group = self.update_ci_best_physical_expressions(group, policy)
             groups[self.physical_expression.group_id] = group
-
-        elif context['optimization_strategy'] == OptimizationStrategy.SENTINEL:
+        else:
             group = self.update_best_physical_expression(group, policy)
             groups[self.physical_expression.group_id] = group
 

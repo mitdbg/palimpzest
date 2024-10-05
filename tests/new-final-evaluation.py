@@ -2,7 +2,7 @@
 import palimpzest as pz
 
 from palimpzest.execution import (
-    PipelinedSingleThreadSentinelExecution
+    SequentialSingleThreadSentinelExecution
 )
 from palimpzest.utils import getModels, udfs
 
@@ -163,7 +163,7 @@ class RealEstateListingSource(pz.UserSource):
         listing = self.listings[idx]
 
         # create data record
-        dr = pz.DataRecord(self.schema, scan_idx=idx)
+        dr = pz.DataRecord(self.schema, source_id=listing)
         dr.listing = listing
         dr.image_contents = []
         listing_dir = os.path.join(self.listings_dir, listing)
@@ -290,7 +290,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--execution",
-        default=PipelinedSingleThreadSentinelExecution,
+        default=SequentialSingleThreadSentinelExecution,
         action="store_true",
         help="The execution engine to use",
     )

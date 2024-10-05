@@ -16,6 +16,7 @@ from collections import Counter
 from openai import OpenAI
 from PIL import Image
 from tenacity import retry, stop_after_attempt, wait_exponential
+from together import Together
 from typing import Any, Dict, List, Tuple, Union
 
 import google.generativeai as genai
@@ -65,7 +66,7 @@ class CustomGenerator(BaseGenerator):
 
     def _get_model(self) -> dsp.LM:
         model = None
-        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+        if self.model_name in [Model.GPT_4o.value, Model.GPT_4o_MINI.value]:
             openai_key = get_api_key("OPENAI_API_KEY")
             max_tokens = 4096
             model = dspy.OpenAI(
@@ -76,13 +77,13 @@ class CustomGenerator(BaseGenerator):
                 logprobs=True,
             )
 
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
             together_key = get_api_key("TOGETHER_API_KEY")
             model = TogetherHFAdaptor(self.model_name, together_key, logprobs=1)
 
-        elif self.model_name in [Model.GEMINI_1.value]:
-            google_key = get_api_key("GOOGLE_API_KEY")
-            model = dspy.Google(model=self.model_name, api_key=google_key)
+        # elif self.model_name in [Model.GEMINI_1.value]:
+        #     google_key = get_api_key("GOOGLE_API_KEY")
+        #     model = dspy.Google(model=self.model_name, api_key=google_key)
 
         else:
             raise ValueError(
@@ -96,17 +97,17 @@ class CustomGenerator(BaseGenerator):
         Parse and return the usage statistics and finish reason.
         """
         usage, finish_reason = None, None
-        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+        if self.model_name in [Model.GPT_4o.value, Model.GPT_4o_MINI.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
             finish_reason = dspy_lm.history[-1]["response"]["choices"][-1][
                 "finish_reason"
             ]
-        elif self.model_name in [Model.GEMINI_1.value]:
-            usage = {"prompt_tokens": 0, "completion_tokens": 0}
-            finish_reason = (
-                dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
-            )
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
+        # elif self.model_name in [Model.GEMINI_1.value]:
+        #     usage = {"prompt_tokens": 0, "completion_tokens": 0}
+        #     finish_reason = (
+        #         dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
+        #     )
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
             finish_reason = dspy_lm.history[-1]["response"]["finish_reason"]
 
@@ -128,21 +129,21 @@ class CustomGenerator(BaseGenerator):
         # get log probabilities data structure
         tokens, token_logprobs = None, None
 
-        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+        if self.model_name in [Model.GPT_4o.value, Model.GPT_4o_MINI.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
             log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"][
                 "content"
             ]
             tokens = list(map(lambda elt: elt["token"], log_probs))
             token_logprobs = list(map(lambda elt: elt["logprob"], log_probs))
-        elif self.model_name in [Model.GEMINI_1.value]:
-            return None
-            # TODO Google gemini does not provide log probabilities!
-            # https://github.com/google/generative-ai-python/issues/238
-            # tok_count = dspy_lm.llm.count_tokens(answer).total_tokens
-            # tokens = [""] * tok_count
-            # token_logprobs = [0] * len(tokens)
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
+        # elif self.model_name in [Model.GEMINI_1.value]:
+        #     return None
+        #     # TODO Google gemini does not provide log probabilities!
+        #     # https://github.com/google/generative-ai-python/issues/238
+        #     # tok_count = dspy_lm.llm.count_tokens(answer).total_tokens
+        #     # tokens = [""] * tok_count
+        #     # token_logprobs = [0] * len(tokens)
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
             # reponse: dict_keys(['prompt', 'choices', 'usage', 'finish_reason', 'tokens', 'token_logprobs'])
             tokens = dspy_lm.history[-1]["response"]["tokens"]
             token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
@@ -246,10 +247,10 @@ class DSPyGenerator(BaseGenerator):
 
     def _get_model(self) -> dsp.LM:
         model = None
-        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+        if self.model_name in [Model.GPT_4o.value, Model.GPT_4o_MINI.value]:
             openai_key = get_api_key("OPENAI_API_KEY")
             max_tokens = (
-                4096 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 150
+                4096 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 250
             )
             model = dspy.OpenAI(
                 model=self.model_name,
@@ -259,13 +260,13 @@ class DSPyGenerator(BaseGenerator):
                 logprobs=True,
             )
 
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
             together_key = get_api_key("TOGETHER_API_KEY")
             model = TogetherHFAdaptor(self.model_name, together_key, logprobs=1)
 
-        elif self.model_name in [Model.GEMINI_1.value]:
-            google_key = get_api_key(f"GOOGLE_API_KEY")
-            model = dspy.Google(model=self.model_name, api_key=google_key)
+        # elif self.model_name in [Model.GEMINI_1.value]:
+        #     google_key = get_api_key(f"GOOGLE_API_KEY")
+        #     model = dspy.Google(model=self.model_name, api_key=google_key)
 
         else:
             raise ValueError(
@@ -279,17 +280,17 @@ class DSPyGenerator(BaseGenerator):
         Parse and return the usage statistics and finish reason.
         """
         usage, finish_reason = None, None
-        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+        if self.model_name in [Model.GPT_4o.value, Model.GPT_4o_MINI.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
             finish_reason = dspy_lm.history[-1]["response"]["choices"][-1][
                 "finish_reason"
             ]
-        elif self.model_name in [Model.GEMINI_1.value]:
-            usage = {"prompt_tokens": 0, "completion_tokens": 0}
-            finish_reason = (
-                dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
-            )
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
+        # elif self.model_name in [Model.GEMINI_1.value]:
+        #     usage = {"prompt_tokens": 0, "completion_tokens": 0}
+        #     finish_reason = (
+        #         dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
+        #     )
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
             finish_reason = dspy_lm.history[-1]["response"]["finish_reason"]
 
@@ -311,21 +312,21 @@ class DSPyGenerator(BaseGenerator):
         # get log probabilities data structure
         tokens, token_logprobs = None, None
 
-        if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
+        if self.model_name in [Model.GPT_4o.value, Model.GPT_4o_MINI.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
             log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"][
                 "content"
             ]
             tokens = list(map(lambda elt: elt["token"], log_probs))
             token_logprobs = list(map(lambda elt: elt["logprob"], log_probs))
-        elif self.model_name in [Model.GEMINI_1.value]:
-            return None
-            # TODO Google gemini does not provide log probabilities!
-            # https://github.com/google/generative-ai-python/issues/238
-            # tok_count = dspy_lm.llm.count_tokens(answer).total_tokens
-            # tokens = [""] * tok_count
-            # token_logprobs = [0] * len(tokens)
-        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
+        # elif self.model_name in [Model.GEMINI_1.value]:
+        #     return None
+        #     # TODO Google gemini does not provide log probabilities!
+        #     # https://github.com/google/generative-ai-python/issues/238
+        #     # tok_count = dspy_lm.llm.count_tokens(answer).total_tokens
+        #     # tokens = [""] * tok_count
+        #     # token_logprobs = [0] * len(tokens)
+        elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
             # reponse: dict_keys(['prompt', 'choices', 'usage', 'finish_reason', 'tokens', 'token_logprobs'])
             tokens = dspy_lm.history[-1]["response"]["tokens"]
             token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
@@ -359,7 +360,7 @@ class DSPyGenerator(BaseGenerator):
         context: str,
         question: str,
     ) -> GenerationOutput:
-
+        # configure DSPy
         dspy_lm = self._get_model()
         dspy.settings.configure(lm=dspy_lm)
         cot = dspyCOT(self.promptSignature)
@@ -392,22 +393,22 @@ class DSPyGenerator(BaseGenerator):
             total_output_cost=output_tokens * usd_per_output_token,
             cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
         )
-        # create GenerationStats
-        stats = GenerationStats(**{
-            "model_name": self.model_name,
-            "llm_call_duration_secs": end_time - start_time,
-            "fn_call_duration_secs": 0.0,
-            "total_input_tokens": input_tokens,
-            "total_output_tokens": output_tokens,
-            "total_input_cost": input_tokens * usd_per_input_token,
-            "total_output_cost": output_tokens * usd_per_output_token,
-            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
-            # "prompt": dspy_lm.history[-1]["prompt"],
-            # "usage": usage,
-            # "finish_reason": finish_reason,
-            # "answer_log_probs": answer_log_probs,
-            # "answer": pred.answer,
-        })
+        # # create GenerationStats
+        # stats = GenerationStats(**{
+        #     "model_name": self.model_name,
+        #     "llm_call_duration_secs": end_time - start_time,
+        #     "fn_call_duration_secs": 0.0,
+        #     "total_input_tokens": input_tokens,
+        #     "total_output_tokens": output_tokens,
+        #     "total_input_cost": input_tokens * usd_per_input_token,
+        #     "total_output_cost": output_tokens * usd_per_output_token,
+        #     "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+        #     # "prompt": dspy_lm.history[-1]["prompt"],
+        #     # "usage": usage,
+        #     # "finish_reason": finish_reason,
+        #     # "answer_log_probs": answer_log_probs,
+        #     # "answer": pred.answer,
+        # })
 
         if self.verbose:
             print("Prompt history:")
@@ -439,14 +440,18 @@ class ImageTextGenerator(BaseGenerator):
 
     def _get_model_client(self) -> Union[OpenAI, genai.GenerativeModel]:
         client = None
-        if self.model_name == Model.GPT_4V.value:
+        if self.model_name in [Model.GPT_4o_V.value, Model.GPT_4o_MINI_V]:
             api_key = get_api_key("OPENAI_API_KEY")
             client = OpenAI(api_key=api_key)
 
-        elif self.model_name == Model.GEMINI_1V.value:
-            api_key = get_api_key("GOOGLE_API_KEY")
-            genai.configure(api_key=api_key)
-            client = genai.GenerativeModel("gemini-pro-vision")
+        # elif self.model_name == Model.GEMINI_1V.value:
+        #     api_key = get_api_key("GOOGLE_API_KEY")
+        #     genai.configure(api_key=api_key)
+        #     client = genai.GenerativeModel("gemini-pro-vision")
+
+        elif self.model_name in [Model.LLAMA3_V]:
+            api_key = get_api_key("TOGETHER_API_KEY")
+            client = Together(api_key=api_key)
 
         else:
             raise ValueError(
@@ -455,9 +460,9 @@ class ImageTextGenerator(BaseGenerator):
 
         return client
 
-    def _make_payloads(self, prompt: str, base64_images: List[str]):
-        payloads = []
-        if self.model_name == Model.GPT_4V.value:
+    def _make_payload(self, prompt: str, base64_images: List[str]):
+        payload = None
+        if self.model_name in [Model.GPT_4o_V.value, Model.GPT_4o_MINI_V]:
             # create content list
             content = [{"type": "text", "text": prompt}]
             for base64_image in base64_images:
@@ -469,42 +474,66 @@ class ImageTextGenerator(BaseGenerator):
                 )
 
             # create payload
-            payloads = [
-                {
-                    "model": "gpt-4-vision-preview",
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": content,
-                        }
-                    ],
-                    "max_tokens": 4000,
-                    "temperature": 0.0,
-                    "logprobs": True,
-                }
-            ]
+            payload = {
+                "model": self.model_name,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": content,
+                    }
+                ],
+                "max_tokens": 4000,
+                "temperature": 0.0,
+                "logprobs": True,
+            }
 
-        elif self.model_name == Model.GEMINI_1V.value:
-            payloads = [
-                [prompt, Image.open(io.BytesIO(self._decode_image(base64_image)))]
-                for base64_image in base64_images
-            ]
+        # elif self.model_name == Model.GEMINI_1V.value:
+        #     payloads = [
+        #         [prompt, Image.open(io.BytesIO(self._decode_image(base64_image)))]
+        #         for base64_image in base64_images
+        #     ]
+
+        # NOTE: it seems Together + LLama3 can only process a single message; we concat multiple images in operator layer for this model
+        elif self.model_name in [Model.LLAMA3_V.value]:
+            # create one message per image
+            messages = []
+            for base64_image in base64_images:
+                message = {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                        }
+                    ]
+                }
+                messages.append(message)
+
+            # create payload
+            payload = {
+                "model": self.model_name,
+                "messages": messages,
+                "max_tokens": 4000,
+                "temperature": 0.0,
+                "logprobs": 1,
+            }
 
         else:
             raise ValueError(
                 "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
             )
 
-        return payloads
+        return payload
 
     def _generate_response(
-        self, client: Union[OpenAI, genai.GenerativeModel], payloads: List[Any]
+        self, client: Union[OpenAI, genai.GenerativeModel], payload: Dict[str, Any]
     ) -> Tuple[str, str, dict]:
         answer, finish_reason, usage = None, None, None
 
-        if self.model_name == Model.GPT_4V.value:
+        if self.model_name in [Model.GPT_4o_V.value, Model.GPT_4o_MINI_V]:
             # GPT-4V will always have a single payload
-            completion = client.chat.completions.create(**payloads[0])
+            completion = client.chat.completions.create(**payload)
             candidate = completion.choices[-1]
             answer = candidate.message.content
             finish_reason = candidate.finish_reason
@@ -516,23 +545,32 @@ class ImageTextGenerator(BaseGenerator):
                 map(lambda elt: elt.logprob, completion.choices[-1].logprobs.content)
             )
 
-        elif self.model_name == Model.GEMINI_1V.value:
-            # iterate through images to generate multiple responses
-            answers, finish_reasons = [], []
-            for idx, payload in enumerate(payloads):
-                response = client.generate_content(payload)
-                candidate = response.candidates[-1]
-                answer = f"Image {idx}: " + candidate.content.parts[0].text
-                finish_reason = candidate.finish_reason
-                answers.append(answer)
-                finish_reasons.append(finish_reason)
+        # elif self.model_name == Model.GEMINI_1V.value:
+        #     # iterate through images to generate multiple responses
+        #     answers, finish_reasons = [], []
+        #     for idx, payload in enumerate(payloads):
+        #         response = client.generate_content(payload)
+        #         candidate = response.candidates[-1]
+        #         answer = f"Image {idx}: " + candidate.content.parts[0].text
+        #         finish_reason = candidate.finish_reason
+        #         answers.append(answer)
+        #         finish_reasons.append(finish_reason)
 
-            # combine answers and compute most frequent finish reason
-            answer = "\n".join(answers)
-            finish_reason = max(set(finish_reasons), key=finish_reasons.count)
+        #     # combine answers and compute most frequent finish reason
+        #     answer = "\n".join(answers)
+        #     finish_reason = max(set(finish_reasons), key=finish_reasons.count)
 
-            # TODO: implement when google suppports usage and logprob stats
-            usage = {}
+        #     # TODO: implement when google suppports usage and logprob stats
+        #     usage = {}
+        #     tokens = []
+        #     token_logprobs = []
+
+        elif self.model_name in [Model.LLAMA3_V.value]:
+            completion = client.chat.completions.create(**payload)
+            candidate = completion.choices[-1]
+            answer = candidate.message.content
+            finish_reason = candidate.finish_reason.value
+            usage = dict(completion.usage)
             tokens = []
             token_logprobs = []
 
@@ -577,15 +615,13 @@ class ImageTextGenerator(BaseGenerator):
         client = self._get_model_client()
 
         # create payload
-        payloads = self._make_payloads(question, context)
+        payload = self._make_payload(question, context)
 
         # generate response
         if self.verbose:
-            print(f"Generating")
+            print(f"Generating -- {self.model_name}")
         start_time = time.time()
-        answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(
-            client, payloads
-        )
+        answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(client, payload)
         end_time = time.time()
         if self.verbose:
             print(answer)
