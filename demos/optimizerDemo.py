@@ -263,7 +263,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        help="One of 'gpt-4o', 'gpt-35', 'mixtral'",
+        help="One of 'gpt-4o', 'gpt-4o-mini', 'llama', 'mixtral'",
         default='gpt-4o',
     )
 

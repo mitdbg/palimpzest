@@ -1,7 +1,7 @@
 from palimpzest.constants import AggFunc
 from palimpzest.operators import *
 from palimpzest.optimizer.primitives import Group, Expression, LogicalExpression, PhysicalExpression
-from palimpzest.utils.model_helpers import getVisionModels
+from palimpzest.utils.model_helpers import getModels, getVisionModels
 
 from copy import deepcopy
 from typing import Set
@@ -231,16 +231,25 @@ class LLMConvertRule(ImplementationRule):
             "logical_op_id": logical_op.get_op_id(),
         })
 
+        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
+        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
+        #
+        # identify models which can be used strictly for text or strictly for images
+        vision_models = set(getVisionModels())
+        text_models = set(getModels())
+        pure_text_models = {model for model in text_models if model not in vision_models}
+        pure_vision_models = {model for model in vision_models if model not in text_models}
+
         physical_expressions = []
         for model in physical_op_params['available_models']:
             # skip this model if:
-            # 1. this is an image model and we're not doing an image conversion, or
-            # 2. this is not an image model and we're doing an image conversion
-            # TODO: make sure this logic can handle models like GPT-4o which are both vision and not-vision
-            is_vision_model = model in getVisionModels()
+            # 1. this is a pure image model and we're not doing an image conversion, or
+            # 2. this is a pure text model and we're doing an image conversion
             is_image_conversion = op_kwargs['image_conversion']
-            image_model_xor = is_vision_model != is_image_conversion
-            if image_model_xor:
+            if model in pure_text_models and is_image_conversion:
+                continue
+
+            elif model in pure_vision_models and not is_image_conversion:
                 continue
 
             # construct multi-expression
@@ -448,16 +457,26 @@ class LLMFilterRule(ImplementationRule):
             "verbose": physical_op_params['verbose'],
             "logical_op_id": logical_op.get_op_id(),
         })
+
+        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
+        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
+        #
+        # identify models which can be used strictly for text or strictly for images
+        vision_models = set(getVisionModels())
+        text_models = set(getModels())
+        pure_text_models = {model for model in text_models if model not in vision_models}
+        pure_vision_models = {model for model in vision_models if model not in text_models}
+
         physical_expressions = []
         for model in physical_op_params['available_models']:
             # skip this model if:
-            # 1. this is an image model and we're not doing an image filter, or
-            # 2. this is not an image model and we're doing an image filter
-            # TODO: make sure this logic can handle models like GPT-4o which are both vision and not-vision
-            is_vision_model = model in getVisionModels()
+            # 1. this is a pure image model and we're not doing an image conversion, or
+            # 2. this is a pure text model and we're doing an image conversion
             is_image_filter = op_kwargs['image_filter']
-            image_model_xor = is_vision_model != is_image_filter
-            if image_model_xor:
+            if model in pure_text_models and is_image_filter:
+                continue
+
+            elif model in pure_vision_models and not is_image_filter:
                 continue
 
             # construct multi-expression
