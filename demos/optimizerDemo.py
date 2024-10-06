@@ -414,8 +414,8 @@ if __name__ == "__main__":
         record_dict = record._asDict()
         record_jsons.append(record_dict)
 
-    with open('profiling-data/fever-record-outputs.json', 'w') as f:
-        json.dump(record_jsons)
+    with open(records_path, 'w') as f:
+        json.dump(record_jsons, f)
 
     # save statistics
     execution_stats_dict = execution_stats.to_json()
