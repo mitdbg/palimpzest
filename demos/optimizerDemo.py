@@ -163,8 +163,11 @@ class RealEstateValidationSource(pz.ValidationDataSource):
         # define quality eval function for price field
         def price_eval(price: str, expected_price: int):
             if type(price) == str:
-                price = price.strip()
-                price = int(price.replace("$", "").replace(",", ""))
+                try:
+                    price = price.strip()
+                    price = int(price.replace("$", "").replace(",", ""))
+                except:
+                    return False
             return price == expected_price
 
         fields_to_metric_fn = {
@@ -283,6 +286,8 @@ if __name__ == "__main__":
     datasetid = args.datasetid
     workload = args.workload
     verbose = args.verbose
+    rank = args.rank
+    num_samples = args.num_samples
     policy = pz.MaxQuality()
     if args.policy == "mincost":
         policy = pz.MinCost()
@@ -342,7 +347,7 @@ if __name__ == "__main__":
         datasource = RealEstateValidationSource(
             datasetId=f"{user_dataset_id}",
             listings_dir=data_filepath,
-            num_samples=args.num_samples,
+            num_samples=num_samples,
             shuffle=False,
             seed=42,
         )
@@ -392,32 +397,32 @@ if __name__ == "__main__":
         available_models=available_models,
         optimization_strategy=optimization_strategy,
         execution_engine=execution_engine,
-        rank=args.rank,
+        rank=rank,
         verbose=verbose,
     )
 
-    # create filepaths for records and stats
-    records_path = (
-        f"opt-profiling-data/{workload}-records.json"
-        if engine == "sentinel"
-        else f"opt-profiling-data/{workload}-baseline-{args.model}-records.json"
-    )
-    stats_path = (
-        f"opt-profiling-data/{workload}-profiling.json"
-        if engine == "sentinel"
-        else f"opt-profiling-data/{workload}-baseline-{args.model}-profiling.json"
-    )
+    # # create filepaths for records and stats
+    # records_path = (
+    #     f"opt-profiling-data/{workload}-rank-{rank}-num-samples-{num_samples}-records.json"
+    #     if engine == "sentinel"
+    #     else f"opt-profiling-data/{workload}-baseline-{args.model}-records.json"
+    # )
+    # stats_path = (
+    #     f"opt-profiling-data/{workload}-rank-{rank}-num-samples-{num_samples}-profiling.json"
+    #     if engine == "sentinel"
+    #     else f"opt-profiling-data/{workload}-baseline-{args.model}-profiling.json"
+    # )
 
-    # save record outputs
-    record_jsons = []
-    for record in records:
-        record_dict = record._asDict()
-        record_jsons.append(record_dict)
+    # # save record outputs
+    # record_jsons = []
+    # for record in records:
+    #     record_dict = record._asDict()
+    #     record_jsons.append(record_dict)
 
-    with open(records_path, 'w') as f:
-        json.dump(record_jsons, f)
+    # with open(records_path, 'w') as f:
+    #     json.dump(record_jsons, f)
 
-    # save statistics
-    execution_stats_dict = execution_stats.to_json()
-    with open(stats_path, "w") as f:
-        json.dump(execution_stats_dict, f)
+    # # save statistics
+    # execution_stats_dict = execution_stats.to_json()
+    # with open(stats_path, "w") as f:
+    #     json.dump(execution_stats_dict, f)

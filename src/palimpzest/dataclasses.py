@@ -318,6 +318,7 @@ class ExecutionStats:
                 plan_id: plan_stats.to_json()
                 for plan_id, plan_stats in self.plan_stats.items()
             },
+            "total_optimization_time": self.total_optimization_time,
             "total_execution_time": self.total_execution_time,
             "total_execution_cost": self.total_execution_cost,
             "plan_strs": self.plan_strs,

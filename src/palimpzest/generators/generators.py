@@ -504,7 +504,8 @@ class ImageTextGenerator(BaseGenerator):
                         {"type": "text", "text": prompt},
                         {
                             "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                            #"image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                            "image_url": {"url": base64_image}, # this will be a URL for Together
                         }
                     ]
                 }

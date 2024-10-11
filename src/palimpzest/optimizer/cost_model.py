@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import math
+import os
 import torch
 
 # NOTE: the answer.mode() call(s) inside of _est_quality() throw a UserWarning when there are multiple
@@ -52,8 +53,6 @@ class BaseCostModel:
 
 class MatrixCompletionCostModel:
     """
-    TODO: run on enron to work out bugs
-    TODO: run end-to-end on enron with 0, 5, 10, 15, 20 validation examples
     TODO: evaluate on some common benchmark datasets, e.g.:
     - Fever dataset
     - Wiki-QA might also be good choices in the future
@@ -121,6 +120,28 @@ class MatrixCompletionCostModel:
             self.logical_op_id_to_sample_masks,
         )
 
+        # TODO: remove after SIGMOD
+        if os.environ['LOG_MATRICES'].lower() == "true":
+            with open(f"opt-profiling-data/sentinel-plan-n-{self.rank + 1}-{sentinel_plan.plan_id}.json", "w") as f:
+                json.dump({"plan_str": str(sentinel_plan)}, f)
+
+            with open(f"opt-profiling-data/sample-masks-n-{self.rank + 1}-{sentinel_plan.plan_id}.json", "w") as f:
+                logical_op_id_to_list_sample_masks = {}
+                for logical_op_id, (sample_matrix, _, _) in self.logical_op_id_to_sample_masks.items():
+                    logical_op_id_to_list_sample_masks[logical_op_id] = sample_matrix.tolist()
+                json.dump(logical_op_id_to_list_sample_masks, f)
+
+            with open(f"opt-profiling-data/raw-matrices-n-{self.rank + 1}-{sentinel_plan.plan_id}.json", "w") as f:
+                logical_op_id_to_list_raw_matrices = {}
+                for logical_op_id, raw_matrix_dict in self.logical_op_id_to_raw_matrices.items():
+                    logical_op_id_to_list_raw_matrices[logical_op_id] = {
+                        "cost": raw_matrix_dict["cost"].tolist(),
+                        "time": raw_matrix_dict["time"].tolist(),
+                        "selectivity": raw_matrix_dict["selectivity"].tolist(),
+                        "quality": raw_matrix_dict["quality"].tolist(),
+                    }
+                json.dump(logical_op_id_to_list_raw_matrices, f)
+
         # complete the observation matrices
         self.logical_op_id_to_matrices = self.complete_matrices(
             self.logical_op_id_to_raw_matrices,
@@ -170,7 +191,7 @@ class MatrixCompletionCostModel:
 
         # if this operation is a failed convert
         if is_convert_op and len(record_set) == 0:
-            record_set[0].record_op_stats.quality = 0.0
+            record_set.record_op_stats[0].quality = 0.0
 
         # if this operation is a filter:
         # - we assign a quality of 1.0 if the record is in the expected outputs and it passes this filter

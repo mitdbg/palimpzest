@@ -546,29 +546,34 @@ class LLMConvert(ConvertOp):
 
             # for LLAMA vision model, we must concatenate images into a single image
             elif self.model in [Model.LLAMA3_V]:
-                # load images, get their dimensions, and create new image to fit them horizontally
-                images = [Image.open(image_file) for image_file in candidate.image_filepaths]
-                widths, heights = zip(*(img.size for img in images))
-                total_width, max_height = sum(widths), max(heights)
-                new_image = Image.new(images[0].mode, (total_width, max_height))
+                # # load images, get their dimensions, and create new image to fit them horizontally
+                # images = [Image.open(image_file) for image_file in candidate.image_filepaths]
+                # widths, heights = zip(*(img.size for img in images))
+                # total_width, max_height = sum(widths), max(heights)
+                # new_image = Image.new(images[0].mode, (total_width, max_height))
 
-                # construct new image by pasting images side-by-side
-                x_offset = 0
-                for img in images:
-                    new_image.paste(img, (x_offset,0))
-                    x_offset += img.size[0]
+                # # construct new image by pasting images side-by-side
+                # x_offset = 0
+                # for img in images:
+                #     new_image.paste(img, (x_offset,0))
+                #     x_offset += img.size[0]
 
-                # crop new image to adhere to max size processed by LLAMA; I'm not sure
-                # what the exact max size allowed by Together is, but 900x900 seems to work
-                crop_height = 900
-                crop_width = 900
-                new_image = new_image.crop((0, 0, crop_width, crop_height))
+                # # crop new image to adhere to max size processed by LLAMA; I'm not sure
+                # # what the exact max size allowed by Together is, but 900x900 seems to work
+                # crop_height = 900
+                # crop_width = 900
+                # new_image = new_image.crop((0, 0, crop_width, crop_height))
 
-                # encode new image in base64
-                buffered = BytesIO()
-                new_image.save(buffered, format=images[0].format)
-                base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                base64_images.append(base64_image)
+                # # encode new image in base64
+                # buffered = BytesIO()
+                # new_image.save(buffered, format=images[0].format)
+                # base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                # base64_images.append(base64_image)
+                
+                # NOTE: Together stopped accepting uploaded images, so we now point them to public s3 urls
+                listing_idx = int(candidate.listing.split("listing")[-1])
+                url = f"https://palimpzest-workloads.s3.amazonaws.com/real-estate-eval-concat-images/img{listing_idx}.png"
+                base64_images.append(url)
 
             content = base64_images
         else:

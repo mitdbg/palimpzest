@@ -311,11 +311,19 @@ class TokenReducedConvertRule(ImplementationRule):
             "logical_op_id": logical_op.get_op_id(),
         })
 
+        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
+        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
+        #
+        # identify models which can be used strictly for text or strictly for images
+        vision_models = set(getVisionModels())
+        text_models = set(getModels())
+        pure_vision_models = {model for model in vision_models if model not in text_models}
+
         physical_expressions = []
         for model in physical_op_params['available_models']:
             for token_budget in cls.token_budgets:
-                # skip this model if this is an image model
-                if model in getVisionModels():
+                # skip this model if this is a pure image model
+                if model in pure_vision_models:
                     continue
 
                 # construct multi-expression
