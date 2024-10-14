@@ -384,7 +384,7 @@ if __name__ == "__main__":
         "--engine",
         type=str,
         help='The engine to use. One of sentinel, nosentinel',
-        default='sentinel',
+        default='nosentinel',
     )
     parser.add_argument(
         "--executor",
@@ -649,18 +649,33 @@ if __name__ == "__main__":
         if engine == "sentinel"
         else f"opt-profiling-data/{workload}-baseline-{args.model}-profiling.json"
     )
+    # create filepaths for records and stats
+    records_path = (
+        f"opt-profiling-data/{workload}-rank-{rank}-num-samples-{num_samples}-records.json"
+        if engine == "sentinel"
+        else f"opt-profiling-data/{workload}-baseline-{args.model}-records.json"
+    )
+    stats_path = (
+        f"opt-profiling-data/{workload}-rank-{rank}-num-samples-{num_samples}-profiling.json"
+        if engine == "sentinel"
+        else f"opt-profiling-data/{workload}-baseline-{args.model}-profiling.json"
+    )
 
     # save record outputs
     record_jsons = []
     for record in records:
         record_dict = record._asDict()
-        if workload == "biodex":
-            record_dict = {k: v for k, v in record_dict.items() if k in ["pmid", "serious", "patientsex", "drugs", "reactions"]}
         record_jsons.append(record_dict)
 
     with open(records_path, 'w') as f:
         json.dump(record_jsons, f)
+    with open(records_path, 'w') as f:
+        json.dump(record_jsons, f)
 
+    # save statistics
+    execution_stats_dict = execution_stats.to_json()
+    with open(stats_path, "w") as f:
+        json.dump(execution_stats_dict, f)
     # save statistics
     execution_stats_dict = execution_stats.to_json()
     with open(stats_path, "w") as f:
