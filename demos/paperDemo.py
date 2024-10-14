@@ -180,13 +180,13 @@ if __name__ == "__main__":
         "--executor",
         type=str,
         help='The plan executor to use. One of sequential, pipelined, parallel',
-        default='parallel',
+        default='sequential',
     )
     parser.add_argument(
         "--policy",
         type=str,
         help="One of 'mincost', 'mintime', 'maxquality'",
-        default='mincost',
+        default='maxquality',
     )
 
     args = parser.parse_args()
@@ -254,7 +254,6 @@ if __name__ == "__main__":
         )
         plan = plan.filter(
             'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
-        )
 
     elif workload == "real-estate":
         # datasetid="real-estate-eval-100" for paper evaluation

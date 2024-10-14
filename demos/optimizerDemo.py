@@ -384,19 +384,19 @@ if __name__ == "__main__":
         "--engine",
         type=str,
         help='The engine to use. One of sentinel, nosentinel',
-        default='nosentinel',
+        default='sentinel',
     )
     parser.add_argument(
         "--executor",
         type=str,
         help='The plan executor to use. One of sequential, pipelined, parallel',
-        default='parallel',
+        default='sequential',
     )
     parser.add_argument(
         "--policy",
         type=str,
         help="One of 'mincost', 'mintime', 'maxquality'",
-        default='mincost',
+        default='maxquality',
     )
     parser.add_argument(
         "--num-samples",
