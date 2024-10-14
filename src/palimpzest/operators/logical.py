@@ -205,6 +205,7 @@ class ConvertScan(LogicalOperator):
             "cardinality": self.cardinality,
             "udf": self.udf,
             "image_conversion": self.image_conversion,
+            "depends_on": self.depends_on,
             "desc": self.desc,
             "targetCacheId": self.targetCacheId,
         }
@@ -256,6 +257,7 @@ class FilteredScan(LogicalOperator):
             "outputSchema": self.outputSchema,
             "filter": self.filter,
             "image_filter": self.image_filter,
+            "depends_on": self.depends_on,
             "targetCacheId": self.targetCacheId,
         }
 

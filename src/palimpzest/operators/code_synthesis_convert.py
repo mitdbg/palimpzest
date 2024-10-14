@@ -202,7 +202,7 @@ class CodeSynthesisConvert(LLMConvert):
 
     def _bonded_query_fallback(self, candidate, start_time):
         fields_to_generate = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
-        candidate_dict = candidate._asDict(include_bytes=False)
+        candidate_dict = candidate._asDict(include_bytes=False, project_cols=self.depends_on)
         candidate_content = json.dumps(candidate_dict)
 
         bonded_op = LLMConvertBonded(
@@ -262,7 +262,7 @@ class CodeSynthesisConvert(LLMConvert):
         #   candidate_dict_str = candidate._asJSONStr(include_bytes=False, include_data_cols=False)
         #   candidate_dict = json.loads(candidate_dict_str)
         #   candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
-        candidate_dict = candidate._asDict(include_bytes=False)
+        candidate_dict = candidate._asDict(include_bytes=False, project_cols=self.depends_on)
 
         # Check if code was already synthesized, or if we have at least one converted sample
         generation_stats = GenerationStats()

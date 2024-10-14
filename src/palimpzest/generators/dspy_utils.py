@@ -89,6 +89,7 @@ class TogetherHFAdaptor(HFModel):
             "top_p": 1,
             "top_k": 20,
             "repetition_penalty": 1,
+            "frequency_penalty": 1,
             "n": 1,
             # "stop": stop_default if "stop" not in kwargs else kwargs["stop"],
             **kwargs

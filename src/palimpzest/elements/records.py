@@ -98,14 +98,19 @@ class DataRecord:
         # TODO: we can implement this method if/when we add joins
         pass
 
-    def _asJSONStr(self, include_bytes: bool = True, *args, **kwargs):
+    def _asJSONStr(self, include_bytes: bool = True, project_cols: Optional[List[str]] = None, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
-        record_dict = self._asDict(include_bytes)
+        record_dict = self._asDict(include_bytes, project_cols)
         return self.schema().asJSONStr(record_dict, *args, **kwargs)
 
-    def _asDict(self, include_bytes: bool = True):
+    def _asDict(self, include_bytes: bool = True, project_cols: Optional[List[str]] = None):
         """Return a dictionary representation of this DataRecord"""
         dct = {k: self.__dict__[k] for k in self._getFields()}
+
+        if project_cols is not None and len(project_cols) > 0:
+            project_fields = set(field.split(".")[-1] for field in project_cols)
+            dct = {k: v for k, v in dct.items() if k in project_fields}
+
         if not include_bytes:
             for k in dct:
                 if isinstance(dct[k], bytes) or (

@@ -298,7 +298,7 @@ class TokenReducedConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        return isinstance(logical_op, ConvertScan) and not logical_op.image_conversion
+        return isinstance(logical_op, ConvertScan) and not logical_op.image_conversion and logical_op.udf is None
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
@@ -376,6 +376,7 @@ class CodeSynthesisConvertRule(ImplementationRule):
             isinstance(logical_op, ConvertScan)
             and not logical_op.image_conversion
             and not logical_op.cardinality == Cardinality.ONE_TO_MANY
+            and logical_op.udf is None
         )
 
     @classmethod

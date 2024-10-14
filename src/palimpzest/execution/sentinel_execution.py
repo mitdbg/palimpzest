@@ -169,6 +169,11 @@ class SentinelExecutionEngine(ExecutionEngine):
             verbose=self.verbose,
         )
 
+        # TODO: remove after SIGMOD
+        import os
+        if os.environ['LOG_MATRICES'].lower() == "true":
+            exit(1)
+
         # (re-)initialize the optimizer
         optimizer = Optimizer(
             policy=policy,
@@ -229,4 +234,6 @@ class SequentialParallelSentinelExecution(SentinelExecutionEngine, SequentialPar
     """
     This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
     """
-    pass
+    def __init__(self, *args, **kwargs):
+        SentinelExecutionEngine.__init__(self, *args, **kwargs)
+        SequentialParallelSentinelPlanExecutor.__init__(self, *args, **kwargs)

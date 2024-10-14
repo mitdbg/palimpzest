@@ -96,66 +96,33 @@ class ImageRealEstateListing(RealEstateListingFiles):
     )
 
 class RealEstateValidationSource(pz.ValidationDataSource):
-    def __init__(self, datasetId, listings_dir, split_idx: int=25, num_samples: int=5, shuffle: bool=False, seed: int=42):
+    def __init__(self, datasetId, listings_dir):
         super().__init__(RealEstateListingFiles, datasetId)
         self.listings_dir = listings_dir
-        self.split_idx = split_idx
         self.listings = sorted(os.listdir(self.listings_dir), key=lambda listing: int(listing.split('listing')[-1]))
 
-        self.val_listings = self.listings[:split_idx]
-        self.listings = self.listings[split_idx:]
-
-        self.num_samples = num_samples
-        self.shuffle = shuffle
-        self.seed = seed
-
-        if split_idx != 25:
-            raise Exception("Currently must split on split_idx=25 for correctness")
-
-        if num_samples > 25:
-            raise Exception("We have not labelled more than the first 25 listings!")
-
-        # construct mapping from listing --> label (field, value) pairs
-        self.label_fields_to_values = {
-            "listing1": {"address": "161 Auburn St Unit 161, Cambridge, MA 02139", "price": 1550000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": True},
-            "listing2": {"address": "14 Concord Unit 712, Cambridge, MA, 02138", "price": 610000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing3": {"address": "10 Dana St Unit 7, Cambridge, MA, 02138", "price": 524900, "is_modern_and_attractive": False, "has_natural_sunlight": False, "_passed_filter": False},
-            "listing4": {"address": "27 Winter St, Cambridge, MA, 02141", "price": 739000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing5": {"address": "59 Kelly Rd Unit 59, Cambridge, MA, 02139", "price": 1775000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": True},
-            "listing6": {"address": "24 Greenough Ave, Cambridge, MA, 02139", "price": 4999999, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing7": {"address": "362-366 Commonwealth Ave Unit 4C, Boston, MA, 02115", "price": 609900, "is_modern_and_attractive": False, "has_natural_sunlight": False, "_passed_filter": False},
-            "listing8": {"address": "188 Brookline Ave Unit 21H, Boston, MA, 02215", "price": 1485000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": True},
-            "listing9": {"address": "11 Aberdeen St Unit 4, Boston, MA, 02215", "price": 699000, "is_modern_and_attractive": False, "has_natural_sunlight": False, "_passed_filter": False},
-            "listing10": {"address": "188 Brookline Ave Unit 19A, Boston, MA, 02215", "price": 3200000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing11": {"address": "49 Melcher St Unit 205, Boston, MA, 02210", "price": 860000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing12": {"address": "15 Sleeper St Unit 406, Boston, MA, 02210", "price": 1450000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing13": {"address": "437 D St Unit 6C, Boston, MA, 02210", "price": 1025000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing14": {"address": "133 Seaport Blvd Unit 1715, Boston, MA, 02210", "price": 1299999, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing15": {"address": "50 Liberty Dr Unit 5E, Boston, MA, 02210", "price": 2995000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing16": {"address": "133 Seaport Blvd Unit 802, Boston, MA, 02210", "price": 1679000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing17": {"address": "14 Ware St Unit 44, Cambridge, MA, 02138", "price": 660000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing18": {"address": "20 Mcternan Unit 203, Cambridge, MA, 02139", "price": 825000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing19": {"address": "150 Hampshire St Unit 5, Cambridge, MA, 02139", "price": 895000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing20": {"address": "144 Spring St, Cambridge, MA, 02141", "price": 2350000, "is_modern_and_attractive": False, "has_natural_sunlight": False, "_passed_filter": False},
-            "listing21": {"address": "41-41A Pleasant St, Cambridge, MA, 02139", "price": 4450000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing22": {"address": "1 Pine St, Cambridge, MA, 02139", "price": 1875000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing23": {"address": "1055 Cambridge Unit 200, Cambridge, MA, 02139", "price": 1390000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_filter": True},
-            "listing24": {"address": "570 Franklin St Unit 1, Cambridge, MA, 02139", "price": 589000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_filter": False},
-            "listing25": {"address": "12 Kinnaird, Cambridge, MA, 02139", "price": 1200000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_filter": False},
-        }
-
-        # shuffle records if shuffle = True
-        if shuffle:
-            random.Random(seed).shuffle(self.val_listings)
-
-        # trim to number of samples
-        self.val_listings = self.val_listings[:num_samples]
+        self.val_listings = self.listings
+        self.listings = []
+        
+        self.label_fields_to_values = {}
+        for listing_dir in os.listdir(listings_dir):
+            for file in os.listdir(os.path.join(listings_dir, listing_dir)):
+                filepath = os.path.join(listings_dir, listing_dir, file)
+                if not filepath.endswith('.txt'):
+                    continue
+                with open(filepath,'r') as f:
+                    listing_text = f.read()
+                    listing_lines = listing_text.split('\n')
+                    address = listing_lines[0].split("Address:")[-1].strip()
+                    price = listing_lines[1].split("Price:")[-1].strip()
+                    price = int(price.replace("$", "").replace(",", ""))
+                    self.label_fields_to_values[listing_dir] = {"address": address, "price": price}
 
     def copy(self):
-        return RealEstateValidationSource(self.dataset_id, self.listings_dir, self.split_idx, self.num_samples, self.shuffle, self.seed)
+        return RealEstateValidationSource(self.dataset_id, self.listings_dir)
 
     def __len__(self):
-        return len(self.listings)
+        return 1 # len(self.listings)
 
     def getValLength(self):
         return len(self.val_listings)
@@ -177,8 +144,6 @@ class RealEstateValidationSource(pz.ValidationDataSource):
         fields_to_metric_fn = {
             "address": "exact",
             "price": price_eval,
-            "is_modern_and_attractive": "exact",
-            "has_natural_sunlight": "exact",
         }
 
         return fields_to_metric_fn
@@ -277,7 +242,7 @@ class BiodexValidationSource(pz.ValidationDataSource):
         self.test_dataset = [self.dataset['test'][idx] for idx in range(len(self.dataset['test']))]
         rng = np.random.default_rng(seed=seed)
         rng.shuffle(self.test_dataset)
-        self.test_dataset = self.test_dataset[:250]
+        self.test_dataset = self.test_dataset[:500]
 
         self.num_samples = num_samples
         self.shuffle = shuffle
@@ -373,6 +338,9 @@ if __name__ == "__main__":
     if "DSP_CACHEBOOL" not in os.environ or os.environ["DSP_CACHEBOOL"].lower() != "false":
         raise Exception("TURN OFF DSPy CACHE BY SETTING `export DSP_CACHEBOOL=False")
 
+    if "LOG_MATRICES" not in os.environ or os.environ["LOG_MATRICES"].lower() != "true":
+        raise Exception("SET LOG_MATRICES=TRUE")
+
     # parse arguments
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument(
@@ -380,24 +348,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--datasetid", type=str, help="The dataset id")
     parser.add_argument("--workload", type=str, help="The workload to run. One of enron, real-estate, medical-schema-matching.")
-    parser.add_argument(
-        "--engine",
-        type=str,
-        help='The engine to use. One of sentinel, nosentinel',
-        default='nosentinel',
-    )
-    parser.add_argument(
-        "--executor",
-        type=str,
-        help='The plan executor to use. One of sequential, pipelined, parallel',
-        default='parallel',
-    )
-    parser.add_argument(
-        "--policy",
-        type=str,
-        help="One of 'mincost', 'mintime', 'maxquality'",
-        default='mincost',
-    )
     parser.add_argument(
         "--num-samples",
         type=int,
@@ -410,13 +360,6 @@ if __name__ == "__main__":
         help="Rank for low-rank MC",
         default=4,
     )
-    parser.add_argument(
-        "--model",
-        type=str,
-        help="One of 'gpt-4o', 'gpt-4o-mini', 'llama', 'mixtral'",
-        default='gpt-4o',
-    )
-
     args = parser.parse_args()
 
     # The user has to indicate the dataset id and the workload
@@ -435,57 +378,14 @@ if __name__ == "__main__":
     verbose = args.verbose
     rank = args.rank
     num_samples = args.num_samples
-    policy = pz.MaxQuality()
-    if args.policy == "mincost":
-        policy = pz.MinCost()
-    elif args.policy == "mintime":
-        policy = pz.MinTime()
-    elif args.policy == "maxquality":
-        policy = pz.MaxQuality()
-    else:
-        print("Policy not supported for this demo")
-        exit(1)
-
-    execution_engine = None
-    engine, executor = args.engine, args.executor
-    if engine == "sentinel":
-        if executor == "sequential":
-            execution_engine = pz.SequentialSingleThreadSentinelExecution
-        elif executor == "parallel":
-            execution_engine = pz.SequentialParallelSentinelExecution
-        else:
-            print("Unknown executor")
-            exit(1)
-    elif engine == "nosentinel":
-        if executor == "sequential":
-            execution_engine = pz.SequentialSingleThreadNoSentinelExecution
-        elif executor == "pipelined":
-            execution_engine = pz.PipelinedSingleThreadNoSentinelExecution
-        elif executor == "parallel":
-            execution_engine = pz.PipelinedParallelNoSentinelExecution
-        else:
-            print("Unknown executor")
-            exit(1)
-    else:
-        print("Unknown engine")
-        exit(1)
+    execution_engine = pz.SequentialParallelSentinelExecution
     
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     # create pz plan
     plan = None
-    if workload == "enron":
-        # datasetid="enron-eval" for paper evaluation
-        plan = pz.Dataset(datasetid, schema=Email)
-        plan = plan.filter(
-            "The email is not quoting from a news article or an article written by someone outside of Enron"
-        )
-        plan = plan.filter(
-            'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
-        )
-
-    elif workload == "real-estate":
+    if workload == "real-estate":
         # datasetid="real-estate-eval-100" for paper evaluation
         data_filepath = f"testdata/{datasetid}"
         user_dataset_id = f"{datasetid}-user"
@@ -494,9 +394,6 @@ if __name__ == "__main__":
         datasource = RealEstateValidationSource(
             datasetId=f"{user_dataset_id}",
             listings_dir=data_filepath,
-            num_samples=num_samples,
-            shuffle=False,
-            seed=42,
         )
         pz.DataDirectory().registerUserSource(
             src=datasource,
@@ -505,84 +402,6 @@ if __name__ == "__main__":
 
         plan = pz.Dataset(user_dataset_id, schema=RealEstateListingFiles)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
-        plan = plan.convert(
-            ImageRealEstateListing, image_conversion=True, depends_on="image_filepaths"
-        )
-        plan = plan.filter(
-            "The interior is modern and attractive, and has lots of natural sunlight",
-            depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
-        )
-        plan = plan.filter(within_two_miles_of_mit, depends_on="address")
-        plan = plan.filter(in_price_range, depends_on="price")
-
-    # elif workload == "biodex-embeddings":
-    #     user_dataset_id = f"biodex-user"
-
-    #     # create and register validation data source
-    #     datasource = BiodexValidationSource(
-    #         datasetId=f"{user_dataset_id}",
-    #         num_samples=num_samples,
-    #         shuffle=False,
-    #         seed=42,
-    #     )
-    #     pz.DataDirectory().registerUserSource(
-    #         src=datasource,
-    #         dataset_id=f"{user_dataset_id}",
-    #     )
-
-    #     def compute_embeddings(record):
-    #         # initialize new data record
-    #         dr = DataRecord.fromParent(BiodexEmbeddings, record, project_cols=["pmid"])
-
-    #         # compute chunks
-    #         chunksize, stride = 4000, 3000
-    #         chunks = [
-    #             record.title,
-    #             record.abstract,
-    #         ]
-    #         start_idx = 0
-    #         while start_idx < len(record.fulltext):
-    #             end_idx = min(start_idx + chunksize, len(record.fulltext))
-    #             chunk = record.fulltext[start_idx:end_idx]
-    #             chunks.append(chunk)
-    #             start_idx += stride
-
-    #         # define helper methods
-    #         client = OpenAI()
-    #         def get_embedding(text, model):
-    #             response = client.embeddings.create(input=text, model=model)
-    #             return response.data[0].embedding
-
-    #         def cosine_similarity(embed1, embed2):
-    #             return dot(embed1, embed2)/(norm(embed1)*norm(embed2))
-
-    #         # for each field, compute embeddings and store k-most relevant to per-field query
-    #         k = 5
-    #         query_embeddings = {
-    #             "serious": get_embedding("This text contains information about the severity of a patient's adverse reaction to a drug", model="text-embedding-3-small"),
-    #             "patientsex": get_embedding("This text contains information about the sex of the patient, or states that the sex is unknown", model="text-embedding-3-small"),
-    #             "drugs": get_embedding("This text contains information about a pharmaceutical drug", model="text-embedding-3-small"),
-    #             "reactions": get_embedding("This text contains information about the medical reactions a patient may have had in response to taking a drug", model="text-embedding-3-small"),
-    #         }
-    #         for field in ["serious", "patientsex", "drugs", "reactions"]:
-    #             query_embedding = query_embeddings[field]
-    #             field_embeddings = [(chunk, get_embedding(chunk, model="text-embedding-3-small")) for chunk in chunks]
-    #             field_embeddings = [(chunk, embedding, cosine_similarity(query_embedding, embedding)) for chunk, embedding in field_embeddings]
-    #             sorted_embeddings = sorted(field_embeddings, key=lambda tup: tup[-1], reverse=True)
-    #             field_embeddings_str = ""
-    #             for idx, (chunk, _, _) in enumerate(sorted_embeddings[:k]):
-    #                 field_embeddings_str += f"{idx+1}. {chunk}\n\n"
-    #             setattr(dr, f"{field}_embeddings", field_embeddings_str)
-
-    #         # return new data record
-    #         return dr
-
-    #     plan = pz.Dataset(user_dataset_id, schema=BiodexEntry)
-    #     plan = plan.convert(BiodexEmbeddings, udf=compute_embeddings)
-    #     plan = plan.convert(BiodexSerious, depends_on=["serious_embeddings"])
-    #     plan = plan.convert(BiodexPatientSex, depends_on=["patientsex_embeddings"])
-    #     plan = plan.convert(BiodexDrugs, depends_on=["drugs_embeddings"])
-    #     plan = plan.convert(BiodexReactions, depends_on=["reactions_embeddings"])
 
     elif workload == "biodex":
         user_dataset_id = f"biodex-user"
@@ -599,36 +418,16 @@ if __name__ == "__main__":
             dataset_id=f"{user_dataset_id}",
         )
         plan = pz.Dataset(user_dataset_id, schema=BiodexEntry)
-        plan = plan.convert(BiodexSerious)
-        plan = plan.convert(BiodexPatientSex)
         plan = plan.convert(BiodexDrugs)
-        plan = plan.convert(BiodexReactions)
 
     # select optimization strategy and available models based on engine
-    optimization_strategy, available_models = None, None
-    if engine == "sentinel":
-        optimization_strategy = pz.OptimizationStrategy.OPTIMAL
-        available_models = getModels(include_vision=True)
-    else:
-        model_str_to_model = {
-            "gpt-4o": Model.GPT_4o,
-            "gpt-4o-mini": Model.GPT_4o_MINI,
-            "mixtral": Model.MIXTRAL,
-            "llama": Model.LLAMA3,
-        }
-        model_str_to_vision_model = {
-            "gpt-4o": Model.GPT_4o_V,
-            "gpt-4o-mini": Model.GPT_4o_MINI_V,
-            "mixtral": Model.LLAMA3_V,
-            "llama": Model.LLAMA3_V,
-        }
-        optimization_strategy = pz.OptimizationStrategy.NONE
-        available_models = [model_str_to_model[args.model]] + [model_str_to_vision_model[args.model]]
+    optimization_strategy = pz.OptimizationStrategy.OPTIMAL
+    available_models = getModels(include_vision=True)
 
     # execute pz plan
-    records, execution_stats = pz.Execute(
+    _, _ = pz.Execute(
         plan,
-        policy,
+        pz.MaxQuality(),
         nocache=True,
         available_models=available_models,
         optimization_strategy=optimization_strategy,
@@ -638,30 +437,3 @@ if __name__ == "__main__":
         allow_code_synth=(workload != "biodex"),
     )
 
-    # create filepaths for records and stats
-    records_path = (
-        f"opt-profiling-data/{workload}-rank-{rank}-num-samples-{num_samples}-records.json"
-        if engine == "sentinel"
-        else f"opt-profiling-data/{workload}-baseline-{args.model}-records.json"
-    )
-    stats_path = (
-        f"opt-profiling-data/{workload}-rank-{rank}-num-samples-{num_samples}-profiling.json"
-        if engine == "sentinel"
-        else f"opt-profiling-data/{workload}-baseline-{args.model}-profiling.json"
-    )
-
-    # save record outputs
-    record_jsons = []
-    for record in records:
-        record_dict = record._asDict()
-        if workload == "biodex":
-            record_dict = {k: v for k, v in record_dict.items() if k in ["pmid", "serious", "patientsex", "drugs", "reactions"]}
-        record_jsons.append(record_dict)
-
-    with open(records_path, 'w') as f:
-        json.dump(record_jsons, f)
-
-    # save statistics
-    execution_stats_dict = execution_stats.to_json()
-    with open(stats_path, "w") as f:
-        json.dump(execution_stats_dict, f)

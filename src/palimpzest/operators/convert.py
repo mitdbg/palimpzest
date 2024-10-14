@@ -27,6 +27,7 @@ class ConvertOp(PhysicalOperator):
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         udf: Optional[Callable] = None,
         desc: Optional[str] = None,
+        depends_on: Optional[List[str]] = None,
         *args,
         **kwargs,
     ):
@@ -34,6 +35,7 @@ class ConvertOp(PhysicalOperator):
         self.cardinality = cardinality
         self.udf = udf
         self.desc = desc
+        self.depends_on = depends_on
         self.heatmap_json_obj = None
 
     def get_copy_kwargs(self):
@@ -42,6 +44,7 @@ class ConvertOp(PhysicalOperator):
             "cardinality": self.cardinality,
             "udf": self.udf,
             "desc": self.desc,
+            "depends_on": self.depends_on,
             **copy_kwargs
         }
 
@@ -51,6 +54,7 @@ class ConvertOp(PhysicalOperator):
             "outputSchema": self.outputSchema,
             "cardinality": self.cardinality.value,
             "udf": self.udf,
+            "depends_on": self.depends_on,
         }
 
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
@@ -113,7 +117,7 @@ class NonLLMConvert(ConvertOp):
         fn_call_duration_secs = time.time() - start_time
 
         # determine whether or not the convert was successful
-        successful_convert = drs is not None and drs != []
+        successful_convert = drs is not None and (isinstance(drs, DataRecord) or len(drs) > 0)
 
         # if drs is a single record output, wrap it in a list
         if successful_convert and isinstance(drs, DataRecord):
@@ -281,7 +285,12 @@ class LLMConvert(ConvertOp):
         doc_type = self.outputSchema.className()
         # build string of input fields and their descriptions
         multilineInputFieldDescription = ""
-        for field_name in self.inputSchema.fieldNames():
+        input_fields = (
+            self.inputSchema.fieldNames()
+            if not self.depends_on
+            else [field.split(".")[-1] for field in self.depends_on]
+        )
+        for field_name in input_fields:
             field_desc = getattr(self.inputSchema, field_name).desc
             multilineInputFieldDescription += prompts.INPUT_FIELD.format(
                 field_name=field_name, field_desc=field_desc
@@ -577,7 +586,7 @@ class LLMConvert(ConvertOp):
 
             content = base64_images
         else:
-            content = candidate._asJSONStr(include_bytes=False)
+            content = candidate._asJSONStr(include_bytes=False, project_cols=self.depends_on)
 
         field_answers: Dict[str, List]
         field_answers, generation_stats = self.convert(

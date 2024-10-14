@@ -10,16 +10,18 @@ from palimpzest.prompts import IMAGE_FILTER_PROMPT
 
 from io import BytesIO
 from PIL import Image
+from typing import List, Optional
 
 import base64
 import time
 
 
 class FilterOp(PhysicalOperator):
-    def __init__(self, filter: Filter, *args, **kwargs):
+    def __init__(self, filter: Filter, depends_on: Optional[List[str]] = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert self.inputSchema == self.outputSchema, "Input and output schemas must match for FilterOp"
         self.filter = filter
+        self.depends_on = depends_on
 
     def __str__(self):
         op = super().__str__()
@@ -28,12 +30,13 @@ class FilterOp(PhysicalOperator):
 
     def get_copy_kwargs(self):
         copy_kwargs = super().get_copy_kwargs()
-        return {"filter": self.filter, **copy_kwargs}
+        return {"filter": self.filter, "depends_on": self.depends_on, **copy_kwargs}
 
     def get_op_params(self):
         return {
             "outputSchema": self.outputSchema,
             "filter": self.filter,
+            "depends_on": self.depends_on,
         }
 
     def __eq__(self, other: FilterOp):
@@ -247,7 +250,7 @@ class LLMFilter(FilterOp):
 
             content = base64_images
         else:
-            content = candidate._asJSONStr(include_bytes=False)
+            content = candidate._asJSONStr(include_bytes=False, project_cols=self.depends_on)
 
         # construct the prompt; for image filters we need to wrap the filter condition in an instruction 
         prompt = self.filter.filterCondition

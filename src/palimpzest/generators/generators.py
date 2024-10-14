@@ -369,6 +369,12 @@ class DSPyGenerator(BaseGenerator):
         if self.verbose:
             print(f"Generating -- {self.model_name}")
         start_time = time.time()
+        # TODO: remove after SIGMOD
+        if self.model_name == Model.LLAMA3.value:
+            TOKENS_PER_CHARACTER = 0.25
+            if len(context) * TOKENS_PER_CHARACTER > 7000:
+                context_factor = len(context) * TOKENS_PER_CHARACTER / 7000.0
+                context = context[:int(len(context)/context_factor)]
         pred = cot(question, context)
         end_time = time.time()
 
@@ -664,30 +670,33 @@ def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose:b
 # Temporarily set default verbose to True for debugging
 def codeEnsembleExecution(api: API, code_ensemble: List[Dict[str, str]], candidate_dict: Dict[str, Any], verbose: bool=True) -> GenerationOutput:
     start_time = time.time()
-    preds = list()
-    for _, code in code_ensemble.items():
-        pred = codeExecution(api, code, candidate_dict)
-        preds.append(pred)
+    try:
+        preds = list()
+        for _, code in code_ensemble.items():
+            pred = codeExecution(api, code, candidate_dict)
+            preds.append(pred)
 
-    preds = [pred for pred in preds if pred is not None]
-    print(preds)
+        preds = [pred for pred in preds if pred is not None]
+        print(preds)
 
-    # TODO: short-term hack to avoid calling Counter(preds) when preds is a list for biofabric (which is unhashable)
-    #       
-    if len(preds) == 1:
-        majority_response = preds[0]
-        exec_stats = GenerationStats(**{
-            "fn_call_duration_secs": time.time() - start_time,
-        })
-        return majority_response, exec_stats
+        # TODO: short-term hack to avoid calling Counter(preds) when preds is a list for biofabric (which is unhashable)
+        #       
+        if len(preds) == 1:
+            majority_response = preds[0]
+            exec_stats = GenerationStats(**{
+                "fn_call_duration_secs": time.time() - start_time,
+            })
+            return majority_response, exec_stats
 
-    if len(preds) > 0:
-        majority_response = Counter(preds).most_common(1)[0][0]
-        exec_stats = GenerationStats(**{
-            "fn_call_duration_secs": time.time() - start_time,
-        })
-        # return majority_response+(" (codegen)" if verbose else ""), ensemble_stats
-        return majority_response, exec_stats
+        if len(preds) > 0:
+            majority_response = Counter(preds).most_common(1)[0][0]
+            exec_stats = GenerationStats(**{
+                "fn_call_duration_secs": time.time() - start_time,
+            })
+            # return majority_response+(" (codegen)" if verbose else ""), ensemble_stats
+            return majority_response, exec_stats
+    except:
+        pass
 
     return None, GenerationStats(**{
             "fn_call_duration_secs": time.time() - start_time,
