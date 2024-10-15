@@ -16,6 +16,10 @@ def getJsonFromAnswer(answer: str, model: Model) -> Dict[str, Any]:
         answer = answer.replace("True", "true")
         answer = answer.replace("False", "false")
 
+    # split off context / excess, which models sometimes output after answer
+    answer = answer.split("Context:")[0]
+    answer = answer.split("# this is the answer")[0]
+
     if not answer.strip().startswith("{"):
         # Find the start index of the actual JSON string
         # assuming the prefix is followed by the JSON object/array

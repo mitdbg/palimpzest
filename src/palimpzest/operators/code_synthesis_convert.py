@@ -213,30 +213,42 @@ class CodeSynthesisConvert(LLMConvert):
         )
         field_answers, generation_stats = bonded_op.convert(candidate_content, fields_to_generate)
 
+
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
-        n_records = max([len(lst) for lst in field_answers.values()])
-        records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
+        try:
+            n_records = max([len(lst) for lst in field_answers.values()])
+        except:
+            print(f"Error in field answers: {field_answers}. Returning empty records.")
+            n_records = 0
+            field_answers = {}
 
-        for field_name, field_answer_lst in field_answers.items():
-            for idx, answer in enumerate(field_answer_lst):
-                records_json[idx][field_name] = answer
+        drs = []
+        if n_records > 0:
+            # build up list of final record dictionaries
+            records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
+            for field_name, answer_list in field_answers.items():
+                for idx, output in enumerate(answer_list):
+                    records_json[idx][field_name] = output
 
-        # create set of data records and record op stats
-        records = [
-            self._create_data_record_from_json(
-                jsonObj=js, candidate=candidate, cardinality_idx=idx
-            )
-            for idx, js in enumerate(records_json)
-        ]
+            # construct list of data records
+            drs = [
+                self._create_data_record_from_json(
+                    jsonObj=js, candidate=candidate, cardinality_idx=idx
+                )
+                for idx, js in enumerate(records_json)
+            ]
+        else:
+            null_js = {field: None for field in fields_to_generate}
+            drs = [self._create_data_record_from_json(jsonObj=null_js, candidate=candidate, cardinality_idx=0)]
 
         # construct DataRecordSet object
         record_set = self._create_record_set(
-            records=records,
+            records=drs,
             fields=fields_to_generate,
             generation_stats=generation_stats,
             total_time=time.time() - start_time,
-            parent_record=candidate,
+            successful_convert=(n_records > 0),
         )
 
         # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
@@ -323,6 +335,7 @@ class CodeSynthesisConvert(LLMConvert):
                 # update field_outputs
                 field_outputs[field_name] = json_answers[field_name][0]
 
+        # TODO: there needs to be a check that field_outputs is non-empty
         # create set of data records
         records = [
             self._create_data_record_from_json(
@@ -336,7 +349,7 @@ class CodeSynthesisConvert(LLMConvert):
             fields=fields_to_generate,
             generation_stats=generation_stats,
             total_time=time.time() - start_time,
-            parent_record=candidate,
+            successful_convert=len(records) > 0,
         )
 
         return record_set
