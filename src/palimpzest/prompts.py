@@ -17,8 +17,9 @@ OPTIONAL_DESC = "Keep in mind that this process is described by this text: {desc
 ### ONE TO ONE ###
 ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR = "an output JSON object that describes an object of type {doc_type}."
 ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL = "the output object"
-ONE_TO_ONE_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The dictionary should only have the output fields: {fields}."
+ONE_TO_ONE_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The dictionary should only have the output fields: {fields}.\n\nFor example:\n{fields_example_dict}"
 
+# TODO: add JSON dict example to ONE_TO_MANY_APPENDIX_INSTRUCTION
 ### ONE_TO_MANY ###
 ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR = "an output array of zero or more JSON objects that describe objects of type {doc_type}."
 ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL = "the output objects"

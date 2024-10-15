@@ -33,7 +33,7 @@ python demos/fever-demo.py --verbose --engine sentinel
 #     done
 # done
 
-# compute fully materialized sample matrices
+# # compute fully materialized sample matrices
 # export LOG_MATRICES="TRUE"
 # for num_samples in 100
 # do
@@ -54,18 +54,16 @@ python demos/fever-demo.py --verbose --engine sentinel
 #     python demos/optimizerDemo.py --verbose --workload biodex --datasetid biodex --engine nosentinel --executor sequential --policy maxquality --model $model
 # done
 
+
 # # compute fully materialized sample matrices
 # export LOG_MATRICES="TRUE"
-# for num_samples in 25 # 5 10 15 20 25
+# for num_samples in 5
 # do
 #     rank=$((num_samples - 1))
 #     echo "RANK: ${rank} -- NUM_SAMPLES: ${num_samples}"
 #     python demos/matrixCompletion.py --verbose \
 #                 --workload biodex \
 #                 --datasetid biodex \
-#                 --engine sentinel \
-#                 --executor parallel \
-#                 --policy maxquality \
 #                 --num-samples $num_samples \
 #                 --rank $rank
 # done

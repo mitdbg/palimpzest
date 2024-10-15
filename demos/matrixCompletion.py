@@ -183,33 +183,7 @@ class BiodexEntry(pz.Schema):
     abstract = pz.StringField(desc="The abstract of the medical paper", required=True)
     fulltext = pz.StringField(desc="The full text of the medical paper, which contains information relevant for creating a drug safety report.", required=True)
 
-# class BiodexEmbeddings(pz.Schema):
-#     pmid = pz.StringField(desc="The PubMed ID of the medical paper", required=True)
-#     serious_embeddings = pz.StringField(desc="text chunks related to severity of adverse reaction", required=True)
-#     patientsex_embeddings = pz.StringField(desc="text chunks related to patient sex", required=True)
-#     drugs_embeddings = pz.StringField(desc="text chunks related to drugs mentioned in paper", required=True)
-#     reactions_embeddings = pz.StringField(desc="text chunks related to adverse reactions mentioned in paper", required=True)
-
-# class BiodexSerious(BiodexEmbeddings):
-class BiodexSerious(BiodexEntry):
-    """
-    You will be presented with the text of a medical article which is partially or entirely about
-    an adverse event experienced by a patient in response to taking one or more drugs. In this task,
-    you will be asked to extract a rating of how serious the event was, with a definition of `serious`
-    provided below.
-    """
-    serious = pz.NumericField(desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.", required=True)
-
-class BiodexPatientSex(BiodexSerious):
-    """
-    You will be presented with the text of a medical article which is partially or entirely about
-    an adverse event experienced by a patient in response to taking one or more drugs. In this task,
-    you will be asked to extract the sex of the patient (if provided), with a definition of the
-    expected output `patientsex` provided below.
-    """
-    patientsex = pz.NumericField(desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.", required=True)
-
-class BiodexDrugs(BiodexPatientSex):
+class BiodexDrugs(BiodexEntry):
     """
     You will be presented with the text of a medical article which is partially or entirely about
     an adverse event experienced by a patient in response to taking one or more drugs. In this task,
@@ -217,68 +191,36 @@ class BiodexDrugs(BiodexPatientSex):
     """
     drugs = pz.ListField(desc="The **list** of all active substance names of the drugs discussed in the report.\n - For example: [\"azathioprine\", \"infliximab\", \"mesalamine\", \"prednisolone\"]", element_type=pz.StringField, required=True)
 
-class BiodexReactions(BiodexDrugs):
-    """
-    You will be presented with the text of a medical article which is partially or entirely about
-    an adverse event experienced by a patient in response to taking one or more drugs. In this task,
-    you will be asked to extract a list of every adverse reaction experienced by the patient.
-    """
-    reactions = pz.ListField(desc="The **list** of all reaction terms discussed in the report.\n - For example: [\"Epstein-Barr virus\", \"infection reactivation\", \"Idiopathic interstitial pneumonia\"]", element_type=pz.StringField, required=True)
-
-class BiodexOutput(BiodexEntry):
-    """The target output fields for an entry in the Biodex ICSR Dataset."""
-    serious = pz.NumericField(desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.", required=True)
-    patientsex = pz.NumericField(desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.", required=True)
-    drugs = pz.ListField(desc="The **list** of all active substance names of the drugs discussed in the report.\n - For example: [\"azathioprine\", \"infliximab\", \"mesalamine\", \"prednisolone\"]", element_type=pz.StringField, required=True)
-    reactions = pz.ListField(desc="The **list** of all reaction terms discussed in the report.\n - For example: [\"Epstein-Barr virus\", \"infection reactivation\", \"Idiopathic interstitial pneumonia\"]", element_type=pz.StringField, required=True)
-
 class BiodexValidationSource(pz.ValidationDataSource):
-    def __init__(self, datasetId, num_samples: int=5, shuffle: bool=False, seed: int=42):
+    def __init__(self, datasetId, shuffle: bool=False, seed: int=42):
         super().__init__(BiodexEntry, datasetId)
         self.dataset = datasets.load_dataset("BioDEX/BioDEX-ICSR")
-        self.train_dataset = [self.dataset['train'][idx] for idx in range(25)]
-
-        # shuffle and sample from full test dataset
-        self.test_dataset = [self.dataset['test'][idx] for idx in range(len(self.dataset['test']))]
-        rng = np.random.default_rng(seed=seed)
-        rng.shuffle(self.test_dataset)
-        self.test_dataset = self.test_dataset[:500]
-
-        self.num_samples = num_samples
-        self.shuffle = shuffle
         self.seed = seed
 
-        if num_samples > 25:
-            raise Exception("We have not labelled more than the first 25 listings!")
+        # shuffle and sample from full test dataset
+        self.val_dataset = [self.dataset['test'][idx] for idx in range(len(self.dataset['test']))]
+        rng = np.random.default_rng(seed=seed)
+        rng.shuffle(self.val_dataset)
+        self.val_dataset = self.val_dataset[:5]
+
+        self.test_dataset = []
 
         # construct mapping from listing --> label (field, value) pairs
         def compute_target_record(entry):
             target_lst = entry['target'].split('\n')
-            label_dict = {
-                "serious": int(target_lst[0].split(':')[-1]),
-                "patientsex": int(target_lst[1].split(':')[-1]),
-                "drugs": [drug.strip().lower() for drug in target_lst[2].split(':')[-1].split(",")],
-                "reactions": [reaction.strip().lower() for reaction in target_lst[3].split(':')[-1].split(",")],
-            }
+            label_dict = {"drugs": [drug.strip().lower() for drug in target_lst[2].split(':')[-1].split(",")]}
             return label_dict
 
-        self.label_fields_to_values = {entry['pmid']: compute_target_record(entry) for entry in self.train_dataset}
-
-        # shuffle records if shuffle = True
-        if shuffle:
-            random.Random(seed).shuffle(self.train_dataset)
-
-        # trim to number of samples
-        self.train_dataset = self.train_dataset[:num_samples]
+        self.label_fields_to_values = {entry['pmid']: compute_target_record(entry) for entry in self.val_dataset}
 
     def copy(self):
-        return BiodexValidationSource(self.dataset_id, self.num_samples, self.shuffle, self.seed)
+        return BiodexValidationSource(self.dataset_id, self.seed)
 
     def __len__(self):
-        return len(self.test_dataset)
+        return 1 # len(self.test_dataset)
 
     def getValLength(self):
-        return len(self.train_dataset)
+        return len(self.val_dataset)
 
     def getSize(self):
         return 0
@@ -302,18 +244,13 @@ class BiodexValidationSource(pz.ValidationDataSource):
 
             return f1
 
-        fields_to_metric_fn = {
-            "serious": "exact",
-            "patientsex": "exact",
-            "drugs": f1_eval,
-            "reactions": f1_eval,
-        }
+        fields_to_metric_fn = {"drugs": f1_eval}
 
         return fields_to_metric_fn
 
     def getItem(self, idx: int, val: bool=False, include_label: bool=False):
         # fetch entry
-        entry = self.test_dataset[idx] if not val else self.train_dataset[idx]
+        entry = self.test_dataset[idx] if not val else self.val_dataset[idx]
 
         # create data record
         dr = pz.DataRecord(self.schema, source_id=entry['pmid'])
@@ -378,8 +315,9 @@ if __name__ == "__main__":
     verbose = args.verbose
     rank = args.rank
     num_samples = args.num_samples
-    execution_engine = pz.SequentialParallelSentinelExecution
-    
+    # execution_engine = pz.SequentialParallelSentinelExecution
+    execution_engine = pz.SequentialSingleThreadSentinelExecution
+
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
@@ -409,8 +347,6 @@ if __name__ == "__main__":
         # create and register validation data source
         datasource = BiodexValidationSource(
             datasetId=f"{user_dataset_id}",
-            num_samples=num_samples,
-            shuffle=False,
             seed=42,
         )
         pz.DataDirectory().registerUserSource(
@@ -436,4 +372,3 @@ if __name__ == "__main__":
         verbose=verbose,
         allow_code_synth=(workload != "biodex"),
     )
-

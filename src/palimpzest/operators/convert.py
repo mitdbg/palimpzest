@@ -324,7 +324,25 @@ class LLMConvert(ConvertOp):
         else:
             targetOutputDescriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
             outputSingleOrPlural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
-            appendixInstruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
+
+            fields_example_dict = {}
+            for field in fields_to_generate:
+                type_str = self.outputSchema.jsonSchema()['properties'][field]['type']
+                if type_str == "string":
+                    fields_example_dict[field] = "abc"
+                elif type_str == "numeric":
+                    fields_example_dict[field] = 123
+                elif type_str == "boolean":
+                    fields_example_dict[field] = True
+                elif type_str == "List[string]":
+                    fields_example_dict[field] = ["<str>", "<str>", "..."]
+                elif type_str == "List[numeric]":
+                    fields_example_dict[field] = ["<int | float>", "<int | float>", "..."]
+                elif type_str == "List[boolean]":
+                    fields_example_dict[field] = ["<bool>", "<bool>", "..."]
+
+            fields_example_dict_str = json.dumps(fields_example_dict, indent=2)
+            appendixInstruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(fields=fields_to_generate, fields_example_dict=fields_example_dict_str)
 
         # construct promptQuestion
         optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
@@ -356,7 +374,7 @@ class LLMConvert(ConvertOp):
         fields: List[str],
         generation_stats: GenerationStats,
         total_time: float,
-        parent_record: Optional[DataRecord] = None,
+        successful_convert: bool,
     ) -> DataRecordSet:
         """
         Construct list of RecordOpStats objects (one for each DataRecord).
@@ -364,8 +382,7 @@ class LLMConvert(ConvertOp):
         record_op_stats_lst = []
 
         # compute variables
-        successful_convert = (len(records) > 0)
-        num_records = len(records) if successful_convert else 1
+        num_records = len(records)
         per_record_stats = generation_stats / num_records
         model = getattr(self, "model", None)
 
@@ -375,14 +392,12 @@ class LLMConvert(ConvertOp):
         #       and compute a RecordOpStats with some fields None'd out and failed_convert=True
         for idx in range(num_records):
             # compute variables which depend on data record
-            record_id, record_parent_id, record_source_id, record_state, answer = None, parent_record._id, parent_record._source_id, None, None
-            if successful_convert:
-                dr = records[idx]
-                record_id = dr._id
-                record_parent_id = dr._parent_id
-                record_source_id = dr._source_id
-                record_state = dr._asDict(include_bytes=False)
-                answer = {field_name: getattr(dr, field_name) for field_name in fields}
+            dr = records[idx]
+            record_id = dr._id
+            record_parent_id = dr._parent_id
+            record_source_id = dr._source_id
+            record_state = dr._asDict(include_bytes=False)
+            answer = {field_name: getattr(dr, field_name) for field_name in fields}
 
             record_op_stats = RecordOpStats(
                 record_id=record_id,
@@ -602,19 +617,24 @@ class LLMConvert(ConvertOp):
             n_records = 0
             field_answers = {}
 
-        # build up list of final record dictionaries
-        records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
-        for field_name, answer_list in field_answers.items():
-            for idx, output in enumerate(answer_list):
-                records_json[idx][field_name] = output
+        drs = []
+        if n_records > 0:
+            # build up list of final record dictionaries
+            records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
+            for field_name, answer_list in field_answers.items():
+                for idx, output in enumerate(answer_list):
+                    records_json[idx][field_name] = output
 
-        # construct list of data records
-        drs = [
-            self._create_data_record_from_json(
-                jsonObj=js, candidate=candidate, cardinality_idx=idx
-            )
-            for idx, js in enumerate(records_json)
-        ]
+            # construct list of data records
+            drs = [
+                self._create_data_record_from_json(
+                    jsonObj=js, candidate=candidate, cardinality_idx=idx
+                )
+                for idx, js in enumerate(records_json)
+            ]
+        else:
+            null_js = {field: None for field in fields_to_generate}
+            drs = [self._create_data_record_from_json(jsonObj=null_js, candidate=candidate, cardinality_idx=0)]
 
         # construct and return DataRecordSet
         record_set = self._create_record_set(
@@ -622,7 +642,7 @@ class LLMConvert(ConvertOp):
             fields=fields_to_generate,
             generation_stats=generation_stats,
             total_time=time.time() - start_time,
-            parent_record=candidate,
+            successful_convert=(n_records > 0),
         )
 
         return record_set
