@@ -16,15 +16,19 @@ from functools import partial
 class FeverClaimsSchema(pz.Schema):
     claim = pz.StringField(desc="the claim being made")
     
+class FeverSearchQueriesSchema(pz.Schema):
+    query = pz.ListField(desc="two search queries to find the most relevant wikipedia articles", pz.StringField)
+    
 class FeverIntermediateSchema(FeverClaimsSchema):
-    relevant_wikipedia_articles = pz.ListField(desc="Most relevant wikipedia articles to the `claim`",
-                                               element_type=pz.StringField, required=True)
+    file1 = pz.StringField(desc="most relevant wikipedia article")
+    file2 = pz.StringField(desc="second most relevaent wikipedia article")
+    file3 = pz.StringField(desc="third most relevant wikipedia article")
     
 # class FeverSummarySchema(FeverIntermediateSchema):
 #     summary = pz.StringField(desc="summary of the relevant wikipedia articles `file1`, `file2`, and `file3` to validate `claim`")
 
 class FeverOutputSchema(FeverIntermediateSchema):
-    label = pz.BooleanField("Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise.")
+    label = pz.BooleanField("Output TRUE if the `claim` is supported by the evidence in `file1`, `file2`, and `file3`; output FALSE otherwise.")
 
 # class FeverOutputSchema(FeverSummarySchema):
 #     label = pz.BooleanField("Output TRUE if the `claim` is supported by the evidence in `file1`, `file2`, and `file3`; output FALSE otherwise.")
@@ -38,13 +42,12 @@ def get_relevant_content(index, k, record):
     # create output DataRecord
     out_record = pz.DataRecord.fromParent(FeverIntermediateSchema, parent_record=record)
     
-    out_record.relevant_wikipedia_articles = most_relevant_files
-    # if len(most_relevant_files) < 3:
-    #     most_relevant_files += [""] * (3 - len(most_relevant_files))
+    if len(most_relevant_files) < 3:
+        most_relevant_files += [""] * (3 - len(most_relevant_files))
         
-    # out_record.file1 = most_relevant_files[0]
-    # out_record.file2 = most_relevant_files[1]
-    # out_record.file3 = most_relevant_files[2]
+    out_record.file1 = most_relevant_files[0]
+    out_record.file2 = most_relevant_files[1]
+    out_record.file3 = most_relevant_files[2]
     return out_record
 
 def set_input_schema(input: DataRecord):
@@ -217,10 +220,7 @@ num_samples=10
 
 engine = args.engine
 # engine = "nosentinel"
-if engine == "sentinel":
-    executor = "parallel"
-else:
-    executor = "sequential"
+executor = "parallel"
 model = args.model
 policy_type = "maxquality"
 
