@@ -99,7 +99,7 @@ class BytesField(Field):
 
 class ListField(Field, list):
     """A field representing a list of elements of specified types, with full list functionality."""
-    def __init__(self, element_type, desc=None, required=False, cardinality="0..*"):
+    def __init__(self, element_type, desc: str, required=False, cardinality="0..*"):
         super().__init__(desc=desc, required=required)
         self.element_type = element_type
         self.cardinality = cardinality
