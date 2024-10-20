@@ -31,11 +31,7 @@ class Field:
         return hash(self._desc + str(self.required) + self.__class__.__name__)
 
     def __eq__(self, other: Field) -> bool:
-        return (
-            self._desc == other._desc
-            and self.required == other.required
-            and self.__class__ == other.__class__
-        )
+        return self._desc == other._desc and self.required == other.required and self.__class__ == other.__class__
 
     @property
     def desc(self) -> str:
@@ -54,34 +50,6 @@ class BooleanField(Field):
     def jsonSchema(self) -> Dict[str, str]:
         return {"description": self._desc, "type": "boolean"}
 
-class CallableField(Field):
-    """A CallableField is a Field that stores a function."""
-
-    def __init__(self, desc: str, required: bool = False):
-        super().__init__(desc=desc, required=required)
-
-    def jsonSchema(self) -> Dict[str, str]:
-        return {"description": self._desc, "type": "callable"}
-
-class StringField(Field):
-    """A StringField is a Field that is definitely a string of text."""
-
-    def __init__(self, desc: str, required: bool = False):
-        super().__init__(desc=desc, required=required)
-
-    def jsonSchema(self) -> Dict[str, str]:
-        return {"description": self._desc, "type": "string"}
-
-
-class NumericField(Field):
-    """A NumericField is a Field that is definitely an integer or a float."""
-
-    def __init__(self, desc: str, required: bool = False):
-        super().__init__(desc=desc, required=required)
-
-    def jsonSchema(self) -> Dict[str, str]:
-        return {"description": self._desc, "type": "numeric"}
-
 
 class BytesField(Field):
     """A BytesField is a Field that is definitely an array of bytes."""
@@ -98,8 +66,19 @@ class BytesField(Field):
         }
 
 
+class CallableField(Field):
+    """A CallableField is a Field that stores a function."""
+
+    def __init__(self, desc: str, required: bool = False):
+        super().__init__(desc=desc, required=required)
+
+    def jsonSchema(self) -> Dict[str, str]:
+        return {"description": self._desc, "type": "callable"}
+
+
 class ListField(Field, list):
     """A field representing a list of elements of specified types, with full list functionality."""
+
     def __init__(self, element_type, desc: str, required=False, cardinality="0..*"):
         super().__init__(desc=desc, required=required)
         self.element_type = element_type
@@ -132,3 +111,23 @@ class ListField(Field, list):
 
     def __str__(self):
         return f"ListField(desc={self.desc}, items={super().__str__()})"
+
+
+class NumericField(Field):
+    """A NumericField is a Field that is definitely an integer or a float."""
+
+    def __init__(self, desc: str, required: bool = False):
+        super().__init__(desc=desc, required=required)
+
+    def jsonSchema(self) -> Dict[str, str]:
+        return {"description": self._desc, "type": "numeric"}
+
+
+class StringField(Field):
+    """A StringField is a Field that is definitely a string of text."""
+
+    def __init__(self, desc: str, required: bool = False):
+        super().__init__(desc=desc, required=required)
+
+    def jsonSchema(self) -> Dict[str, str]:
+        return {"description": self._desc, "type": "string"}
