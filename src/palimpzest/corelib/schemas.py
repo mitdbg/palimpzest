@@ -112,6 +112,11 @@ class Schema(metaclass=SchemaMetaclass):
     Note that because not all papers are published in journals, this field might be optional (`required=False`).
     """
 
+    def __init__(self, desc: str | None = None):
+        self._desc = ""
+        if desc is not None:
+            self._desc = desc
+
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
 
@@ -144,7 +149,6 @@ class Any(Schema):
     """
 
     def __init__(self, possibleSchemas: List[Schema], desc: str):
-        # TODO: figure out why this is being passed in as Schema has no __init__
         super().__init__(desc=desc)
         self._possibleSchemas = possibleSchemas
 
