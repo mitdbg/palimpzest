@@ -1,9 +1,9 @@
+from typing import List, Optional
+
 from palimpzest.constants import Model, OptimizationStrategy
 from palimpzest.execution import ExecutionEngine, PipelinedSingleThreadSentinelExecution
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
-
-from typing import List, Optional
 
 
 class Execute:

@@ -1,7 +1,7 @@
-from palimpzest.execution import CostModel
-import palimpzest as pz
-
 import pytest
+
+import palimpzest as pz
+from palimpzest.execution import CostModel
 
 
 class TestCostModel:

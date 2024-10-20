@@ -1,13 +1,10 @@
-import palimpzest as pz
-from palimpzest.utils import udfs
-from io import BytesIO
-from pathlib import Path
-
-import pandas as pd
-
 import argparse
 import json
 import os
+from pathlib import Path
+
+import palimpzest as pz
+from palimpzest.utils import udfs
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups

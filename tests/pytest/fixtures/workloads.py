@@ -1,9 +1,8 @@
-from io import BytesIO
+import pytest
+
+import palimpzest as pz
 from palimpzest.utils import udfs
 
-import pytest
-import palimpzest as pz
-import pandas as pd
 
 ### UDFs ###
 def within_two_miles_of_mit(record):

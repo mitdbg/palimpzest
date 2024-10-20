@@ -1,9 +1,10 @@
 from __future__ import annotations
-from palimpzest.constants import MAX_ID_CHARS
-from palimpzest.operators import LogicalOperator, PhysicalOperator
-from typing import Dict, List, Optional, Set, Union
 
 import hashlib
+from typing import Dict, List, Optional, Set, Union
+
+from palimpzest.constants import MAX_ID_CHARS
+from palimpzest.operators import LogicalOperator, PhysicalOperator
 
 
 class Expression:

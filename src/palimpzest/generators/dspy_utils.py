@@ -1,9 +1,10 @@
-from palimpzest.constants import log_attempt_number, RETRY_MAX_ATTEMPTS, RETRY_MAX_SECS, RETRY_MULTIPLIER
+import dspy
+import requests
 from dsp.modules.hf import HFModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-import dspy
-import requests
+from palimpzest.constants import RETRY_MAX_ATTEMPTS, RETRY_MAX_SECS, RETRY_MULTIPLIER, log_attempt_number
+
 
 ### DSPy Signatures ###
 # Given a questionn, we'll feed it with the paper context for answer generation.
@@ -49,7 +50,7 @@ def gen_qa_signature_class(doc_schema, doc_type):
     instruction = f"Answer question(s) about a {doc_schema}."
     context_desc = f"contains full text of the {doc_type}"
     question_desc = f"one or more question about the {doc_type}"
-    answer_desc = f"print the answer only, separated by a newline character"
+    answer_desc = "print the answer only, separated by a newline character"
     return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
 

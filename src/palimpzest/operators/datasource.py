@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from palimpzest.constants import *
-from palimpzest.corelib import Schema
-from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.elements import DataRecord
-from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
-
+import time
 from typing import List, Union
 
-import time
+from palimpzest.constants import *
+from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
+from palimpzest.elements import DataRecord
+from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
 
 
 class DataSourcePhysicalOp(PhysicalOperator):

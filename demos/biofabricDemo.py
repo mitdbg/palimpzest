@@ -4,20 +4,11 @@ Make sure to run:
 python src/cli/cli_main.py reg --path testdata/biofabric-urls/ --name biofabric-urls
 
 """
-from palimpzest.utils import udfs
-import context
-from palimpzest.constants import PZ_DIR
-import palimpzest as pz
-import pdb 
-import gradio as gr
-import numpy as np
-import pandas as pd
-
 import argparse
-import requests
-import json
 import time
-import os
+
+import palimpzest as pz
+from palimpzest.utils import udfs
 
 
 class ScientificPaper(pz.PDFFile):

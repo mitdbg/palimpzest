@@ -4,29 +4,24 @@ python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usec
 
 """
 
+import os
+import time
+
+import pandas as pd
+
 import palimpzest as pz
 from palimpzest.utils import udfs
-import pandas as pd
-import time
-import os
 
 pz.DataDirectory().clearCache(keep_registry=True)
 
 
+
+import matplotlib.pyplot as plt
 import networkx as nx
 import streamlit as st
-import context
-import palimpzest as pz
-import gradio as gr
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 
-import argparse
-import requests
-import json
-import time
-import os
+import palimpzest as pz
+
 
 class ScientificPaper(pz.PDFFile):
    """Represents a scientific research paper, which in practice is usually from a PDF file"""

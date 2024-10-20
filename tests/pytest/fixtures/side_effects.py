@@ -1,10 +1,10 @@
+import json
+
 import pytest
 
 from palimpzest.dataclasses import RecordOpStats
 from palimpzest.elements import DataRecord
 
-import json
-import time
 
 ### Side-Effects for Mocking LLM Calls ###
 @pytest.fixture
@@ -27,7 +27,7 @@ def enron_filter():
         )
 
         # set _passed_filter attribute and return
-        setattr(candidate, "_passed_filter", passed_filter)
+        candidate._passed_filter = passed_filter
 
         return [candidate], [record_op_stats]
 

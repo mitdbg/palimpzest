@@ -1,13 +1,12 @@
-from palimpzest.generators import CustomGenerator
-from .sandbox import API
-from palimpzest.constants import Model, CodeGenStrategy
-from palimpzest.elements import DataRecord
-
-from typing import Any, Dict, List, Tuple
-from collections import Counter
-
-import json
 import time
+from collections import Counter
+from typing import Any, Dict, List, Tuple
+
+from palimpzest.constants import CodeGenStrategy, Model
+from palimpzest.elements import DataRecord
+from palimpzest.generators import CustomGenerator
+
+from .sandbox import API
 
 llm = CustomGenerator(model_name=Model.GPT_4.value)
 def run_codegen(prompt, language='Python'):
@@ -15,7 +14,7 @@ def run_codegen(prompt, language='Python'):
     ordered_keys = [
         f'```{language}',
         f'```{language.lower()}',
-        f'```'
+        '```'
     ]
     code = None
     for key in ordered_keys:

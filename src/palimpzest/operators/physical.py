@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from palimpzest.constants import MAX_ID_CHARS
-from palimpzest.corelib import Schema
-from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.datamanager import DataDirectory
-from palimpzest.elements import DataRecord
-
-from typing import List, Tuple, Optional
-
 import hashlib
 import json
+from typing import List, Optional, Tuple
+
+from palimpzest.constants import MAX_ID_CHARS
+from palimpzest.corelib import Schema
+from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
+from palimpzest.datamanager import DataDirectory
+from palimpzest.elements import DataRecord
 
 # TYPE DEFINITIONS
 DataRecordsWithStats = Tuple[List[DataRecord], List[RecordOpStats]]

@@ -1,5 +1,7 @@
 import pytest
+
 import palimpzest as pz
+
 
 ### SCHEMAS ###
 @pytest.fixture

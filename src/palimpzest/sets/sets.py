@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from palimpzest.datamanager import DataDirectory
-from palimpzest.constants import AggFunc, Cardinality, MAX_ID_CHARS
+import hashlib
+import json
+from typing import Callable, List, Optional, Union
+
+from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
 from palimpzest.corelib import Number, Schema
+from palimpzest.datamanager import DataDirectory
+from palimpzest.datasources import DataSource
 from palimpzest.elements import (
     Filter,
     GroupBySig,
 )
-from palimpzest.datasources import DataSource
-
-from typing import Callable, List, Optional, Union
-
-import hashlib
-import json
 
 
 #####################################################

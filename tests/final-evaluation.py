@@ -1,30 +1,21 @@
 #!/usr/bin/env python3
-from palimpzest.profiler import Profiler, StatsProcessor
-import palimpzest as pz
-
-from palimpzest.execution import graphicEmit, flatten_nested_tuples
-from palimpzest.operators import ConvertFromCandidateOp
-
-from pathlib import Path
-from PIL import Image
-from palimpzest.utils import udfs
-from sklearn.metrics import precision_recall_fscore_support
-from tabulate import tabulate
-
-from collections import defaultdict
-from multiprocessing import Pool
-
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-
 import argparse
 import json
-import shutil
-import subprocess
-import time
 import os
 import pdb
+import shutil
+import time
+from multiprocessing import Pool
+from pathlib import Path
+
+import pandas as pd
+from sklearn.metrics import precision_recall_fscore_support
+
+import palimpzest as pz
+from palimpzest.execution import flatten_nested_tuples, graphicEmit
+from palimpzest.operators import ConvertFromCandidateOp
+from palimpzest.profiler import StatsProcessor
+from palimpzest.utils import udfs
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -285,7 +276,7 @@ def score_biofabric_plans(
     index = [x for x in output.columns if x != "study"]
     # target_matching = pd.read_csv(os.path.join(f'final-eval-results/{opt}/{workload}/', "target_matching.csv"), index_col=0).reindex(index)
     target_matching = pd.read_csv(
-        os.path.join(f"testdata/", "target_matching.csv"), index_col=0
+        os.path.join("testdata/", "target_matching.csv"), index_col=0
     ).reindex(index)
 
     studies = output["study"].unique()
@@ -957,7 +948,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     print("----------------------")
     ops = plan.dumpPhysicalTree()
     flatten_ops = flatten_nested_tuples(ops)
-    print(f"Final Plan:")
+    print("Final Plan:")
     graphicEmit(flatten_ops)
     print("---")
 

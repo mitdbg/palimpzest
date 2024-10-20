@@ -1,9 +1,10 @@
-from palimpzest.constants import PZ_DIR
-
 import os
 import sys
 import tempfile
+
 import yaml
+
+from palimpzest.constants import PZ_DIR
 
 
 class Config:
@@ -20,7 +21,7 @@ class Config:
             self._save_config()
 
         self.config = self._load_config()
-        if not "filecachedir" in self.config:
+        if "filecachedir" not in self.config:
             # Get the system's temporary directory
             temp_dir = tempfile.gettempdir()
             pz_file_cache_dir = os.path.join(temp_dir, "pz")

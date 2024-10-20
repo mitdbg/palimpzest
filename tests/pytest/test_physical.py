@@ -1,20 +1,11 @@
 """ This script contains tests for the refactoring of the physical operators
 """
 
-import os
 import sys
-import time
-import pdb
-
-from palimpzest.corelib import File, TextFile
 
 sys.path.append("./tests/")
 sys.path.append("./tests/refactor-tests/")
-import context
 
-import pytest
-import palimpzest as pz
-from utils import remove_cache
 
 # TODO: uncomment once I understand what is supposed to be happening with
 #       ParallelConvertFromCandidateOp and ParallelFilterCandidateOp (I don't

@@ -1,10 +1,11 @@
+
+import palimpzest as pz
 from palimpzest.constants import Model
 from palimpzest.cost_model import CostModel
-from palimpzest.optimizer import LogicalExpression, Group, Optimizer
 from palimpzest.operators import *
+from palimpzest.optimizer import Group, LogicalExpression, Optimizer
 from palimpzest.policy import *
-import palimpzest as pz
-import pytest
+
 
 class TestPrimitives:
     def test_group_id_equality(self, email_schema):

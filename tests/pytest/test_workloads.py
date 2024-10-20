@@ -1,18 +1,17 @@
+import os
+
+import pandas as pd
 import pytest
+from sklearn.metrics import precision_recall_fscore_support
+
+import palimpzest as pz
 from palimpzest.execution import (
     Execute,
     PipelinedParallelNoSentinelExecution,
     PipelinedSingleThreadNoSentinelExecution,
     SequentialSingleThreadNoSentinelExecution,
 )
-import palimpzest as pz
-
 from palimpzest.utils.model_helpers import getModels
-from sklearn.metrics import precision_recall_fscore_support
-
-import pandas as pd
-
-import os
 
 
 def score_biofabric_plans(dataset, records, policy_str=None, reopt=False) -> float:
@@ -64,7 +63,7 @@ def score_biofabric_plans(dataset, records, policy_str=None, reopt=False) -> flo
     index = [x for x in output.columns if x != "study"]
     # target_matching = pd.read_csv(os.path.join(f'final-eval-results/{opt}/{workload}/', "target_matching.csv"), index_col=0).reindex(index)
     target_matching = pd.read_csv(
-        os.path.join(f"testdata/", "target_matching.csv"), index_col=0
+        os.path.join("testdata/", "target_matching.csv"), index_col=0
     ).reindex(index)
 
     studies = output["study"].unique()

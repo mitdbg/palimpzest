@@ -1,25 +1,26 @@
 from __future__ import annotations
-from palimpzest.constants import OptimizationStrategy, Cardinality
+
+from copy import deepcopy
+from typing import List
+
+from palimpzest.constants import OptimizationStrategy
 from palimpzest.cost_model import CostModel
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import DataSource
 from palimpzest.operators import *
 from palimpzest.optimizer import (
-    LogicalExpression,
-    Group,
-    PhysicalPlan,
-    SentinelPlan,
     IMPLEMENTATION_RULES,
     TRANSFORMATION_RULES,
+    Group,
+    LogicalExpression,
+    PhysicalPlan,
+    SentinelPlan,
 )
 from palimpzest.optimizer.rules import *
 from palimpzest.optimizer.tasks import *
 from palimpzest.policy import Policy
 from palimpzest.sets import Dataset, Set
 from palimpzest.utils import getChampionModel, getCodeChampionModel, getConventionalFallbackModel
-
-from copy import deepcopy
-from typing import List
 
 # DEFINITIONS
 # NOTE: the name pz.Dataset has always been a bit awkward; from a user-facing perspective,

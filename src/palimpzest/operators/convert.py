@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import base64
+import time
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
 from palimpzest import prompts
 from palimpzest.constants import *
 from palimpzest.corelib import *
@@ -8,11 +12,6 @@ from palimpzest.elements import *
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
 from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
 from palimpzest.utils import getJsonFromAnswer
-
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-
-import base64
-import time
 
 # TYPE DEFINITIONS
 FieldName = str
@@ -434,7 +433,7 @@ class LLMConvert(ConvertOp):
                 for item in json_answer["items"]:
                     try:
                         field_answers[field].append(item[field])
-                    except Exception as e:
+                    except Exception:
                         print(f"Error parsing field {field} in one-to-many answer: {item}")
 
         else:

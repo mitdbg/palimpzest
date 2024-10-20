@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from palimpzest.constants import AggFunc, Cardinality, MAX_ID_CHARS
-from palimpzest.corelib import ImageFile, File, Schema
-from palimpzest.datamanager import DataDirectory
-from palimpzest.elements import *
-
-from typing import Callable, List, Optional
-
 import hashlib
 import json
+from typing import Callable, List, Optional
+
+from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
+from palimpzest.corelib import ImageFile, Schema
+from palimpzest.elements import *
 
 
 class LogicalOperator:

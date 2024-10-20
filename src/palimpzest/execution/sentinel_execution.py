@@ -1,3 +1,5 @@
+import time
+
 from palimpzest.constants import OptimizationStrategy
 from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import ExecutionStats
@@ -10,10 +12,6 @@ from palimpzest.execution import (
 from palimpzest.optimizer import Optimizer
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
-
-from typing import List
-
-import time
 
 
 class SentinelExecutionEngine(ExecutionEngine):
