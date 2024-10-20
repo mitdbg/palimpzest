@@ -1,4 +1,5 @@
 import hashlib
+from typing import Type
 
 from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.corelib import Schema
@@ -9,10 +10,10 @@ class DataRecord:
 
     def __init__(
         self,
-        schema: Schema,
-        parent_id: str = None,
-        scan_idx: int = None,
-        cardinality_idx: int = None,
+        schema: Type[Schema],
+        parent_id: str | None = None,
+        scan_idx: int | None = None,
+        cardinality_idx: int | None = None,
     ):
         # schema for the data record
         self.schema = schema
@@ -25,20 +26,17 @@ class DataRecord:
         # We currently do NOT hash just based on record content (i.e. schema (key, value) pairs)
         # because multiple outputs for a given operation may have the exact same
         # schema (key, value) pairs.
-        # 
+        #
         # We may revisit this hashing scheme in the future.
 
         # unique identifier for the record
         id_str = (
             str(schema) + (parent_id if parent_id is not None else str(scan_idx))
             if cardinality_idx is None
-            else str(schema)
-            + str(cardinality_idx)
-            + (parent_id if parent_id is not None else str(scan_idx))
+            else str(schema) + str(cardinality_idx) + (parent_id if parent_id is not None else str(scan_idx))
         )
         self._id = hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
         self._parent_id = parent_id
-
 
     def _asJSONStr(self, include_bytes: bool = True, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
