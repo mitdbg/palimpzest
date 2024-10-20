@@ -68,7 +68,7 @@ class SchemaMetaclass(type):
 
         return json.dumps(d, sort_keys=True)
 
-    def jsonSchema(cls) -> Dict[str, Any]:
+    def jsonSchema(cls) -> Dict[str, TypingAny]:
         """The JSON representation of the Schema"""
         fields = SchemaMetaclass.fieldNames(cls)
 

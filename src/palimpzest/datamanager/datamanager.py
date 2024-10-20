@@ -7,12 +7,14 @@ import yaml
 from palimpzest import constants
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
-from palimpzest.datasources import *
 from palimpzest.datasources.datasources import (
+    FileSource,
     HTMLFileDirectorySource,
     ImageFileDirectorySource,
+    MemorySource,
     PDFFileDirectorySource,
     TextFileDirectorySource,
+    UserSource,
     XLSFileDirectorySource,
 )
 
@@ -24,9 +26,7 @@ class DataDirectorySingletonMeta(type):
     def __call__(cls, *args, **kwargs):
         with cls._lock:
             if cls not in cls._instances:
-                instance = super(DataDirectorySingletonMeta, cls).__call__(
-                    *args, **kwargs
-                )
+                instance = super(DataDirectorySingletonMeta, cls).__call__(*args, **kwargs)
                 cls._instances[cls] = instance
         return cls._instances[cls]
 
@@ -82,9 +82,13 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
                 current_config_dict = yaml.safe_load(f)
                 self.current_config = Config(current_config_dict["current_config_name"])
 
+        # if we are here and current_config is None, we throw
+        if self.current_config is None:
+            raise Exception("Could not find current config file at", current_config_path)
+
         # initialize the file cache directory, defaulting to the system's temporary directory "tmp/pz"
         pz_file_cache_dir = self.current_config.get("filecachedir")
-        if not os.path.exists(pz_file_cache_dir):
+        if pz_file_cache_dir and not os.path.exists(pz_file_cache_dir):
             os.makedirs(pz_file_cache_dir)
 
         # Unpickle the registry of data sources
@@ -103,9 +107,13 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         return self.cacheService
 
     def getConfig(self):
+        if not self.current_config:
+            raise Exception("No current config found.")
         return self.current_config._load_config()
 
     def getFileCacheDir(self):
+        if not self.current_config:
+            raise Exception("No current config found.")
         return self.current_config.get("filecachedir")
 
     #
@@ -138,30 +146,29 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         """Return a dataset from the registry."""
         if dataset_id not in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
+        if not self.current_config:
+            raise Exception("No current config found.")
 
         entry, rock = self._registry[dataset_id]
         if entry == "dir":
-            if all([ f.endswith(tuple(constants.IMAGE_EXTENSIONS))
-                        for f in os.listdir(rock)]):
+            if all([f.endswith(tuple(constants.IMAGE_EXTENSIONS)) for f in os.listdir(rock)]):
                 return ImageFileDirectorySource(rock, dataset_id)
-            elif all([ f.endswith(tuple(constants.PDF_EXTENSIONS))
-                        for f in os.listdir(rock)]):
+            elif all([f.endswith(tuple(constants.PDF_EXTENSIONS)) for f in os.listdir(rock)]):
                 pdfprocessor = self.current_config.get("pdfprocessor")
+                if not pdfprocessor:
+                    raise Exception("No PDF processor found in the current config.")
                 file_cache_dir = self.getFileCacheDir()
-                return PDFFileDirectorySource(path=rock, 
-                                              dataset_id=dataset_id, 
-                                              pdfprocessor=pdfprocessor,
-                                              file_cache_dir=file_cache_dir
-                                              )
-            elif all([ f.endswith(tuple(constants.XLS_EXTENSIONS))
-                        for f in os.listdir(rock)]):
+                if not file_cache_dir:
+                    raise Exception("No file cache directory found.")
+                return PDFFileDirectorySource(
+                    path=rock, dataset_id=dataset_id, pdfprocessor=pdfprocessor, file_cache_dir=file_cache_dir
+                )
+            elif all([f.endswith(tuple(constants.XLS_EXTENSIONS)) for f in os.listdir(rock)]):
                 return XLSFileDirectorySource(rock, dataset_id)
-            elif all([ f.endswith(tuple(constants.HTML_EXTENSIONS))
-                        for f in os.listdir(rock)]):
+            elif all([f.endswith(tuple(constants.HTML_EXTENSIONS)) for f in os.listdir(rock)]):
                 return HTMLFileDirectorySource(rock, dataset_id)
             else:
                 return TextFileDirectorySource(rock, dataset_id)
-            
 
         elif entry == "file":
             return FileSource(rock, dataset_id)
@@ -191,13 +198,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         if entry == "dir":
             # Return the number of files in the directory
             path = rock
-            return len(
-                [
-                    name
-                    for name in os.listdir(path)
-                    if os.path.isfile(os.path.join(path, name))
-                ]
-            )
+            return len([name for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
         elif entry == "file":
             # Return 1
             return 1
@@ -240,7 +241,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         self._tempCache = {}
 
         # Delete all files in the cache directory (except registry.pkl if keep_registry=True)
-        for root, dirs, files in os.walk(self._dir + "/data/cache"):
+        for root, _, files in os.walk(self._dir + "/data/cache"):
             for file in files:
                 if os.path.basename(file) != "registry.pkl" or keep_registry is False:
                     os.remove(root + "/" + file)
@@ -250,11 +251,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         return cacheId in self._cache
 
     def openCache(self, cacheId):
-        if (
-            cacheId is not None
-            and cacheId not in self._cache
-            and cacheId not in self._tempCache
-        ):
+        if cacheId is not None and cacheId not in self._cache and cacheId not in self._tempCache:
             self._tempCache[cacheId] = []
             return True
         return False
