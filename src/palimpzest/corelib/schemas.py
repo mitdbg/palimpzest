@@ -12,7 +12,6 @@ from palimpzest.corelib.fields import BytesField, CallableField, Field, ListFiel
 #       check between two instances of these schemas will not return `False` if they are both the
 #       the same object (e.g. the same file of text), but one has Schema == Any([TextFile, PDFFile])
 #       and the other has Schema = TextFile
-#
 class SchemaMetaclass(type):
     """
     This is a metaclass for our Schema class.
