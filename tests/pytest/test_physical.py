@@ -1,10 +1,14 @@
 """ This script contains tests for the refactoring of the physical operators
 """
-
+import os
 import sys
 
 sys.path.append("./tests/")
 sys.path.append("./tests/refactor-tests/")
+
+if not os.environ.get('OPENAI_API_KEY'):
+    from palimpzest.utils import load_env
+    load_env()
 
 
 # TODO: uncomment once I understand what is supposed to be happening with

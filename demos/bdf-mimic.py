@@ -1,12 +1,11 @@
 # Note: include in the tests folder a .env file that contains the API keys for the services used in the tests
 import os
 
-if not os.environ.get('OPENAI_API_KEY'):
-    pass
-    
-import os
-
 import palimpzest as pz
+
+if not os.environ.get('OPENAI_API_KEY'):
+    from palimpzest.utils import load_env
+    load_env()
 
 pz.DataDirectory().clearCache(keep_registry=True)
 

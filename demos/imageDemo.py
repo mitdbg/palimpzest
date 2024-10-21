@@ -10,6 +10,10 @@ from PIL import Image
 
 import palimpzest as pz
 
+if not os.environ.get('OPENAI_API_KEY'):
+    from palimpzest.utils import load_env
+    load_env()
+
 
 class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required = True)

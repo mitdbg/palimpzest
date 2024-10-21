@@ -7,20 +7,19 @@ python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usec
 import os
 import time
 
+import matplotlib.pyplot as plt
+import networkx as nx
 import pandas as pd
+import streamlit as st
 
 import palimpzest as pz
 from palimpzest.utils import udfs
 
+if not os.environ.get('OPENAI_API_KEY'):
+    from palimpzest.utils import load_env
+    load_env()
+
 pz.DataDirectory().clearCache(keep_registry=True)
-
-
-
-import matplotlib.pyplot as plt
-import networkx as nx
-import streamlit as st
-
-import palimpzest as pz
 
 
 class ScientificPaper(pz.PDFFile):
