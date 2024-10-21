@@ -1,20 +1,25 @@
 """ This testing class is an integration test suite. 
 What it does is consider one of the demo scenarios and test whether we can obtain the same results with the refactored code
 """
-
+import os
 import sys
+
 import pytest
 
 sys.path.append("./tests/")
 sys.path.append("./tests/refactor-tests/")
-import context
 
 import palimpzest as pz
+from palimpzest.constants import PromptStrategy
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.elements.records import DataRecord
-from palimpzest.operators import LLMConvertConventional, LLMConvertBonded
+from palimpzest.operators import LLMConvertBonded, LLMConvertConventional
 from palimpzest.operators.datasource import MarshalAndScanDataOp
-from palimpzest.constants import PromptStrategy
+
+if not os.environ.get('OPENAI_API_KEY'):
+    from palimpzest.utils import load_env
+    load_env()
+
 
 @pytest.mark.parametrize("convert_op", [LLMConvertBonded, LLMConvertConventional])
 def test_convert(convert_op, email_schema):

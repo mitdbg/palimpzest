@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from typing import Any, Dict
+
 
 #############################
 # Filters that can be applied against a particular Schema

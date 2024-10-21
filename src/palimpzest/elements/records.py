@@ -1,7 +1,7 @@
+import hashlib
+
 from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.corelib import Schema
-
-import hashlib
 
 
 class DataRecord:

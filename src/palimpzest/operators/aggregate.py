@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
-from palimpzest.corelib import Number
-from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.elements import DataRecord, GroupBySig
-from palimpzest.operators import PhysicalOperator, DataRecordsWithStats
-
+import time
 from typing import List
 
-import time
+from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
+from palimpzest.corelib import Number
+from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
+from palimpzest.elements import DataRecord, GroupBySig
+from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 
 
 class AggregateOp(PhysicalOperator):

@@ -1,9 +1,10 @@
+import os
+
 import pytest
 
 from palimpzest.corelib import File
 from palimpzest.elements import DataRecord
 
-import os
 
 ### EXPECTED RECORDS ###
 @pytest.fixture

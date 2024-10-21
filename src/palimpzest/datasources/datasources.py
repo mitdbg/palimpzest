@@ -1,23 +1,20 @@
-from bs4 import BeautifulSoup
-from palimpzest.constants import Cardinality
-from palimpzest.corelib import File, Number, Schema
-from palimpzest.elements import DataRecord
-from typing import Any, Dict, List, Union
-
+import json
 import os
 import sys
+from io import BytesIO
+from typing import Any, Dict, List, Union
 
-from palimpzest import constants
-from palimpzest.corelib.schemas import ImageFile, PDFFile, TextFile, XLSFile, WebPage
-
-from palimpzest.tools.pdfparser import get_text_from_pdf
-from papermage import Document
-
-
-import json
 import modal
 import pandas as pd
-from io import BytesIO
+from bs4 import BeautifulSoup
+from papermage import Document
+
+from palimpzest import constants
+from palimpzest.constants import Cardinality
+from palimpzest.corelib import File, Number, Schema
+from palimpzest.corelib.schemas import ImageFile, PDFFile, TextFile, WebPage, XLSFile
+from palimpzest.elements import DataRecord
+from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
 class AbstractDataSource:
@@ -42,7 +39,7 @@ class AbstractDataSource:
         return self.__dict__ == __value.__dict__
 
     def __len__(self) -> int:
-        raise NotImplementedError(f"You are calling this method from an abstract class.")
+        raise NotImplementedError("You are calling this method from an abstract class.")
 
     def serialize(self) -> Dict[str, Any]:
         return {"schema": self.schema.jsonSchema()}
@@ -51,10 +48,10 @@ class AbstractDataSource:
         return self.schema
 
     def getSize(self) -> int:
-        raise NotImplementedError(f"You are calling this method from an abstract class.")
+        raise NotImplementedError("You are calling this method from an abstract class.")
 
     def getItem(self, idx: int) -> DataRecord:
-        raise NotImplementedError(f"You are calling this method from an abstract class.")
+        raise NotImplementedError("You are calling this method from an abstract class.")
 
 
 class DataSource(AbstractDataSource):
@@ -120,7 +117,7 @@ class DirectorySource(DataSource):
         return sum([os.path.getsize(filepath) for filepath in self.filepaths])
 
     def getItem(self, idx: int):
-        raise NotImplementedError(f"You are calling this method from an abstract class.")
+        raise NotImplementedError("You are calling this method from an abstract class.")
 
 class TextFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:

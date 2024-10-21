@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """ This scripts is a demo for image processing, it is simply an abridged version of simpleDemo.py """
-import context
-import palimpzest as pz
-
-from PIL import Image
+import argparse
+import os
+import time
 
 import gradio as gr
 import numpy as np
+from PIL import Image
 
-import argparse
-import time
-import os
+import palimpzest as pz
+
+if not os.environ.get('OPENAI_API_KEY'):
+    from palimpzest.utils import load_env
+    load_env()
+
 
 class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required = True)
@@ -30,7 +33,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     no_cache = args.no_cache
     datasetid = "images-tiny"
-    if not datasetid in pz.DataDirectory().listRegisteredDatasets():
+    if datasetid not in pz.DataDirectory().listRegisteredDatasets():
         pz.DataDirectory().registerLocalDirectory(
             path="testdata/images-tiny", dataset_id="images-tiny")
 

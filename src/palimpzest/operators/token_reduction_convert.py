@@ -1,5 +1,9 @@
 
 from __future__ import annotations
+
+import math
+from typing import Any, Dict, List, Tuple
+
 from palimpzest.constants import (
     MODEL_CARDS,
     NAIVE_EST_NUM_INPUT_TOKENS,
@@ -8,12 +12,8 @@ from palimpzest.constants import (
 )
 from palimpzest.dataclasses import OperatorCostEstimates
 from palimpzest.generators import DSPyGenerator
-from palimpzest.operators import LLMConvert, LLMConvertConventional, LLMConvertBonded
+from palimpzest.operators import LLMConvert, LLMConvertBonded, LLMConvertConventional
 from palimpzest.utils import best_substring_match, find_best_range
-
-from typing import Any, Dict, List, Tuple
-
-import math
 
 
 class TokenReducedConvert(LLMConvert):

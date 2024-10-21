@@ -1,8 +1,7 @@
-from palimpzest.constants import Model
-
+import os
 from typing import List, Optional
 
-import os
+from palimpzest.constants import Model
 
 
 def getVisionModels() -> List[Model]:

@@ -4,20 +4,16 @@ Make sure to run:
 python src/cli/cli_main.py reg --path testdata/biofabric-urls/ --name biofabric-urls
 
 """
-from palimpzest.utils import udfs
-import context
-from palimpzest.constants import PZ_DIR
-import palimpzest as pz
-import pdb 
-import gradio as gr
-import numpy as np
-import pandas as pd
-
 import argparse
-import requests
-import json
-import time
 import os
+import time
+
+import palimpzest as pz
+from palimpzest.utils import udfs
+
+if not os.environ.get('OPENAI_API_KEY'):
+    from palimpzest.utils import load_env
+    load_env()
 
 
 class ScientificPaper(pz.PDFFile):

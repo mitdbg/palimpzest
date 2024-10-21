@@ -1,4 +1,5 @@
 import time
+
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.cost_model.cost_model import CostModel
 from palimpzest.dataclasses import OperatorStats, PlanStats
@@ -9,11 +10,6 @@ from palimpzest.operators.filter import FilterOp
 from palimpzest.optimizer.optimizer import Optimizer
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
-
-
-
-import os
-import shutil
 
 
 class StreamingSequentialExecution(ExecutionEngine):

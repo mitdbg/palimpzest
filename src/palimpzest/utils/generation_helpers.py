@@ -1,7 +1,7 @@
+import json
 from typing import Any, Dict
 
-import json
-import regex as re # Use regex instead of re to used variable length lookbehind
+import regex as re  # Use regex instead of re to used variable length lookbehind
 
 
 def getJsonFromAnswer(answer: str) -> Dict[str, Any]:

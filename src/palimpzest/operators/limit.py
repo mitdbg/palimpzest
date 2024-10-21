@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from typing import List
+
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.elements import DataRecord
-from palimpzest.operators import PhysicalOperator, DataRecordsWithStats
-
-from typing import List
+from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 
 
 class LimitScanOp(PhysicalOperator):

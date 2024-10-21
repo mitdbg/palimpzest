@@ -2,30 +2,29 @@
 My suggestion is to rename at least the base generator into LLMGenerator.
 See llm_wrapper.py for a proposed refactoring of generators.py using the class factory pattern.
 """
-from palimpzest.constants import *
-from palimpzest.generators import (
-    dspyCOT,
-    gen_filter_signature_class,
-    gen_qa_signature_class,
-    TogetherHFAdaptor,
-)
-from palimpzest.dataclasses import GenerationStats
-from palimpzest.utils import API
-
-from collections import Counter
-from openai import OpenAI
-from PIL import Image
-from tenacity import retry, stop_after_attempt, wait_exponential
-from typing import Any, Dict, List, Tuple, Union
-
-import google.generativeai as genai
-
 import base64
-import dsp
-import dspy
 import io
 import os
 import time
+from collections import Counter
+from typing import Any, Dict, List, Tuple, Union
+
+import dsp
+import dspy
+import google.generativeai as genai
+from openai import OpenAI
+from PIL import Image
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+from palimpzest.constants import *
+from palimpzest.dataclasses import GenerationStats
+from palimpzest.generators import (
+    TogetherHFAdaptor,
+    dspyCOT,
+    gen_filter_signature_class,
+    gen_qa_signature_class,
+)
+from palimpzest.utils import API
 
 # DEFINITIONS
 GenerationOutput = Tuple[str, GenerationStats]
@@ -36,7 +35,7 @@ def get_api_key(key: str) -> str:
     if key not in os.environ:
         print(f"KEY: {key}")
         print(f"{os.environ.keys()}")
-        raise ValueError(f"key not found in environment variables")
+        raise ValueError("key not found in environment variables")
 
     return os.environ[key]
 
@@ -264,7 +263,7 @@ class DSPyGenerator(BaseGenerator):
             model = TogetherHFAdaptor(self.model_name, together_key, logprobs=1)
 
         elif self.model_name in [Model.GEMINI_1.value]:
-            google_key = get_api_key(f"GOOGLE_API_KEY")
+            google_key = get_api_key("GOOGLE_API_KEY")
             model = dspy.Google(model=self.model_name, api_key=google_key)
 
         else:
@@ -581,7 +580,7 @@ class ImageTextGenerator(BaseGenerator):
 
         # generate response
         if self.verbose:
-            print(f"Generating")
+            print("Generating")
         start_time = time.time()
         answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(
             client, payloads
