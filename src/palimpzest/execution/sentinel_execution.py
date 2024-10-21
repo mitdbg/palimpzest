@@ -3,8 +3,8 @@ import time
 from palimpzest.constants import OptimizationStrategy
 from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import ExecutionStats
-from palimpzest.execution import (
-    ExecutionEngine,
+from palimpzest.execution.execution_engine import ExecutionEngine
+from palimpzest.execution.plan_executors import (
     PipelinedParallelPlanExecutor,
     PipelinedSingleThreadPlanExecutor,
     SequentialSingleThreadPlanExecutor,

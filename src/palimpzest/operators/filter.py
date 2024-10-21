@@ -8,9 +8,8 @@ from palimpzest.constants import *
 from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.elements import DataRecord, Filter
 from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
+from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
 from palimpzest.prompts import IMAGE_FILTER_PROMPT
-
-from .physical import DataRecordsWithStats, PhysicalOperator
 
 
 class FilterOp(PhysicalOperator):

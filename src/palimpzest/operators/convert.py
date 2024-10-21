@@ -10,7 +10,7 @@ from palimpzest.corelib import *
 from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.elements import *
 from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
+from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 from palimpzest.utils import getJsonFromAnswer
 
 # TYPE DEFINITIONS

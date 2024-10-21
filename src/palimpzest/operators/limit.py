@@ -4,7 +4,7 @@ from typing import List
 
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.elements import DataRecord
-from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
+from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 
 
 class LimitScanOp(PhysicalOperator):

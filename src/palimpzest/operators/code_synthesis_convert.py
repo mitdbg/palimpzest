@@ -9,7 +9,7 @@ from palimpzest.constants import *
 from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.elements import *
-from palimpzest.operators import LLMConvert, LLMConvertBonded, LLMConvertConventional
+from palimpzest.operators.convert import LLMConvert, LLMConvertBonded, LLMConvertConventional
 from palimpzest.prompts import ADVICEGEN_PROMPT, CODEGEN_PROMPT, EXAMPLE_PROMPT
 from palimpzest.utils import API
 
