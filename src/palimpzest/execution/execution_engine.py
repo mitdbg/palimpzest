@@ -1,20 +1,19 @@
-from palimpzest.constants import Model, OptimizationStrategy, MAX_ID_CHARS
+import hashlib
+import multiprocessing
+import os
+import shutil
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, List, Optional, Tuple, Union
+
+from palimpzest.constants import MAX_ID_CHARS, Model, OptimizationStrategy
 from palimpzest.cost_model import CostModel
-from palimpzest.dataclasses import RecordOpStats, PlanStats
+from palimpzest.dataclasses import PlanStats, RecordOpStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import DataRecord
 from palimpzest.optimizer import Optimizer, PhysicalPlan
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 from palimpzest.utils import getModels
-
-from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional, Union, Tuple
-
-import hashlib
-import multiprocessing
-import os
-import shutil
 
 
 class ExecutionEngine:

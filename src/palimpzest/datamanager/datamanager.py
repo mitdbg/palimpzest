@@ -1,14 +1,20 @@
+import os
+import pickle
+from threading import Lock
+
+import yaml
+
+from palimpzest import constants
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
 from palimpzest.datasources import *
-
-import os
-import pickle
-import yaml
-from threading import Lock
-
-from palimpzest import constants
-from palimpzest.datasources.datasources import ImageFileDirectorySource, PDFFileDirectorySource, TextFileDirectorySource, XLSFileDirectorySource, HTMLFileDirectorySource
+from palimpzest.datasources.datasources import (
+    HTMLFileDirectorySource,
+    ImageFileDirectorySource,
+    PDFFileDirectorySource,
+    TextFileDirectorySource,
+    XLSFileDirectorySource,
+)
 
 
 class DataDirectorySingletonMeta(type):
@@ -130,7 +136,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
 
     def getRegisteredDataset(self, dataset_id):
         """Return a dataset from the registry."""
-        if not dataset_id in self._registry:
+        if dataset_id not in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
 
         entry, rock = self._registry[dataset_id]
@@ -169,7 +175,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
 
     def getRegisteredDatasetType(self, dataset_id):
         """Return the type of the given dataset in the registry."""
-        if not dataset_id in self._registry:
+        if dataset_id not in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
 
         entry, _ = self._registry[dataset_id]
@@ -178,7 +184,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
 
     def getCardinality(self, dataset_id):
         """Return the number of records in a dataset."""
-        if not dataset_id in self._registry:
+        if dataset_id not in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
 
         entry, rock = self._registry[dataset_id]
@@ -220,7 +226,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
     def getCachedResult(self, cacheId):
         """Return a cached result."""
         cachedResult = None
-        if not cacheId in self._cache:
+        if cacheId not in self._cache:
             return cachedResult
 
         with open(self._cache[cacheId], "rb") as f:
@@ -245,9 +251,9 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
 
     def openCache(self, cacheId):
         if (
-            not cacheId is None
-            and not cacheId in self._cache
-            and not cacheId in self._tempCache
+            cacheId is not None
+            and cacheId not in self._cache
+            and cacheId not in self._tempCache
         ):
             self._tempCache[cacheId] = []
             return True
@@ -273,7 +279,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         return dataset_id in self._registry
 
     def getPath(self, dataset_id):
-        if not dataset_id in self._registry:
+        if dataset_id not in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
         entry, path = self._registry[dataset_id]
         return path

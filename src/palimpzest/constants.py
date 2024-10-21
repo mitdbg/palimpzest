@@ -1,7 +1,6 @@
 ### This file contains constants used by Palimpzest ###
-from enum import Enum
-
 import os
+from enum import Enum
 
 
 # TODO: add GPT-4o, GPT-4o-mini; update vision

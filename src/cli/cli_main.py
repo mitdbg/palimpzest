@@ -1,11 +1,12 @@
-from click_aliases import ClickAliasedGroup
-from prettytable import PrettyTable
+import os
+import subprocess
 from typing import Tuple
 
 import click
-import os
-import subprocess
 import yaml
+from click_aliases import ClickAliasedGroup
+from prettytable import PrettyTable
+
 
 ############ DEFINITIONS ############
 class InvalidCommandException(Exception):
@@ -206,7 +207,7 @@ def clear_cache() -> None:
     """
     import palimpzest as pz
     pz.DataDirectory().clearCache(keep_registry=True)
-    _print_msg(f"Cache cleared")
+    _print_msg("Cache cleared")
 
 
 @cli.command(aliases=["config", "pc"])

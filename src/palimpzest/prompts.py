@@ -3,7 +3,6 @@ Whenever they are called, they can be parameterize with the str.format() method 
 For now, this is an easy decoupling. In the future, we maybe want a more sophisticated approach like a PromptBuilder.
 """
 
-from enum import Enum
 
 ### CONVERT PROMPTS ### 
 INPUT_FIELD = "{field_name}: {field_desc}\n"

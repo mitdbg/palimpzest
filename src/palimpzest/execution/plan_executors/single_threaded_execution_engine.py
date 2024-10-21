@@ -1,14 +1,13 @@
+import time
+from typing import Optional, Union
+
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements import DataRecord
-from palimpzest.execution import ExecutionEngine
+from palimpzest.execution.execution_engine import ExecutionEngine
 from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
 from palimpzest.optimizer import PhysicalPlan
-
-from typing import Optional, Union
-
-import time
 
 
 class SequentialSingleThreadPlanExecutor(ExecutionEngine):

@@ -1,8 +1,8 @@
-from palimpzest.constants import MAX_ROWS
-from palimpzest.corelib.fields import *
+import json
 from typing import Any, Dict, List
 
-import json
+from palimpzest.constants import MAX_ROWS
+from palimpzest.corelib.fields import *
 
 
 class SchemaMetaclass(type):

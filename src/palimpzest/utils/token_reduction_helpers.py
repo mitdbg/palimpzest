@@ -1,4 +1,4 @@
-from fuzzywuzzy import process, fuzz
+from fuzzywuzzy import fuzz, process
 
 
 def find_best_range(values, budget, trim_zeros=False):

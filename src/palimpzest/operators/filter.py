@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
-from .physical import PhysicalOperator, DataRecordsWithStats
-
-from palimpzest.constants import *
-from palimpzest.dataclasses import GenerationStats, RecordOpStats
-from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.elements import DataRecord, Filter
-from palimpzest.prompts import IMAGE_FILTER_PROMPT
-
-from typing import List
-
 import base64
 import time
+from typing import List
+
+from palimpzest.constants import *
+from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
+from palimpzest.elements import DataRecord, Filter
+from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
+from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
+from palimpzest.prompts import IMAGE_FILTER_PROMPT
 
 
 class FilterOp(PhysicalOperator):
@@ -97,7 +94,7 @@ class NonLLMFilter(FilterOp):
         )
 
         # set _passed_filter attribute and return
-        setattr(candidate, "_passed_filter", result)
+        candidate._passed_filter = result
 
         if self.verbose:
             output_str = f"{self.filter.getFilterStr()}:\n{result}"
@@ -266,6 +263,6 @@ class LLMFilter(FilterOp):
         )
 
         # set _passed_filter attribute and return
-        setattr(candidate, "_passed_filter", passed_filter)
+        candidate._passed_filter = passed_filter
 
         return [candidate], [record_op_stats]

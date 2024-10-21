@@ -1,20 +1,18 @@
-import palimpzest as pz
-from palimpzest.config import Config
-from pypdf import PdfReader
-
-from fastapi import status
-from typing import List, BinaryIO
-from zipfile import ZipFile
-
-import pandas as pd
-
 import hashlib
 import io
 import json
 import os
-import requests
 import time
+from typing import BinaryIO, List
+from zipfile import ZipFile
 
+import pandas as pd
+import requests
+from fastapi import status
+from pypdf import PdfReader
+
+import palimpzest as pz
+from palimpzest.config import Config
 
 COSMOS_ADDRESS = "https://xdd.wisc.edu/cosmos_service"
 class PdfParser:

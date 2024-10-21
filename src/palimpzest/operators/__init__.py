@@ -1,12 +1,13 @@
-from .physical import *
-from .logical import *
 from .aggregate import *
+from .code_synthesis_convert import *
 from .convert import *
 from .datasource import *
 from .filter import *
 from .limit import *
+from .logical import *
+from .physical import *
 from .token_reduction_convert import *
-from .code_synthesis_convert import *
+
 
 # https://stackoverflow.com/a/21563930
 def classesinmodule(module):

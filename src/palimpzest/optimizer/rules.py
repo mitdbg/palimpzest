@@ -1,10 +1,10 @@
-from palimpzest.constants import AggFunc
-from palimpzest.operators import *
-from palimpzest.optimizer.primitives import Group, Expression, LogicalExpression, PhysicalExpression
-from palimpzest.utils.model_helpers import getVisionModels
-
 from copy import deepcopy
 from typing import Set
+
+from palimpzest.constants import AggFunc
+from palimpzest.operators import *
+from palimpzest.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
+from palimpzest.utils.model_helpers import getVisionModels
 
 
 class Rule:

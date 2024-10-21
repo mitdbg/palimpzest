@@ -28,9 +28,9 @@ pdfProcessingImage = modal.Image.debian_slim(python_version="3.11").apt_install(
 @app.function(image=pdfProcessingImage)
 def processPapermagePdf(pdfBytesDocs: list[bytes]):
     """Process a PDF file and return the text contents."""
-    import papermage
-    import os
     import json
+    import os
+
     from papermage.recipes import CoreRecipe
 
     os.makedirs("/tmp", exist_ok=True)
@@ -54,6 +54,7 @@ def processPapermagePdf(pdfBytesDocs: list[bytes]):
 @app.local_entrypoint()
 def main():
     import json
+
     from papermage import Document
     pdfBytes1 = open("test.pdf", "rb").read()
 

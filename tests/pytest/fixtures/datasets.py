@@ -1,7 +1,10 @@
-import pytest
-import palimpzest as pz
 import os
 from pathlib import Path
+
+import pytest
+
+import palimpzest as pz
+
 
 ### DATA SOURCES ###
 # NOTE: I need to have RealEstateListingFiles and RealEstateListingSource

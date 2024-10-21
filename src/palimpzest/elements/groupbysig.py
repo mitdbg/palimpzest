@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 from typing import Any, Dict
+
 from palimpzest.corelib import Field, OperatorDerivedSchema, Schema
+
 
 #signature for a group by aggregate that applies
 # group and aggregation to an input tuple

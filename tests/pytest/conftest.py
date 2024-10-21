@@ -1,6 +1,6 @@
-from palimpzest.constants import Model
-
 import pytest
+
+from palimpzest.constants import Model
 
 # with open(".env") as f:
 #     for line in f:

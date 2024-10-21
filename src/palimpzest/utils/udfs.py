@@ -2,18 +2,18 @@
 This scripts collects a sample of useful UDFs to convert schemata.
 """
 import io
-import palimpzest as pz
-import pandas as pd
+import json
 from datetime import datetime
+
+import modal
+import pandas as pd
+import requests
+from papermage import Document
 
 import palimpzest as pz
 from palimpzest.constants import *
 from palimpzest.tools.pdfparser import get_text_from_pdf
-from papermage import Document
-import pandas as pd
-import json
-import modal
-import requests
+
 
 def url_to_file(candidate):
     """ Function used to convert a DataRecord instance of URL to a File DataRecord. """

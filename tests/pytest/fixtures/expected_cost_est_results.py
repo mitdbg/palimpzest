@@ -1,8 +1,9 @@
+import pytest
+
 from palimpzest.constants import Model
 from palimpzest.operators import ConvertOp, FilterOp, MarshalAndScanDataOp
 from palimpzest.utils import getModels
 
-import pytest
 
 @pytest.fixture
 def simple_plan_expected_operator_estimates(simple_plan_scan_data, simple_plan_convert_data, simple_plan_filter_data):

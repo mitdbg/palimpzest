@@ -1,9 +1,10 @@
-from conftest import *
-from palimpzest.execution import *
-from palimpzest.operators import LLMConvert, LLMFilter, CodeSynthesisConvert
-
 import time
+
 import pytest
+from conftest import *
+
+from palimpzest.execution import *
+from palimpzest.operators import CodeSynthesisConvert, LLMConvert, LLMFilter
 
 
 @pytest.mark.parametrize(

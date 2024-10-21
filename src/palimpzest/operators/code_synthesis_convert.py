@@ -1,18 +1,17 @@
 from __future__ import annotations
 
+import json
+import time
+from typing import List, Tuple
+
 from palimpzest import generators
 from palimpzest.constants import *
 from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.elements import *
-from palimpzest.operators import LLMConvert, LLMConvertBonded, LLMConvertConventional
-from palimpzest.prompts import EXAMPLE_PROMPT, CODEGEN_PROMPT, ADVICEGEN_PROMPT
+from palimpzest.operators.convert import LLMConvert, LLMConvertBonded, LLMConvertConventional
+from palimpzest.prompts import ADVICEGEN_PROMPT, CODEGEN_PROMPT, EXAMPLE_PROMPT
 from palimpzest.utils import API
-
-from typing import List, Tuple
-
-import json
-import time
 
 # TYPE DEFINITIONS
 FieldName = str
@@ -247,7 +246,7 @@ class CodeSynthesisConvert(LLMConvert):
         if self.cache_across_plans:
             cache = DataDirectory().getCacheService()
             exemplars_cache_id = self.get_op_id()
-            cache.putCachedData(f"codeExemplars", exemplars_cache_id, exemplars)
+            cache.putCachedData("codeExemplars", exemplars_cache_id, exemplars)
 
         return drs, record_op_stats_lst
 
@@ -385,7 +384,7 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
         ordered_keys = [
             f'```{language}',
             f'```{language.lower()}',
-            f'```'
+            '```'
         ]
         code = None
         for key in ordered_keys:

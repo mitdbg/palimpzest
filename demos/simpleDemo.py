@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
-import palimpzest as pz
-
-from palimpzest.constants import Cardinality
-from palimpzest.elements import DataRecord, GroupBySig
-
-from bs4 import BeautifulSoup
-from PIL import Image
-from requests_html import HTMLSession # for downloading JavaScript content
-from tabulate import tabulate
-
-import gradio as gr
-import numpy as np
-import pandas as pd
-
 import argparse
 import csv
 import datetime
 import json
 import os
-import requests
 import sys
 import time
+
+import gradio as gr
+import numpy as np
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+from PIL import Image
+from requests_html import HTMLSession  # for downloading JavaScript content
+from tabulate import tabulate
+
+import palimpzest as pz
+from palimpzest.constants import Cardinality
+from palimpzest.elements import DataRecord, GroupBySig
 
 
 class ScientificPaper(pz.PDFFile):

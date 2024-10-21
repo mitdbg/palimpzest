@@ -1,6 +1,8 @@
-import io
 import contextlib
+import io
+
 import IPython.terminal.embed as embed
+
 
 class Sandbox:
     def __init__(self, codes=list(), reset=False):

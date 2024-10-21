@@ -3,9 +3,9 @@
 #####################################################
 # Description: This file contains the functions that are from ASKEM skema tools at endpoints:
 # https://api.askem.lum.ai/docs
-import base64
-import requests
 import time
+
+import requests
 
 
 def equations_to_latex(image_content):

@@ -1,30 +1,12 @@
 #!/usr/bin/env python3
-import palimpzest as pz
-
-from palimpzest.execution import (
-    PipelinedSingleThreadSentinelExecution
-)
-from palimpzest.utils import getModels, udfs
-
-from pathlib import Path
-from PIL import Image
-from sklearn.metrics import precision_recall_fscore_support
-from tabulate import tabulate
-
-from collections import defaultdict
-from multiprocessing import Pool
-
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-
 import argparse
-import json
-import shutil
-import subprocess
-import time
 import os
-import pdb
+import time
+from pathlib import Path
+
+import palimpzest as pz
+from palimpzest.execution import PipelinedSingleThreadSentinelExecution
+from palimpzest.utils import getModels, udfs
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups

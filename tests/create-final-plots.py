@@ -1,24 +1,15 @@
 #!/usr/bin/env python3
-from palimpzest.profiler import Profiler, StatsProcessor
-import palimpzest as pz
 
-from palimpzest.execution import graphicEmit, flatten_nested_tuples
 
-from PIL import Image
-from sklearn.metrics import precision_recall_fscore_support
-from tabulate import tabulate
+
+import argparse
+import json
+import os
+import time
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-
-import argparse
-import json
-import shutil
-import subprocess
-import time
-import os
-import pdb
 
 
 def get_color(workload, result_dict, plan_idx):
@@ -219,10 +210,10 @@ def plot_runtime_cost_vs_quality(results):
         axs_clean_mc[1][idx].set_xlabel("F1 Score", fontsize=12)
 
     fig_text.savefig(
-        f"final-eval-results/plots/all-text.png", dpi=500, bbox_inches="tight"
+        "final-eval-results/plots/all-text.png", dpi=500, bbox_inches="tight"
     )
     fig_clean_mc.savefig(
-        f"final-eval-results/plots/all-clean-mc.png", dpi=500, bbox_inches="tight"
+        "final-eval-results/plots/all-clean-mc.png", dpi=500, bbox_inches="tight"
     )
 
 
@@ -342,7 +333,7 @@ def plot_reopt(results, workload):
     axs[2][0].set_ylabel("Medical Schema Matching", fontsize=12)
     axs[0][1].set_title("Palimpzest Selected Plans vs. GPT-4 Baseline", fontsize=15)
 
-    fig.savefig(f"final-eval-results/plots/reopt.png", dpi=500, bbox_inches="tight")
+    fig.savefig("final-eval-results/plots/reopt.png", dpi=500, bbox_inches="tight")
 
 
 if __name__ == "__main__":
@@ -357,7 +348,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # create directory for intermediate results
-    os.makedirs(f"final-eval-results/plots", exist_ok=True)
+    os.makedirs("final-eval-results/plots", exist_ok=True)
 
     if args.all:
         # # opt and workload to # of plots

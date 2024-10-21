@@ -1,7 +1,8 @@
-from .primitives import *
 from .plan import *
+from .primitives import *
 from .rules import *
 from .tasks import *
+
 
 # TODO repeated function find a place to move it to
 # https://stackoverflow.com/a/21563930

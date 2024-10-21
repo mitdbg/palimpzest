@@ -3,24 +3,17 @@
 python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usecase3-pdf
 
 """
-import context
-from pypdf import PdfReader
 
-import networkx as nx
-import streamlit as st
-from palimpzest.constants import PZ_DIR
-import palimpzest as pz
-import pdb 
-import gradio as gr
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-import argparse
-import requests
-import json
-import time
 import os
+import time
+
+import matplotlib.pyplot as plt
+import networkx as nx
+import pandas as pd
+import streamlit as st
+
+import palimpzest as pz
+
 
 class ScientificPaper(pz.PDFFile):
    """Represents a scientific research paper, which in practice is usually from a PDF file"""

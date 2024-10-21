@@ -1,17 +1,5 @@
 from __future__ import annotations
 
-from palimpzest.constants import Cardinality, GPT_4_MODEL_CARD, MODEL_CARDS
-from palimpzest.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
-from palimpzest.datamanager import DataDirectory
-from palimpzest.operators import PhysicalOperator
-from palimpzest.utils import getChampionModelName, getModels
-
-import palimpzest as pz
-
-from typing import Any, Dict, List, Optional, Tuple
-
-import pandas as pd
-import scipy.stats as stats
 import math
 
 # NOTE: the answer.mode() call(s) inside of _est_quality() throw a UserWarning when there are multiple
@@ -21,6 +9,18 @@ import math
 #       multiple w/the same count, but in the future we may want to cast the 'dict' --> 'str' or compute
 #       the mode on a per-field basis.
 import warnings
+from typing import Any, Dict, List, Optional, Tuple
+
+import pandas as pd
+import scipy.stats as stats
+
+import palimpzest as pz
+from palimpzest.constants import GPT_4_MODEL_CARD, MODEL_CARDS, Cardinality
+from palimpzest.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
+from palimpzest.datamanager import DataDirectory
+from palimpzest.operators import PhysicalOperator
+from palimpzest.utils import getChampionModelName, getModels
+
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 class CostModel:
