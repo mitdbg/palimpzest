@@ -1,7 +1,8 @@
 from typing import List, Optional
 
 from palimpzest.constants import Model, OptimizationStrategy
-from palimpzest.execution import ExecutionEngine, PipelinedSingleThreadSentinelExecution
+from palimpzest.execution.execution_engine import ExecutionEngine
+from palimpzest.execution.sentinel_execution import PipelinedSingleThreadSentinelExecution
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 

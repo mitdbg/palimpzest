@@ -6,7 +6,7 @@ from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements import DataRecord
-from palimpzest.execution import ExecutionEngine
+from palimpzest.execution.execution_engine import ExecutionEngine
 from palimpzest.operators import AggregateOp, LimitScanOp, MarshalAndScanDataOp, PhysicalOperator
 from palimpzest.optimizer import PhysicalPlan
 

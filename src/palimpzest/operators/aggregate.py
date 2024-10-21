@@ -7,7 +7,7 @@ from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
 from palimpzest.corelib import Number
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.elements import DataRecord, GroupBySig
-from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
+from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 
 
 class AggregateOp(PhysicalOperator):

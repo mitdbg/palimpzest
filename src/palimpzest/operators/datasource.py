@@ -6,7 +6,7 @@ from typing import List, Union
 from palimpzest.constants import *
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.elements import DataRecord
-from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
+from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 
 
 class DataSourcePhysicalOp(PhysicalOperator):
