@@ -279,7 +279,6 @@ class Optimizer:
         short_to_full_field_name = {}
         for node_idx, node in enumerate(dataset_nodes):
             # update mapping from short to full field names
-            import pdb; pdb.set_trace()
             short_field_names = node.schema.fieldNames()
             full_field_names = node.schema.fieldNames(unique=True, id=node.universalIdentifier())
             for short_field_name, full_field_name in zip(short_field_names, full_field_names):
@@ -443,7 +442,6 @@ class Optimizer:
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
         """
-        import pdb; pdb.set_trace()
         # compute the initial group tree for the user plan
         final_group_id = self.convert_query_plan_to_group_tree(query_plan)
 
