@@ -1,7 +1,8 @@
-"""GV: This class is about LLM wrappers. 
+"""GV: This class is about LLM wrappers.
 My suggestion is to rename at least the base generator into LLMGenerator.
 See llm_wrapper.py for a proposed refactoring of generators.py using the class factory pattern.
 """
+
 import base64
 import io
 import os
@@ -85,7 +86,8 @@ class CustomGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ",
+                self.model_name,
             )
 
         return model
@@ -97,14 +99,10 @@ class CustomGenerator(BaseGenerator):
         usage, finish_reason = None, None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
-            finish_reason = dspy_lm.history[-1]["response"]["choices"][-1][
-                "finish_reason"
-            ]
+            finish_reason = dspy_lm.history[-1]["response"]["choices"][-1]["finish_reason"]
         elif self.model_name in [Model.GEMINI_1.value]:
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
-            finish_reason = (
-                dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
-            )
+            finish_reason = dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
             finish_reason = dspy_lm.history[-1]["response"]["finish_reason"]
@@ -129,9 +127,7 @@ class CustomGenerator(BaseGenerator):
 
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
-            log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"][
-                "content"
-            ]
+            log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"]["content"]
             tokens = list(map(lambda elt: elt["token"], log_probs))
             token_logprobs = list(map(lambda elt: elt["logprob"], log_probs))
         elif self.model_name in [Model.GEMINI_1.value]:
@@ -147,7 +143,8 @@ class CustomGenerator(BaseGenerator):
             token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ",
+                self.model_name,
             )
 
         # get indices of the start and end token for the answer
@@ -192,21 +189,23 @@ class CustomGenerator(BaseGenerator):
         output_tokens = usage["completion_tokens"]
 
         # create GenerationStats
-        stats = GenerationStats(**{
-            "model_name": self.model_name,
-            "llm_call_duration_secs": end_time - start_time,
-            "fn_call_duration_secs": 0.0,
-            "total_input_tokens": input_tokens,
-            "total_output_tokens": output_tokens,
-            "total_input_cost": input_tokens * usd_per_input_token,
-            "total_output_cost": output_tokens * usd_per_output_token,
-            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
-            # "prompt": dspy_lm.history[-1]["prompt"],
-            # "usage": usage,
-            # "finish_reason": finish_reason,
-            # "answer_log_probs": answer_log_probs,
-            # "answer": answer,
-        })
+        stats = GenerationStats(
+            **{
+                "model_name": self.model_name,
+                "llm_call_duration_secs": end_time - start_time,
+                "fn_call_duration_secs": 0.0,
+                "total_input_tokens": input_tokens,
+                "total_output_tokens": output_tokens,
+                "total_input_cost": input_tokens * usd_per_input_token,
+                "total_output_cost": output_tokens * usd_per_output_token,
+                "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+                # "prompt": dspy_lm.history[-1]["prompt"],
+                # "usage": usage,
+                # "finish_reason": finish_reason,
+                # "answer_log_probs": answer_log_probs,
+                # "answer": answer,
+            }
+        )
 
         if self.verbose:
             print("Prompt history:")
@@ -239,17 +238,13 @@ class DSPyGenerator(BaseGenerator):
         elif prompt_strategy == PromptStrategy.DSPY_COT_QA:
             self.promptSignature = gen_qa_signature_class(doc_schema, doc_type)
         else:
-            raise ValueError(
-                f"DSPyGenerator does not support prompt_strategy: {prompt_strategy.value}"
-            )
+            raise ValueError(f"DSPyGenerator does not support prompt_strategy: {prompt_strategy.value}")
 
     def _get_model(self) -> dsp.LM:
         model = None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             openai_key = get_api_key("OPENAI_API_KEY")
-            max_tokens = (
-                4096 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 150
-            )
+            max_tokens = 4096 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 150
             model = dspy.OpenAI(
                 model=self.model_name,
                 api_key=openai_key,
@@ -268,7 +263,8 @@ class DSPyGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ",
+                self.model_name,
             )
 
         return model
@@ -280,14 +276,10 @@ class DSPyGenerator(BaseGenerator):
         usage, finish_reason = None, None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
-            finish_reason = dspy_lm.history[-1]["response"]["choices"][-1][
-                "finish_reason"
-            ]
+            finish_reason = dspy_lm.history[-1]["response"]["choices"][-1]["finish_reason"]
         elif self.model_name in [Model.GEMINI_1.value]:
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
-            finish_reason = (
-                dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
-            )
+            finish_reason = dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
             finish_reason = dspy_lm.history[-1]["response"]["finish_reason"]
@@ -312,9 +304,7 @@ class DSPyGenerator(BaseGenerator):
 
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
-            log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"][
-                "content"
-            ]
+            log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"]["content"]
             tokens = list(map(lambda elt: elt["token"], log_probs))
             token_logprobs = list(map(lambda elt: elt["logprob"], log_probs))
         elif self.model_name in [Model.GEMINI_1.value]:
@@ -330,7 +320,8 @@ class DSPyGenerator(BaseGenerator):
             token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ",
+                self.model_name,
             )
 
         # get indices of the start and end token for the answer
@@ -358,7 +349,6 @@ class DSPyGenerator(BaseGenerator):
         context: str,
         question: str,
     ) -> GenerationOutput:
-
         dspy_lm = self._get_model()
         dspy.settings.configure(lm=dspy_lm)
         cot = dspyCOT(self.promptSignature)
@@ -392,21 +382,23 @@ class DSPyGenerator(BaseGenerator):
             cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
         )
         # create GenerationStats
-        stats = GenerationStats(**{
-            "model_name": self.model_name,
-            "llm_call_duration_secs": end_time - start_time,
-            "fn_call_duration_secs": 0.0,
-            "total_input_tokens": input_tokens,
-            "total_output_tokens": output_tokens,
-            "total_input_cost": input_tokens * usd_per_input_token,
-            "total_output_cost": output_tokens * usd_per_output_token,
-            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
-            # "prompt": dspy_lm.history[-1]["prompt"],
-            # "usage": usage,
-            # "finish_reason": finish_reason,
-            # "answer_log_probs": answer_log_probs,
-            # "answer": pred.answer,
-        })
+        stats = GenerationStats(
+            **{
+                "model_name": self.model_name,
+                "llm_call_duration_secs": end_time - start_time,
+                "fn_call_duration_secs": 0.0,
+                "total_input_tokens": input_tokens,
+                "total_output_tokens": output_tokens,
+                "total_input_cost": input_tokens * usd_per_input_token,
+                "total_output_cost": output_tokens * usd_per_output_token,
+                "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+                # "prompt": dspy_lm.history[-1]["prompt"],
+                # "usage": usage,
+                # "finish_reason": finish_reason,
+                # "answer_log_probs": answer_log_probs,
+                # "answer": pred.answer,
+            }
+        )
 
         if self.verbose:
             print("Prompt history:")
@@ -449,7 +441,8 @@ class ImageTextGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ",
+                self.model_name,
             )
 
         return client
@@ -485,13 +478,13 @@ class ImageTextGenerator(BaseGenerator):
 
         elif self.model_name == Model.GEMINI_1V.value:
             payloads = [
-                [prompt, Image.open(io.BytesIO(self._decode_image(base64_image)))]
-                for base64_image in base64_images
+                [prompt, Image.open(io.BytesIO(self._decode_image(base64_image)))] for base64_image in base64_images
             ]
 
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ",
+                self.model_name,
             )
 
         return payloads
@@ -508,12 +501,8 @@ class ImageTextGenerator(BaseGenerator):
             answer = candidate.message.content
             finish_reason = candidate.finish_reason
             usage = dict(completion.usage)
-            tokens = list(
-                map(lambda elt: elt.token, completion.choices[-1].logprobs.content)
-            )
-            token_logprobs = list(
-                map(lambda elt: elt.logprob, completion.choices[-1].logprobs.content)
-            )
+            tokens = list(map(lambda elt: elt.token, completion.choices[-1].logprobs.content))
+            token_logprobs = list(map(lambda elt: elt.logprob, completion.choices[-1].logprobs.content))
 
         elif self.model_name == Model.GEMINI_1V.value:
             # iterate through images to generate multiple responses
@@ -537,14 +526,13 @@ class ImageTextGenerator(BaseGenerator):
 
         else:
             raise ValueError(
-                "Model must be one of the language models specified in palimpzest.constants.Model but it is ", self.model_name
+                "Model must be one of the language models specified in palimpzest.constants.Model but it is ",
+                self.model_name,
             )
 
         return answer, finish_reason, usage, tokens, token_logprobs
 
-    def _get_answer_log_probs(
-        self, tokens: List[str], token_logprobs: List[float], answer: str
-    ) -> List[float]:
+    def _get_answer_log_probs(self, tokens: List[str], token_logprobs: List[float], answer: str) -> List[float]:
         """
         Filter and return the list of log probabilities for the tokens which appear in `answer`.
         """
@@ -582,9 +570,7 @@ class ImageTextGenerator(BaseGenerator):
         if self.verbose:
             print("Generating")
         start_time = time.time()
-        answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(
-            client, payloads
-        )
+        answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(client, payloads)
         end_time = time.time()
         if self.verbose:
             print(answer)
@@ -596,35 +582,39 @@ class ImageTextGenerator(BaseGenerator):
         output_tokens = usage["completion_tokens"]
 
         # create GenerationStats
-        stats = GenerationStats(**{
-            "model_name": self.model_name,
-            "llm_call_duration_secs": end_time - start_time,
-            "fn_call_duration_secs": 0.0,
-            "total_input_tokens": input_tokens,
-            "total_output_tokens": output_tokens,
-            "total_input_cost": input_tokens * usd_per_input_token,
-            "total_output_cost": output_tokens * usd_per_output_token,
-            "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
-            # "prompt": dspy_lm.history[-1]["prompt"],
-            # "usage": usage,
-            # "finish_reason": finish_reason,
-            # "answer_log_probs": answer_log_probs,
-            # "answer": pred.answer,
-        })
+        stats = GenerationStats(
+            **{
+                "model_name": self.model_name,
+                "llm_call_duration_secs": end_time - start_time,
+                "fn_call_duration_secs": 0.0,
+                "total_input_tokens": input_tokens,
+                "total_output_tokens": output_tokens,
+                "total_input_cost": input_tokens * usd_per_input_token,
+                "total_output_cost": output_tokens * usd_per_output_token,
+                "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+                # "prompt": dspy_lm.history[-1]["prompt"],
+                # "usage": usage,
+                # "finish_reason": finish_reason,
+                # "answer_log_probs": answer_log_probs,
+                # "answer": pred.answer,
+            }
+        )
 
         return answer, stats
 
 
-
 # TODO: refactor this to have a CodeSynthGenerator
-def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose:bool=False):
+def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose: bool = False):
     inputs = {field_name: candidate_dict[field_name] for field_name in api.inputs}
     response = api.api_execute(code, inputs)
-    pred = response['response'] if response['status'] and response['response'] else None
+    pred = response["response"] if response["status"] and response["response"] else None
     return pred
 
+
 # Temporarily set default verbose to True for debugging
-def codeEnsembleExecution(api: API, code_ensemble: List[Dict[str, str]], candidate_dict: Dict[str, Any], verbose: bool=True) -> GenerationOutput:
+def codeEnsembleExecution(
+    api: API, code_ensemble: List[Dict[str, str]], candidate_dict: Dict[str, Any], verbose: bool = True
+) -> GenerationOutput:
     start_time = time.time()
     preds = list()
     for _, code in code_ensemble.items():
@@ -635,22 +625,28 @@ def codeEnsembleExecution(api: API, code_ensemble: List[Dict[str, str]], candida
     print(preds)
 
     # TODO: short-term hack to avoid calling Counter(preds) when preds is a list for biofabric (which is unhashable)
-    #       
+    #
     if len(preds) == 1:
         majority_response = preds[0]
-        exec_stats = GenerationStats(**{
-            "fn_call_duration_secs": time.time() - start_time,
-        })
+        exec_stats = GenerationStats(
+            **{
+                "fn_call_duration_secs": time.time() - start_time,
+            }
+        )
         return majority_response, exec_stats
 
     if len(preds) > 0:
         majority_response = Counter(preds).most_common(1)[0][0]
-        exec_stats = GenerationStats(**{
-            "fn_call_duration_secs": time.time() - start_time,
-        })
+        exec_stats = GenerationStats(
+            **{
+                "fn_call_duration_secs": time.time() - start_time,
+            }
+        )
         # return majority_response+(" (codegen)" if verbose else ""), ensemble_stats
         return majority_response, exec_stats
 
-    return None, GenerationStats(**{
+    return None, GenerationStats(
+        **{
             "fn_call_duration_secs": time.time() - start_time,
-        })
+        }
+    )

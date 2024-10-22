@@ -17,25 +17,27 @@ from palimpzest.utils import getModels
 
 
 class ExecutionEngine:
-    def __init__(self,
-            num_samples: int=float("inf"),
-            scan_start_idx: int=0,
-            nocache: bool=True,  # NOTE: until we properly implement caching, let's set the default to True
-            include_baselines: bool=False,
-            min_plans: Optional[int] = None,
-            verbose: bool = False,
-            available_models: List[Model] = [],
-            allow_bonded_query: bool=True,
-            allow_conventional_query: bool=False,
-            allow_model_selection: bool=True,
-            allow_code_synth: bool=True,
-            allow_token_reduction: bool=True,
-            optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
-            max_workers: int=1,
-            num_workers_per_thread: int=1,
-            inter_plan_parallelism: bool=True,
-            *args, **kwargs
-        ) -> None:
+    def __init__(
+        self,
+        num_samples: int = float("inf"),
+        scan_start_idx: int = 0,
+        nocache: bool = True,  # NOTE: until we properly implement caching, let's set the default to True
+        include_baselines: bool = False,
+        min_plans: Optional[int] = None,
+        verbose: bool = False,
+        available_models: List[Model] = [],
+        allow_bonded_query: bool = True,
+        allow_conventional_query: bool = False,
+        allow_model_selection: bool = True,
+        allow_code_synth: bool = True,
+        allow_token_reduction: bool = True,
+        optimization_strategy: OptimizationStrategy = OptimizationStrategy.OPTIMAL,
+        max_workers: int = 1,
+        num_workers_per_thread: int = 1,
+        inter_plan_parallelism: bool = True,
+        *args,
+        **kwargs,
+    ) -> None:
         self.num_samples = num_samples
         self.scan_start_idx = scan_start_idx
         self.nocache = nocache
@@ -56,9 +58,8 @@ class ExecutionEngine:
         self.max_workers = max_workers
         self.num_workers_per_thread = num_workers_per_thread
         self.inter_plan_parallelism = inter_plan_parallelism
-        
-        self.datadir = DataDirectory()
 
+        self.datadir = DataDirectory()
 
     def execution_id(self) -> str:
         """
@@ -71,7 +72,6 @@ class ExecutionEngine:
 
         return hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
-
     def clear_cached_responses_and_examples(self):
         """
         Clear cached LLM responses and codegen samples.
@@ -81,7 +81,6 @@ class ExecutionEngine:
             shutil.rmtree(dspy_cache_dir)
         cache = self.datadir.getCacheService()
         cache.rmCache()
-
 
     def set_source_dataset_id(self, dataset: Set) -> str:
         """
@@ -97,7 +96,6 @@ class ExecutionEngine:
         # set the source dataset id
         self.source_dataset_id = dataset.dataset_id
 
-
     def get_parallel_max_workers(self):
         # for now, return the number of system CPUs;
         # in the future, we may want to consider the models the user has access to
@@ -108,7 +106,6 @@ class ExecutionEngine:
         # changing the max_workers in response to 429 errors.
         return max(int(0.8 * multiprocessing.cpu_count()), 1)
 
-
     def get_max_quality_plan_id(self, plans: List[PhysicalPlan]) -> str:
         """
         Return the plan_id for the plan with the highest quality in the list of plans.
@@ -118,9 +115,8 @@ class ExecutionEngine:
             if plan.quality > max_quality or max_quality_plan_id is None:
                 max_quality_plan_id = plan.plan_id
                 max_quality = plan.quality
-        
-        return max_quality_plan_id
 
+        return max_quality_plan_id
 
     def aggregate_plan_stats(self, plan_stats: List[PlanStats]) -> Dict[str, PlanStats]:
         """
@@ -139,8 +135,9 @@ class ExecutionEngine:
 
         return agg_plan_stats
 
-
-    def execute_plans(self, plans: List[PhysicalPlan], max_quality_plan_id: str, num_samples: Union[int, float] = float("inf")):
+    def execute_plans(
+        self, plans: List[PhysicalPlan], max_quality_plan_id: str, num_samples: Union[int, float] = float("inf")
+    ):
         """
         Execute a given list of plans for num_samples records each, using whatever parallelism is available.
         """
@@ -155,11 +152,13 @@ class ExecutionEngine:
         )
         max_workers = min(max_workers, num_plans)
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            results = list(executor.map(lambda x: self.execute_plan(**x),
-                    [{"plan": plan,
-                      "num_samples": num_samples,
-                      "max_workers": self.num_workers_per_thread}
-                      for plan in plans],
+            results = list(
+                executor.map(
+                    lambda x: self.execute_plan(**x),
+                    [
+                        {"plan": plan, "num_samples": num_samples, "max_workers": self.num_workers_per_thread}
+                        for plan in plans
+                    ],
                 )
             )
         # results = list(map(lambda x: self.execute_plan(**x),
@@ -179,19 +178,18 @@ class ExecutionEngine:
             for operator_stats in plan_stats.operator_stats.values():
                 all_sample_execution_data.extend(operator_stats.record_op_stats_lst)
 
-            # if this is the max quality plan for this set of plans, return its results for these records 
+            # if this is the max quality plan for this set of plans, return its results for these records
             if plan.plan_id == max_quality_plan_id:
                 return_records = records
 
         return all_sample_execution_data, return_records, plan_stats
 
-
     def execute_optimal_strategy(
-            self,
-            dataset: Set,
-            optimizer: Optimizer,
-            execution_data: List[RecordOpStats]=[],
-        ) -> Tuple[List[DataRecord], List[PlanStats]]:
+        self,
+        dataset: Set,
+        optimizer: Optimizer,
+        execution_data: List[RecordOpStats] = [],
+    ) -> Tuple[List[DataRecord], List[PlanStats]]:
         # get the optimal plan according to the optimizer
         plans = optimizer.optimize(dataset)
         final_plan = plans[0]
@@ -205,13 +203,12 @@ class ExecutionEngine:
         # return the output records and plan stats
         return records, [plan_stats]
 
-
     def execute_confidence_interval_strategy(
-            self,
-            dataset: Set,
-            optimizer: Optimizer,
-            execution_data: List[RecordOpStats]=[],
-        ) -> Tuple[List[DataRecord], List[PlanStats]]:
+        self,
+        dataset: Set,
+        optimizer: Optimizer,
+        execution_data: List[RecordOpStats] = [],
+    ) -> Tuple[List[DataRecord], List[PlanStats]]:
         # initialize output records and plan stats
         records, plan_stats = [], []
 
@@ -226,7 +223,9 @@ class ExecutionEngine:
             max_quality_plan_id = self.get_max_quality_plan_id(plans)
 
             # execute the set of plans for a fixed number of samples
-            new_execution_data, new_records, new_plan_stats = self.execute_plans(list(plans), max_quality_plan_id, self.num_samples)
+            new_execution_data, new_records, new_plan_stats = self.execute_plans(
+                list(plans), max_quality_plan_id, self.num_samples
+            )
             records.extend(new_records)
             plan_stats.extend(new_plan_stats)
 
@@ -258,13 +257,11 @@ class ExecutionEngine:
         # return the final set of records and plan stats
         return records, plan_stats
 
-
-    def execute_plan(self, plan: PhysicalPlan,
-                     num_samples: Union[int, float] = float("inf"),
-                     max_workers: Optional[int] = None):
+    def execute_plan(
+        self, plan: PhysicalPlan, num_samples: Union[int, float] = float("inf"), max_workers: Optional[int] = None
+    ):
         """Execute the given plan and return the output records and plan stats."""
         raise NotImplementedError("Abstract method to be overwritten by sub-classes")
-
 
     def execute(self, dataset: Set, policy: Policy):
         """

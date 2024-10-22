@@ -43,7 +43,6 @@ class FilterOp(PhysicalOperator):
 
 
 class NonLLMFilter(FilterOp):
-
     def __eq__(self, other: NonLLMFilter):
         return (
             isinstance(other, self.__class__)
@@ -104,7 +103,6 @@ class NonLLMFilter(FilterOp):
 
 
 class LLMFilter(FilterOp):
-
     def __init__(
         self,
         model: Model,
@@ -141,7 +139,7 @@ class LLMFilter(FilterOp):
             "model": self.model,
             "prompt_strategy": self.prompt_strategy,
             "image_filter": self.image_filter,
-            **copy_kwargs
+            **copy_kwargs,
         }
 
     def get_op_params(self):
@@ -164,7 +162,7 @@ class LLMFilter(FilterOp):
         # estimate number of input tokens from source
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
         if self.image_filter:
-            est_num_input_tokens = 765 / 10 # 1024x1024 image is 765 tokens
+            est_num_input_tokens = 765 / 10  # 1024x1024 image is 765 tokens
 
         # NOTE: in truth, the DSPy COT output often generates an entire reasoning sentence,
         #       thus the true value may be higher
@@ -174,8 +172,7 @@ class LLMFilter(FilterOp):
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
-            MODEL_CARDS[self.model.value]["seconds_per_output_token"]
-            * est_num_output_tokens
+            MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
         ) / self.max_workers
 
         # get est. of conversion cost (in USD) per record from model card
@@ -211,9 +208,7 @@ class LLMFilter(FilterOp):
             base64_images = []
             if hasattr(candidate, "contents"):
                 # TODO: should address this now; we need a way to infer (or have the programmer declare) what fields contain image content
-                base64_images = [
-                    base64.b64encode(candidate.contents).decode("utf-8")  
-                ]
+                base64_images = [base64.b64encode(candidate.contents).decode("utf-8")]
             else:
                 base64_images = [
                     base64.b64encode(image).decode("utf-8")
@@ -223,7 +218,7 @@ class LLMFilter(FilterOp):
         else:
             content = candidate._asJSONStr(include_bytes=False)
 
-        # construct the prompt; for image filters we need to wrap the filter condition in an instruction 
+        # construct the prompt; for image filters we need to wrap the filter condition in an instruction
         prompt = self.filter.filterCondition
         if self.image_filter:
             prompt = IMAGE_FILTER_PROMPT.format(filter_condition=self.filter.filterCondition)
@@ -236,11 +231,7 @@ class LLMFilter(FilterOp):
             print(f"Error invoking LLM for filter: {e}")
 
         # compute whether the record passed the filter or not
-        passed_filter = (
-            "true" in response.lower()
-            if response is not None
-            else False
-        )
+        passed_filter = "true" in response.lower() if response is not None else False
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(

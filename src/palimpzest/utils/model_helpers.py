@@ -37,6 +37,7 @@ def getModels(include_vision: Optional[bool] = False) -> List[Model]:
 
     return models
 
+
 def getChampionModel():
     champion_model = None
     if os.environ.get("OPENAI_API_KEY", None) is not None:
@@ -46,9 +47,12 @@ def getChampionModel():
     elif os.environ.get("GOOGLE_API_KEY", None) is not None:
         champion_model = Model.GEMINI_1
     else:
-        raise Exception("No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]")
+        raise Exception(
+            "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
+        )
 
     return champion_model
+
 
 def getConventionalFallbackModel():
     fallback_model = None
@@ -59,13 +63,17 @@ def getConventionalFallbackModel():
     elif os.environ.get("GOOGLE_API_KEY", None) is not None:
         fallback_model = Model.GEMINI_1
     else:
-        raise Exception("No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]")
+        raise Exception(
+            "No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]"
+        )
 
     return fallback_model
+
 
 def getCodeChampionModel():
     # NOTE: for now, assume same champion as getChampionModel()
     return getChampionModel()
+
 
 def getChampionModelName():
     return getChampionModel().value

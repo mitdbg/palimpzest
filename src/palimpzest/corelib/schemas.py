@@ -54,7 +54,8 @@ class SchemaMetaclass(type):
     def getDesc(cls) -> str:
         """Return a description of the schema"""
         fields = SchemaMetaclass.fieldNames(cls)
-        d = {k: hash(getattr(cls, k)) for k in fields}
+        # the | str is necessary for the __class__ assignment below
+        d: dict[str, int | str] = {k: hash(getattr(cls, k)) for k in fields}
 
         # TODO: this causes an exception why trying to use Schema in a type definition
         # e.g. TaskDescriptor = Tuple[str, Union[tuple, None], Schema, Schema]
@@ -116,7 +117,6 @@ class Schema(metaclass=SchemaMetaclass):
         self._desc = ""
         if desc is not None:
             self._desc = desc
-
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
 

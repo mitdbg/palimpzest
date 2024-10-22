@@ -15,6 +15,7 @@ class DataSourcePhysicalOp(PhysicalOperator):
     in order to accurately compute naive cost estimates. Thus, we use a slightly
     modified abstract base class for these operators.
     """
+
     def __init__(self, dataset_id: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dataset_id = dataset_id
@@ -45,13 +46,13 @@ class DataSourcePhysicalOp(PhysicalOperator):
         input_record_size_in_bytes: Union[int, float],
     ) -> OperatorCostEstimates:
         """
-        In addition to 
+        In addition to
         This function returns a naive estimate of this operator's:
         - cardinality
         - time_per_record
         - cost_per_record
         - quality
-    
+
         For the implemented operator. These will be used by the CostModel
         when PZ does not have sample execution data -- and it will be necessary
         in some cases even when sample execution data is present. (For example,
@@ -63,7 +64,6 @@ class DataSourcePhysicalOp(PhysicalOperator):
 
 
 class MarshalAndScanDataOp(DataSourcePhysicalOp):
-
     def naiveCostEstimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
@@ -123,10 +123,10 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
 
         return records, record_op_stats_lst
 
-class CacheScanDataOp(DataSourcePhysicalOp):
 
+class CacheScanDataOp(DataSourcePhysicalOp):
     def naiveCostEstimates(
-        self, 
+        self,
         source_op_cost_estimates: OperatorCostEstimates,
         input_cardinality: Union[int, float],
         input_record_size_in_bytes: Union[int, float],

@@ -9,11 +9,12 @@ class GenerationStats:
     """
     Dataclass for storing statistics about the execution of an operator on a single record.
     """
+
     model_name: Optional[str] = None
 
     # The raw answer as output from the generator (a list of strings, possibly of len 1)
     # raw_answers: Optional[List[str]] = field(default_factory=list)
-    
+
     # the total number of input tokens processed by this operator; None if this operation did not use an LLM
     total_input_tokens: int = 0.0
 
@@ -37,43 +38,83 @@ class GenerationStats:
 
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
         # self.raw_answers.extend(other.raw_answers)
-        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'cost_per_record', 'llm_call_duration_secs', 'fn_call_duration_secs']:
+        for field in [
+            "total_input_tokens",
+            "total_output_tokens",
+            "total_input_cost",
+            "total_output_cost",
+            "cost_per_record",
+            "llm_call_duration_secs",
+            "fn_call_duration_secs",
+        ]:
             setattr(self, field, getattr(self, field) + getattr(other, field))
         return self
 
     def __add__(self, other: GenerationStats) -> GenerationStats:
-        dct = {field: getattr(self, field) + getattr(other, field) for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'llm_call_duration_secs', 'fn_call_duration_secs', 'cost_per_record']}
+        dct = {
+            field: getattr(self, field) + getattr(other, field)
+            for field in [
+                "total_input_tokens",
+                "total_output_tokens",
+                "total_input_cost",
+                "total_output_cost",
+                "llm_call_duration_secs",
+                "fn_call_duration_secs",
+                "cost_per_record",
+            ]
+        }
         # dct['raw_answers'] = self.raw_answers + other.raw_answers
-        dct['model_name'] = self.model_name      
+        dct["model_name"] = self.model_name
         return GenerationStats(**dct)
-    
+
     # Do the same as iadd and add but with division operator
     def __itruediv__(self, quotient: float) -> GenerationStats:
         if quotient == 0:
             raise ZeroDivisionError("Cannot divide by zero")
         if isinstance(quotient, int):
             quotient = float(quotient)
-        for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'cost_per_record', 'llm_call_duration_secs', 'fn_call_duration_secs']:
+        for field in [
+            "total_input_tokens",
+            "total_output_tokens",
+            "total_input_cost",
+            "total_output_cost",
+            "cost_per_record",
+            "llm_call_duration_secs",
+            "fn_call_duration_secs",
+        ]:
             setattr(self, field, getattr(self, field) / quotient)
         return self
-    
+
     def __truediv__(self, quotient: float) -> GenerationStats:
         if quotient == 0:
             raise ZeroDivisionError("Cannot divide by zero")
         if isinstance(quotient, int):
             quotient = float(quotient)
-        dct = {field: getattr(self, field) / quotient for field in ['total_input_tokens', 'total_output_tokens', 'total_input_cost', 'total_output_cost', 'llm_call_duration_secs', 'fn_call_duration_secs', 'cost_per_record']}
-        dct['model_name'] = self.model_name      
+        dct = {
+            field: getattr(self, field) / quotient
+            for field in [
+                "total_input_tokens",
+                "total_output_tokens",
+                "total_input_cost",
+                "total_output_cost",
+                "llm_call_duration_secs",
+                "fn_call_duration_secs",
+                "cost_per_record",
+            ]
+        }
+        dct["model_name"] = self.model_name
         return GenerationStats(**dct)
 
     def __radd__(self, other: int) -> GenerationStats:
         return self
-    
+
+
 @dataclass
 class RecordOpStats:
     """
     Dataclass for storing statistics about the execution of an operator on a single record.
     """
+
     ##### REQUIRED FIELDS #####
     # record id; an identifier for this record
     record_id: str
@@ -147,10 +188,7 @@ class RecordOpStats:
     failed_convert: Optional[bool] = None
 
     def to_json(self):
-        return {
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-        }
+        return {field.name: getattr(self, field.name) for field in fields(self)}
 
 
 @dataclass
@@ -158,6 +196,7 @@ class OperatorStats:
     """
     Dataclass for storing statistics captured within a given operator.
     """
+
     # the ID of the physical operation in which these stats were collected
     op_id: str
 
@@ -177,11 +216,11 @@ class OperatorStats:
     op_details: Dict[str, Any] = field(default_factory=dict)
 
     def add_record_op_stats(
-            self,
-            record_op_stats_lst: Union[RecordOpStats, List[RecordOpStats]],
-            source_op_id: str,
-            plan_id: str,
-        ):
+        self,
+        record_op_stats_lst: Union[RecordOpStats, List[RecordOpStats]],
+        source_op_id: str,
+        plan_id: str,
+    ):
         # convert individual record into list
         if type(record_op_stats_lst) != type([]):
             record_op_stats_lst = [record_op_stats_lst]
@@ -206,10 +245,7 @@ class OperatorStats:
             "op_name": self.op_name,
             "total_op_time": self.total_op_time,
             "total_op_cost": self.total_op_cost,
-            "record_op_stats_lst": [
-                record_op_stats.to_json()
-                for record_op_stats in self.record_op_stats_lst
-            ],
+            "record_op_stats_lst": [record_op_stats.to_json() for record_op_stats in self.record_op_stats_lst],
             "op_details": self.op_details,
         }
 
@@ -219,6 +255,7 @@ class PlanStats:
     """
     Dataclass for storing statistics captured for an entire plan.
     """
+
     # id for identifying the physical plan
     plan_id: str
 
@@ -265,10 +302,7 @@ class PlanStats:
         return {
             "plan_id": self.plan_id,
             "plan_str": self.plan_str,
-            "operator_stats": {
-                op_id: op_stats.to_json()
-                for op_id, op_stats in self.operator_stats.items()
-            },
+            "operator_stats": {op_id: op_stats.to_json() for op_id, op_stats in self.operator_stats.items()},
             "total_plan_time": self.total_plan_time,
             "total_plan_cost": self.total_plan_cost,
         }
@@ -279,6 +313,7 @@ class ExecutionStats:
     """
     Dataclass for storing statistics captured for the entire execution of a workload.
     """
+
     # string for identifying this workload execution
     execution_id: str = None
 
@@ -297,10 +332,7 @@ class ExecutionStats:
     def to_json(self):
         return {
             "execution_id": self.execution_id,
-            "plan_stats": {
-                plan_id: plan_stats.to_json()
-                for plan_id, plan_stats in self.plan_stats.items()
-            },
+            "plan_stats": {plan_id: plan_stats.to_json() for plan_id, plan_stats in self.plan_stats.items()},
             "total_execution_time": self.total_execution_time,
             "total_execution_cost": self.total_execution_cost,
             "plan_strs": self.plan_strs,
@@ -312,6 +344,7 @@ class OperatorCostEstimates:
     """
     Dataclass for storing estimates of key metrics of interest for each operator.
     """
+
     # (estimated) number of records output by this operator
     cardinality: float
 
@@ -371,6 +404,7 @@ class PlanCost:
     """
     Dataclass for storing the (cost, time, quality) estimates of (sub)-plans and their upper and lower bounds.
     """
+
     # the expression cost
     cost: float
 
@@ -431,7 +465,7 @@ class PlanCost:
             if getattr(self, field) is not None and getattr(other, field) is not None:
                 product = getattr(self, field) * getattr(other, field)
                 setattr(self, field, product)
-        
+
         return self
 
     def __add__(self, other: PlanCost) -> PlanCost:
@@ -441,9 +475,16 @@ class PlanCost:
         """
         dct = {
             field: getattr(self, field) + getattr(other, field)
-            for field in ["cost", "cost_lower_bound", "cost_upper_bound", "time", "time_lower_bound", "time_upper_bound"]
+            for field in [
+                "cost",
+                "cost_lower_bound",
+                "cost_upper_bound",
+                "time",
+                "time_lower_bound",
+                "time_upper_bound",
+            ]
         }
         for field in ["quality", "quality_lower_bound", "quality_upper_bound"]:
             dct[field] = getattr(self, field) * getattr(other, field)
-        
+
         return PlanCost(**dct)

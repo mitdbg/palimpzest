@@ -38,7 +38,7 @@ class SentinelExecutionEngine(ExecutionEngine):
         #       the sentinels even if the computation is partially cached
         # only run sentinels if there isn't a cached result already
         uid = dataset.universalIdentifier()
-        run_sentinels = self.nocache or not self.datadir.hasCachedAnswer(uid)    
+        run_sentinels = self.nocache or not self.datadir.hasCachedAnswer(uid)
         if run_sentinels:
             # construct the CostModel
             cost_model = CostModel(source_dataset_id=self.source_dataset_id)
@@ -56,7 +56,7 @@ class SentinelExecutionEngine(ExecutionEngine):
                 allow_token_reduction=False,
                 optimization_strategy=OptimizationStrategy.SENTINEL,
             )
- 
+
             # use optimizer to generate sentinel plans
             sentinel_plans = optimizer.optimize(dataset)
 
@@ -103,7 +103,9 @@ class SentinelExecutionEngine(ExecutionEngine):
             execution_id=self.execution_id(),
             plan_stats=aggregate_plan_stats,
             total_execution_time=time.time() - execution_start_time,
-            total_execution_cost=sum(list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats.values()))),
+            total_execution_cost=sum(
+                list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats.values()))
+            ),
             plan_strs={plan_stats.plan_id: plan_stats.plan_str for plan_stats in aggregate_plan_stats.items()},
         )
 
@@ -114,6 +116,7 @@ class SequentialSingleThreadSentinelExecution(SentinelExecutionEngine, Sequentia
     """
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
     """
+
     pass
 
 
@@ -121,6 +124,7 @@ class PipelinedSingleThreadSentinelExecution(SentinelExecutionEngine, PipelinedS
     """
     This class performs sentinel execution while executing plans in a pipelined, single-threaded fashion.
     """
+
     pass
 
 
@@ -128,4 +132,5 @@ class PipelinedParallelSentinelExecution(SentinelExecutionEngine, PipelinedParal
     """
     This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
     """
+
     pass

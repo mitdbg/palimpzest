@@ -13,14 +13,15 @@ class Expression:
     (if it's a logical expression) or a physical operator (if it's a physical expression)
     and the group ids which are inputs to this expression
     """
+
     def __init__(
-            self,
-            operator: Union[LogicalOperator, PhysicalOperator],
-            input_group_ids: List[int],
-            input_fields: Set[str],
-            generated_fields: Set[str],
-            group_id: Optional[int] = None,
-        ):
+        self,
+        operator: Union[LogicalOperator, PhysicalOperator],
+        input_group_ids: List[int],
+        input_fields: Set[str],
+        generated_fields: Set[str],
+        group_id: Optional[int] = None,
+    ):
         self.operator = operator
         self.input_group_ids = input_group_ids
         self.input_fields = input_fields
@@ -61,6 +62,7 @@ class Group:
     Represents the execution of an un-ordered set of logical operators.
     Maintains a set of logical multi-expressions and physical multi-expressions.
     """
+
     def __init__(self, logical_expressions: List[Expression], fields: Set[str], properties: Dict[str, Set[str]]):
         self.logical_expressions = set(logical_expressions)
         self.physical_expressions = set()

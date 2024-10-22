@@ -103,6 +103,7 @@ def ls_data() -> None:
     """
     # fetch list of registered datasets
     import palimpzest as pz
+
     ds = pz.DataDirectory().listRegisteredDatasets()
 
     # construct table for printing
@@ -124,7 +125,7 @@ def ls_data() -> None:
 def synthesize_data(name: str, count: int) -> None:
     """
     Register a synthetic set of values with PZ
-    
+
     Parameters
     ----------
     name: str
@@ -134,13 +135,14 @@ def synthesize_data(name: str, count: int) -> None:
         The nunber of values to synthesize
     """
     import palimpzest as pz
+
     name = name.strip()
-    
+
     vals = []
     for i in range(0, count):
         vals.append(i)
     pz.DataDirectory().registerDataset(vals, name)
-    
+
     _print_msg(f"Registered {name}")
 
 
@@ -160,21 +162,20 @@ def register_data(path: str, name: str) -> None:
         Name to register the data file / directory with.
     """
     import palimpzest as pz
+
     # parse path and name
     path = path.strip()
     name = name.strip()
 
     # register dataset
-    if os.path.isfile(path):     
+    if os.path.isfile(path):
         pz.DataDirectory().registerLocalFile(os.path.abspath(path), name)
 
     elif os.path.isdir(path):
         pz.DataDirectory().registerLocalDirectory(os.path.abspath(path), name)
 
     else:
-        raise InvalidCommandException(
-            f"Path {path} is invalid. Does not point to a file or directory."
-        )
+        raise InvalidCommandException(f"Path {path} is invalid. Does not point to a file or directory.")
 
     _print_msg(f"Registered {name}")
 
@@ -191,6 +192,7 @@ def rm_data(name: str) -> None:
         Name of the dataset to unregister.
     """
     import palimpzest as pz
+
     # parse name
     name = name.strip()
 
@@ -206,6 +208,7 @@ def clear_cache() -> None:
     Clear the Palimpzest cache.
     """
     import palimpzest as pz
+
     pz.DataDirectory().clearCache(keep_registry=True)
     _print_msg("Cache cleared")
 
@@ -216,6 +219,7 @@ def print_config() -> None:
     Print the current config that Palimpzest is using.
     """
     import palimpzest as pz
+
     # load config yaml file
     config = pz.DataDirectory().getConfig()
 
@@ -225,7 +229,12 @@ def print_config() -> None:
 
 @cli.command(aliases=["cc"])
 @click.option("--name", type=str, default=None, required=True, help="Name of the config to create.")
-@click.option("--llmservice", type=click.Choice(['openai', 'together', 'google'], case_sensitive=False), default="openai", help="Name of the LLM service to use.")
+@click.option(
+    "--llmservice",
+    type=click.Choice(["openai", "together", "google"], case_sensitive=False),
+    default="openai",
+    help="Name of the LLM service to use.",
+)
 @click.option("--parallel", type=bool, default=False, help="Whether to run operations in parallel or not.")
 @click.option("--set", type=bool, is_flag=True, help="Set the created config to be the current config.")
 def create_config(name: str, llmservice: str, parallel: bool, set: bool) -> None:
@@ -258,7 +267,7 @@ def create_config(name: str, llmservice: str, parallel: bool, set: bool) -> None
     # set newly created config to be the current config if specified
     if set:
         config.set_current_config()
-    
+
     _print_msg(f"Created config: {name}" if set is False else f"Created and set config: {name}")
 
 

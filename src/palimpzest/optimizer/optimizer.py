@@ -32,6 +32,7 @@ from palimpzest.utils import getChampionModel, getCodeChampionModel, getConventi
 #       revisit the naming of Dataset.
 QueryPlan = Dataset
 
+
 class Optimizer:
     """
     The optimizer is responsible for searching the space of possible physical plans
@@ -54,23 +55,23 @@ class Optimizer:
       but we should quickly move to standardizing field names to be "[{source_name}.]{schema_name}.{field_name}"
       - this^ would relax our assumption to be that fields are unique for a given (source, schema), which
         I believe is very reasonable
-    
+
     """
 
     def __init__(
-            self,
-            policy: Policy,
-            cost_model: CostModel,
-            no_cache: bool=False,
-            verbose: bool=False,
-            available_models: List[Model]=[],
-            allow_bonded_query: bool=True,
-            allow_conventional_query: bool=False,
-            allow_code_synth: bool=True,
-            allow_token_reduction: bool=True,
-            optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
-            sentinel_low_rank: Optional[int]=None,
-        ):
+        self,
+        policy: Policy,
+        cost_model: CostModel,
+        no_cache: bool = False,
+        verbose: bool = False,
+        available_models: List[Model] = [],
+        allow_bonded_query: bool = True,
+        allow_conventional_query: bool = False,
+        allow_code_synth: bool = True,
+        allow_token_reduction: bool = True,
+        optimization_strategy: OptimizationStrategy = OptimizationStrategy.OPTIMAL,
+        sentinel_low_rank: Optional[int] = None,
+    ):
         # store the policy
         self.policy = policy
 
@@ -104,26 +105,26 @@ class Optimizer:
         # prune implementation rules based on boolean flags
         if not self.allow_bonded_query:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules
+                rule
+                for rule in self.implementation_rules
                 if rule not in [LLMConvertBondedRule, TokenReducedConvertBondedRule]
             ]
 
         if not self.allow_conventional_query:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules
+                rule
+                for rule in self.implementation_rules
                 if rule not in [LLMConvertConventionalRule, TokenReducedConvertConventionalRule]
             ]
 
         if not self.allow_code_synth:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules
-                if not issubclass(rule, CodeSynthesisConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, CodeSynthesisConvertRule)
             ]
 
         if not self.allow_token_reduction:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules
-                if not issubclass(rule, TokenReducedConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, TokenReducedConvertRule)
             ]
 
     def update_cost_model(self, cost_model: CostModel):
@@ -204,17 +205,18 @@ class Optimizer:
 
         # compute the input group ids and fields for this node
         input_group_ids, input_group_fields, input_group_properties = (
-            self.construct_group_tree(dataset_nodes[:-1])
-            if len(dataset_nodes) > 1
-            else ([], set(), {})
+            self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], set(), {})
         )
 
         # compute the fields added by this operation and all fields
         input_group_short_fields = list(map(lambda full_field: full_field.split(".")[-1], input_group_fields))
-        new_fields = set([
-            field for field in op.outputSchema.fieldNames(unique=True, id=uid)
-            if (field.split(".")[-1] not in input_group_short_fields) or (node._udf is not None)
-        ])
+        new_fields = set(
+            [
+                field
+                for field in op.outputSchema.fieldNames(unique=True, id=uid)
+                if (field.split(".")[-1] not in input_group_short_fields) or (node._udf is not None)
+            ]
+        )
         all_fields = new_fields.union(input_group_fields)
 
         # compute all properties including this operations'
@@ -256,11 +258,10 @@ class Optimizer:
 
         return [group.group_id], all_fields, all_properties
 
-
     def convert_query_plan_to_group_tree(self, query_plan: QueryPlan) -> str:
         # Obtain ordered list of datasets
         dataset_nodes = []
-        node = query_plan # TODO: copy
+        node = query_plan  # TODO: copy
 
         while isinstance(node, Dataset):
             dataset_nodes.append(node)
@@ -320,7 +321,7 @@ class Optimizer:
         """
         pass
 
-    def search_optimization_space(self, group_id: int, include_transformations: bool=True) -> None:
+    def search_optimization_space(self, group_id: int, include_transformations: bool = True) -> None:
         # begin the search for an optimal plan with a task to optimize the final group
         initial_task = OptimizeGroup(group_id)
         self.tasks_stack.append(initial_task)
@@ -346,7 +347,6 @@ class Optimizer:
 
             self.tasks_stack.extend(new_tasks)
 
-
     def get_sentinel_plan(self, group_id: int) -> SentinelPlan:
         """
         Create and return a SentinelPlan object.
@@ -371,7 +371,6 @@ class Optimizer:
         # add this operator set to best physical plan and return
         return SentinelPlan.fromOpsAndSubPlan([phys_op_set], best_phys_subplan)
 
-
     def get_optimal_physical_plan(self, group_id: int) -> PhysicalPlan:
         """
         Return the best plan with respect to the user provided policy.
@@ -389,11 +388,12 @@ class Optimizer:
         best_phys_subplan = PhysicalPlan(operators=[])
         for input_group_id in best_phys_expr.input_group_ids:
             input_best_phys_plan = self.get_optimal_physical_plan(input_group_id)
-            best_phys_subplan = PhysicalPlan.fromOpsAndSubPlan(best_phys_subplan.operators, best_phys_subplan.plan_cost, input_best_phys_plan)
+            best_phys_subplan = PhysicalPlan.fromOpsAndSubPlan(
+                best_phys_subplan.operators, best_phys_subplan.plan_cost, input_best_phys_plan
+            )
 
         # add this operator to best physical plan and return
         return PhysicalPlan.fromOpsAndSubPlan([best_phys_expr.operator], best_phys_expr.plan_cost, best_phys_subplan)
-
 
     def get_confidence_interval_optimal_plans(self, group_id: int) -> List[PhysicalPlan]:
         """
@@ -435,7 +435,6 @@ class Optimizer:
                     best_plans.append(plan)
 
         return best_plans
-
 
     def optimize(self, query_plan: QueryPlan) -> List[PhysicalPlan]:
         """

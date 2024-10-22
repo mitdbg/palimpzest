@@ -23,14 +23,14 @@ CodeEnsemble = Dict[CodeName, Code]
 
 
 class CodeSynthesisConvert(LLMConvert):
-
     def __init__(
         self,
         exemplar_generation_model: Model = Model.GPT_4,
         code_synth_model: Model = Model.GPT_4,
         conventional_fallback_model: Model = Model.GPT_3_5,
         cache_across_plans: bool = True,
-        *args, **kwargs
+        *args,
+        **kwargs,
     ):
         kwargs["model"] = None
         super().__init__(*args, **kwargs)
@@ -84,7 +84,7 @@ class CodeSynthesisConvert(LLMConvert):
             "code_synth_model": self.code_synth_model,
             "conventional_fallback_model": self.conventional_fallback_model,
             "cache_across_plans": self.cache_across_plans,
-            **copy_kwargs
+            **copy_kwargs,
         }
 
     def get_op_params(self):
@@ -114,7 +114,7 @@ class CodeSynthesisConvert(LLMConvert):
         """
         naive_op_cost_estimates = super().naiveCostEstimates(source_op_cost_estimates)
         naive_op_cost_estimates.time_per_record = 1e-5
-        naive_op_cost_estimates.cost_per_record = 1e-4 # amortize code synth cost across records
+        naive_op_cost_estimates.cost_per_record = 1e-4  # amortize code synth cost across records
         naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * (GPT_4_MODEL_CARD["code"] / 100.0)
 
         return naive_op_cost_estimates
@@ -136,31 +136,27 @@ class CodeSynthesisConvert(LLMConvert):
         else:
             return {}
 
-    def _shouldSynthesize(self, 
-                        exemplars: List[Exemplar],
-                        num_exemplars: int=1,
-                        code_regenerate_frequency: int=200,
-                          *args, **kwargs) -> bool:
-        """ This function determines whether code synthesis should be performed based on the strategy and the number of exemplars available. """
+    def _shouldSynthesize(
+        self, exemplars: List[Exemplar], num_exemplars: int = 1, code_regenerate_frequency: int = 200, *args, **kwargs
+    ) -> bool:
+        """This function determines whether code synthesis should be performed based on the strategy and the number of exemplars available."""
         raise NotImplementedError("This method should be implemented in a subclass")
 
     def _synthesize_field_code(
         self,
         api: API,
         output_field_name: str,
-        code_ensemble_num: int=1,       # if strategy != SINGLE
-        num_exemplars: int=1,           # if strategy != EXAMPLE_ENSEMBLE
+        code_ensemble_num: int = 1,  # if strategy != SINGLE
+        num_exemplars: int = 1,  # if strategy != EXAMPLE_ENSEMBLE
     ) -> Tuple[Dict[CodeName, Code], GenerationStats]:
-        """ This method is responsible for synthesizing the code on a per-field basis. 
+        """This method is responsible for synthesizing the code on a per-field basis.
         Wrapping different calls to the LLM and returning a set of per-field query statistics.
         The format of the code ensemble dictionary is {code_name: code} where code_name is a string and code is a string representing the code.
         """
         raise NotImplementedError("This method should be implemented in a subclass")
 
-    def synthesize_code_ensemble(self, 
-                                 fields_to_generate,
-                                 candidate_dict: DataRecordDict, *args, **kwargs):
-        """ This function is a wrapper around specific code synthesis methods 
+    def synthesize_code_ensemble(self, fields_to_generate, candidate_dict: DataRecordDict, *args, **kwargs):
+        """This function is a wrapper around specific code synthesis methods
         that wraps the synthesized code per-field in a dictionary and returns the stats object.
         """
         # synthesize the per-field code ensembles
@@ -171,7 +167,7 @@ class CodeSynthesisConvert(LLMConvert):
                 inputSchema=self.inputSchema,
                 outputSchema=self.outputSchema,
                 field_name=field_name,
-                input_fields=candidate_dict.keys()
+                input_fields=candidate_dict.keys(),
             )
 
             # TODO here _synthesize_code should be called with the right parameters per-code-strategy?!
@@ -220,9 +216,7 @@ class CodeSynthesisConvert(LLMConvert):
 
         # create data records and record op stats
         drs = [
-            self._create_data_record_from_json(
-                jsonObj=js, candidate=candidate, cardinality_idx=idx
-            )
+            self._create_data_record_from_json(jsonObj=js, candidate=candidate, cardinality_idx=idx)
             for idx, js in enumerate(records_json)
         ]
 
@@ -238,7 +232,7 @@ class CodeSynthesisConvert(LLMConvert):
         # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
         #       keep an eye out for a regression in code synth performance and revert if necessary
         # update operator's set of exemplars
-        
+
         exemplars = [(candidate_dict, dr._asDict(include_bytes=False)) for dr in drs]
         self.exemplars.extend(exemplars)
 
@@ -264,8 +258,8 @@ class CodeSynthesisConvert(LLMConvert):
         # Check if code was already synthesized, or if we have at least one converted sample
         generation_stats = GenerationStats()
         if self._shouldSynthesize():
-            self.field_to_code_ensemble, total_code_synth_stats = (
-                self.synthesize_code_ensemble(fields_to_generate, candidate_dict)
+            self.field_to_code_ensemble, total_code_synth_stats = self.synthesize_code_ensemble(
+                fields_to_generate, candidate_dict
             )
             self.code_synthesized = True
             generation_stats += total_code_synth_stats
@@ -287,7 +281,7 @@ class CodeSynthesisConvert(LLMConvert):
                 inputSchema=self.inputSchema,
                 outputSchema=self.outputSchema,
                 field_name=field_name,
-                input_fields=candidate_dict.keys()
+                input_fields=candidate_dict.keys(),
             )
             code_ensemble = self.field_to_code_ensemble[field_name]
             answer, exec_stats = generators.codeEnsembleExecution(api, code_ensemble, candidate_dict)
@@ -320,11 +314,7 @@ class CodeSynthesisConvert(LLMConvert):
                 # update field_outputs
                 field_outputs[field_name] = json_answers[field_name][0]
 
-        drs = [
-            self._create_data_record_from_json(
-                jsonObj=field_outputs, candidate=candidate, cardinality_idx=0
-            )
-        ]
+        drs = [self._create_data_record_from_json(jsonObj=field_outputs, candidate=candidate, cardinality_idx=0)]
 
         # compute the record_op_stats for each data record and return
         record_op_stats_lst = self._create_record_op_stats_lst(
@@ -339,40 +329,52 @@ class CodeSynthesisConvert(LLMConvert):
 
 
 class CodeSynthesisConvertNone(CodeSynthesisConvert):
-
     def _shouldSynthesize(self, *args, **kwargs):
         return False
 
-    def _synthesize_field_code(self, api:API, *args, **kwargs):
+    def _synthesize_field_code(self, api: API, *args, **kwargs):
         code = api.api_def() + "  return None\n"
         code_ensemble = {"{api.name}_v0": code}
         return code_ensemble, GenerationStats()
 
 
 class CodeSynthesisConvertSingle(CodeSynthesisConvert):
-
-    def _shouldSynthesize(self, num_exemplars: int=1, *args, **kwargs) -> bool:
-        """ This function determines whether code synthesis 
-        should be performed based on the strategy and the number of exemplars available. """
+    def _shouldSynthesize(self, num_exemplars: int = 1, *args, **kwargs) -> bool:
+        """This function determines whether code synthesis
+        should be performed based on the strategy and the number of exemplars available."""
         if len(self.exemplars) < num_exemplars:
             return False
         return not self.code_synthesized
 
-    def _code_synth_single(self, api: API, output_field_name: str, exemplars: List[Exemplar]=list(), advice: str=None, language='Python'):
+    def _code_synth_single(
+        self,
+        api: API,
+        output_field_name: str,
+        exemplars: List[Exemplar] = list(),
+        advice: str = None,
+        language="Python",
+    ):
         context = {
-            'language': language,
-            'api': api.args_call(),
-            'output': api.output,
-            'inputs_desc': "\n".join([f"- {field_name} ({api.input_descs[i]})" for i, field_name in enumerate(api.inputs)]),
-            'output_desc': api.output_desc,
-            'examples_desc': "\n".join([
-                EXAMPLE_PROMPT.format(
-                    idx = f" {i}",
-                    example_inputs = "\n".join([f"- {field_name} = {repr(example[0][field_name])}" for field_name in api.inputs]),
-                    example_output = f"{example[1][output_field_name]}"
-                ) for i, example in enumerate(exemplars)
-            ]),
-            'advice': f"Hint: {advice}" if advice else "",
+            "language": language,
+            "api": api.args_call(),
+            "output": api.output,
+            "inputs_desc": "\n".join(
+                [f"- {field_name} ({api.input_descs[i]})" for i, field_name in enumerate(api.inputs)]
+            ),
+            "output_desc": api.output_desc,
+            "examples_desc": "\n".join(
+                [
+                    EXAMPLE_PROMPT.format(
+                        idx=f" {i}",
+                        example_inputs="\n".join(
+                            [f"- {field_name} = {repr(example[0][field_name])}" for field_name in api.inputs]
+                        ),
+                        example_output=f"{example[1][output_field_name]}",
+                    )
+                    for i, example in enumerate(exemplars)
+                ]
+            ),
+            "advice": f"Hint: {advice}" if advice else "",
         }
         prompt = CODEGEN_PROMPT.format(**context)
         if self.verbose:
@@ -381,15 +383,11 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
             print(f"{prompt}")
         # invoke the champion model to generate the code
         pred, stats = self.code_champion_generator.generate(prompt=prompt)
-        ordered_keys = [
-            f'```{language}',
-            f'```{language.lower()}',
-            '```'
-        ]
+        ordered_keys = [f"```{language}", f"```{language.lower()}", "```"]
         code = None
         for key in ordered_keys:
             if key in pred:
-                code = pred.split(key)[1].split('```')[0].strip()
+                code = pred.split(key)[1].split("```")[0].strip()
                 break
 
         if self.verbose:
@@ -400,23 +398,22 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
 
         return code, stats
 
-    def _synthesize_field_code(self, api:API, output_field_name:str, num_exemplars:int=1, *args, **kwargs):
-        code, generation_stats = self._code_synth_single(api, output_field_name, exemplars=self.exemplars[:num_exemplars])
-        code_ensemble = {f"{api.name}_v0" : code}
+    def _synthesize_field_code(self, api: API, output_field_name: str, num_exemplars: int = 1, *args, **kwargs):
+        code, generation_stats = self._code_synth_single(
+            api, output_field_name, exemplars=self.exemplars[:num_exemplars]
+        )
+        code_ensemble = {f"{api.name}_v0": code}
         return code_ensemble, generation_stats
 
 
 # NOTE A nicer truly class based approach would re-implement the code_synth_single method with calls to __super__ and then only re-implement the differences instead of having the code in the superclass know about the subclass-specific parameters (i.e., advice).
 class CodeSynthesisConvertExampleEnsemble(CodeSynthesisConvert):
-
-    def _shouldSynthesize(self, num_exemplars: int=1, *args, **kwargs) -> bool:
+    def _shouldSynthesize(self, num_exemplars: int = 1, *args, **kwargs) -> bool:
         if len(self.exemplars) < num_exemplars:
             return False
         return not self.code_synthesized
 
-    def _synthesize_field_code(self, api:API, 
-                         output_field_name:str, 
-                         code_ensemble_num:int=1, *args, **kwargs):
+    def _synthesize_field_code(self, api: API, output_field_name: str, code_ensemble_num: int = 1, *args, **kwargs):
         # creates an ensemble of `code_ensemble_num` synthesized functions; each of
         # which uses a different exemplar (modulo the # of exemplars) for its synthesis
         code_ensemble = {}
@@ -432,71 +429,81 @@ class CodeSynthesisConvertExampleEnsemble(CodeSynthesisConvert):
 
 
 class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvert):
-
     def _shouldSynthesize(self, *args, **kwargs):
         return False
 
-    def _parse_multiple_outputs(self, text, outputs=['Thought', 'Action']):
+    def _parse_multiple_outputs(self, text, outputs=["Thought", "Action"]):
         data = {}
         for key in reversed(outputs):
-            if key+':' in text:
-                remain, value = text.rsplit(key+':', 1)
+            if key + ":" in text:
+                remain, value = text.rsplit(key + ":", 1)
                 data[key.lower()] = value.strip()
                 text = remain
             else:
                 data[key.lower()] = None
         return data
 
-    def _synthesize_advice(self, 
-                           api: API, 
-                           output_field_name: str, 
-                           exemplars: List[Exemplar]=list(), language='Python', 
-                           n_advices=4,
-                           limit:int=3):
+    def _synthesize_advice(
+        self,
+        api: API,
+        output_field_name: str,
+        exemplars: List[Exemplar] = list(),
+        language="Python",
+        n_advices=4,
+        limit: int = 3,
+    ):
         context = {
-            'language': language,
-            'api': api.args_call(),
-            'output': api.output,
-            'inputs_desc': "\n".join([f"- {field_name} ({api.input_descs[i]})" for i, field_name in enumerate(api.inputs)]),
-            'output_desc': api.output_desc,
-            'examples_desc': "\n".join([
-                EXAMPLE_PROMPT.format(
-                    idx = f" {i}",
-                    example_inputs = "\n".join([f"- {field_name} = {repr(example[0][field_name])}" for field_name in api.inputs]),
-                    example_output = f"{example[1][output_field_name]}"
-                ) for i, example in enumerate(exemplars)
-            ]),
-            'n': n_advices,
+            "language": language,
+            "api": api.args_call(),
+            "output": api.output,
+            "inputs_desc": "\n".join(
+                [f"- {field_name} ({api.input_descs[i]})" for i, field_name in enumerate(api.inputs)]
+            ),
+            "output_desc": api.output_desc,
+            "examples_desc": "\n".join(
+                [
+                    EXAMPLE_PROMPT.format(
+                        idx=f" {i}",
+                        example_inputs="\n".join(
+                            [f"- {field_name} = {repr(example[0][field_name])}" for field_name in api.inputs]
+                        ),
+                        example_output=f"{example[1][output_field_name]}",
+                    )
+                    for i, example in enumerate(exemplars)
+                ]
+            ),
+            "n": n_advices,
         }
         prompt = ADVICEGEN_PROMPT.format(**context)
         pred, stats = self.champion_llm.generate(prompt=prompt)
-        advs = self._parse_multiple_outputs(pred, outputs=[f'Idea {i}' for i in range(1, limit+1)])
+        advs = self._parse_multiple_outputs(pred, outputs=[f"Idea {i}" for i in range(1, limit + 1)])
 
         return advs, stats
 
-    def _synthesize_field_code(self, 
-                         api:API, 
-                         output_field_name:str, 
-                         code_ensemble_num:int=1,
-                         num_exemplars: int = 1,
-                         *args, **kwargs):
+    def _synthesize_field_code(
+        self, api: API, output_field_name: str, code_ensemble_num: int = 1, num_exemplars: int = 1, *args, **kwargs
+    ):
         # a more advanced approach in which advice is first solicited, and then
         # provided as context when synthesizing the code ensemble
         output_stats = {}
         # solicit advice
-        advices, adv_stats = self._synthesize_advice(api, output_field_name, exemplars=self.exemplars[:num_exemplars], n_advices=code_ensemble_num)
-        for key,value in adv_stats.items():
+        advices, adv_stats = self._synthesize_advice(
+            api, output_field_name, exemplars=self.exemplars[:num_exemplars], n_advices=code_ensemble_num
+        )
+        for key, value in adv_stats.items():
             if type(value) == type(dict()):
                 for k2, v2 in value.items():
-                    output_stats[k2] = output_stats.get(k2,0) + v2
+                    output_stats[k2] = output_stats.get(k2, 0) + v2
             else:
-                output_stats[key] += output_stats.get(key,type(value)()) + value
+                output_stats[key] += output_stats.get(key, type(value)()) + value
 
         code_ensemble = {}
         # synthesize code ensemble
         for i, adv in enumerate(advices):
             code_name = f"{api.name}_v{i}"
-            code, stats = self._code_synth_single(api, output_field_name, exemplars=self.exemplars[:num_exemplars], advice=adv)
+            code, stats = self._code_synth_single(
+                api, output_field_name, exemplars=self.exemplars[:num_exemplars], advice=adv
+            )
             code_ensemble[code_name] = code
             for key in output_stats.keys():
                 output_stats[key] += stats[key]
@@ -504,10 +511,11 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvert):
 
 
 class CodeSynthesisConvertAdviceEnsembleValidation(CodeSynthesisConvert):
-
-    def _shouldSynthesize(self, code_regenerate_frequency:int = 200, *args, **kwargs):
+    def _shouldSynthesize(self, code_regenerate_frequency: int = 200, *args, **kwargs):
         return len(self.exemplars) % code_regenerate_frequency == 0
 
-    def _synthesize_field_code(self, api:API, output_field_name:str, exemplars:List[Exemplar]=list(), *args, **kwargs):
-        # TODO this was not implemented ? 
+    def _synthesize_field_code(
+        self, api: API, output_field_name: str, exemplars: List[Exemplar] = list(), *args, **kwargs
+    ):
+        # TODO this was not implemented ?
         raise Exception("not implemented yet")
