@@ -5,10 +5,15 @@ python src/cli/cli_main.py reg --path testdata/biofabric-urls/ --name biofabric-
 
 """
 import argparse
+import os
 import time
 
 import palimpzest as pz
 from palimpzest.utils import udfs
+
+if not os.environ.get('OPENAI_API_KEY'):
+    from palimpzest.utils import load_env
+    load_env()
 
 
 class ScientificPaper(pz.PDFFile):
