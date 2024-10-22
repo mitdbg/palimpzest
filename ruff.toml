@@ -6,4 +6,4 @@ indent-width = 4
 extend-select = ["I", "B"]
 fixable = ["ALL"]
 unfixable = []
-ignore = ["E712"]
+ignore = []
