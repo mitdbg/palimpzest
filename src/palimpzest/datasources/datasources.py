@@ -221,7 +221,7 @@ class HTMLFileDirectorySource(DirectorySource):
 
 class ImageFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
-        super().__init__(path=path, dataset_id=dataset_id, schema=ImageFile())
+        super().__init__(path=path, dataset_id=dataset_id, schema=ImageFile)
         assert all([filename.endswith(tuple(constants.IMAGE_EXTENSIONS)) for filename in self.filepaths])
 
     def getItem(self, idx: int):
