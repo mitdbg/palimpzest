@@ -11,7 +11,7 @@ from typing import Any, Dict
 class Filter:
     """A filter that can be applied to a Set"""
 
-    def __init__(self, filterCondition: str | None = None, filterFn: callable = None) -> None:
+    def __init__(self, filterCondition: str | None = None, filterFn: callable | None = None) -> None:
         self.filterCondition = filterCondition
         self.filterFn = filterFn
 

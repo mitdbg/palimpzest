@@ -18,10 +18,10 @@ from palimpzest.operators.datasource import MarshalAndScanDataOp
 
 
 @pytest.mark.parametrize("convert_op", [LLMConvertBonded, LLMConvertConventional])
-def test_convert(convert_op, email_schema):
+def test_convert(convert_op, email_schema, enron_eval_tiny):
     """Test whether convert operators"""
     model = pz.Model.GPT_4
-    scanOp = MarshalAndScanDataOp(outputSchema=pz.TextFile, dataset_id="enron-eval-tiny")
+    scanOp = MarshalAndScanDataOp(outputSchema=pz.TextFile, dataset_id=enron_eval_tiny)
     convertOp = convert_op(
         inputSchema=pz.File,
         outputSchema=email_schema,
@@ -29,7 +29,7 @@ def test_convert(convert_op, email_schema):
         prompt_strategy=PromptStrategy.DSPY_COT_QA,
     )
  
-    datasource = DataDirectory().getRegisteredDataset("enron-eval-tiny")
+    datasource = DataDirectory().getRegisteredDataset(enron_eval_tiny)
     candidate = DataRecord(schema=pz.File, parent_id=None, scan_idx=0)
     candidate.idx = 0
     candidate.get_item_fn = datasource.getItem
