@@ -117,6 +117,7 @@ class Schema(metaclass=SchemaMetaclass):
         self._desc = ""
         if desc is not None:
             self._desc = desc
+
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
 
