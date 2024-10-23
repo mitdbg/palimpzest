@@ -22,5 +22,4 @@ __all__ = [
     "TextFileDirectorySource",
     "UserSource",
     "XLSFileDirectorySource",
-    "UserSource",
 ]

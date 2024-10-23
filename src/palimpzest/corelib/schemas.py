@@ -136,11 +136,10 @@ class Schema(metaclass=SchemaMetaclass):
         return cls.__name__
 
 
-#####################################################
-# A Schema that can be one of multiple other kinds of Schemas.
-# For example, I might want to process Any([PDF, WordDoc, TextFile])
-#####################################################
-
+###################################################################################
+# "Core" useful Schemas. These are Schemas that almost everyone will need.
+# File, TextFile, Image, PDF, etc.
+###################################################################################
 
 # First-level Schema's
 class Any(Schema):
@@ -193,10 +192,6 @@ class RawJSONObject(Schema):
     json = StringField(desc="String representation of a JSON object", required=True)
 
 
-###################################################################################
-# "Core" useful Schemas. These are Schemas that almost everyone will need.
-# File, TextFile, Image, PDF, etc.
-###################################################################################
 class SourceRecord(Schema):
     """
     Schema used inside of Execution.execute_dag to produce a candidate for operators

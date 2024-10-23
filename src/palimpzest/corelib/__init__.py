@@ -1,4 +1,4 @@
-from .fields import BooleanField, BytesField, CallableField, ListField, NumericField, StringField
+from .fields import BooleanField, BytesField, CallableField, Field, ListField, NumericField, StringField
 from .schemas import (
     URL,
     Any,
@@ -24,11 +24,11 @@ __all__ = [
     "BooleanField",
     "BytesField",
     "CallableField",
+    "Field",
     "ListField",
     "NumericField",
     "StringField",
     # alphabetically ordered schema exports
-    "URL",
     "Any",
     "Download",
     "EquationImage",
@@ -43,6 +43,7 @@ __all__ = [
     "SourceRecord",
     "Table",
     "TextFile",
+    "URL",
     "WebPage",
     "XLSFile",
 ]
