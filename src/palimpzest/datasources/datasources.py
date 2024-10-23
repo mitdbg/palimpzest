@@ -120,7 +120,7 @@ class MemorySource(DataSource):
 
     def getItem(self, idx: int):
         value = self.vals[idx]
-        dr = DataRecord(self._schema, scan_idx=idx)
+        dr = DataRecord(self.schema, scan_idx=idx)
         dr.value = value
 
         return dr
