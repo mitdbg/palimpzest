@@ -12,7 +12,7 @@ from palimpzest.elements import *
 class LogicalOperator:
     """
     A logical operator is an operator that operates on Sets.
-    
+
     Right now it can be one of:
     - BaseScan (scans data from DataSource)
     - CacheScan (scans cached Set)
@@ -34,7 +34,7 @@ class LogicalOperator:
         self.inputSchema = inputSchema
         self.outputSchema = outputSchema
         self.op_id = None
-    
+
     def __str__(self) -> str:
         raise NotImplementedError("Abstract method")
 
@@ -52,7 +52,7 @@ class LogicalOperator:
         """
         Returns a dictionary mapping logical operator parameters which may be used to
         implement a physical operator associated with this logical operation.
-        
+
         This method is also used to obtain the op_id for the logical operator.
         """
         raise NotImplementedError("Calling get_op_params on abstract method")
@@ -63,7 +63,7 @@ class LogicalOperator:
               returned by self.get_op_params() after they call to super().__init__().
 
         NOTE: This is NOT a universal ID.
-        
+
         Two different PhysicalOperator instances with the identical returned values
         from the call to self.get_op_params() will have equivalent op_ids.
         """
@@ -331,7 +331,7 @@ class GroupByAggregate(LogicalOperator):
             "inputSchema": self.inputSchema,
             "outputSchema": self.outputSchema,
             "gbySig": self.gbySig,
-            "targetCacheId": self.targetCacheId
+            "targetCacheId": self.targetCacheId,
         }
 
 

@@ -14,15 +14,19 @@ def scan_only_plan():
     plan = PhysicalPlan(operators=[scanOp])
     return plan
 
+
 @pytest.fixture
 def non_llm_filter_plan():
     scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_id="enron-eval-tiny")
+
     def filter_emails(record):
         return record.filename in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
+
     filter = Filter(filterFn=filter_emails)
     filterOp = NonLLMFilter(inputSchema=File, outputSchema=File, filter=filter, targetCacheId="abc123")
     plan = PhysicalPlan(operators=[scanOp, filterOp])
     return plan
+
 
 @pytest.fixture
 def llm_filter_plan():
@@ -38,6 +42,7 @@ def llm_filter_plan():
     plan = PhysicalPlan(operators=[scanOp, filterOp])
     return plan
 
+
 @pytest.fixture
 def bonded_llm_convert_plan(email_schema):
     scanOp = MarshalAndScanDataOp(outputSchema=TextFile, dataset_id="enron-eval-tiny")
@@ -49,6 +54,7 @@ def bonded_llm_convert_plan(email_schema):
     )
     plan = PhysicalPlan(operators=[scanOp, convertOpLLM])
     return plan
+
 
 @pytest.fixture
 def code_synth_convert_plan(email_schema):
@@ -65,6 +71,7 @@ def code_synth_convert_plan(email_schema):
     plan = PhysicalPlan(operators=[scanOp, convertOpLLM])
     return plan
 
+
 @pytest.fixture
 def token_reduction_convert_plan(email_schema):
     scanOp = MarshalAndScanDataOp(outputSchema=TextFile, dataset_id="enron-eval-tiny")
@@ -78,6 +85,7 @@ def token_reduction_convert_plan(email_schema):
     plan = PhysicalPlan(operators=[scanOp, convertOpLLM])
     return plan
 
+
 @pytest.fixture
 def image_convert_plan(real_estate_listing_files_schema, image_real_estate_listing_schema):
     scanOp = MarshalAndScanDataOp(outputSchema=real_estate_listing_files_schema, dataset_id="real-estate-eval-tiny")
@@ -90,6 +98,7 @@ def image_convert_plan(real_estate_listing_files_schema, image_real_estate_listi
     )
     plan = PhysicalPlan(operators=[scanOp, convertOpLLM])
     return plan
+
 
 @pytest.fixture
 def one_to_many_convert_plan(real_estate_listing_files_schema, room_real_estate_listing_schema):

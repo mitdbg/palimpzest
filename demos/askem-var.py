@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-""" This scripts is a demo for the biofabric data integration.
+"""This scripts is a demo for the biofabric data integration.
 python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usecase3-pdf
 
 """
@@ -15,12 +15,14 @@ import palimpzest as pz
 
 class Papersnippet(pz.TextFile):
     """Represents an excerpt from a scientific research paper, which potentially contains variables"""
+
     excerptid = pz.Field(desc="The unique identifier for the excerpt", required=True)
     excerpt = pz.Field(desc="The text of the excerpt", required=True)
 
 
 class Variable(pz.Schema):
-    """ Represents a variable of scientific model in a scientific paper"""
+    """Represents a variable of scientific model in a scientific paper"""
+
     name = pz.Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
     description = pz.Field(desc="A description of the variable, optional, set 'null' if not found", required=False)
     value = pz.Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
@@ -33,8 +35,9 @@ if __name__ == "__main__":
     if run_pz:
         # reference, plan, stats = run_workload()
         excerpts = pz.Dataset(dataset, schema=pz.TextFile)
-        output = excerpts.convert(Variable, desc="A variable used or introduced in the paper snippet",
-                                  cardinality=pz.Cardinality.ONE_TO_MANY)
+        output = excerpts.convert(
+            Variable, desc="A variable used or introduced in the paper snippet", cardinality=pz.Cardinality.ONE_TO_MANY
+        )
 
         engine = pz.StreamingSequentialExecution
         # policy = pz.MinCost()
@@ -112,12 +115,14 @@ if __name__ == "__main__":
                         var.value = "null"
                 except:
                     continue
-                variables.append({
-                    "id": index,
-                    "name": var.name,
-                    "description": var.description,
-                    "value": var.value,
-                })
+                variables.append(
+                    {
+                        "id": index,
+                        "name": var.name,
+                        "description": var.description,
+                        "value": var.value,
+                    }
+                )
 
                 # write variables into json file with readable format for every 10 variables
                 if index % 10 == 0:
@@ -134,8 +139,6 @@ if __name__ == "__main__":
         with open(f"askem-variables-{dataset}.json", "w") as f:
             json.dump(variables, f, indent=4)
         vars_df = pd.DataFrame(variables)
-
-
 
     # G = nx.DiGraph()
     # try:

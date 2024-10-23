@@ -12,7 +12,7 @@ def enron_filter():
     def mock_call(candidate):
         # determine the answer based on the record filename
         passed_filter = candidate.filename in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
-        
+
         # create RecordOpStats object with positive time and cost per record
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
@@ -101,10 +101,12 @@ def real_estate_convert(image_real_estate_listing_schema):
             op_name="MockConvert",
             time_per_record=1.0,
             cost_per_record=1.0,
-            answer=json.dumps({
-                "is_modern_and_attractive": dr.is_modern_and_attractive,
-                "has_natural_sunlight": dr.has_natural_sunlight,
-            }),
+            answer=json.dumps(
+                {
+                    "is_modern_and_attractive": dr.is_modern_and_attractive,
+                    "has_natural_sunlight": dr.has_natural_sunlight,
+                }
+            ),
         )
 
         return [dr], [record_op_stats]

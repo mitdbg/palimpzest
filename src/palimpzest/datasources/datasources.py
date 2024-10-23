@@ -209,11 +209,11 @@ class HTMLFileDirectorySource(DirectorySource):
             textcontent = f.read()
 
         html = textcontent
-        tokens = html.split()[:constants.MAX_HTML_ROWS]
+        tokens = html.split()[: constants.MAX_HTML_ROWS]
         dr.html = " ".join(tokens)
 
         strippedHtml = self.html_to_text_with_links(textcontent)
-        tokens = strippedHtml.split()[:constants.MAX_HTML_ROWS]
+        tokens = strippedHtml.split()[: constants.MAX_HTML_ROWS]
         dr.text = " ".join(tokens)
 
         return dr

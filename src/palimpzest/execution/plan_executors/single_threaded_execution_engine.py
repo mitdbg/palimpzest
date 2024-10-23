@@ -17,9 +17,9 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
     the higher-level execute() method.
     """
 
-    def execute_plan(self, plan: PhysicalPlan,
-                     num_samples: Union[int, float] = float("inf"),
-                     max_workers: Optional[int] = None):
+    def execute_plan(
+        self, plan: PhysicalPlan, num_samples: Union[int, float] = float("inf"), max_workers: Optional[int] = None
+    ):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
@@ -33,7 +33,9 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
+            plan_stats.operator_stats[op_id] = OperatorStats(
+                op_id=op_id, op_name=op.op_name()
+            )  # TODO: also add op_details here
 
         # initialize list of output records and intermediate variables
         output_records = []
@@ -49,23 +51,13 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
         datasource_len = len(datasource)
 
         # initialize processing queues for each operation
-        processing_queues = {
-            op.get_op_id(): []
-            for op in plan.operators
-            if not isinstance(op, DataSourcePhysicalOp)
-        }
+        processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, DataSourcePhysicalOp)}
 
         # execute the plan one operator at a time
         for op_idx, operator in enumerate(plan.operators):
             op_id = operator.get_op_id()
-            prev_op_id = (
-                plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
-            )
-            next_op_id = (
-                plan.operators[op_idx + 1].get_op_id()
-                if op_idx + 1 < len(plan.operators)
-                else None
-            )
+            prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
+            next_op_id = plan.operators[op_idx + 1].get_op_id() if op_idx + 1 < len(plan.operators) else None
 
             # initialize output records and record_op_stats_lst for this operator
             records, record_op_stats_lst = [], []
@@ -89,10 +81,7 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
                     current_scan_idx += 1
 
                     # update whether to keep scanning source records
-                    keep_scanning_source_records = (
-                        current_scan_idx < datasource_len
-                        and len(records) < num_samples
-                    )
+                    keep_scanning_source_records = current_scan_idx < datasource_len and len(records) < num_samples
 
             # aggregate operators accept all input records at once
             elif isinstance(operator, AggregateOp):
@@ -155,9 +144,9 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
     the higher-level execute() method.
     """
 
-    def execute_plan(self, plan: PhysicalPlan,
-                     num_samples: Union[int, float] = float("inf"),
-                     max_workers: Optional[int] = None):
+    def execute_plan(
+        self, plan: PhysicalPlan, num_samples: Union[int, float] = float("inf"), max_workers: Optional[int] = None
+    ):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
@@ -171,7 +160,9 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here     
+            plan_stats.operator_stats[op_id] = OperatorStats(
+                op_id=op_id, op_name=op.op_name()
+            )  # TODO: also add op_details here
 
         # initialize list of output records and intermediate variables
         output_records = []
@@ -188,11 +179,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
         datasource_len = len(datasource)
 
         # initialize processing queues for each operation
-        processing_queues = {
-            op.get_op_id(): []
-            for op in plan.operators
-            if not isinstance(op, DataSourcePhysicalOp)
-        }
+        processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, DataSourcePhysicalOp)}
 
         # execute the plan until either:
         # 1. all records have been processed, or
@@ -202,14 +189,8 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
             for op_idx, operator in enumerate(plan.operators):
                 op_id = operator.get_op_id()
 
-                prev_op_id = (
-                    plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
-                )
-                next_op_id = (
-                    plan.operators[op_idx + 1].get_op_id()
-                    if op_idx + 1 < len(plan.operators)
-                    else None
-                )
+                prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
+                next_op_id = plan.operators[op_idx + 1].get_op_id() if op_idx + 1 < len(plan.operators) else None
                 records_processed = False
 
                 # invoke datasource operator(s) until we run out of source records or hit the num_samples limit
@@ -243,8 +224,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
                         # check upstream ops which do have a processing queue
                         upstream_op_id = plan.operators[upstream_op_idx].get_op_id()
                         upstream_ops_are_finished = (
-                            upstream_ops_are_finished
-                            and len(processing_queues[upstream_op_id]) == 0
+                            upstream_ops_are_finished and len(processing_queues[upstream_op_id]) == 0
                         )
 
                     if not keep_scanning_source_records and upstream_ops_are_finished:
@@ -284,15 +264,12 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
 
             # update finished_executing based on whether all records have been processed
             still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
-            keep_scanning_source_records = (
-                current_scan_idx < datasource_len
-                and source_records_scanned < num_samples
-            )
+            keep_scanning_source_records = current_scan_idx < datasource_len and source_records_scanned < num_samples
             finished_executing = not keep_scanning_source_records and not still_processing
 
             # update finished_executing based on limit
             if isinstance(operator, LimitScanOp):
-                finished_executing = (len(output_records) == operator.limit)
+                finished_executing = len(output_records) == operator.limit
 
         # if caching was allowed, close the cache
         if not self.nocache:

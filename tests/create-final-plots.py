@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 
-
 import argparse
 import json
 import os
@@ -14,27 +13,16 @@ import seaborn as sns
 
 def get_color(workload, result_dict, plan_idx):
     color = "black"
-    if (
-        workload != "real-estate"
-        and len(set(filter(None, result_dict["plan_info"]["models"]))) > 1
-    ):
+    if workload != "real-estate" and len(set(filter(None, result_dict["plan_info"]["models"]))) > 1:
         color = "green"
 
-    elif (
-        workload != "real-estate"
-        and len(set(filter(None, result_dict["plan_info"]["models"]))) > 2
-    ):
+    elif workload != "real-estate" and len(set(filter(None, result_dict["plan_info"]["models"]))) > 2:
         color = "green"
 
     elif "codegen-with-fallback" in result_dict["plan_info"]["query_strategies"]:
         color = "green"
 
-    elif any(
-        [
-            budget is not None and budget < 1.0
-            for budget in result_dict["plan_info"]["token_budgets"]
-        ]
-    ):
+    elif any([budget is not None and budget < 1.0 for budget in result_dict["plan_info"]["token_budgets"]]):
         color = "green"
 
     elif workload == "real-estate":
@@ -98,12 +86,8 @@ def plot_runtime_cost_vs_quality(results):
             # plot runtime vs. f1_score and cost vs. f1_score
             axs_text[0][col].scatter(f1_score, runtime, alpha=0.6, color=color)
             axs_text[1][col].scatter(f1_score, cost, alpha=0.6, color=color)
-            axs_clean_mc[0][col].scatter(
-                f1_score, runtime, alpha=0.6, color=color, marker=marker
-            )
-            axs_clean_mc[1][col].scatter(
-                f1_score, cost, alpha=0.6, color=color, marker=marker
-            )
+            axs_clean_mc[0][col].scatter(f1_score, runtime, alpha=0.6, color=color, marker=marker)
+            axs_clean_mc[1][col].scatter(f1_score, cost, alpha=0.6, color=color, marker=marker)
 
             # add annotations
             axs_text[0][col].annotate(text, (f1_score, runtime))
@@ -115,46 +99,26 @@ def plot_runtime_cost_vs_quality(results):
         runtime_pareto_lst_indices = get_pareto_indices(all_result_dicts, "runtime")
 
         # plot line for pareto frontiers
-        cost_pareto_qualities = [
-            all_result_dicts[idx]["f1_score"] for idx in cost_pareto_lst_indices
-        ]
-        pareto_costs = [
-            all_result_dicts[idx]["cost"] for idx in cost_pareto_lst_indices
-        ]
+        cost_pareto_qualities = [all_result_dicts[idx]["f1_score"] for idx in cost_pareto_lst_indices]
+        pareto_costs = [all_result_dicts[idx]["cost"] for idx in cost_pareto_lst_indices]
         cost_pareto_curve = zip(cost_pareto_qualities, pareto_costs)
         cost_pareto_curve = sorted(cost_pareto_curve, key=lambda tup: tup[0])
         if workload == "biofabric":
-            cost_pareto_curve = list(
-                filter(lambda tup: tup[0] > 0.3, cost_pareto_curve)
-            )
+            cost_pareto_curve = list(filter(lambda tup: tup[0] > 0.3, cost_pareto_curve))
         pareto_cost_xs, pareto_cost_ys = zip(*cost_pareto_curve)
 
-        runtime_pareto_qualities = [
-            all_result_dicts[idx]["f1_score"] for idx in runtime_pareto_lst_indices
-        ]
-        pareto_runtimes = [
-            all_result_dicts[idx]["runtime"] for idx in runtime_pareto_lst_indices
-        ]
+        runtime_pareto_qualities = [all_result_dicts[idx]["f1_score"] for idx in runtime_pareto_lst_indices]
+        pareto_runtimes = [all_result_dicts[idx]["runtime"] for idx in runtime_pareto_lst_indices]
         runtime_pareto_curve = zip(runtime_pareto_qualities, pareto_runtimes)
         runtime_pareto_curve = sorted(runtime_pareto_curve, key=lambda tup: tup[0])
         if workload == "biofabric":
-            runtime_pareto_curve = list(
-                filter(lambda tup: tup[0] > 0.3, runtime_pareto_curve)
-            )
+            runtime_pareto_curve = list(filter(lambda tup: tup[0] > 0.3, runtime_pareto_curve))
         pareto_runtime_xs, pareto_runtime_ys = zip(*runtime_pareto_curve)
 
-        axs_text[0][col].plot(
-            pareto_runtime_xs, pareto_runtime_ys, color="#ef9b20", linestyle="--"
-        )
-        axs_text[1][col].plot(
-            pareto_cost_xs, pareto_cost_ys, color="#ef9b20", linestyle="--"
-        )
-        axs_clean_mc[0][col].plot(
-            pareto_runtime_xs, pareto_runtime_ys, color="#ef9b20", linestyle="--"
-        )
-        axs_clean_mc[1][col].plot(
-            pareto_cost_xs, pareto_cost_ys, color="#ef9b20", linestyle="--"
-        )
+        axs_text[0][col].plot(pareto_runtime_xs, pareto_runtime_ys, color="#ef9b20", linestyle="--")
+        axs_text[1][col].plot(pareto_cost_xs, pareto_cost_ys, color="#ef9b20", linestyle="--")
+        axs_clean_mc[0][col].plot(pareto_runtime_xs, pareto_runtime_ys, color="#ef9b20", linestyle="--")
+        axs_clean_mc[1][col].plot(pareto_cost_xs, pareto_cost_ys, color="#ef9b20", linestyle="--")
 
         # set x,y-lim for each workload
         left, right = -0.05, 1.05
@@ -209,12 +173,8 @@ def plot_runtime_cost_vs_quality(results):
     for idx in range(3):
         axs_clean_mc[1][idx].set_xlabel("F1 Score", fontsize=12)
 
-    fig_text.savefig(
-        "final-eval-results/plots/all-text.png", dpi=500, bbox_inches="tight"
-    )
-    fig_clean_mc.savefig(
-        "final-eval-results/plots/all-clean-mc.png", dpi=500, bbox_inches="tight"
-    )
+    fig_text.savefig("final-eval-results/plots/all-text.png", dpi=500, bbox_inches="tight")
+    fig_clean_mc.savefig("final-eval-results/plots/all-clean-mc.png", dpi=500, bbox_inches="tight")
 
 
 def plot_reopt(results, workload):
@@ -238,9 +198,7 @@ def plot_reopt(results, workload):
     ]
 
     for workload, metric, row, col in plots:
-        data_df = results_df[
-            (results_df.workload == workload) & (results_df.metric == metric)
-        ]
+        data_df = results_df[(results_df.workload == workload) & (results_df.metric == metric)]
 
         if metric == "runtime":
             data_df["value"] = data_df.value / 60.0
@@ -251,17 +209,11 @@ def plot_reopt(results, workload):
             "min-cost-at-fixed-quality": "Policy C",
         }
         data_df["label_col"] = data_df.apply(
-            lambda row: (
-                policy_to_label_col[row["policy"]]
-                if row["plan"] == "PZ"
-                else "Baseline"
-            ),
+            lambda row: (policy_to_label_col[row["policy"]] if row["plan"] == "PZ" else "Baseline"),
             axis=1,
         )
         label_col_to_ord = {"Baseline": 0, "Policy A": 1, "Policy B": 2, "Policy C": 3}
-        data_df["label_col_ord"] = data_df.label_col.apply(
-            lambda label: label_col_to_ord[label]
-        )
+        data_df["label_col_ord"] = data_df.label_col.apply(lambda label: label_col_to_ord[label])
 
         # drop duplicates for baseline, which is replicated across policies
         data_df.drop_duplicates(subset=["label_col"], inplace=True)
@@ -414,9 +366,7 @@ if __name__ == "__main__":
         for workload in ["enron", "real-estate", "biofabric"]:
             num_plans = workload_to_num_plans[workload]
             for plan_idx in range(num_plans):
-                with open(
-                    f"final-eval-results/{workload}/results-{plan_idx}.json", "r"
-                ) as f:
+                with open(f"final-eval-results/{workload}/results-{plan_idx}.json", "r") as f:
                     result = json.load(f)
                     results[workload].append((plan_idx, result))
 
@@ -511,9 +461,7 @@ if __name__ == "__main__":
                 #     results.append({"plan": "Best", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
 
                 naive_plan_idx = policy_to_naive_plan[policy][workload]
-                with open(
-                    f"final-eval-results/{workload}/results-{naive_plan_idx}.json", "r"
-                ) as f:
+                with open(f"final-eval-results/{workload}/results-{naive_plan_idx}.json", "r") as f:
                     result_dict = json.load(f)
                     # results.append({"plan": "Baseline", "policy": policy, "workload": workload, "f1_score": result_dict["f1_score"], "cost": result_dict["cost"], "runtime": result_dict["runtime"]})
                     results.append(

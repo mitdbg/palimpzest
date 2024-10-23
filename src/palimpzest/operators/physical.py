@@ -29,7 +29,8 @@ class PhysicalOperator:
         max_workers: int = 1,
         targetCacheId: Optional[str] = None,
         verbose: bool = False,
-        *args, **kwargs
+        *args,
+        **kwargs,
     ) -> None:
         self.outputSchema = outputSchema
         self.inputSchema = inputSchema
@@ -74,7 +75,7 @@ class PhysicalOperator:
               returned by self.get_op_params() after they call to super().__init__().
 
         NOTE: This is NOT a universal ID.
-        
+
         Two different PhysicalOperator instances with the identical returned values
         from the call to self.get_op_params() will have equivalent op_ids.
         """
@@ -114,7 +115,7 @@ class PhysicalOperator:
 
         The function takes an argument which contains the OperatorCostEstimates
         of the physical operator whose output is the input to this operator.
-    
+
         For the implemented operator. These will be used by the CostModel
         when PZ does not have sample execution data -- and it will be necessary
         in some cases even when sample execution data is present. (For example,

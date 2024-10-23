@@ -87,9 +87,7 @@ class Set:
             "cardinality": self._cardinality,
             "image_conversion": self._image_conversion,
             "limit": self._limit,
-            "groupBy": (
-                None if self._groupBy is None else self._groupBy.serialize()
-            ),
+            "groupBy": (None if self._groupBy is None else self._groupBy.serialize()),
         }
 
         return d
@@ -121,11 +119,7 @@ class Dataset(Set):
 
     def __init__(self, source: Union[str, DataSource], *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
-        source = (
-            DataDirectory().getRegisteredDataset(source)
-            if isinstance(source, str)
-            else source
-        )
+        source = DataDirectory().getRegisteredDataset(source) if isinstance(source, str) else source
 
         # intialize class
         super().__init__(source=source, *args, **kwargs)

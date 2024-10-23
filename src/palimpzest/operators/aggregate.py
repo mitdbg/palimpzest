@@ -16,12 +16,12 @@ class AggregateOp(PhysicalOperator):
     __call__ methods. Thus, we use a slightly modified abstract base class for
     these operators.
     """
+
     def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
         raise NotImplementedError("Using __call__ from abstract method")
 
 
 class ApplyGroupByOp(AggregateOp):
-
     def __init__(self, gbySig: GroupBySig, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.gbySig = gbySig
@@ -37,7 +37,7 @@ class ApplyGroupByOp(AggregateOp):
         op = super().__str__()
         op += f"    Group-by Signature: {str(self.gbySig)}\n"
         return op
-    
+
     def get_copy_kwargs(self):
         copy_kwargs = super().get_copy_kwargs()
         return {"gbySig": self.gbySig, **copy_kwargs}
@@ -99,9 +99,7 @@ class ApplyGroupByOp(AggregateOp):
             group = ()
             for f in self.gbySig.gbyFields:
                 if not hasattr(candidate, f):
-                    raise TypeError(
-                        f"ApplyGroupByOp record missing expected field {f}"
-                    )
+                    raise TypeError(f"ApplyGroupByOp record missing expected field {f}")
                 group = group + (getattr(candidate, f),)
             if group in aggState:
                 state = aggState[group]
@@ -112,9 +110,7 @@ class ApplyGroupByOp(AggregateOp):
             for i in range(0, len(self.gbySig.aggFuncs)):
                 fun = self.gbySig.aggFuncs[i]
                 if not hasattr(candidate, self.gbySig.aggFields[i]):
-                    raise TypeError(
-                        f"ApplyGroupByOp record missing expected field {self.gbySig.aggFields[i]}"
-                    )
+                    raise TypeError(f"ApplyGroupByOp record missing expected field {self.gbySig.aggFields[i]}")
                 field = getattr(candidate, self.gbySig.aggFields[i])
                 state[i] = ApplyGroupByOp.agg_merge(fun, state[i], field)
             aggState[group] = state
@@ -162,10 +158,7 @@ class CountAggregateOp(AggregateOp):
         self.aggFunc = aggFunc
 
     def __eq__(self, other: PhysicalOperator):
-        return (
-            isinstance(other, self.__class__)
-            and self.aggFunc == other.aggFunc
-        )
+        return isinstance(other, self.__class__) and self.aggFunc == other.aggFunc
 
     def __str__(self):
         op = super().__str__()

@@ -1,4 +1,3 @@
-
 import palimpzest as pz
 from palimpzest.constants import Model
 from palimpzest.cost_model import CostModel
@@ -19,7 +18,7 @@ class TestPrimitives:
         filter1_expr = LogicalExpression(
             operator=filter1_op,
             input_group_ids=[0],
-            input_fields=set(['contents']),
+            input_fields=set(["contents"]),
             generated_fields=set([]),
             group_id=None,
         )
@@ -33,7 +32,7 @@ class TestPrimitives:
         filter2_expr = LogicalExpression(
             operator=filter2_op,
             input_group_ids=[1],
-            input_fields=set(['contents']),
+            input_fields=set(["contents"]),
             generated_fields=set([]),
             group_id=None,
         )
@@ -48,7 +47,7 @@ class TestPrimitives:
         convert_expr = LogicalExpression(
             operator=convert_op,
             input_group_ids=[2],
-            input_fields=set(['contents']),
+            input_fields=set(["contents"]),
             generated_fields=set([]),
             group_id=None,
         )
@@ -57,7 +56,7 @@ class TestPrimitives:
         }
         g1 = Group(
             logical_expressions=[convert_expr],
-            fields=set(['sender', 'subject', 'contents', 'filename']),
+            fields=set(["sender", "subject", "contents", "filename"]),
             properties=g1_properties,
         )
         g2_properties = {
@@ -65,14 +64,13 @@ class TestPrimitives:
         }
         g2 = Group(
             logical_expressions=[filter2_expr],
-            fields=set(['sender', 'subject', 'contents', 'filename']),
+            fields=set(["sender", "subject", "contents", "filename"]),
             properties=g2_properties,
         )
         assert g1.group_id == g2.group_id
 
 
 class TestOptimizer:
-
     def test_basic_functionality(self, enron_eval_tiny):
         plan = pz.Dataset(enron_eval_tiny, schema=pz.TextFile)
         policy = MaxQuality()
@@ -204,11 +202,11 @@ class TestOptimizer:
 
         assert len(physical_plan) == 6
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)  # RealEstateListingFiles
-        assert isinstance(physical_plan[1], LLMConvert)            # TextRealEstateListing
-        assert isinstance(physical_plan[2], NonLLMFilter)          # TextRealEstateListing(price/addr)
-        assert isinstance(physical_plan[3], NonLLMFilter)          # TextRealEstateListing(price/addr)
-        assert isinstance(physical_plan[4], LLMConvert)            # ImageRealEstateListing
-        assert isinstance(physical_plan[5], LLMFilter)             # ImageRealEstateListing(attractive)
+        assert isinstance(physical_plan[1], LLMConvert)  # TextRealEstateListing
+        assert isinstance(physical_plan[2], NonLLMFilter)  # TextRealEstateListing(price/addr)
+        assert isinstance(physical_plan[3], NonLLMFilter)  # TextRealEstateListing(price/addr)
+        assert isinstance(physical_plan[4], LLMConvert)  # ImageRealEstateListing
+        assert isinstance(physical_plan[5], LLMFilter)  # ImageRealEstateListing(attractive)
 
     def test_seven_filters(self, enron_eval_tiny, email_schema):
         plan = pz.Dataset(enron_eval_tiny, schema=email_schema)

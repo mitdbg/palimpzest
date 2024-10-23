@@ -5,7 +5,9 @@ from palimpzest.execution import CostModel
 
 
 class TestCostModel:
-    def test_compute_operator_estimates(self, simple_plan_sample_execution_data, simple_plan_expected_operator_estimates):
+    def test_compute_operator_estimates(
+        self, simple_plan_sample_execution_data, simple_plan_expected_operator_estimates
+    ):
         # construct estimator
         estimator = CostModel(source_dataset_id=None, sample_execution_data=simple_plan_sample_execution_data)
 
@@ -28,7 +30,6 @@ class TestCostModel:
                     for metric, expected_value in expected_model_estimates.items():
                         assert operator_estimates[op_id][model_name][metric] == expected_value
 
-
     # TODO: rewrite this test to be agnostic to the simple plan
     @pytest.mark.parametrize(
         argnames=("physical_plan", "expected_cost_est_results"),
@@ -38,10 +39,16 @@ class TestCostModel:
             pytest.param("cost-est-simple-plan-gpt4-mixtral", "cost-est-simple-plan-gpt4-mixtral", id="gpt4-mixtral"),
             pytest.param("cost-est-simple-plan-gpt35-gpt4", "cost-est-simple-plan-gpt35-gpt4", id="gpt35-gpt4"),
             pytest.param("cost-est-simple-plan-gpt35-gpt35", "cost-est-simple-plan-gpt35-gpt35", id="gpt35-gpt35"),
-            pytest.param("cost-est-simple-plan-gpt35-mixtral", "cost-est-simple-plan-gpt35-mixtral", id="gpt35-mixtral"),
+            pytest.param(
+                "cost-est-simple-plan-gpt35-mixtral", "cost-est-simple-plan-gpt35-mixtral", id="gpt35-mixtral"
+            ),
             pytest.param("cost-est-simple-plan-mixtral-gpt4", "cost-est-simple-plan-mixtral-gpt4", id="mixtral-gpt4"),
-            pytest.param("cost-est-simple-plan-mixtral-gpt35", "cost-est-simple-plan-mixtral-gpt35", id="mixtral-gpt35"),
-            pytest.param("cost-est-simple-plan-mixtral-mixtral", "cost-est-simple-plan-mixtral-mixtral", id="mixtral-mixtral"),
+            pytest.param(
+                "cost-est-simple-plan-mixtral-gpt35", "cost-est-simple-plan-mixtral-gpt35", id="mixtral-gpt35"
+            ),
+            pytest.param(
+                "cost-est-simple-plan-mixtral-mixtral", "cost-est-simple-plan-mixtral-mixtral", id="mixtral-mixtral"
+            ),
         ],
         indirect=True,
     )
