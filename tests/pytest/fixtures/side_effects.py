@@ -11,8 +11,12 @@ from palimpzest.elements import DataRecord
 def enron_filter():
     def mock_call(candidate):
         # determine the answer based on the record filename
-        passed_filter = candidate.filename in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
-        
+        passed_filter = candidate.filename in [
+            "buy-r-inbox-628.txt",
+            "buy-r-inbox-749.txt",
+            "zipper-a-espeed-28.txt",
+        ]
+
         # create RecordOpStats object with positive time and cost per record
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
@@ -55,7 +59,9 @@ def enron_convert(email_schema):
         }
 
         # construct data record
-        dr = DataRecord(schema=email_schema, parent_id=candidate._id, cardinality_idx=0)
+        dr = DataRecord(
+            schema=email_schema, parent_id=candidate._id, cardinality_idx=0
+        )
         dr.sender = filename_to_sender[candidate.filename]
         dr.subject = filename_to_subject[candidate.filename]
         dr.filename = candidate.filename
@@ -81,13 +87,29 @@ def enron_convert(email_schema):
 @pytest.fixture
 def real_estate_convert(image_real_estate_listing_schema):
     def mock_call(candidate):
-        listing_to_modern_and_attractive = {"listing1": True, "listing2": False, "listing3": False}
-        listing_to_has_natural_sunlight = {"listing1": True, "listing2": True, "listing3": False}
+        listing_to_modern_and_attractive = {
+            "listing1": True,
+            "listing2": False,
+            "listing3": False,
+        }
+        listing_to_has_natural_sunlight = {
+            "listing1": True,
+            "listing2": True,
+            "listing3": False,
+        }
 
         # construct data record
-        dr = DataRecord(schema=image_real_estate_listing_schema, parent_id=candidate._id, cardinality_idx=0)
-        dr.is_modern_and_attractive = listing_to_modern_and_attractive[candidate.listing]
-        dr.has_natural_sunlight = listing_to_has_natural_sunlight[candidate.listing]
+        dr = DataRecord(
+            schema=image_real_estate_listing_schema,
+            parent_id=candidate._id,
+            cardinality_idx=0,
+        )
+        dr.is_modern_and_attractive = listing_to_modern_and_attractive[
+            candidate.listing
+        ]
+        dr.has_natural_sunlight = listing_to_has_natural_sunlight[
+            candidate.listing
+        ]
         dr.listing = candidate.listing
         dr.text_content = candidate.text_content
         dr.image_contents = candidate.image_contents
@@ -101,10 +123,12 @@ def real_estate_convert(image_real_estate_listing_schema):
             op_name="MockConvert",
             time_per_record=1.0,
             cost_per_record=1.0,
-            answer=json.dumps({
-                "is_modern_and_attractive": dr.is_modern_and_attractive,
-                "has_natural_sunlight": dr.has_natural_sunlight,
-            }),
+            answer=json.dumps(
+                {
+                    "is_modern_and_attractive": dr.is_modern_and_attractive,
+                    "has_natural_sunlight": dr.has_natural_sunlight,
+                }
+            ),
         )
 
         return [dr], [record_op_stats]
@@ -125,7 +149,11 @@ def real_estate_one_to_many_convert(room_real_estate_listing_schema):
         data_records, record_op_stats_lst = [], []
         for idx, room in enumerate(listing_to_rooms[candidate.listing]):
             # create data record
-            dr = DataRecord(schema=room_real_estate_listing_schema, parent_id=candidate._id, cardinality_idx=idx)
+            dr = DataRecord(
+                schema=room_real_estate_listing_schema,
+                parent_id=candidate._id,
+                cardinality_idx=idx,
+            )
             dr.room = room
             dr.listing = candidate.listing
             dr.text_content = candidate.text_content
@@ -141,7 +169,9 @@ def real_estate_one_to_many_convert(room_real_estate_listing_schema):
                 op_name="MockConvert",
                 time_per_record=1.0,
                 cost_per_record=1.0,
-                answer=json.dumps({"room": listing_to_rooms[candidate.listing]}),
+                answer=json.dumps(
+                    {"room": listing_to_rooms[candidate.listing]}
+                ),
             )
             record_op_stats_lst.append(record_op_stats)
 

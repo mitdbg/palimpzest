@@ -14,7 +14,9 @@ from palimpzest.execution import (
 from palimpzest.utils.model_helpers import getModels
 
 
-def score_biofabric_plans(dataset, records, policy_str=None, reopt=False) -> float:
+def score_biofabric_plans(
+    dataset, records, policy_str=None, reopt=False
+) -> float:
     """
     Computes the results of all biofabric plans
     """
@@ -39,7 +41,7 @@ def score_biofabric_plans(dataset, records, policy_str=None, reopt=False) -> flo
     ]
     output_rows = []
     for rec in records:
-        dct = {k:v for k,v in rec._asDict().items() if k in matching_columns}
+        dct = {k: v for k, v in rec._asDict().items() if k in matching_columns}
         filename = os.path.basename(rec._asDict()["filename"])
         dct["study"] = os.path.basename(filename).split("_")[0]
         output_rows.append(dct)
@@ -88,7 +90,13 @@ def score_biofabric_plans(dataset, records, policy_str=None, reopt=False) -> flo
             max_matches = 0
             max_col = "missing"
             for input_col in input_df.columns:
-                matches = sum([1 for idx, x in enumerate(output_study[col]) if x == input_df[input_col][idx]])
+                matches = sum(
+                    [
+                        1
+                        for idx, x in enumerate(output_study[col])
+                        if x == input_df[input_col][idx]
+                    ]
+                )
                 if matches > max_matches:
                     max_matches = matches
                     max_col = input_col
@@ -135,7 +143,9 @@ def score_plan(dataset, records, policy_str=None, reopt=False) -> float:
     # get lists of predictions and groundtruth answers
     preds, targets = None, None
     if "enron" in dataset:
-        preds = records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
+        preds = records_df.filename.apply(
+            lambda fn: os.path.basename(fn)
+        ).tolist()
         gt_df = pd.read_csv("testdata/groundtruth/enron-eval-tiny.csv")
         targets = list(gt_df[gt_df.label == 1].filename)
     elif "real-estate" in dataset:
@@ -161,18 +171,25 @@ def score_plan(dataset, records, policy_str=None, reopt=False) -> float:
     precision = tp / (tp + fp) if tp + fp > 0 else 0.0
     recall = tp / (tp + fn) if tp + fn > 0 else 0.0
     f1_score = (
-        2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+        2 * precision * recall / (precision + recall)
+        if precision + recall > 0
+        else 0.0
     )
 
     return f1_score
 
+
 @pytest.mark.parametrize(
     argnames=("execution_engine"),
     argvalues=[
-        pytest.param(SequentialSingleThreadNoSentinelExecution, id="seq-single-thread"),
-        pytest.param(PipelinedSingleThreadNoSentinelExecution, id="pipe-single-thread"),
+        pytest.param(
+            SequentialSingleThreadNoSentinelExecution, id="seq-single-thread"
+        ),
+        pytest.param(
+            PipelinedSingleThreadNoSentinelExecution, id="pipe-single-thread"
+        ),
         pytest.param(PipelinedParallelNoSentinelExecution, id="pipe-parallel"),
-    ]
+    ],
 )
 @pytest.mark.parametrize(
     argnames=("dataset", "workload"),
@@ -183,22 +200,28 @@ def score_plan(dataset, records, policy_str=None, reopt=False) -> float:
     ],
     indirect=True,
 )
-def test_workload(dataset, workload, execution_engine):    
+def test_workload(dataset, workload, execution_engine):
     # workload_to_dataset_size = {"enron": 1000, "real-estate": 100, "biofabric": 11}
-    dataset_to_size = {"enron-eval-tiny": 10, "real-estate-eval-tiny": 5, "biofabric-tiny": 3}
+    dataset_to_size = {
+        "enron-eval-tiny": 10,
+        "real-estate-eval-tiny": 5,
+        "biofabric-tiny": 3,
+    }
     dataset_size = dataset_to_size[dataset]
     num_samples = int(0.05 * dataset_size) if dataset != "biofabric-tiny" else 1
 
     available_models = getModels(include_vision=True)
-    records, stats = Execute(workload, 
-                            policy=pz.MinCost(),
-                            available_models=available_models,
-                            num_samples=num_samples,
-                            nocache=True,
-                            allow_bonded_query=True,
-                            allow_code_synth=False,
-                            allow_token_reduction=False,
-                            execution_engine=execution_engine)
+    records, stats = Execute(
+        workload,
+        policy=pz.MinCost(),
+        available_models=available_models,
+        num_samples=num_samples,
+        nocache=True,
+        allow_bonded_query=True,
+        allow_code_synth=False,
+        allow_token_reduction=False,
+        execution_engine=execution_engine,
+    )
 
     # NOTE: f1 score calculation will be low for biofabric b/c the
     #       evaluation function still checks against the full dataset's labels

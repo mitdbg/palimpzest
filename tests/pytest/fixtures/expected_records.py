@@ -19,20 +19,37 @@ def enron_all_expected_records(enron_eval_tiny_data):
 
     return data_records
 
+
 @pytest.fixture
 def enron_filter_expected_records(enron_all_expected_records):
     data_records = [
         record
         for record in enron_all_expected_records
-        if record.filename in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
+        if record.filename
+        in [
+            "buy-r-inbox-628.txt",
+            "buy-r-inbox-749.txt",
+            "zipper-a-espeed-28.txt",
+        ]
     ]
     return data_records
 
+
 @pytest.fixture
-def real_estate_all_expected_records(real_estate_eval_tiny_data, image_real_estate_listing_schema):
+def real_estate_all_expected_records(
+    real_estate_eval_tiny_data, image_real_estate_listing_schema
+):
     expected_listings = sorted(os.listdir(real_estate_eval_tiny_data))
-    listing_to_modern_and_attractive = {"listing1": True, "listing2": False, "listing3": False}
-    listing_to_has_natural_sunlight = {"listing1": True, "listing2": True, "listing3": False}
+    listing_to_modern_and_attractive = {
+        "listing1": True,
+        "listing2": False,
+        "listing3": False,
+    }
+    listing_to_has_natural_sunlight = {
+        "listing1": True,
+        "listing2": True,
+        "listing3": False,
+    }
 
     data_records = []
     for idx, listing in enumerate(expected_listings):
@@ -44,10 +61,13 @@ def real_estate_all_expected_records(real_estate_eval_tiny_data, image_real_esta
 
     return data_records
 
+
 @pytest.fixture
-def real_estate_one_to_many_expected_records(real_estate_eval_tiny_data, room_real_estate_listing_schema):
+def real_estate_one_to_many_expected_records(
+    real_estate_eval_tiny_data, room_real_estate_listing_schema
+):
     expected_listings = sorted(os.listdir(real_estate_eval_tiny_data))
-    listing_to_rooms= {
+    listing_to_rooms = {
         "listing1": ["other", "living_room", "kitchen"],
         "listing2": ["other", "living_room", "living_room"],
         "listing3": ["other", "living_room", "other"],
@@ -56,7 +76,9 @@ def real_estate_one_to_many_expected_records(real_estate_eval_tiny_data, room_re
     data_records = []
     for idx, listing in enumerate(expected_listings):
         for room in listing_to_rooms[listing]:
-            dr = DataRecord(schema=room_real_estate_listing_schema, scan_idx=idx)
+            dr = DataRecord(
+                schema=room_real_estate_listing_schema, scan_idx=idx
+            )
             dr.listing = listing
             dr.room = room
             data_records.append(dr)

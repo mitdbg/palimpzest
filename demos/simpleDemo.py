@@ -29,9 +29,12 @@ class ScientificPaper(pz.PDFFile):
         required=True,
     )
     publicationYear = pz.Field(
-        desc="The year the paper was published. This is a number.", required=False
+        desc="The year the paper was published. This is a number.",
+        required=False,
     )
-    author = pz.Field(desc="The name of the first author of the paper", required=True)
+    author = pz.Field(
+        desc="The name of the first author of the paper", required=True
+    )
     institution = pz.Field(
         desc="The institution of the first author of the paper", required=True
     )
@@ -70,9 +73,10 @@ class VLDBPaperListing(pz.Schema):
     authors = pz.Field(desc="The authors of the paper", required=True)
     pdfLink = pz.Field(desc="The link to the PDF of the paper", required=True)
 
+
 def vldb_text_file_to_url(candidate: DataRecord):
     url_records = []
-    with open(candidate.filename, 'r') as f:
+    with open(candidate.filename, "r") as f:
         for line in f:
             dr = DataRecord(pz.URL, parent_id=candidate._id)
             dr.url = line.strip()
@@ -80,29 +84,32 @@ def vldb_text_file_to_url(candidate: DataRecord):
 
     return url_records
 
+
 def html_to_text_with_links(html):
     # Parse the HTML content
-    soup = BeautifulSoup(html, 'html.parser')
-    
+    soup = BeautifulSoup(html, "html.parser")
+
     # Find all hyperlink tags
-    for a in soup.find_all('a'):
+    for a in soup.find_all("a"):
         # Check if the hyperlink tag has an 'href' attribute
-        if a.has_attr('href'):
+        if a.has_attr("href"):
             # Replace the hyperlink with its text and URL in parentheses
             a.replace_with(f"{a.text} ({a['href']})")
-    
+
     # Extract text from the modified HTML
-    text = soup.get_text(separator='\n', strip=True)        
+    text = soup.get_text(separator="\n", strip=True)
     return text
+
 
 def get_page_text(url):
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
     }
 
     session = HTMLSession()
     response = session.get(url, headers=headers)
     return response.text
+
 
 def download_html(candidate: DataRecord):
     textcontent = get_page_text(candidate.url)
@@ -121,6 +128,7 @@ def download_html(candidate: DataRecord):
     dr.timestamp = datetime.datetime.now().isoformat()
     return dr
 
+
 def download_pdf(candidate: DataRecord):
     print(f"DOWNLOADING: {candidate.pdfLink}")
     content = requests.get(candidate.pdfLink).content
@@ -131,7 +139,10 @@ def download_pdf(candidate: DataRecord):
     time.sleep(1)
     return dr
 
-def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profile=False):
+
+def downloadVLDBPapers(
+    vldbListingPageURLsId, outputDir, execution_engine, profile=False
+):
     """This function downloads a bunch of VLDB papers from an online listing and saves them to disk.  It also saves a CSV file of the paper listings."""
     # 1. Grab the input VLDB listing page(s) and scrape them for paper metadata
     tfs = pz.Dataset(
@@ -152,20 +163,24 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profi
         cardinality=Cardinality.ONE_TO_MANY,
     )
 
-    listing_records, listing_execution_stats = pz.Execute(vldbPaperListings, 
-                                policy=pz.MaxQuality(),
-                                nocache=True,
-                                allow_token_reduction=False,
-                                allow_code_synth=False,
-                                execution_engine=execution_engine,
-                                verbose=True)
+    listing_records, listing_execution_stats = pz.Execute(
+        vldbPaperListings,
+        policy=pz.MaxQuality(),
+        nocache=True,
+        allow_token_reduction=False,
+        allow_code_synth=False,
+        execution_engine=execution_engine,
+        verbose=True,
+    )
 
     # save the paper listings to a CSV file
     os.makedirs(outputDir, exist_ok=True)
     outputPath = os.path.join(outputDir, "vldbPaperListings.csv")
 
     with open(outputPath, "w", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=listing_records[0].__dict__.keys())
+        writer = csv.DictWriter(
+            csvfile, fieldnames=listing_records[0].__dict__.keys()
+        )
         writer.writeheader()
         for record in listing_records:
             writer.writerow(record._asDict())
@@ -175,16 +190,20 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profi
             json.dump(listing_execution_stats.to_json(), f)
 
     # 2. Get the PDF URL for each paper that's listed and download it
-    pdfContent = vldbPaperListings.convert(outputSchema=pz.Download, udf=download_pdf)
+    pdfContent = vldbPaperListings.convert(
+        outputSchema=pz.Download, udf=download_pdf
+    )
 
     # 3. Save the paper listings to a CSV file and the PDFs to disk
-    pdf_records, download_execution_stats = pz.Execute(pdfContent, 
-                                policy=pz.MaxQuality(),
-                                nocache=True,
-                                allow_token_reduction=False,
-                                allow_code_synth=False,
-                                execution_engine=execution_engine,
-                                verbose=True)
+    pdf_records, download_execution_stats = pz.Execute(
+        pdfContent,
+        policy=pz.MaxQuality(),
+        nocache=True,
+        allow_token_reduction=False,
+        allow_code_synth=False,
+        execution_engine=execution_engine,
+        verbose=True,
+    )
 
     for idx, pdf_record in enumerate(pdf_records):
         with open(os.path.join(outputDir, str(idx) + ".pdf"), "wb") as f:
@@ -198,7 +217,9 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profi
 class GitHubUpdate(pz.Schema):
     """GitHubUpdate represents a single commit message from a GitHub repo"""
 
-    commitId = pz.Field(desc="The unique identifier for the commit", required=True)
+    commitId = pz.Field(
+        desc="The unique identifier for the commit", required=True
+    )
     reponame = pz.Field(desc="The name of the repository", required=True)
     commit_message = pz.Field(
         desc="The message associated with the commit", required=True
@@ -271,11 +292,11 @@ def enronAverageCountPlan(datasetId):
 
     return averageEmailsPerSender
 
+
 def enronLimitPlan(datasetId, limit=5):
     data = pz.Dataset(datasetId, schema=Email)
     limitData = data.limit(limit)
     return limitData
-
 
 
 class DogImage(pz.ImageFile):
@@ -312,10 +333,13 @@ def printTable(records, cols=None, gradio=False, plan_str=None):
     ]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
-    final_df = records_df[print_cols] if not records_df.empty else pd.DataFrame(columns=print_cols)
+    final_df = (
+        records_df[print_cols]
+        if not records_df.empty
+        else pd.DataFrame(columns=print_cols)
+    )
 
     if not gradio:
-        
         print(tabulate(final_df, headers="keys", tablefmt="psql"))
 
     else:
@@ -333,30 +357,36 @@ if __name__ == "__main__":
     startTime = time.time()
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument(
-        "--verbose", default=False, action="store_true", help="Print verbose output"
+        "--verbose",
+        default=False,
+        action="store_true",
+        help="Print verbose output",
     )
     parser.add_argument(
-        "--profile", default=False, action="store_true", help="Profile execution"
+        "--profile",
+        default=False,
+        action="store_true",
+        help="Profile execution",
     )
     parser.add_argument("--datasetid", type=str, help="The dataset id")
     parser.add_argument("--task", type=str, help="The task to run")
     parser.add_argument(
         "--engine",
         type=str,
-        help='The engine to use. One of sentinel, nosentinel',
-        default='nosentinel',
+        help="The engine to use. One of sentinel, nosentinel",
+        default="nosentinel",
     )
     parser.add_argument(
         "--executor",
         type=str,
-        help='The plan executor to use. One of sequential, pipelined, parallel',
-        default='parallel',
+        help="The plan executor to use. One of sequential, pipelined, parallel",
+        default="parallel",
     )
     parser.add_argument(
         "--policy",
         type=str,
         help="One of 'mincost', 'mintime', 'maxquality'",
-        default='mincost',
+        default="mincost",
     )
 
     args = parser.parse_args()
@@ -412,13 +442,23 @@ if __name__ == "__main__":
     else:
         print("Unknown engine")
         exit(1)
-    
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
+
+    if (
+        os.getenv("OPENAI_API_KEY") is None
+        and os.getenv("TOGETHER_API_KEY") is None
+    ):
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     if task == "paper":
         rootSet = buildMITBatteryPaperPlan(datasetid)
-        cols = ["title", "publicationYear", "author", "institution", "journal", "fundingAgency"]
+        cols = [
+            "title",
+            "publicationYear",
+            "author",
+            "institution",
+            "journal",
+            "fundingAgency",
+        ]
         stat_path = "profiling-data/paper-profiling.json"
 
     elif task == "enron":
@@ -483,7 +523,7 @@ if __name__ == "__main__":
 
                     params["page"] += 1
                     time.sleep(1)
-                
+
                 # to make the demo go faster
                 self.commits = self.commits[:10]
 
@@ -491,7 +531,9 @@ if __name__ == "__main__":
                 return len(self.commits)
 
             def getSize(self):
-                return sum(map(lambda commit: sys.getsizeof(commit), self.commits))
+                return sum(
+                    map(lambda commit: sys.getsizeof(commit), self.commits)
+                )
 
             def getItem(self, idx: int):
                 # NOTE: we can make this a streaming demo again by modifying this getItem function
@@ -502,7 +544,9 @@ if __name__ == "__main__":
 
                 return dr
 
-        pz.DataDirectory().registerUserSource(GitHubCommitSource(datasetid), datasetid)
+        pz.DataDirectory().registerUserSource(
+            GitHubCommitSource(datasetid), datasetid
+        )
 
         rootSet = testUserSource(datasetid)
         cols = ["commitId", "reponame", "commit_message"]
@@ -519,7 +563,9 @@ if __name__ == "__main__":
 
     # NOTE: VLDB seems to rate limit downloads; causing the program to hang
     elif task == "vldb":
-        downloadVLDBPapers(datasetid, "vldbPapers", execution_engine, profile=args.profile)
+        downloadVLDBPapers(
+            datasetid, "vldbPapers", execution_engine, profile=args.profile
+        )
 
     elif task == "limit":
         rootSet = enronLimitPlan(datasetid, 5)
@@ -530,13 +576,15 @@ if __name__ == "__main__":
         print("Unknown task")
         exit(1)
 
-    records, execution_stats = pz.Execute(rootSet, 
-                                    policy = policy,
-                                    nocache=True,
-                                    allow_token_reduction=False,
-                                    allow_code_synth=False,
-                                    execution_engine=execution_engine,
-                                    verbose=verbose)
+    records, execution_stats = pz.Execute(
+        rootSet,
+        policy=policy,
+        nocache=True,
+        allow_token_reduction=False,
+        allow_code_synth=False,
+        execution_engine=execution_engine,
+        verbose=verbose,
+    )
 
     print(f"Policy is: {str(policy)}")
     print("Executed plan:")
@@ -549,7 +597,7 @@ if __name__ == "__main__":
         with open(stat_path, "w") as f:
             json.dump(execution_stats.to_json(), f)
 
-    if task == 'image':
+    if task == "image":
         imgs, breeds = [], []
         for record in records:
             path = os.path.join("testdata/images-tiny/", record.filename)
@@ -572,6 +620,6 @@ if __name__ == "__main__":
             gr.Textbox(value=plan_str, info="Query Plan")
 
         demo.launch()
-     
+
     else:
         printTable(records, cols=cols, gradio=False, plan_str=plan_str)

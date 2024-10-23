@@ -55,11 +55,17 @@ class CaseData(pz.Schema):
         desc="Whether an individual describes themselves as Hispanic or Latino or not.",
         required=False,
     )
-    gender = pz.Field(desc="Text designations that identify gender.", required=False)
-    vital_status = pz.Field(desc="The vital status of the patient", required=False)
+    gender = pz.Field(
+        desc="Text designations that identify gender.", required=False
+    )
+    vital_status = pz.Field(
+        desc="The vital status of the patient", required=False
+    )
     ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
     ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
-    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
+    ajcc_pathologic_stage = pz.Field(
+        desc="The AJCC pathologic stage", required=False
+    )
     tumor_grade = pz.Field(desc="The tumor grade", required=False)
     tumor_focality = pz.Field(desc="The tumor focality", required=False)
     tumor_largest_dimension_diameter = pz.Field(
@@ -72,7 +78,8 @@ class CaseData(pz.Schema):
     )
     # tumor_code = pz.Field(desc="The tumor code", required=False)
     filename = pz.Field(
-        desc="The name of the file the record was extracted from", required=False
+        desc="The name of the file the record was extracted from",
+        required=False,
     )
     study = pz.Field(
         desc="The last name of the author of the study, from the table name",
@@ -154,7 +161,9 @@ class RealEstateListingSource(pz.UserSource):
         return len(self.listings)
 
     def getSize(self):
-        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob('*'))
+        return sum(
+            file.stat().st_size for file in Path(self.listings_dir).rglob("*")
+        )
 
     def getItem(self, idx: int):
         # fetch listing
@@ -181,7 +190,9 @@ def buildNestedStr(node, indent=0, buildStr=""):
     elt, child = node
     indentation = " " * indent
     buildStr = (
-        f"{indentation}{elt}" if indent == 0 else buildStr + f"\n{indentation}{elt}"
+        f"{indentation}{elt}"
+        if indent == 0
+        else buildStr + f"\n{indentation}{elt}"
     )
     if child is not None:
         return buildNestedStr(child, indent=indent + 2, buildStr=buildStr)
@@ -218,10 +229,12 @@ def compute_label(physicalTree, label_idx):
     # print(f"LABEL {label_idx}: {label}")
 
     ops = flatten_nested_tuples(physicalOps)
-    label = "-".join([
-        f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
-        for op in ops
-    ])
+    label = "-".join(
+        [
+            f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
+            for op in ops
+        ]
+    )
     return f"PZ-{label_idx}-{label}"
 
 
@@ -333,13 +346,17 @@ def score_biofabric_plans(
     return f1
 
 
-def score_plan(workload, records, plan_idx, policy_str=None, reopt=False) -> float:
+def score_plan(
+    workload, records, plan_idx, policy_str=None, reopt=False
+) -> float:
     """
     Computes the F1 score of the plan
     """
     # special handling for biofabric workload
     if workload == "biofabric":
-        return score_biofabric_plans(workload, records, plan_idx, policy_str, reopt)
+        return score_biofabric_plans(
+            workload, records, plan_idx, policy_str, reopt
+        )
 
     # parse records
     # records = [
@@ -369,7 +386,9 @@ def score_plan(workload, records, plan_idx, policy_str=None, reopt=False) -> flo
     # get list of predictions
     preds = None
     if workload == "enron":
-        preds = records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
+        preds = records_df.filename.apply(
+            lambda fn: os.path.basename(fn)
+        ).tolist()
     elif workload == "real-estate":
         preds = list(records_df.listing)
 
@@ -400,14 +419,21 @@ def score_plan(workload, records, plan_idx, policy_str=None, reopt=False) -> flo
     precision = tp / (tp + fp) if tp + fp > 0 else 0.0
     recall = tp / (tp + fn) if tp + fn > 0 else 0.0
     f1_score = (
-        2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+        2 * precision * recall / (precision + recall)
+        if precision + recall > 0
+        else 0.0
     )
 
     return f1_score
 
 
 def run_pz_plan(
-    workload, plan, plan_idx, total_sentinel_cost, total_sentinel_time, sentinel_records
+    workload,
+    plan,
+    plan_idx,
+    total_sentinel_cost,
+    total_sentinel_time,
+    sentinel_records,
 ):
     """
     I'm placing this in a separate file from evaluate_pz_plans to see if this prevents
@@ -475,7 +501,10 @@ def run_pz_plan(
 
 
 def get_logical_tree(
-    workload, nocache: bool = True, num_samples: int = None, scan_start_idx: int = 0
+    workload,
+    nocache: bool = True,
+    num_samples: int = None,
+    scan_start_idx: int = 0,
 ):
     """
     This assumes you have preregistered the enron and biofabric datasets:
@@ -534,15 +563,21 @@ def get_logical_tree(
             num_samples=num_samples,
             scan_start_idx=scan_start_idx,
         )
-        listings = listings.convert(TextRealEstateListing, depends_on="text_content")
         listings = listings.convert(
-            ImageRealEstateListing, image_conversion=True, depends_on="image_contents"
+            TextRealEstateListing, depends_on="text_content"
+        )
+        listings = listings.convert(
+            ImageRealEstateListing,
+            image_conversion=True,
+            depends_on="image_contents",
         )
         listings = listings.filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
         )
-        listings = listings.filter(within_two_miles_of_mit, depends_on="address")
+        listings = listings.filter(
+            within_two_miles_of_mit, depends_on="address"
+        )
         listings = listings.filter(in_price_range, depends_on="price")
         return listings.getLogicalTree()
 
@@ -554,12 +589,18 @@ def get_logical_tree(
             num_samples=num_samples,
             scan_start_idx=scan_start_idx,
         )
-        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+        patient_tables = xls.convert(
+            pz.Table,
+            udf=udfs.xls_to_tables,
+            cardinality=pz.Cardinality.ONE_TO_MANY,
+        )
         patient_tables = patient_tables.filter(
             "The rows of the table contain the patient age"
         )
         case_data = patient_tables.convert(
-            CaseData, desc="The patient data in the table", cardinality="oneToMany"
+            CaseData,
+            desc="The patient data in the table",
+            cardinality="oneToMany",
         )
 
         return case_data.getLogicalTree()
@@ -570,7 +611,9 @@ def get_logical_tree(
 # function to run sentinel
 def run_sentinel_plan(plan_idx, workload, num_samples):
     # get specified sentinel plan
-    logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
+    logicalTree = get_logical_tree(
+        workload, nocache=True, num_samples=num_samples
+    )
     sentinel_plans = logicalTree.createPhysicalPlanCandidates(sentinels=True)
     plan = sentinel_plans[plan_idx]
 
@@ -637,7 +680,9 @@ def run_sentinel_plans(
     start_time = time.time()
 
     # create query for dataset
-    logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
+    logicalTree = get_logical_tree(
+        workload, nocache=True, num_samples=num_samples
+    )
 
     # compute number of plans
     sentinel_plans = logicalTree.createPhysicalPlanCandidates(sentinels=True)
@@ -654,7 +699,9 @@ def run_sentinel_plans(
         )
 
         # write out result dict and samples collected for each sentinel
-        for idx, (records, result_dict, cost_est_sample_data) in enumerate(results):
+        for idx, (records, result_dict, cost_est_sample_data) in enumerate(
+            results
+        ):
             fp = (
                 f"final-eval-results/reoptimization/{workload}/sentinel-{idx}-{policy_str}-results.json"
                 if policy_str is not None
@@ -719,7 +766,9 @@ def evaluate_pz_plan(sentinel_data, workload, plan_idx):
     ) = sentinel_data
 
     # get logicalTree
-    logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
+    logicalTree = get_logical_tree(
+        workload, nocache=True, scan_start_idx=num_samples
+    )
 
     # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
     plans = logicalTree.createPhysicalPlanCandidates(
@@ -770,7 +819,9 @@ def evaluate_pz_plan(sentinel_data, workload, plan_idx):
     print("---")
 
     # write result json object
-    with open(f"final-eval-results/{workload}/results-{plan_idx}.json", "w") as f:
+    with open(
+        f"final-eval-results/{workload}/results-{plan_idx}.json", "w"
+    ) as f:
         json.dump(result_dict, f)
 
 
@@ -786,7 +837,11 @@ def evaluate_pz_plans(workload, dry_run=False):
 
     Make sure to set DSP_CACHEBOOL=false.
     """
-    workload_to_dataset_size = {"enron": 1000, "real-estate": 100, "biofabric": 11}
+    workload_to_dataset_size = {
+        "enron": 1000,
+        "real-estate": 100,
+        "biofabric": 11,
+    }
     dataset_size = workload_to_dataset_size[workload]
     # num_samples = min(10, int(0.05 * dataset_size)) if workload != "biofabric" else 0
     num_samples = int(0.05 * dataset_size) if workload != "biofabric" else 1
@@ -801,7 +856,9 @@ def evaluate_pz_plans(workload, dry_run=False):
     ) = output
 
     # create query for dataset
-    logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
+    logicalTree = get_logical_tree(
+        workload, nocache=True, scan_start_idx=num_samples
+    )
 
     # get total number of plans
     compilation_start = time.time()
@@ -847,7 +904,10 @@ def evaluate_pz_plans(workload, dry_run=False):
         )
         _ = pool.starmap(
             evaluate_pz_plan,
-            [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)],
+            [
+                (sentinel_data, workload, plan_idx)
+                for plan_idx in range(num_plans)
+            ],
         )
 
     # workaround to disabling cache: delete all cached generations after each plan
@@ -899,7 +959,11 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     # TODO: in practice could move this inside of get_logical_tree w/flag indicating sentinel run;
     #       for now just manually set to make sure evaluation is accurate
     # set samples and size of dataset
-    workload_to_dataset_size = {"enron": 1000, "real-estate": 100, "biofabric": 11}
+    workload_to_dataset_size = {
+        "enron": 1000,
+        "real-estate": 100,
+        "biofabric": 11,
+    }
     dataset_size = workload_to_dataset_size[workload]
     num_samples = int(0.05 * dataset_size) if workload != "biofabric" else 1
 
@@ -931,7 +995,9 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     #     json.dump(estimates, f)
 
     # create new plan candidates based on current estimate data
-    logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
+    logicalTree = get_logical_tree(
+        workload, nocache=True, scan_start_idx=num_samples
+    )
     candidatePlans = logicalTree.createPhysicalPlanCandidates(
         cost_estimate_sample_data=all_cost_estimate_data,
         allow_bonded_query=True,
@@ -942,7 +1008,9 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     )
 
     # choose best plan and execute it
-    (_, _, _, plan, _), plan_idx = policy.choose(candidatePlans, return_idx=True)
+    (_, _, _, plan, _), plan_idx = policy.choose(
+        candidatePlans, return_idx=True
+    )
 
     # display the plan output
     print("----------------------")
@@ -1024,7 +1092,9 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
 if __name__ == "__main__":
     # parse arguments
     startTime = time.time()
-    parser = argparse.ArgumentParser(description="Run the evaluation(s) for the paper")
+    parser = argparse.ArgumentParser(
+        description="Run the evaluation(s) for the paper"
+    )
     parser.add_argument(
         "--workload",
         type=str,
@@ -1042,7 +1112,10 @@ if __name__ == "__main__":
         help="The directory with real-estate listings",
     )
     parser.add_argument(
-        "--reoptimize", default=False, action="store_true", help="Run reoptimization"
+        "--reoptimize",
+        default=False,
+        action="store_true",
+        help="Run reoptimization",
     )
     parser.add_argument(
         "--policy",
@@ -1068,12 +1141,15 @@ if __name__ == "__main__":
     if args.workload == "real-estate":
         print("Registering Datasource")
         pz.DataDirectory().registerUserSource(
-            RealEstateListingSource(args.workload, args.listings_dir), args.workload
+            RealEstateListingSource(args.workload, args.listings_dir),
+            args.workload,
         )
 
     # re-optimization is unique enough to warrant its own code path
     if args.reoptimize:
-        os.makedirs(f"final-eval-results/reoptimization/{args.workload}", exist_ok=True)
+        os.makedirs(
+            f"final-eval-results/reoptimization/{args.workload}", exist_ok=True
+        )
         run_reoptimize_eval(args.workload, args.policy, args.parallel)
         exit(1)
 

@@ -1,4 +1,3 @@
-
 from palimpzest.corelib import (
     BooleanField,
     StringField,

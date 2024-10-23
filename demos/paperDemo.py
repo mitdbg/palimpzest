@@ -21,6 +21,7 @@ FAR_AWAY_ADDRS = [
     "E 5th St",
 ]
 
+
 def within_two_miles_of_mit(record):
     # NOTE: I'm using this hard-coded function so that folks w/out a
     #       Geocoding API key from google can still run this example
@@ -36,6 +37,7 @@ def within_two_miles_of_mit(record):
     except:
         return False
 
+
 def in_price_range(record):
     try:
         price = record.price
@@ -45,6 +47,7 @@ def in_price_range(record):
         return 6e5 < price and price <= 2e6
     except:
         return False
+
 
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
@@ -68,11 +71,17 @@ class CaseData(pz.Schema):
         desc="Whether an individual describes themselves as Hispanic or Latino or not.",
         required=False,
     )
-    gender = pz.Field(desc="Text designations that identify gender.", required=False)
-    vital_status = pz.Field(desc="The vital status of the patient", required=False)
+    gender = pz.Field(
+        desc="Text designations that identify gender.", required=False
+    )
+    vital_status = pz.Field(
+        desc="The vital status of the patient", required=False
+    )
     ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
     ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
-    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
+    ajcc_pathologic_stage = pz.Field(
+        desc="The AJCC pathologic stage", required=False
+    )
     tumor_grade = pz.Field(desc="The tumor grade", required=False)
     tumor_focality = pz.Field(desc="The tumor focality", required=False)
     tumor_largest_dimension_diameter = pz.Field(
@@ -85,7 +94,8 @@ class CaseData(pz.Schema):
     )
     # tumor_code = pz.Field(desc="The tumor code", required=False)
     filename = pz.Field(
-        desc="The name of the file the record was extracted from", required=False
+        desc="The name of the file the record was extracted from",
+        required=False,
     )
     study = pz.Field(
         desc="The last name of the author of the study, from the table name",
@@ -135,7 +145,9 @@ class RealEstateListingSource(pz.UserSource):
         return len(self.listings)
 
     def getSize(self):
-        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob('*'))
+        return sum(
+            file.stat().st_size for file in Path(self.listings_dir).rglob("*")
+        )
 
     def getItem(self, idx: int):
         # fetch listing
@@ -162,30 +174,40 @@ if __name__ == "__main__":
     # parse arguments
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument(
-        "--verbose", default=False, action="store_true", help="Print verbose output"
+        "--verbose",
+        default=False,
+        action="store_true",
+        help="Print verbose output",
     )
     parser.add_argument(
-        "--profile", default=False, action="store_true", help="Profile execution"
+        "--profile",
+        default=False,
+        action="store_true",
+        help="Profile execution",
     )
     parser.add_argument("--datasetid", type=str, help="The dataset id")
-    parser.add_argument("--workload", type=str, help="The workload to run. One of enron, real-estate, medical-schema-matching.")
+    parser.add_argument(
+        "--workload",
+        type=str,
+        help="The workload to run. One of enron, real-estate, medical-schema-matching.",
+    )
     parser.add_argument(
         "--engine",
         type=str,
-        help='The engine to use. One of sentinel, nosentinel',
-        default='sentinel',
+        help="The engine to use. One of sentinel, nosentinel",
+        default="sentinel",
     )
     parser.add_argument(
         "--executor",
         type=str,
-        help='The plan executor to use. One of sequential, pipelined, parallel',
-        default='parallel',
+        help="The plan executor to use. One of sequential, pipelined, parallel",
+        default="parallel",
     )
     parser.add_argument(
         "--policy",
         type=str,
         help="One of 'mincost', 'mintime', 'maxquality'",
-        default='mincost',
+        default="mincost",
     )
 
     args = parser.parse_args()
@@ -242,8 +264,11 @@ if __name__ == "__main__":
     else:
         print("Unknown engine")
         exit(1)
-    
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
+
+    if (
+        os.getenv("OPENAI_API_KEY") is None
+        and os.getenv("TOGETHER_API_KEY") is None
+    ):
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     # create pz plan
@@ -268,7 +293,9 @@ if __name__ == "__main__":
         plan = pz.Dataset(user_dataset_id, schema=RealEstateListingFiles)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
         plan = plan.convert(
-            ImageRealEstateListing, image_conversion=True, depends_on="image_contents"
+            ImageRealEstateListing,
+            image_conversion=True,
+            depends_on="image_contents",
         )
         plan = plan.filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
@@ -280,9 +307,17 @@ if __name__ == "__main__":
     elif workload == "medical-schema-matching":
         # datasetid="biofabric-medium" for paper evaluation
         plan = pz.Dataset(datasetid, schema=pz.XLSFile)
-        plan = plan.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+        plan = plan.convert(
+            pz.Table,
+            udf=udfs.xls_to_tables,
+            cardinality=pz.Cardinality.ONE_TO_MANY,
+        )
         plan = plan.filter("The rows of the table contain the patient age")
-        plan = plan.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
+        plan = plan.convert(
+            CaseData,
+            desc="The patient data in the table",
+            cardinality=pz.Cardinality.ONE_TO_MANY,
+        )
 
     # execute pz plan
     records, execution_stats = pz.Execute(

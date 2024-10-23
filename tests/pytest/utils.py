@@ -21,7 +21,9 @@ def buildNestedStr(node, indent=0, buildStr=""):
     elt, child = node
     indentation = " " * indent
     buildStr = (
-        f"{indentation}{elt}" if indent == 0 else buildStr + f"\n{indentation}{elt}"
+        f"{indentation}{elt}"
+        if indent == 0
+        else buildStr + f"\n{indentation}{elt}"
     )
     if child is not None:
         return buildNestedStr(child, indent=indent + 2, buildStr=buildStr)
