@@ -34,12 +34,8 @@ class ScientificPaper(pz.PDFFile):
         desc="The year the paper was published. This is a number.",
         required=False,
     )
-    paper_author = pz.Field(
-        desc="The name of the first author of the paper", required=True
-    )
-    paper_journal = pz.Field(
-        desc="The name of the journal the paper was published in", required=True
-    )
+    paper_author = pz.Field(desc="The name of the first author of the paper", required=True)
+    paper_journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
     paper_subject = pz.Field(
         desc="A summary of the paper contribution in one sentence",
         required=False,
@@ -50,18 +46,10 @@ class ScientificPaper(pz.PDFFile):
 class Reference(pz.Schema):
     """Represents a reference to another paper, which is cited in a scientific paper"""
 
-    reference_index = pz.Field(
-        desc="The index of the reference in the paper", required=True
-    )
-    reference_title = pz.Field(
-        desc="The title of the paper being cited", required=True
-    )
-    reference_first_author = pz.Field(
-        desc="The author of the paper being cited", required=True
-    )
-    reference_year = pz.Field(
-        desc="The year in which the cited paper was published", required=True
-    )
+    reference_index = pz.Field(desc="The index of the reference in the paper", required=True)
+    reference_title = pz.Field(desc="The title of the paper being cited", required=True)
+    reference_first_author = pz.Field(desc="The author of the paper being cited", required=True)
+    reference_year = pz.Field(desc="The year in which the cited paper was published", required=True)
     # snippet = pz.Field(desc="A snippet from the source paper that references the index", required=False)
 
 
@@ -69,9 +57,7 @@ class CaseData(pz.Schema):
     """An individual row extracted from a table containing medical study data."""
 
     case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-    age_at_diagnosis = pz.Field(
-        desc="The age of the patient at the time of diagnosis", required=False
-    )
+    age_at_diagnosis = pz.Field(desc="The age of the patient at the time of diagnosis", required=False)
     race = pz.Field(
         desc="An arbitrary classification of a taxonomic group that is a division of a species.",
         required=False,
@@ -80,12 +66,8 @@ class CaseData(pz.Schema):
         desc="Whether an individual describes themselves as Hispanic or Latino or not.",
         required=False,
     )
-    gender = pz.Field(
-        desc="Text designations that identify gender.", required=False
-    )
-    vital_status = pz.Field(
-        desc="The vital status of the patient", required=False
-    )
+    gender = pz.Field(desc="Text designations that identify gender.", required=False)
+    vital_status = pz.Field(desc="The vital status of the patient", required=False)
     ajcc_pathologic_t = pz.Field(
         desc="Code of pathological T (primary tumor) to define the size or contiguous extension of the primary tumor (T), using staging criteria from the American Joint Committee on Cancer (AJCC).",
         required=False,
@@ -106,9 +88,7 @@ class CaseData(pz.Schema):
         desc="The text term used to describe whether the patient's disease originated in a single location or multiple locations.",
         required=False,
     )
-    tumor_largest_dimension_diameter = pz.Field(
-        desc="The tumor largest dimension diameter.", required=False
-    )
+    tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter.", required=False)
     primary_diagnosis = pz.Field(
         desc="Text term used to describe the patient's histologic diagnosis, as described by the World Health Organization's (WHO) International Classification of Diseases for Oncology (ICD-O).",
         required=False,
@@ -142,9 +122,7 @@ def extract_supplemental(engine, policy):
     # tableURLS = urlFile.convert(pz.URL, desc="The URLs of the tables")
     tables = tableURLS.convert(pz.File, udf=udfs.url_to_file)
     xls = tables.convert(pz.XLSFile, udf=udfs.file_to_xls)
-    patient_tables = xls.convert(
-        pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY
-    )
+    patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
 
     output = patient_tables
     iterable = pz.Execute(
@@ -169,15 +147,9 @@ def extract_supplemental(engine, policy):
 @st.cache_resource()
 def integrate_tables(engine, policy):
     xls = pz.Dataset("biofabric-tiny", schema=pz.XLSFile)
-    patient_tables = xls.convert(
-        pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY
-    )
-    patient_tables = patient_tables.filter(
-        "The table contains biometric information about the patient"
-    )
-    case_data = patient_tables.convert(
-        CaseData, desc="The patient data in the table", cardinality="oneToMany"
-    )
+    patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+    patient_tables = patient_tables.filter("The table contains biometric information about the patient")
+    case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality="oneToMany")
 
     iterable = pz.Execute(
         case_data,
@@ -285,11 +257,7 @@ if run_pz:
                 index = ref.index
             except:
                 continue
-            ref.key = (
-                ref.first_author.split()[0]
-                + ref.title.split()[0]
-                + str(ref.year)
-            )
+            ref.key = ref.first_author.split()[0] + ref.title.split()[0] + str(ref.year)
             references.append(
                 {
                     "title": ref.title,
@@ -322,9 +290,7 @@ else:
             df["first_author"] = df["authors"].apply(lambda x: x.split()[0])
         except:
             breakpoint()
-        df["key"] = (
-            df["first_author"] + df["first_title"] + df["year"].astype(str)
-        )
+        df["key"] = df["first_author"] + df["first_title"] + df["year"].astype(str)
         references.append(df)
     references_df = pd.concat(references)
 

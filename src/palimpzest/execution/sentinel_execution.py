@@ -61,9 +61,7 @@ class SentinelExecutionEngine(ExecutionEngine):
             sentinel_plans = optimizer.optimize(dataset)
 
             # run sentinel plans
-            all_execution_data, all_records, all_plan_stats = (
-                self.execute_plans(sentinel_plans)
-            )
+            all_execution_data, all_records, all_plan_stats = self.execute_plans(sentinel_plans)
 
         # construct the CostModel with any sample execution data we've gathered
         cost_model = CostModel(
@@ -88,19 +86,12 @@ class SentinelExecutionEngine(ExecutionEngine):
 
         # execute plan(s) according to the optimization strategy
         if self.optimization_strategy == OptimizationStrategy.OPTIMAL:
-            records, plan_stats = self.execute_optimal_strategy(
-                dataset, optimizer
-            )
+            records, plan_stats = self.execute_optimal_strategy(dataset, optimizer)
             all_records.extend(records)
             all_plan_stats.extend(plan_stats)
 
-        elif (
-            self.optimization_strategy
-            == OptimizationStrategy.CONFIDENCE_INTERVAL
-        ):
-            records, plan_stats = self.execute_confidence_interval_strategy(
-                dataset, optimizer
-            )
+        elif self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
+            records, plan_stats = self.execute_confidence_interval_strategy(dataset, optimizer)
             all_records.extend(records)
             all_plan_stats.extend(plan_stats)
 
@@ -120,18 +111,13 @@ class SentinelExecutionEngine(ExecutionEngine):
                     )
                 )
             ),
-            plan_strs={
-                plan_stats.plan_id: plan_stats.plan_str
-                for plan_stats in aggregate_plan_stats.items()
-            },
+            plan_strs={plan_stats.plan_id: plan_stats.plan_str for plan_stats in aggregate_plan_stats.items()},
         )
 
         return all_records, execution_stats
 
 
-class SequentialSingleThreadSentinelExecution(
-    SentinelExecutionEngine, SequentialSingleThreadPlanExecutor
-):
+class SequentialSingleThreadSentinelExecution(SentinelExecutionEngine, SequentialSingleThreadPlanExecutor):
     """
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
     """
@@ -139,9 +125,7 @@ class SequentialSingleThreadSentinelExecution(
     pass
 
 
-class PipelinedSingleThreadSentinelExecution(
-    SentinelExecutionEngine, PipelinedSingleThreadPlanExecutor
-):
+class PipelinedSingleThreadSentinelExecution(SentinelExecutionEngine, PipelinedSingleThreadPlanExecutor):
     """
     This class performs sentinel execution while executing plans in a pipelined, single-threaded fashion.
     """
@@ -149,9 +133,7 @@ class PipelinedSingleThreadSentinelExecution(
     pass
 
 
-class PipelinedParallelSentinelExecution(
-    SentinelExecutionEngine, PipelinedParallelPlanExecutor
-):
+class PipelinedParallelSentinelExecution(SentinelExecutionEngine, PipelinedParallelPlanExecutor):
     """
     This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
     """

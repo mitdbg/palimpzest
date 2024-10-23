@@ -54,9 +54,7 @@ class ConvertOp(PhysicalOperator):
         }
 
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
-        raise NotImplementedError(
-            "This is an abstract class. Use a subclass instead."
-        )
+        raise NotImplementedError("This is an abstract class. Use a subclass instead.")
 
 
 class NonLLMConvert(ConvertOp):
@@ -75,19 +73,13 @@ class NonLLMConvert(ConvertOp):
         op += f"    UDF: {str(self.udf)}\n"
         return op
 
-    def naiveCostEstimates(
-        self, source_op_cost_estimates: OperatorCostEstimates
-    ) -> OperatorCostEstimates:
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Compute naive cost estimates for the NonLLMConvert operation. These estimates assume
         that the UDF convert (1) has no cost and (2) has perfect quality.
         """
         # estimate cardinality and selectivity given the "cardinality" set by the user
-        selectivity = (
-            1.0
-            if self.cardinality == Cardinality.ONE_TO_ONE
-            else NAIVE_EST_ONE_TO_MANY_SELECTIVITY
-        )
+        selectivity = 1.0 if self.cardinality == Cardinality.ONE_TO_ONE else NAIVE_EST_ONE_TO_MANY_SELECTIVITY
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate 1 ms single-threaded execution for udf function
@@ -126,10 +118,7 @@ class NonLLMConvert(ConvertOp):
                 op_name=self.op_name(),
                 time_per_record=fn_call_duration_secs / len(drs),
                 cost_per_record=0.0,
-                answer={
-                    field_name: getattr(dr, field_name)
-                    for field_name in self.outputSchema.fieldNames()
-                },
+                answer={field_name: getattr(dr, field_name) for field_name in self.outputSchema.fieldNames()},
                 input_fields=self.inputSchema.fieldNames(),
                 generated_fields=self.outputSchema.fieldNames(),
                 fn_call_duration_secs=fn_call_duration_secs / len(drs),
@@ -190,9 +179,7 @@ class LLMConvert(ConvertOp):
 
         return op_params
 
-    def naiveCostEstimates(
-        self, source_op_cost_estimates: OperatorCostEstimates
-    ) -> OperatorCostEstimates:
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Compute naive cost estimates for the LLMConvert operation. Implicitly, these estimates
         assume the use of a single LLM call for each input record. Child classes of LLMConvert
@@ -208,36 +195,23 @@ class LLMConvert(ConvertOp):
 
         # get est. of conversion time per record from model card;
         # NOTE: model will only be None for code synthesis, which uses GPT-3.5 as fallback
-        model_name = (
-            self.model.value
-            if getattr(self, "model", None) is not None
-            else Model.GPT_3_5.value
-        )
+        model_name = self.model.value if getattr(self, "model", None) is not None else Model.GPT_3_5.value
         model_conversion_time_per_record = (
-            MODEL_CARDS[model_name]["seconds_per_output_token"]
-            * est_num_output_tokens
+            MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
         ) / self.max_workers
 
         # get est. of conversion cost (in USD) per record from model card
         model_conversion_usd_per_record = (
-            MODEL_CARDS[model_name]["usd_per_input_token"]
-            * est_num_input_tokens
-            + MODEL_CARDS[model_name]["usd_per_output_token"]
-            * est_num_output_tokens
+            MODEL_CARDS[model_name]["usd_per_input_token"] * est_num_input_tokens
+            + MODEL_CARDS[model_name]["usd_per_output_token"] * est_num_output_tokens
         )
 
         # estimate cardinality and selectivity given the "cardinality" set by the user
-        selectivity = (
-            1.0
-            if self.cardinality == Cardinality.ONE_TO_ONE
-            else NAIVE_EST_ONE_TO_MANY_SELECTIVITY
-        )
+        selectivity = 1.0 if self.cardinality == Cardinality.ONE_TO_ONE else NAIVE_EST_ONE_TO_MANY_SELECTIVITY
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate quality of output based on the strength of the model being used
-        quality = (
-            MODEL_CARDS[model_name]["MMLU"] / 100.0
-        ) * source_op_cost_estimates.quality
+        quality = (MODEL_CARDS[model_name]["MMLU"] / 100.0) * source_op_cost_estimates.quality
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -246,9 +220,7 @@ class LLMConvert(ConvertOp):
             quality=quality,
         )
 
-    def _generate_field_names(
-        self, candidate: DataRecord, inputSchema: Schema, outputSchema: Schema
-    ) -> List[str]:
+    def _generate_field_names(self, candidate: DataRecord, inputSchema: Schema, outputSchema: Schema) -> List[str]:
         """
         Creates the list of field names that the convert operation needs to generate.
         """
@@ -259,10 +231,7 @@ class LLMConvert(ConvertOp):
         #    a. if the field is present, but its value is None --> we will try to generate it
         fields_to_generate = []
         for field_name in outputSchema.fieldNames():
-            if (
-                field_name not in inputSchema.fieldNames()
-                and getattr(candidate, field_name, None) is None
-            ):
+            if field_name not in inputSchema.fieldNames() and getattr(candidate, field_name, None) is None:
                 fields_to_generate.append(field_name)
 
         return fields_to_generate
@@ -280,66 +249,38 @@ class LLMConvert(ConvertOp):
         multilineInputFieldDescription = ""
         for field_name in self.inputSchema.fieldNames():
             field_desc = getattr(self.inputSchema, field_name).desc
-            multilineInputFieldDescription += prompts.INPUT_FIELD.format(
-                field_name=field_name, field_desc=field_desc
-            )
+            multilineInputFieldDescription += prompts.INPUT_FIELD.format(field_name=field_name, field_desc=field_desc)
 
         # build string of output fields and their descriptions
         multilineOutputFieldDescription = ""
         for field_name in fields_to_generate:
             field_desc = getattr(self.outputSchema, field_name).desc
-            multilineOutputFieldDescription += prompts.OUTPUT_FIELD.format(
-                field_name=field_name, field_desc=field_desc
-            )
+            multilineOutputFieldDescription += prompts.OUTPUT_FIELD.format(field_name=field_name, field_desc=field_desc)
 
         # add input/output schema descriptions (if they have a docstring)
         optionalInputDesc = (
             ""
             if self.inputSchema.__doc__ is None
-            else prompts.OPTIONAL_INPUT_DESC.format(
-                desc=self.inputSchema.__doc__
-            )
+            else prompts.OPTIONAL_INPUT_DESC.format(desc=self.inputSchema.__doc__)
         )
         optionalOutputDesc = (
             ""
             if self.outputSchema.__doc__ is None
-            else prompts.OPTIONAL_OUTPUT_DESC.format(
-                desc=self.outputSchema.__doc__
-            )
+            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.outputSchema.__doc__)
         )
 
         # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
         if self.cardinality == Cardinality.ONE_TO_MANY:
-            targetOutputDescriptor = (
-                prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(
-                    doc_type=doc_type
-                )
-            )
+            targetOutputDescriptor = prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
             outputSingleOrPlural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
-            appendixInstruction = (
-                prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION.format(
-                    fields=fields_to_generate
-                )
-            )
+            appendixInstruction = prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
         else:
-            targetOutputDescriptor = (
-                prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(
-                    doc_type=doc_type
-                )
-            )
+            targetOutputDescriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
             outputSingleOrPlural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
-            appendixInstruction = (
-                prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(
-                    fields=fields_to_generate
-                )
-            )
+            appendixInstruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
 
         # construct promptQuestion
-        optional_desc = (
-            ""
-            if self.desc is None
-            else prompts.OPTIONAL_DESC.format(desc=self.desc)
-        )
+        optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
         if not self.image_conversion:
             prompt_question = prompts.STRUCTURED_CONVERT_PROMPT
         else:
@@ -398,9 +339,7 @@ class LLMConvert(ConvertOp):
                 record_id = dr._id
                 record_parent_id = dr._parent_id
                 record_state = dr._asDict(include_bytes=False)
-                answer = {
-                    field_name: getattr(dr, field_name) for field_name in fields
-                }
+                answer = {field_name: getattr(dr, field_name) for field_name in fields}
 
             record_op_stats = RecordOpStats(
                 record_id=record_id,
@@ -461,9 +400,7 @@ class LLMConvert(ConvertOp):
 
         return dr
 
-    def parse_answer(
-        self, answer: str, fields_to_generate: List[str]
-    ) -> Dict[FieldName, List[Any]]:
+    def parse_answer(self, answer: str, fields_to_generate: List[str]) -> Dict[FieldName, List[Any]]:
         """
         This functions gets a string answer and parses it into an iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
         #"""
@@ -474,17 +411,12 @@ class LLMConvert(ConvertOp):
             # sanity check validity of parsed json
             assert json_answer != {}, "No output was found!"
             if self.cardinality == Cardinality.ONE_TO_MANY:
+                assert "items" in json_answer, '"items" key missing from one-to-many JSON'
                 assert (
-                    "items" in json_answer
-                ), '"items" key missing from one-to-many JSON'
-                assert (
-                    isinstance(json_answer["items"], list)
-                    and len(json_answer["items"]) > 0
+                    isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0
                 ), "No output objects were generated for one-to-many query"
             else:
-                assert all(
-                    [field in json_answer for field in fields_to_generate]
-                ), "Not all fields were generated!"
+                assert all([field in json_answer for field in fields_to_generate]), "Not all fields were generated!"
 
         except Exception as e:
             print(f"Error parsing LLM answer: {e}")
@@ -504,23 +436,17 @@ class LLMConvert(ConvertOp):
                     try:
                         field_answers[field].append(item[field])
                     except Exception:
-                        print(
-                            f"Error parsing field {field} in one-to-many answer: {item}"
-                        )
+                        print(f"Error parsing field {field} in one-to-many answer: {item}")
 
         else:
-            field_answers = {
-                field: [json_answer[field]] for field in fields_to_generate
-            }
+            field_answers = {field: [json_answer[field]] for field in fields_to_generate}
 
         return field_answers
 
     def _dspy_generate_fields(
         self,
         prompt: str,
-        content: Optional[
-            Union[str, List[bytes]]
-        ] = None,  # either text or image
+        content: Optional[Union[str, List[bytes]]] = None,  # either text or image
         verbose: bool = False,
     ) -> Tuple[str, GenerationStats]:
         """This functions wraps the call to the generator method to actually perform the field generation. Returns an answer which is a string and a query_stats which is a GenerationStats object."""
@@ -543,9 +469,7 @@ class LLMConvert(ConvertOp):
             )
 
         try:
-            answer, query_stats = generator.generate(
-                context=content, question=prompt
-            )
+            answer, query_stats = generator.generate(context=content, question=prompt)
         except Exception as e:
             print(f"DSPy generation error: {e}")
             return "", GenerationStats()
@@ -562,24 +486,18 @@ class LLMConvert(ConvertOp):
          - field_outputs: a dictionary where keys are the fields and values are lists of JSON corresponding to the value of the field in that record.
          - query_stats
         """
-        raise NotImplementedError(
-            "This is an abstract class. Use a subclass instead!"
-        )
+        raise NotImplementedError("This is an abstract class. Use a subclass instead!")
 
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         start_time = time.time()
-        fields_to_generate = self._generate_field_names(
-            candidate, self.inputSchema, self.outputSchema
-        )
+        fields_to_generate = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
 
         # get text or image content depending on prompt strategy
         if self.image_conversion:
             base64_images = []
             if hasattr(candidate, "contents"):
                 # TODO: should address this now; we need a way to infer (or have the programmer declare) what fields contain image content
-                base64_images = [
-                    base64.b64encode(candidate.contents).decode("utf-8")
-                ]
+                base64_images = [base64.b64encode(candidate.contents).decode("utf-8")]
             else:
                 base64_images = [
                     base64.b64encode(image).decode("utf-8")
@@ -590,24 +508,17 @@ class LLMConvert(ConvertOp):
             content = candidate._asJSONStr(include_bytes=False)
 
         field_answers: Dict[str, List]
-        field_answers, generation_stats = self.convert(
-            fields=fields_to_generate, candidate_content=content
-        )
+        field_answers, generation_stats = self.convert(fields=fields_to_generate, candidate_content=content)
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
         try:
             n_records = max([len(lst) for lst in field_answers.values()])
         except:
-            print(
-                f"Error in field answers: {field_answers}. Returning empty records."
-            )
+            print(f"Error in field answers: {field_answers}. Returning empty records.")
             breakpoint()
             return [], []
-        records_json = [
-            {field: None for field in fields_to_generate}
-            for _ in range(n_records)
-        ]
+        records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
 
         for field_name, answer_list in field_answers.items():
             for idx, output in enumerate(answer_list):
@@ -615,9 +526,7 @@ class LLMConvert(ConvertOp):
                 record[field_name] = output
 
         drs = [
-            self._create_data_record_from_json(
-                jsonObj=js, candidate=candidate, cardinality_idx=idx
-            )
+            self._create_data_record_from_json(jsonObj=js, candidate=candidate, cardinality_idx=idx)
             for idx, js in enumerate(records_json)
         ]
 
@@ -634,17 +543,13 @@ class LLMConvert(ConvertOp):
 
 
 class LLMConvertConventional(LLMConvert):
-    def naiveCostEstimates(
-        self, source_op_cost_estimates: OperatorCostEstimates
-    ) -> OperatorCostEstimates:
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Update the cost per record and time per record estimates to account for the additional
         LLM calls we incur by executing one query per-field.
         """
         # get naive cost estimates from LLMConvert
-        naive_op_cost_estimates = super().naiveCostEstimates(
-            source_op_cost_estimates
-        )
+        naive_op_cost_estimates = super().naiveCostEstimates(source_op_cost_estimates)
 
         # re-compute cost per record assuming we use fewer input tokens
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
@@ -666,25 +571,18 @@ class LLMConvertConventional(LLMConvert):
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
-            MODEL_CARDS[self.model.value]["seconds_per_output_token"]
-            * est_num_output_tokens
+            MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
         ) / self.max_workers
 
         # get est. of conversion cost (in USD) per record from model card
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"]
-            * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"]
-            * est_num_output_tokens
+            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
+            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
         )
 
         # set refined estimate of time and cost per record
-        naive_op_cost_estimates.time_per_record = (
-            model_conversion_time_per_record
-        )
-        naive_op_cost_estimates.cost_per_record = (
-            model_conversion_usd_per_record
-        )
+        naive_op_cost_estimates.time_per_record = model_conversion_time_per_record
+        naive_op_cost_estimates.cost_per_record = model_conversion_usd_per_record
 
         return naive_op_cost_estimates
 
@@ -694,9 +592,7 @@ class LLMConvertConventional(LLMConvert):
         fields_answers = {}
         fields_stats = {}
         for field_name in fields:
-            prompt = self._construct_query_prompt(
-                fields_to_generate=[field_name]
-            )
+            prompt = self._construct_query_prompt(fields_to_generate=[field_name])
             answer, stats = self._dspy_generate_fields(
                 content=candidate_content,
                 prompt=prompt,
@@ -711,9 +607,7 @@ class LLMConvertConventional(LLMConvert):
 
 
 class LLMConvertBonded(LLMConvert):
-    def convert(
-        self, candidate_content, fields
-    ) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+    def convert(self, candidate_content, fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
         prompt = self._construct_query_prompt(fields_to_generate=fields)
 
         # generate all fields in a single query
@@ -735,9 +629,7 @@ class LLMConvertBonded(LLMConvert):
                     verbose=self.verbose,
                 )
 
-                field_answer, field_stats = conventional_op.convert(
-                    candidate_content, [field]
-                )
+                field_answer, field_stats = conventional_op.convert(candidate_content, [field])
                 json_answers[field] = field_answer[field]
                 generation_stats += field_stats
 

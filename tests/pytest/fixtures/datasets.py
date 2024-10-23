@@ -14,9 +14,7 @@ class RealEstateListingFiles(pz.Schema):
     """The source text and image data for a real estate listing."""
 
     listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.StringField(
-        desc="The content of the listing's text description", required=True
-    )
+    text_content = pz.StringField(desc="The content of the listing's text description", required=True)
     image_contents = pz.ListField(
         element_type=pz.BytesField,
         desc="A list of the contents of each image of the listing",
@@ -34,9 +32,7 @@ class RealEstateListingSource(pz.UserSource):
         return len(self.listings)
 
     def getSize(self):
-        return sum(
-            file.stat().st_size for file in Path(self.listings_dir).rglob("*")
-        )
+        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
 
     def getItem(self, idx: int):
         # fetch listing

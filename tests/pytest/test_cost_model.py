@@ -20,9 +20,7 @@ class TestCostModel:
         operator_estimates = estimator.operator_estimates
 
         # check that all operators are present
-        assert sorted(operator_estimates.keys()) == sorted(
-            simple_plan_expected_operator_estimates.keys()
-        )
+        assert sorted(operator_estimates.keys()) == sorted(simple_plan_expected_operator_estimates.keys())
 
         # validate operator estimates
         for (
@@ -44,10 +42,7 @@ class TestCostModel:
                         metric,
                         expected_value,
                     ) in expected_model_estimates.items():
-                        assert (
-                            operator_estimates[op_id][model_name][metric]
-                            == expected_value
-                        )
+                        assert operator_estimates[op_id][model_name][metric] == expected_value
 
     # TODO: rewrite this test to be agnostic to the simple plan
     @pytest.mark.parametrize(
@@ -127,13 +122,9 @@ class TestCostModel:
             "filter123": filter_op_id,
         }
         for record_op_stats in simple_plan_sample_execution_data:
-            record_op_stats.op_id = test_op_id_to_new_op_id[
-                record_op_stats.op_id
-            ]
+            record_op_stats.op_id = test_op_id_to_new_op_id[record_op_stats.op_id]
             if record_op_stats.source_op_id is not None:
-                record_op_stats.source_op_id = test_op_id_to_new_op_id[
-                    record_op_stats.source_op_id
-                ]
+                record_op_stats.source_op_id = test_op_id_to_new_op_id[record_op_stats.source_op_id]
 
         # construct cost model
         cost_model = CostModel(
@@ -148,9 +139,7 @@ class TestCostModel:
             source_op_estimates = op_plan_cost.op_estimates
 
             # check that estimated time, cost, and quality are as expected
-            op_cost, op_time, op_quality, output_cardinality = (
-                expected_cost_est_results(op, input_cardinality)
-            )
+            op_cost, op_time, op_quality, output_cardinality = expected_cost_est_results(op, input_cardinality)
             assert op_plan_cost.cost == op_cost
             assert op_plan_cost.time == op_time
             assert op_plan_cost.quality == op_quality

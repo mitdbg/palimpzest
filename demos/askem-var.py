@@ -16,9 +16,7 @@ import palimpzest as pz
 class Papersnippet(pz.TextFile):
     """Represents an excerpt from a scientific research paper, which potentially contains variables"""
 
-    excerptid = pz.Field(
-        desc="The unique identifier for the excerpt", required=True
-    )
+    excerptid = pz.Field(desc="The unique identifier for the excerpt", required=True)
     excerpt = pz.Field(desc="The text of the excerpt", required=True)
 
 

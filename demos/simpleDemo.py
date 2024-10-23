@@ -32,15 +32,9 @@ class ScientificPaper(pz.PDFFile):
         desc="The year the paper was published. This is a number.",
         required=False,
     )
-    author = pz.Field(
-        desc="The name of the first author of the paper", required=True
-    )
-    institution = pz.Field(
-        desc="The institution of the first author of the paper", required=True
-    )
-    journal = pz.Field(
-        desc="The name of the journal the paper was published in", required=True
-    )
+    author = pz.Field(desc="The name of the first author of the paper", required=True)
+    institution = pz.Field(desc="The institution of the first author of the paper", required=True)
+    journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
     fundingAgency = pz.Field(
         desc="The name of the funding agency that supported the research",
         required=False,
@@ -140,9 +134,7 @@ def download_pdf(candidate: DataRecord):
     return dr
 
 
-def downloadVLDBPapers(
-    vldbListingPageURLsId, outputDir, execution_engine, profile=False
-):
+def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profile=False):
     """This function downloads a bunch of VLDB papers from an online listing and saves them to disk.  It also saves a CSV file of the paper listings."""
     # 1. Grab the input VLDB listing page(s) and scrape them for paper metadata
     tfs = pz.Dataset(
@@ -178,9 +170,7 @@ def downloadVLDBPapers(
     outputPath = os.path.join(outputDir, "vldbPaperListings.csv")
 
     with open(outputPath, "w", newline="") as csvfile:
-        writer = csv.DictWriter(
-            csvfile, fieldnames=listing_records[0].__dict__.keys()
-        )
+        writer = csv.DictWriter(csvfile, fieldnames=listing_records[0].__dict__.keys())
         writer.writeheader()
         for record in listing_records:
             writer.writerow(record._asDict())
@@ -190,9 +180,7 @@ def downloadVLDBPapers(
             json.dump(listing_execution_stats.to_json(), f)
 
     # 2. Get the PDF URL for each paper that's listed and download it
-    pdfContent = vldbPaperListings.convert(
-        outputSchema=pz.Download, udf=download_pdf
-    )
+    pdfContent = vldbPaperListings.convert(outputSchema=pz.Download, udf=download_pdf)
 
     # 3. Save the paper listings to a CSV file and the PDFs to disk
     pdf_records, download_execution_stats = pz.Execute(
@@ -217,20 +205,12 @@ def downloadVLDBPapers(
 class GitHubUpdate(pz.Schema):
     """GitHubUpdate represents a single commit message from a GitHub repo"""
 
-    commitId = pz.Field(
-        desc="The unique identifier for the commit", required=True
-    )
+    commitId = pz.Field(desc="The unique identifier for the commit", required=True)
     reponame = pz.Field(desc="The name of the repository", required=True)
-    commit_message = pz.Field(
-        desc="The message associated with the commit", required=True
-    )
+    commit_message = pz.Field(desc="The message associated with the commit", required=True)
     commit_date = pz.Field(desc="The date the commit was made", required=True)
-    committer_name = pz.Field(
-        desc="The name of the person who made the commit", required=True
-    )
-    file_names = pz.Field(
-        desc="The list of files changed in the commit", required=False
-    )
+    committer_name = pz.Field(desc="The name of the person who made the commit", required=True)
+    file_names = pz.Field(desc="The list of files changed in the commit", required=False)
 
 
 def testUserSource(datasetId: str):
@@ -251,9 +231,7 @@ def buildEnronPlan(datasetId):
 
 def computeEnronStats(datasetId):
     emails = pz.Dataset(datasetId, schema=Email)
-    subjectLineLengths = emails.convert(
-        pz.Number, desc="The number of words in the subject field"
-    )
+    subjectLineLengths = emails.convert(pz.Number, desc="The number of words in the subject field")
     return subjectLineLengths
 
 
@@ -323,21 +301,10 @@ def buildImageAggPlan(datasetId):
 
 
 def printTable(records, cols=None, gradio=False, plan_str=None):
-    records = [
-        {
-            key: record.__dict__[key]
-            for key in record.__dict__
-            if not key.startswith("_")
-        }
-        for record in records
-    ]
+    records = [{key: record.__dict__[key] for key in record.__dict__ if not key.startswith("_")} for record in records]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
-    final_df = (
-        records_df[print_cols]
-        if not records_df.empty
-        else pd.DataFrame(columns=print_cols)
-    )
+    final_df = records_df[print_cols] if not records_df.empty else pd.DataFrame(columns=print_cols)
 
     if not gradio:
         print(tabulate(final_df, headers="keys", tablefmt="psql"))
@@ -443,10 +410,7 @@ if __name__ == "__main__":
         print("Unknown engine")
         exit(1)
 
-    if (
-        os.getenv("OPENAI_API_KEY") is None
-        and os.getenv("TOGETHER_API_KEY") is None
-    ):
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     if task == "paper":
@@ -531,9 +495,7 @@ if __name__ == "__main__":
                 return len(self.commits)
 
             def getSize(self):
-                return sum(
-                    map(lambda commit: sys.getsizeof(commit), self.commits)
-                )
+                return sum(map(lambda commit: sys.getsizeof(commit), self.commits))
 
             def getItem(self, idx: int):
                 # NOTE: we can make this a streaming demo again by modifying this getItem function
@@ -544,9 +506,7 @@ if __name__ == "__main__":
 
                 return dr
 
-        pz.DataDirectory().registerUserSource(
-            GitHubCommitSource(datasetid), datasetid
-        )
+        pz.DataDirectory().registerUserSource(GitHubCommitSource(datasetid), datasetid)
 
         rootSet = testUserSource(datasetid)
         cols = ["commitId", "reponame", "commit_message"]
@@ -563,9 +523,7 @@ if __name__ == "__main__":
 
     # NOTE: VLDB seems to rate limit downloads; causing the program to hang
     elif task == "vldb":
-        downloadVLDBPapers(
-            datasetid, "vldbPapers", execution_engine, profile=args.profile
-        )
+        downloadVLDBPapers(datasetid, "vldbPapers", execution_engine, profile=args.profile)
 
     elif task == "limit":
         rootSet = enronLimitPlan(datasetid, 5)

@@ -8,9 +8,7 @@ from palimpzest.corelib import Field, OperatorDerivedSchema, Schema
 # signature for a group by aggregate that applies
 # group and aggregation to an input tuple
 class GroupBySig:
-    def __init__(
-        self, gbyFields: list[str], aggFuncs: list[str], aggFields: list[str]
-    ):
+    def __init__(self, gbyFields: list[str], aggFuncs: list[str], aggFields: list[str]):
         self.gbyFields = gbyFields
         self.aggFields = aggFields
         self.aggFuncs = aggFuncs
@@ -41,10 +39,7 @@ class GroupBySig:
 
     def __eq__(self, other) -> bool:
         # __eq__ should be defined for consistency with __hash__
-        return (
-            isinstance(other, GroupBySig)
-            and self.serialize() == other.serialize()
-        )
+        return isinstance(other, GroupBySig) and self.serialize() == other.serialize()
 
     def getAggFieldNames(self) -> list[str]:
         ops = []

@@ -44,11 +44,7 @@ class CostModel:
         self.source_dataset_id = source_dataset_id
 
         # construct full dataset of samples
-        self.sample_execution_data_df = (
-            pd.DataFrame(sample_execution_data)
-            if len(sample_execution_data) > 0
-            else None
-        )
+        self.sample_execution_data_df = pd.DataFrame(sample_execution_data) if len(sample_execution_data) > 0 else None
         # df contains a column called record_state, that sometimes contain a dict
         # we want to extract the keys from the dict and create a new column for each key
 
@@ -61,9 +57,7 @@ class CostModel:
         # compute per-operator estimates
         self.operator_estimates = self._compute_operator_estimates()
 
-    def _compute_ci(
-        self, sample_mean: float, n_samples: int, std_dev: float
-    ) -> Tuple[float, float]:
+    def _compute_ci(self, sample_mean: float, n_samples: int, std_dev: float) -> Tuple[float, float]:
         """
         Compute confidence interval (for non-proportion quantities) given the sample mean, number of samples,
         and sample std. deviation at the CostModel's given confidence level. We use a t-distribution for
@@ -77,9 +71,7 @@ class CostModel:
         )
         return ci
 
-    def _compute_proportion_ci(
-        self, sample_prop: float, n_samples: int
-    ) -> Tuple[float, float]:
+    def _compute_proportion_ci(self, sample_prop: float, n_samples: int) -> Tuple[float, float]:
         """
         Compute confidence interval for proportion quantities (i.e. selectivity) given the sample proportion
         and the number of samples. We use the normal distribution for computing the interval here, for reasons
@@ -88,9 +80,7 @@ class CostModel:
         if sample_prop == 0.0 or sample_prop == 1.0:
             return (sample_prop, sample_prop)
 
-        scaling_factor = math.sqrt(
-            (sample_prop * (1 - sample_prop)) / n_samples
-        )
+        scaling_factor = math.sqrt((sample_prop * (1 - sample_prop)) / n_samples)
         lower_bound, upper_bound = stats.norm.interval(
             confidence=self.conf_level,  # Confidence level
             loc=sample_prop,  # Sample proportion
@@ -139,9 +129,7 @@ class CostModel:
 
         return col_mean, col_lb, col_ub
 
-    def _est_time_per_record(
-        self, op_df: pd.DataFrame, model_name: Optional[str] = None
-    ) -> Tuple[float, float, float]:
+    def _est_time_per_record(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> Tuple[float, float, float]:
         """
         Given sample cost data observations for a specific operation, compute the mean and CI
         for the time per record.
@@ -153,9 +141,7 @@ class CostModel:
             non_negative_lb=True,
         )
 
-    def _est_cost_per_record(
-        self, op_df: pd.DataFrame, model_name: Optional[str] = None
-    ) -> Tuple[float, float, float]:
+    def _est_cost_per_record(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> Tuple[float, float, float]:
         """
         Given sample cost data observations for a specific operation, compute the mean and CI
         for the cost per record.
@@ -189,9 +175,7 @@ class CostModel:
 
         return total_input_tokens_tuple, total_output_tokens_tuple
 
-    def _est_cardinality(
-        self, op_df: pd.DataFrame, model_name: Optional[str] = None
-    ) -> float:
+    def _est_cardinality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the number of
         rows output by the operation.
@@ -232,17 +216,13 @@ class CostModel:
                 else:
                     op_ids = model_op_df.op_id.unique().tolist()
                     plan_ids = model_op_df.plan_id.unique().tolist()
-                    num_output_records = df[
-                        df.source_op_id.isin(op_ids) & df.plan_id.isin(plan_ids)
-                    ].shape[0]
+                    num_output_records = df[df.source_op_id.isin(op_ids) & df.plan_id.isin(plan_ids)].shape[0]
 
                 # estimate the selectivity / fan-out and compute bounds
                 est_selectivity = num_output_records / num_input_records
                 if is_filter_op:
-                    est_selectivity_lb, est_selectivity_ub = (
-                        self._compute_proportion_ci(
-                            est_selectivity, n_samples=num_input_records
-                        )
+                    est_selectivity_lb, est_selectivity_ub = self._compute_proportion_ci(
+                        est_selectivity, n_samples=num_input_records
                     )
 
                 # for now, if we are doing a convert operation w/fan-out then the assumptions of _compute_proportion_ci
@@ -267,10 +247,8 @@ class CostModel:
         # estimate the selectivity / fan-out and compute bounds
         est_selectivity = num_output_records / num_input_records
         if is_filter_op:
-            est_selectivity_lb, est_selectivity_ub = (
-                self._compute_proportion_ci(
-                    est_selectivity, n_samples=num_input_records
-                )
+            est_selectivity_lb, est_selectivity_ub = self._compute_proportion_ci(
+                est_selectivity, n_samples=num_input_records
             )
 
         # for now, if we are doing a convert operation w/fan-out then the assumptions of _compute_proportion_ci
@@ -303,16 +281,12 @@ class CostModel:
             return row
 
         except Exception as e:
-            print(
-                f"WARNING: error decoding answer or accepted_answer: {str(e)}"
-            )
+            print(f"WARNING: error decoding answer or accepted_answer: {str(e)}")
             row["correct"] = 0
             row["num_answers"] = 1
             return row
 
-    def _est_quality(
-        self, op_df: pd.DataFrame, model_name: Optional[str] = None
-    ) -> float:
+    def _est_quality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the an estimate
         of the quality of its outputs by using GPT-4 as a champion model.
@@ -327,53 +301,31 @@ class CostModel:
         record_id_to_answer = {}
         for record_id in record_ids:
             record_df = op_df[op_df.record_id == record_id]
-            champion_most_common_answer = record_df[
-                record_df.model_name == champion_model_name
-            ].answer.mode()
+            champion_most_common_answer = record_df[record_df.model_name == champion_model_name].answer.mode()
             all_models_most_common_answer = record_df.answer.mode()
 
             if not champion_most_common_answer.empty:
-                record_id_to_answer[record_id] = (
-                    champion_most_common_answer.iloc[0]
-                )
+                record_id_to_answer[record_id] = champion_most_common_answer.iloc[0]
             elif not all_models_most_common_answer.empty:
-                record_id_to_answer[record_id] = (
-                    all_models_most_common_answer.iloc[0]
-                )
+                record_id_to_answer[record_id] = all_models_most_common_answer.iloc[0]
             else:
                 record_id_to_answer[record_id] = None
 
         # compute accepted answers and clean all answers
         pd.options.mode.chained_assignment = None  # turn off copy warnings
-        op_df.loc[:, "accepted_answer"] = op_df.record_id.apply(
-            lambda id: record_id_to_answer[id]
-        )
+        op_df.loc[:, "accepted_answer"] = op_df.record_id.apply(lambda id: record_id_to_answer[id])
         op_df = op_df.apply(lambda row: self._compute_quality(row), axis=1)
 
         # get subset of observations for model_name and estimate quality w/fraction of answers that match accepted answer
-        model_df = (
-            op_df[op_df.model_name == model_name]
-            if model_name is not None
-            else op_df[op_df.model_name.isna()]
-        )
+        model_df = op_df[op_df.model_name == model_name] if model_name is not None else op_df[op_df.model_name.isna()]
 
         # compute quality as the fraction of answers which are correct (recall on expected output)
-        num_correct = (
-            model_df.correct.sum()
-            if not model_df.empty
-            else op_df.correct.sum()
-        )
-        total_answers = (
-            model_df.num_answers.sum()
-            if not model_df.empty
-            else op_df.num_answers.sum()
-        )
+        num_correct = model_df.correct.sum() if not model_df.empty else op_df.correct.sum()
+        total_answers = model_df.num_answers.sum() if not model_df.empty else op_df.num_answers.sum()
         est_quality = num_correct / total_answers
 
         # compute CI on the proportion of correct answers
-        est_quality_lb, est_quality_ub = self._compute_proportion_ci(
-            est_quality, n_samples=total_answers
-        )
+        est_quality_lb, est_quality_ub = self._compute_proportion_ci(est_quality, n_samples=total_answers)
 
         return est_quality, est_quality_lb, est_quality_ub
 
@@ -392,9 +344,7 @@ class CostModel:
         operator_estimates = {}
         for op_id in op_ids:
             # filter for subset of sample execution data related to this operation
-            op_df = self.sample_execution_data_df[
-                self.sample_execution_data_df.op_id == op_id
-            ]
+            op_df = self.sample_execution_data_df[self.sample_execution_data_df.op_id == op_id]
 
             # skip computing an estimate if we didn't capture any sampling data for this operator
             # (this can happen if/when upstream filter operation(s) filter out all records)
@@ -405,41 +355,27 @@ class CostModel:
             estimates = {}
 
             # get the op_name for this operation
-            model_name = (
-                op_df.model_name.iloc[0]
-                if op_df.model_name.iloc[0] is not None
-                else None
-            )
+            model_name = op_df.model_name.iloc[0] if op_df.model_name.iloc[0] is not None else None
             op_name = str(op_df.op_name.iloc[0])
             if model_name is not None:
                 # compute estimates per-model, and add None which forces computation of avg. across all models
-                model_names = [
-                    m.value for m in getModels(include_vision=True)
-                ] + [None]
+                model_names = [m.value for m in getModels(include_vision=True)] + [None]
                 # model_names = op_df.model_name.unique().tolist()
                 estimates = {model_name: None for model_name in model_names}
                 for model_name in model_names:
-                    time_per_record, time_per_record_lb, time_per_record_ub = (
-                        self._est_time_per_record(op_df, model_name=model_name)
-                    )
-                    cost_per_record, cost_per_record_lb, cost_per_record_ub = (
-                        self._est_cost_per_record(op_df, model_name=model_name)
-                    )
-                    input_tokens_tup, output_tokens_tup = (
-                        self._est_tokens_per_record(
-                            op_df, model_name=model_name
-                        )
-                    )
-                    selectivity, selectivity_lb, selectivity_ub = (
-                        self._est_selectivity(
-                            self.sample_execution_data_df,
-                            op_df,
-                            model_name=model_name,
-                        )
-                    )
-                    quality, quality_lb, quality_ub = self._est_quality(
+                    time_per_record, time_per_record_lb, time_per_record_ub = self._est_time_per_record(
                         op_df, model_name=model_name
                     )
+                    cost_per_record, cost_per_record_lb, cost_per_record_ub = self._est_cost_per_record(
+                        op_df, model_name=model_name
+                    )
+                    input_tokens_tup, output_tokens_tup = self._est_tokens_per_record(op_df, model_name=model_name)
+                    selectivity, selectivity_lb, selectivity_ub = self._est_selectivity(
+                        self.sample_execution_data_df,
+                        op_df,
+                        model_name=model_name,
+                    )
+                    quality, quality_lb, quality_ub = self._est_quality(op_df, model_name=model_name)
 
                     model_estimates = {
                         "time_per_record": time_per_record,
@@ -465,11 +401,9 @@ class CostModel:
 
             # TODO pre-compute lists of op_names in groups
             elif op_name in ["NonLLMFilter"]:
-                time_per_record, time_per_record_lb, time_per_record_ub = (
-                    self._est_time_per_record(op_df)
-                )
-                selectivity, selectivity_lb, selectivity_ub = (
-                    self._est_selectivity(self.sample_execution_data_df, op_df)
+                time_per_record, time_per_record_lb, time_per_record_ub = self._est_time_per_record(op_df)
+                selectivity, selectivity_lb, selectivity_ub = self._est_selectivity(
+                    self.sample_execution_data_df, op_df
                 )
                 estimates = {
                     "time_per_record": time_per_record,
@@ -487,9 +421,7 @@ class CostModel:
                 "CountAggregateOp",
                 "AverageAggregateOp",
             ]:
-                time_per_record, time_per_record_lb, time_per_record_ub = (
-                    self._est_time_per_record(op_df)
-                )
+                time_per_record, time_per_record_lb, time_per_record_ub = self._est_time_per_record(op_df)
                 estimates = {
                     "time_per_record": time_per_record,
                     "time_per_record_lower_bound": time_per_record_lb,
@@ -497,9 +429,7 @@ class CostModel:
                 }
 
             elif op_name in ["ApplyGroupByOp"]:
-                time_per_record, time_per_record_lb, time_per_record_ub = (
-                    self._est_time_per_record(op_df)
-                )
+                time_per_record, time_per_record_lb, time_per_record_ub = self._est_time_per_record(op_df)
                 cardinality = self._est_cardinality(op_df)
                 estimates = {
                     "time_per_record": time_per_record,
@@ -523,12 +453,8 @@ class CostModel:
         # initialize estimates of operator metrics based on naive (but sometimes precise) logic
         if isinstance(operator, pz.MarshalAndScanDataOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.getRegisteredDataset(
-                self.source_dataset_id
-            )
-            dataset_type = self.datadir.getRegisteredDatasetType(
-                self.source_dataset_id
-            )
+            datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
+            dataset_type = self.datadir.getRegisteredDatasetType(self.source_dataset_id)
             datasource_len = len(datasource)
             datasource_memsize = datasource.getSize()
 
@@ -570,18 +496,10 @@ class CostModel:
         # if we have sample execution data, update naive estimates with more informed ones
         sample_op_estimates = self.operator_estimates
         if sample_op_estimates is not None and op_id in sample_op_estimates:
-            if isinstance(operator, pz.MarshalAndScanDataOp) or isinstance(
-                operator, pz.CacheScanDataOp
-            ):
-                op_estimates.time_per_record = sample_op_estimates[op_id][
-                    "time_per_record"
-                ]
-                op_estimates.time_per_record_lower_bound = sample_op_estimates[
-                    op_id
-                ]["time_per_record_lower_bound"]
-                op_estimates.time_per_record_upper_bound = sample_op_estimates[
-                    op_id
-                ]["time_per_record_upper_bound"]
+            if isinstance(operator, pz.MarshalAndScanDataOp) or isinstance(operator, pz.CacheScanDataOp):
+                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
+                op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
             elif isinstance(operator, pz.ApplyGroupByOp):
                 # NOTE: in theory we should also treat this cardinality est. as a random variable, but in practice we will
@@ -592,271 +510,163 @@ class CostModel:
                 #       produced by the groupby in our sample and assume it may generalize to the full workload. To estimate
                 #       actual cardinalities of operators we estimate their selectivities / fan-outs and multiply those by
                 #       the input cardinality (where the initial input cardinality from the datasource is known).
-                op_estimates.cardinality = sample_op_estimates[op_id][
-                    "cardinality"
-                ]
+                op_estimates.cardinality = sample_op_estimates[op_id]["cardinality"]
                 op_estimates.cardinality_lower_bound = op_estimates.cardinality
                 op_estimates.cardinality_upper_bound = op_estimates.cardinality
-                op_estimates.time_per_record = sample_op_estimates[op_id][
-                    "time_per_record"
-                ]
-                op_estimates.time_per_record_lower_bound = sample_op_estimates[
-                    op_id
-                ]["time_per_record_lower_bound"]
-                op_estimates.time_per_record_upper_bound = sample_op_estimates[
-                    op_id
-                ]["time_per_record_upper_bound"]
+                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
+                op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
-            elif isinstance(operator, pz.CountAggregateOp) or isinstance(
-                operator, pz.AverageAggregateOp
-            ):
-                op_estimates.time_per_record = sample_op_estimates[op_id][
-                    "time_per_record"
-                ]
-                op_estimates.time_per_record_lower_bound = sample_op_estimates[
-                    op_id
-                ]["time_per_record_lower_bound"]
-                op_estimates.time_per_record_upper_bound = sample_op_estimates[
-                    op_id
-                ]["time_per_record_upper_bound"]
+            elif isinstance(operator, pz.CountAggregateOp) or isinstance(operator, pz.AverageAggregateOp):
+                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
+                op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
             elif isinstance(operator, pz.LimitScanOp):
-                op_estimates.time_per_record = sample_op_estimates[op_id][
-                    "time_per_record"
-                ]
-                op_estimates.time_per_record_lower_bound = sample_op_estimates[
-                    op_id
-                ]["time_per_record_lower_bound"]
-                op_estimates.time_per_record_upper_bound = sample_op_estimates[
-                    op_id
-                ]["time_per_record_upper_bound"]
+                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
+                op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
             elif isinstance(operator, pz.NonLLMFilter):
-                op_estimates.cardinality = (
-                    source_op_estimates.cardinality
-                    * sample_op_estimates[op_id]["selectivity"]
-                )
+                op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
                 op_estimates.cardinality_lower_bound = (
-                    source_op_estimates.cardinality_lower_bound
-                    * sample_op_estimates[op_id]["selectivity_lower_bound"]
+                    source_op_estimates.cardinality_lower_bound * sample_op_estimates[op_id]["selectivity_lower_bound"]
                 )
                 op_estimates.cardinality_upper_bound = (
-                    source_op_estimates.cardinality_upper_bound
-                    * sample_op_estimates[op_id]["selectivity_upper_bound"]
+                    source_op_estimates.cardinality_upper_bound * sample_op_estimates[op_id]["selectivity_upper_bound"]
                 )
 
-                op_estimates.time_per_record = sample_op_estimates[op_id][
-                    "time_per_record"
-                ]
-                op_estimates.time_per_record_lower_bound = sample_op_estimates[
-                    op_id
-                ]["time_per_record_lower_bound"]
-                op_estimates.time_per_record_upper_bound = sample_op_estimates[
-                    op_id
-                ]["time_per_record_upper_bound"]
+                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
+                op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
-                op_estimates.cost_per_record = sample_op_estimates[op_id][
-                    "cost_per_record"
-                ]
-                op_estimates.cost_per_record_lower_bound = sample_op_estimates[
-                    op_id
-                ]["cost_per_record_lower_bound"]
-                op_estimates.cost_per_record_upper_bound = sample_op_estimates[
-                    op_id
-                ]["cost_per_record_upper_bound"]
+                op_estimates.cost_per_record = sample_op_estimates[op_id]["cost_per_record"]
+                op_estimates.cost_per_record_lower_bound = sample_op_estimates[op_id]["cost_per_record_lower_bound"]
+                op_estimates.cost_per_record_upper_bound = sample_op_estimates[op_id]["cost_per_record_upper_bound"]
 
             elif isinstance(operator, pz.LLMFilter):
                 model_name = operator.model.value
                 op_estimates.cardinality = (
-                    source_op_estimates.cardinality
-                    * sample_op_estimates[op_id][model_name]["selectivity"]
+                    source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
                 )
                 op_estimates.cardinality_lower_bound = (
                     source_op_estimates.cardinality_lower_bound
-                    * sample_op_estimates[op_id][model_name][
-                        "selectivity_lower_bound"
-                    ]
+                    * sample_op_estimates[op_id][model_name]["selectivity_lower_bound"]
                 )
                 op_estimates.cardinality_upper_bound = (
                     source_op_estimates.cardinality_upper_bound
-                    * sample_op_estimates[op_id][model_name][
-                        "selectivity_upper_bound"
-                    ]
+                    * sample_op_estimates[op_id][model_name]["selectivity_upper_bound"]
                 )
 
-                op_estimates.time_per_record = sample_op_estimates[op_id][
-                    model_name
-                ]["time_per_record"]
-                op_estimates.time_per_record_lower_bound = sample_op_estimates[
-                    op_id
-                ][model_name]["time_per_record_lower_bound"]
-                op_estimates.time_per_record_upper_bound = sample_op_estimates[
-                    op_id
-                ][model_name]["time_per_record_upper_bound"]
-
-                op_estimates.cost_per_record = sample_op_estimates[op_id][
-                    model_name
-                ]["cost_per_record"]
-                op_estimates.cost_per_record_lower_bound = sample_op_estimates[
-                    op_id
-                ][model_name]["cost_per_record_lower_bound"]
-                op_estimates.cost_per_record_upper_bound = sample_op_estimates[
-                    op_id
-                ][model_name]["cost_per_record_upper_bound"]
-
-                op_estimates.quality = sample_op_estimates[op_id][model_name][
-                    "quality"
+                op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
+                op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id][model_name][
+                    "time_per_record_lower_bound"
                 ]
-                op_estimates.quality_lower_bound = sample_op_estimates[op_id][
-                    model_name
-                ]["quality_lower_bound"]
-                op_estimates.quality_upper_bound = sample_op_estimates[op_id][
-                    model_name
-                ]["quality_upper_bound"]
+                op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id][model_name][
+                    "time_per_record_upper_bound"
+                ]
+
+                op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
+                op_estimates.cost_per_record_lower_bound = sample_op_estimates[op_id][model_name][
+                    "cost_per_record_lower_bound"
+                ]
+                op_estimates.cost_per_record_upper_bound = sample_op_estimates[op_id][model_name][
+                    "cost_per_record_upper_bound"
+                ]
+
+                op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
+                op_estimates.quality_lower_bound = sample_op_estimates[op_id][model_name]["quality_lower_bound"]
+                op_estimates.quality_upper_bound = sample_op_estimates[op_id][model_name]["quality_upper_bound"]
 
             elif isinstance(operator, pz.LLMConvert):
                 # TODO: EVEN BETTER: do similarity match (e.g. largest param intersection, more exotic techniques);
                 #       another heuristic: logical_op_id-->subclass_physical_op_id-->specific_physical_op_id-->most_param_match_physical_op_id
                 # TODO: instead of [op_id][model_name] --> [logical_op_id][physical_op_id]
                 # NOTE: code synthesis does not have a model attribute
-                model_name = (
-                    operator.model.value if hasattr(operator, "model") else None
-                )
+                model_name = operator.model.value if hasattr(operator, "model") else None
                 op_estimates.cardinality = (
-                    source_op_estimates.cardinality
-                    * sample_op_estimates[op_id][model_name]["selectivity"]
+                    source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
                 )
                 op_estimates.cardinality_lower_bound = (
                     source_op_estimates.cardinality_lower_bound
-                    * sample_op_estimates[op_id][model_name][
-                        "selectivity_lower_bound"
-                    ]
+                    * sample_op_estimates[op_id][model_name]["selectivity_lower_bound"]
                 )
                 op_estimates.cardinality_upper_bound = (
                     source_op_estimates.cardinality_upper_bound
-                    * sample_op_estimates[op_id][model_name][
-                        "selectivity_upper_bound"
-                    ]
+                    * sample_op_estimates[op_id][model_name]["selectivity_upper_bound"]
                 )
 
-                op_estimates.time_per_record = sample_op_estimates[op_id][
-                    model_name
-                ]["time_per_record"]
-                op_estimates.time_per_record_lower_bound = sample_op_estimates[
-                    op_id
-                ][model_name]["time_per_record_lower_bound"]
-                op_estimates.time_per_record_upper_bound = sample_op_estimates[
-                    op_id
-                ][model_name]["time_per_record_upper_bound"]
-
-                op_estimates.cost_per_record = sample_op_estimates[op_id][
-                    model_name
-                ]["cost_per_record"]
-                op_estimates.cost_per_record_lower_bound = sample_op_estimates[
-                    op_id
-                ][model_name]["cost_per_record_lower_bound"]
-                op_estimates.cost_per_record_upper_bound = sample_op_estimates[
-                    op_id
-                ][model_name]["cost_per_record_upper_bound"]
-
-                op_estimates.quality = sample_op_estimates[op_id][model_name][
-                    "quality"
+                op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
+                op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id][model_name][
+                    "time_per_record_lower_bound"
                 ]
-                op_estimates.quality_lower_bound = sample_op_estimates[op_id][
-                    model_name
-                ]["quality_lower_bound"]
-                op_estimates.quality_upper_bound = sample_op_estimates[op_id][
-                    model_name
-                ]["quality_upper_bound"]
+                op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id][model_name][
+                    "time_per_record_upper_bound"
+                ]
+
+                op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
+                op_estimates.cost_per_record_lower_bound = sample_op_estimates[op_id][model_name][
+                    "cost_per_record_lower_bound"
+                ]
+                op_estimates.cost_per_record_upper_bound = sample_op_estimates[op_id][model_name][
+                    "cost_per_record_upper_bound"
+                ]
+
+                op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
+                op_estimates.quality_lower_bound = sample_op_estimates[op_id][model_name]["quality_lower_bound"]
+                op_estimates.quality_upper_bound = sample_op_estimates[op_id][model_name]["quality_upper_bound"]
 
                 # NOTE: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
                 #       which would wildly mess up estimate of time and cost per-record
                 # do code synthesis adjustment
                 if isinstance(operator, pz.CodeSynthesisConvert):
                     op_estimates.time_per_record = 1e-5
-                    op_estimates.time_per_record_lower_bound = (
-                        op_estimates.time_per_record
-                    )
-                    op_estimates.time_per_record_upper_bound = (
-                        op_estimates.time_per_record
-                    )
+                    op_estimates.time_per_record_lower_bound = op_estimates.time_per_record
+                    op_estimates.time_per_record_upper_bound = op_estimates.time_per_record
                     op_estimates.cost_per_record = 1e-4
-                    op_estimates.cost_per_record_lower_bound = (
-                        op_estimates.cost_per_record
-                    )
-                    op_estimates.cost_per_record_upper_bound = (
-                        op_estimates.cost_per_record
-                    )
-                    op_estimates.quality = op_estimates.quality * (
+                    op_estimates.cost_per_record_lower_bound = op_estimates.cost_per_record
+                    op_estimates.cost_per_record_upper_bound = op_estimates.cost_per_record
+                    op_estimates.quality = op_estimates.quality * (GPT_4_MODEL_CARD["code"] / 100.0)
+                    op_estimates.quality_lower_bound = op_estimates.quality_lower_bound * (
                         GPT_4_MODEL_CARD["code"] / 100.0
                     )
-                    op_estimates.quality_lower_bound = (
-                        op_estimates.quality_lower_bound
-                        * (GPT_4_MODEL_CARD["code"] / 100.0)
-                    )
-                    op_estimates.quality_upper_bound = (
-                        op_estimates.quality_upper_bound
-                        * (GPT_4_MODEL_CARD["code"] / 100.0)
+                    op_estimates.quality_upper_bound = op_estimates.quality_upper_bound * (
+                        GPT_4_MODEL_CARD["code"] / 100.0
                     )
 
                 # token reduction adjustment
                 if isinstance(operator, pz.TokenReducedConvert):
                     total_input_tokens = (
-                        operator.token_budget
-                        * sample_op_estimates[op_id][model_name][
-                            "total_input_tokens"
-                        ]
+                        operator.token_budget * sample_op_estimates[op_id][model_name]["total_input_tokens"]
                     )
-                    total_output_tokens = sample_op_estimates[op_id][
-                        model_name
-                    ]["total_output_tokens"]
+                    total_output_tokens = sample_op_estimates[op_id][model_name]["total_output_tokens"]
                     op_estimates.cost_per_record = (
-                        MODEL_CARDS[model_name]["usd_per_input_token"]
-                        * total_input_tokens
-                        + MODEL_CARDS[model_name]["usd_per_output_token"]
-                        * total_output_tokens
+                        MODEL_CARDS[model_name]["usd_per_input_token"] * total_input_tokens
+                        + MODEL_CARDS[model_name]["usd_per_output_token"] * total_output_tokens
                     )
                     total_input_tokens_lb = (
-                        operator.token_budget
-                        * sample_op_estimates[op_id][model_name][
-                            "total_input_tokens_lower_bound"
-                        ]
+                        operator.token_budget * sample_op_estimates[op_id][model_name]["total_input_tokens_lower_bound"]
                     )
-                    total_output_tokens_lb = sample_op_estimates[op_id][
-                        model_name
-                    ]["total_output_tokens_lower_bound"]
+                    total_output_tokens_lb = sample_op_estimates[op_id][model_name]["total_output_tokens_lower_bound"]
                     op_estimates.cost_per_record_lower_bound = (
-                        MODEL_CARDS[model_name]["usd_per_input_token"]
-                        * total_input_tokens_lb
-                        + MODEL_CARDS[model_name]["usd_per_output_token"]
-                        * total_output_tokens_lb
+                        MODEL_CARDS[model_name]["usd_per_input_token"] * total_input_tokens_lb
+                        + MODEL_CARDS[model_name]["usd_per_output_token"] * total_output_tokens_lb
                     )
                     total_input_tokens_ub = (
-                        operator.token_budget
-                        * sample_op_estimates[op_id][model_name][
-                            "total_input_tokens_upper_bound"
-                        ]
+                        operator.token_budget * sample_op_estimates[op_id][model_name]["total_input_tokens_upper_bound"]
                     )
-                    total_output_tokens_ub = sample_op_estimates[op_id][
-                        model_name
-                    ]["total_output_tokens_upper_bound"]
+                    total_output_tokens_ub = sample_op_estimates[op_id][model_name]["total_output_tokens_upper_bound"]
                     op_estimates.cost_per_record_upper_bound = (
-                        MODEL_CARDS[model_name]["usd_per_input_token"]
-                        * total_input_tokens_ub
-                        + MODEL_CARDS[model_name]["usd_per_output_token"]
-                        * total_output_tokens_ub
+                        MODEL_CARDS[model_name]["usd_per_input_token"] * total_input_tokens_ub
+                        + MODEL_CARDS[model_name]["usd_per_output_token"] * total_output_tokens_ub
                     )
 
-                    op_estimates.quality = op_estimates.quality * math.sqrt(
+                    op_estimates.quality = op_estimates.quality * math.sqrt(math.sqrt(operator.token_budget))
+                    op_estimates.quality_lower_bound = op_estimates.quality_lower_bound * math.sqrt(
                         math.sqrt(operator.token_budget)
                     )
-                    op_estimates.quality_lower_bound = (
-                        op_estimates.quality_lower_bound
-                        * math.sqrt(math.sqrt(operator.token_budget))
-                    )
-                    op_estimates.quality_upper_bound = (
-                        op_estimates.quality_upper_bound
-                        * math.sqrt(math.sqrt(operator.token_budget))
+                    op_estimates.quality_upper_bound = op_estimates.quality_upper_bound * math.sqrt(
+                        math.sqrt(operator.token_budget)
                     )
 
             else:
@@ -868,22 +678,10 @@ class CostModel:
         op_quality = op_estimates.quality
 
         # compute bounds on total time and cost estimates for this operator
-        op_cost_lower_bound = (
-            op_estimates.cost_per_record_lower_bound
-            * source_op_estimates.cardinality_lower_bound
-        )
-        op_cost_upper_bound = (
-            op_estimates.cost_per_record_upper_bound
-            * source_op_estimates.cardinality_upper_bound
-        )
-        op_time_lower_bound = (
-            op_estimates.time_per_record_lower_bound
-            * source_op_estimates.cardinality_lower_bound
-        )
-        op_time_upper_bound = (
-            op_estimates.time_per_record_upper_bound
-            * source_op_estimates.cardinality_upper_bound
-        )
+        op_cost_lower_bound = op_estimates.cost_per_record_lower_bound * source_op_estimates.cardinality_lower_bound
+        op_cost_upper_bound = op_estimates.cost_per_record_upper_bound * source_op_estimates.cardinality_upper_bound
+        op_time_lower_bound = op_estimates.time_per_record_lower_bound * source_op_estimates.cardinality_lower_bound
+        op_time_upper_bound = op_estimates.time_per_record_upper_bound * source_op_estimates.cardinality_upper_bound
         op_quality_lower_bound = op_estimates.quality_lower_bound
         op_quality_upper_bound = op_estimates.quality_upper_bound
 

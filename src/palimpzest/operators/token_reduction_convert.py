@@ -60,9 +60,7 @@ class TokenReducedConvert(LLMConvert):
             and self.max_workers == other.max_workers
         )
 
-    def naiveCostEstimates(
-        self, source_op_cost_estimates: OperatorCostEstimates
-    ) -> OperatorCostEstimates:
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Update the cost per record and quality estimates produced by LLMConvert's naive estimates.
         We adjust the cost per record to account for the reduced number of input tokens following
@@ -70,28 +68,20 @@ class TokenReducedConvert(LLMConvert):
         using fewer tokens.
         """
         # get naive cost estimates from LLMConvert
-        naive_op_cost_estimates = super().naiveCostEstimates(
-            source_op_cost_estimates
-        )
+        naive_op_cost_estimates = super().naiveCostEstimates(source_op_cost_estimates)
 
         # re-compute cost per record assuming we use fewer input tokens
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS * self.token_budget
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"]
-            * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"]
-            * est_num_output_tokens
+            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
+            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
         )
 
         # set refined estimate of cost per record and, for now,
         # assume quality multiplier is proportional to sqrt(sqrt(token_budget))
-        naive_op_cost_estimates.cost_per_record = (
-            model_conversion_usd_per_record
-        )
-        naive_op_cost_estimates.quality = (
-            naive_op_cost_estimates.quality
-        ) * math.sqrt(math.sqrt(self.token_budget))
+        naive_op_cost_estimates.cost_per_record = model_conversion_usd_per_record
+        naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * math.sqrt(math.sqrt(self.token_budget))
 
         return naive_op_cost_estimates
 
@@ -117,9 +107,7 @@ class TokenReducedConvert(LLMConvert):
             return sample
 
         else:
-            raise NotImplementedError(
-                "Token reduction is only supported for DSPY_COT_QA prompts"
-            )
+            raise NotImplementedError("Token reduction is only supported for DSPY_COT_QA prompts")
 
     def _dspy_generate_fields(
         self,
@@ -128,14 +116,9 @@ class TokenReducedConvert(LLMConvert):
         verbose: bool = False,
     ) -> Tuple[List[Dict[str, List]] | Any]:
         full_context = content
-        if (
-            self.first_execution
-            or self.heatmap_dict["count"] < self.MAX_HEATMAP_UPDATES
-        ):
+        if self.first_execution or self.heatmap_dict["count"] < self.MAX_HEATMAP_UPDATES:
             print("Warming up heatmap")
-            answer, query_stats = super()._dspy_generate_fields(
-                prompt, full_context, verbose
-            )
+            answer, query_stats = super()._dspy_generate_fields(prompt, full_context, verbose)
             self.first_execution = False
             # create the heatmap structure with default resolution of 0.001 and count of 0
             self.heatmap_dict = {
@@ -155,9 +138,7 @@ class TokenReducedConvert(LLMConvert):
                     verbose,
                 )
             else:
-                raise Exception(
-                    f"Token reduction not implemented for {self.prompt_strategy}"
-                )
+                raise Exception(f"Token reduction not implemented for {self.prompt_strategy}")
 
             heatmap = self.heatmap_dict["heatmap"]
             count = self.heatmap_dict["count"]
@@ -166,16 +147,10 @@ class TokenReducedConvert(LLMConvert):
             if count >= self.TOKEN_REDUCTION_SAMPLE:
                 context = self.reduce_context(heatmap, full_context)
                 try:
-                    answer, query_stats = generator.generate(
-                        context=context, question=prompt
-                    )
+                    answer, query_stats = generator.generate(context=context, question=prompt)
                 except Exception as e:
-                    print(
-                        f"DSPy generation error: {e}, falling back to unreduced generation"
-                    )
-                    answer, query_stats = super()._dspy_generate_fields(
-                        prompt, content, verbose
-                    )
+                    print(f"DSPy generation error: {e}, falling back to unreduced generation")
+                    answer, query_stats = super()._dspy_generate_fields(prompt, content, verbose)
 
         try:
             gsi, gei = best_substring_match(answer, full_context)
@@ -199,9 +174,7 @@ class TokenReducedConvert(LLMConvert):
         return answer, query_stats
 
 
-class TokenReducedConvertConventional(
-    TokenReducedConvert, LLMConvertConventional
-):
+class TokenReducedConvertConventional(TokenReducedConvert, LLMConvertConventional):
     pass
 
 

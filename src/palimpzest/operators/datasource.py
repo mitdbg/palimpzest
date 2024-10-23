@@ -89,8 +89,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         cardinality = (
             source_op_cost_estimates.cardinality
             if input_cardinality == Cardinality.ONE_TO_ONE
-            else source_op_cost_estimates.cardinality
-            * NAIVE_EST_ONE_TO_MANY_SELECTIVITY
+            else source_op_cost_estimates.cardinality * NAIVE_EST_ONE_TO_MANY_SELECTIVITY
         )
 
         # for now, assume no cost per record for reading data
@@ -108,11 +107,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         """
         start_time = time.time()
         output = candidate.get_item_fn(candidate.idx)
-        records = (
-            [output]
-            if candidate.cardinality == Cardinality.ONE_TO_ONE
-            else output
-        )
+        records = [output] if candidate.cardinality == Cardinality.ONE_TO_ONE else output
         end_time = time.time()
 
         # create RecordOpStats objects
@@ -150,8 +145,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
         cardinality = (
             source_op_cost_estimates.cardinality
             if input_cardinality == Cardinality.ONE_TO_ONE
-            else source_op_cost_estimates.cardinality
-            * NAIVE_EST_ONE_TO_MANY_SELECTIVITY
+            else source_op_cost_estimates.cardinality * NAIVE_EST_ONE_TO_MANY_SELECTIVITY
         )
 
         # for now, assume no cost per record for reading from cache
@@ -165,11 +159,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         start_time = time.time()
         output = candidate.get_item_fn(candidate.idx)
-        records = (
-            [output]
-            if candidate.cardinality == Cardinality.ONE_TO_ONE
-            else output
-        )
+        records = [output] if candidate.cardinality == Cardinality.ONE_TO_ONE else output
         end_time = time.time()
 
         # create RecordOpStats objects

@@ -55,11 +55,7 @@ class SchemaMetaclass(type):
         attributes = dir(cls)
         attributes = [attr for attr in attributes if not attr.startswith("__")]
         prefix = f"{cls.__name__}.{id}." if unique else ""
-        fields = [
-            prefix + attr
-            for attr in attributes
-            if isinstance(getattr(cls, attr), Field)
-        ]
+        fields = [prefix + attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
         return fields
 
     def getDesc(cls) -> str:
@@ -132,9 +128,7 @@ class Schema(metaclass=SchemaMetaclass):
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
 
-    def asJSONStr(
-        self, record_dict: Dict[str, TypingAny], include_data_cols: bool = True
-    ) -> str:
+    def asJSONStr(self, record_dict: Dict[str, TypingAny], include_data_cols: bool = True) -> str:
         """Return a JSON representation of a data record with this Schema"""
         if include_data_cols:
             record_dict["data type"] = str(self.__class__.__name__)
@@ -186,9 +180,7 @@ class File(Schema):
     - the contents of the file (bytes)
     """
 
-    filename = StringField(
-        desc="The UNIX-style name of the file", required=True
-    )
+    filename = StringField(desc="The UNIX-style name of the file", required=True)
     contents = BytesField(desc="The contents of the file", required=True)
 
 
@@ -205,9 +197,7 @@ class OperatorDerivedSchema(Schema):
 class RawJSONObject(Schema):
     """A JSON object, which is a dictionary of key-value pairs."""
 
-    json = StringField(
-        desc="String representation of a JSON object", required=True
-    )
+    json = StringField(desc="String representation of a JSON object", required=True)
 
 
 class SourceRecord(Schema):
@@ -217,32 +207,20 @@ class SourceRecord(Schema):
     """
 
     idx = NumericField(desc="The scan index of the record", required=True)
-    get_item_fn = CallableField(
-        desc="The get_item() function from the DataSource", required=True
-    )
-    cardinality = StringField(
-        desc="The cardinality of the datasource", required=True
-    )
+    get_item_fn = CallableField(desc="The get_item() function from the DataSource", required=True)
+    cardinality = StringField(desc="The cardinality of the datasource", required=True)
 
 
 class Table(Schema):
     """A Table is an object composed of a header and rows."""
 
-    filename = StringField(
-        desc="The name of the file the table was extracted from", required=False
-    )
+    filename = StringField(desc="The name of the file the table was extracted from", required=False)
     name = StringField(desc="The name of the table", required=False)
-    header = ListField(
-        element_type=StringField, desc="The header of the table", required=True
-    )
+    header = ListField(element_type=StringField, desc="The header of the table", required=True)
     # TODO currently no support for nesting data records on data records
-    rows = ListField(
-        element_type=ListField, desc="The rows of the table", required=True
-    )
+    rows = ListField(element_type=ListField, desc="The rows of the table", required=True)
 
-    def asJSONStr(
-        self, record_dict: Dict[str, TypingAny], *args, **kwargs
-    ) -> str:
+    def asJSONStr(self, record_dict: Dict[str, TypingAny], *args, **kwargs) -> str:
         """Return a JSON representation of an instantiated object of this Schema"""
         # Take the rows in the record_dict and turn them into comma separated strings
         rows = []
@@ -275,18 +253,14 @@ class WebPage(Schema):
 class ImageFile(File):
     """A file that contains an image."""
 
-    text_description = StringField(
-        desc="A text description of the image", required=False
-    )
+    text_description = StringField(desc="A text description of the image", required=False)
 
 
 class PDFFile(File):
     """A PDF file is a File that is a PDF. It has specialized fields, font information, etc."""
 
     # This class is currently very impoverished. It needs a lot more fields before it can correctly represent a PDF.
-    text_contents = StringField(
-        desc="The text-only contents of the PDF", required=True
-    )
+    text_contents = StringField(desc="The text-only contents of the PDF", required=True)
 
 
 class TextFile(File):
@@ -296,9 +270,7 @@ class TextFile(File):
 class XLSFile(File):
     """An XLS file is a File that contains one or more Excel spreadsheets."""
 
-    number_sheets = NumericField(
-        desc="The number of sheets in the Excel file", required=True
-    )
+    number_sheets = NumericField(desc="The number of sheets in the Excel file", required=True)
     sheet_names = ListField(
         element_type=NumericField,
         desc="The names of the sheets in the Excel file",
@@ -319,6 +291,4 @@ class EquationImage(ImageFile):
 class PlotImage(ImageFile):
     """An image that contains a plot, such as a graph or chart."""
 
-    plot_description = StringField(
-        desc="A description of the plot", required=True
-    )
+    plot_description = StringField(desc="A description of the plot", required=True)

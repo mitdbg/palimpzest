@@ -86,9 +86,7 @@ class DataSource(AbstractDataSource):
 class DirectorySource(DataSource):
     """DirectorySource returns multiple File objects from a real-world source (a directory on disk)"""
 
-    def __init__(
-        self, path: str, dataset_id: str, schema: Type[Schema]
-    ) -> None:
+    def __init__(self, path: str, dataset_id: str, schema: Type[Schema]) -> None:
         self.filepaths = [
             os.path.join(path, filename)
             for filename in sorted(os.listdir(path))
@@ -112,9 +110,7 @@ class DirectorySource(DataSource):
         return sum([os.path.getsize(filepath) for filepath in self.filepaths])
 
     def getItem(self, idx: int):
-        raise NotImplementedError(
-            "You are calling this method from an abstract class."
-        )
+        raise NotImplementedError("You are calling this method from an abstract class.")
 
 
 class MemorySource(DataSource):
@@ -129,9 +125,7 @@ class MemorySource(DataSource):
         return len(self.vals)
 
     def getSize(self):
-        return sum(
-            [sys.getsizeof(self.getItem(idx)) for idx in range(len(self))]
-        )
+        return sum([sys.getsizeof(self.getItem(idx)) for idx in range(len(self))])
 
     def getItem(self, idx: int):
         value = self.vals[idx]
@@ -202,12 +196,7 @@ class UserSource(DataSource):
 class HTMLFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=WebPage)
-        assert all(
-            [
-                filename.endswith(tuple(constants.HTML_EXTENSIONS))
-                for filename in self.filepaths
-            ]
-        )
+        assert all([filename.endswith(tuple(constants.HTML_EXTENSIONS)) for filename in self.filepaths])
 
     def html_to_text_with_links(self, html):
         # Parse the HTML content
@@ -245,12 +234,7 @@ class HTMLFileDirectorySource(DirectorySource):
 class ImageFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=ImageFile)
-        assert all(
-            [
-                filename.endswith(tuple(constants.IMAGE_EXTENSIONS))
-                for filename in self.filepaths
-            ]
-        )
+        assert all([filename.endswith(tuple(constants.IMAGE_EXTENSIONS)) for filename in self.filepaths])
 
     def getItem(self, idx: int):
         filepath = self.filepaths[idx]
@@ -270,12 +254,7 @@ class PDFFileDirectorySource(DirectorySource):
         file_cache_dir: str = "/tmp",
     ) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=PDFFile)
-        assert all(
-            [
-                filename.endswith(tuple(constants.PDF_EXTENSIONS))
-                for filename in self.filepaths
-            ]
-        )
+        assert all([filename.endswith(tuple(constants.PDF_EXTENSIONS)) for filename in self.filepaths])
         self.pdfprocessor = pdfprocessor
         self.file_cache_dir = file_cache_dir
 
@@ -287,9 +266,7 @@ class PDFFileDirectorySource(DirectorySource):
 
         if self.pdfprocessor == "modal":
             print("handling PDF processing remotely")
-            remoteFunc = modal.Function.lookup(
-                "palimpzest.tools", "processPapermagePdf"
-            )
+            remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
         else:
             remoteFunc = None
 
@@ -302,9 +279,7 @@ class PDFFileDirectorySource(DirectorySource):
             for p in doc.pages:
                 text_content += p.text
         else:
-            text_content = get_text_from_pdf(
-                pdf_filename, pdf_bytes, file_cache_dir=self.file_cache_dir
-            )
+            text_content = get_text_from_pdf(pdf_filename, pdf_bytes, file_cache_dir=self.file_cache_dir)
 
         # construct data record
         dr = DataRecord(self.schema, scan_idx=idx)
@@ -331,12 +306,7 @@ class TextFileDirectorySource(DirectorySource):
 class XLSFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=XLSFile)
-        assert all(
-            [
-                filename.endswith(tuple(constants.XLS_EXTENSIONS))
-                for filename in self.filepaths
-            ]
-        )
+        assert all([filename.endswith(tuple(constants.XLS_EXTENSIONS)) for filename in self.filepaths])
 
     def getItem(self, idx: int):
         filepath = self.filepaths[idx]

@@ -195,9 +195,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[2], LLMFilter)
         assert isinstance(physical_plan[3], CodeSynthesisConvert)
 
-    def test_real_estate_logical_reorder(
-        self, real_estate_eval_tiny, real_estate_workload
-    ):
+    def test_real_estate_logical_reorder(self, real_estate_eval_tiny, real_estate_workload):
         policy = MinCost()
         cost_model = CostModel(real_estate_eval_tiny, sample_execution_data=[])
         optimizer = Optimizer(
@@ -218,22 +216,12 @@ class TestOptimizer:
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 6
-        assert isinstance(
-            physical_plan[0], MarshalAndScanDataOp
-        )  # RealEstateListingFiles
+        assert isinstance(physical_plan[0], MarshalAndScanDataOp)  # RealEstateListingFiles
         assert isinstance(physical_plan[1], LLMConvert)  # TextRealEstateListing
-        assert isinstance(
-            physical_plan[2], NonLLMFilter
-        )  # TextRealEstateListing(price/addr)
-        assert isinstance(
-            physical_plan[3], NonLLMFilter
-        )  # TextRealEstateListing(price/addr)
-        assert isinstance(
-            physical_plan[4], LLMConvert
-        )  # ImageRealEstateListing
-        assert isinstance(
-            physical_plan[5], LLMFilter
-        )  # ImageRealEstateListing(attractive)
+        assert isinstance(physical_plan[2], NonLLMFilter)  # TextRealEstateListing(price/addr)
+        assert isinstance(physical_plan[3], NonLLMFilter)  # TextRealEstateListing(price/addr)
+        assert isinstance(physical_plan[4], LLMConvert)  # ImageRealEstateListing
+        assert isinstance(physical_plan[5], LLMFilter)  # ImageRealEstateListing(attractive)
 
     def test_seven_filters(self, enron_eval_tiny, email_schema):
         plan = pz.Dataset(enron_eval_tiny, schema=email_schema)

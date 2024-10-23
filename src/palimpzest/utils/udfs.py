@@ -33,9 +33,7 @@ def file_to_pdf(candidate):
     pdfprocessor = pz.DataDirectory().current_config.get("pdfprocessor")
     if pdfprocessor == "modal":
         print("handling PDF processing remotely")
-        remoteFunc = modal.Function.lookup(
-            "palimpzest.tools", "processPapermagePdf"
-        )
+        remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
     else:
         remoteFunc = None
 
@@ -72,9 +70,7 @@ def xls_to_tables(candidate):
 
     records = []
     for sheet_name in sheet_names:
-        dataframe = pd.read_excel(
-            io.BytesIO(xls_bytes), sheet_name=sheet_name, engine="openpyxl"
-        )
+        dataframe = pd.read_excel(io.BytesIO(xls_bytes), sheet_name=sheet_name, engine="openpyxl")
 
         # TODO extend number of rows with dynamic sizing of context length
         # construct data record

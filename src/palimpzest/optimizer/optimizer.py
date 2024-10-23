@@ -111,8 +111,7 @@ class Optimizer:
             self.implementation_rules = [
                 rule
                 for rule in self.implementation_rules
-                if rule
-                not in [LLMConvertBondedRule, TokenReducedConvertBondedRule]
+                if rule not in [LLMConvertBondedRule, TokenReducedConvertBondedRule]
             ]
 
         if not self.allow_conventional_query:
@@ -128,16 +127,12 @@ class Optimizer:
 
         if not self.allow_code_synth:
             self.implementation_rules = [
-                rule
-                for rule in self.implementation_rules
-                if not issubclass(rule, CodeSynthesisConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, CodeSynthesisConvertRule)
             ]
 
         if not self.allow_token_reduction:
             self.implementation_rules = [
-                rule
-                for rule in self.implementation_rules
-                if not issubclass(rule, TokenReducedConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, TokenReducedConvertRule)
             ]
 
     def update_cost_model(self, cost_model: CostModel):
@@ -152,15 +147,11 @@ class Optimizer:
             "conventional_fallback_model": getConventionalFallbackModel(),
         }
 
-    def construct_group_tree(
-        self, dataset_nodes: List[Set]
-    ) -> Tuple[List[int], Set[str], Dict[str, Set[str]]]:
+    def construct_group_tree(self, dataset_nodes: List[Set]) -> Tuple[List[int], Set[str], Dict[str, Set[str]]]:
         # get node, outputSchema, and inputSchema(if applicable)
         node = dataset_nodes[-1]
         outputSchema = node.schema
-        inputSchema = (
-            dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
-        )
+        inputSchema = dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
 
         ### convert node --> Group ###
         uid = node.universalIdentifier()
@@ -218,29 +209,20 @@ class Optimizer:
             )
 
         else:
-            raise NotImplementedError(
-                "No logical operator exists for the specified dataset construction."
-            )
+            raise NotImplementedError("No logical operator exists for the specified dataset construction.")
 
         # compute the input group ids and fields for this node
         input_group_ids, input_group_fields, input_group_properties = (
-            self.construct_group_tree(dataset_nodes[:-1])
-            if len(dataset_nodes) > 1
-            else ([], set(), {})
+            self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], set(), {})
         )
 
         # compute the fields added by this operation and all fields
-        input_group_short_fields = list(
-            map(
-                lambda full_field: full_field.split(".")[-1], input_group_fields
-            )
-        )
+        input_group_short_fields = list(map(lambda full_field: full_field.split(".")[-1], input_group_fields))
         new_fields = set(
             [
                 field
                 for field in op.outputSchema.fieldNames(unique=True, id=uid)
-                if (field.split(".")[-1] not in input_group_short_fields)
-                or (node._udf is not None)
+                if (field.split(".")[-1] not in input_group_short_fields) or (node._udf is not None)
             ]
         )
         all_fields = new_fields.union(input_group_fields)
@@ -297,10 +279,7 @@ class Optimizer:
 
         # remove unnecessary convert if output schema from data source scan matches
         # input schema for the next operator
-        if (
-            len(dataset_nodes) > 1
-            and dataset_nodes[0].schema == dataset_nodes[1].schema
-        ):
+        if len(dataset_nodes) > 1 and dataset_nodes[0].schema == dataset_nodes[1].schema:
             dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
             if len(dataset_nodes) > 1:
                 dataset_nodes[1]._source = dataset_nodes[0]
@@ -310,22 +289,14 @@ class Optimizer:
         for node_idx, node in enumerate(dataset_nodes):
             # update mapping from short to full field names
             short_field_names = node.schema.fieldNames()
-            full_field_names = node.schema.fieldNames(
-                unique=True, id=node.universalIdentifier()
-            )
-            for short_field_name, full_field_name in zip(
-                short_field_names, full_field_names
-            ):
+            full_field_names = node.schema.fieldNames(unique=True, id=node.universalIdentifier())
+            for short_field_name, full_field_name in zip(short_field_names, full_field_names):
                 # set mapping automatically if this is a new field
                 if short_field_name not in short_to_full_field_name:
                     short_to_full_field_name[short_field_name] = full_field_name
 
                 # otherwise, update mapping if and only if this is a non-llm convert (which may overwrite an input field)
-                elif (
-                    node_idx > 0
-                    and dataset_nodes[node_idx - 1].schema != node.schema
-                    and node._udf is not None
-                ):
+                elif node_idx > 0 and dataset_nodes[node_idx - 1].schema != node.schema and node._udf is not None:
                     short_to_full_field_name[short_field_name] = full_field_name
 
             # if the node is a data source, then skip
@@ -345,11 +316,7 @@ class Optimizer:
             # otherwise, make the node depend on all upstream nodes
             node._depends_on = set()
             for upstream_node in dataset_nodes[:node_idx]:
-                node._depends_on.update(
-                    upstream_node.schema.fieldNames(
-                        unique=True, id=node.universalIdentifier()
-                    )
-                )
+                node._depends_on.update(upstream_node.schema.fieldNames(unique=True, id=node.universalIdentifier()))
             node._depends_on = list(node._depends_on)
 
         # construct tree of groups
@@ -367,17 +334,13 @@ class Optimizer:
         """
         pass
 
-    def search_optimization_space(
-        self, group_id: int, include_transformations: bool = True
-    ) -> None:
+    def search_optimization_space(self, group_id: int, include_transformations: bool = True) -> None:
         # begin the search for an optimal plan with a task to optimize the final group
         initial_task = OptimizeGroup(group_id)
         self.tasks_stack.append(initial_task)
 
         # use transformation rules if specified
-        transformation_rules = (
-            self.transformation_rules if include_transformations else []
-        )
+        transformation_rules = self.transformation_rules if include_transformations else []
 
         # TODO: conditionally stop when X number of tasks have been executed to limit exhaustive search
         while len(self.tasks_stack) > 0:
@@ -388,9 +351,7 @@ class Optimizer:
             elif isinstance(task, ExpandGroup):
                 new_tasks = task.perform(self.groups)
             elif isinstance(task, OptimizeLogicalExpression):
-                new_tasks = task.perform(
-                    transformation_rules, self.implementation_rules
-                )
+                new_tasks = task.perform(transformation_rules, self.implementation_rules)
             elif isinstance(task, ApplyRule):
                 new_tasks = task.perform(
                     self.groups,
@@ -399,9 +360,7 @@ class Optimizer:
                 )
             elif isinstance(task, OptimizePhysicalExpression):
                 context = {"optimization_strategy": self.optimization_strategy}
-                new_tasks = task.perform(
-                    self.cost_model, self.groups, self.policy, context=context
-                )
+                new_tasks = task.perform(self.cost_model, self.groups, self.policy, context=context)
 
             self.tasks_stack.extend(new_tasks)
 
@@ -424,9 +383,7 @@ class Optimizer:
         best_phys_subplan = SentinelPlan(operator_sets=[])
         for input_group_id in best_phys_expr.input_group_ids:
             input_best_phys_plan = self.get_sentinel_plans(input_group_id)
-            best_phys_subplan = SentinelPlan.fromOpsAndSubPlan(
-                best_phys_subplan.operator_sets, input_best_phys_plan
-            )
+            best_phys_subplan = SentinelPlan.fromOpsAndSubPlan(best_phys_subplan.operator_sets, input_best_phys_plan)
 
         # add this operator set to best physical plan and return
         return SentinelPlan.fromOpsAndSubPlan([phys_op_set], best_phys_subplan)
@@ -450,9 +407,7 @@ class Optimizer:
         # get the best physical plan(s) for this group's inputs
         best_phys_subplan = PhysicalPlan(operators=[])
         for input_group_id in best_phys_expr.input_group_ids:
-            input_best_phys_plan = self.get_optimal_physical_plan(
-                input_group_id
-            )
+            input_best_phys_plan = self.get_optimal_physical_plan(input_group_id)
             best_phys_subplan = PhysicalPlan.fromOpsAndSubPlan(
                 best_phys_subplan.operators,
                 best_phys_subplan.plan_cost,
@@ -466,9 +421,7 @@ class Optimizer:
             best_phys_subplan,
         )
 
-    def get_confidence_interval_optimal_plans(
-        self, group_id: int
-    ) -> List[PhysicalPlan]:
+    def get_confidence_interval_optimal_plans(self, group_id: int) -> List[PhysicalPlan]:
         """
         Return all physical plans whose upper bound on the primary policy metric is greater than the
         best plan's lower bound on the primary policy metric (subject to satisfying the policy constraint).
@@ -498,24 +451,16 @@ class Optimizer:
                 # TODO: need to handle joins
                 best_phys_subplans = [PhysicalPlan(operators=[])]
                 for input_group_id in phys_expr.input_group_ids:
-                    input_best_phys_plans = (
-                        self.get_confidence_interval_optimal_plans(
-                            input_group_id
-                        )
-                    )
+                    input_best_phys_plans = self.get_confidence_interval_optimal_plans(input_group_id)
                     best_phys_subplans = [
-                        PhysicalPlan.fromOpsAndSubPlan(
-                            subplan.operators, subplan.plan_cost, input_subplan
-                        )
+                        PhysicalPlan.fromOpsAndSubPlan(subplan.operators, subplan.plan_cost, input_subplan)
                         for subplan in best_phys_subplans
                         for input_subplan in input_best_phys_plans
                     ]
 
                 # add this operator to best physical plan and return
                 for subplan in best_phys_subplans:
-                    plan = PhysicalPlan.fromOpsAndSubPlan(
-                        [phys_expr.operator], phys_expr.plan_cost, subplan
-                    )
+                    plan = PhysicalPlan.fromOpsAndSubPlan([phys_expr.operator], phys_expr.plan_cost, subplan)
                     best_plans.append(plan)
 
         return best_plans
@@ -529,9 +474,7 @@ class Optimizer:
         final_group_id = self.convert_query_plan_to_group_tree(query_plan)
 
         # use transformation rules if we're not doing sentinel optimization
-        include_transformations = (
-            self.optimization_strategy != OptimizationStrategy.SENTINEL
-        )
+        include_transformations = self.optimization_strategy != OptimizationStrategy.SENTINEL
 
         # TODO
         # # do heuristic based pre-optimization
@@ -548,10 +491,7 @@ class Optimizer:
         elif self.optimization_strategy == OptimizationStrategy.OPTIMAL:
             plans = [self.get_optimal_physical_plan(final_group_id)]
 
-        elif (
-            self.optimization_strategy
-            == OptimizationStrategy.CONFIDENCE_INTERVAL
-        ):
+        elif self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
             plans = self.get_confidence_interval_optimal_plans(final_group_id)
 
         return plans

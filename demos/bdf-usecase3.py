@@ -27,9 +27,7 @@ class ScientificPaper(pz.PDFFile):
         desc="The title of the paper. This is a natural language title, not a number or letter.",
         required=True,
     )
-    author = pz.Field(
-        desc="The name of the first author of the paper", required=True
-    )
+    author = pz.Field(desc="The name of the first author of the paper", required=True)
     #    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
     #    journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
     abstract = pz.Field(
@@ -44,16 +42,10 @@ class ScientificPaper(pz.PDFFile):
 class Reference(pz.Schema):
     """Represents a reference to another paper, which is cited in a scientific paper"""
 
-    index = pz.Field(
-        desc="The index of the reference in the paper", required=True
-    )
+    index = pz.Field(desc="The index of the reference in the paper", required=True)
     title = pz.Field(desc="The title of the paper being cited", required=True)
-    first_author = pz.Field(
-        desc="The author of the paper being cited", required=True
-    )
-    year = pz.Field(
-        desc="The year in which the cited paper was published", required=True
-    )
+    first_author = pz.Field(desc="The author of the paper being cited", required=True)
+    year = pz.Field(desc="The year in which the cited paper was published", required=True)
     # snippet = pz.Field(desc="A snippet from the source paper that references the index", required=False)
 
 
@@ -180,9 +172,7 @@ else:
             df["first_author"] = df["authors"].apply(lambda x: x.split()[0])
         except:
             breakpoint()
-        df["key"] = (
-            df["first_author"] + df["first_title"] + df["year"].astype(str)
-        )
+        df["key"] = df["first_author"] + df["first_title"] + df["year"].astype(str)
         references.append(df)
     references_df = pd.concat(references)
 

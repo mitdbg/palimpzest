@@ -36,9 +36,7 @@ def enron_filter_expected_records(enron_all_expected_records):
 
 
 @pytest.fixture
-def real_estate_all_expected_records(
-    real_estate_eval_tiny_data, image_real_estate_listing_schema
-):
+def real_estate_all_expected_records(real_estate_eval_tiny_data, image_real_estate_listing_schema):
     expected_listings = sorted(os.listdir(real_estate_eval_tiny_data))
     listing_to_modern_and_attractive = {
         "listing1": True,
@@ -63,9 +61,7 @@ def real_estate_all_expected_records(
 
 
 @pytest.fixture
-def real_estate_one_to_many_expected_records(
-    real_estate_eval_tiny_data, room_real_estate_listing_schema
-):
+def real_estate_one_to_many_expected_records(real_estate_eval_tiny_data, room_real_estate_listing_schema):
     expected_listings = sorted(os.listdir(real_estate_eval_tiny_data))
     listing_to_rooms = {
         "listing1": ["other", "living_room", "kitchen"],
@@ -76,9 +72,7 @@ def real_estate_one_to_many_expected_records(
     data_records = []
     for idx, listing in enumerate(expected_listings):
         for room in listing_to_rooms[listing]:
-            dr = DataRecord(
-                schema=room_real_estate_listing_schema, scan_idx=idx
-            )
+            dr = DataRecord(schema=room_real_estate_listing_schema, scan_idx=idx)
             dr.listing = listing
             dr.room = room
             data_records.append(dr)

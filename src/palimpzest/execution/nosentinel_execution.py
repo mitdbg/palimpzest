@@ -51,17 +51,10 @@ class NoSentinelExecutionEngine(ExecutionEngine):
         # execute plan(s) according to the optimization strategy
         records, plan_stats = [], []
         if self.optimization_strategy == OptimizationStrategy.OPTIMAL:
-            records, plan_stats = self.execute_optimal_strategy(
-                dataset, optimizer
-            )
+            records, plan_stats = self.execute_optimal_strategy(dataset, optimizer)
 
-        elif (
-            self.optimization_strategy
-            == OptimizationStrategy.CONFIDENCE_INTERVAL
-        ):
-            records, plan_stats = self.execute_confidence_interval_strategy(
-                dataset, optimizer
-            )
+        elif self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
+            records, plan_stats = self.execute_confidence_interval_strategy(dataset, optimizer)
 
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)
@@ -79,18 +72,13 @@ class NoSentinelExecutionEngine(ExecutionEngine):
                     )
                 )
             ),
-            plan_strs={
-                plan_id: plan_stats.plan_str
-                for plan_id, plan_stats in aggregate_plan_stats.items()
-            },
+            plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 
         return records, execution_stats
 
 
-class SequentialSingleThreadNoSentinelExecution(
-    NoSentinelExecutionEngine, SequentialSingleThreadPlanExecutor
-):
+class SequentialSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, SequentialSingleThreadPlanExecutor):
     """
     This class performs non-sample based execution while executing plans in a sequential, single-threaded fashion.
     """
@@ -98,9 +86,7 @@ class SequentialSingleThreadNoSentinelExecution(
     pass
 
 
-class PipelinedSingleThreadNoSentinelExecution(
-    NoSentinelExecutionEngine, PipelinedSingleThreadPlanExecutor
-):
+class PipelinedSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, PipelinedSingleThreadPlanExecutor):
     """
     This class performs non-sample based execution while executing plans in a pipelined, single-threaded fashion.
     """
@@ -108,9 +94,7 @@ class PipelinedSingleThreadNoSentinelExecution(
     pass
 
 
-class PipelinedParallelNoSentinelExecution(
-    NoSentinelExecutionEngine, PipelinedParallelPlanExecutor
-):
+class PipelinedParallelNoSentinelExecution(NoSentinelExecutionEngine, PipelinedParallelPlanExecutor):
     """
     This class performs non-sample based execution while executing plans in a pipelined, parallel fashion.
     """

@@ -32,22 +32,15 @@ if __name__ == "__main__":
     # parse arguments
     startTime = time.time()
     parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument(
-        "--no-cache", action="store_true", help="Do not use cached results"
-    )
+    parser.add_argument("--no-cache", action="store_true", help="Do not use cached results")
 
     args = parser.parse_args()
     no_cache = args.no_cache
     datasetid = "images-tiny"
     if datasetid not in pz.DataDirectory().listRegisteredDatasets():
-        pz.DataDirectory().registerLocalDirectory(
-            path="testdata/images-tiny", dataset_id="images-tiny"
-        )
+        pz.DataDirectory().registerLocalDirectory(path="testdata/images-tiny", dataset_id="images-tiny")
 
-    if (
-        os.getenv("OPENAI_API_KEY") is None
-        and os.getenv("TOGETHER_API_KEY") is None
-    ):
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     print("Starting image task")

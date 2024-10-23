@@ -44,9 +44,7 @@ class CaseData(pz.Schema):
     """An individual row extracted from a table containing medical study data."""
 
     case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-    age_at_diagnosis = pz.Field(
-        desc="The age of the patient at the time of diagnosis", required=False
-    )
+    age_at_diagnosis = pz.Field(desc="The age of the patient at the time of diagnosis", required=False)
     race = pz.Field(
         desc="An arbitrary classification of a taxonomic group that is a division of a species.",
         required=False,
@@ -55,27 +53,17 @@ class CaseData(pz.Schema):
         desc="Whether an individual describes themselves as Hispanic or Latino or not.",
         required=False,
     )
-    gender = pz.Field(
-        desc="Text designations that identify gender.", required=False
-    )
-    vital_status = pz.Field(
-        desc="The vital status of the patient", required=False
-    )
+    gender = pz.Field(desc="Text designations that identify gender.", required=False)
+    vital_status = pz.Field(desc="The vital status of the patient", required=False)
     ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
     ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
-    ajcc_pathologic_stage = pz.Field(
-        desc="The AJCC pathologic stage", required=False
-    )
+    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
     tumor_grade = pz.Field(desc="The tumor grade", required=False)
     tumor_focality = pz.Field(desc="The tumor focality", required=False)
-    tumor_largest_dimension_diameter = pz.Field(
-        desc="The tumor largest dimension diameter", required=False
-    )
+    tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter", required=False)
     primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
     morphology = pz.Field(desc="The morphology", required=False)
-    tissue_or_organ_of_origin = pz.Field(
-        desc="The tissue or organ of origin", required=False
-    )
+    tissue_or_organ_of_origin = pz.Field(desc="The tissue or organ of origin", required=False)
     # tumor_code = pz.Field(desc="The tumor code", required=False)
     filename = pz.Field(
         desc="The name of the file the record was extracted from",
@@ -96,9 +84,7 @@ class RealEstateListingFiles(pz.Schema):
     """The source text and image data for a real estate listing."""
 
     listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.StringField(
-        desc="The content of the listing's text description", required=True
-    )
+    text_content = pz.StringField(desc="The content of the listing's text description", required=True)
     image_contents = pz.ListField(
         element_type=pz.BytesField,
         desc="A list of the contents of each image of the listing",
@@ -161,9 +147,7 @@ class RealEstateListingSource(pz.UserSource):
         return len(self.listings)
 
     def getSize(self):
-        return sum(
-            file.stat().st_size for file in Path(self.listings_dir).rglob("*")
-        )
+        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
 
     def getItem(self, idx: int):
         # fetch listing
@@ -189,11 +173,7 @@ class RealEstateListingSource(pz.UserSource):
 def buildNestedStr(node, indent=0, buildStr=""):
     elt, child = node
     indentation = " " * indent
-    buildStr = (
-        f"{indentation}{elt}"
-        if indent == 0
-        else buildStr + f"\n{indentation}{elt}"
-    )
+    buildStr = f"{indentation}{elt}" if indent == 0 else buildStr + f"\n{indentation}{elt}"
     if child is not None:
         return buildNestedStr(child, indent=indent + 2, buildStr=buildStr)
     else:
@@ -238,9 +218,7 @@ def compute_label(physicalTree, label_idx):
     return f"PZ-{label_idx}-{label}"
 
 
-def score_biofabric_plans(
-    workload, records, plan_idx, policy_str=None, reopt=False
-) -> float:
+def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=False) -> float:
     """
     Computes the results of all biofabric plans
     """
@@ -273,9 +251,7 @@ def score_biofabric_plans(
 
     records_df = pd.DataFrame(output_rows)
     if not reopt:
-        records_df.to_csv(
-            f"final-eval-results/{workload}/preds-{plan_idx}.csv", index=False
-        )
+        records_df.to_csv(f"final-eval-results/{workload}/preds-{plan_idx}.csv", index=False)
     else:
         records_df.to_csv(
             f"final-eval-results/reoptimization/{workload}/{policy_str}.csv",
@@ -288,9 +264,7 @@ def score_biofabric_plans(
     output = records_df
     index = [x for x in output.columns if x != "study"]
     # target_matching = pd.read_csv(os.path.join(f'final-eval-results/{opt}/{workload}/', "target_matching.csv"), index_col=0).reindex(index)
-    target_matching = pd.read_csv(
-        os.path.join("testdata/", "target_matching.csv"), index_col=0
-    ).reindex(index)
+    target_matching = pd.read_csv(os.path.join("testdata/", "target_matching.csv"), index_col=0).reindex(index)
 
     studies = output["study"].unique()
     # Group by output by the "study" column and split it into many dataframes indexed by the "study" column
@@ -302,9 +276,7 @@ def score_biofabric_plans(
     for study in studies:
         output_study = output[output["study"] == study]
         try:
-            input_df = pd.read_excel(
-                os.path.join("testdata/biofabric-matching/", f"{study}.xlsx")
-            )
+            input_df = pd.read_excel(os.path.join("testdata/biofabric-matching/", f"{study}.xlsx"))
         except:
             print("Cannot find the study", study)
             targets += [study] * 5
@@ -318,13 +290,7 @@ def score_biofabric_plans(
             max_col = "missing"
             for input_col in input_df.columns:
                 try:
-                    matches = sum(
-                        [
-                            1
-                            for idx, x in enumerate(output_study[col])
-                            if x == input_df[input_col][idx]
-                        ]
-                    )
+                    matches = sum([1 for idx, x in enumerate(output_study[col]) if x == input_df[input_col][idx]])
                 except:
                     pdb.set_trace()
                 if matches > max_matches:
@@ -339,24 +305,18 @@ def score_biofabric_plans(
         predicted += list(df[study].values)
 
     # print(df)
-    p, r, f1, sup = precision_recall_fscore_support(
-        targets, predicted, average="micro", zero_division=0
-    )
+    p, r, f1, sup = precision_recall_fscore_support(targets, predicted, average="micro", zero_division=0)
 
     return f1
 
 
-def score_plan(
-    workload, records, plan_idx, policy_str=None, reopt=False
-) -> float:
+def score_plan(workload, records, plan_idx, policy_str=None, reopt=False) -> float:
     """
     Computes the F1 score of the plan
     """
     # special handling for biofabric workload
     if workload == "biofabric":
-        return score_biofabric_plans(
-            workload, records, plan_idx, policy_str, reopt
-        )
+        return score_biofabric_plans(workload, records, plan_idx, policy_str, reopt)
 
     # parse records
     # records = [
@@ -371,9 +331,7 @@ def score_plan(
 
     # save predictions for this plan
     if not reopt:
-        records_df.to_csv(
-            f"final-eval-results/{workload}/preds-{plan_idx}.csv", index=False
-        )
+        records_df.to_csv(f"final-eval-results/{workload}/preds-{plan_idx}.csv", index=False)
     else:
         records_df.to_csv(
             f"final-eval-results/reoptimization/{workload}/{policy_str}.csv",
@@ -386,9 +344,7 @@ def score_plan(
     # get list of predictions
     preds = None
     if workload == "enron":
-        preds = records_df.filename.apply(
-            lambda fn: os.path.basename(fn)
-        ).tolist()
+        preds = records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
     elif workload == "real-estate":
         preds = list(records_df.listing)
 
@@ -418,11 +374,7 @@ def score_plan(
     # compute precision, recall, f1 score
     precision = tp / (tp + fp) if tp + fp > 0 else 0.0
     recall = tp / (tp + fn) if tp + fn > 0 else 0.0
-    f1_score = (
-        2 * precision * recall / (precision + recall)
-        if precision + recall > 0
-        else 0.0
-    )
+    f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
 
     return f1_score
 
@@ -535,12 +487,7 @@ def get_logical_tree(
             # NOTE: I'm using this hard-coded function so that folks w/out a
             #       Geocoding API key from google can still run this example
             try:
-                if any(
-                    [
-                        street.lower() in record.address.lower()
-                        for street in FAR_AWAY_ADDRS
-                    ]
-                ):
+                if any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
                     return False
                 return True
             except:
@@ -563,9 +510,7 @@ def get_logical_tree(
             num_samples=num_samples,
             scan_start_idx=scan_start_idx,
         )
-        listings = listings.convert(
-            TextRealEstateListing, depends_on="text_content"
-        )
+        listings = listings.convert(TextRealEstateListing, depends_on="text_content")
         listings = listings.convert(
             ImageRealEstateListing,
             image_conversion=True,
@@ -575,9 +520,7 @@ def get_logical_tree(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
         )
-        listings = listings.filter(
-            within_two_miles_of_mit, depends_on="address"
-        )
+        listings = listings.filter(within_two_miles_of_mit, depends_on="address")
         listings = listings.filter(in_price_range, depends_on="price")
         return listings.getLogicalTree()
 
@@ -594,9 +537,7 @@ def get_logical_tree(
             udf=udfs.xls_to_tables,
             cardinality=pz.Cardinality.ONE_TO_MANY,
         )
-        patient_tables = patient_tables.filter(
-            "The rows of the table contain the patient age"
-        )
+        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(
             CaseData,
             desc="The patient data in the table",
@@ -611,9 +552,7 @@ def get_logical_tree(
 # function to run sentinel
 def run_sentinel_plan(plan_idx, workload, num_samples):
     # get specified sentinel plan
-    logicalTree = get_logical_tree(
-        workload, nocache=True, num_samples=num_samples
-    )
+    logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
     sentinel_plans = logicalTree.createPhysicalPlanCandidates(sentinels=True)
     plan = sentinel_plans[plan_idx]
 
@@ -674,15 +613,11 @@ def run_sentinel_plan(plan_idx, workload, num_samples):
     return records, result_dict, cost_estimate_sample_data
 
 
-def run_sentinel_plans(
-    workload, num_samples, policy_str: str = None, parallel: bool = False
-):
+def run_sentinel_plans(workload, num_samples, policy_str: str = None, parallel: bool = False):
     start_time = time.time()
 
     # create query for dataset
-    logicalTree = get_logical_tree(
-        workload, nocache=True, num_samples=num_samples
-    )
+    logicalTree = get_logical_tree(workload, nocache=True, num_samples=num_samples)
 
     # compute number of plans
     sentinel_plans = logicalTree.createPhysicalPlanCandidates(sentinels=True)
@@ -692,16 +627,11 @@ def run_sentinel_plans(
     with Pool(processes=num_sentinel_plans) as pool:
         results = pool.starmap(
             run_sentinel_plan,
-            [
-                (plan_idx, workload, num_samples)
-                for plan_idx in range(num_sentinel_plans)
-            ],
+            [(plan_idx, workload, num_samples) for plan_idx in range(num_sentinel_plans)],
         )
 
         # write out result dict and samples collected for each sentinel
-        for idx, (records, result_dict, cost_est_sample_data) in enumerate(
-            results
-        ):
+        for idx, (records, result_dict, cost_est_sample_data) in enumerate(results):
             fp = (
                 f"final-eval-results/reoptimization/{workload}/sentinel-{idx}-{policy_str}-results.json"
                 if policy_str is not None
@@ -723,8 +653,7 @@ def run_sentinel_plans(
             # find GPT-4 plan records and add those to all_records
             if all(
                 [
-                    model is None
-                    or model in ["gpt-4-0125-preview", "gpt-4-vision-preview"]
+                    model is None or model in ["gpt-4-0125-preview", "gpt-4-vision-preview"]
                     for model in result_dict["plan_info"]["models"]
                 ]
             ):
@@ -736,9 +665,7 @@ def run_sentinel_plans(
     total_sentinel_time = time.time() - start_time
 
     # workaround to disabling cache: delete all cached generations after each plan
-    dspy_cache_dir = os.path.join(
-        os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/"
-    )
+    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
     if os.path.exists(dspy_cache_dir):
         shutil.rmtree(dspy_cache_dir)
 
@@ -766,9 +693,7 @@ def evaluate_pz_plan(sentinel_data, workload, plan_idx):
     ) = sentinel_data
 
     # get logicalTree
-    logicalTree = get_logical_tree(
-        workload, nocache=True, scan_start_idx=num_samples
-    )
+    logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
 
     # TODO: for now, re-create candidate plans until we debug duplicate profiler issue
     plans = logicalTree.createPhysicalPlanCandidates(
@@ -819,9 +744,7 @@ def evaluate_pz_plan(sentinel_data, workload, plan_idx):
     print("---")
 
     # write result json object
-    with open(
-        f"final-eval-results/{workload}/results-{plan_idx}.json", "w"
-    ) as f:
+    with open(f"final-eval-results/{workload}/results-{plan_idx}.json", "w") as f:
         json.dump(result_dict, f)
 
 
@@ -856,9 +779,7 @@ def evaluate_pz_plans(workload, dry_run=False):
     ) = output
 
     # create query for dataset
-    logicalTree = get_logical_tree(
-        workload, nocache=True, scan_start_idx=num_samples
-    )
+    logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
 
     # get total number of plans
     compilation_start = time.time()
@@ -904,16 +825,11 @@ def evaluate_pz_plans(workload, dry_run=False):
         )
         _ = pool.starmap(
             evaluate_pz_plan,
-            [
-                (sentinel_data, workload, plan_idx)
-                for plan_idx in range(num_plans)
-            ],
+            [(sentinel_data, workload, plan_idx) for plan_idx in range(num_plans)],
         )
 
     # workaround to disabling cache: delete all cached generations after each plan
-    dspy_cache_dir = os.path.join(
-        os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/"
-    )
+    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
     if os.path.exists(dspy_cache_dir):
         shutil.rmtree(dspy_cache_dir)
 
@@ -940,21 +856,13 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     policy = pz.MaxHarmonicMean()
     if policy_str is not None:
         if policy_str == "max-quality-at-fixed-cost":
-            policy = pz.MaxQualityAtFixedCost(
-                fixed_cost=workload_to_fixed_cost[workload]
-            )
+            policy = pz.MaxQualityAtFixedCost(fixed_cost=workload_to_fixed_cost[workload])
         elif policy_str == "max-quality-at-fixed-runtime":
-            policy = pz.MaxQualityAtFixedTime(
-                fixed_runtime=workload_to_fixed_runtime[workload]
-            )
+            policy = pz.MaxQualityAtFixedTime(fixed_runtime=workload_to_fixed_runtime[workload])
         elif policy_str == "min-runtime-at-fixed-quality":
-            policy = pz.MinTimeAtFixedQuality(
-                fixed_quality=workload_to_fixed_quality[workload]
-            )
+            policy = pz.MinTimeAtFixedQuality(fixed_quality=workload_to_fixed_quality[workload])
         elif policy_str == "min-cost-at-fixed-quality":
-            policy = pz.MinCostAtFixedQuality(
-                fixed_quality=workload_to_fixed_quality[workload]
-            )
+            policy = pz.MinCostAtFixedQuality(fixed_quality=workload_to_fixed_quality[workload])
 
     # TODO: in practice could move this inside of get_logical_tree w/flag indicating sentinel run;
     #       for now just manually set to make sure evaluation is accurate
@@ -969,9 +877,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
 
     # run sentinels
     start_time = time.time()
-    output = run_sentinel_plans(
-        workload, num_samples, policy_str=policy_str, parallel=parallel
-    )
+    output = run_sentinel_plans(workload, num_samples, policy_str=policy_str, parallel=parallel)
     total_sentinel_cost, _, all_cost_estimate_data, sentinel_records = output
 
     # # get cost estimates given current candidate plans
@@ -995,9 +901,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     #     json.dump(estimates, f)
 
     # create new plan candidates based on current estimate data
-    logicalTree = get_logical_tree(
-        workload, nocache=True, scan_start_idx=num_samples
-    )
+    logicalTree = get_logical_tree(workload, nocache=True, scan_start_idx=num_samples)
     candidatePlans = logicalTree.createPhysicalPlanCandidates(
         cost_estimate_sample_data=all_cost_estimate_data,
         allow_bonded_query=True,
@@ -1008,9 +912,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     )
 
     # choose best plan and execute it
-    (_, _, _, plan, _), plan_idx = policy.choose(
-        candidatePlans, return_idx=True
-    )
+    (_, _, _, plan, _), plan_idx = policy.choose(candidatePlans, return_idx=True)
 
     # display the plan output
     print("----------------------")
@@ -1040,9 +942,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     sp = StatsProcessor(profileData)
 
     # workaround to disabling cache: delete all cached generations after each plan
-    dspy_cache_dir = os.path.join(
-        os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/"
-    )
+    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
     if os.path.exists(dspy_cache_dir):
         shutil.rmtree(dspy_cache_dir)
 
@@ -1067,9 +967,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
         stats = stats.source_op_stats
 
     # score plan
-    f1_score = score_plan(
-        workload, all_records, None, policy_str=policy_str, reopt=True
-    )
+    f1_score = score_plan(workload, all_records, None, policy_str=policy_str, reopt=True)
 
     # construct and return result_dict
     result_dict = {
@@ -1092,9 +990,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
 if __name__ == "__main__":
     # parse arguments
     startTime = time.time()
-    parser = argparse.ArgumentParser(
-        description="Run the evaluation(s) for the paper"
-    )
+    parser = argparse.ArgumentParser(description="Run the evaluation(s) for the paper")
     parser.add_argument(
         "--workload",
         type=str,
@@ -1147,9 +1043,7 @@ if __name__ == "__main__":
 
     # re-optimization is unique enough to warrant its own code path
     if args.reoptimize:
-        os.makedirs(
-            f"final-eval-results/reoptimization/{args.workload}", exist_ok=True
-        )
+        os.makedirs(f"final-eval-results/reoptimization/{args.workload}", exist_ok=True)
         run_reoptimize_eval(args.workload, args.policy, args.parallel)
         exit(1)
 

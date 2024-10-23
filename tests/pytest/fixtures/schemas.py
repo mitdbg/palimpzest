@@ -21,9 +21,7 @@ def real_estate_listing_files_schema():
         """The source text and image data for a real estate listing."""
 
         listing = pz.StringField(desc="The name of the listing", required=True)
-        text_content = pz.StringField(
-            desc="The content of the listing's text description", required=True
-        )
+        text_content = pz.StringField(desc="The content of the listing's text description", required=True)
         image_contents = pz.ListField(
             element_type=pz.BytesField,
             desc="A list of the contents of each image of the listing",
@@ -90,33 +88,17 @@ def case_data_schema():
             desc="Whether an individual describes themselves as Hispanic or Latino or not.",
             required=False,
         )
-        gender = pz.Field(
-            desc="Text designations that identify gender.", required=False
-        )
-        vital_status = pz.Field(
-            desc="The vital status of the patient", required=False
-        )
-        ajcc_pathologic_t = pz.Field(
-            desc="The AJCC pathologic T", required=False
-        )
-        ajcc_pathologic_n = pz.Field(
-            desc="The AJCC pathologic N", required=False
-        )
-        ajcc_pathologic_stage = pz.Field(
-            desc="The AJCC pathologic stage", required=False
-        )
+        gender = pz.Field(desc="Text designations that identify gender.", required=False)
+        vital_status = pz.Field(desc="The vital status of the patient", required=False)
+        ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
+        ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
+        ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
         tumor_grade = pz.Field(desc="The tumor grade", required=False)
         tumor_focality = pz.Field(desc="The tumor focality", required=False)
-        tumor_largest_dimension_diameter = pz.Field(
-            desc="The tumor largest dimension diameter", required=False
-        )
-        primary_diagnosis = pz.Field(
-            desc="The primary diagnosis", required=False
-        )
+        tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter", required=False)
+        primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
         morphology = pz.Field(desc="The morphology", required=False)
-        tissue_or_organ_of_origin = pz.Field(
-            desc="The tissue or organ of origin", required=False
-        )
+        tissue_or_organ_of_origin = pz.Field(desc="The tissue or organ of origin", required=False)
         # tumor_code = pz.Field(desc="The tumor code", required=False)
         filename = pz.Field(
             desc="The name of the file the record was extracted from",

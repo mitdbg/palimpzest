@@ -75,27 +75,17 @@ def physical_plan(
         "token-reduction-convert": token_reduction_convert_plan,
         "image-convert": image_convert_plan,
         "one-to-many-convert": one_to_many_convert_plan,
-        "cost-est-simple-plan-gpt4-gpt4": simple_plan_factory(
-            convert_model=Model.GPT_4, filter_model=Model.GPT_4
-        ),
-        "cost-est-simple-plan-gpt4-gpt35": simple_plan_factory(
-            convert_model=Model.GPT_4, filter_model=Model.GPT_3_5
-        ),
-        "cost-est-simple-plan-gpt4-mixtral": simple_plan_factory(
-            convert_model=Model.GPT_4, filter_model=Model.MIXTRAL
-        ),
-        "cost-est-simple-plan-gpt35-gpt4": simple_plan_factory(
-            convert_model=Model.GPT_3_5, filter_model=Model.GPT_4
-        ),
+        "cost-est-simple-plan-gpt4-gpt4": simple_plan_factory(convert_model=Model.GPT_4, filter_model=Model.GPT_4),
+        "cost-est-simple-plan-gpt4-gpt35": simple_plan_factory(convert_model=Model.GPT_4, filter_model=Model.GPT_3_5),
+        "cost-est-simple-plan-gpt4-mixtral": simple_plan_factory(convert_model=Model.GPT_4, filter_model=Model.MIXTRAL),
+        "cost-est-simple-plan-gpt35-gpt4": simple_plan_factory(convert_model=Model.GPT_3_5, filter_model=Model.GPT_4),
         "cost-est-simple-plan-gpt35-gpt35": simple_plan_factory(
             convert_model=Model.GPT_3_5, filter_model=Model.GPT_3_5
         ),
         "cost-est-simple-plan-gpt35-mixtral": simple_plan_factory(
             convert_model=Model.GPT_3_5, filter_model=Model.MIXTRAL
         ),
-        "cost-est-simple-plan-mixtral-gpt4": simple_plan_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.GPT_4
-        ),
+        "cost-est-simple-plan-mixtral-gpt4": simple_plan_factory(convert_model=Model.MIXTRAL, filter_model=Model.GPT_4),
         "cost-est-simple-plan-mixtral-gpt35": simple_plan_factory(
             convert_model=Model.MIXTRAL, filter_model=Model.GPT_3_5
         ),

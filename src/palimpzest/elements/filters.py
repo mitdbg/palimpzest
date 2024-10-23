@@ -29,19 +29,11 @@ class Filter:
         return "Filter(" + self.getFilterStr() + ")"
 
     def getFilterStr(self) -> str:
-        return (
-            self.filterCondition
-            if self.filterCondition is not None
-            else str(self.filterFn)
-        )
+        return self.filterCondition if self.filterCondition is not None else str(self.filterFn)
 
     def __hash__(self) -> int:
         # custom hash function
-        return (
-            hash(self.filterCondition)
-            if self.filterCondition is not None
-            else hash(str(self.filterFn))
-        )
+        return hash(self.filterCondition) if self.filterCondition is not None else hash(str(self.filterFn))
 
     def __eq__(self, other: Filter) -> bool:
         # __eq__ should be defined for consistency with __hash__

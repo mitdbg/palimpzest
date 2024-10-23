@@ -33,9 +33,7 @@ class Plan:
 
     def __str__(self):
         start = self.operators[0]
-        plan_str = (
-            f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n\n"
-        )
+        plan_str = f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n\n"
 
         for idx, operator in enumerate(self.operators[1:]):
             plan_str += f" {idx+1}. {str(operator)}\n"
@@ -53,11 +51,7 @@ class PhysicalPlan(Plan):
         plan_cost: Optional[PlanCost] = None,
     ):
         self.operators = operators
-        self.plan_cost = (
-            plan_cost
-            if plan_cost is not None
-            else PlanCost(cost=0.0, time=0.0, quality=1.0)
-        )
+        self.plan_cost = plan_cost if plan_cost is not None else PlanCost(cost=0.0, time=0.0, quality=1.0)
         self.plan_id = self.compute_plan_id()
 
     def compute_plan_id(self) -> str:
@@ -67,9 +61,7 @@ class PhysicalPlan(Plan):
         Two different PhysicalPlan instances with the identical lists of operators will have equivalent plan_ids.
         """
         hash_str = str(tuple(op.get_op_id() for op in self.operators))
-        return hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[
-            :MAX_ID_CHARS
-        ]
+        return hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
     def __eq__(self, other: PhysicalPlan):
         return self.operators == other.operators
@@ -109,14 +101,8 @@ class SentinelPlan(Plan):
 
         Two different SentinelPlan instances with the identical operator_sets will have equivalent plan_ids.
         """
-        hash_str = str(
-            tuple(
-                op.get_op_id() for op_set in self.operator_sets for op in op_set
-            )
-        )
-        return hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[
-            :MAX_ID_CHARS
-        ]
+        hash_str = str(tuple(op.get_op_id() for op_set in self.operator_sets for op in op_set))
+        return hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
     def __eq__(self, other: PhysicalPlan):
         return self.operator_sets == other.operator_sets
@@ -127,9 +113,7 @@ class SentinelPlan(Plan):
     def __str__(self):
         # making the assumption that first operator_set can only be a scan
         start = list(self.operator_sets[0])[0]
-        plan_str = (
-            f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n\n"
-        )
+        plan_str = f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n\n"
 
         for idx, operator_set in enumerate(self.operator_sets[1:]):
             if len(operator_set) == 1:
@@ -143,13 +127,9 @@ class SentinelPlan(Plan):
         return plan_str
 
     @staticmethod
-    def fromOpsAndSubPlan(
-        op_sets: List[Set[PhysicalOperator]], subPlan: SentinelPlan
-    ) -> SentinelPlan:
+    def fromOpsAndSubPlan(op_sets: List[Set[PhysicalOperator]], subPlan: SentinelPlan) -> SentinelPlan:
         # create copies of all logical operators
-        copySubPlan = [
-            {op.copy() for op in op_set} for op_set in subPlan.operator_sets
-        ]
+        copySubPlan = [{op.copy() for op in op_set} for op_set in subPlan.operator_sets]
         copyOps = [{op.copy() for op in op_set} for op_set in op_sets]
 
         # construct full set of operators

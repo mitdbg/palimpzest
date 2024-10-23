@@ -29,12 +29,8 @@ class ScientificPaper(pz.PDFFile):
         desc="The year the paper was published. This is a number.",
         required=False,
     )
-    author = pz.Field(
-        desc="The name of the first author of the paper", required=True
-    )
-    journal = pz.Field(
-        desc="The name of the journal the paper was published in", required=True
-    )
+    author = pz.Field(desc="The name of the first author of the paper", required=True)
+    journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
     subject = pz.Field(
         desc="A summary of the paper contribution in one sentence",
         required=False,
@@ -46,9 +42,7 @@ class CaseData(pz.Schema):
     """An individual row extracted from a table containing medical study data."""
 
     case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-    age_at_diagnosis = pz.Field(
-        desc="The age of the patient at the time of diagnosis", required=False
-    )
+    age_at_diagnosis = pz.Field(desc="The age of the patient at the time of diagnosis", required=False)
     race = pz.Field(
         desc="An arbitrary classification of a taxonomic group that is a division of a species.",
         required=False,
@@ -57,27 +51,17 @@ class CaseData(pz.Schema):
         desc="Whether an individual describes themselves as Hispanic or Latino or not.",
         required=False,
     )
-    gender = pz.Field(
-        desc="Text designations that identify gender.", required=False
-    )
-    vital_status = pz.Field(
-        desc="The vital status of the patient", required=False
-    )
+    gender = pz.Field(desc="Text designations that identify gender.", required=False)
+    vital_status = pz.Field(desc="The vital status of the patient", required=False)
     ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
     ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
-    ajcc_pathologic_stage = pz.Field(
-        desc="The AJCC pathologic stage", required=False
-    )
+    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
     tumor_grade = pz.Field(desc="The tumor grade", required=False)
     tumor_focality = pz.Field(desc="The tumor focality", required=False)
-    tumor_largest_dimension_diameter = pz.Field(
-        desc="The tumor largest dimension diameter", required=False
-    )
+    tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter", required=False)
     primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
     morphology = pz.Field(desc="The morphology", required=False)
-    tissue_or_organ_of_origin = pz.Field(
-        desc="The tissue or organ of origin", required=False
-    )
+    tissue_or_organ_of_origin = pz.Field(desc="The tissue or organ of origin", required=False)
     # tumor_code = pz.Field(desc="The tumor code", required=False)
     study = pz.Field(
         desc="The last name of the author of the study, from the table name",
@@ -100,9 +84,7 @@ def print_table(output):
 if __name__ == "__main__":
     startTime = time.time()
     parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument(
-        "--no-cache", action="store_true", help="Do not use cached results"
-    )
+    parser.add_argument("--no-cache", action="store_true", help="Do not use cached results")
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -121,12 +103,8 @@ if __name__ == "__main__":
         help="The experiment to run",
         default="matching",
     )
-    parser.add_argument(
-        "--policy", type=str, help="The policy to use", default="cost"
-    )
-    parser.add_argument(
-        "--engine", type=str, help="The engine to use", default="parallel"
-    )
+    parser.add_argument("--policy", type=str, help="The policy to use", default="cost")
+    parser.add_argument("--engine", type=str, help="The engine to use", default="parallel")
 
     args = parser.parse_args()
     no_cache = args.no_cache
@@ -178,9 +156,7 @@ if __name__ == "__main__":
             udf=udfs.xls_to_tables,
             cardinality=pz.Cardinality.ONE_TO_MANY,
         )
-        patient_tables = patient_tables.filter(
-            "The rows of the table contain the patient age"
-        )
+        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         # patient_tables = patient_tables.filter("The table explains the meaning of attributes")
         # patient_tables = patient_tables.filter("The table contains patient biometric data")
         # patient_tables = patient_tables.filter("The table contains proteomic data")
@@ -208,9 +184,7 @@ if __name__ == "__main__":
             udf=udfs.xls_to_tables,
             cardinality=pz.Cardinality.ONE_TO_MANY,
         )
-        patient_tables = patient_tables.filter(
-            "The rows of the table contain the patient age"
-        )
+        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(
             CaseData,
             desc="The patient data in the table",

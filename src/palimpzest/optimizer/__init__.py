@@ -11,11 +11,7 @@ def classesinmodule(module):
     return [
         md[c]
         for c in md
-        if (
-            isinstance(md[c], type)
-            and md[c].__module__ == module.__name__
-            and issubclass(md[c], Rule)
-        )
+        if (isinstance(md[c], type) and md[c].__module__ == module.__name__ and issubclass(md[c], Rule))
     ]
 
 
@@ -33,9 +29,7 @@ IMPLEMENTATION_RULES = [
     ]
 ]
 TRANSFORMATION_RULES = [
-    rule
-    for rule in ALL_RULES
-    if issubclass(rule, TransformationRule) and rule not in [TransformationRule]
+    rule for rule in ALL_RULES if issubclass(rule, TransformationRule) and rule not in [TransformationRule]
 ]
 
 from .optimizer import *

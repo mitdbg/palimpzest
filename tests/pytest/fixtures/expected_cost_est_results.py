@@ -6,9 +6,7 @@ from palimpzest.utils import getModels
 
 
 @pytest.fixture
-def simple_plan_expected_operator_estimates(
-    simple_plan_scan_data, simple_plan_convert_data, simple_plan_filter_data
-):
+def simple_plan_expected_operator_estimates(simple_plan_scan_data, simple_plan_convert_data, simple_plan_filter_data):
     # get op_id for each operator
     scan_op_id = simple_plan_scan_data["op_id"]
     convert_op_id = simple_plan_convert_data["op_id"]
@@ -48,17 +46,13 @@ def simple_plan_expected_operator_estimates(
 
     # fill-in scan operator estimates
     scan_time_per_records = simple_plan_scan_data["time_per_records"]
-    expected_operator_estimates[scan_op_id]["time_per_record"] = sum(
-        scan_time_per_records
-    ) / len(scan_time_per_records)
+    expected_operator_estimates[scan_op_id]["time_per_record"] = sum(scan_time_per_records) / len(scan_time_per_records)
 
     # fill-in convert operator estimates
     convert_time_per_records = simple_plan_convert_data["time_per_records"]
     convert_cost_per_records = simple_plan_convert_data["cost_per_records"]
     convert_total_input_tokens = simple_plan_convert_data["total_input_tokens"]
-    convert_total_output_tokens = simple_plan_convert_data[
-        "total_output_tokens"
-    ]
+    convert_total_output_tokens = simple_plan_convert_data["total_output_tokens"]
     for model_name in all_model_names:
         model_start_idx, model_end_idx, expected_quality = None, None, None
         if model_name == Model.GPT_4.value:
@@ -79,36 +73,20 @@ def simple_plan_expected_operator_estimates(
             expected_quality = 7.0 / 12.0  # correct answers / total keys
 
         num_samples = model_end_idx - model_start_idx
-        expected_operator_estimates[convert_op_id][model_name][
-            "time_per_record"
-        ] = (
-            sum(convert_time_per_records[model_start_idx:model_end_idx])
-            / num_samples
+        expected_operator_estimates[convert_op_id][model_name]["time_per_record"] = (
+            sum(convert_time_per_records[model_start_idx:model_end_idx]) / num_samples
         )
-        expected_operator_estimates[convert_op_id][model_name][
-            "cost_per_record"
-        ] = (
-            sum(convert_cost_per_records[model_start_idx:model_end_idx])
-            / num_samples
+        expected_operator_estimates[convert_op_id][model_name]["cost_per_record"] = (
+            sum(convert_cost_per_records[model_start_idx:model_end_idx]) / num_samples
         )
-        expected_operator_estimates[convert_op_id][model_name][
-            "total_input_tokens"
-        ] = (
-            sum(convert_total_input_tokens[model_start_idx:model_end_idx])
-            / num_samples
+        expected_operator_estimates[convert_op_id][model_name]["total_input_tokens"] = (
+            sum(convert_total_input_tokens[model_start_idx:model_end_idx]) / num_samples
         )
-        expected_operator_estimates[convert_op_id][model_name][
-            "total_output_tokens"
-        ] = (
-            sum(convert_total_output_tokens[model_start_idx:model_end_idx])
-            / num_samples
+        expected_operator_estimates[convert_op_id][model_name]["total_output_tokens"] = (
+            sum(convert_total_output_tokens[model_start_idx:model_end_idx]) / num_samples
         )
-        expected_operator_estimates[convert_op_id][model_name][
-            "selectivity"
-        ] = 1.0
-        expected_operator_estimates[convert_op_id][model_name]["quality"] = (
-            expected_quality
-        )
+        expected_operator_estimates[convert_op_id][model_name]["selectivity"] = 1.0
+        expected_operator_estimates[convert_op_id][model_name]["quality"] = expected_quality
 
     # fill-in filter operator estimates
     filter_time_per_records = simple_plan_filter_data["time_per_records"]
@@ -144,36 +122,20 @@ def simple_plan_expected_operator_estimates(
             expected_quality = 3.0 / 6.0  # avg. accuracy
 
         num_samples = model_end_idx - model_start_idx
-        expected_operator_estimates[filter_op_id][model_name][
-            "time_per_record"
-        ] = (
-            sum(filter_time_per_records[model_start_idx:model_end_idx])
-            / num_samples
+        expected_operator_estimates[filter_op_id][model_name]["time_per_record"] = (
+            sum(filter_time_per_records[model_start_idx:model_end_idx]) / num_samples
         )
-        expected_operator_estimates[filter_op_id][model_name][
-            "cost_per_record"
-        ] = (
-            sum(filter_cost_per_records[model_start_idx:model_end_idx])
-            / num_samples
+        expected_operator_estimates[filter_op_id][model_name]["cost_per_record"] = (
+            sum(filter_cost_per_records[model_start_idx:model_end_idx]) / num_samples
         )
-        expected_operator_estimates[filter_op_id][model_name][
-            "total_input_tokens"
-        ] = (
-            sum(filter_total_input_tokens[model_start_idx:model_end_idx])
-            / num_samples
+        expected_operator_estimates[filter_op_id][model_name]["total_input_tokens"] = (
+            sum(filter_total_input_tokens[model_start_idx:model_end_idx]) / num_samples
         )
-        expected_operator_estimates[filter_op_id][model_name][
-            "total_output_tokens"
-        ] = (
-            sum(filter_total_output_tokens[model_start_idx:model_end_idx])
-            / num_samples
+        expected_operator_estimates[filter_op_id][model_name]["total_output_tokens"] = (
+            sum(filter_total_output_tokens[model_start_idx:model_end_idx]) / num_samples
         )
-        expected_operator_estimates[filter_op_id][model_name]["selectivity"] = (
-            expected_selectivity
-        )
-        expected_operator_estimates[filter_op_id][model_name]["quality"] = (
-            expected_quality
-        )
+        expected_operator_estimates[filter_op_id][model_name]["selectivity"] = expected_selectivity
+        expected_operator_estimates[filter_op_id][model_name]["quality"] = expected_quality
 
     return expected_operator_estimates
 
@@ -196,9 +158,7 @@ def simple_plan_expected_results_factory(
 
             # compute expected cost, time, and quality for different operations
             if isinstance(physical_op, MarshalAndScanDataOp):
-                scan_time_per_record = simple_plan_expected_operator_estimates[
-                    "scan123"
-                ]["time_per_record"]
+                scan_time_per_record = simple_plan_expected_operator_estimates["scan123"]["time_per_record"]
                 expected_op_time = scan_time_per_record * input_cardinality
                 expected_op_cost = 0.0
                 expected_op_quality = 1.0
@@ -207,50 +167,36 @@ def simple_plan_expected_results_factory(
 
             # compute expected cost, time, and quality for convert operation
             elif isinstance(physical_op, ConvertOp):
-                convert_time_per_record = (
-                    simple_plan_expected_operator_estimates["convert123"][
-                        convert_model
-                    ]["time_per_record"]
-                )
+                convert_time_per_record = simple_plan_expected_operator_estimates["convert123"][convert_model][
+                    "time_per_record"
+                ]
                 expected_op_time = convert_time_per_record * input_cardinality
 
-                convert_cost_per_record = (
-                    simple_plan_expected_operator_estimates["convert123"][
-                        convert_model
-                    ]["cost_per_record"]
-                )
+                convert_cost_per_record = simple_plan_expected_operator_estimates["convert123"][convert_model][
+                    "cost_per_record"
+                ]
                 expected_op_cost = convert_cost_per_record * input_cardinality
 
-                expected_op_quality = simple_plan_expected_operator_estimates[
-                    "convert123"
-                ][convert_model]["quality"]
-                convert_selectivity = simple_plan_expected_operator_estimates[
-                    "convert123"
-                ][convert_model]["selectivity"]
+                expected_op_quality = simple_plan_expected_operator_estimates["convert123"][convert_model]["quality"]
+                convert_selectivity = simple_plan_expected_operator_estimates["convert123"][convert_model][
+                    "selectivity"
+                ]
                 output_cardinality = convert_selectivity * input_cardinality
 
             # compute expected cost, time, and quality for filter operation
             elif isinstance(physical_op, FilterOp):
-                filter_time_per_record = (
-                    simple_plan_expected_operator_estimates["filter123"][
-                        filter_model
-                    ]["time_per_record"]
-                )
+                filter_time_per_record = simple_plan_expected_operator_estimates["filter123"][filter_model][
+                    "time_per_record"
+                ]
                 expected_op_time = filter_time_per_record * input_cardinality
 
-                filter_cost_per_record = (
-                    simple_plan_expected_operator_estimates["filter123"][
-                        filter_model
-                    ]["cost_per_record"]
-                )
+                filter_cost_per_record = simple_plan_expected_operator_estimates["filter123"][filter_model][
+                    "cost_per_record"
+                ]
                 expected_op_cost = filter_cost_per_record * input_cardinality
 
-                expected_op_quality = simple_plan_expected_operator_estimates[
-                    "filter123"
-                ][filter_model]["quality"]
-                filter_selectivity = simple_plan_expected_operator_estimates[
-                    "filter123"
-                ][filter_model]["selectivity"]
+                expected_op_quality = simple_plan_expected_operator_estimates["filter123"][filter_model]["quality"]
+                filter_selectivity = simple_plan_expected_operator_estimates["filter123"][filter_model]["selectivity"]
                 output_cardinality = filter_selectivity * input_cardinality
 
             return (

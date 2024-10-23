@@ -32,9 +32,7 @@ class Email(pz.TextFile):
 
 
 class EmailSender(pz.TextFile):
-    sender = pz.StringField(
-        desc="The email address of the sender", required=True
-    )
+    sender = pz.StringField(desc="The email address of the sender", required=True)
 
 
 class EmailSubject(pz.TextFile):
@@ -42,15 +40,11 @@ class EmailSubject(pz.TextFile):
 
 
 class EmailCC(pz.TextFile):
-    cc_list = pz.StringField(
-        desc="The list of people cc'ed on the email, if any", required=True
-    )
+    cc_list = pz.StringField(desc="The list of people cc'ed on the email, if any", required=True)
 
 
 class EmailBCC(pz.TextFile):
-    bcc_list = pz.StringField(
-        desc="The list of people bcc'ed on the email, if any", required=True
-    )
+    bcc_list = pz.StringField(desc="The list of people bcc'ed on the email, if any", required=True)
 
 
 class EmailMeetings(pz.TextFile):
@@ -61,24 +55,18 @@ class EmailMeetings(pz.TextFile):
 
 
 class EmailSummary(pz.TextFile):
-    summary = pz.StringField(
-        desc="A one sentence summary of the email", required=True
-    )
+    summary = pz.StringField(desc="A one sentence summary of the email", required=True)
 
 
 class EmailSentiment(pz.TextFile):
-    sentiment = pz.StringField(
-        desc='The sentiment of the email, one of ["positive", "negative", "neutral"]'
-    )
+    sentiment = pz.StringField(desc='The sentiment of the email, one of ["positive", "negative", "neutral"]')
 
 
 class CaseData(pz.Schema):
     """An individual row extracted from a table containing medical study data."""
 
     case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-    age_at_diagnosis = pz.Field(
-        desc="The age of the patient at the time of diagnosis", required=False
-    )
+    age_at_diagnosis = pz.Field(desc="The age of the patient at the time of diagnosis", required=False)
     race = pz.Field(
         desc="An arbitrary classification of a taxonomic group that is a division of a species.",
         required=False,
@@ -87,27 +75,17 @@ class CaseData(pz.Schema):
         desc="Whether an individual describes themselves as Hispanic or Latino or not.",
         required=False,
     )
-    gender = pz.Field(
-        desc="Text designations that identify gender.", required=False
-    )
-    vital_status = pz.Field(
-        desc="The vital status of the patient", required=False
-    )
+    gender = pz.Field(desc="Text designations that identify gender.", required=False)
+    vital_status = pz.Field(desc="The vital status of the patient", required=False)
     ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
     ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
-    ajcc_pathologic_stage = pz.Field(
-        desc="The AJCC pathologic stage", required=False
-    )
+    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
     tumor_grade = pz.Field(desc="The tumor grade", required=False)
     tumor_focality = pz.Field(desc="The tumor focality", required=False)
-    tumor_largest_dimension_diameter = pz.Field(
-        desc="The tumor largest dimension diameter", required=False
-    )
+    tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter", required=False)
     primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
     morphology = pz.Field(desc="The morphology", required=False)
-    tissue_or_organ_of_origin = pz.Field(
-        desc="The tissue or organ of origin", required=False
-    )
+    tissue_or_organ_of_origin = pz.Field(desc="The tissue or organ of origin", required=False)
     # tumor_code = pz.Field(desc="The tumor code", required=False)
     filename = pz.Field(
         desc="The name of the file the record was extracted from",
@@ -128,9 +106,7 @@ class RealEstateListingFiles(pz.Schema):
     """The source text and image data for a real estate listing."""
 
     listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.StringField(
-        desc="The content of the listing's text description", required=True
-    )
+    text_content = pz.StringField(desc="The content of the listing's text description", required=True)
     image_contents = pz.ListField(
         element_type=pz.BytesField,
         desc="A list of the contents of each image of the listing",
@@ -166,9 +142,7 @@ class RealEstateListingSource(pz.UserSource):
         return len(self.listings)
 
     def getSize(self):
-        return sum(
-            file.stat().st_size for file in Path(self.listings_dir).rglob("*")
-        )
+        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
 
     def getItem(self, idx: int):
         # fetch listing
@@ -217,22 +191,14 @@ def get_workload_for_eval_dataset(dataset):
         # emails = emails.convert(EmailSummary, depends_on="text_content")
         # emails = emails.convert(EmailSentiment, depends_on="text_content")
         emails = pz.Dataset(dataset, schema=Email)
-        emails = emails.filter(
-            "The email is about business at Enron", depends_on="text_content"
-        )
-        emails = emails.filter(
-            "The email has a negative sentiment", depends_on="text_content"
-        )
-        emails = emails.filter(
-            "The email has no attachments", depends_on="text_content"
-        )
+        emails = emails.filter("The email is about business at Enron", depends_on="text_content")
+        emails = emails.filter("The email has a negative sentiment", depends_on="text_content")
+        emails = emails.filter("The email has no attachments", depends_on="text_content")
         emails = emails.filter(
             "The email is not about scheduling a meeting",
             depends_on="text_content",
         )
-        emails = emails.filter(
-            "The email is replying to another email", depends_on="text_content"
-        )
+        emails = emails.filter("The email is replying to another email", depends_on="text_content")
         emails = emails.filter(
             "The email is written in clear and concise language",
             depends_on="text_content",
@@ -245,12 +211,7 @@ def get_workload_for_eval_dataset(dataset):
             # NOTE: I'm using this hard-coded function so that folks w/out a
             #       Geocoding API key from google can still run this example
             try:
-                if any(
-                    [
-                        street.lower() in record.address.lower()
-                        for street in FAR_AWAY_ADDRS
-                    ]
-                ):
+                if any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
                     return False
                 return True
             except:
@@ -267,9 +228,7 @@ def get_workload_for_eval_dataset(dataset):
                 return False
 
         listings = pz.Dataset(dataset, schema=RealEstateListingFiles)
-        listings = listings.convert(
-            TextRealEstateListing, depends_on="text_content"
-        )
+        listings = listings.convert(TextRealEstateListing, depends_on="text_content")
         listings = listings.convert(
             ImageRealEstateListing,
             image_conversion=True,
@@ -279,9 +238,7 @@ def get_workload_for_eval_dataset(dataset):
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
         )
-        listings = listings.filter(
-            within_two_miles_of_mit, depends_on="address"
-        )
+        listings = listings.filter(within_two_miles_of_mit, depends_on="address")
         listings = listings.filter(in_price_range, depends_on="price")
         return listings
 
@@ -292,9 +249,7 @@ def get_workload_for_eval_dataset(dataset):
             udf=udfs.xls_to_tables,
             cardinality=pz.Cardinality.ONE_TO_MANY,
         )
-        patient_tables = patient_tables.filter(
-            "The rows of the table contain the patient age"
-        )
+        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(
             CaseData,
             desc="The patient data in the table",
@@ -307,9 +262,7 @@ def get_workload_for_eval_dataset(dataset):
 if __name__ == "__main__":
     # parse arguments
     startTime = time.time()
-    parser = argparse.ArgumentParser(
-        description="Run the evaluation(s) for the paper"
-    )
+    parser = argparse.ArgumentParser(description="Run the evaluation(s) for the paper")
     parser.add_argument(
         "--dataset",
         type=str,

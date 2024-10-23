@@ -16,25 +16,17 @@ from palimpzest.constants import (
 class FilterOverPaper(dspy.Signature):
     """Answer condition questions about a scientific paper."""
 
-    context = dspy.InputField(
-        desc="contains full text of the paper, including author, institution, title, and body"
-    )
+    context = dspy.InputField(desc="contains full text of the paper, including author, institution, title, and body")
     question = dspy.InputField(desc="one or more conditions about the paper")
-    answer = dspy.OutputField(
-        desc="often a TRUE/FALSE answer to the condition question(s) about the paper"
-    )
+    answer = dspy.OutputField(desc="often a TRUE/FALSE answer to the condition question(s) about the paper")
 
 
 class QuestionOverPaper(dspy.Signature):
     """Answer question(s) about a scientific paper."""
 
-    context = dspy.InputField(
-        desc="contains full text of the paper, including author, institution, title, and body"
-    )
+    context = dspy.InputField(desc="contains full text of the paper, including author, institution, title, and body")
     question = dspy.InputField(desc="one or more question about the paper")
-    answer = dspy.OutputField(
-        desc="print the answer only, separated by a newline character"
-    )
+    answer = dspy.OutputField(desc="print the answer only, separated by a newline character")
 
 
 class SingleQuestionOverSample(dspy.Signature):
@@ -65,9 +57,7 @@ def gen_filter_signature_class(doc_schema, doc_type):
     context_desc = f"contains full text of the {doc_type}"
     question_desc = f"one or more conditions about the {doc_type}"
     answer_desc = f"often a TRUE/FALSE answer to the condition question(s) about the {doc_type}"
-    return gen_signature_class(
-        instruction, context_desc, question_desc, answer_desc
-    )
+    return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
 
 def gen_qa_signature_class(doc_schema, doc_type):
@@ -75,9 +65,7 @@ def gen_qa_signature_class(doc_schema, doc_type):
     context_desc = f"contains full text of the {doc_type}"
     question_desc = f"one or more question about the {doc_type}"
     answer_desc = "print the answer only, separated by a newline character"
-    return gen_signature_class(
-        instruction, context_desc, question_desc, answer_desc
-    )
+    return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
 
 ### DSPy Modules ###
@@ -105,9 +93,7 @@ class TogetherHFAdaptor(HFModel):
         self.model = model
 
         self.use_inst_template = False
-        if any(
-            keyword in self.model.lower() for keyword in ["inst", "instruct"]
-        ):
+        if any(keyword in self.model.lower() for keyword in ["inst", "instruct"]):
             self.use_inst_template = True
 
         stop_default = "\n\n---"
@@ -176,23 +162,12 @@ class TogetherHFAdaptor(HFModel):
 
         headers = {"Authorization": f"Bearer {self.token}"}
         try:
-            with requests.Session().post(
-                url, headers=headers, json=body
-            ) as resp:
+            with requests.Session().post(url, headers=headers, json=body) as resp:
                 resp_json = resp.json()
                 if use_chat_api:
-                    completions = [
-                        resp_json["output"]
-                        .get("choices", [])[0]
-                        .get("message", {})
-                        .get("content", "")
-                    ]
+                    completions = [resp_json["output"].get("choices", [])[0].get("message", {}).get("content", "")]
                 else:
-                    completions = [
-                        resp_json["output"]
-                        .get("choices", [])[0]
-                        .get("text", "")
-                    ]
+                    completions = [resp_json["output"].get("choices", [])[0].get("text", "")]
                 response = {
                     "prompt": resp_json["prompt"][-1],
                     "choices": [{"text": c} for c in completions],
@@ -200,12 +175,8 @@ class TogetherHFAdaptor(HFModel):
                 response["usage"] = resp_json["output"]["usage"]
                 response["finish_reason"] = resp_json["output"]["finish_reason"]
                 if logprobs > 0:
-                    response["tokens"] = resp_json["output"]["choices"][0][
-                        "tokens"
-                    ]
-                    response["token_logprobs"] = resp_json["output"]["choices"][
-                        0
-                    ]["token_logprobs"]
+                    response["tokens"] = resp_json["output"]["choices"][0]["tokens"]
+                    response["token_logprobs"] = resp_json["output"]["choices"][0]["token_logprobs"]
 
                 return response
         except Exception as e:

@@ -88,9 +88,7 @@ class PhysicalOperator:
         op_params = self.get_op_params()
         op_params = {k: str(v) for k, v in op_params.items()}
         hash_str = json.dumps({"op_name": op_name, **op_params}, sort_keys=True)
-        self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[
-            :MAX_ID_CHARS
-        ]
+        self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
         return self.op_id
 
@@ -107,9 +105,7 @@ class PhysicalOperator:
     def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
         raise NotImplementedError("Calling __call__ from abstract method")
 
-    def naiveCostEstimates(
-        self, source_op_cost_estimates: OperatorCostEstimates
-    ) -> OperatorCostEstimates:
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         This function returns a naive estimate of this operator's:
         - cardinality

@@ -14,9 +14,7 @@ from palimpzest.execution import (
 from palimpzest.utils.model_helpers import getModels
 
 
-def score_biofabric_plans(
-    dataset, records, policy_str=None, reopt=False
-) -> float:
+def score_biofabric_plans(dataset, records, policy_str=None, reopt=False) -> float:
     """
     Computes the results of all biofabric plans
     """
@@ -64,9 +62,7 @@ def score_biofabric_plans(
     output = records_df
     index = [x for x in output.columns if x != "study"]
     # target_matching = pd.read_csv(os.path.join(f'final-eval-results/{opt}/{workload}/', "target_matching.csv"), index_col=0).reindex(index)
-    target_matching = pd.read_csv(
-        os.path.join("testdata/", "target_matching.csv"), index_col=0
-    ).reindex(index)
+    target_matching = pd.read_csv(os.path.join("testdata/", "target_matching.csv"), index_col=0).reindex(index)
 
     studies = output["study"].unique()
     # Group by output by the "study" column and split it into many dataframes indexed by the "study" column
@@ -77,9 +73,7 @@ def score_biofabric_plans(
     for study in studies:
         output_study = output[output["study"] == study]
         try:
-            input_df = pd.read_excel(
-                os.path.join("testdata/biofabric-matching/", f"{study}.xlsx")
-            )
+            input_df = pd.read_excel(os.path.join("testdata/biofabric-matching/", f"{study}.xlsx"))
         except:
             print("Cannot find the study", study)
             targets += [study] * 5
@@ -90,13 +84,7 @@ def score_biofabric_plans(
             max_matches = 0
             max_col = "missing"
             for input_col in input_df.columns:
-                matches = sum(
-                    [
-                        1
-                        for idx, x in enumerate(output_study[col])
-                        if x == input_df[input_col][idx]
-                    ]
-                )
+                matches = sum([1 for idx, x in enumerate(output_study[col]) if x == input_df[input_col][idx]])
                 if matches > max_matches:
                     max_matches = matches
                     max_col = input_col
@@ -109,9 +97,7 @@ def score_biofabric_plans(
         predicted += list(df[study].values)
 
     # print(df)
-    p, r, f1, sup = precision_recall_fscore_support(
-        targets, predicted, average="micro", zero_division=0
-    )
+    p, r, f1, sup = precision_recall_fscore_support(targets, predicted, average="micro", zero_division=0)
 
     return f1
 
@@ -143,9 +129,7 @@ def score_plan(dataset, records, policy_str=None, reopt=False) -> float:
     # get lists of predictions and groundtruth answers
     preds, targets = None, None
     if "enron" in dataset:
-        preds = records_df.filename.apply(
-            lambda fn: os.path.basename(fn)
-        ).tolist()
+        preds = records_df.filename.apply(lambda fn: os.path.basename(fn)).tolist()
         gt_df = pd.read_csv("testdata/groundtruth/enron-eval-tiny.csv")
         targets = list(gt_df[gt_df.label == 1].filename)
     elif "real-estate" in dataset:
@@ -170,11 +154,7 @@ def score_plan(dataset, records, policy_str=None, reopt=False) -> float:
     # compute precision, recall, f1 score
     precision = tp / (tp + fp) if tp + fp > 0 else 0.0
     recall = tp / (tp + fn) if tp + fn > 0 else 0.0
-    f1_score = (
-        2 * precision * recall / (precision + recall)
-        if precision + recall > 0
-        else 0.0
-    )
+    f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
 
     return f1_score
 
@@ -182,12 +162,8 @@ def score_plan(dataset, records, policy_str=None, reopt=False) -> float:
 @pytest.mark.parametrize(
     argnames=("execution_engine"),
     argvalues=[
-        pytest.param(
-            SequentialSingleThreadNoSentinelExecution, id="seq-single-thread"
-        ),
-        pytest.param(
-            PipelinedSingleThreadNoSentinelExecution, id="pipe-single-thread"
-        ),
+        pytest.param(SequentialSingleThreadNoSentinelExecution, id="seq-single-thread"),
+        pytest.param(PipelinedSingleThreadNoSentinelExecution, id="pipe-single-thread"),
         pytest.param(PipelinedParallelNoSentinelExecution, id="pipe-parallel"),
     ],
 )

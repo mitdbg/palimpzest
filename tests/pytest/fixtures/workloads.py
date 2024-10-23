@@ -21,12 +21,7 @@ def within_two_miles_of_mit(record):
         "E 5th St",
     ]
     try:
-        if any(
-            [
-                street.lower() in record.address.lower()
-                for street in FAR_AWAY_ADDRS
-            ]
-        ):
+        if any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
             return False
         return True
     except:
@@ -64,12 +59,8 @@ def real_estate_workload(
     text_real_estate_listing_schema,
     image_real_estate_listing_schema,
 ):
-    listings = pz.Dataset(
-        real_estate_eval_tiny, schema=real_estate_listing_files_schema
-    )
-    listings = listings.convert(
-        text_real_estate_listing_schema, depends_on="text_content"
-    )
+    listings = pz.Dataset(real_estate_eval_tiny, schema=real_estate_listing_files_schema)
+    listings = listings.convert(text_real_estate_listing_schema, depends_on="text_content")
     listings = listings.convert(
         image_real_estate_listing_schema,
         image_conversion=True,
@@ -89,12 +80,8 @@ def biofabric_workload(biofabric_tiny, case_data_schema):
     xls = pz.Dataset(biofabric_tiny, schema=pz.XLSFile)
     # patient_tables = xls.convert(
     #     pz.Table, desc="All tables in the file", cardinality=pz.Cardinality.ONE_TO_MANY)
-    patient_tables = xls.convert(
-        pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY
-    )
-    patient_tables = patient_tables.filter(
-        "The rows of the table contain the patient age"
-    )
+    patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+    patient_tables = patient_tables.filter("The rows of the table contain the patient age")
     case_data = patient_tables.convert(
         case_data_schema,
         desc="The patient data in the table",

@@ -198,9 +198,7 @@ def register_data(path: str, name: str) -> None:
         pz.DataDirectory().registerLocalDirectory(os.path.abspath(path), name)
 
     else:
-        raise InvalidCommandException(
-            f"Path {path} is invalid. Does not point to a file or directory."
-        )
+        raise InvalidCommandException(f"Path {path} is invalid. Does not point to a file or directory.")
 
     _print_msg(f"Registered {name}")
 
@@ -284,9 +282,7 @@ def print_config() -> None:
     is_flag=True,
     help="Set the created config to be the current config.",
 )
-def create_config(
-    name: str, llmservice: str, parallel: bool, set: bool
-) -> None:
+def create_config(name: str, llmservice: str, parallel: bool, set: bool) -> None:
     """
     Create a Palimpzest config. You must set the `name` field. You may optionally
     set the `llmservice` and `parallel` fields (default to )
@@ -308,9 +304,7 @@ def create_config(
 
     # check that config name is unique
     if os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
-        raise InvalidCommandException(
-            f"Config with name {name} already exists."
-        )
+        raise InvalidCommandException(f"Config with name {name} already exists.")
 
     # create config
     config = Config(name, llmservice, parallel)
@@ -319,11 +313,7 @@ def create_config(
     if set:
         config.set_current_config()
 
-    _print_msg(
-        f"Created config: {name}"
-        if set is False
-        else f"Created and set config: {name}"
-    )
+    _print_msg(f"Created config: {name}" if set is False else f"Created and set config: {name}")
 
 
 @cli.command(aliases=["rmconfig", "rmc"])
@@ -349,9 +339,7 @@ def rm_config(name: str) -> None:
 
     # check that config exists
     if not os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
-        raise InvalidCommandException(
-            f"Config with name {name} does not exist."
-        )
+        raise InvalidCommandException(f"Config with name {name} does not exist.")
 
     # load the specified config
     config = Config(name)
@@ -383,9 +371,7 @@ def set_config(name: str) -> None:
 
     # check that config exists
     if not os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
-        raise InvalidCommandException(
-            f"Config with name {name} does not exist."
-        )
+        raise InvalidCommandException(f"Config with name {name} does not exist.")
 
     # load the specified config
     config = Config(name)

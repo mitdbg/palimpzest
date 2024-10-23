@@ -57,13 +57,9 @@ class StreamingSequentialExecution(ExecutionEngine):
         self.plan_stats = PlanStats(plan_id=self.plan.plan_id)
         for op in self.plan.operators:
             if isinstance(op, AggregateOp):
-                raise Exception(
-                    "You cannot have a Streaming Execution if there is an Aggregation Operator"
-                )
+                raise Exception("You cannot have a Streaming Execution if there is an Aggregation Operator")
             op_id = op.get_op_id()
-            self.plan_stats.operator_stats[op_id] = OperatorStats(
-                op_id=op_id, op_name=op.op_name()
-            )
+            self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name())
         print("Time for planning: ", time.time() - start_time)
         self.plan_generated = True
         return self.plan
@@ -93,18 +89,14 @@ class StreamingSequentialExecution(ExecutionEngine):
         datasource = (
             self.datadir.getRegisteredDataset(self.source_dataset_id)
             if isinstance(scan_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(
-                scan_operator.cachedDataIdentifier
-            )
+            else self.datadir.getCachedResult(scan_operator.cachedDataIdentifier)
         )
         datasource_len = len(datasource)
 
         input_records = []
         record_op_stats = []
         for idx in range(datasource_len):
-            candidate = DataRecord(
-                schema=SourceRecord, parent_id=None, scan_idx=idx
-            )
+            candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=idx)
             candidate.idx = idx
             candidate.get_item_fn = datasource.getItem
             candidate.cardinality = datasource.cardinality
@@ -129,9 +121,7 @@ class StreamingSequentialExecution(ExecutionEngine):
         for op_idx, operator in enumerate(plan.operators):
             output_records = []
             op_id = operator.get_op_id()
-            prev_op_id = (
-                plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
-            )
+            prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
 
             if isinstance(operator, DataSourcePhysicalOp):
                 continue
@@ -150,9 +140,7 @@ class StreamingSequentialExecution(ExecutionEngine):
 
                 if isinstance(operator, FilterOp):
                     # delete all records that did not pass the filter
-                    output_records = [
-                        r for r in output_records if r._passed_filter
-                    ]
+                    output_records = [r for r in output_records if r._passed_filter]
                     if not output_records:
                         break
 

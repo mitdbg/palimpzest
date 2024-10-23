@@ -23,15 +23,11 @@ if not os.environ.get("OPENAI_API_KEY"):
     load_env()
 
 
-@pytest.mark.parametrize(
-    "convert_op", [LLMConvertBonded, LLMConvertConventional]
-)
+@pytest.mark.parametrize("convert_op", [LLMConvertBonded, LLMConvertConventional])
 def test_convert(convert_op, email_schema, enron_eval_tiny):
     """Test whether convert operators"""
     model = pz.Model.GPT_4
-    scanOp = MarshalAndScanDataOp(
-        outputSchema=pz.TextFile, dataset_id=enron_eval_tiny
-    )
+    scanOp = MarshalAndScanDataOp(outputSchema=pz.TextFile, dataset_id=enron_eval_tiny)
     convertOp = convert_op(
         inputSchema=pz.File,
         outputSchema=email_schema,
