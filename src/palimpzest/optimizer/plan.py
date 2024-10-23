@@ -45,7 +45,6 @@ class Plan:
 
 
 class PhysicalPlan(Plan):
-
     def __init__(self, operators: List[PhysicalOperator], plan_cost: Optional[PlanCost] = None):
         self.operators = operators
         self.plan_cost = plan_cost if plan_cost is not None else PlanCost(cost=0.0, time=0.0, quality=1.0)
@@ -54,7 +53,7 @@ class PhysicalPlan(Plan):
     def compute_plan_id(self) -> str:
         """
         NOTE: This is NOT a universal ID.
-        
+
         Two different PhysicalPlan instances with the identical lists of operators will have equivalent plan_ids.
         """
         hash_str = str(tuple(op.get_op_id() for op in self.operators))

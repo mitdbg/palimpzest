@@ -14,14 +14,13 @@ class RealEstateListingFiles(pz.Schema):
     """The source text and image data for a real estate listing."""
 
     listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.StringField(
-        desc="The content of the listing's text description", required=True
-    )
+    text_content = pz.StringField(desc="The content of the listing's text description", required=True)
     image_contents = pz.ListField(
         element_type=pz.BytesField,
         desc="A list of the contents of each image of the listing",
         required=True,
     )
+
 
 class RealEstateListingSource(pz.UserSource):
     def __init__(self, datasetId, listings_dir):
@@ -33,7 +32,7 @@ class RealEstateListingSource(pz.UserSource):
         return len(self.listings)
 
     def getSize(self):
-        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob('*'))
+        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
 
     def getItem(self, idx: int):
         # fetch listing
@@ -55,14 +54,17 @@ class RealEstateListingSource(pz.UserSource):
 
         return dr
 
+
 ### DATASET DATA PATHS ###
 @pytest.fixture
 def enron_eval_tiny_data():
     return "testdata/enron-eval-tiny"
 
+
 @pytest.fixture
 def real_estate_eval_tiny_data():
     return "testdata/real-estate-eval-tiny"
+
 
 @pytest.fixture
 def biofabric_tiny_data():
@@ -79,6 +81,7 @@ def enron_eval_tiny(enron_eval_tiny_data):
     )
     yield dataset_id
 
+
 @pytest.fixture
 def real_estate_eval_tiny(real_estate_eval_tiny_data):
     dataset_id = "real-estate-eval-tiny"
@@ -89,6 +92,7 @@ def real_estate_eval_tiny(real_estate_eval_tiny_data):
     )
     yield dataset_id
 
+
 @pytest.fixture
 def biofabric_tiny(biofabric_tiny_data):
     dataset_id = "biofabric-tiny"
@@ -96,4 +100,4 @@ def biofabric_tiny(biofabric_tiny_data):
         path=biofabric_tiny_data,
         dataset_id=dataset_id,
     )
-    yield dataset_id 
+    yield dataset_id

@@ -8,7 +8,6 @@ from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 
 
 class LimitScanOp(PhysicalOperator):
-
     def __init__(self, limit: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.limit = limit

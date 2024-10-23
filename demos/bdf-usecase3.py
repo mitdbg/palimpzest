@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-""" This scripts is a demo for the biofabric data integration.
+"""This scripts is a demo for the biofabric data integration.
 python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usecase3-pdf
 
 """
@@ -14,44 +14,57 @@ import streamlit as st
 
 import palimpzest as pz
 
-if not os.environ.get('OPENAI_API_KEY'):
+if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils import load_env
+
     load_env()
 
 
 class ScientificPaper(pz.PDFFile):
-   """Represents a scientific research paper, which in practice is usually from a PDF file"""
-   paper_title = pz.Field(desc="The title of the paper. This is a natural language title, not a number or letter.", required=True)
-   author = pz.Field(desc="The name of the first author of the paper", required=True)
-#    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
-#    journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
-   abstract = pz.Field(desc="A short description of the paper contributions and findings", required=False)
+    """Represents a scientific research paper, which in practice is usually from a PDF file"""
+
+    paper_title = pz.Field(
+        desc="The title of the paper. This is a natural language title, not a number or letter.", required=True
+    )
+    author = pz.Field(desc="The name of the first author of the paper", required=True)
+    #    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
+    #    journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
+    abstract = pz.Field(desc="A short description of the paper contributions and findings", required=False)
+
+
 #    doiURL se= pz.Field(desc="The DOI URL for the paper", required=True)
 
+
 class Reference(pz.Schema):
-    """ Represents a reference to another paper, which is cited in a scientific paper"""
+    """Represents a reference to another paper, which is cited in a scientific paper"""
+
     index = pz.Field(desc="The index of the reference in the paper", required=True)
     title = pz.Field(desc="The title of the paper being cited", required=True)
     first_author = pz.Field(desc="The author of the paper being cited", required=True)
     year = pz.Field(desc="The year in which the cited paper was published", required=True)
     # snippet = pz.Field(desc="A snippet from the source paper that references the index", required=False)
 
+
 @st.cache_resource()
 def run_workload():
     papers = pz.Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
     # papers = papers.filter("The paper mentions phosphorylation of Exo1")
-    references = papers.convert(Reference, desc="A paper cited in the reference section", cardinality=pz.Cardinality.ONE_TO_MANY)
+    references = papers.convert(
+        Reference, desc="A paper cited in the reference section", cardinality=pz.Cardinality.ONE_TO_MANY
+    )
 
     output = references
     # engine = pz.NoSentinelExecution
     engine = pz.StreamingSequentialExecution
     policy = pz.MinCost()
-    iterable  =  pz.Execute(output,
-                            policy = policy,
-                            nocache=True,
-                            allow_code_synth=False,
-                            allow_token_reduction=False,
-                            execution_engine=engine)
+    iterable = pz.Execute(
+        output,
+        policy=policy,
+        nocache=True,
+        allow_code_synth=False,
+        allow_token_reduction=False,
+        execution_engine=engine,
+    )
 
     tables = []
     statistics = []
@@ -87,18 +100,19 @@ if run_pz:
     engine = pz.StreamingSequentialExecution
     # policy = pz.MinCost()
     policy = pz.MaxQuality()
-    iterable  =  pz.Execute(output,
-                            policy = policy,
-                            nocache=True,
-                            allow_code_synth=False,
-                            allow_token_reduction=False,
-                            execution_engine=engine)
+    iterable = pz.Execute(
+        output,
+        policy=policy,
+        nocache=True,
+        allow_code_synth=False,
+        allow_token_reduction=False,
+        execution_engine=engine,
+    )
 
     references = []
     statistics = []
 
     for idx, (reference, plan, stats) in enumerate(iterable):
-        
         record_time = time.time()
         statistics.append(stats)
 
@@ -116,20 +130,22 @@ if run_pz:
             except:
                 continue
             # ref.key = ref.first_author.split()[0] + ref.title.split()[0] + str(ref.year)
-            references.append({
-                "title": ref.title,
-                "index": index,
-                "first_author": ref.first_author,
-                "year": ref.year,
-                # "snippet": ref.snippet,
-                "source": ref.filename,
-                # "key": ref.key,
-            })
+            references.append(
+                {
+                    "title": ref.title,
+                    "index": index,
+                    "first_author": ref.first_author,
+                    "year": ref.year,
+                    # "snippet": ref.snippet,
+                    "source": ref.filename,
+                    # "key": ref.key,
+                }
+            )
 
             with st.container(height=200, border=True):
                 st.write(" **idx:** ", ref.index)
                 st.write(" **Paper:** ", ref.title)
-                st.write(" **Author:**" ,ref.first_author)
+                st.write(" **Author:**", ref.first_author)
                 st.write(" **Year:** ", ref.year)
                 # st.write(" **Key:** ", ref.key)
                 # st.write(" **Reference text:** ", ref.snippet, "\n")
@@ -172,7 +188,7 @@ G.remove_nodes_from(pruned_nodes)
 st.title("Graph network")
 fig, ax = plt.subplots()
 pos = nx.random_layout(G)
-nx.draw(G,pos, with_labels=True)
+nx.draw(G, pos, with_labels=True)
 st.pyplot(fig)
 
 nx.write_gexf(G, "demos/bdf-usecase3.gexf")

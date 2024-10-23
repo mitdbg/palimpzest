@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import math
@@ -19,9 +18,9 @@ from palimpzest.utils import best_substring_match, find_best_range
 class TokenReducedConvert(LLMConvert):
     # NOTE: moving these closer to the TokenReducedConvert class for now (in part to make
     #       them easier to mock); we can make these parameterized as well
-    MAX_HEATMAP_UPDATES: int=5
-    TOKEN_REDUCTION_SAMPLE: int=0
-    TOKEN_REDUCTION_GRANULARITY: float=0.001
+    MAX_HEATMAP_UPDATES: int = 5
+    TOKEN_REDUCTION_SAMPLE: int = 0
+    TOKEN_REDUCTION_GRANULARITY: float = 0.001
 
     def __init__(self, token_budget: float, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -78,7 +77,7 @@ class TokenReducedConvert(LLMConvert):
         # set refined estimate of cost per record and, for now,
         # assume quality multiplier is proportional to sqrt(sqrt(token_budget))
         naive_op_cost_estimates.cost_per_record = model_conversion_usd_per_record
-        naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * math.sqrt(math.sqrt(self.token_budget))  
+        naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * math.sqrt(math.sqrt(self.token_budget))
 
         return naive_op_cost_estimates
 
@@ -102,12 +101,13 @@ class TokenReducedConvert(LLMConvert):
                 print("character start:", start, "end:", end)
             sample = full_context[start:end]
             return sample
-    
+
         else:
             raise NotImplementedError("Token reduction is only supported for DSPY_COT_QA prompts")
 
-    def _dspy_generate_fields(self, prompt: str, content: str | List[bytes] | None = None, verbose: bool = False) -> Tuple[List[Dict[str, List]] | Any]:
-
+    def _dspy_generate_fields(
+        self, prompt: str, content: str | List[bytes] | None = None, verbose: bool = False
+    ) -> Tuple[List[Dict[str, List]] | Any]:
         full_context = content
         if self.first_execution or self.heatmap_dict["count"] < self.MAX_HEATMAP_UPDATES:
             print("Warming up heatmap")
@@ -123,9 +123,7 @@ class TokenReducedConvert(LLMConvert):
             doc_type = self.outputSchema.className()
 
             if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-                generator = DSPyGenerator(
-                    self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
-                )
+                generator = DSPyGenerator(self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose)
             else:
                 raise Exception(f"Token reduction not implemented for {self.prompt_strategy}")
 
@@ -148,17 +146,21 @@ class TokenReducedConvert(LLMConvert):
             gsi, gei = 0, len(full_context)
         context_len = len(full_context)
         gsr, ger = gsi / context_len, gei / context_len
-        norm_si, norm_ei = int(gsr/self.resolution), int(ger/self.resolution)
+        norm_si, norm_ei = int(gsr / self.resolution), int(ger / self.resolution)
         if verbose:
             print(f"best_start: {gsi} -- best_end: {gei}")
 
         self.heatmap_dict["count"] += 1
-        self.heatmap_dict["heatmap"][norm_si:norm_ei] = map(lambda x: x+1, self.heatmap_dict["heatmap"][norm_si:norm_ei])
-        
+        self.heatmap_dict["heatmap"][norm_si:norm_ei] = map(
+            lambda x: x + 1, self.heatmap_dict["heatmap"][norm_si:norm_ei]
+        )
+
         return answer, query_stats
+
 
 class TokenReducedConvertConventional(TokenReducedConvert, LLMConvertConventional):
     pass
+
 
 class TokenReducedConvertBonded(TokenReducedConvert, LLMConvertBonded):
     pass

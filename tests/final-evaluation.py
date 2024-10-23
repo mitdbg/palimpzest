@@ -44,9 +44,7 @@ class CaseData(pz.Schema):
     """An individual row extracted from a table containing medical study data."""
 
     case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-    age_at_diagnosis = pz.Field(
-        desc="The age of the patient at the time of diagnosis", required=False
-    )
+    age_at_diagnosis = pz.Field(desc="The age of the patient at the time of diagnosis", required=False)
     race = pz.Field(
         desc="An arbitrary classification of a taxonomic group that is a division of a species.",
         required=False,
@@ -62,18 +60,12 @@ class CaseData(pz.Schema):
     ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
     tumor_grade = pz.Field(desc="The tumor grade", required=False)
     tumor_focality = pz.Field(desc="The tumor focality", required=False)
-    tumor_largest_dimension_diameter = pz.Field(
-        desc="The tumor largest dimension diameter", required=False
-    )
+    tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter", required=False)
     primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
     morphology = pz.Field(desc="The morphology", required=False)
-    tissue_or_organ_of_origin = pz.Field(
-        desc="The tissue or organ of origin", required=False
-    )
+    tissue_or_organ_of_origin = pz.Field(desc="The tissue or organ of origin", required=False)
     # tumor_code = pz.Field(desc="The tumor code", required=False)
-    filename = pz.Field(
-        desc="The name of the file the record was extracted from", required=False
-    )
+    filename = pz.Field(desc="The name of the file the record was extracted from", required=False)
     study = pz.Field(
         desc="The last name of the author of the study, from the table name",
         required=False,
@@ -89,9 +81,7 @@ class RealEstateListingFiles(pz.Schema):
     """The source text and image data for a real estate listing."""
 
     listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.StringField(
-        desc="The content of the listing's text description", required=True
-    )
+    text_content = pz.StringField(desc="The content of the listing's text description", required=True)
     image_contents = pz.ListField(
         element_type=pz.BytesField,
         desc="A list of the contents of each image of the listing",
@@ -154,7 +144,7 @@ class RealEstateListingSource(pz.UserSource):
         return len(self.listings)
 
     def getSize(self):
-        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob('*'))
+        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
 
     def getItem(self, idx: int):
         # fetch listing
@@ -180,9 +170,7 @@ class RealEstateListingSource(pz.UserSource):
 def buildNestedStr(node, indent=0, buildStr=""):
     elt, child = node
     indentation = " " * indent
-    buildStr = (
-        f"{indentation}{elt}" if indent == 0 else buildStr + f"\n{indentation}{elt}"
-    )
+    buildStr = f"{indentation}{elt}" if indent == 0 else buildStr + f"\n{indentation}{elt}"
     if child is not None:
         return buildNestedStr(child, indent=indent + 2, buildStr=buildStr)
     else:
@@ -218,16 +206,16 @@ def compute_label(physicalTree, label_idx):
     # print(f"LABEL {label_idx}: {label}")
 
     ops = flatten_nested_tuples(physicalOps)
-    label = "-".join([
-        f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
-        for op in ops
-    ])
+    label = "-".join(
+        [
+            f"{repr(op.model)}_{op.query_strategy if isinstance(op, ConvertFromCandidateOp) else None}_{op.token_budget if isinstance(op, ConvertFromCandidateOp) else None}"
+            for op in ops
+        ]
+    )
     return f"PZ-{label_idx}-{label}"
 
 
-def score_biofabric_plans(
-    workload, records, plan_idx, policy_str=None, reopt=False
-) -> float:
+def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=False) -> float:
     """
     Computes the results of all biofabric plans
     """
@@ -260,9 +248,7 @@ def score_biofabric_plans(
 
     records_df = pd.DataFrame(output_rows)
     if not reopt:
-        records_df.to_csv(
-            f"final-eval-results/{workload}/preds-{plan_idx}.csv", index=False
-        )
+        records_df.to_csv(f"final-eval-results/{workload}/preds-{plan_idx}.csv", index=False)
     else:
         records_df.to_csv(
             f"final-eval-results/reoptimization/{workload}/{policy_str}.csv",
@@ -275,9 +261,7 @@ def score_biofabric_plans(
     output = records_df
     index = [x for x in output.columns if x != "study"]
     # target_matching = pd.read_csv(os.path.join(f'final-eval-results/{opt}/{workload}/', "target_matching.csv"), index_col=0).reindex(index)
-    target_matching = pd.read_csv(
-        os.path.join("testdata/", "target_matching.csv"), index_col=0
-    ).reindex(index)
+    target_matching = pd.read_csv(os.path.join("testdata/", "target_matching.csv"), index_col=0).reindex(index)
 
     studies = output["study"].unique()
     # Group by output by the "study" column and split it into many dataframes indexed by the "study" column
@@ -289,9 +273,7 @@ def score_biofabric_plans(
     for study in studies:
         output_study = output[output["study"] == study]
         try:
-            input_df = pd.read_excel(
-                os.path.join("testdata/biofabric-matching/", f"{study}.xlsx")
-            )
+            input_df = pd.read_excel(os.path.join("testdata/biofabric-matching/", f"{study}.xlsx"))
         except:
             print("Cannot find the study", study)
             targets += [study] * 5
@@ -305,13 +287,7 @@ def score_biofabric_plans(
             max_col = "missing"
             for input_col in input_df.columns:
                 try:
-                    matches = sum(
-                        [
-                            1
-                            for idx, x in enumerate(output_study[col])
-                            if x == input_df[input_col][idx]
-                        ]
-                    )
+                    matches = sum([1 for idx, x in enumerate(output_study[col]) if x == input_df[input_col][idx]])
                 except:
                     pdb.set_trace()
                 if matches > max_matches:
@@ -326,9 +302,7 @@ def score_biofabric_plans(
         predicted += list(df[study].values)
 
     # print(df)
-    p, r, f1, sup = precision_recall_fscore_support(
-        targets, predicted, average="micro", zero_division=0
-    )
+    p, r, f1, sup = precision_recall_fscore_support(targets, predicted, average="micro", zero_division=0)
 
     return f1
 
@@ -354,9 +328,7 @@ def score_plan(workload, records, plan_idx, policy_str=None, reopt=False) -> flo
 
     # save predictions for this plan
     if not reopt:
-        records_df.to_csv(
-            f"final-eval-results/{workload}/preds-{plan_idx}.csv", index=False
-        )
+        records_df.to_csv(f"final-eval-results/{workload}/preds-{plan_idx}.csv", index=False)
     else:
         records_df.to_csv(
             f"final-eval-results/reoptimization/{workload}/{policy_str}.csv",
@@ -399,16 +371,12 @@ def score_plan(workload, records, plan_idx, policy_str=None, reopt=False) -> flo
     # compute precision, recall, f1 score
     precision = tp / (tp + fp) if tp + fp > 0 else 0.0
     recall = tp / (tp + fn) if tp + fn > 0 else 0.0
-    f1_score = (
-        2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
-    )
+    f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
 
     return f1_score
 
 
-def run_pz_plan(
-    workload, plan, plan_idx, total_sentinel_cost, total_sentinel_time, sentinel_records
-):
+def run_pz_plan(workload, plan, plan_idx, total_sentinel_cost, total_sentinel_time, sentinel_records):
     """
     I'm placing this in a separate file from evaluate_pz_plans to see if this prevents
     an error where the DSPy calls to Gemini (and other models?) opens too many files.
@@ -474,9 +442,7 @@ def run_pz_plan(
     return result_dict
 
 
-def get_logical_tree(
-    workload, nocache: bool = True, num_samples: int = None, scan_start_idx: int = 0
-):
+def get_logical_tree(workload, nocache: bool = True, num_samples: int = None, scan_start_idx: int = 0):
     """
     This assumes you have preregistered the enron and biofabric datasets:
 
@@ -506,12 +472,7 @@ def get_logical_tree(
             # NOTE: I'm using this hard-coded function so that folks w/out a
             #       Geocoding API key from google can still run this example
             try:
-                if any(
-                    [
-                        street.lower() in record.address.lower()
-                        for street in FAR_AWAY_ADDRS
-                    ]
-                ):
+                if any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
                     return False
                 return True
             except:
@@ -535,9 +496,7 @@ def get_logical_tree(
             scan_start_idx=scan_start_idx,
         )
         listings = listings.convert(TextRealEstateListing, depends_on="text_content")
-        listings = listings.convert(
-            ImageRealEstateListing, image_conversion=True, depends_on="image_contents"
-        )
+        listings = listings.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_contents")
         listings = listings.filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
@@ -555,12 +514,8 @@ def get_logical_tree(
             scan_start_idx=scan_start_idx,
         )
         patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
-        patient_tables = patient_tables.filter(
-            "The rows of the table contain the patient age"
-        )
-        case_data = patient_tables.convert(
-            CaseData, desc="The patient data in the table", cardinality="oneToMany"
-        )
+        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
+        case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality="oneToMany")
 
         return case_data.getLogicalTree()
 
@@ -631,9 +586,7 @@ def run_sentinel_plan(plan_idx, workload, num_samples):
     return records, result_dict, cost_estimate_sample_data
 
 
-def run_sentinel_plans(
-    workload, num_samples, policy_str: str = None, parallel: bool = False
-):
+def run_sentinel_plans(workload, num_samples, policy_str: str = None, parallel: bool = False):
     start_time = time.time()
 
     # create query for dataset
@@ -647,10 +600,7 @@ def run_sentinel_plans(
     with Pool(processes=num_sentinel_plans) as pool:
         results = pool.starmap(
             run_sentinel_plan,
-            [
-                (plan_idx, workload, num_samples)
-                for plan_idx in range(num_sentinel_plans)
-            ],
+            [(plan_idx, workload, num_samples) for plan_idx in range(num_sentinel_plans)],
         )
 
         # write out result dict and samples collected for each sentinel
@@ -676,8 +626,7 @@ def run_sentinel_plans(
             # find GPT-4 plan records and add those to all_records
             if all(
                 [
-                    model is None
-                    or model in ["gpt-4-0125-preview", "gpt-4-vision-preview"]
+                    model is None or model in ["gpt-4-0125-preview", "gpt-4-vision-preview"]
                     for model in result_dict["plan_info"]["models"]
                 ]
             ):
@@ -689,9 +638,7 @@ def run_sentinel_plans(
     total_sentinel_time = time.time() - start_time
 
     # workaround to disabling cache: delete all cached generations after each plan
-    dspy_cache_dir = os.path.join(
-        os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/"
-    )
+    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
     if os.path.exists(dspy_cache_dir):
         shutil.rmtree(dspy_cache_dir)
 
@@ -851,9 +798,7 @@ def evaluate_pz_plans(workload, dry_run=False):
         )
 
     # workaround to disabling cache: delete all cached generations after each plan
-    dspy_cache_dir = os.path.join(
-        os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/"
-    )
+    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
     if os.path.exists(dspy_cache_dir):
         shutil.rmtree(dspy_cache_dir)
 
@@ -880,21 +825,13 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     policy = pz.MaxHarmonicMean()
     if policy_str is not None:
         if policy_str == "max-quality-at-fixed-cost":
-            policy = pz.MaxQualityAtFixedCost(
-                fixed_cost=workload_to_fixed_cost[workload]
-            )
+            policy = pz.MaxQualityAtFixedCost(fixed_cost=workload_to_fixed_cost[workload])
         elif policy_str == "max-quality-at-fixed-runtime":
-            policy = pz.MaxQualityAtFixedTime(
-                fixed_runtime=workload_to_fixed_runtime[workload]
-            )
+            policy = pz.MaxQualityAtFixedTime(fixed_runtime=workload_to_fixed_runtime[workload])
         elif policy_str == "min-runtime-at-fixed-quality":
-            policy = pz.MinTimeAtFixedQuality(
-                fixed_quality=workload_to_fixed_quality[workload]
-            )
+            policy = pz.MinTimeAtFixedQuality(fixed_quality=workload_to_fixed_quality[workload])
         elif policy_str == "min-cost-at-fixed-quality":
-            policy = pz.MinCostAtFixedQuality(
-                fixed_quality=workload_to_fixed_quality[workload]
-            )
+            policy = pz.MinCostAtFixedQuality(fixed_quality=workload_to_fixed_quality[workload])
 
     # TODO: in practice could move this inside of get_logical_tree w/flag indicating sentinel run;
     #       for now just manually set to make sure evaluation is accurate
@@ -905,9 +842,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
 
     # run sentinels
     start_time = time.time()
-    output = run_sentinel_plans(
-        workload, num_samples, policy_str=policy_str, parallel=parallel
-    )
+    output = run_sentinel_plans(workload, num_samples, policy_str=policy_str, parallel=parallel)
     total_sentinel_cost, _, all_cost_estimate_data, sentinel_records = output
 
     # # get cost estimates given current candidate plans
@@ -972,9 +907,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
     sp = StatsProcessor(profileData)
 
     # workaround to disabling cache: delete all cached generations after each plan
-    dspy_cache_dir = os.path.join(
-        os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/"
-    )
+    dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
     if os.path.exists(dspy_cache_dir):
         shutil.rmtree(dspy_cache_dir)
 
@@ -999,9 +932,7 @@ def run_reoptimize_eval(workload, policy_str, parallel: bool = False):
         stats = stats.source_op_stats
 
     # score plan
-    f1_score = score_plan(
-        workload, all_records, None, policy_str=policy_str, reopt=True
-    )
+    f1_score = score_plan(workload, all_records, None, policy_str=policy_str, reopt=True)
 
     # construct and return result_dict
     result_dict = {
@@ -1041,9 +972,7 @@ if __name__ == "__main__":
         type=str,
         help="The directory with real-estate listings",
     )
-    parser.add_argument(
-        "--reoptimize", default=False, action="store_true", help="Run reoptimization"
-    )
+    parser.add_argument("--reoptimize", default=False, action="store_true", help="Run reoptimization")
     parser.add_argument(
         "--policy",
         type=str,
@@ -1067,9 +996,7 @@ if __name__ == "__main__":
     # register real-estate workload if necessary
     if args.workload == "real-estate":
         print("Registering Datasource")
-        pz.DataDirectory().registerUserSource(
-            RealEstateListingSource(args.workload, args.listings_dir), args.workload
-        )
+        pz.DataDirectory().registerUserSource(RealEstateListingSource(args.workload, args.listings_dir), args.workload)
 
     # re-optimization is unique enough to warrant its own code path
     if args.reoptimize:

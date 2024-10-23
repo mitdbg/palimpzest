@@ -38,11 +38,11 @@ def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
     try:
         response = json.loads(answer)
     except Exception as e:
-        if "items" in answer: # If we are in one to many
+        if "items" in answer:  # If we are in one to many
             # Find the last dictionary item not closed
             last_idx = answer.rfind("},")
             # Close the last dictionary item
-            answer = answer[:last_idx+1] + "]}"
+            answer = answer[: last_idx + 1] + "]}"
             response = json.loads(answer)
         else:
             raise e

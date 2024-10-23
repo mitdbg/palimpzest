@@ -13,12 +13,10 @@ from palimpzest.sets import Set
 
 
 class StreamingSequentialExecution(ExecutionEngine):
-    """ This class can be used for a streaming, record-based execution.
+    """This class can be used for a streaming, record-based execution.
     Results are returned as an iterable that can be consumed by the caller."""
 
-    def __init__(self,
-            *args, **kwargs
-        ) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.last_record = False
         self.current_scan_idx = 0
@@ -56,16 +54,16 @@ class StreamingSequentialExecution(ExecutionEngine):
             if isinstance(op, AggregateOp):
                 raise Exception("You cannot have a Streaming Execution if there is an Aggregation Operator")
             op_id = op.get_op_id()
-            self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) 
+            self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name())
         print("Time for planning: ", time.time() - start_time)
         self.plan_generated = True
         return self.plan
 
-    def execute(self,
+    def execute(
+        self,
         dataset: Set,
         policy: Policy,
     ):
-
         start_time = time.time()
         # Always delete cache
         if not self.plan_generated:
@@ -100,7 +98,7 @@ class StreamingSequentialExecution(ExecutionEngine):
             records, record_op_stats_lst = scan_operator(candidate)
             input_records += records
             record_op_stats += record_op_stats_lst
-        
+
         op_id = scan_operator.get_op_id()
         self.plan_stats.operator_stats[op_id].add_record_op_stats(
             record_op_stats,
@@ -118,16 +116,14 @@ class StreamingSequentialExecution(ExecutionEngine):
         for op_idx, operator in enumerate(plan.operators):
             output_records = []
             op_id = operator.get_op_id()
-            prev_op_id = (
-                plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
-            )
+            prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
 
             if isinstance(operator, DataSourcePhysicalOp):
                 continue
             # only invoke aggregate operator(s) once there are no more source records and all
             # upstream operators' processing queues are empty
             # elif isinstance(operator, AggregateOp):
-                # output_records, record_op_stats_lst = operator(candidates=input_records)
+            # output_records, record_op_stats_lst = operator(candidates=input_records)
             elif isinstance(operator, LimitScanOp):
                 if len(self.records_count) >= operator.limit:
                     break
@@ -142,7 +138,7 @@ class StreamingSequentialExecution(ExecutionEngine):
                     output_records = [r for r in output_records if r._passed_filter]
                     if not output_records:
                         break
-                
+
             self.plan_stats.operator_stats[op_id].add_record_op_stats(
                 record_op_stats_lst,
                 source_op_id=prev_op_id,

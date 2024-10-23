@@ -17,6 +17,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
     This class still needs to be sub-classed by another Execution class which implements
     the higher-level execute() method.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.max_workers = self.get_parallel_max_workers()
@@ -32,9 +33,9 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
         return records, record_op_stats_lst, operator
 
-    def execute_plan(self, plan: PhysicalPlan,
-                     num_samples: Union[int, float] = float("inf"),
-                     max_workers: Optional[int] = None):
+    def execute_plan(
+        self, plan: PhysicalPlan, num_samples: Union[int, float] = float("inf"), max_workers: Optional[int] = None
+    ):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
@@ -48,7 +49,9 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
         for op_idx, op in enumerate(plan.operators):
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name()) # TODO: also add op_details here
+            plan_stats.operator_stats[op_id] = OperatorStats(
+                op_id=op_id, op_name=op.op_name()
+            )  # TODO: also add op_details here
 
         # initialize list of output records and intermediate variables
         output_records = []
@@ -59,8 +62,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         op_id_to_futures_in_flight = {op.get_op_id(): 0 for op in plan.operators}
         op_id_to_operator = {op.get_op_id(): op for op in plan.operators}
         op_id_to_prev_operator = {
-            op.get_op_id(): plan.operators[idx - 1] if idx > 0 else None
-            for idx, op in enumerate(plan.operators)
+            op.get_op_id(): plan.operators[idx - 1] if idx > 0 else None for idx, op in enumerate(plan.operators)
         }
         op_id_to_next_operator = {
             op.get_op_id(): plan.operators[idx + 1] if idx + 1 < len(plan.operators) else None
@@ -91,9 +93,11 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
             candidate.idx = current_scan_idx
             candidate.get_item_fn = datasource.getItem
             candidate.cardinality = datasource.cardinality
-            futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
+            futures.append(
+                executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate)
+            )
             op_id_to_futures_in_flight[source_op_id] += 1
-            current_scan_idx += 1   
+            current_scan_idx += 1
 
             # iterate until we have processed all operators on all records or come to an early stopping condition
             while len(futures) > 0:
@@ -149,7 +153,11 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                             candidate.idx = current_scan_idx
                             candidate.get_item_fn = datasource.getItem
                             candidate.cardinality = datasource.cardinality
-                            new_futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
+                            new_futures.append(
+                                executor.submit(
+                                    PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate
+                                )
+                            )
                             op_id_to_futures_in_flight[source_op_id] += 1
                             current_scan_idx += 1
 
@@ -167,7 +175,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                         future = executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, operator, candidate)
                         new_futures.append(future)
                         op_id_to_futures_in_flight[operator.get_op_id()] += 1
-                    
+
                     # otherwise, put it back on the queue
                     else:
                         temp_processing_queue.append((operator, candidate))
@@ -183,7 +191,9 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                     upstream_ops_are_finished = True
                     for upstream_op_idx in range(agg_op_idx):
                         upstream_op_id = plan.operators[upstream_op_idx].get_op_id()
-                        upstream_op_id_queue = list(filter(lambda tup: tup[0].get_op_id() == upstream_op_id, temp_processing_queue))
+                        upstream_op_id_queue = list(
+                            filter(lambda tup: tup[0].get_op_id() == upstream_op_id, temp_processing_queue)
+                        )
 
                         upstream_ops_are_finished = (
                             upstream_ops_are_finished

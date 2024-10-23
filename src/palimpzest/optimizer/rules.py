@@ -11,6 +11,7 @@ class Rule:
     """
     The abstract base class for transformation and implementation rules.
     """
+
     @classmethod
     def get_rule_id(cls):
         return cls.__name__
@@ -30,12 +31,15 @@ class TransformationRule(Rule):
     The substitute method for a TransformationRule should return all new expressions and all new groups
     which are created during the substitution.
     """
+
     @staticmethod
-    def substitute(logical_expression: LogicalExpression, groups: Dict[int, Group], expressions: Dict[int, Expression], **kwargs) -> Tuple[Set[LogicalExpression], Set[Group]]:
+    def substitute(
+        logical_expression: LogicalExpression, groups: Dict[int, Group], expressions: Dict[int, Expression], **kwargs
+    ) -> Tuple[Set[LogicalExpression], Set[Group]]:
         """
         This function applies the transformation rule to the logical expression, which
         potentially creates new intermediate expressions and groups.
-        
+
         The function returns a tuple containing:
         - the set of all new logical expressions created when applying the transformation
         - the set of all new groups created when applying the transformation
@@ -49,12 +53,15 @@ class PushDownFilter(TransformationRule):
     If this operator is a filter, push down the filter and replace it with the
     most expensive operator in the input group.
     """
+
     @staticmethod
     def matches_pattern(logical_expression: Expression) -> bool:
         return isinstance(logical_expression.operator, FilteredScan)
 
     @staticmethod
-    def substitute(logical_expression: LogicalExpression, groups: Dict[int, Group], expressions: Dict[int, Expression], **kwargs) -> Tuple[Set[LogicalExpression], Set[Group]]:
+    def substitute(
+        logical_expression: LogicalExpression, groups: Dict[int, Group], expressions: Dict[int, Expression], **kwargs
+    ) -> Tuple[Set[LogicalExpression], Set[Group]]:
         # initialize the sets of new logical expressions and groups to be returned
         new_logical_expressions, new_groups = set(), set()
 
@@ -115,7 +122,7 @@ class PushDownFilter(TransformationRule):
 
                     # if the expression we're swapping with is a FilteredScan, we need to remove its filter from the input group properties
                     if isinstance(expr.operator, FilteredScan):
-                        filter_str = expr.operator.filter.getFilterStr()                            
+                        filter_str = expr.operator.filter.getFilterStr()
                         new_group_properties["filters"].remove(filter_str)
 
                     # finally, add the pushed-down filter to the new group's properties
@@ -147,7 +154,8 @@ class PushDownFilter(TransformationRule):
                 # create final new logical expression with expr's operator pulled up
                 new_expr = LogicalExpression(
                     expr.operator,
-                    input_group_ids=[group_id] + [g_id for g_id in logical_expression.input_group_ids if g_id != input_group_id],
+                    input_group_ids=[group_id]
+                    + [g_id for g_id in logical_expression.input_group_ids if g_id != input_group_id],
                     input_fields=group.fields,
                     generated_fields=expr.generated_fields,
                     group_id=logical_expression.group_id,
@@ -163,6 +171,7 @@ class ImplementationRule(Rule):
     """
     Base class for implementation rules which convert a logical expression to a physical expression.
     """
+
     pass
 
 
@@ -173,10 +182,7 @@ class NonLLMConvertRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        return (
-            isinstance(logical_expression.operator, ConvertScan)
-            and logical_expression.operator.udf is not None
-        )
+        return isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is not None
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
@@ -184,10 +190,12 @@ class NonLLMConvertRule(ImplementationRule):
 
         # get initial set of parameters for physical op
         op_kwargs = logical_op.get_op_params()
-        op_kwargs.update({
-            "verbose": physical_op_params['verbose'],
-            "logical_op_id": logical_op.get_op_id(),
-        })
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_op_id(),
+            }
+        )
 
         # construct multi-expression
         op = NonLLMConvert(**op_kwargs)
@@ -210,15 +218,13 @@ class LLMConvertRule(ImplementationRule):
     NOTE: we provide the physical convert class(es) in their own sub-classed rules to make
     it easier to allow/disallow groups of rules at the Optimizer level.
     """
+
     # overridden by sub-classes
     physical_convert_class = None
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        return (
-            isinstance(logical_expression.operator, ConvertScan)
-            and logical_expression.operator.udf is None
-        )
+        return isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is None
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
@@ -226,19 +232,21 @@ class LLMConvertRule(ImplementationRule):
 
         # get initial set of parameters for physical op
         op_kwargs = logical_op.get_op_params()
-        op_kwargs.update({
-            "verbose": physical_op_params['verbose'],
-            "logical_op_id": logical_op.get_op_id(),
-        })
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_op_id(),
+            }
+        )
 
         physical_expressions = []
-        for model in physical_op_params['available_models']:
+        for model in physical_op_params["available_models"]:
             # skip this model if:
             # 1. this is an image model and we're not doing an image conversion, or
             # 2. this is not an image model and we're doing an image conversion
             # TODO: make sure this logic can handle models like GPT-4o which are both vision and not-vision
             is_vision_model = model in getVisionModels()
-            is_image_conversion = op_kwargs['image_conversion']
+            is_image_conversion = op_kwargs["image_conversion"]
             image_model_xor = is_vision_model != is_image_conversion
             if image_model_xor:
                 continue
@@ -265,6 +273,7 @@ class LLMConvertBondedRule(LLMConvertRule):
     """
     Substitute a logical expression for a ConvertScan with a bonded convert physical implementation.
     """
+
     physical_convert_class = LLMConvertBonded
 
 
@@ -272,6 +281,7 @@ class LLMConvertConventionalRule(LLMConvertRule):
     """
     Substitute a logical expression for a ConvertScan with a conventional convert physical implementation.
     """
+
     physical_convert_class = LLMConvertConventional
 
 
@@ -283,6 +293,7 @@ class TokenReducedConvertRule(ImplementationRule):
     NOTE: we provide the physical convert class(es) in their own sub-classed rules to make
     it easier to allow/disallow groups of rules at the Optimizer level.
     """
+
     physical_convert_class = None  # overriden by sub-classes
     token_budgets = [0.1, 0.5, 0.9]
 
@@ -297,13 +308,15 @@ class TokenReducedConvertRule(ImplementationRule):
 
         # get initial set of parameters for physical op
         op_kwargs = logical_op.get_op_params()
-        op_kwargs.update({
-            "verbose": physical_op_params['verbose'],
-            "logical_op_id": logical_op.get_op_id(),
-        })
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_op_id(),
+            }
+        )
 
         physical_expressions = []
-        for model in physical_op_params['available_models']:
+        for model in physical_op_params["available_models"]:
             for token_budget in cls.token_budgets:
                 # skip this model if this is an image model
                 if model in getVisionModels():
@@ -332,6 +345,7 @@ class TokenReducedConvertBondedRule(TokenReducedConvertRule):
     """
     Substitute a logical expression for a ConvertScan with a bonded token reduced physical implementation.
     """
+
     physical_convert_class = TokenReducedConvertBonded
 
 
@@ -339,6 +353,7 @@ class TokenReducedConvertConventionalRule(TokenReducedConvertRule):
     """
     Substitute a logical expression for a ConvertScan with a conventional token reduced physical implementation.
     """
+
     physical_convert_class = TokenReducedConvertConventional
 
 
@@ -350,6 +365,7 @@ class CodeSynthesisConvertRule(ImplementationRule):
     NOTE: we provide the physical convert class(es) in their own sub-classed rules to make
     it easier to allow/disallow groups of rules at the Optimizer level.
     """
+
     physical_convert_class = None  # overriden by sub-classes
 
     @classmethod
@@ -367,16 +383,18 @@ class CodeSynthesisConvertRule(ImplementationRule):
 
         # get initial set of parameters for physical op
         op_kwargs = logical_op.get_op_params()
-        op_kwargs.update({
-            "verbose": physical_op_params['verbose'],
-            "logical_op_id": logical_op.get_op_id(),
-        })
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_op_id(),
+            }
+        )
 
         # construct multi-expression
         op = cls.physical_convert_class(
-            exemplar_generation_model=physical_op_params['champion_model'],
-            code_synth_model=physical_op_params['code_champion_model'],
-            conventional_fallback_model=physical_op_params['conventional_fallback_model'],
+            exemplar_generation_model=physical_op_params["champion_model"],
+            code_synth_model=physical_op_params["code_champion_model"],
+            conventional_fallback_model=physical_op_params["conventional_fallback_model"],
             prompt_strategy=PromptStrategy.DSPY_COT_QA,
             **op_kwargs,
         )
@@ -395,6 +413,7 @@ class CodeSynthesisConvertSingleRule(CodeSynthesisConvertRule):
     """
     Substitute a logical expression for a ConvertScan with a (single) code synthesis physical implementation.
     """
+
     physical_convert_class = CodeSynthesisConvertSingle
 
 
@@ -402,6 +421,7 @@ class NonLLMFilterRule(ImplementationRule):
     """
     Substitute a logical expression for a FilteredScan with a non-llm filter physical implementation.
     """
+
     @staticmethod
     def matches_pattern(logical_expression: LogicalExpression) -> bool:
         return (
@@ -413,10 +433,12 @@ class NonLLMFilterRule(ImplementationRule):
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_op_params()
-        op_kwargs.update({
-            "verbose": physical_op_params['verbose'],
-            "logical_op_id": logical_op.get_op_id(),
-        })
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_op_id(),
+            }
+        )
         op = NonLLMFilter(**op_kwargs)
 
         expression = PhysicalExpression(
@@ -433,6 +455,7 @@ class LLMFilterRule(ImplementationRule):
     """
     Substitute a logical expression for a FilteredScan with an llm filter physical implementation.
     """
+
     @staticmethod
     def matches_pattern(logical_expression: LogicalExpression) -> bool:
         return (
@@ -444,18 +467,20 @@ class LLMFilterRule(ImplementationRule):
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_op_params()
-        op_kwargs.update({
-            "verbose": physical_op_params['verbose'],
-            "logical_op_id": logical_op.get_op_id(),
-        })
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_op_id(),
+            }
+        )
         physical_expressions = []
-        for model in physical_op_params['available_models']:
+        for model in physical_op_params["available_models"]:
             # skip this model if:
             # 1. this is an image model and we're not doing an image filter, or
             # 2. this is not an image model and we're doing an image filter
             # TODO: make sure this logic can handle models like GPT-4o which are both vision and not-vision
             is_vision_model = model in getVisionModels()
-            is_image_filter = op_kwargs['image_filter']
+            is_image_filter = op_kwargs["image_filter"]
             image_model_xor = is_vision_model != is_image_filter
             if image_model_xor:
                 continue
@@ -482,6 +507,7 @@ class AggregateRule(ImplementationRule):
     """
     Substitute the logical expression for an aggregate with its physical counterpart.
     """
+
     @staticmethod
     def matches_pattern(logical_expression: LogicalExpression) -> bool:
         return isinstance(logical_expression.operator, Aggregate)
@@ -490,10 +516,12 @@ class AggregateRule(ImplementationRule):
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_op_params()
-        op_kwargs.update({
-            "verbose": physical_op_params['verbose'],
-            "logical_op_id": logical_op.get_op_id(),
-        })
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_op_id(),
+            }
+        )
 
         op = None
         if logical_op.aggFunc == AggFunc.COUNT:
@@ -518,6 +546,7 @@ class BasicSubstitutionRule(ImplementationRule):
     For logical operators with a single physical implementation, substitute the
     logical expression with its physical counterpart.
     """
+
     LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP = {
         BaseScan: MarshalAndScanDataOp,
         CacheScan: CacheScanDataOp,
@@ -534,10 +563,12 @@ class BasicSubstitutionRule(ImplementationRule):
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_op_params()
-        op_kwargs.update({
-            "verbose": physical_op_params['verbose'],
-            "logical_op_id": logical_op.get_op_id(),
-        })
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_op_id(),
+            }
+        )
         physical_op_class = cls.LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP[logical_op.__class__]
         op = physical_op_class(**op_kwargs)
 

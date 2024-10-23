@@ -18,7 +18,6 @@ FieldName = str
 
 
 class ConvertOp(PhysicalOperator):
-
     def __init__(
         self,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
@@ -35,12 +34,7 @@ class ConvertOp(PhysicalOperator):
 
     def get_copy_kwargs(self):
         copy_kwargs = super().get_copy_kwargs()
-        return {
-            "cardinality": self.cardinality,
-            "udf": self.udf,
-            "desc": self.desc,
-            **copy_kwargs
-        }
+        return {"cardinality": self.cardinality, "udf": self.udf, "desc": self.desc, **copy_kwargs}
 
     def get_op_params(self):
         return {
@@ -55,7 +49,6 @@ class ConvertOp(PhysicalOperator):
 
 
 class NonLLMConvert(ConvertOp):
-
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
@@ -127,7 +120,6 @@ class NonLLMConvert(ConvertOp):
 
 
 class LLMConvert(ConvertOp):
-
     def __init__(
         self,
         model: Model,
@@ -164,7 +156,7 @@ class LLMConvert(ConvertOp):
             "model": self.model,
             "prompt_strategy": self.prompt_strategy,
             "image_conversion": self.image_conversion,
-            **copy_kwargs
+            **copy_kwargs,
         }
 
     def get_op_params(self):
@@ -190,7 +182,7 @@ class LLMConvert(ConvertOp):
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
 
         if self.image_conversion:
-            est_num_input_tokens = 765 / 10 # 1024x1024 image is 765 tokens
+            est_num_input_tokens = 765 / 10  # 1024x1024 image is 765 tokens
 
         # get est. of conversion time per record from model card;
         # NOTE: model will only be None for code synthesis, which uses GPT-3.5 as fallback
@@ -248,17 +240,13 @@ class LLMConvert(ConvertOp):
         multilineInputFieldDescription = ""
         for field_name in self.inputSchema.fieldNames():
             field_desc = getattr(self.inputSchema, field_name).desc
-            multilineInputFieldDescription += prompts.INPUT_FIELD.format(
-                field_name=field_name, field_desc=field_desc
-            )
+            multilineInputFieldDescription += prompts.INPUT_FIELD.format(field_name=field_name, field_desc=field_desc)
 
         # build string of output fields and their descriptions
         multilineOutputFieldDescription = ""
         for field_name in fields_to_generate:
             field_desc = getattr(self.outputSchema, field_name).desc
-            multilineOutputFieldDescription += prompts.OUTPUT_FIELD.format(
-                field_name=field_name, field_desc=field_desc
-            )
+            multilineOutputFieldDescription += prompts.OUTPUT_FIELD.format(field_name=field_name, field_desc=field_desc)
 
         # add input/output schema descriptions (if they have a docstring)
         optionalInputDesc = (
@@ -291,14 +279,14 @@ class LLMConvert(ConvertOp):
 
         prompt_question = prompt_question.format(
             targetOutputDescriptor=targetOutputDescriptor,
-            input_type = self.inputSchema.className(),
-            outputSingleOrPlural = outputSingleOrPlural,
-            optionalInputDesc = optionalInputDesc,
-            optionalOutputDesc = optionalOutputDesc,
-            multilineInputFieldDescription = multilineInputFieldDescription,
-            multilineOutputFieldDescription = multilineOutputFieldDescription,
-            appendixInstruction = appendixInstruction,
-            optional_desc = optional_desc
+            input_type=self.inputSchema.className(),
+            outputSingleOrPlural=outputSingleOrPlural,
+            optionalInputDesc=optionalInputDesc,
+            optionalOutputDesc=optionalOutputDesc,
+            multilineInputFieldDescription=multilineInputFieldDescription,
+            multilineOutputFieldDescription=multilineOutputFieldDescription,
+            appendixInstruction=appendixInstruction,
+            optional_desc=optional_desc,
         )
         # TODO: add this for boolean questions?
         # if prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
@@ -320,7 +308,7 @@ class LLMConvert(ConvertOp):
         record_op_stats_lst = []
 
         # compute variables
-        successful_convert = (len(records) > 0)
+        successful_convert = len(records) > 0
         num_records = len(records) if successful_convert else 1
         per_record_stats = generation_stats / num_records
         model = getattr(self, "model", None)
@@ -365,14 +353,12 @@ class LLMConvert(ConvertOp):
 
     def _create_data_record_from_json(
         self,
-        jsonObj: Any, 
+        jsonObj: Any,
         candidate: DataRecord,
         cardinality_idx: int = None,
     ) -> DataRecord:
         # initialize data record
-        dr = DataRecord(
-            self.outputSchema, parent_id=candidate._id, cardinality_idx=cardinality_idx
-        )
+        dr = DataRecord(self.outputSchema, parent_id=candidate._id, cardinality_idx=cardinality_idx)
 
         # TODO: This inherits all pre-computed fields in an incremental fashion. The positive / pros of this approach is that it enables incremental schema computation, which tends to feel more natural for the end-user. The downside is it requires us to support an explicit projection to eliminate unwanted input / intermediate computation.
         #
@@ -396,12 +382,10 @@ class LLMConvert(ConvertOp):
 
         return dr
 
-    def parse_answer(
-        self, answer: str, fields_to_generate: List[str]
-    ) -> Dict[FieldName, List[Any]]:
-        """ 
+    def parse_answer(self, answer: str, fields_to_generate: List[str]) -> Dict[FieldName, List[Any]]:
+        """
         This functions gets a string answer and parses it into an iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
-        # """
+        #"""
         try:
             # parse json from answer string
             json_answer = getJsonFromAnswer(answer)
@@ -409,7 +393,7 @@ class LLMConvert(ConvertOp):
             # sanity check validity of parsed json
             assert json_answer != {}, "No output was found!"
             if self.cardinality == Cardinality.ONE_TO_MANY:
-                assert "items" in json_answer, "\"items\" key missing from one-to-many JSON"
+                assert "items" in json_answer, '"items" key missing from one-to-many JSON'
                 assert (
                     isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0
                 ), "No output objects were generated for one-to-many query"
@@ -421,8 +405,8 @@ class LLMConvert(ConvertOp):
             print(f"\tAnswer: {answer}")
             # msg = str(e)
             # if "line" in msg:
-                # line = int(str(msg).split("line ")[1].split(" ")[0])
-                # print(f"\tAnswer snippet: {answer.splitlines()[line]}")
+            # line = int(str(msg).split("line ")[1].split(" ")[0])
+            # print(f"\tAnswer snippet: {answer.splitlines()[line]}")
             return {field_name: [] for field_name in fields_to_generate}
 
         field_answers = {}
@@ -437,44 +421,41 @@ class LLMConvert(ConvertOp):
                         print(f"Error parsing field {field} in one-to-many answer: {item}")
 
         else:
-            field_answers = {
-                field: [json_answer[field]] for field in fields_to_generate
-            }
+            field_answers = {field: [json_answer[field]] for field in fields_to_generate}
 
         return field_answers
 
     def _dspy_generate_fields(
         self,
         prompt: str,
-        content: Optional[Union[str, List[bytes]]] = None, #either text or image
+        content: Optional[Union[str, List[bytes]]] = None,  # either text or image
         verbose: bool = False,
     ) -> Tuple[str, GenerationStats]:
-        """ This functions wraps the call to the generator method to actually perform the field generation. Returns an answer which is a string and a query_stats which is a GenerationStats object.
-        """
+        """This functions wraps the call to the generator method to actually perform the field generation. Returns an answer which is a string and a query_stats which is a GenerationStats object."""
         # create DSPy generator and generate
         doc_schema = str(self.outputSchema)
         doc_type = self.outputSchema.className()
 
         # generate LLM response and capture statistics
-        answer:str
-        query_stats:GenerationStats
+        answer: str
+        query_stats: GenerationStats
         if self.image_conversion:
             generator = ImageTextGenerator(self.model.value, verbose)
         else:
-            generator = DSPyGenerator(
-                self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
-            )
+            generator = DSPyGenerator(self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose)
 
         try:
             answer, query_stats = generator.generate(context=content, question=prompt)
         except Exception as e:
             print(f"DSPy generation error: {e}")
             return "", GenerationStats()
-        
+
         return answer, query_stats
 
-    def convert(self, candidate_content: Union[str,List[bytes]], fields: List[str]) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
-        """ This function is responsible for the LLM conversion process. 
+    def convert(
+        self, candidate_content: Union[str, List[bytes]], fields: List[str]
+    ) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+        """This function is responsible for the LLM conversion process.
         Different strategies may/should reimplement this function and leave the __call__ function untouched.
         The input is ...
         Outputs:
@@ -492,9 +473,7 @@ class LLMConvert(ConvertOp):
             base64_images = []
             if hasattr(candidate, "contents"):
                 # TODO: should address this now; we need a way to infer (or have the programmer declare) what fields contain image content
-                base64_images = [
-                    base64.b64encode(candidate.contents).decode("utf-8")  
-                ]
+                base64_images = [base64.b64encode(candidate.contents).decode("utf-8")]
             else:
                 base64_images = [
                     base64.b64encode(image).decode("utf-8")
@@ -505,9 +484,7 @@ class LLMConvert(ConvertOp):
             content = candidate._asJSONStr(include_bytes=False)
 
         field_answers: Dict[str, List]
-        field_answers, generation_stats = self.convert(
-            fields=fields_to_generate, candidate_content=content
-        )
+        field_answers, generation_stats = self.convert(fields=fields_to_generate, candidate_content=content)
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
@@ -516,7 +493,7 @@ class LLMConvert(ConvertOp):
         except:
             print(f"Error in field answers: {field_answers}. Returning empty records.")
             breakpoint()
-            return [],[]
+            return [], []
         records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
 
         for field_name, answer_list in field_answers.items():
@@ -525,9 +502,7 @@ class LLMConvert(ConvertOp):
                 record[field_name] = output
 
         drs = [
-            self._create_data_record_from_json(
-                jsonObj=js, candidate=candidate, cardinality_idx=idx
-            )
+            self._create_data_record_from_json(jsonObj=js, candidate=candidate, cardinality_idx=idx)
             for idx, js in enumerate(records_json)
         ]
 
@@ -544,7 +519,6 @@ class LLMConvert(ConvertOp):
 
 
 class LLMConvertConventional(LLMConvert):
-
     def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Update the cost per record and time per record estimates to account for the additional
@@ -569,7 +543,7 @@ class LLMConvertConventional(LLMConvert):
         est_num_output_tokens *= num_fields_to_generate
 
         if self.image_conversion:
-            est_num_input_tokens = 765 / 10 # 1024x1024 image is 765 tokens
+            est_num_input_tokens = 765 / 10  # 1024x1024 image is 765 tokens
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
@@ -609,10 +583,7 @@ class LLMConvertConventional(LLMConvert):
 
 
 class LLMConvertBonded(LLMConvert):
-
-    def convert(self,
-                candidate_content,
-                fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+    def convert(self, candidate_content, fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
         prompt = self._construct_query_prompt(fields_to_generate=fields)
 
         # generate all fields in a single query

@@ -24,6 +24,7 @@ pytest_plugins = [
 #       and cache the result. Thus, we minimize recomputation and don't
 #       need to, for example, re-register datasets for each individual test.
 
+
 @pytest.fixture
 def dataset(request, enron_eval_tiny, real_estate_eval_tiny, biofabric_tiny):
     dataset_id = request.param
@@ -78,11 +79,19 @@ def physical_plan(
         "cost-est-simple-plan-gpt4-gpt35": simple_plan_factory(convert_model=Model.GPT_4, filter_model=Model.GPT_3_5),
         "cost-est-simple-plan-gpt4-mixtral": simple_plan_factory(convert_model=Model.GPT_4, filter_model=Model.MIXTRAL),
         "cost-est-simple-plan-gpt35-gpt4": simple_plan_factory(convert_model=Model.GPT_3_5, filter_model=Model.GPT_4),
-        "cost-est-simple-plan-gpt35-gpt35": simple_plan_factory(convert_model=Model.GPT_3_5, filter_model=Model.GPT_3_5),
-        "cost-est-simple-plan-gpt35-mixtral": simple_plan_factory(convert_model=Model.GPT_3_5, filter_model=Model.MIXTRAL),
+        "cost-est-simple-plan-gpt35-gpt35": simple_plan_factory(
+            convert_model=Model.GPT_3_5, filter_model=Model.GPT_3_5
+        ),
+        "cost-est-simple-plan-gpt35-mixtral": simple_plan_factory(
+            convert_model=Model.GPT_3_5, filter_model=Model.MIXTRAL
+        ),
         "cost-est-simple-plan-mixtral-gpt4": simple_plan_factory(convert_model=Model.MIXTRAL, filter_model=Model.GPT_4),
-        "cost-est-simple-plan-mixtral-gpt35": simple_plan_factory(convert_model=Model.MIXTRAL, filter_model=Model.GPT_3_5),
-        "cost-est-simple-plan-mixtral-mixtral": simple_plan_factory(convert_model=Model.MIXTRAL, filter_model=Model.MIXTRAL),
+        "cost-est-simple-plan-mixtral-gpt35": simple_plan_factory(
+            convert_model=Model.MIXTRAL, filter_model=Model.GPT_3_5
+        ),
+        "cost-est-simple-plan-mixtral-mixtral": simple_plan_factory(
+            convert_model=Model.MIXTRAL, filter_model=Model.MIXTRAL
+        ),
     }
     return physical_plan_id_to_physical_plan[physical_plan_id]
 
@@ -131,15 +140,33 @@ def expected_cost_est_results(
 ):
     cost_est_results_id = request.param
     cost_est_results_id_to_cost_est_results = {
-        "cost-est-simple-plan-gpt4-gpt4": simple_plan_expected_results_factory(convert_model=Model.GPT_4, filter_model=Model.GPT_4),
-        "cost-est-simple-plan-gpt4-gpt35": simple_plan_expected_results_factory(convert_model=Model.GPT_4, filter_model=Model.GPT_3_5),
-        "cost-est-simple-plan-gpt4-mixtral": simple_plan_expected_results_factory(convert_model=Model.GPT_4, filter_model=Model.MIXTRAL),
-        "cost-est-simple-plan-gpt35-gpt4": simple_plan_expected_results_factory(convert_model=Model.GPT_3_5, filter_model=Model.GPT_4),
-        "cost-est-simple-plan-gpt35-gpt35": simple_plan_expected_results_factory(convert_model=Model.GPT_3_5, filter_model=Model.GPT_3_5),
-        "cost-est-simple-plan-gpt35-mixtral": simple_plan_expected_results_factory(convert_model=Model.GPT_3_5, filter_model=Model.MIXTRAL),
-        "cost-est-simple-plan-mixtral-gpt4": simple_plan_expected_results_factory(convert_model=Model.MIXTRAL, filter_model=Model.GPT_4),
-        "cost-est-simple-plan-mixtral-gpt35": simple_plan_expected_results_factory(convert_model=Model.MIXTRAL, filter_model=Model.GPT_3_5),
-        "cost-est-simple-plan-mixtral-mixtral": simple_plan_expected_results_factory(convert_model=Model.MIXTRAL, filter_model=Model.MIXTRAL),
+        "cost-est-simple-plan-gpt4-gpt4": simple_plan_expected_results_factory(
+            convert_model=Model.GPT_4, filter_model=Model.GPT_4
+        ),
+        "cost-est-simple-plan-gpt4-gpt35": simple_plan_expected_results_factory(
+            convert_model=Model.GPT_4, filter_model=Model.GPT_3_5
+        ),
+        "cost-est-simple-plan-gpt4-mixtral": simple_plan_expected_results_factory(
+            convert_model=Model.GPT_4, filter_model=Model.MIXTRAL
+        ),
+        "cost-est-simple-plan-gpt35-gpt4": simple_plan_expected_results_factory(
+            convert_model=Model.GPT_3_5, filter_model=Model.GPT_4
+        ),
+        "cost-est-simple-plan-gpt35-gpt35": simple_plan_expected_results_factory(
+            convert_model=Model.GPT_3_5, filter_model=Model.GPT_3_5
+        ),
+        "cost-est-simple-plan-gpt35-mixtral": simple_plan_expected_results_factory(
+            convert_model=Model.GPT_3_5, filter_model=Model.MIXTRAL
+        ),
+        "cost-est-simple-plan-mixtral-gpt4": simple_plan_expected_results_factory(
+            convert_model=Model.MIXTRAL, filter_model=Model.GPT_4
+        ),
+        "cost-est-simple-plan-mixtral-gpt35": simple_plan_expected_results_factory(
+            convert_model=Model.MIXTRAL, filter_model=Model.GPT_3_5
+        ),
+        "cost-est-simple-plan-mixtral-mixtral": simple_plan_expected_results_factory(
+            convert_model=Model.MIXTRAL, filter_model=Model.MIXTRAL
+        ),
     }
 
     return cost_est_results_id_to_cost_est_results[cost_est_results_id]
