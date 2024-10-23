@@ -76,7 +76,9 @@ class ExecutionEngine:
         """
         Clear cached LLM responses and codegen samples.
         """
-        dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
+        dspy_cache_dir = os.path.join(
+            os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/"
+        )
         if os.path.exists(dspy_cache_dir):
             shutil.rmtree(dspy_cache_dir)
         cache = self.datadir.getCacheService()
@@ -118,7 +120,9 @@ class ExecutionEngine:
 
         return max_quality_plan_id
 
-    def aggregate_plan_stats(self, plan_stats: List[PlanStats]) -> Dict[str, PlanStats]:
+    def aggregate_plan_stats(
+        self, plan_stats: List[PlanStats]
+    ) -> Dict[str, PlanStats]:
         """
         Aggregate a list of plan stats into a dictionary mapping plan_id --> cumulative plan stats.
 
@@ -136,7 +140,10 @@ class ExecutionEngine:
         return agg_plan_stats
 
     def execute_plans(
-        self, plans: List[PhysicalPlan], max_quality_plan_id: str, num_samples: Union[int, float] = float("inf")
+        self,
+        plans: List[PhysicalPlan],
+        max_quality_plan_id: str,
+        num_samples: Union[int, float] = float("inf"),
     ):
         """
         Execute a given list of plans for num_samples records each, using whatever parallelism is available.
@@ -156,7 +163,11 @@ class ExecutionEngine:
                 executor.map(
                     lambda x: self.execute_plan(**x),
                     [
-                        {"plan": plan, "num_samples": num_samples, "max_workers": self.num_workers_per_thread}
+                        {
+                            "plan": plan,
+                            "num_samples": num_samples,
+                            "max_workers": self.num_workers_per_thread,
+                        }
                         for plan in plans
                     ],
                 )
@@ -173,10 +184,14 @@ class ExecutionEngine:
 
         # process results to get sample execution data and sentinel plan stats
         all_sample_execution_data, return_records = [], []
-        for records, plan_stats, plan in zip(all_records, all_plan_stats, plans):
+        for records, plan_stats, plan in zip(
+            all_records, all_plan_stats, plans
+        ):
             # aggregate sentinel est. data
             for operator_stats in plan_stats.operator_stats.values():
-                all_sample_execution_data.extend(operator_stats.record_op_stats_lst)
+                all_sample_execution_data.extend(
+                    operator_stats.record_op_stats_lst
+                )
 
             # if this is the max quality plan for this set of plans, return its results for these records
             if plan.plan_id == max_quality_plan_id:
@@ -223,8 +238,10 @@ class ExecutionEngine:
             max_quality_plan_id = self.get_max_quality_plan_id(plans)
 
             # execute the set of plans for a fixed number of samples
-            new_execution_data, new_records, new_plan_stats = self.execute_plans(
-                list(plans), max_quality_plan_id, self.num_samples
+            new_execution_data, new_records, new_plan_stats = (
+                self.execute_plans(
+                    list(plans), max_quality_plan_id, self.num_samples
+                )
             )
             records.extend(new_records)
             plan_stats.extend(new_plan_stats)
@@ -258,13 +275,20 @@ class ExecutionEngine:
         return records, plan_stats
 
     def execute_plan(
-        self, plan: PhysicalPlan, num_samples: Union[int, float] = float("inf"), max_workers: Optional[int] = None
+        self,
+        plan: PhysicalPlan,
+        num_samples: Union[int, float] = float("inf"),
+        max_workers: Optional[int] = None,
     ):
         """Execute the given plan and return the output records and plan stats."""
-        raise NotImplementedError("Abstract method to be overwritten by sub-classes")
+        raise NotImplementedError(
+            "Abstract method to be overwritten by sub-classes"
+        )
 
     def execute(self, dataset: Set, policy: Policy):
         """
         Execute the workload specified by the given dataset according to the policy provided by the user.
         """
-        raise NotImplementedError("Abstract method to be overwritten by sub-classes")
+        raise NotImplementedError(
+            "Abstract method to be overwritten by sub-classes"
+        )

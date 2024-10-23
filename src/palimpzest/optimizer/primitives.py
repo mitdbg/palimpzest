@@ -31,11 +31,20 @@ class Expression:
         self.plan_cost = None
 
     def __eq__(self, other: Expression):
-        return self.operator == other.operator and self.input_group_ids == other.input_group_ids
+        return (
+            self.operator == other.operator
+            and self.input_group_ids == other.input_group_ids
+        )
 
     def __hash__(self):
-        hash_str = str(tuple(sorted(self.input_group_ids)) + (self.operator.get_op_id(), str(self.__class__.__name__)))
-        hash_id = int(hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS], 16)
+        hash_str = str(
+            tuple(sorted(self.input_group_ids))
+            + (self.operator.get_op_id(), str(self.__class__.__name__))
+        )
+        hash_id = int(
+            hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS],
+            16,
+        )
         return hash_id
 
     def add_applied_rule(self, rule):
@@ -63,7 +72,12 @@ class Group:
     Maintains a set of logical multi-expressions and physical multi-expressions.
     """
 
-    def __init__(self, logical_expressions: List[Expression], fields: Set[str], properties: Dict[str, Set[str]]):
+    def __init__(
+        self,
+        logical_expressions: List[Expression],
+        fields: Set[str],
+        properties: Dict[str, Set[str]],
+    ):
         self.logical_expressions = set(logical_expressions)
         self.physical_expressions = set()
         self.fields = fields
@@ -92,5 +106,8 @@ class Group:
             sorted_properties.extend(sorted(self.properties[key]))
 
         hash_str = str(tuple(sorted_fields + sorted_properties))
-        hash_id = int(hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS], 16)
+        hash_id = int(
+            hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS],
+            16,
+        )
         return hash_id

@@ -35,7 +35,9 @@ class LimitScanOp(PhysicalOperator):
             and self.inputSchema == other.inputSchema
         )
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naiveCostEstimates(
+        self, source_op_cost_estimates: OperatorCostEstimates
+    ) -> OperatorCostEstimates:
         # for now, assume applying the limit takes negligible additional time (and no cost in USD)
         return OperatorCostEstimates(
             cardinality=min(self.limit, source_op_cost_estimates.cardinality),

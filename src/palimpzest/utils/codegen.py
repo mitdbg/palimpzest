@@ -35,7 +35,9 @@ def parse_multiple_outputs(text, outputs=["Thought", "Action"]):
 
 
 def parse_ideas(text, limit=3):
-    return parse_multiple_outputs(text, outputs=[f"Idea {i}" for i in range(1, limit + 1)])
+    return parse_multiple_outputs(
+        text, outputs=[f"Idea {i}" for i in range(1, limit + 1)]
+    )
 
 
 def run_advgen(prompt):
@@ -62,20 +64,27 @@ Return the implementation only."""
 
 # NOTE: I think examples was List[DataRecord] and is now List[dict]
 def codeGenSingle(
-    api: API, examples: List[Dict[DataRecord, DataRecord]] = list(), advice: str = None, language="Python"
+    api: API,
+    examples: List[Dict[DataRecord, DataRecord]] = list(),
+    advice: str = None,
+    language="Python",
 ):
     prompt_template = CODEGEN_PROMPT
     context = {
         "language": language,
         "api": api.args_call(),
         "output": api.output,
-        "inputs_desc": "\n".join([f"- {k} ({api.input_descs[i]})" for i, k in enumerate(api.inputs)]),
+        "inputs_desc": "\n".join(
+            [f"- {k} ({api.input_descs[i]})" for i, k in enumerate(api.inputs)]
+        ),
         "output_desc": api.output_desc,
         "examples_desc": "\n".join(
             [
                 EXAMPLE_PROMPT.format(
                     idx=f" {i}" if len(examples) > 1 else "",
-                    example_inputs="\n".join([f"- {k} = {repr(example[k])}" for k in api.inputs]),
+                    example_inputs="\n".join(
+                        [f"- {k} = {repr(example[k])}" for k in api.inputs]
+                    ),
                     example_output="",
                 )
                 for i, example in enumerate(examples, 1)
@@ -114,19 +123,28 @@ Please provide me with {n} different ideas to complete this task. Return the ide
 
 
 # NOTE: I think examples was List[DataRecord] and is now List[dict]
-def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]] = list(), language="Python", n_advices=4):
+def adviceGen(
+    api: API,
+    examples: List[Dict[DataRecord, DataRecord]] = list(),
+    language="Python",
+    n_advices=4,
+):
     prompt_template = ADVICEGEN_PROMPT
     context = {
         "language": language,
         "api": api.args_call(),
         "output": api.output,
-        "inputs_desc": "\n".join([f"- {k} ({api.input_descs[i]})" for i, k in enumerate(api.inputs)]),
+        "inputs_desc": "\n".join(
+            [f"- {k} ({api.input_descs[i]})" for i, k in enumerate(api.inputs)]
+        ),
         "output_desc": api.output_desc,
         "examples_desc": "\n".join(
             [
                 EXAMPLE_PROMPT.format(
                     idx=f" {i}" if len(examples) > 1 else "",
-                    example_inputs="\n".join([f"- {k} = {repr(example[k])}" for k in api.inputs]),
+                    example_inputs="\n".join(
+                        [f"- {k} = {repr(example[k])}" for k in api.inputs]
+                    ),
                     example_output="",
                 )
                 for i, example in enumerate(examples, 1)
@@ -191,11 +209,17 @@ def codeEnsembleGeneration(
             code_ensemble[code_name] = code
         return code_ensemble, code_gen_stats
     if strategy == CodeGenStrategy.ADVICE_ENSEMBLE:
-        advices, adv_stats = adviceGen(api, examples=examples[:code_num_examples], n_advices=code_ensemble_num)
+        advices, adv_stats = adviceGen(
+            api,
+            examples=examples[:code_num_examples],
+            n_advices=code_ensemble_num,
+        )
         code_gen_stats.advice_gen_stats = adv_stats
         for i, adv in enumerate(advices):
             code_name = f"{api.name}_v{i}"
-            code, stats = codeGenSingle(api, examples=examples[:code_num_examples], advice=adv)
+            code, stats = codeGenSingle(
+                api, examples=examples[:code_num_examples], advice=adv
+            )
             code_gen_stats.code_versions_stats[code_name] = stats
             code_ensemble[code_name] = code
         return code_ensemble, code_gen_stats
@@ -203,11 +227,19 @@ def codeEnsembleGeneration(
         raise Exception("not implemented yet")
 
 
-def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose: bool = False):
+def codeExecution(
+    api: API, code: str, candidate_dict: Dict[str, Any], verbose: bool = False
+):
     start_time = time.time()
-    inputs = {field_name: candidate_dict[field_name] for field_name in api.inputs}
+    inputs = {
+        field_name: candidate_dict[field_name] for field_name in api.inputs
+    }
     response = api.api_execute(code, inputs)
-    pred = response["response"] if response["status"] and response["response"] else None
+    pred = (
+        response["response"]
+        if response["status"] and response["response"]
+        else None
+    )
     end_time = time.time()
     stats = CodeExecutionSingleStats(
         code_response=response,
@@ -218,7 +250,10 @@ def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose: 
 
 # Temporarily set default verbose to True for debugging
 def codeEnsembleExecution(
-    api: API, code_ensemble: List[str], candidate_dict: Dict[str, Any], verbose: bool = True
+    api: API,
+    code_ensemble: List[str],
+    candidate_dict: Dict[str, Any],
+    verbose: bool = True,
 ) -> Tuple[DataRecord, Dict]:
     ensemble_stats = CodeExecutionEnsembleStats()
     preds = list()

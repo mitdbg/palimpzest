@@ -80,14 +80,20 @@ class Set:
             "schema": self.schema.jsonSchema(),
             "source": self._source.serialize(),
             "desc": repr(self._desc),
-            "filter": None if self._filter is None else self._filter.serialize(),
+            "filter": None
+            if self._filter is None
+            else self._filter.serialize(),
             "udf": None if self._udf is None else str(self._udf),
-            "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(),
+            "aggFunc": None
+            if self._aggFunc is None
+            else self._aggFunc.serialize(),
             "fnid": self._fnid,
             "cardinality": self._cardinality,
             "image_conversion": self._image_conversion,
             "limit": self._limit,
-            "groupBy": (None if self._groupBy is None else self._groupBy.serialize()),
+            "groupBy": (
+                None if self._groupBy is None else self._groupBy.serialize()
+            ),
         }
 
         return d
@@ -119,7 +125,11 @@ class Dataset(Set):
 
     def __init__(self, source: Union[str, DataSource], *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
-        source = DataDirectory().getRegisteredDataset(source) if isinstance(source, str) else source
+        source = (
+            DataDirectory().getRegisteredDataset(source)
+            if isinstance(source, str)
+            else source
+        )
 
         # intialize class
         super().__init__(source=source, *args, **kwargs)

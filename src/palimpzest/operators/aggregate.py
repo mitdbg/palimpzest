@@ -17,7 +17,9 @@ class AggregateOp(PhysicalOperator):
     these operators.
     """
 
-    def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
+    def __call__(
+        self, candidates: List[DataRecord]
+    ) -> List[DataRecordsWithStats]:
         raise NotImplementedError("Using __call__ from abstract method")
 
 
@@ -52,7 +54,9 @@ class ApplyGroupByOp(AggregateOp):
             "gbySig": str(self.gbySig.serialize()),
         }
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naiveCostEstimates(
+        self, source_op_cost_estimates: OperatorCostEstimates
+    ) -> OperatorCostEstimates:
         # for now, assume applying the groupby takes negligible additional time (and no cost in USD)
         return OperatorCostEstimates(
             cardinality=NAIVE_EST_NUM_GROUPS,
@@ -90,7 +94,9 @@ class ApplyGroupByOp(AggregateOp):
         else:
             raise Exception("Unknown agg function " + func)
 
-    def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
+    def __call__(
+        self, candidates: List[DataRecord]
+    ) -> List[DataRecordsWithStats]:
         start_time = time.time()
 
         # build group array
@@ -99,7 +105,9 @@ class ApplyGroupByOp(AggregateOp):
             group = ()
             for f in self.gbySig.gbyFields:
                 if not hasattr(candidate, f):
-                    raise TypeError(f"ApplyGroupByOp record missing expected field {f}")
+                    raise TypeError(
+                        f"ApplyGroupByOp record missing expected field {f}"
+                    )
                 group = group + (getattr(candidate, f),)
             if group in aggState:
                 state = aggState[group]
@@ -110,7 +118,9 @@ class ApplyGroupByOp(AggregateOp):
             for i in range(0, len(self.gbySig.aggFuncs)):
                 fun = self.gbySig.aggFuncs[i]
                 if not hasattr(candidate, self.gbySig.aggFields[i]):
-                    raise TypeError(f"ApplyGroupByOp record missing expected field {self.gbySig.aggFields[i]}")
+                    raise TypeError(
+                        f"ApplyGroupByOp record missing expected field {self.gbySig.aggFields[i]}"
+                    )
                 field = getattr(candidate, self.gbySig.aggFields[i])
                 state[i] = ApplyGroupByOp.agg_merge(fun, state[i], field)
             aggState[group] = state
@@ -158,7 +168,9 @@ class CountAggregateOp(AggregateOp):
         self.aggFunc = aggFunc
 
     def __eq__(self, other: PhysicalOperator):
-        return isinstance(other, self.__class__) and self.aggFunc == other.aggFunc
+        return (
+            isinstance(other, self.__class__) and self.aggFunc == other.aggFunc
+        )
 
     def __str__(self):
         op = super().__str__()
@@ -176,7 +188,9 @@ class CountAggregateOp(AggregateOp):
         """
         return {"aggFunc": str(self.aggFunc)}
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naiveCostEstimates(
+        self, source_op_cost_estimates: OperatorCostEstimates
+    ) -> OperatorCostEstimates:
         # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
         return OperatorCostEstimates(
             cardinality=1,
@@ -185,7 +199,9 @@ class CountAggregateOp(AggregateOp):
             quality=1.0,
         )
 
-    def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
+    def __call__(
+        self, candidates: List[DataRecord]
+    ) -> List[DataRecordsWithStats]:
         start_time = time.time()
 
         # NOTE: this will set the parent_id to be the id of the final source record;
@@ -216,7 +232,9 @@ class AverageAggregateOp(AggregateOp):
         self.aggFunc = aggFunc
 
         if not self.inputSchema == Number:
-            raise Exception("Aggregate function AVERAGE is only defined over Numbers")
+            raise Exception(
+                "Aggregate function AVERAGE is only defined over Numbers"
+            )
 
     def __eq__(self, other: PhysicalOperator):
         return (
@@ -241,7 +259,9 @@ class AverageAggregateOp(AggregateOp):
         """
         return {"aggFunc": str(self.aggFunc)}
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naiveCostEstimates(
+        self, source_op_cost_estimates: OperatorCostEstimates
+    ) -> OperatorCostEstimates:
         # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
         return OperatorCostEstimates(
             cardinality=1,
@@ -250,13 +270,17 @@ class AverageAggregateOp(AggregateOp):
             quality=1.0,
         )
 
-    def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
+    def __call__(
+        self, candidates: List[DataRecord]
+    ) -> List[DataRecordsWithStats]:
         start_time = time.time()
 
         # NOTE: this will set the parent_id to be the id of the final source record;
         #       in the near future we may want to have parent_id accept a list of ids
         dr = DataRecord(Number, parent_id=candidates[-1]._id)
-        dr.value = sum(list(map(lambda c: float(c.value), candidates))) / len(candidates)
+        dr.value = sum(list(map(lambda c: float(c.value), candidates))) / len(
+            candidates
+        )
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(

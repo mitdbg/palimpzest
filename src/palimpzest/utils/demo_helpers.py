@@ -32,7 +32,9 @@ def createPlanStr(flatten_ops):
     """Helper function to return string w/physical plan."""
     plan_str = ""
     start = flatten_ops[0]
-    plan_str += f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n"
+    plan_str += (
+        f" 0. {type(start).__name__} -> {start.outputSchema.__name__} \n"
+    )
 
     for idx, (left, right) in enumerate(pairwise(flatten_ops)):
         in_schema = left.outputSchema
@@ -62,7 +64,14 @@ def printTable(records, cols=None, query=None, plan=None):
         print("No records met search criteria")
         return
 
-    records = [{key: record.__dict__[key] for key in record.__dict__ if not key.startswith("_")} for record in records]
+    records = [
+        {
+            key: record.__dict__[key]
+            for key in record.__dict__
+            if not key.startswith("_")
+        }
+        for record in records
+    ]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
 

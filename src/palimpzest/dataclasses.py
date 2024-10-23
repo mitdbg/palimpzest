@@ -245,7 +245,10 @@ class OperatorStats:
             "op_name": self.op_name,
             "total_op_time": self.total_op_time,
             "total_op_cost": self.total_op_cost,
-            "record_op_stats_lst": [record_op_stats.to_json() for record_op_stats in self.record_op_stats_lst],
+            "record_op_stats_lst": [
+                record_op_stats.to_json()
+                for record_op_stats in self.record_op_stats_lst
+            ],
             "op_details": self.op_details,
         }
 
@@ -289,7 +292,12 @@ class PlanStats:
 
     def finalize(self, total_plan_time: float):
         self.total_plan_time = total_plan_time
-        self.total_plan_cost = sum([op_stats.total_op_cost for _, op_stats in self.operator_stats.items()])
+        self.total_plan_cost = sum(
+            [
+                op_stats.total_op_cost
+                for _, op_stats in self.operator_stats.items()
+            ]
+        )
 
     def __str__(self):
         stats = f"Total_plan_time={self.total_plan_time} \n"
@@ -302,7 +310,10 @@ class PlanStats:
         return {
             "plan_id": self.plan_id,
             "plan_str": self.plan_str,
-            "operator_stats": {op_id: op_stats.to_json() for op_id, op_stats in self.operator_stats.items()},
+            "operator_stats": {
+                op_id: op_stats.to_json()
+                for op_id, op_stats in self.operator_stats.items()
+            },
             "total_plan_time": self.total_plan_time,
             "total_plan_cost": self.total_plan_cost,
         }
@@ -332,7 +343,10 @@ class ExecutionStats:
     def to_json(self):
         return {
             "execution_id": self.execution_id,
-            "plan_stats": {plan_id: plan_stats.to_json() for plan_id, plan_stats in self.plan_stats.items()},
+            "plan_stats": {
+                plan_id: plan_stats.to_json()
+                for plan_id, plan_stats in self.plan_stats.items()
+            },
             "total_execution_time": self.total_execution_time,
             "total_execution_cost": self.total_execution_cost,
             "plan_strs": self.plan_strs,
@@ -382,19 +396,31 @@ class OperatorCostEstimates:
     quality_upper_bound: float = None
 
     def __post_init__(self):
-        if self.cardinality_lower_bound is None and self.cardinality_upper_bound is None:
+        if (
+            self.cardinality_lower_bound is None
+            and self.cardinality_upper_bound is None
+        ):
             self.cardinality_lower_bound = self.cardinality
             self.cardinality_upper_bound = self.cardinality
 
-        if self.time_per_record_lower_bound is None and self.time_per_record_upper_bound is None:
+        if (
+            self.time_per_record_lower_bound is None
+            and self.time_per_record_upper_bound is None
+        ):
             self.time_per_record_lower_bound = self.time_per_record
             self.time_per_record_upper_bound = self.time_per_record
 
-        if self.cost_per_record_lower_bound is None and self.cost_per_record_upper_bound is None:
+        if (
+            self.cost_per_record_lower_bound is None
+            and self.cost_per_record_upper_bound is None
+        ):
             self.cost_per_record_lower_bound = self.cost_per_record
             self.cost_per_record_upper_bound = self.cost_per_record
 
-        if self.quality_lower_bound is None and self.quality_upper_bound is None:
+        if (
+            self.quality_lower_bound is None
+            and self.quality_upper_bound is None
+        ):
             self.quality_lower_bound = self.quality
             self.quality_upper_bound = self.quality
 
@@ -444,7 +470,10 @@ class PlanCost:
             self.cost_lower_bound = self.cost
             self.cost_upper_bound = self.cost
 
-        if self.quality_lower_bound is None and self.quality_upper_bound is None:
+        if (
+            self.quality_lower_bound is None
+            and self.quality_upper_bound is None
+        ):
             self.quality_lower_bound = self.quality
             self.quality_upper_bound = self.quality
 
@@ -456,13 +485,24 @@ class PlanCost:
         self.cost += other.cost
         self.time += other.time
         self.quality *= other.quality
-        for field in ["cost_lower_bound", "cost_upper_bound", "time_lower_bound", "time_upper_bound"]:
-            if getattr(self, field) is not None and getattr(other, field) is not None:
+        for field in [
+            "cost_lower_bound",
+            "cost_upper_bound",
+            "time_lower_bound",
+            "time_upper_bound",
+        ]:
+            if (
+                getattr(self, field) is not None
+                and getattr(other, field) is not None
+            ):
                 summation = getattr(self, field) + getattr(other, field)
                 setattr(self, field, summation)
 
         for field in ["quality_lower_bound", "quality_upper_bound"]:
-            if getattr(self, field) is not None and getattr(other, field) is not None:
+            if (
+                getattr(self, field) is not None
+                and getattr(other, field) is not None
+            ):
                 product = getattr(self, field) * getattr(other, field)
                 setattr(self, field, product)
 

@@ -31,11 +31,16 @@ class DataRecord:
 
         # unique identifier for the record
         id_str = (
-            str(schema) + (parent_id if parent_id is not None else str(scan_idx))
+            str(schema)
+            + (parent_id if parent_id is not None else str(scan_idx))
             if cardinality_idx is None
-            else str(schema) + str(cardinality_idx) + (parent_id if parent_id is not None else str(scan_idx))
+            else str(schema)
+            + str(cardinality_idx)
+            + (parent_id if parent_id is not None else str(scan_idx))
         )
-        self._id = hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+        self._id = hashlib.sha256(id_str.encode("utf-8")).hexdigest()[
+            :MAX_ID_CHARS
+        ]
         self._parent_id = parent_id
 
     def _asJSONStr(self, include_bytes: bool = True, *args, **kwargs):
@@ -49,14 +54,18 @@ class DataRecord:
         if not include_bytes:
             for k in dct:
                 if isinstance(dct[k], bytes) or (
-                    isinstance(dct[k], list) and len(dct[k]) > 0 and isinstance(dct[k][0], bytes)
+                    isinstance(dct[k], list)
+                    and len(dct[k]) > 0
+                    and isinstance(dct[k][0], bytes)
                 ):
                     dct[k] = "<bytes>"
         return dct
 
     def __str__(self):
         keys = sorted(self.__dict__.keys())
-        items = ("{}={!r}...".format(k, str(self.__dict__[k])[:15]) for k in keys)
+        items = (
+            "{}={!r}...".format(k, str(self.__dict__[k])[:15]) for k in keys
+        )
         return "{}({})".format(type(self).__name__, ", ".join(items))
 
     def __eq__(self, other):
@@ -65,4 +74,8 @@ class DataRecord:
     # NOTE: the method is called _getFields instead of getFields to avoid it being picked up as a data record attribute;
     #       in the future we will come up with a less ugly fix -- but for now do not remove the _ even though it's not private
     def _getFields(self):
-        return [k for k in self.__dict__.keys() if not k.startswith("_") and k != "schema"]
+        return [
+            k
+            for k in self.__dict__.keys()
+            if not k.startswith("_") and k != "schema"
+        ]

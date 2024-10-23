@@ -24,7 +24,9 @@ def find_best_range(values, budget, trim_zeros=False):
         current_sum += values[i]
 
         # If the current range exceeds the budget, remove elements from the beginning.
-        while current_start + budget - 1 < i and current_start + budget - 1 >= 0:
+        while (
+            current_start + budget - 1 < i and current_start + budget - 1 >= 0
+        ):
             current_sum -= values[current_start]
             current_start += 1
 
@@ -55,9 +57,22 @@ def find_best_range(values, budget, trim_zeros=False):
             trailing_zeros += 1
             end_idx -= 1
         half_zeros = int((leading_zeros + trailing_zeros) / 2)
-        print("leading_zeros:", leading_zeros, "trailing_zeros:", trailing_zeros, "half_zeros:", half_zeros)
+        print(
+            "leading_zeros:",
+            leading_zeros,
+            "trailing_zeros:",
+            trailing_zeros,
+            "half_zeros:",
+            half_zeros,
+        )
         best_start = best_start - half_zeros + leading_zeros
-        best_end = best_end - trailing_zeros + leading_zeros + trailing_zeros - half_zeros
+        best_end = (
+            best_end
+            - trailing_zeros
+            + leading_zeros
+            + trailing_zeros
+            - half_zeros
+        )
 
         if best_start < 0:
             best_end = best_end - best_start
@@ -69,7 +84,9 @@ def find_best_range(values, budget, trim_zeros=False):
     return best_start, best_end + 1
 
 
-def get_range_from_hist(file_path, range_budget, resolution=0.001, trim_zeros=True):
+def get_range_from_hist(
+    file_path, range_budget, resolution=0.001, trim_zeros=True
+):
     # Load data from csv file and extract he second column as values
     values = []
     with open(file_path, "r") as file:
@@ -86,7 +103,10 @@ def get_range_from_hist(file_path, range_budget, resolution=0.001, trim_zeros=Tr
 
 def best_substring_match(query, context):
     # This will extract all substrings of length equal to the query from the string
-    candidates = [context[i : i + len(query)] for i in range(len(context) - len(query) + 1)]
+    candidates = [
+        context[i : i + len(query)]
+        for i in range(len(context) - len(query) + 1)
+    ]
     print("grd:", query)
     # Find the best match among the candidates
     ret = process.extractOne(query, candidates, scorer=fuzz.ratio)

@@ -12,7 +12,9 @@ class Model(str, Enum):
     remotely or locally (if applicable).
     """
 
-    LLAMA2 = "meta-llama/Llama-2-7b-hf"  # "togethercomputer/Llama-2-7B-32K-Instruct"
+    LLAMA2 = (
+        "meta-llama/Llama-2-7b-hf"  # "togethercomputer/Llama-2-7B-32K-Instruct"
+    )
     LLAMA3 = "meta-llama/Llama-3-8b-chat-hf"
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
     GPT_3_5 = "gpt-3.5-turbo-0125"
@@ -62,9 +64,13 @@ class Cardinality(str, Enum):
     @classmethod
     def _missing_(cls, value):
         if value:
-            normalized_value = "".join([x for x in value if x.isalpha()]).lower()
+            normalized_value = "".join(
+                [x for x in value if x.isalpha()]
+            ).lower()
             for member in cls:
-                normalized_member = "".join([x for x in member if x.isalpha()]).lower()
+                normalized_member = "".join(
+                    [x for x in member if x.isalpha()]
+                ).lower()
                 if normalized_member == normalized_value:
                     return member
         return cls.ONE_TO_ONE
@@ -168,7 +174,8 @@ LOG_LLM_OUTPUT = False
 # - Gemini 1: https://blog.google/technology/ai/google-gemini-ai/
 LLAMA2_7B_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 1 / 1e10,  # for now, let's have a de minimis cost for Llama2
+    "usd_per_input_token": 1
+    / 1e10,  # for now, let's have a de minimis cost for Llama2
     "usd_per_output_token": 1 / 1e10,
     ##### Time #####
     "seconds_per_output_token": 0.005,  # Assuming an A10 (i.e. G5 on EC2); see link for A100 est.
@@ -315,7 +322,8 @@ GPT_4V_MODEL_CARD = {
 
 GEMINI_1_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 125 / 1e8,  # Gemini is free but rate limited for now. Pricing will be updated
+    "usd_per_input_token": 125
+    / 1e8,  # Gemini is free but rate limited for now. Pricing will be updated
     "usd_per_output_token": 375 / 1e9,
     ##### Time #####
     "seconds_per_output_token": 0.042 / 10.0,  # TODO:
@@ -339,7 +347,8 @@ GEMINI_1_MODEL_CARD = {
 
 GEMINI_1V_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 25 / 1e6,  # Gemini is free but rate limited for now. Pricing will be updated
+    "usd_per_input_token": 25
+    / 1e6,  # Gemini is free but rate limited for now. Pricing will be updated
     "usd_per_output_token": 375 / 1e9,
     ##### Time #####
     "seconds_per_output_token": 0.042,  # / 10.0, # TODO:

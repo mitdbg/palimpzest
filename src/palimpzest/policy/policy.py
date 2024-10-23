@@ -22,20 +22,26 @@ class Policy:
         some function: f(cost, time, quality). In that case, we may deprecate this
         method and update its callers.
         """
-        raise NotImplementedError("Calling this method from an abstract base class.")
+        raise NotImplementedError(
+            "Calling this method from an abstract base class."
+        )
 
     def constraint(self, plan: PlanCost) -> bool:
         """
         Return True if the given (cost, runtime, quality) for a plan (or subplan)
         satisfy the policy's constraint(s). Otherwise, return False.
         """
-        raise NotImplementedError("Calling this method from an abstract base class.")
+        raise NotImplementedError(
+            "Calling this method from an abstract base class."
+        )
 
     def choose(self, plan: PlanCost, other_plan: PlanCost) -> float:
         """
         Return True if plan is better than other_plan and return False otherwise.
         """
-        raise NotImplementedError("Calling this method from an abstract base class.")
+        raise NotImplementedError(
+            "Calling this method from an abstract base class."
+        )
 
 
 class MaxQuality(Policy):

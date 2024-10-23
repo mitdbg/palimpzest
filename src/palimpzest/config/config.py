@@ -8,7 +8,12 @@ from palimpzest.constants import PZ_DIR
 
 
 class Config:
-    def __init__(self, name: str = "default", llmservice: str = "openai", parallel: bool = False):
+    def __init__(
+        self,
+        name: str = "default",
+        llmservice: str = "openai",
+        parallel: bool = False,
+    ):
         self.configfilepath = os.path.join(PZ_DIR, f"config_{name}.yaml")
         if not os.path.exists(PZ_DIR):
             raise Exception(

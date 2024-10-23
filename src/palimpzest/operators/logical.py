@@ -76,7 +76,9 @@ class LogicalOperator:
         op_params = self.get_op_params()
         op_params = {k: str(v) for k, v in op_params.items()}
         hash_str = json.dumps({"op_name": op_name, **op_params}, sort_keys=True)
-        self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+        self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[
+            :MAX_ID_CHARS
+        ]
 
         return self.op_id
 
@@ -111,7 +113,10 @@ class BaseScan(LogicalOperator):
         )
 
     def get_op_params(self) -> dict:
-        return {"outputSchema": self.outputSchema, "dataset_id": self.dataset_id}
+        return {
+            "outputSchema": self.outputSchema,
+            "dataset_id": self.dataset_id,
+        }
 
 
 class CacheScan(LogicalOperator):
@@ -165,7 +170,9 @@ class ConvertScan(LogicalOperator):
         super().__init__(*args, **kwargs)
         self.cardinality = cardinality
         self.udf = udf
-        self.image_conversion = image_conversion or (self.inputSchema == ImageFile)
+        self.image_conversion = image_conversion or (
+            self.inputSchema == ImageFile
+        )
         self.depends_on = depends_on
         self.desc = desc
         self.targetCacheId = targetCacheId

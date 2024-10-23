@@ -53,7 +53,9 @@ def cosmos_parquet_to_json(path):
 
     if len(parquet_data) > 0:
         parquet_data_keys = list(parquet_data.keys())
-        num_data_rows = max([int(k) for k in parquet_data[parquet_data_keys[0]]])
+        num_data_rows = max(
+            [int(k) for k in parquet_data[parquet_data_keys[0]]]
+        )
 
         row_order_parquet_data = [dict() for i in range(num_data_rows + 1)]
         for field_key, row_data in parquet_data.items():
@@ -85,7 +87,9 @@ def cosmos_parquet_to_json(path):
                 if ext1_page_num > ext2_page_num:
                     break
 
-                (ext2_x1, ext2_y1, ext2_x2, ext2_y2) = extraction2["bounding_box"]
+                (ext2_x1, ext2_y1, ext2_x2, ext2_y2) = extraction2[
+                    "bounding_box"
+                ]
 
                 if ext1_y2 <= ext2_y1:
                     ext2_xspan = ext2_x2 - ext2_x1
@@ -103,7 +107,9 @@ def cosmos_parquet_to_json(path):
                 )
         for edit_dict in edits:
             del row_order_parquet_data[edit_dict["del_idx"]]
-            row_order_parquet_data.insert(edit_dict["ins_idx"], edit_dict["val"])
+            row_order_parquet_data.insert(
+                edit_dict["ins_idx"], edit_dict["val"]
+            )
         row_order_parquet_data.sort(key=lambda d: (d["pdf_name"]))
 
         name2results = dict()
@@ -137,7 +143,9 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10):
     ]
     print(f"Sending {name} to COSMOS")
     response = requests.post(f"{COSMOS_ADDRESS}/process/", files=files)
-    print(f"Received response of  {response.json()['status_endpoint']} from COSMOS: {response.status_code}")
+    print(
+        f"Received response of  {response.json()['status_endpoint']} from COSMOS: {response.status_code}"
+    )
     # get md5 of the data
     md5 = get_md5(data)
 
@@ -151,12 +159,15 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10):
             if poll.status_code == status.HTTP_200_OK:
                 poll_results = poll.json()
                 if poll_results["job_completed"]:
-                    cosmos_response = requests.get(f"{callback_endpoints['result_endpoint']}")
+                    cosmos_response = requests.get(
+                        f"{callback_endpoints['result_endpoint']}"
+                    )
                     if cosmos_response.status_code == status.HTTP_200_OK:
                         data = cosmos_response.content
                         with ZipFile(io.BytesIO(data)) as z:
                             output_subdir = os.path.join(
-                                output_dir, f"COSMOS_{os.path.splitext(name)[0].replace(' ', '_')}_{md5}"
+                                output_dir,
+                                f"COSMOS_{os.path.splitext(name)[0].replace(' ', '_')}_{md5}",
                             )
                             os.makedirs(output_subdir, exist_ok=True)
                             z.extractall(path=output_subdir)
@@ -172,19 +183,35 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10):
                                     print(f"Converting {file} to JSON")
                                     # if error while converting parquet to json, skip this file
                                     try:
-                                        json_data = cosmos_parquet_to_json(os.path.join(output_subdir, file))
+                                        json_data = cosmos_parquet_to_json(
+                                            os.path.join(output_subdir, file)
+                                        )
                                         with open(
-                                            os.path.join(output_subdir, f"{os.path.splitext(file)[0]}.json"), "w"
+                                            os.path.join(
+                                                output_subdir,
+                                                f"{os.path.splitext(file)[0]}.json",
+                                            ),
+                                            "w",
                                         ) as json_file:
                                             json.dump(json_data, json_file)
                                         with open(
-                                            os.path.join(output_subdir, f"{os.path.splitext(file)[0]}.txt"), "w"
+                                            os.path.join(
+                                                output_subdir,
+                                                f"{os.path.splitext(file)[0]}.txt",
+                                            ),
+                                            "w",
                                         ) as text_file:
-                                            text_file.write("\n".join(cosmos_json_txt(json_data)))
+                                            text_file.write(
+                                                "\n".join(
+                                                    cosmos_json_txt(json_data)
+                                                )
+                                            )
                                         # print(f"{file} : {json_data}")
 
                                     except Exception as e:
-                                        print(f"Error while converting {file} to JSON: {e}")
+                                        print(
+                                            f"Error while converting {file} to JSON: {e}"
+                                        )
                                         pass
                         return
                         # raise RuntimeError("COSMOS data doesn't include document file for annotation")
@@ -198,10 +225,14 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10):
                     pass
 
         # If we reached this point, we time out
-        raise TimeoutError(f"Timed out waiting for COSMOS on retry num {retry_num + 1}")
+        raise TimeoutError(
+            f"Timed out waiting for COSMOS on retry num {retry_num + 1}"
+        )
 
     else:
-        raise RuntimeError(f"COSMOS Error - STATUS CODE: {response.status_code} - {COSMOS_ADDRESS}")
+        raise RuntimeError(
+            f"COSMOS Error - STATUS CODE: {response.status_code} - {COSMOS_ADDRESS}"
+        )
 
 
 ##
@@ -209,7 +240,9 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10):
 # 1. Check if the text file already exists in the cache, if so, read from the cache
 # 2. If not, call the cosmos_client function to process the PDF file and cache the text file
 ##
-def get_text_from_pdf(filename, pdf_bytes, enable_file_cache=True, file_cache_dir="/tmp"):
+def get_text_from_pdf(
+    filename, pdf_bytes, enable_file_cache=True, file_cache_dir="/tmp"
+):
     pdfprocessor = pz.DataDirectory().current_config.get("pdfprocessor")
 
     pdf_filename = filename
@@ -227,9 +260,13 @@ def get_text_from_pdf(filename, pdf_bytes, enable_file_cache=True, file_cache_di
     else:
         # Get md5 of the pdf_bytes
         md5 = get_md5(pdf_bytes)
-        cached_extraction_folder = f"COSMOS_{os.path.splitext(file_name)[0].replace(' ', '_')}_{md5}"
+        cached_extraction_folder = (
+            f"COSMOS_{os.path.splitext(file_name)[0].replace(' ', '_')}_{md5}"
+        )
         # Check if pz_file_cache_dir exists in the file system
-        pz_file_cache_dir = os.path.join(file_cache_dir, cached_extraction_folder)
+        pz_file_cache_dir = os.path.join(
+            file_cache_dir, cached_extraction_folder
+        )
         if enable_file_cache and os.path.exists(pz_file_cache_dir):
             print(
                 f"Text file {text_file_name} already exists in system tmp folder {pz_file_cache_dir}, reading from cache"
@@ -260,7 +297,9 @@ def get_text_from_pdf(filename, pdf_bytes, enable_file_cache=True, file_cache_di
         cosmos_client(file_name, pdf_bytes, file_cache_dir)
         text_file_path = os.path.join(pz_file_cache_dir, text_file_name)
         if not os.path.exists(text_file_path):
-            raise FileNotFoundError(f"Text file {text_file_name} not found in {pz_file_cache_dir}/{text_file_name}")
+            raise FileNotFoundError(
+                f"Text file {text_file_name} not found in {pz_file_cache_dir}/{text_file_name}"
+            )
         # DataDirectory().registerLocalFile(text_file_path, text_file_name)
         with open(text_file_path, "r") as file:
             text_content = file.read()

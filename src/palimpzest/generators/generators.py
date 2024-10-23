@@ -99,10 +99,16 @@ class CustomGenerator(BaseGenerator):
         usage, finish_reason = None, None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
-            finish_reason = dspy_lm.history[-1]["response"]["choices"][-1]["finish_reason"]
+            finish_reason = dspy_lm.history[-1]["response"]["choices"][-1][
+                "finish_reason"
+            ]
         elif self.model_name in [Model.GEMINI_1.value]:
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
-            finish_reason = dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
+            finish_reason = (
+                dspy_lm.history[-1]["response"][0]
+                ._result.candidates[0]
+                .finish_reason
+            )
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
             finish_reason = dspy_lm.history[-1]["response"]["finish_reason"]
@@ -115,7 +121,9 @@ class CustomGenerator(BaseGenerator):
         """
         pass
 
-    def _get_answer_log_probs(self, dspy_lm: dsp.LM, answer: str) -> List[float]:
+    def _get_answer_log_probs(
+        self, dspy_lm: dsp.LM, answer: str
+    ) -> List[float]:
         """
         For the given DSPy LM object:
         1. fetch the data structure containing its output log probabilities
@@ -127,7 +135,9 @@ class CustomGenerator(BaseGenerator):
 
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
-            log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"]["content"]
+            log_probs = dspy_lm.history[-1]["response"]["choices"][-1][
+                "logprobs"
+            ]["content"]
             tokens = list(map(lambda elt: elt["token"], log_probs))
             token_logprobs = list(map(lambda elt: elt["logprob"], log_probs))
         elif self.model_name in [Model.GEMINI_1.value]:
@@ -183,8 +193,12 @@ class CustomGenerator(BaseGenerator):
         usage = response["usage"]
 
         # collect statistics on prompt, usage, and timing
-        usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
-        usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
+        usd_per_input_token = MODEL_CARDS[self.model_name][
+            "usd_per_input_token"
+        ]
+        usd_per_output_token = MODEL_CARDS[self.model_name][
+            "usd_per_output_token"
+        ]
         input_tokens = usage["prompt_tokens"]
         output_tokens = usage["completion_tokens"]
 
@@ -198,7 +212,8 @@ class CustomGenerator(BaseGenerator):
                 "total_output_tokens": output_tokens,
                 "total_input_cost": input_tokens * usd_per_input_token,
                 "total_output_cost": output_tokens * usd_per_output_token,
-                "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+                "cost_per_record": input_tokens * usd_per_input_token
+                + output_tokens * usd_per_output_token,
                 # "prompt": dspy_lm.history[-1]["prompt"],
                 # "usage": usage,
                 # "finish_reason": finish_reason,
@@ -234,17 +249,25 @@ class DSPyGenerator(BaseGenerator):
 
         # set prompt signature based on prompt_strategy
         if prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
-            self.promptSignature = gen_filter_signature_class(doc_schema, doc_type)
+            self.promptSignature = gen_filter_signature_class(
+                doc_schema, doc_type
+            )
         elif prompt_strategy == PromptStrategy.DSPY_COT_QA:
             self.promptSignature = gen_qa_signature_class(doc_schema, doc_type)
         else:
-            raise ValueError(f"DSPyGenerator does not support prompt_strategy: {prompt_strategy.value}")
+            raise ValueError(
+                f"DSPyGenerator does not support prompt_strategy: {prompt_strategy.value}"
+            )
 
     def _get_model(self) -> dsp.LM:
         model = None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             openai_key = get_api_key("OPENAI_API_KEY")
-            max_tokens = 4096 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 150
+            max_tokens = (
+                4096
+                if self.prompt_strategy == PromptStrategy.DSPY_COT_QA
+                else 150
+            )
             model = dspy.OpenAI(
                 model=self.model_name,
                 api_key=openai_key,
@@ -276,10 +299,16 @@ class DSPyGenerator(BaseGenerator):
         usage, finish_reason = None, None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
-            finish_reason = dspy_lm.history[-1]["response"]["choices"][-1]["finish_reason"]
+            finish_reason = dspy_lm.history[-1]["response"]["choices"][-1][
+                "finish_reason"
+            ]
         elif self.model_name in [Model.GEMINI_1.value]:
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
-            finish_reason = dspy_lm.history[-1]["response"][0]._result.candidates[0].finish_reason
+            finish_reason = (
+                dspy_lm.history[-1]["response"][0]
+                ._result.candidates[0]
+                .finish_reason
+            )
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             usage = dspy_lm.history[-1]["response"]["usage"]
             finish_reason = dspy_lm.history[-1]["response"]["finish_reason"]
@@ -292,7 +321,9 @@ class DSPyGenerator(BaseGenerator):
         """
         pass
 
-    def _get_answer_log_probs(self, dspy_lm: dsp.LM, answer: str) -> List[float]:
+    def _get_answer_log_probs(
+        self, dspy_lm: dsp.LM, answer: str
+    ) -> List[float]:
         """
         For the given DSPy LM object:
         1. fetch the data structure containing its output log probabilities
@@ -304,7 +335,9 @@ class DSPyGenerator(BaseGenerator):
 
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
-            log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"]["content"]
+            log_probs = dspy_lm.history[-1]["response"]["choices"][-1][
+                "logprobs"
+            ]["content"]
             tokens = list(map(lambda elt: elt["token"], log_probs))
             token_logprobs = list(map(lambda elt: elt["logprob"], log_probs))
         elif self.model_name in [Model.GEMINI_1.value]:
@@ -365,8 +398,12 @@ class DSPyGenerator(BaseGenerator):
         usage, finish_reason = self._get_usage_and_finish_reason(dspy_lm)
 
         # collect statistics on prompt, usage, and timing
-        usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
-        usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
+        usd_per_input_token = MODEL_CARDS[self.model_name][
+            "usd_per_input_token"
+        ]
+        usd_per_output_token = MODEL_CARDS[self.model_name][
+            "usd_per_output_token"
+        ]
         input_tokens = usage["prompt_tokens"]
         output_tokens = usage["completion_tokens"]
 
@@ -379,7 +416,8 @@ class DSPyGenerator(BaseGenerator):
             total_output_tokens=output_tokens,
             total_input_cost=input_tokens * usd_per_input_token,
             total_output_cost=output_tokens * usd_per_output_token,
-            cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+            cost_per_record=input_tokens * usd_per_input_token
+            + output_tokens * usd_per_output_token,
         )
         # create GenerationStats
         stats = GenerationStats(
@@ -391,7 +429,8 @@ class DSPyGenerator(BaseGenerator):
                 "total_output_tokens": output_tokens,
                 "total_input_cost": input_tokens * usd_per_input_token,
                 "total_output_cost": output_tokens * usd_per_output_token,
-                "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+                "cost_per_record": input_tokens * usd_per_input_token
+                + output_tokens * usd_per_output_token,
                 # "prompt": dspy_lm.history[-1]["prompt"],
                 # "usage": usage,
                 # "finish_reason": finish_reason,
@@ -456,7 +495,9 @@ class ImageTextGenerator(BaseGenerator):
                 content.append(
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        },
                     }
                 )
 
@@ -478,7 +519,11 @@ class ImageTextGenerator(BaseGenerator):
 
         elif self.model_name == Model.GEMINI_1V.value:
             payloads = [
-                [prompt, Image.open(io.BytesIO(self._decode_image(base64_image)))] for base64_image in base64_images
+                [
+                    prompt,
+                    Image.open(io.BytesIO(self._decode_image(base64_image))),
+                ]
+                for base64_image in base64_images
             ]
 
         else:
@@ -501,8 +546,18 @@ class ImageTextGenerator(BaseGenerator):
             answer = candidate.message.content
             finish_reason = candidate.finish_reason
             usage = dict(completion.usage)
-            tokens = list(map(lambda elt: elt.token, completion.choices[-1].logprobs.content))
-            token_logprobs = list(map(lambda elt: elt.logprob, completion.choices[-1].logprobs.content))
+            tokens = list(
+                map(
+                    lambda elt: elt.token,
+                    completion.choices[-1].logprobs.content,
+                )
+            )
+            token_logprobs = list(
+                map(
+                    lambda elt: elt.logprob,
+                    completion.choices[-1].logprobs.content,
+                )
+            )
 
         elif self.model_name == Model.GEMINI_1V.value:
             # iterate through images to generate multiple responses
@@ -532,7 +587,9 @@ class ImageTextGenerator(BaseGenerator):
 
         return answer, finish_reason, usage, tokens, token_logprobs
 
-    def _get_answer_log_probs(self, tokens: List[str], token_logprobs: List[float], answer: str) -> List[float]:
+    def _get_answer_log_probs(
+        self, tokens: List[str], token_logprobs: List[float], answer: str
+    ) -> List[float]:
         """
         Filter and return the list of log probabilities for the tokens which appear in `answer`.
         """
@@ -570,14 +627,20 @@ class ImageTextGenerator(BaseGenerator):
         if self.verbose:
             print("Generating")
         start_time = time.time()
-        answer, finish_reason, usage, tokens, token_logprobs = self._generate_response(client, payloads)
+        answer, finish_reason, usage, tokens, token_logprobs = (
+            self._generate_response(client, payloads)
+        )
         end_time = time.time()
         if self.verbose:
             print(answer)
 
         # collect statistics on prompt, usage, and timing
-        usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
-        usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
+        usd_per_input_token = MODEL_CARDS[self.model_name][
+            "usd_per_input_token"
+        ]
+        usd_per_output_token = MODEL_CARDS[self.model_name][
+            "usd_per_output_token"
+        ]
         input_tokens = usage["prompt_tokens"]
         output_tokens = usage["completion_tokens"]
 
@@ -591,7 +654,8 @@ class ImageTextGenerator(BaseGenerator):
                 "total_output_tokens": output_tokens,
                 "total_input_cost": input_tokens * usd_per_input_token,
                 "total_output_cost": output_tokens * usd_per_output_token,
-                "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+                "cost_per_record": input_tokens * usd_per_input_token
+                + output_tokens * usd_per_output_token,
                 # "prompt": dspy_lm.history[-1]["prompt"],
                 # "usage": usage,
                 # "finish_reason": finish_reason,
@@ -604,16 +668,27 @@ class ImageTextGenerator(BaseGenerator):
 
 
 # TODO: refactor this to have a CodeSynthGenerator
-def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose: bool = False):
-    inputs = {field_name: candidate_dict[field_name] for field_name in api.inputs}
+def codeExecution(
+    api: API, code: str, candidate_dict: Dict[str, Any], verbose: bool = False
+):
+    inputs = {
+        field_name: candidate_dict[field_name] for field_name in api.inputs
+    }
     response = api.api_execute(code, inputs)
-    pred = response["response"] if response["status"] and response["response"] else None
+    pred = (
+        response["response"]
+        if response["status"] and response["response"]
+        else None
+    )
     return pred
 
 
 # Temporarily set default verbose to True for debugging
 def codeEnsembleExecution(
-    api: API, code_ensemble: List[Dict[str, str]], candidate_dict: Dict[str, Any], verbose: bool = True
+    api: API,
+    code_ensemble: List[Dict[str, str]],
+    candidate_dict: Dict[str, Any],
+    verbose: bool = True,
 ) -> GenerationOutput:
     start_time = time.time()
     preds = list()

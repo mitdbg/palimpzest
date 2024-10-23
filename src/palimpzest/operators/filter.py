@@ -5,7 +5,11 @@ import time
 from typing import List
 
 from palimpzest.constants import *
-from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
+from palimpzest.dataclasses import (
+    GenerationStats,
+    OperatorCostEstimates,
+    RecordOpStats,
+)
 from palimpzest.elements import DataRecord, Filter
 from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
 from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
@@ -15,7 +19,9 @@ from palimpzest.prompts import IMAGE_FILTER_PROMPT
 class FilterOp(PhysicalOperator):
     def __init__(self, filter: Filter, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        assert self.inputSchema == self.outputSchema, "Input and output schemas must match for FilterOp"
+        assert (
+            self.inputSchema == self.outputSchema
+        ), "Input and output schemas must match for FilterOp"
         self.filter = filter
 
     def __str__(self):
@@ -50,7 +56,9 @@ class NonLLMFilter(FilterOp):
             and self.outputSchema == other.outputSchema
         )
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates):
+    def naiveCostEstimates(
+        self, source_op_cost_estimates: OperatorCostEstimates
+    ):
         # estimate output cardinality using a constant assumption of the filter selectivity
         selectivity = NAIVE_EST_FILTER_SELECTIVITY
         cardinality = selectivity * source_op_cost_estimates.cardinality
@@ -128,10 +136,14 @@ class LLMFilter(FilterOp):
                     verbose=self.verbose,
                 )
             else:
-                self.generator = ImageTextGenerator(self.model.value, self.verbose)
+                self.generator = ImageTextGenerator(
+                    self.model.value, self.verbose
+                )
 
         else:
-            raise Exception(f"Prompt strategy {self.prompt_strategy} not implemented yet")
+            raise Exception(
+                f"Prompt strategy {self.prompt_strategy} not implemented yet"
+            )
 
     def get_copy_kwargs(self):
         copy_kwargs = super().get_copy_kwargs()
@@ -158,7 +170,9 @@ class LLMFilter(FilterOp):
             and self.outputSchema == other.outputSchema
         )
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates):
+    def naiveCostEstimates(
+        self, source_op_cost_estimates: OperatorCostEstimates
+    ):
         # estimate number of input tokens from source
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
         if self.image_filter:
@@ -172,13 +186,16 @@ class LLMFilter(FilterOp):
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
-            MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+            MODEL_CARDS[self.model.value]["seconds_per_output_token"]
+            * est_num_output_tokens
         ) / self.max_workers
 
         # get est. of conversion cost (in USD) per record from model card
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            MODEL_CARDS[self.model.value]["usd_per_input_token"]
+            * est_num_input_tokens
+            + MODEL_CARDS[self.model.value]["usd_per_output_token"]
+            * est_num_output_tokens
         )
 
         # estimate output cardinality using a constant assumption of the filter selectivity
@@ -187,9 +204,11 @@ class LLMFilter(FilterOp):
 
         # estimate quality of output based on the strength of the model being used
         quality = (
-            (MODEL_CARDS[self.model.value]["MMLU"] / 100.0) * source_op_cost_estimates.quality
+            (MODEL_CARDS[self.model.value]["MMLU"] / 100.0)
+            * source_op_cost_estimates.quality
             if self.image_filter
-            else (MODEL_CARDS[self.model.value]["reasoning"] / 100.0) * source_op_cost_estimates.quality
+            else (MODEL_CARDS[self.model.value]["reasoning"] / 100.0)
+            * source_op_cost_estimates.quality
         )
 
         return OperatorCostEstimates(
@@ -208,7 +227,9 @@ class LLMFilter(FilterOp):
             base64_images = []
             if hasattr(candidate, "contents"):
                 # TODO: should address this now; we need a way to infer (or have the programmer declare) what fields contain image content
-                base64_images = [base64.b64encode(candidate.contents).decode("utf-8")]
+                base64_images = [
+                    base64.b64encode(candidate.contents).decode("utf-8")
+                ]
             else:
                 base64_images = [
                     base64.b64encode(image).decode("utf-8")
@@ -221,17 +242,23 @@ class LLMFilter(FilterOp):
         # construct the prompt; for image filters we need to wrap the filter condition in an instruction
         prompt = self.filter.filterCondition
         if self.image_filter:
-            prompt = IMAGE_FILTER_PROMPT.format(filter_condition=self.filter.filterCondition)
+            prompt = IMAGE_FILTER_PROMPT.format(
+                filter_condition=self.filter.filterCondition
+            )
 
         # invoke LLM to generate filter decision (True or False)
         response, gen_stats = None, GenerationStats()
         try:
-            response, gen_stats = self.generator.generate(context=content, question=prompt)
+            response, gen_stats = self.generator.generate(
+                context=content, question=prompt
+            )
         except Exception as e:
             print(f"Error invoking LLM for filter: {e}")
 
         # compute whether the record passed the filter or not
-        passed_filter = "true" in response.lower() if response is not None else False
+        passed_filter = (
+            "true" in response.lower() if response is not None else False
+        )
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(

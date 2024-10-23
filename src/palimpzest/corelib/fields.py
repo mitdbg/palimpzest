@@ -31,7 +31,11 @@ class Field:
         return hash(self._desc + str(self.required) + self.__class__.__name__)
 
     def __eq__(self, other) -> bool:
-        return self.desc == other.desc and self.required == other.required and self.__class__ == other.__class__
+        return (
+            self.desc == other.desc
+            and self.required == other.required
+            and self.__class__ == other.__class__
+        )
 
     @property
     def desc(self) -> str:
@@ -79,7 +83,9 @@ class CallableField(Field):
 class ListField(Field, list):
     """A field representing a list of elements of specified types, with full list functionality."""
 
-    def __init__(self, element_type, desc: str, required=False, cardinality="0..*"):
+    def __init__(
+        self, element_type, desc: str, required=False, cardinality="0..*"
+    ):
         super().__init__(desc=desc, required=required)
         self.element_type = element_type
         self.cardinality = cardinality
@@ -87,26 +93,34 @@ class ListField(Field, list):
     def append(self, item):
         """Append item to the list after type validation."""
         if not isinstance(item, self.element_type):
-            raise TypeError(f"Item must be an instance of {self.element_type.__name__}")
+            raise TypeError(
+                f"Item must be an instance of {self.element_type.__name__}"
+            )
         super().append(item)
 
     def insert(self, index, item):
         """Insert item at the specified position after type validation."""
         if not isinstance(item, self.element_type):
-            raise TypeError(f"Item must be an instance of {self.element_type.__name__}")
+            raise TypeError(
+                f"Item must be an instance of {self.element_type.__name__}"
+            )
         super().insert(index, item)
 
     def extend(self, iterable):
         """Extend list by appending elements from the iterable after type validation."""
         for item in iterable:
             if not isinstance(item, self.element_type):
-                raise TypeError(f"All items must be instances of {self.element_type.__name__}")
+                raise TypeError(
+                    f"All items must be instances of {self.element_type.__name__}"
+                )
         super().extend(iterable)
 
     def __setitem__(self, index, item):
         """Set the item at the specified index after type validation."""
         if not isinstance(item, self.element_type):
-            raise TypeError(f"Item must be an instance of {self.element_type.__name__}")
+            raise TypeError(
+                f"Item must be an instance of {self.element_type.__name__}"
+            )
         super().__setitem__(index, item)
 
     def __str__(self):

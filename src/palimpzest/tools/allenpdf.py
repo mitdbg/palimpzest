@@ -25,7 +25,9 @@ pipPacks = [
 
 pdfProcessingImage = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install(["ffmpeg", "pkg-config", "libpoppler-cpp-dev", "poppler-utils"])
+    .apt_install(
+        ["ffmpeg", "pkg-config", "libpoppler-cpp-dev", "poppler-utils"]
+    )
     .pip_install(["torch==2.1.1", "pkgconfig", "python-poppler"] + pipPacks)
 )
 

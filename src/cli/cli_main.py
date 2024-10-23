@@ -120,8 +120,19 @@ def ls_data() -> None:
 
 
 @cli.command(aliases=["synthesize", "syn"])
-@click.option("--name", type=str, default=None, required=True, help="Registered name for the set of synthetic values")
-@click.option("--count", type=int, default=100, help="How many values should be synthesized")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    required=True,
+    help="Registered name for the set of synthetic values",
+)
+@click.option(
+    "--count",
+    type=int,
+    default=100,
+    help="How many values should be synthesized",
+)
 def synthesize_data(name: str, count: int) -> None:
     """
     Register a synthetic set of values with PZ
@@ -147,8 +158,20 @@ def synthesize_data(name: str, count: int) -> None:
 
 
 @cli.command(aliases=["register", "reg", "r"])
-@click.option("--path", type=str, default=None, required=True, help="File or directory to register as dataset.")
-@click.option("--name", type=str, default=None, required=True, help="Registered name for the file/dir.")
+@click.option(
+    "--path",
+    type=str,
+    default=None,
+    required=True,
+    help="File or directory to register as dataset.",
+)
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    required=True,
+    help="Registered name for the file/dir.",
+)
 def register_data(path: str, name: str) -> None:
     """
     Register a data file or data directory with PZ.
@@ -175,13 +198,21 @@ def register_data(path: str, name: str) -> None:
         pz.DataDirectory().registerLocalDirectory(os.path.abspath(path), name)
 
     else:
-        raise InvalidCommandException(f"Path {path} is invalid. Does not point to a file or directory.")
+        raise InvalidCommandException(
+            f"Path {path} is invalid. Does not point to a file or directory."
+        )
 
     _print_msg(f"Registered {name}")
 
 
 @cli.command(aliases=["rmdata", "rm"])
-@click.option("--name", type=str, default=None, required=True, help="Name of registered dataset to be removed.")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    required=True,
+    help="Name of registered dataset to be removed.",
+)
 def rm_data(name: str) -> None:
     """
     Remove a dataset that was registered with PZ.
@@ -228,16 +259,34 @@ def print_config() -> None:
 
 
 @cli.command(aliases=["cc"])
-@click.option("--name", type=str, default=None, required=True, help="Name of the config to create.")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    required=True,
+    help="Name of the config to create.",
+)
 @click.option(
     "--llmservice",
     type=click.Choice(["openai", "together", "google"], case_sensitive=False),
     default="openai",
     help="Name of the LLM service to use.",
 )
-@click.option("--parallel", type=bool, default=False, help="Whether to run operations in parallel or not.")
-@click.option("--set", type=bool, is_flag=True, help="Set the created config to be the current config.")
-def create_config(name: str, llmservice: str, parallel: bool, set: bool) -> None:
+@click.option(
+    "--parallel",
+    type=bool,
+    default=False,
+    help="Whether to run operations in parallel or not.",
+)
+@click.option(
+    "--set",
+    type=bool,
+    is_flag=True,
+    help="Set the created config to be the current config.",
+)
+def create_config(
+    name: str, llmservice: str, parallel: bool, set: bool
+) -> None:
     """
     Create a Palimpzest config. You must set the `name` field. You may optionally
     set the `llmservice` and `parallel` fields (default to )
@@ -259,7 +308,9 @@ def create_config(name: str, llmservice: str, parallel: bool, set: bool) -> None
 
     # check that config name is unique
     if os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
-        raise InvalidCommandException(f"Config with name {name} already exists.")
+        raise InvalidCommandException(
+            f"Config with name {name} already exists."
+        )
 
     # create config
     config = Config(name, llmservice, parallel)
@@ -268,11 +319,21 @@ def create_config(name: str, llmservice: str, parallel: bool, set: bool) -> None
     if set:
         config.set_current_config()
 
-    _print_msg(f"Created config: {name}" if set is False else f"Created and set config: {name}")
+    _print_msg(
+        f"Created config: {name}"
+        if set is False
+        else f"Created and set config: {name}"
+    )
 
 
 @cli.command(aliases=["rmconfig", "rmc"])
-@click.option("--name", type=str, default=None, required=True, help="Name of the config to remove.")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    required=True,
+    help="Name of the config to remove.",
+)
 def rm_config(name: str) -> None:
     """
     Remove the specified config from Palimpzest. You cannot remove the default config.
@@ -288,7 +349,9 @@ def rm_config(name: str) -> None:
 
     # check that config exists
     if not os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
-        raise InvalidCommandException(f"Config with name {name} does not exist.")
+        raise InvalidCommandException(
+            f"Config with name {name} does not exist."
+        )
 
     # load the specified config
     config = Config(name)
@@ -299,7 +362,13 @@ def rm_config(name: str) -> None:
 
 
 @cli.command(aliases=["set", "sc"])
-@click.option("--name", type=str, default=None, required=True, help="Name of the config to set as the current config.")
+@click.option(
+    "--name",
+    type=str,
+    default=None,
+    required=True,
+    help="Name of the config to set as the current config.",
+)
 def set_config(name: str) -> None:
     """
     Set the current config for Palimpzest to use.
@@ -314,7 +383,9 @@ def set_config(name: str) -> None:
 
     # check that config exists
     if not os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
-        raise InvalidCommandException(f"Config with name {name} does not exist.")
+        raise InvalidCommandException(
+            f"Config with name {name} does not exist."
+        )
 
     # load the specified config
     config = Config(name)

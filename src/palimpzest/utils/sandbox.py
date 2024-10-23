@@ -25,23 +25,49 @@ class Sandbox:
         for code in self.codes:
             response = self.shell.run_cell(code)
             if not response.success:
-                return {"status": False, "response": None, "msg": response["msg"]}
-        return {"status": True, "response": self.shell.user_ns["_"], "msg": None}
+                return {
+                    "status": False,
+                    "response": None,
+                    "msg": response["msg"],
+                }
+        return {
+            "status": True,
+            "response": self.shell.user_ns["_"],
+            "msg": None,
+        }
 
     def execute(self, code, reset=False):
         try:
             if reset:
                 response = self.reset()
                 if not response["status"]:
-                    return {"status": False, "response": None, "msg": str(response.error_in_exec)}
-            with io.StringIO() as buf, contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                    return {
+                        "status": False,
+                        "response": None,
+                        "msg": str(response.error_in_exec),
+                    }
+            with io.StringIO() as buf, contextlib.redirect_stdout(
+                buf
+            ), contextlib.redirect_stderr(buf):
                 response = self.shell.run_cell(code)
             if response.success:
-                return {"status": True, "response": self.shell.user_ns["_"], "msg": None}
+                return {
+                    "status": True,
+                    "response": self.shell.user_ns["_"],
+                    "msg": None,
+                }
             else:
-                return {"status": False, "response": None, "msg": str(response.error_in_exec)}
+                return {
+                    "status": False,
+                    "response": None,
+                    "msg": str(response.error_in_exec),
+                }
         except Exception as e:
-            return {"status": False, "response": None, "msg": str(type(e)) + " " + str(e)}
+            return {
+                "status": False,
+                "response": None,
+                "msg": str(type(e)) + " " + str(e),
+            }
 
     def add(self, code, index=-1):
         self.codes.insert(index, code)
@@ -82,7 +108,9 @@ class API:
         assert "name" in self.config, "Name is required!"
         assert "inputs" in self.config, "Inputs are required!"
         assert "outputs" in self.config, "Outputs are required!"
-        assert len(self.config["outputs"]) == 1, "Currently only single output is supported!"
+        assert (
+            len(self.config["outputs"]) == 1
+        ), "Currently only single output is supported!"
 
         if "env" not in self.config:
             self.env = Sandbox(codes=list())
@@ -96,18 +124,37 @@ class API:
         if input_fields is None:
             input_fields = td.inputSchema.fieldNames()
         for input_field_name in input_fields:
-            inputs.append({"name": input_field_name, "desc": getattr(td.inputSchema, input_field_name).desc})
-        outputs = [{"name": field_name, "desc": getattr(td.outputSchema, field_name).desc}]
+            inputs.append(
+                {
+                    "name": input_field_name,
+                    "desc": getattr(td.inputSchema, input_field_name).desc,
+                }
+            )
+        outputs = [
+            {
+                "name": field_name,
+                "desc": getattr(td.outputSchema, field_name).desc,
+            }
+        ]
         return cls(name=name, inputs=inputs, outputs=outputs)
 
     @classmethod
-    def from_input_output_schemas(cls, inputSchema, outputSchema, field_name, input_fields=None):
+    def from_input_output_schemas(
+        cls, inputSchema, outputSchema, field_name, input_fields=None
+    ):
         name, inputs, outputs = "extraction", list(), list()
         if input_fields is None:
             input_fields = inputSchema.fieldNames()
         for input_field_name in input_fields:
-            inputs.append({"name": input_field_name, "desc": getattr(inputSchema, input_field_name).desc})
-        outputs = [{"name": field_name, "desc": getattr(outputSchema, field_name).desc}]
+            inputs.append(
+                {
+                    "name": input_field_name,
+                    "desc": getattr(inputSchema, input_field_name).desc,
+                }
+            )
+        outputs = [
+            {"name": field_name, "desc": getattr(outputSchema, field_name).desc}
+        ]
         return cls(name=name, inputs=inputs, outputs=outputs)
 
     @property
@@ -144,12 +191,16 @@ class API:
     @property
     def asgs(self):
         # attr1=attr1, attr2=attr2, attr3=attr3, ...
-        return ", ".join(i["name"] + "=" + i["name"] for i in self.config["inputs"])
+        return ", ".join(
+            i["name"] + "=" + i["name"] for i in self.config["inputs"]
+        )
 
     def inps(self, inputs=dict()):
         # attr1=..., attr2=..., attr3=..., ...
         return ", ".join(
-            i["name"] + "=" + repr(inputs[i["name"]]) for i in self.config["inputs"] if i["name"] in inputs
+            i["name"] + "=" + repr(inputs[i["name"]])
+            for i in self.config["inputs"]
+            if i["name"] in inputs
         )
 
     def kwargs_call(self):
@@ -158,11 +209,21 @@ class API:
 
     def args_call(self, with_kwargs=False):
         # name(attr1, attr2, attr3, ..., **kwargs)
-        return self.config["name"] + "(" + self.args + (", **kwargs)" if with_kwargs else ")")
+        return (
+            self.config["name"]
+            + "("
+            + self.args
+            + (", **kwargs)" if with_kwargs else ")")
+        )
 
     def asgs_call(self, with_kwargs=False):
         # name(attr1=attr1, attr2=attr2, attr3=attr3, ..., **kwargs)
-        return self.config["name"] + "(" + self.asgs + (", **kwargs)" if with_kwargs else ")")
+        return (
+            self.config["name"]
+            + "("
+            + self.asgs
+            + (", **kwargs)" if with_kwargs else ")")
+        )
 
     def api_def(self, with_kwargs=False):
         # def name(attr1, attr2, attr3, ..., **kwargs):
@@ -170,7 +231,12 @@ class API:
 
     def api_call(self, inputs, with_kwargs=False):
         # name(attr1=..., attr2=..., attr3=..., ..., **kwargs)
-        return self.config["name"] + "(" + self.inps(inputs) + (", **kwargs)" if with_kwargs else ")")
+        return (
+            self.config["name"]
+            + "("
+            + self.inps(inputs)
+            + (", **kwargs)" if with_kwargs else ")")
+        )
 
     def api_execute(self, code, inputs):
         self.env.add(code)
