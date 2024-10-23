@@ -46,7 +46,6 @@ class DataSourcePhysicalOp(PhysicalOperator):
         input_record_size_in_bytes: Union[int, float],
     ) -> OperatorCostEstimates:
         """
-        In addition to
         This function returns a naive estimate of this operator's:
         - cardinality
         - time_per_record

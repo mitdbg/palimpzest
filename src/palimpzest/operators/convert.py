@@ -385,7 +385,7 @@ class LLMConvert(ConvertOp):
     def parse_answer(self, answer: str, fields_to_generate: List[str]) -> Dict[FieldName, List[Any]]:
         """
         This functions gets a string answer and parses it into an iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
-        #"""
+        """
         try:
             # parse json from answer string
             json_answer = getJsonFromAnswer(answer)
@@ -405,8 +405,8 @@ class LLMConvert(ConvertOp):
             print(f"\tAnswer: {answer}")
             # msg = str(e)
             # if "line" in msg:
-            # line = int(str(msg).split("line ")[1].split(" ")[0])
-            # print(f"\tAnswer snippet: {answer.splitlines()[line]}")
+            #     line = int(str(msg).split("line ")[1].split(" ")[0])
+            #     print(f"\tAnswer snippet: {answer.splitlines()[line]}")
             return {field_name: [] for field_name in fields_to_generate}
 
         field_answers = {}
