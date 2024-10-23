@@ -5,15 +5,15 @@ from typing import Any, Dict
 from palimpzest.corelib import Field, OperatorDerivedSchema, Schema
 
 
-#signature for a group by aggregate that applies
+# signature for a group by aggregate that applies
 # group and aggregation to an input tuple
 class GroupBySig:
-    def __init__(self, gbyFields: list[str], aggFuncs:list[str], aggFields:list[str]):
-        self.gbyFields = gbyFields 
+    def __init__(self, gbyFields: list[str], aggFuncs: list[str], aggFields: list[str]):
+        self.gbyFields = gbyFields
         self.aggFields = aggFields
         self.aggFuncs = aggFuncs
 
-    def validateSchema(self, inputSchema: Schema) -> tuple[bool, str]:
+    def validateSchema(self, inputSchema: Schema) -> tuple[bool, str | None]:
         for f in self.gbyFields:
             if not hasattr(inputSchema, f):
                 return (False, "Supplied schema has no field " + f)
@@ -37,7 +37,7 @@ class GroupBySig:
         # custom hash function
         return hash(repr(self.serialize()))
 
-    def __eq__(self, other: GroupBySig) -> bool:
+    def __eq__(self, other) -> bool:
         # __eq__ should be defined for consistency with __hash__
         return isinstance(other, GroupBySig) and self.serialize() == other.serialize()
 

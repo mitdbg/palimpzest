@@ -442,7 +442,6 @@ class Optimizer:
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
         """
-
         # compute the initial group tree for the user plan
         final_group_id = self.convert_query_plan_to_group_tree(query_plan)
 
