@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Type
 
 from palimpzest.corelib import Field, OperatorDerivedSchema, Schema
 
@@ -10,10 +10,10 @@ from palimpzest.corelib import Field, OperatorDerivedSchema, Schema
 class GroupBySig:
     def __init__(self, gbyFields: list[str], aggFuncs: list[str], aggFields: list[str]):
         self.gbyFields = gbyFields
-        self.aggFields = aggFields
         self.aggFuncs = aggFuncs
+        self.aggFields = aggFields
 
-    def validateSchema(self, inputSchema: Schema) -> tuple[bool, str | None]:
+    def validateSchema(self, inputSchema: Type[Schema]) -> tuple[bool, str | None]:
         for f in self.gbyFields:
             if not hasattr(inputSchema, f):
                 return (False, "Supplied schema has no field " + f)
@@ -47,16 +47,16 @@ class GroupBySig:
             ops.append(self.aggFuncs[i] + "(" + self.aggFields[i] + ")")
         return ops
 
-    def outputSchema(self) -> OperatorDerivedSchema:
+    def outputSchema(self) -> Type[OperatorDerivedSchema]:
         # the output class varies depending on the group by, so here
         # we dynamically construct this output
-        s = type("CustomGroupBy", (OperatorDerivedSchema,), {})
+        Schema = type("CustomGroupBy", (OperatorDerivedSchema,), {})
 
         for g in self.gbyFields:
             f = Field(desc=g, required=True)
-            setattr(s, g, f)
+            setattr(Schema, g, f)
         ops = self.getAggFieldNames()
         for op in ops:
             f = Field(desc=op, required=True)
-            setattr(s, op, f)
-        return s
+            setattr(Schema, op, f)
+        return Schema

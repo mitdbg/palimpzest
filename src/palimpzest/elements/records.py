@@ -1,5 +1,5 @@
 import hashlib
-from typing import Type
+from typing import Any, Type
 
 from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.corelib import Schema
@@ -17,6 +17,8 @@ class DataRecord:
     ):
         # schema for the data record
         self.schema = schema
+        # dynamic properties
+        self._data = {}
 
         # NOTE: Record ids are hashed based on:
         # 0. their schema (keys)
@@ -38,6 +40,18 @@ class DataRecord:
         self._id = hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
         self._parent_id = parent_id
 
+    def __setattr__(self, name: str, value: Any, /) -> None:
+        if name in ["schema", "scan_idx"]:
+            super().__setattr__(name, value)
+        else:
+            self._data[name] = value
+
+    def __getattr__(self, name: str) -> Any:
+        if name in self._data:
+            return self._data[name]
+        else:
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
     def _asJSONStr(self, include_bytes: bool = True, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
         record_dict = self._asDict(include_bytes)
@@ -45,24 +59,21 @@ class DataRecord:
 
     def _asDict(self, include_bytes: bool = True):
         """Return a dictionary representation of this DataRecord"""
-        dct = {k: self.__dict__[k] for k in self._getFields()}
+        dct = self._data.copy()
         if not include_bytes:
-            for k in dct:
-                if isinstance(dct[k], bytes) or (
-                    isinstance(dct[k], list) and len(dct[k]) > 0 and isinstance(dct[k][0], bytes)
-                ):
+            for k, v in dct.items():
+                if isinstance(v, bytes) or (isinstance(v, list) and len(v) > 0 and isinstance(v[0], bytes)):
                     dct[k] = "<bytes>"
         return dct
 
     def __str__(self):
-        keys = sorted(self.__dict__.keys())
-        items = ("{}={!r}...".format(k, str(self.__dict__[k])[:15]) for k in keys)
+        items = ("{}={!r}...".format(k, str(v)[:15]) for k, v in sorted(self._data.items()))
         return "{}({})".format(type(self).__name__, ", ".join(items))
 
     def __eq__(self, other):
-        return self.__dict__ == other.__dict__
+        return isinstance(other, DataRecord) and self._data == other._data and self.schema == other.schema
 
     # NOTE: the method is called _getFields instead of getFields to avoid it being picked up as a data record attribute;
     #       in the future we will come up with a less ugly fix -- but for now do not remove the _ even though it's not private
     def _getFields(self):
-        return [k for k in self.__dict__.keys() if not k.startswith("_") and k != "schema"]
+        return list(self._data.keys())

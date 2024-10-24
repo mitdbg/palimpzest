@@ -141,21 +141,21 @@ class Optimizer:
 
     def construct_group_tree(self, dataset_nodes: List[Set]) -> Tuple[List[int], Set[str], Dict[str, Set[str]]]:
         # get node, outputSchema, and inputSchema(if applicable)
-        node = dataset_nodes[-1]
-        outputSchema = node.schema
+        node = dataset_nodes[-1] if len(dataset_nodes) > 0 else None
+        if node is None:
+            raise ValueError("No node found in dataset_nodes")
+        outputSchema = node.schema()
         inputSchema = dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
 
         ### convert node --> Group ###
         uid = node.universalIdentifier()
 
         # create the op for the given node
-        op: LogicalOperator = None
+        op: LogicalOperator | None = None
         if not self.no_cache and DataDirectory().hasCachedAnswer(uid):
-            op = CacheScan(dataset_id=uid, outputSchema=outputSchema)
-
+            op = CacheScan(dataset_id=uid, input_schema=None, outputSchema=outputSchema)
         elif isinstance(node, DataSource):
             op = BaseScan(dataset_id=uid, outputSchema=outputSchema)
-
         elif node._filter is not None:
             op = FilteredScan(
                 inputSchema=inputSchema,
@@ -164,7 +164,6 @@ class Optimizer:
                 depends_on=node._depends_on,
                 targetCacheId=uid,
             )
-
         elif node._groupBy is not None:
             op = GroupByAggregate(
                 inputSchema=inputSchema,
@@ -172,7 +171,6 @@ class Optimizer:
                 gbySig=node._groupBy,
                 targetCacheId=uid,
             )
-
         elif node._aggFunc is not None:
             op = Aggregate(
                 inputSchema=inputSchema,
@@ -180,7 +178,6 @@ class Optimizer:
                 aggFunc=node._aggFunc,
                 targetCacheId=uid,
             )
-
         elif node._limit is not None:
             op = LimitScan(
                 inputSchema=inputSchema,
@@ -199,7 +196,6 @@ class Optimizer:
                 depends_on=node._depends_on,
                 targetCacheId=uid,
             )
-
         else:
             raise NotImplementedError("No logical operator exists for the specified dataset construction.")
 
