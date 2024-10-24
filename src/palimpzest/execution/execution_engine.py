@@ -38,8 +38,6 @@ class ExecutionEngine:
         *args,
         **kwargs,
     ) -> None:
-        if available_models is None:
-            available_models = []
         self.num_samples = num_samples
         self.scan_start_idx = scan_start_idx
         self.nocache = nocache
@@ -47,7 +45,7 @@ class ExecutionEngine:
         self.min_plans = min_plans
         self.verbose = verbose
         self.available_models = available_models
-        if not available_models:
+        if self.available_models is None or len(self.available_models) == 0:
             self.available_models = getModels(include_vision=True)
         if self.verbose:
             print("Available models: ", self.available_models)
@@ -190,7 +188,7 @@ class ExecutionEngine:
         self,
         dataset: Set,
         optimizer: Optimizer,
-        execution_data: List[RecordOpStats] = None,
+        execution_data: List[RecordOpStats] | None = None,
     ) -> Tuple[List[DataRecord], List[PlanStats]]:
         # get the optimal plan according to the optimizer
         if execution_data is None:
@@ -211,7 +209,7 @@ class ExecutionEngine:
         self,
         dataset: Set,
         optimizer: Optimizer,
-        execution_data: List[RecordOpStats] = None,
+        execution_data: List[RecordOpStats] | None = None,
     ) -> Tuple[List[DataRecord], List[PlanStats]]:
         # initialize output records and plan stats
         if execution_data is None:

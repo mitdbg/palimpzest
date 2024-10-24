@@ -295,7 +295,7 @@ class DSPyGenerator(BaseGenerator):
         3. return the list of those tokens' log probabilities
         """
         # get log probabilities data structure
-        token_logprobs = None, None
+        token_logprobs = None
 
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]

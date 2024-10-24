@@ -453,7 +453,7 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvert):
         limit: int = 3,
     ):
         if exemplars is None:
-            exemplars = list()
+            exemplars = []
         context = {
             "language": language,
             "api": api.args_call(),
@@ -521,5 +521,5 @@ class CodeSynthesisConvertAdviceEnsembleValidation(CodeSynthesisConvert):
     ):
         # TODO this was not implemented ?
         if exemplars is None:
-            exemplars = list()
+            exemplars = []
         raise Exception("not implemented yet")
