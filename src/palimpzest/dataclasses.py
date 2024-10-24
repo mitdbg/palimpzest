@@ -241,7 +241,7 @@ class OperatorStats:
         """NOTE: we assume the execution layer guarantees these op_stats belong to the same operator."""
         self.total_op_time += op_stats.total_op_time
         self.total_op_cost += op_stats.total_op_cost
-        self.record_op_stats_lst += op_stats.record_op_stats_lst
+        self.record_op_stats_lst.extend(op_stats.record_op_stats_lst)
         return self
 
     def to_json(self):
