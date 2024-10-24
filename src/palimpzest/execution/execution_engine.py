@@ -25,7 +25,7 @@ class ExecutionEngine:
         include_baselines: bool = False,
         min_plans: Optional[int] = None,
         verbose: bool = False,
-        available_models: List[Model] = [],
+        available_models: List[Model] | None = None,
         allow_bonded_query: bool = True,
         allow_conventional_query: bool = False,
         allow_model_selection: bool = True,
@@ -45,7 +45,7 @@ class ExecutionEngine:
         self.min_plans = min_plans
         self.verbose = verbose
         self.available_models = available_models
-        if not available_models:
+        if self.available_models is None or len(self.available_models) == 0:
             self.available_models = getModels(include_vision=True)
         if self.verbose:
             print("Available models: ", self.available_models)
@@ -188,9 +188,11 @@ class ExecutionEngine:
         self,
         dataset: Set,
         optimizer: Optimizer,
-        execution_data: List[RecordOpStats] = [],
+        execution_data: List[RecordOpStats] | None = None,
     ) -> Tuple[List[DataRecord], List[PlanStats]]:
         # get the optimal plan according to the optimizer
+        if execution_data is None:
+            execution_data = []
         plans = optimizer.optimize(dataset)
         final_plan = plans[0]
 
@@ -207,9 +209,11 @@ class ExecutionEngine:
         self,
         dataset: Set,
         optimizer: Optimizer,
-        execution_data: List[RecordOpStats] = [],
+        execution_data: List[RecordOpStats] | None = None,
     ) -> Tuple[List[DataRecord], List[PlanStats]]:
         # initialize output records and plan stats
+        if execution_data is None:
+            execution_data = []
         records, plan_stats = [], []
 
         # get total number of input records in the datasource

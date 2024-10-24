@@ -47,7 +47,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
         # initialize plan and operator stats
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
-        for op_idx, op in enumerate(plan.operators):
+        for op in plan.operators:
             op_id = op.get_op_id()
             plan_stats.operator_stats[op_id] = OperatorStats(
                 op_id=op_id, op_name=op.op_name()

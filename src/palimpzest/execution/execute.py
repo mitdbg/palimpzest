@@ -18,7 +18,7 @@ class Execute:
         min_plans: Optional[int] = None,
         max_workers: int = 1,
         verbose: bool = False,
-        available_models: Optional[List[Model]] = [],
+        available_models: Optional[List[Model]] = None,
         allow_bonded_query: Optional[bool] = True,
         allow_conventional_query: Optional[bool] = False,
         allow_model_selection: Optional[bool] = True,
@@ -29,6 +29,8 @@ class Execute:
         *args,
         **kwargs,
     ):
+        if available_models is None:
+            available_models = []
         return execution_engine(
             num_samples=num_samples,
             nocache=nocache,

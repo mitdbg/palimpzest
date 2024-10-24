@@ -217,7 +217,7 @@ class Table(Schema):
         # Take the rows in the record_dict and turn them into comma separated strings
         rows = []
         # only sample the first MAX_ROWS
-        for i, row in enumerate(record_dict["rows"][:MAX_ROWS]):
+        for row in record_dict["rows"][:MAX_ROWS]:
             rows += [",".join(map(str, row)) + "\n"]
         record_dict["rows"] = rows
         header = ",".join(record_dict["header"])

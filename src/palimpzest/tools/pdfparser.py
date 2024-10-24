@@ -252,7 +252,7 @@ def get_text_from_pdf(filename, pdf_bytes, enable_file_cache=True, file_cache_di
         #        with open(text_file_path, 'r') as file:
         #            text_content = file.read()
         #            return text_content
-        cosmos_file_dir = file_name_without_extension.replace(" ", "_")
+        # cosmos_file_dir = file_name_without_extension.replace(" ", "_")
         # get a tmp of the system temp directory
 
         print(f"Processing {file_name} through COSMOS")

@@ -5,7 +5,9 @@ import IPython.terminal.embed as embed
 
 
 class Sandbox:
-    def __init__(self, codes=list(), reset=False):
+    def __init__(self, codes: list | None = None, reset: bool = False):
+        if codes is None:
+            codes = list()
         super().__init__()
         self.shell = None
         self.codes = codes
@@ -146,8 +148,10 @@ class API:
         # attr1=attr1, attr2=attr2, attr3=attr3, ...
         return ", ".join(i["name"] + "=" + i["name"] for i in self.config["inputs"])
 
-    def inps(self, inputs=dict()):
+    def inps(self, inputs=None):
         # attr1=..., attr2=..., attr3=..., ...
+        if inputs is None:
+            inputs = dict()
         return ", ".join(
             i["name"] + "=" + repr(inputs[i["name"]]) for i in self.config["inputs"] if i["name"] in inputs
         )
