@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Type, Union
 
 from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
 from palimpzest.corelib import Number, Schema
@@ -39,8 +39,8 @@ class Set:
 
     def __init__(
         self,
-        schema: Schema,
         source: Union[Set, DataSource],
+        schema: Schema,
         desc: str = None,
         filter: Filter = None,
         udf: Callable = None,
@@ -50,10 +50,10 @@ class Set:
         fnid: str = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool = None,
-        depends_on: List[str] = [],
+        depends_on: List[str] | None = None,
         nocache: bool = False,
     ):
-        self.schema = schema
+        self._schema = schema
         self._source = source
         self._desc = desc
         self._filter = filter
@@ -69,6 +69,10 @@ class Set:
 
     def __str__(self):
         return f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, filter={str(self._filter)}, udf={str(self._udf)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
+
+    @property
+    def schema(self) -> Type[Schema]:
+        return self._schema
 
     def serialize(self):
         # NOTE: I needed to remove depends_on from the serialization dictionary because
@@ -122,20 +126,23 @@ class Dataset(Set):
         source = DataDirectory().getRegisteredDataset(source) if isinstance(source, str) else source
 
         # intialize class
-        super().__init__(source=source, *args, **kwargs)
+        super().__init__(source, *args, **kwargs)
 
-        if type(self._depends_on) == str:
+        if self._depends_on is None:
+            self._depends_on = []
+
+        elif type(self._depends_on) is str:
             self._depends_on = [self._depends_on]
 
     def filter(
         self,
         _filter: Union[str, callable],
-        depends_on: Union[str, List[str]] = [],
+        depends_on: Union[str, List[str]] | None = None,
         desc: str = "Apply filter(s)",
     ) -> Dataset:
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
         f = None
-        if type(_filter) == str:
+        if type(_filter) is str:
             f = Filter(_filter)
         elif callable(_filter):
             f = Filter(filterFn=_filter)
@@ -157,7 +164,7 @@ class Dataset(Set):
         udf: Optional[Callable] = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool = False,
-        depends_on: Union[str, List[str]] = [],
+        depends_on: Union[str, List[str]] | None = None,
         desc: str = "Convert to new schema",
     ) -> Dataset:
         """Convert the Set to a new schema."""
