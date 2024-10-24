@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 
 
 #############################
@@ -11,7 +11,7 @@ from typing import Any, Dict
 class Filter:
     """A filter that can be applied to a Set"""
 
-    def __init__(self, filterCondition: str | None = None, filterFn: callable | None = None) -> None:
+    def __init__(self, filterCondition: str | None = None, filterFn: Callable | None = None) -> None:
         self.filterCondition = filterCondition
         self.filterFn = filterFn
 
@@ -28,7 +28,7 @@ class Filter:
         # custom hash function
         return hash(self.filterCondition) if self.filterCondition is not None else hash(str(self.filterFn))
 
-    def __eq__(self, other: Filter) -> bool:
+    def __eq__(self, other) -> bool:
         # __eq__ should be defined for consistency with __hash__
         return (
             isinstance(other, Filter)

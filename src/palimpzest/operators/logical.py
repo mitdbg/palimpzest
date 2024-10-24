@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Type
 
 from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
 from palimpzest.corelib import ImageFile, Schema
-from palimpzest.elements import *
+from palimpzest.elements import Filter, GroupBySig
 
 
 class LogicalOperator:
@@ -28,17 +28,17 @@ class LogicalOperator:
 
     def __init__(
         self,
-        inputSchema: Schema,
-        outputSchema: Schema,
+        outputSchema: Type[Schema],
+        inputSchema: Type[Schema] | None = None,
     ):
-        self.inputSchema = inputSchema
         self.outputSchema = outputSchema
-        self.op_id = None
+        self.inputSchema = inputSchema
+        self.op_id: str | None = None
 
     def __str__(self) -> str:
         raise NotImplementedError("Abstract method")
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         raise NotImplementedError("Calling __eq__ on abstract method")
 
     def copy(self) -> LogicalOperator:
@@ -81,6 +81,8 @@ class LogicalOperator:
         return self.op_id
 
     def __hash__(self):
+        if not self.op_id:
+            raise ValueError("op_id not set, unable to hash")
         return int(self.op_id, 16)
 
 
@@ -88,7 +90,11 @@ class BaseScan(LogicalOperator):
     """A BaseScan is a logical operator that represents a scan of a particular data source."""
 
     def __init__(self, dataset_id: str, *args, **kwargs):
-        kwargs["inputSchema"] = None
+        if kwargs.get("inputSchema", None) is not None:
+            raise Exception(
+                f"BaseScan must be initialized with `inputSchema=None` but was initialized with `inputSchema={kwargs.get('inputSchema')}`"
+            )
+
         super().__init__(*args, **kwargs)
         self.dataset_id = dataset_id
 
@@ -118,15 +124,18 @@ class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached Set."""
 
     def __init__(self, dataset_id: str, *args, **kwargs):
-        kwargs["inputSchema"] = None
+        if kwargs.get("inputSchema", None) is not None:
+            raise Exception(
+                f"CacheScan must be initialized with `inputSchema=None` but was initialized with `inputSchema={kwargs.get('inputSchema')}`"
+            )
 
-        super().__init__(None, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.dataset_id = dataset_id
 
     def __str__(self):
         return f"CacheScan({str(self.outputSchema)},{str(self.dataset_id)})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, CacheScan)
             and self.inputSchema == other.inputSchema
@@ -156,9 +165,9 @@ class ConvertScan(LogicalOperator):
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         udf: Optional[Callable] = None,
         image_conversion: bool = False,
-        depends_on: List[str] = [],
-        desc: str = None,
-        targetCacheId: str = None,
+        depends_on: List[str] | None = None,
+        desc: str | None = None,
+        targetCacheId: str | None = None,
         *args,
         **kwargs,
     ):
@@ -166,7 +175,7 @@ class ConvertScan(LogicalOperator):
         self.cardinality = cardinality
         self.udf = udf
         self.image_conversion = image_conversion or (self.inputSchema == ImageFile)
-        self.depends_on = depends_on
+        self.depends_on = [] if depends_on is None else depends_on
         self.desc = desc
         self.targetCacheId = targetCacheId
 
@@ -215,15 +224,15 @@ class FilteredScan(LogicalOperator):
         self,
         filter: Filter,
         image_filter: bool = False,
-        depends_on: List[str] = [],
-        targetCacheId: str = None,
+        depends_on: List[str] | None = None,
+        targetCacheId: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.filter = filter
         self.image_filter = image_filter or (self.inputSchema == ImageFile)
-        self.depends_on = depends_on
+        self.depends_on = [] if depends_on is None else depends_on
         self.targetCacheId = targetCacheId
 
     def __str__(self):
@@ -259,7 +268,7 @@ class FilteredScan(LogicalOperator):
 
 
 class LimitScan(LogicalOperator):
-    def __init__(self, limit: int, targetCacheId: str = None, *args, **kwargs):
+    def __init__(self, limit: int, targetCacheId: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.limit = limit
         self.targetCacheId = targetCacheId
@@ -296,11 +305,13 @@ class GroupByAggregate(LogicalOperator):
     def __init__(
         self,
         gbySig: GroupBySig,
-        targetCacheId: str = None,
+        targetCacheId: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+        if not self.inputSchema:
+            raise ValueError("GroupByAggregate requires an input schema")
         (valid, error) = gbySig.validateSchema(self.inputSchema)
         if not valid:
             raise TypeError(error)
@@ -344,7 +355,7 @@ class Aggregate(LogicalOperator):
     def __init__(
         self,
         aggFunc: AggFunc,
-        targetCacheId: str = None,
+        targetCacheId: str | None = None,
         *args,
         **kwargs,
     ):

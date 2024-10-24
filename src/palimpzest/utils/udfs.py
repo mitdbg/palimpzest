@@ -86,16 +86,3 @@ def xls_to_tables(candidate):
         records.append(dr)
 
     return records
-
-
-def url_to_file(candidate):
-    """Function used to convert a DataRecord instance of URL to a File DataRecord."""
-    candidate.filename = candidate.url.split("/")[-1]
-    candidate.timestamp = datetime.now().isoformat()
-    try:
-        contents = requests.get(candidate.url).content
-    except Exception as e:
-        print(f"Error fetching URL {candidate.url}: {e}")
-        contents = b""
-    candidate.contents = contents
-    return [candidate]
