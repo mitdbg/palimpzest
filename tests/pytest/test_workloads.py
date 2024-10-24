@@ -74,7 +74,7 @@ def score_biofabric_plans(dataset, records, policy_str=None, reopt=False) -> flo
         output_study = output[output["study"] == study]
         try:
             input_df = pd.read_excel(os.path.join("testdata/biofabric-matching/", f"{study}.xlsx"))
-        except:
+        except Exception:
             print("Cannot find the study", study)
             targets += [study] * 5
             predicted += ["missing"] * 5

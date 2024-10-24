@@ -447,7 +447,7 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvert):
         self,
         api: API,
         output_field_name: str,
-        exemplars: List[Exemplar] = None,
+        exemplars: List[Exemplar] | None = None,
         language="Python",
         n_advices=4,
         limit: int = 3,

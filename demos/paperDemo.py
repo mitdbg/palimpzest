@@ -29,7 +29,7 @@ def within_two_miles_of_mit(record):
         if any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
             return False
         return True
-    except:
+    except Exception:
         return False
 
 
@@ -40,7 +40,7 @@ def in_price_range(record):
             price = price.strip()
             price = int(price.replace("$", "").replace(",", ""))
         return 6e5 < price and price <= 2e6
-    except:
+    except Exception:
         return False
 
 
