@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from palimpzest.constants import OptimizationStrategy
 from palimpzest.cost_model import CostModel
@@ -17,7 +17,7 @@ class Task:
     rules, and optimizing inputs / costing the full group tree.
     """
 
-    def perform(self, groups: Dict[int, Group], context: Dict[str, Any] = {}) -> List[Task]:
+    def perform(self, groups: Dict[int, Group], context: Optional[Dict[str, Any]] = None) -> List[Task]:
         """
         NOTE: At the moment we do not make use of the context, but in the future
         this can be used to store required physical properties (e.g. sort conditions
@@ -40,8 +40,10 @@ class OptimizeGroup(Task):
     def __init__(self, group_id: int):
         self.group_id = group_id
 
-    def perform(self, groups: Dict[int, Group], context: Dict[str, Any] = {}) -> List[Task]:
+    def perform(self, groups: Dict[int, Group], context: Optional[Dict[str, Any]] = None) -> List[Task]:
         # get updated instance of the group to be optimized
+        if context is None:
+            context = {}
         group = groups[self.group_id]
 
         # if this group has already been optimized, there's nothing more to do
@@ -73,8 +75,10 @@ class ExpandGroup(Task):
     def __init__(self, group_id: int):
         self.group_id = group_id
 
-    def perform(self, groups: Dict[int, Group], context: Dict[str, Any] = {}) -> List[Task]:
+    def perform(self, groups: Dict[int, Group], context: Optional[Dict[str, Any]] = None) -> List[Task]:
         # fetch group
+        if context is None:
+            context = {}
         group = groups[self.group_id]
 
         # if the group has been explored before, return []
@@ -109,9 +113,11 @@ class OptimizeLogicalExpression(Task):
         self,
         transformation_rules: List[TransformationRule],
         implementation_rules: List[ImplementationRule],
-        context: Dict[str, Any] = {},
+        context: Optional[Dict[str, Any]] = None,
     ) -> List[Task]:
         # if we're exploring, only apply transformation rules
+        if context is None:
+            context = {}
         rules = transformation_rules if self.exploring else transformation_rules + implementation_rules
 
         # filter out rules that have already been applied to logical expression
@@ -161,10 +167,12 @@ class ApplyRule(Task):
         self,
         groups: Dict[int, Group],
         expressions: Dict[int, Expression],
-        context: Dict[str, Any] = {},
+        context: Optional[Dict[str, Any]] = None,
         **physical_op_params,
     ) -> Tuple[List[Task], int]:
         # check if rule has already been applied to this logical expression; return [] if so
+        if context is None:
+            context = {}
         if self.rule.get_rule_id() in self.logical_expression.rules_applied:
             return []
 
@@ -357,9 +365,11 @@ class OptimizePhysicalExpression(Task):
         return group
 
     def perform(
-        self, cost_model: CostModel, groups: Dict[int, Group], policy: Policy, context: Dict[str, Any] = {}
+        self, cost_model: CostModel, groups: Dict[int, Group], policy: Policy, context: Optional[Dict[str, Any]] = None
     ) -> List[Task]:
         # return if we've already computed the cost of this physical expression
+        if context is None:
+            context = {}
         if self.physical_expression.plan_cost is not None:
             return []
 

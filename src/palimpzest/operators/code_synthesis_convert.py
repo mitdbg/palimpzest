@@ -41,7 +41,7 @@ class CodeSynthesisConvert(LLMConvert):
 
         # initialize optimization-specific parameters
         self.field_to_code_ensemble = None
-        self.exemplars = None
+        self.exemplars = []
         self.code_synthesized = False
         self.code_champion_generator = generators.CustomGenerator(model_name=self.code_synth_model.value)
 
@@ -53,13 +53,9 @@ class CodeSynthesisConvert(LLMConvert):
             # set and return exemplars if it is not empty
             if exemplars is not None and len(exemplars) > 0:
                 self.exemplars = exemplars
-            else:
-                self.exemplars = []
-        else:
-            self.exemplars = []
         self.field_to_code_ensemble = {}
 
-    def __eq__(self, other: CodeSynthesisConvert):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.exemplar_generation_model == other.exemplar_generation_model
@@ -119,7 +115,7 @@ class CodeSynthesisConvert(LLMConvert):
 
         return naive_op_cost_estimates
 
-    def _fetch_cached_code(self, fields_to_generate: List[str]) -> Tuple[Dict[CodeName, Code]]:
+    def _fetch_cached_code(self, fields_to_generate: List[str]) -> Dict[CodeName, Code]:
         # if we are allowed to cache synthesized code across plan executions, check the cache
         field_to_code_ensemble = {}
         cache = DataDirectory().getCacheService()
@@ -350,10 +346,12 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
         self,
         api: API,
         output_field_name: str,
-        exemplars: List[Exemplar] = list(),
-        advice: str = None,
+        exemplars: List[Exemplar] | None = None,
+        advice: str | None = None,
         language="Python",
     ):
+        if exemplars is None:
+            exemplars = []
         context = {
             "language": language,
             "api": api.args_call(),
@@ -432,7 +430,9 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvert):
     def _shouldSynthesize(self, *args, **kwargs):
         return False
 
-    def _parse_multiple_outputs(self, text, outputs=["Thought", "Action"]):
+    def _parse_multiple_outputs(self, text, outputs=None):
+        if outputs is None:
+            outputs = ["Thought", "Action"]
         data = {}
         for key in reversed(outputs):
             if key + ":" in text:
@@ -447,11 +447,13 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvert):
         self,
         api: API,
         output_field_name: str,
-        exemplars: List[Exemplar] = list(),
+        exemplars: List[Exemplar] = None,
         language="Python",
         n_advices=4,
         limit: int = 3,
     ):
+        if exemplars is None:
+            exemplars = list()
         context = {
             "language": language,
             "api": api.args_call(),
@@ -515,7 +517,9 @@ class CodeSynthesisConvertAdviceEnsembleValidation(CodeSynthesisConvert):
         return len(self.exemplars) % code_regenerate_frequency == 0
 
     def _synthesize_field_code(
-        self, api: API, output_field_name: str, exemplars: List[Exemplar] = list(), *args, **kwargs
+        self, api: API, output_field_name: str, exemplars: List[Exemplar] = None, *args, **kwargs
     ):
         # TODO this was not implemented ?
+        if exemplars is None:
+            exemplars = list()
         raise Exception("not implemented yet")

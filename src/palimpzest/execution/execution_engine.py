@@ -25,7 +25,7 @@ class ExecutionEngine:
         include_baselines: bool = False,
         min_plans: Optional[int] = None,
         verbose: bool = False,
-        available_models: List[Model] = [],
+        available_models: List[Model] | None = None,
         allow_bonded_query: bool = True,
         allow_conventional_query: bool = False,
         allow_model_selection: bool = True,
@@ -38,6 +38,8 @@ class ExecutionEngine:
         *args,
         **kwargs,
     ) -> None:
+        if available_models is None:
+            available_models = []
         self.num_samples = num_samples
         self.scan_start_idx = scan_start_idx
         self.nocache = nocache
@@ -188,9 +190,11 @@ class ExecutionEngine:
         self,
         dataset: Set,
         optimizer: Optimizer,
-        execution_data: List[RecordOpStats] = [],
+        execution_data: List[RecordOpStats] = None,
     ) -> Tuple[List[DataRecord], List[PlanStats]]:
         # get the optimal plan according to the optimizer
+        if execution_data is None:
+            execution_data = []
         plans = optimizer.optimize(dataset)
         final_plan = plans[0]
 
@@ -207,9 +211,11 @@ class ExecutionEngine:
         self,
         dataset: Set,
         optimizer: Optimizer,
-        execution_data: List[RecordOpStats] = [],
+        execution_data: List[RecordOpStats] = None,
     ) -> Tuple[List[DataRecord], List[PlanStats]]:
         # initialize output records and plan stats
+        if execution_data is None:
+            execution_data = []
         records, plan_stats = [], []
 
         # get total number of input records in the datasource

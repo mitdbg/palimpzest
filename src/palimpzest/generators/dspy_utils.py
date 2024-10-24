@@ -91,8 +91,7 @@ class TogetherHFAdaptor(HFModel):
         if any(keyword in self.model.lower() for keyword in ["inst", "instruct"]):
             self.use_inst_template = True
 
-        stop_default = "\n\n---"
-
+        # stop_default = "\n\n---"
         # print("Stop procedure", stop_default)
         self.kwargs = {
             "temperature": 0.0,
