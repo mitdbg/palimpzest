@@ -3,8 +3,11 @@ import json
 import os
 from pathlib import Path
 
+import gradio as gr
+import numpy as np
 import palimpzest as pz
 from palimpzest.utils import udfs
+from PIL import Image
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -36,7 +39,7 @@ def within_two_miles_of_mit(record):
 def in_price_range(record):
     try:
         price = record.price
-        if type(price) == str:
+        if isinstance(price, str):
             price = price.strip()
             price = int(price.replace("$", "").replace(",", ""))
         return 6e5 < price and price <= 2e6
@@ -149,6 +152,7 @@ class RealEstateListingSource(pz.UserSource):
 if __name__ == "__main__":
     # parse arguments
     parser = argparse.ArgumentParser(description="Run a simple demo")
+    parser.add_argument("--viz", default=False, action="store_true", help="Visualize output in Gradio")
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--profile", default=False, action="store_true", help="Profile execution")
     parser.add_argument("--datasetid", type=str, help="The dataset id")
@@ -190,6 +194,7 @@ if __name__ == "__main__":
 
     datasetid = args.datasetid
     workload = args.workload
+    visualize = args.viz
     verbose = args.verbose
     profile = args.profile
     policy = pz.MaxQuality()
@@ -284,3 +289,47 @@ if __name__ == "__main__":
         execution_stats_dict = execution_stats.to_json()
         with open(stats_path, "w") as f:
             json.dump(execution_stats_dict, f)
+
+    # visualize output in Gradio
+    if visualize:
+        from palimpzest.utils import printTable
+        plan_str = list(execution_stats.plan_strs.values())[-1]
+        if workload == "enron":
+            printTable(records, cols=["sender", "subject"], plan_str=plan_str)
+
+        elif workload == "real-estate":
+            fst_imgs, snd_imgs, thrd_imgs, addrs, prices = [], [], [], [], []
+            for record in records:
+                addrs.append(record.address)
+                prices.append(record.price)
+                for idx, img_name in enumerate(["img1.png", "img2.png", "img3.png"]):
+                    path = os.path.join(f"testdata/{datasetid}", record.listing, img_name)
+                    img = Image.open(path)
+                    img_arr = np.asarray(img)
+                    if idx == 0:
+                        fst_imgs.append(img_arr)
+                    elif idx == 1:
+                        snd_imgs.append(img_arr)
+                    elif idx == 2:
+                        thrd_imgs.append(img_arr)
+
+            with gr.Blocks() as demo:
+                fst_img_blocks, snd_img_blocks, thrd_img_blocks, addr_blocks, price_blocks = [], [], [], [], []
+                for fst_img, snd_img, thrd_img, addr, price in zip(fst_imgs, snd_imgs, thrd_imgs, addrs, prices):
+                    with gr.Row(equal_height=True):
+                        with gr.Column():
+                            fst_img_blocks.append(gr.Image(value=fst_img))
+                        with gr.Column():
+                            snd_img_blocks.append(gr.Image(value=snd_img))
+                        with gr.Column():
+                            thrd_img_blocks.append(gr.Image(value=thrd_img))
+                    with gr.Row():
+                        with gr.Column():
+                            addr_blocks.append(gr.Textbox(value=addr, info="Address"))
+                        with gr.Column():
+                            price_blocks.append(gr.Textbox(value=price, info="Price"))
+
+                plan_str = list(execution_stats.plan_strs.values())[0]
+                gr.Textbox(value=plan_str, info="Query Plan")
+
+            demo.launch()

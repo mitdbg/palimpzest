@@ -56,24 +56,20 @@ def createPlanStr(flatten_ops):
     return plan_str
 
 
-def printTable(records, cols=None, query=None, plan=None):
+def printTable(records, cols=None, plan_str=None):
     """Helper function to print execution results using Gradio"""
     if len(records) == 0:
         print("No records met search criteria")
         return
 
-    records = [{key: record.__dict__[key] for key in record.__dict__ if not key.startswith("_")} for record in records]
+    records = [record._asDict() for record in records]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
 
     with gr.Blocks() as demo:
         gr.Dataframe(records_df[print_cols])
 
-        if plan is not None:
-            # plan_str = buildNestedStr(plan.dumpPhysicalTree())
-            ops = plan.dumpPhysicalTree()
-            flatten_ops = flatten_nested_tuples(ops)
-            plan_str = createPlanStr(flatten_ops)
+        if plan_str is not None:
             gr.Textbox(value=plan_str, info="Physical Plan")
 
     demo.launch()
