@@ -141,9 +141,7 @@ class Optimizer:
 
     def construct_group_tree(self, dataset_nodes: List[Set]) -> Tuple[List[int], Set[str], Dict[str, Set[str]]]:
         # get node, outputSchema, and inputSchema(if applicable)
-        node = dataset_nodes[-1] if len(dataset_nodes) > 0 else None
-        if node is None:
-            raise ValueError("No node found in dataset_nodes")
+        node = dataset_nodes[-1]
         outputSchema = node.schema()
         inputSchema = dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
 
