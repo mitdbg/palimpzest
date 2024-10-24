@@ -82,12 +82,8 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
                 current_config_dict = yaml.safe_load(f)
                 self._current_config = Config(current_config_dict["current_config_name"])
 
-        # if we are here and current_config is None, we throw
-        if self._current_config is None:
-            raise Exception("Could not find current config file at", current_config_path)
-
         # initialize the file cache directory, defaulting to the system's temporary directory "tmp/pz"
-        pz_file_cache_dir = self._current_config.get("filecachedir")
+        pz_file_cache_dir = self.current_config.get("filecachedir")
         if pz_file_cache_dir and not os.path.exists(pz_file_cache_dir):
             os.makedirs(pz_file_cache_dir)
 
@@ -113,14 +109,10 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         return self.cacheService
 
     def getConfig(self):
-        if not self._current_config:
-            raise Exception("No current config found.")
-        return self._current_config._load_config()
+        return self.current_config._load_config()
 
     def getFileCacheDir(self):
-        if not self._current_config:
-            raise Exception("No current config found.")
-        return self._current_config.get("filecachedir")
+        return self.current_config.get("filecachedir")
 
     #
     # These methods handle properly registered data files, meant to be kept over the long haul
