@@ -274,7 +274,7 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
         output_study = output[output["study"] == study]
         try:
             input_df = pd.read_excel(os.path.join("testdata/biofabric-matching/", f"{study}.xlsx"))
-        except:
+        except Exception:
             print("Cannot find the study", study)
             targets += [study] * 5
             predicted += ["missing"] * 5
@@ -288,7 +288,7 @@ def score_biofabric_plans(workload, records, plan_idx, policy_str=None, reopt=Fa
             for input_col in input_df.columns:
                 try:
                     matches = sum([1 for idx, x in enumerate(output_study[col]) if x == input_df[input_col][idx]])
-                except:
+                except Exception:
                     pdb.set_trace()
                 if matches > max_matches:
                     max_matches = matches
@@ -475,7 +475,7 @@ def get_logical_tree(workload, nocache: bool = True, num_samples: int = None, sc
                 if any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
                     return False
                 return True
-            except:
+            except Exception:
                 return False
 
         def in_price_range(record):
@@ -485,7 +485,7 @@ def get_logical_tree(workload, nocache: bool = True, num_samples: int = None, sc
                     price = price.strip()
                     price = int(price.replace("$", "").replace(",", ""))
                 return 6e5 < price and price <= 2e6
-            except:
+            except Exception:
                 return False
 
         listings = pz.Dataset(

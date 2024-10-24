@@ -113,7 +113,7 @@ if __name__ == "__main__":
                     # set value to None if not found
                     if var.value is None:
                         var.value = "null"
-                except:
+                except Exception:
                     continue
                 variables.append(
                     {
@@ -143,13 +143,13 @@ if __name__ == "__main__":
     # G = nx.DiGraph()
     # try:
     #     G.add_nodes_from(references_df["key"].values)
-    # except:
+    # except Exception:
     #     breakpoint()
     # try:
     #     G.add_nodes_from(references_df["source"].unique())
     #     for idx, row in references_df.iterrows():
     #         G.add_edge(row["source"], row["key"])
-    # except:
+    # except Exception:
     #     G.add_nodes_from(references_df["filename"].unique())
     #     for idx, row in references_df.iterrows():
     #         G.add_edge(row["filename"], row["key"])

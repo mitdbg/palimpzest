@@ -127,7 +127,7 @@ if run_pz:
         for ref in reference:
             try:
                 index = ref.index
-            except:
+            except Exception:
                 continue
             # ref.key = ref.first_author.split()[0] + ref.title.split()[0] + str(ref.year)
             references.append(
@@ -160,7 +160,7 @@ else:
         df["first_title"] = df["title"].apply(lambda x: x.split()[0])
         try:
             df["first_author"] = df["authors"].apply(lambda x: x.split()[0])
-        except:
+        except Exception:
             breakpoint()
         df["key"] = df["first_author"] + df["first_title"] + df["year"].astype(str)
         references.append(df)
@@ -169,13 +169,13 @@ else:
 G = nx.DiGraph()
 try:
     G.add_nodes_from(references_df["key"].values)
-except:
+except Exception:
     breakpoint()
 try:
     G.add_nodes_from(references_df["source"].unique())
     for idx, row in references_df.iterrows():
         G.add_edge(row["source"], row["key"])
-except:
+except Exception:
     G.add_nodes_from(references_df["filename"].unique())
     for idx, row in references_df.iterrows():
         G.add_edge(row["filename"], row["key"])

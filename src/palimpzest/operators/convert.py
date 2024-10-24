@@ -490,7 +490,7 @@ class LLMConvert(ConvertOp):
         # list is indexed per record
         try:
             n_records = max([len(lst) for lst in field_answers.values()])
-        except:
+        except Exception:
             print(f"Error in field answers: {field_answers}. Returning empty records.")
             breakpoint()
             return [], []

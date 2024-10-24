@@ -1,7 +1,7 @@
 # for those of us who resist change and are still on Python 3.9
 try:
     from itertools import pairwise
-except:
+except Exception:
     from more_itertools import pairwise
 
 import gradio as gr
