@@ -16,10 +16,10 @@ class GenerationStats:
     # raw_answers: Optional[List[str]] = field(default_factory=list)
 
     # the total number of input tokens processed by this operator; None if this operation did not use an LLM
-    total_input_tokens: float = 0.0
+    total_input_tokens: int = 0
 
     # the total number of output tokens processed by this operator; None if this operation did not use an LLM
-    total_output_tokens: float = 0.0
+    total_output_tokens: int = 0
 
     # the total cost of processing the input tokens; None if this operation did not use an LLM
     total_input_cost: float = 0.0
