@@ -64,7 +64,7 @@ class Optimizer:
         cost_model: CostModel,
         no_cache: bool = False,
         verbose: bool = False,
-        available_models: List[Model] = [],
+        available_models: List[Model] | None = None,
         allow_bonded_query: bool = True,
         allow_conventional_query: bool = False,
         allow_code_synth: bool = True,
@@ -73,6 +73,8 @@ class Optimizer:
         sentinel_low_rank: Optional[int] = None,
     ):
         # store the policy
+        if available_models is None:
+            available_models = []
         self.policy = policy
 
         # store the cost model

@@ -22,7 +22,9 @@ def run_codegen(prompt, language="Python"):
     return code, stats
 
 
-def parse_multiple_outputs(text, outputs=["Thought", "Action"]):
+def parse_multiple_outputs(text: str, outputs: list[str] | None = None):
+    if outputs is None:
+        outputs = ["Thought", "Action"]
     data = {}
     for key in reversed(outputs):
         if key + ":" in text:
@@ -61,9 +63,9 @@ Return the implementation only."""
 
 
 # NOTE: I think examples was List[DataRecord] and is now List[dict]
-def codeGenSingle(
-    api: API, examples: List[Dict[DataRecord, DataRecord]] = list(), advice: str = None, language="Python"
-):
+def codeGenSingle(api: API, examples: List[Dict[DataRecord, DataRecord]] = None, advice: str = None, language="Python"):
+    if examples is None:
+        examples = list()
     prompt_template = CODEGEN_PROMPT
     context = {
         "language": language,
@@ -106,7 +108,7 @@ For example, if I want to complete a task: "extract the salary number (in USD) f
 Idea 1: Use regular expressions to extract the salary number: a number with a dollar sign in front of it. For example, $100,000.
 Idea 2: Find the table entry with the salary number.
 Idea 3: Use a pre-trained NLP model to extract the salary number.
-# 
+#
 Now, consider the following {language} programming task that extracts `{output}` ({output_desc}) from given inputs:
 {examples_desc}
 Please provide me with {n} different ideas to complete this task. Return the ideas only, following the format above.
@@ -114,7 +116,9 @@ Please provide me with {n} different ideas to complete this task. Return the ide
 
 
 # NOTE: I think examples was List[DataRecord] and is now List[dict]
-def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]] = list(), language="Python", n_advices=4):
+def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]] = None, language="Python", n_advices=4):
+    if examples is None:
+        examples = list()
     prompt_template = ADVICEGEN_PROMPT
     context = {
         "language": language,
@@ -142,12 +146,14 @@ def adviceGen(api: API, examples: List[Dict[DataRecord, DataRecord]] = list(), l
 # NOTE: I think examples was List[DataRecord] and is now List[dict]
 def reGenerationCondition(
     api: API,
-    examples: List[Dict[DataRecord, DataRecord]] = list(),
+    examples: List[Dict[DataRecord, DataRecord]] = None,
     strategy: CodeGenStrategy = CodeGenStrategy.SINGLE,
     code_ensemble: int = 4,  # if strategy != SINGLE
     code_num_examples: int = 1,  # if strategy != EXAMPLE_ENSEMBLE
     code_regenerate_frequency: int = 200,  # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION
 ) -> bool:
+    if examples is None:
+        examples = list()
     if strategy == CodeGenStrategy.NONE:
         return False
     if strategy == CodeGenStrategy.EXAMPLE_ENSEMBLE:
@@ -161,12 +167,14 @@ def reGenerationCondition(
 # NOTE: I think examples was List[DataRecord] and is now List[dict]
 def codeEnsembleGeneration(
     api: API,
-    examples: List[Dict[DataRecord, DataRecord]] = list(),
+    examples: List[Dict[DataRecord, DataRecord]] = None,
     strategy: CodeGenStrategy = CodeGenStrategy.SINGLE,
     code_ensemble_num: int = 1,  # if strategy != SINGLE
     code_num_examples: int = 1,  # if strategy != EXAMPLE_ENSEMBLE
     code_regenerate_frequency: int = 200,  # if strategy == ADVICE_ENSEMBLE_WITH_VALIDATION
 ) -> Tuple[Dict[str, str], CodeGenEnsembleStats]:
+    if examples is None:
+        examples = list()
     code_ensemble = dict()
     code_gen_stats = CodeGenEnsembleStats()
     if strategy == CodeGenStrategy.NONE:

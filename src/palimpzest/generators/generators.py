@@ -123,12 +123,10 @@ class CustomGenerator(BaseGenerator):
         3. return the list of those tokens' log probabilities
         """
         # get log probabilities data structure
-        tokens, token_logprobs = None, None
-
+        token_logprobs = None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
             log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"]["content"]
-            tokens = list(map(lambda elt: elt["token"], log_probs))
             token_logprobs = list(map(lambda elt: elt["logprob"], log_probs))
         elif self.model_name in [Model.GEMINI_1.value]:
             return None
@@ -139,7 +137,6 @@ class CustomGenerator(BaseGenerator):
             # token_logprobs = [0] * len(tokens)
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             # reponse: dict_keys(['prompt', 'choices', 'usage', 'finish_reason', 'tokens', 'token_logprobs'])
-            tokens = dspy_lm.history[-1]["response"]["tokens"]
             token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
         else:
             raise ValueError(
@@ -178,8 +175,6 @@ class CustomGenerator(BaseGenerator):
         end_time = time.time()
 
         answer = response["choices"][0]["message"]["content"]
-        answer_log_probs = response["choices"][0]["logprobs"]
-        finish_reason = response["choices"][0]["finish_reason"]
         usage = response["usage"]
 
         # collect statistics on prompt, usage, and timing
@@ -300,12 +295,11 @@ class DSPyGenerator(BaseGenerator):
         3. return the list of those tokens' log probabilities
         """
         # get log probabilities data structure
-        tokens, token_logprobs = None, None
+        token_logprobs = None
 
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             # [{'token': 'some', 'bytes': [12, 34, ...], 'logprob': -0.7198808, 'top_logprobs': []}}]
             log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"]["content"]
-            tokens = list(map(lambda elt: elt["token"], log_probs))
             token_logprobs = list(map(lambda elt: elt["logprob"], log_probs))
         elif self.model_name in [Model.GEMINI_1.value]:
             return None
@@ -316,7 +310,6 @@ class DSPyGenerator(BaseGenerator):
             # token_logprobs = [0] * len(tokens)
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA2.value]:
             # reponse: dict_keys(['prompt', 'choices', 'usage', 'finish_reason', 'tokens', 'token_logprobs'])
-            tokens = dspy_lm.history[-1]["response"]["tokens"]
             token_logprobs = dspy_lm.history[-1]["response"]["token_logprobs"]
         else:
             raise ValueError(
@@ -361,7 +354,6 @@ class DSPyGenerator(BaseGenerator):
         end_time = time.time()
 
         # extract the log probabilities for the actual result(s) which are returned
-        answer_log_probs = self._get_answer_log_probs(dspy_lm, pred.answer)
         usage, finish_reason = self._get_usage_and_finish_reason(dspy_lm)
 
         # collect statistics on prompt, usage, and timing

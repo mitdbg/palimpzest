@@ -31,8 +31,14 @@ class CostModel:
     """
 
     def __init__(
-        self, source_dataset_id: str, sample_execution_data: List[RecordOpStats] = [], confidence_level: float = 0.90
+        self,
+        source_dataset_id: str,
+        sample_execution_data: List[RecordOpStats] | None = None,
+        confidence_level: float = 0.90,
     ):
+        if sample_execution_data is None:
+            sample_execution_data = []
+
         # store source dataset id to help with estimating cardinalities
         self.source_dataset_id = source_dataset_id
 
