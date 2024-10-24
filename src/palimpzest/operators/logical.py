@@ -28,7 +28,7 @@ class LogicalOperator:
 
     def __init__(
         self,
-        inputSchema: Optional[Type[Schema],
+        inputSchema: Optional[Type[Schema]],
         outputSchema: Type[Schema],
     ):
         self.inputSchema = inputSchema
