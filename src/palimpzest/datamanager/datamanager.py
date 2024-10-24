@@ -144,15 +144,13 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         """Return a dataset from the registry."""
         if dataset_id not in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
-        if not self._current_config:
-            raise Exception("No current config found.")
 
         entry, rock = self._registry[dataset_id]
         if entry == "dir":
             if all([f.endswith(tuple(constants.IMAGE_EXTENSIONS)) for f in os.listdir(rock)]):
                 return ImageFileDirectorySource(rock, dataset_id)
             elif all([f.endswith(tuple(constants.PDF_EXTENSIONS)) for f in os.listdir(rock)]):
-                pdfprocessor = self._current_config.get("pdfprocessor")
+                pdfprocessor = self.current_config.get("pdfprocessor")
                 if not pdfprocessor:
                     raise Exception("No PDF processor found in the current config.")
                 file_cache_dir = self.getFileCacheDir()
