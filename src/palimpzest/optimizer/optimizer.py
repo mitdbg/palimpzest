@@ -142,7 +142,7 @@ class Optimizer:
     def construct_group_tree(self, dataset_nodes: List[Set]) -> Tuple[List[int], Set[str], Dict[str, Set[str]]]:
         # get node, outputSchema, and inputSchema(if applicable)
         node = dataset_nodes[-1]
-        outputSchema = node.schema()
+        outputSchema = node.schema
         inputSchema = dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
 
         ### convert node --> Group ###
@@ -151,7 +151,7 @@ class Optimizer:
         # create the op for the given node
         op: LogicalOperator | None = None
         if not self.no_cache and DataDirectory().hasCachedAnswer(uid):
-            op = CacheScan(dataset_id=uid, input_schema=None, outputSchema=outputSchema)
+            op = CacheScan(dataset_id=uid, inputSchema=None, outputSchema=outputSchema)
         elif isinstance(node, DataSource):
             op = BaseScan(dataset_id=uid, outputSchema=outputSchema)
         elif node._filter is not None:

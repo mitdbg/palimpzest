@@ -28,11 +28,11 @@ class LogicalOperator:
 
     def __init__(
         self,
-        inputSchema: Optional[Type[Schema]],
         outputSchema: Type[Schema],
+        inputSchema: Type[Schema] | None = None,
     ):
-        self.inputSchema = inputSchema
         self.outputSchema = outputSchema
+        self.inputSchema = inputSchema
         self.op_id: str | None = None
 
     def __str__(self) -> str:
@@ -90,7 +90,11 @@ class BaseScan(LogicalOperator):
     """A BaseScan is a logical operator that represents a scan of a particular data source."""
 
     def __init__(self, dataset_id: str, *args, **kwargs):
-        kwargs["inputSchema"] = None
+        if kwargs.get("inputSchema", None) is not None:
+            raise Exception(
+                f"BaseScan must be initialized with `inputSchema=None` but was initialized with `inputSchema={kwargs.get('inputSchema')}`"
+            )
+
         super().__init__(*args, **kwargs)
         self.dataset_id = dataset_id
 
@@ -120,6 +124,11 @@ class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached Set."""
 
     def __init__(self, dataset_id: str, *args, **kwargs):
+        if kwargs.get("inputSchema", None) is not None:
+            raise Exception(
+                f"CacheScan must be initialized with `inputSchema=None` but was initialized with `inputSchema={kwargs.get('inputSchema')}`"
+            )
+
         super().__init__(*args, **kwargs)
         self.dataset_id = dataset_id
 
@@ -156,7 +165,7 @@ class ConvertScan(LogicalOperator):
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         udf: Optional[Callable] = None,
         image_conversion: bool = False,
-        depends_on: List[str] = [],
+        depends_on: List[str] | None = None,
         desc: str | None = None,
         targetCacheId: str | None = None,
         *args,
@@ -166,7 +175,7 @@ class ConvertScan(LogicalOperator):
         self.cardinality = cardinality
         self.udf = udf
         self.image_conversion = image_conversion or (self.inputSchema == ImageFile)
-        self.depends_on = depends_on
+        self.depends_on = [] if depends_on is None else depends_on
         self.desc = desc
         self.targetCacheId = targetCacheId
 
@@ -215,7 +224,7 @@ class FilteredScan(LogicalOperator):
         self,
         filter: Filter,
         image_filter: bool = False,
-        depends_on: List[str] = [],
+        depends_on: List[str] | None = None,
         targetCacheId: str | None = None,
         *args,
         **kwargs,
@@ -223,7 +232,7 @@ class FilteredScan(LogicalOperator):
         super().__init__(*args, **kwargs)
         self.filter = filter
         self.image_filter = image_filter or (self.inputSchema == ImageFile)
-        self.depends_on = depends_on
+        self.depends_on = [] if depends_on is None else depends_on
         self.targetCacheId = targetCacheId
 
     def __str__(self):

@@ -41,13 +41,15 @@ class DataRecord:
         self._parent_id = parent_id
 
     def __setattr__(self, name: str, value: Any, /) -> None:
-        if name in ["schema", "scan_idx"]:
+        if name in ["schema", "_data"]:
             super().__setattr__(name, value)
         else:
             self._data[name] = value
 
     def __getattr__(self, name: str) -> Any:
-        if name in self._data:
+        if name == "_data":
+            pass
+        elif name in self._data:
             return self._data[name]
         else:
             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
