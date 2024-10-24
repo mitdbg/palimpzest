@@ -51,7 +51,7 @@ class CodeSynthesisConvert(LLMConvert):
             exemplars_cache_id = self.get_op_id()
             exemplars = cache.getCachedData("codeExemplars", exemplars_cache_id)
             # set and return exemplars if it is not empty
-            if exemplars is not None and len(exemplars) > 0:
+            if exemplars is not None and isinstance(exemplars, list) and len(exemplars) > 0:
                 self.exemplars = exemplars
         self.field_to_code_ensemble = {}
 

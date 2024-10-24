@@ -16,10 +16,12 @@ class GenerationStats:
     # raw_answers: Optional[List[str]] = field(default_factory=list)
 
     # the total number of input tokens processed by this operator; None if this operation did not use an LLM
-    total_input_tokens: int = 0.0
+    # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
+    total_input_tokens: float = 0.0
 
     # the total number of output tokens processed by this operator; None if this operation did not use an LLM
-    total_output_tokens: int = 0.0
+    # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
+    total_output_tokens: float = 0.0
 
     # the total cost of processing the input tokens; None if this operation did not use an LLM
     total_input_cost: float = 0.0
@@ -161,10 +163,12 @@ class RecordOpStats:
     generated_fields: Optional[List[str]] = None
 
     # the total number of input tokens processed by this operator; None if this operation did not use an LLM
-    total_input_tokens: int = 0.0
+    # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
+    total_input_tokens: float = 0.0
 
     # the total number of output tokens processed by this operator; None if this operation did not use an LLM
-    total_output_tokens: int = 0.0
+    # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
+    total_output_tokens: float = 0.0
 
     # the total cost of processing the input tokens; None if this operation did not use an LLM
     total_input_cost: float = 0.0
@@ -222,7 +226,7 @@ class OperatorStats:
         plan_id: str,
     ):
         # convert individual record into list
-        if type(record_op_stats_lst) != type([]):
+        if not isinstance(record_op_stats_lst, list):
             record_op_stats_lst = [record_op_stats_lst]
 
         # update op stats
@@ -238,6 +242,7 @@ class OperatorStats:
         self.total_op_time += op_stats.total_op_time
         self.total_op_cost += op_stats.total_op_cost
         self.record_op_stats_lst.extend(op_stats.record_op_stats_lst)
+        return self
 
     def to_json(self):
         return {
@@ -260,7 +265,7 @@ class PlanStats:
     plan_id: str
 
     # string representation of the physical plan
-    plan_str: str = None
+    plan_str: str | None = None
 
     # dictionary of OperatorStats objects (one for each operator)
     operator_stats: Dict[str, OperatorStats] = field(default_factory=dict)
@@ -315,7 +320,7 @@ class ExecutionStats:
     """
 
     # string for identifying this workload execution
-    execution_id: str = None
+    execution_id: str | None = None
 
     # dictionary of PlanStats objects (one for each plan run during execution)
     plan_stats: Dict[str, PlanStats] = field(default_factory=dict)
@@ -358,28 +363,28 @@ class OperatorCostEstimates:
     quality: float
 
     # lower bound on cardinality
-    cardinality_lower_bound: float = None
+    cardinality_lower_bound: float | None = None
 
     # upper bound on cardinality
-    cardinality_upper_bound: float = None
+    cardinality_upper_bound: float | None = None
 
     # lower bound on time_per_record
-    time_per_record_lower_bound: float = None
+    time_per_record_lower_bound: float | None = None
 
     # upper bound on time_per_record
-    time_per_record_upper_bound: float = None
+    time_per_record_upper_bound: float | None = None
 
     # lower bound on cost_per_record
-    cost_per_record_lower_bound: float = None
+    cost_per_record_lower_bound: float | None = None
 
     # upper bound on cost_per_record
-    cost_per_record_upper_bound: float = None
+    cost_per_record_upper_bound: float | None = None
 
     # lower bound on quality
-    quality_lower_bound: float = None
+    quality_lower_bound: float | None = None
 
     # upper bound on quality
-    quality_upper_bound: float = None
+    quality_upper_bound: float | None = None
 
     def __post_init__(self):
         if self.cardinality_lower_bound is None and self.cardinality_upper_bound is None:
@@ -415,25 +420,25 @@ class PlanCost:
     quality: float
 
     # operator-specific cost estimates
-    op_estimates: OperatorCostEstimates = None
+    op_estimates: OperatorCostEstimates | None = None
 
     # lower bound on the expression cost
-    cost_lower_bound: float = None
+    cost_lower_bound: float | None = None
 
     # upper bound on the expression cost
-    cost_upper_bound: float = None
+    cost_upper_bound: float | None = None
 
     # lower bound on the expression time
-    time_lower_bound: float = None
+    time_lower_bound: float | None = None
 
     # upper bound on the expression time
-    time_upper_bound: float = None
+    time_upper_bound: float | None = None
 
     # lower bound on the expression quality
-    quality_lower_bound: float = None
+    quality_lower_bound: float | None = None
 
     # upper bound on the expression quality
-    quality_upper_bound: float = None
+    quality_upper_bound: float | None = None
 
     def __post_init__(self):
         if self.time_lower_bound is None and self.time_upper_bound is None:
