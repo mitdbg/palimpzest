@@ -213,6 +213,7 @@ class OperatorStats:
         self.total_op_time += op_stats.total_op_time
         self.total_op_cost += op_stats.total_op_cost
         self.record_op_stats_lst.extend(op_stats.record_op_stats_lst)
+        return self
 
     def to_json(self):
         return {

@@ -50,7 +50,7 @@
 
 # compute fully materialized sample matrices
 export LOG_MATRICES="TRUE"
-for num_samples in 5
+for num_samples in 100
 do
     rank=$((num_samples - 1))
     echo "RANK: ${rank} -- NUM_SAMPLES: ${num_samples}"
