@@ -11,8 +11,10 @@ import pandas as pd
 import requests
 from papermage import Document
 
-import palimpzest as pz
-from palimpzest.constants import *
+from palimpzest.constants import MAX_ROWS
+from palimpzest.corelib.schemas import Table
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.elements.records import DataRecord
 from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
@@ -30,7 +32,7 @@ def url_to_file(candidate):
 
 
 def file_to_pdf(candidate):
-    pdfprocessor = pz.DataDirectory().current_config.get("pdfprocessor")
+    pdfprocessor = DataDirectory().current_config.get("pdfprocessor")
     if pdfprocessor == "modal":
         print("handling PDF processing remotely")
         remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
@@ -74,12 +76,12 @@ def xls_to_tables(candidate):
 
         # TODO extend number of rows with dynamic sizing of context length
         # construct data record
-        dr = pz.DataRecord(pz.Table, parent_id=candidate._id)
+        dr = DataRecord(Table, parent_id=candidate._id)
         rows = []
         for row in dataframe.values[:100]:
             row_record = [str(x) for x in row]
             rows += [row_record]
-        dr.rows = rows[: pz.MAX_ROWS]
+        dr.rows = rows[:MAX_ROWS]
         dr.filename = candidate.filename
         dr.header = dataframe.columns.values.tolist()
         dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
