@@ -5,10 +5,9 @@ import time
 from typing import Any, Dict, List, Tuple
 
 from palimpzest import generators
-from palimpzest.constants import *
+from palimpzest.constants import GPT_4_MODEL_CARD, Model
 from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.elements import *
 from palimpzest.operators.convert import LLMConvert, LLMConvertBonded, LLMConvertConventional
 from palimpzest.prompts import ADVICEGEN_PROMPT, CODEGEN_PROMPT, EXAMPLE_PROMPT
 from palimpzest.utils import API
@@ -493,7 +492,7 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvert):
             api, output_field_name, exemplars=self.exemplars[:num_exemplars], n_advices=code_ensemble_num
         )
         for key, value in adv_stats.items():
-            if type(value) == type(dict()):
+            if isinstance(value, dict):
                 for k2, v2 in value.items():
                     output_stats[k2] = output_stats.get(k2, 0) + v2
             else:
