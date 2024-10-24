@@ -237,17 +237,12 @@ class OperatorStats:
             self.total_op_time += record_op_stats.time_per_record
             self.total_op_cost += record_op_stats.cost_per_record
 
-    def __add__(self, op_stats: OperatorStats):
+    def __iadd__(self, op_stats: OperatorStats):
         """NOTE: we assume the execution layer guarantees these op_stats belong to the same operator."""
-        new_op_stats = OperatorStats(
-            op_id=self.op_id,
-            op_name=self.op_name,
-            total_op_time=self.total_op_time + op_stats.total_op_time,
-            total_op_cost=self.total_op_cost + op_stats.total_op_cost,
-            record_op_stats_lst=self.record_op_stats_lst + op_stats.record_op_stats_lst,
-            op_details=self.op_details,
-        )
-        return new_op_stats
+        self.total_op_time += op_stats.total_op_time
+        self.total_op_cost += op_stats.total_op_cost
+        self.record_op_stats_lst += op_stats.record_op_stats_lst
+        return self
 
     def to_json(self):
         return {
@@ -293,8 +288,7 @@ class PlanStats:
         self.total_plan_cost += plan_stats.total_plan_cost
         for op, op_stats in plan_stats.operator_stats.items():
             if op in self.operator_stats:
-                existing = self.operator_stats[op]
-                self.operator_stats[op] = op_stats + existing
+                self.operator_stats[op] += op_stats
             else:
                 self.operator_stats[op] = op_stats
 
