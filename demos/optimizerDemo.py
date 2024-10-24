@@ -469,7 +469,7 @@ if __name__ == "__main__":
     else:
         print("Unknown engine")
         exit(1)
-    
+
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
