@@ -370,10 +370,10 @@ class DSPyGenerator(BaseGenerator):
             print(f"Generating -- {self.model_name}")
         start_time = time.time()
         # TODO: remove after SIGMOD
-        if self.model_name == Model.LLAMA3.value:
+        if self.model_name == Model.LLAMA3.value or self.model_name == Model.MIXTRAL.value:
             TOKENS_PER_CHARACTER = 0.25
-            if len(context) * TOKENS_PER_CHARACTER > 7000:
-                context_factor = len(context) * TOKENS_PER_CHARACTER / 7000.0
+            if len(context) * TOKENS_PER_CHARACTER > 6000:
+                context_factor = len(context) * TOKENS_PER_CHARACTER / 6000.0
                 context = context[:int(len(context)/context_factor)]
         pred = cot(question, context)
         end_time = time.time()

@@ -273,18 +273,13 @@ class BiodexValidationSource(pz.ValidationDataSource):
         self.dataset = datasets.load_dataset("BioDEX/BioDEX-ICSR")
         self.train_dataset = [self.dataset['train'][idx] for idx in range(25)]
 
-        # shuffle and sample from full test dataset
+        # sample from full test dataset
         self.test_dataset = [self.dataset['test'][idx] for idx in range(len(self.dataset['test']))]
-        rng = np.random.default_rng(seed=seed)
-        rng.shuffle(self.test_dataset)
-        self.test_dataset = self.test_dataset[:250]
+        self.test_dataset = self.test_dataset[:250] # use first 250 to compare directly with biodex
 
         self.num_samples = num_samples
         self.shuffle = shuffle
         self.seed = seed
-
-        if num_samples > 25:
-            raise Exception("We have not labelled more than the first 25 listings!")
 
         # construct mapping from listing --> label (field, value) pairs
         def compute_target_record(entry):

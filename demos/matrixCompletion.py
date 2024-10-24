@@ -192,7 +192,7 @@ class BiodexDrugs(BiodexEntry):
     drugs = pz.ListField(desc="The **list** of all active substance names of the drugs discussed in the report.\n - For example: [\"azathioprine\", \"infliximab\", \"mesalamine\", \"prednisolone\"]", element_type=pz.StringField, required=True)
 
 class BiodexValidationSource(pz.ValidationDataSource):
-    def __init__(self, datasetId, shuffle: bool=False, seed: int=42):
+    def __init__(self, datasetId, seed: int=42):
         super().__init__(BiodexEntry, datasetId)
         self.dataset = datasets.load_dataset("BioDEX/BioDEX-ICSR")
         self.seed = seed
@@ -201,7 +201,9 @@ class BiodexValidationSource(pz.ValidationDataSource):
         self.val_dataset = [self.dataset['test'][idx] for idx in range(len(self.dataset['test']))]
         rng = np.random.default_rng(seed=seed)
         rng.shuffle(self.val_dataset)
-        self.val_dataset = self.val_dataset[:5]
+        # TODO: also store mapping from optimizations (phys_op_id,op_details,op_str) to columns in metrics
+        # NOTE: used first 100 for MC evaluation; 250 for plan execution
+        self.val_dataset = self.val_dataset[:100] # 250
 
         self.test_dataset = []
 
@@ -229,6 +231,8 @@ class BiodexValidationSource(pz.ValidationDataSource):
         # define quality eval function for drugs and reactions fields
         def f1_eval(preds: list, targets: list):
             # TODO? convert preds to a list of strings
+            if preds is None:
+                return 0.0
 
             # compute precision and recall
             s_preds = set(preds)
@@ -315,8 +319,8 @@ if __name__ == "__main__":
     verbose = args.verbose
     rank = args.rank
     num_samples = args.num_samples
-    # execution_engine = pz.SequentialParallelSentinelExecution
-    execution_engine = pz.SequentialSingleThreadSentinelExecution
+    execution_engine = pz.SequentialParallelSentinelExecution
+    # execution_engine = pz.SequentialSingleThreadSentinelExecution
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")

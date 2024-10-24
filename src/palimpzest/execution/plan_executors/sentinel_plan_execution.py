@@ -5,7 +5,7 @@ from palimpzest.elements import DataRecord, DataRecordSet
 from palimpzest.execution import ExecutionEngine, SequentialSingleThreadPlanExecutor
 from palimpzest.operators import *
 from palimpzest.optimizer import SentinelPlan
-from palimpzest.utils import create_sample_matrix, getChampionModel
+from palimpzest.utils import create_sample_mask, getChampionModel
 
 from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
@@ -279,7 +279,7 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
             )
 
             # create a sample matrix
-            sample_matrix, record_to_row_map, phys_op_to_col_map = create_sample_matrix(candidates, op_set, self.rank)
+            sample_matrix, record_to_row_map, phys_op_to_col_map = create_sample_mask(candidates, op_set, self.rank)
 
             # run operator set on records
             source_id_to_record_sets, source_id_to_champion_record_set = self.execute_op_set(candidates, op_set, sample_matrix)
@@ -363,7 +363,9 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
     """
     def __init__(self, pick_output_strategy: PickOutputStrategy = PickOutputStrategy.CHAMPION, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.max_workers = self.get_parallel_max_workers()
+        # self.max_workers = self.get_parallel_max_workers()
+        # TODO: undo
+        self.max_workers = 4
         self.pick_output_fn = (
             self.pick_champion_output
             if pick_output_strategy == PickOutputStrategy.CHAMPION
@@ -559,7 +561,7 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
             )
 
             # create a sample matrix
-            sample_matrix, record_to_row_map, phys_op_to_col_map = create_sample_matrix(candidates, op_set, self.rank)
+            sample_matrix, record_to_row_map, phys_op_to_col_map = create_sample_mask(candidates, op_set, self.rank)
 
             # run operator set on records
             source_id_to_record_sets, source_id_to_champion_record_set = self.execute_op_set(candidates, op_set, sample_matrix)
