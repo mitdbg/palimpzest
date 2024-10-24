@@ -76,15 +76,11 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             default_config.set_current_config()
 
         # read current config (and dict. of configs) from disk
-        self.current_config = None
+        self._current_config = None
         if os.path.exists(current_config_path):
             with open(current_config_path, "r") as f:
                 current_config_dict = yaml.safe_load(f)
-                self.current_config = Config(current_config_dict["current_config_name"])
-
-        # if we are here and current_config is None, we throw
-        if self.current_config is None:
-            raise Exception("Could not find current config file at", current_config_path)
+                self._current_config = Config(current_config_dict["current_config_name"])
 
         # initialize the file cache directory, defaulting to the system's temporary directory "tmp/pz"
         pz_file_cache_dir = self.current_config.get("filecachedir")
@@ -103,17 +99,19 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
                     cacheId = file[:-7]
                     self._cache[cacheId] = root + "/" + file
 
+    @property
+    def current_config(self):
+        if not self._current_config:
+            raise Exception("No current config found.")
+        return self._current_config
+
     def getCacheService(self):
         return self.cacheService
 
     def getConfig(self):
-        if not self.current_config:
-            raise Exception("No current config found.")
         return self.current_config._load_config()
 
     def getFileCacheDir(self):
-        if not self.current_config:
-            raise Exception("No current config found.")
         return self.current_config.get("filecachedir")
 
     #
@@ -146,8 +144,6 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         """Return a dataset from the registry."""
         if dataset_id not in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
-        if not self.current_config:
-            raise Exception("No current config found.")
 
         entry, rock = self._registry[dataset_id]
         if entry == "dir":
