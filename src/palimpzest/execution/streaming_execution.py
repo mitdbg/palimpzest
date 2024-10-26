@@ -1,9 +1,9 @@
 import time
 
 from palimpzest.corelib.schemas import SourceRecord
-from palimpzest.cost_model.cost_model import CostModel
+from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import OperatorStats, PlanStats
-from palimpzest.elements import DataRecord
+from palimpzest.elements.records import DataRecord
 from palimpzest.execution.execution_engine import ExecutionEngine
 from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp

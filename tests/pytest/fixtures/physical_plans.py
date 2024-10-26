@@ -1,9 +1,14 @@
 import pytest
 
-import palimpzest as pz
-from palimpzest.corelib import File
-from palimpzest.operators import *
-from palimpzest.optimizer import PhysicalPlan
+from palimpzest.constants import Cardinality, Model
+from palimpzest.corelib.schemas import File, Schema, StringField, TextFile
+from palimpzest.elements.filters import Filter
+from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvertSingle
+from palimpzest.operators.convert import LLMConvertBonded
+from palimpzest.operators.datasource import MarshalAndScanDataOp
+from palimpzest.operators.filter import LLMFilter, NonLLMFilter
+from palimpzest.operators.token_reduction_convert import TokenReducedConvertBonded
+from palimpzest.optimizer.plan import PhysicalPlan
 
 
 ### PHYSICAL PLANS ###
@@ -118,8 +123,8 @@ def one_to_many_convert_plan(real_estate_listing_files_schema, room_real_estate_
 @pytest.fixture
 def simple_plan_factory():
     def simple_plan_generator(convert_model, filter_model):
-        class FooSchema(pz.Schema):
-            foo = pz.StringField("foo")
+        class FooSchema(Schema):
+            foo = StringField("foo")
 
         scanOp = MarshalAndScanDataOp(outputSchema=File, dataset_id="foobar")
         convertOpLLM = LLMConvertBonded(

@@ -4,13 +4,12 @@ import pandas as pd
 import pytest
 from sklearn.metrics import precision_recall_fscore_support
 
-import palimpzest as pz
-from palimpzest.execution import (
-    Execute,
+from palimpzest.execution.nosentinel_execution import (
     PipelinedParallelNoSentinelExecution,
     PipelinedSingleThreadNoSentinelExecution,
     SequentialSingleThreadNoSentinelExecution,
 )
+from palimpzest.policy import MinCost
 from palimpzest.utils.model_helpers import getModels
 
 
@@ -19,7 +18,6 @@ def score_biofabric_plans(dataset, records, policy_str=None, reopt=False) -> flo
     Computes the results of all biofabric plans
     """
     # parse records
-    exclude_keys = ["op_id", "id", "parent_id", "stats"]
     matching_columns = [
         "age_at_diagnosis",
         "ajcc_pathologic_n",
@@ -185,7 +183,7 @@ def test_workload(dataset, workload, execution_engine):
     available_models = getModels(include_vision=True)
     records, stats = Execute(
         workload,
-        policy=pz.MinCost(),
+        policy=MinCost(),
         available_models=available_models,
         num_samples=num_samples,
         nocache=True,

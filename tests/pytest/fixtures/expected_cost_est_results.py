@@ -2,7 +2,7 @@ import pytest
 
 from palimpzest.constants import Model
 from palimpzest.operators import ConvertOp, FilterOp, MarshalAndScanDataOp
-from palimpzest.utils import getModels
+from palimpzest.utils.model_helpers import getModels
 
 
 @pytest.fixture

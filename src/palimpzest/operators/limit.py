@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List
 
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.elements import DataRecord
+from palimpzest.elements.records import DataRecord
 from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 
 

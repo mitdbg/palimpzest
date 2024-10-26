@@ -3,7 +3,7 @@ import json
 import pytest
 
 from palimpzest.dataclasses import RecordOpStats
-from palimpzest.elements import DataRecord
+from palimpzest.elements.records import DataRecord
 
 
 ### Side-Effects for Mocking LLM Calls ###

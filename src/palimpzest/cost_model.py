@@ -25,7 +25,7 @@ from palimpzest.operators.datasource import CacheScanDataOp, MarshalAndScanDataO
 from palimpzest.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.operators.limit import LimitScanOp
 from palimpzest.operators.token_reduction_convert import TokenReducedConvert
-from palimpzest.utils import getChampionModelName, getModels
+from palimpzest.utils.model_helpers import getChampionModelName, getModels
 
 warnings.simplefilter(action="ignore", category=UserWarning)
 

@@ -4,9 +4,10 @@ import time
 from typing import List
 
 from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
-from palimpzest.corelib import Number
+from palimpzest.corelib.schemas import Number
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.elements import DataRecord, GroupBySig
+from palimpzest.elements.groupbysig import GroupBySig
+from palimpzest.elements.records import DataRecord
 from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 
 
@@ -149,64 +150,6 @@ class ApplyGroupByOp(AggregateOp):
         return drs, record_op_stats_lst
 
 
-class CountAggregateOp(AggregateOp):
-    # NOTE: we don't actually need / use aggFunc here (yet)
-
-    def __init__(self, aggFunc: AggFunc, *args, **kwargs):
-        kwargs["outputSchema"] = Number
-        super().__init__(*args, **kwargs)
-        self.aggFunc = aggFunc
-
-    def __eq__(self, other: PhysicalOperator):
-        return isinstance(other, self.__class__) and self.aggFunc == other.aggFunc
-
-    def __str__(self):
-        op = super().__str__()
-        op += f"    Function: {str(self.aggFunc)}\n"
-        return op
-
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {"aggFunc": self.aggFunc, **copy_kwargs}
-
-    def get_op_params(self):
-        """
-        We identify the operation by its aggregation function.
-        inputSchema is ignored as it depends on how the Optimizer orders operations.
-        """
-        return {"aggFunc": str(self.aggFunc)}
-
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
-        # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
-        return OperatorCostEstimates(
-            cardinality=1,
-            time_per_record=0,
-            cost_per_record=0,
-            quality=1.0,
-        )
-
-    def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
-        start_time = time.time()
-
-        # NOTE: this will set the parent_id to be the id of the final source record;
-        #       in the near future we may want to have parent_id accept a list of ids
-        dr = DataRecord(Number, parent_id=candidates[-1]._id)
-        dr.value = len(candidates)
-
-        # create RecordOpStats object
-        record_op_stats = RecordOpStats(
-            record_id=dr._id,
-            record_parent_id=dr._parent_id,
-            record_state=dr._asDict(include_bytes=False),
-            op_id=self.get_op_id(),
-            op_name=self.op_name(),
-            time_per_record=time.time() - start_time,
-            cost_per_record=0.0,
-        )
-
-        return [dr], [record_op_stats]
-
-
 class AverageAggregateOp(AggregateOp):
     # NOTE: we don't actually need / use aggFunc here (yet)
 
@@ -257,6 +200,64 @@ class AverageAggregateOp(AggregateOp):
         #       in the near future we may want to have parent_id accept a list of ids
         dr = DataRecord(Number, parent_id=candidates[-1]._id)
         dr.value = sum(list(map(lambda c: float(c.value), candidates))) / len(candidates)
+
+        # create RecordOpStats object
+        record_op_stats = RecordOpStats(
+            record_id=dr._id,
+            record_parent_id=dr._parent_id,
+            record_state=dr._asDict(include_bytes=False),
+            op_id=self.get_op_id(),
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+        )
+
+        return [dr], [record_op_stats]
+
+
+class CountAggregateOp(AggregateOp):
+    # NOTE: we don't actually need / use aggFunc here (yet)
+
+    def __init__(self, aggFunc: AggFunc, *args, **kwargs):
+        kwargs["outputSchema"] = Number
+        super().__init__(*args, **kwargs)
+        self.aggFunc = aggFunc
+
+    def __eq__(self, other: PhysicalOperator):
+        return isinstance(other, self.__class__) and self.aggFunc == other.aggFunc
+
+    def __str__(self):
+        op = super().__str__()
+        op += f"    Function: {str(self.aggFunc)}\n"
+        return op
+
+    def get_copy_kwargs(self):
+        copy_kwargs = super().get_copy_kwargs()
+        return {"aggFunc": self.aggFunc, **copy_kwargs}
+
+    def get_op_params(self):
+        """
+        We identify the operation by its aggregation function.
+        inputSchema is ignored as it depends on how the Optimizer orders operations.
+        """
+        return {"aggFunc": str(self.aggFunc)}
+
+    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
+        return OperatorCostEstimates(
+            cardinality=1,
+            time_per_record=0,
+            cost_per_record=0,
+            quality=1.0,
+        )
+
+    def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
+        start_time = time.time()
+
+        # NOTE: this will set the parent_id to be the id of the final source record;
+        #       in the near future we may want to have parent_id accept a list of ids
+        dr = DataRecord(Number, parent_id=candidates[-1]._id)
+        dr.value = len(candidates)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(

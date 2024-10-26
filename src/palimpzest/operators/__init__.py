@@ -1,31 +1,49 @@
-from .aggregate import *
-from .code_synthesis_convert import *
-from .convert import *
-from .datasource import *
-from .filter import *
-from .limit import *
-from .logical import *
-from .physical import *
-from .token_reduction_convert import *
+from palimpzest.operators.aggregate import AggregateOp, ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
+from palimpzest.operators.convert import ConvertOp, LLMConvert, LLMConvertBonded, LLMConvertConventional, NonLLMConvert
+from palimpzest.operators.datasource import CacheScanDataOp, DataSourcePhysicalOp, MarshalAndScanDataOp
+from palimpzest.operators.filter import FilterOp, LLMFilter, NonLLMFilter
+from palimpzest.operators.limit import LimitScanOp
+from palimpzest.operators.logical import (
+    Aggregate,
+    BaseScan,
+    CacheScan,
+    ConvertScan,
+    FilteredScan,
+    GroupByAggregate,
+    LimitScan,
+    LogicalOperator,
+)
+from palimpzest.operators.physical import PhysicalOperator
 
-
-# https://stackoverflow.com/a/21563930
-def classesinmodule(module):
-    md = module.__dict__
-    return [
-        md[c]
-        for c in md
-        if (isinstance(md[c], type) and md[c].__module__ == module.__name__ and not issubclass(md[c], type))
-    ]
+LOGICAL_OPERATORS = [
+    LogicalOperator,
+    Aggregate,
+    BaseScan,
+    CacheScan,
+    ConvertScan,
+    FilteredScan,
+    GroupByAggregate,
+    LimitScan,
+]
 
 
 PHYSICAL_OPERATORS = (
-    classesinmodule(physical)
-    + classesinmodule(aggregate)
-    + classesinmodule(convert)
-    + classesinmodule(datasource)
-    + classesinmodule(filter)
-    + classesinmodule(limit)
+    # aggregate
+    [AggregateOp, ApplyGroupByOp, AverageAggregateOp, CountAggregateOp]
+    # convert
+    + [ConvertOp, NonLLMConvert, LLMConvert, LLMConvertConventional, LLMConvertBonded]
+    # datasource
+    + [DataSourcePhysicalOp, MarshalAndScanDataOp, CacheScanDataOp]
+    # filter
+    + [FilterOp, NonLLMFilter, LLMFilter]
+    # limit
+    + [LimitScanOp]
+    # physical
+    + [PhysicalOperator]
 )
 
-LOGICAL_OPERATORS = classesinmodule(logical)
+
+__all__ = [
+    "LOGICAL_OPERATORS",
+    "PHYSICAL_OPERATORS",
+]

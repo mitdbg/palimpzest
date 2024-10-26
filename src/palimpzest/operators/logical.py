@@ -5,8 +5,9 @@ import json
 from typing import Callable, List, Optional, Type
 
 from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
-from palimpzest.corelib import ImageFile, Schema
-from palimpzest.elements import Filter, GroupBySig
+from palimpzest.corelib.schemas import ImageFile, Schema
+from palimpzest.elements.filters import Filter
+from palimpzest.elements.groupbysig import GroupBySig
 
 
 class LogicalOperator:
@@ -84,6 +85,51 @@ class LogicalOperator:
         if not self.op_id:
             raise ValueError("op_id not set, unable to hash")
         return int(self.op_id, 16)
+
+
+class Aggregate(LogicalOperator):
+    """
+    Aggregate is a logical operator that applies an aggregation to the input set and yields a single result.
+    This is a base class that has to be further specialized to implement specific aggregation functions.
+    """
+
+    def __init__(
+        self,
+        aggFunc: AggFunc,
+        targetCacheId: str | None = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.aggFunc = aggFunc
+        self.targetCacheId = targetCacheId
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(function: {str(self.aggFunc.value)})"
+
+    def __eq__(self, other: LogicalOperator) -> bool:
+        return (
+            isinstance(other, Aggregate)
+            and self.inputSchema == other.inputSchema
+            and self.outputSchema == other.outputSchema
+            and self.aggFunc == other.aggFunc
+        )
+
+    def copy(self):
+        return self.__class__(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            aggFunc=self.aggFunc,
+            targetCacheId=self.targetCacheId,
+        )
+
+    def get_op_params(self) -> dict:
+        return {
+            "inputSchema": self.inputSchema,
+            "outputSchema": self.outputSchema,
+            "aggFunc": self.aggFunc,
+            "targetCacheId": self.targetCacheId,
+        }
 
 
 class BaseScan(LogicalOperator):
@@ -267,40 +313,6 @@ class FilteredScan(LogicalOperator):
         }
 
 
-class LimitScan(LogicalOperator):
-    def __init__(self, limit: int, targetCacheId: str | None = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.limit = limit
-        self.targetCacheId = targetCacheId
-
-    def __str__(self):
-        return f"LimitScan({str(self.inputSchema)}, {str(self.outputSchema)})"
-
-    def copy(self):
-        return LimitScan(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
-            limit=self.limit,
-            targetCacheId=self.targetCacheId,
-        )
-
-    def __eq__(self, other: LogicalOperator) -> bool:
-        return (
-            isinstance(other, LimitScan)
-            and self.inputSchema == other.inputSchema
-            and self.outputSchema == other.outputSchema
-            and self.limit == other.limit
-        )
-
-    def get_op_params(self) -> dict:
-        return {
-            "inputSchema": self.inputSchema,
-            "outputSchema": self.outputSchema,
-            "limit": self.limit,
-            "targetCacheId": self.targetCacheId,
-        }
-
-
 class GroupByAggregate(LogicalOperator):
     def __init__(
         self,
@@ -346,46 +358,35 @@ class GroupByAggregate(LogicalOperator):
         }
 
 
-class Aggregate(LogicalOperator):
-    """
-    Aggregate is a logical operator that applies an aggregation to the input set and yields a single result.
-    This is a base class that has to be further specialized to implement specific aggregation functions.
-    """
-
-    def __init__(
-        self,
-        aggFunc: AggFunc,
-        targetCacheId: str | None = None,
-        *args,
-        **kwargs,
-    ):
+class LimitScan(LogicalOperator):
+    def __init__(self, limit: int, targetCacheId: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.aggFunc = aggFunc
+        self.limit = limit
         self.targetCacheId = targetCacheId
 
     def __str__(self):
-        return f"{self.__class__.__name__}(function: {str(self.aggFunc.value)})"
+        return f"LimitScan({str(self.inputSchema)}, {str(self.outputSchema)})"
+
+    def copy(self):
+        return LimitScan(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            limit=self.limit,
+            targetCacheId=self.targetCacheId,
+        )
 
     def __eq__(self, other: LogicalOperator) -> bool:
         return (
-            isinstance(other, Aggregate)
+            isinstance(other, LimitScan)
             and self.inputSchema == other.inputSchema
             and self.outputSchema == other.outputSchema
-            and self.aggFunc == other.aggFunc
-        )
-
-    def copy(self):
-        return self.__class__(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
-            aggFunc=self.aggFunc,
-            targetCacheId=self.targetCacheId,
+            and self.limit == other.limit
         )
 
     def get_op_params(self) -> dict:
         return {
             "inputSchema": self.inputSchema,
             "outputSchema": self.outputSchema,
-            "aggFunc": self.aggFunc,
+            "limit": self.limit,
             "targetCacheId": self.targetCacheId,
         }

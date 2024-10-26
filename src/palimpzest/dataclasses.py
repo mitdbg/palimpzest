@@ -75,7 +75,7 @@ class GenerationStats:
             raise ZeroDivisionError("Cannot divide by zero")
         if isinstance(quotient, int):
             quotient = float(quotient)
-        for field in [
+        for dataclass_field in [
             "total_input_tokens",
             "total_output_tokens",
             "total_input_cost",
@@ -84,7 +84,7 @@ class GenerationStats:
             "llm_call_duration_secs",
             "fn_call_duration_secs",
         ]:
-            setattr(self, field, getattr(self, field) / quotient)
+            setattr(self, dataclass_field, getattr(self, dataclass_field) / quotient)
         return self
 
     def __truediv__(self, quotient: float) -> GenerationStats:
@@ -461,15 +461,15 @@ class PlanCost:
         self.cost += other.cost
         self.time += other.time
         self.quality *= other.quality
-        for field in ["cost_lower_bound", "cost_upper_bound", "time_lower_bound", "time_upper_bound"]:
-            if getattr(self, field) is not None and getattr(other, field) is not None:
-                summation = getattr(self, field) + getattr(other, field)
-                setattr(self, field, summation)
+        for dataclass_field in ["cost_lower_bound", "cost_upper_bound", "time_lower_bound", "time_upper_bound"]:
+            if getattr(self, dataclass_field) is not None and getattr(other, dataclass_field) is not None:
+                summation = getattr(self, dataclass_field) + getattr(other, dataclass_field)
+                setattr(self, dataclass_field, summation)
 
-        for field in ["quality_lower_bound", "quality_upper_bound"]:
-            if getattr(self, field) is not None and getattr(other, field) is not None:
-                product = getattr(self, field) * getattr(other, field)
-                setattr(self, field, product)
+        for dataclass_field in ["quality_lower_bound", "quality_upper_bound"]:
+            if getattr(self, dataclass_field) is not None and getattr(other, dataclass_field) is not None:
+                product = getattr(self, dataclass_field) * getattr(other, dataclass_field)
+                setattr(self, dataclass_field, product)
 
         return self
 
@@ -489,7 +489,7 @@ class PlanCost:
                 "time_upper_bound",
             ]
         }
-        for field in ["quality", "quality_lower_bound", "quality_upper_bound"]:
-            dct[field] = getattr(self, field) * getattr(other, field)
+        for dataclass_field in ["quality", "quality_lower_bound", "quality_upper_bound"]:
+            dct[dataclass_field] = getattr(self, dataclass_field) * getattr(other, dataclass_field)
 
         return PlanCost(**dct)

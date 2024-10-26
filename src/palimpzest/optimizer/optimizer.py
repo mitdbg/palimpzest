@@ -1,26 +1,47 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import List
+from typing import Dict, List, Optional, Tuple
+from typing import Set as TypingSet
 
-from palimpzest.constants import OptimizationStrategy
+from palimpzest.constants import Model, OptimizationStrategy
 from palimpzest.cost_model import CostModel
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import DataSource
-from palimpzest.operators import *
+from palimpzest.operators.logical import (
+    Aggregate,
+    BaseScan,
+    CacheScan,
+    ConvertScan,
+    FilteredScan,
+    GroupByAggregate,
+    LimitScan,
+    LogicalOperator,
+)
 from palimpzest.optimizer import (
     IMPLEMENTATION_RULES,
     TRANSFORMATION_RULES,
-    Group,
-    LogicalExpression,
-    PhysicalPlan,
-    SentinelPlan,
 )
-from palimpzest.optimizer.rules import *
-from palimpzest.optimizer.tasks import *
+from palimpzest.optimizer.plan import PhysicalPlan, SentinelPlan
+from palimpzest.optimizer.primitives import Group, LogicalExpression
+from palimpzest.optimizer.rules import (
+    CodeSynthesisConvertRule,
+    LLMConvertBondedRule,
+    LLMConvertConventionalRule,
+    TokenReducedConvertBondedRule,
+    TokenReducedConvertConventionalRule,
+    TokenReducedConvertRule,
+)
+from palimpzest.optimizer.tasks import (
+    ApplyRule,
+    ExpandGroup,
+    OptimizeGroup,
+    OptimizeLogicalExpression,
+    OptimizePhysicalExpression,
+)
 from palimpzest.policy import Policy
 from palimpzest.sets import Dataset, Set
-from palimpzest.utils import getChampionModel, getCodeChampionModel, getConventionalFallbackModel
+from palimpzest.utils.model_helpers import getChampionModel, getCodeChampionModel, getConventionalFallbackModel
 
 # DEFINITIONS
 # NOTE: the name pz.Dataset has always been a bit awkward; from a user-facing perspective,
@@ -141,7 +162,9 @@ class Optimizer:
             "conventional_fallback_model": getConventionalFallbackModel(),
         }
 
-    def construct_group_tree(self, dataset_nodes: List[Set]) -> Tuple[List[int], Set[str], Dict[str, Set[str]]]:
+    def construct_group_tree(
+        self, dataset_nodes: List[Set]
+    ) -> Tuple[List[int], TypingSet[str], Dict[str, TypingSet[str]]]:
         # get node, outputSchema, and inputSchema(if applicable)
         node = dataset_nodes[-1]
         outputSchema = node.schema

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Type
 
-from palimpzest.corelib import Field, OperatorDerivedSchema, Schema
+from palimpzest.corelib.fields import Field
+from palimpzest.corelib.schemas import OperatorDerivedSchema, Schema
 
 
 # signature for a group by aggregate that applies

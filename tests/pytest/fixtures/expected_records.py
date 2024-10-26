@@ -2,8 +2,8 @@ import os
 
 import pytest
 
-from palimpzest.corelib import File
-from palimpzest.elements import DataRecord
+from palimpzest.corelib.schemas import File
+from palimpzest.elements.records import DataRecord
 
 
 ### EXPECTED RECORDS ###

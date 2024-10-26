@@ -4,11 +4,18 @@ import base64
 import time
 from typing import List
 
-from palimpzest.constants import *
+from palimpzest.constants import (
+    MODEL_CARDS,
+    NAIVE_EST_FILTER_SELECTIVITY,
+    NAIVE_EST_NUM_INPUT_TOKENS,
+    Model,
+    PromptStrategy,
+)
 from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
-from palimpzest.elements import DataRecord, Filter
+from palimpzest.elements.filters import Filter
+from palimpzest.elements.records import DataRecord
 from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
-from palimpzest.operators import DataRecordsWithStats, PhysicalOperator
+from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 from palimpzest.prompts import IMAGE_FILTER_PROMPT
 
 

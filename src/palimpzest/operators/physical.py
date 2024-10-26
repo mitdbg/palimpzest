@@ -5,10 +5,10 @@ import json
 from typing import List, Optional, Tuple
 
 from palimpzest.constants import MAX_ID_CHARS
-from palimpzest.corelib import Schema
+from palimpzest.corelib.schemas import Schema
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.datamanager import DataDirectory
-from palimpzest.elements import DataRecord
+from palimpzest.elements.records import DataRecord
 
 # TYPE DEFINITIONS
 DataRecordsWithStats = Tuple[List[DataRecord], List[RecordOpStats]]

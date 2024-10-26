@@ -1,11 +1,6 @@
-from .config import *
-from .corelib import *
-from .cost_model import *
-from .datamanager import *  # This takes a long time
-from .datasources import *
-from .elements import *
-from .execution import *
-from .generators import *
-from .operators import *  # So does this one
-from .policy import *
-from .sets import *
+from palimpzest.corelib.fields import *
+from palimpzest.corelib.schemas import *
+from palimpzest.datamanager import DataDirectory
+from palimpzest.datasources import UserSource
+from palimpzest.elements.records import DataRecord
+from palimpzest.sets import Dataset

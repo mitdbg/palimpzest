@@ -3,11 +3,11 @@ from typing import Optional, Union
 
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
-from palimpzest.elements import DataRecord
+from palimpzest.elements.records import DataRecord
 from palimpzest.execution.execution_engine import ExecutionEngine
 from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
-from palimpzest.optimizer import PhysicalPlan
+from palimpzest.optimizer.plan import PhysicalPlan
 
 
 class SequentialSingleThreadPlanExecutor(ExecutionEngine):
@@ -31,7 +31,7 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
 
         # initialize plan and operator stats
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
-        for op_idx, op in enumerate(plan.operators):
+        for op in plan.operators:
             op_id = op.get_op_id()
             plan_stats.operator_stats[op_id] = OperatorStats(
                 op_id=op_id, op_name=op.op_name()
@@ -158,7 +158,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
 
         # initialize plan and operator stats
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
-        for op_idx, op in enumerate(plan.operators):
+        for op in plan.operators:
             op_id = op.get_op_id()
             plan_stats.operator_stats[op_id] = OperatorStats(
                 op_id=op_id, op_name=op.op_name()

@@ -3,9 +3,14 @@ from __future__ import annotations
 import time
 from typing import List, Union
 
-from palimpzest.constants import *
+from palimpzest.constants import (
+    LOCAL_SCAN_TIME_PER_KB,
+    MEMORY_SCAN_TIME_PER_KB,
+    NAIVE_EST_ONE_TO_MANY_SELECTIVITY,
+    Cardinality,
+)
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.elements import DataRecord
+from palimpzest.elements.records import DataRecord
 from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 
 

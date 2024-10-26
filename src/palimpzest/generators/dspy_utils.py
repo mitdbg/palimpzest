@@ -1,4 +1,3 @@
-
 import dspy
 import requests
 from dsp.modules.hf import HFModel
@@ -179,4 +178,4 @@ class TogetherHFAdaptor(HFModel):
                 if resp_json:
                     print(f"resp_json:{resp_json}")
                 print(f"Failed to parse JSON response: {e}")
-                raise Exception("Received invalid JSON response from server")
+                raise Exception("Received invalid JSON response from server") from e

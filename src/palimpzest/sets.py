@@ -5,13 +5,11 @@ import json
 from typing import Callable, List, Optional, Type, Union
 
 from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
-from palimpzest.corelib import Number, Schema
+from palimpzest.corelib.schemas import Number, Schema
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import DataSource
-from palimpzest.elements import (
-    Filter,
-    GroupBySig,
-)
+from palimpzest.elements.filters import Filter
+from palimpzest.elements.groupbysig import GroupBySig
 
 
 #####################################################

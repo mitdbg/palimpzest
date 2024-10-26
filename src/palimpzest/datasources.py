@@ -12,9 +12,8 @@ from papermage import Document
 
 from palimpzest import constants
 from palimpzest.constants import Cardinality
-from palimpzest.corelib import File, Number, Schema
-from palimpzest.corelib.schemas import ImageFile, PDFFile, TextFile, WebPage, XLSFile
-from palimpzest.elements import DataRecord
+from palimpzest.corelib.schemas import File, ImageFile, Number, PDFFile, Schema, TextFile, WebPage, XLSFile
+from palimpzest.elements.records import DataRecord
 from palimpzest.tools.pdfparser import get_text_from_pdf
 
 

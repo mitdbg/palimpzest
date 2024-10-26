@@ -7,10 +7,10 @@ from typing import Any, Dict, List, Tuple
 from palimpzest import generators
 from palimpzest.constants import GPT_4_MODEL_CARD, Model
 from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates
-from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.datamanager import DataDirectory
 from palimpzest.operators.convert import LLMConvert, LLMConvertBonded, LLMConvertConventional
 from palimpzest.prompts import ADVICEGEN_PROMPT, CODEGEN_PROMPT, EXAMPLE_PROMPT
-from palimpzest.utils import API
+from palimpzest.utils.sandbox import API
 
 # TYPE DEFINITIONS
 FieldName = str

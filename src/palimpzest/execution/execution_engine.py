@@ -9,11 +9,11 @@ from palimpzest.constants import MAX_ID_CHARS, Model, OptimizationStrategy
 from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import PlanStats, RecordOpStats
 from palimpzest.datamanager import DataDirectory
-from palimpzest.elements import DataRecord
-from palimpzest.optimizer import Optimizer, PhysicalPlan
+from palimpzest.elements.records import DataRecord
+from palimpzest.optimizer.optimizer import Optimizer, PhysicalPlan
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
-from palimpzest.utils import getModels
+from palimpzest.utils.model_helpers import getModels
 
 
 class ExecutionEngine:

@@ -12,7 +12,7 @@ from fastapi import status
 from pypdf import PdfReader
 
 from palimpzest.config import Config
-from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.datamanager import DataDirectory
 
 COSMOS_ADDRESS = "https://xdd.wisc.edu/cosmos_service"
 
