@@ -1,4 +1,4 @@
-from palimpzest.corelib import (
+from palimpzest.corelib.fields import (
     BooleanField,
     StringField,
 )

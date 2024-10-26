@@ -2,6 +2,11 @@ import time
 
 import pytest
 
+from palimpzest.execution.sentinel_execution import (
+    PipelinedParallelSentinelExecution,
+    PipelinedSingleThreadSentinelExecution,
+    SequentialSingleThreadSentinelExecution,
+)
 from palimpzest.operators import LLMConvert, LLMFilter
 from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
 

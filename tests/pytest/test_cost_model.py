@@ -1,7 +1,8 @@
+from palimpzest.datamanager import DataDirectory
 import pytest
 
 import palimpzest as pz
-from palimpzest.execution import CostModel
+from palimpzest.cost_model import CostModel
 
 
 class TestCostModel:
@@ -56,7 +57,7 @@ class TestCostModel:
         # register a fake dataset
         dataset_id = "foobar"
         vals = [1, 2, 3, 4, 5, 6]
-        pz.DataDirectory().registerDataset(
+        DataDirectory().registerDataset(
             vals=vals,
             dataset_id=dataset_id,
         )

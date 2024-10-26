@@ -18,7 +18,7 @@ from palimpzest.operators import LLMConvertBonded, LLMConvertConventional
 from palimpzest.operators.datasource import MarshalAndScanDataOp
 
 if not os.environ.get("OPENAI_API_KEY"):
-    from palimpzest.utils import load_env
+    from palimpzest.utils.env_helpers import load_env
 
     load_env()
 

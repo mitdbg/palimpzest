@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 from sklearn.metrics import precision_recall_fscore_support
 
+from palimpzest.execution.execute import Execute
 from palimpzest.execution.nosentinel_execution import (
     PipelinedParallelNoSentinelExecution,
     PipelinedSingleThreadNoSentinelExecution,

@@ -16,7 +16,7 @@ import palimpzest as pz
 from palimpzest.utils import udfs
 
 if not os.environ.get("OPENAI_API_KEY"):
-    from palimpzest.utils import load_env
+    from palimpzest.utils.env_helpers import load_env
 
     load_env()
 

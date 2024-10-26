@@ -158,7 +158,7 @@ class Dataset(Set):
 
     def convert(
         self,
-        outputSchema: Schema,
+        outputSchema: Type[Schema],
         udf: Optional[Callable] = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool = False,
