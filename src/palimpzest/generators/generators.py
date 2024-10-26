@@ -7,8 +7,9 @@ import base64
 import io
 import os
 import time
+from abc import ABC, abstractmethod
 from collections import Counter
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, Generic, List, Tuple, TypeVar, Union
 
 import dsp
 import dspy
@@ -17,9 +18,17 @@ from openai import OpenAI
 from PIL import Image
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from palimpzest.constants import *
+from palimpzest.constants import (
+    MODEL_CARDS,
+    RETRY_MAX_ATTEMPTS,
+    RETRY_MAX_SECS,
+    RETRY_MULTIPLIER,
+    Model,
+    PromptStrategy,
+    log_attempt_number,
+)
 from palimpzest.dataclasses import GenerationStats
-from palimpzest.generators import (
+from palimpzest.generators.dspy_utils import (
     TogetherHFAdaptor,
     dspyCOT,
     gen_filter_signature_class,
@@ -28,7 +37,9 @@ from palimpzest.generators import (
 from palimpzest.utils import API
 
 # DEFINITIONS
-GenerationOutput = Tuple[str, GenerationStats]
+GenerationOutput = Tuple[str | None, GenerationStats]
+InputType = TypeVar("InputType")
+ContextType = TypeVar("ContextType")
 
 
 def get_api_key(key: str) -> str:
@@ -41,19 +52,16 @@ def get_api_key(key: str) -> str:
     return os.environ[key]
 
 
-class BaseGenerator:
+class BaseGenerator(Generic[InputType, ContextType], ABC):
     """
     Abstract base class for Generators.
     """
 
-    def __init__(self):
-        pass
-
-    def generate(self) -> GenerationOutput:
-        raise NotImplementedError("Abstract method")
+    @abstractmethod
+    def generate(self, context: InputType, prompt: ContextType, **kwargs) -> GenerationOutput: ...
 
 
-class CustomGenerator(BaseGenerator):
+class CustomGenerator(BaseGenerator[None, str]):
     """
     Class for generating outputs with a given model using a custom prompt.
     """
@@ -63,7 +71,7 @@ class CustomGenerator(BaseGenerator):
         self.model_name = model_name
         self.verbose = verbose
 
-    def _get_model(self) -> dsp.LM:
+    def _get_model(self) -> dspy.OpenAI | dspy.Google | TogetherHFAdaptor:
         model = None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             openai_key = get_api_key("OPENAI_API_KEY")
@@ -109,13 +117,7 @@ class CustomGenerator(BaseGenerator):
 
         return usage, finish_reason
 
-    def _get_attn(self, dspy_lm: dsp.LM):
-        """
-        TODO
-        """
-        pass
-
-    def _get_answer_log_probs(self, dspy_lm: dsp.LM, answer: str) -> List[float]:
+    def _get_answer_log_probs(self, dspy_lm: dsp.LM, answer: str) -> List[float] | None:
         """
         For the given DSPy LM object:
         1. fetch the data structure containing its output log probabilities
@@ -164,13 +166,15 @@ class CustomGenerator(BaseGenerator):
         after=log_attempt_number,
         reraise=True,
     )
-    def generate(self, prompt: str) -> GenerationOutput:
+    def generate(self, context, prompt, **kwargs) -> GenerationOutput:
         # fetch model
         dspy_lm = self._get_model()
 
         start_time = time.time()
 
         response = dspy_lm.request(prompt)
+        if not response:
+            raise ValueError("Model did not return a response.")
 
         end_time = time.time()
 
@@ -209,7 +213,7 @@ class CustomGenerator(BaseGenerator):
         return answer, stats
 
 
-class DSPyGenerator(BaseGenerator):
+class DSPyGenerator(BaseGenerator[str, str]):
     """
     Class for generating outputs with a given model using DSPy for prompting optimization(s).
     """
@@ -279,13 +283,11 @@ class DSPyGenerator(BaseGenerator):
             usage = dspy_lm.history[-1]["response"]["usage"]
             finish_reason = dspy_lm.history[-1]["response"]["finish_reason"]
 
-        return usage, finish_reason
+        # raise if usage or finish_reason is None
+        if usage is None or finish_reason is None:
+            raise ValueError(f"Usage or finish_reason is None: {usage}, {finish_reason}")
 
-    def _get_attn(self, dspy_lm: dsp.LM):
-        """
-        TODO
-        """
-        pass
+        return usage, finish_reason
 
     def _get_answer_log_probs(self, dspy_lm: dsp.LM, answer: str) -> List[float]:
         """
@@ -302,7 +304,7 @@ class DSPyGenerator(BaseGenerator):
             log_probs = dspy_lm.history[-1]["response"]["choices"][-1]["logprobs"]["content"]
             token_logprobs = list(map(lambda elt: elt["logprob"], log_probs))
         elif self.model_name in [Model.GEMINI_1.value]:
-            return None
+            raise ValueError("Gemini not supported for log probabilities")
             # TODO Google gemini does not provide log probabilities!
             # https://github.com/google/generative-ai-python/issues/238
             # tok_count = dspy_lm.llm.count_tokens(answer).total_tokens
@@ -337,11 +339,7 @@ class DSPyGenerator(BaseGenerator):
         after=log_attempt_number,
         reraise=True,
     )
-    def generate(
-        self,
-        context: str,
-        question: str,
-    ) -> GenerationOutput:
+    def generate(self, context, prompt, **kwargs) -> GenerationOutput:
         dspy_lm = self._get_model()
         dspy.settings.configure(lm=dspy_lm)
         cot = dspyCOT(self.promptSignature)
@@ -350,7 +348,7 @@ class DSPyGenerator(BaseGenerator):
         if self.verbose:
             print(f"Generating -- {self.model_name}")
         start_time = time.time()
-        pred = cot(question, context)
+        pred = cot(prompt, context)
         end_time = time.time()
 
         # extract the log probabilities for the actual result(s) which are returned
@@ -407,7 +405,7 @@ class DSPyGenerator(BaseGenerator):
         return pred.answer, stats
 
 
-class ImageTextGenerator(BaseGenerator):
+class ImageTextGenerator(BaseGenerator[List[str], str]):
     """
     Class for generating field descriptions for an image with a given image model.
     """
@@ -443,7 +441,7 @@ class ImageTextGenerator(BaseGenerator):
         payloads = []
         if self.model_name == Model.GPT_4V.value:
             # create content list
-            content = [{"type": "text", "text": prompt}]
+            content: List[Dict[str, str | Dict[str, str]]] = [{"type": "text", "text": prompt}]
             for base64_image in base64_images:
                 content.append(
                     {
@@ -481,12 +479,12 @@ class ImageTextGenerator(BaseGenerator):
 
         return payloads
 
-    def _generate_response(
-        self, client: Union[OpenAI, genai.GenerativeModel], payloads: List[Any]
-    ) -> Tuple[str, str, dict]:
+    def _generate_response(self, client: Union[OpenAI, genai.GenerativeModel], payloads: List[Any]):
         answer, finish_reason, usage = None, None, None
 
         if self.model_name == Model.GPT_4V.value:
+            if not isinstance(client, OpenAI):
+                raise ValueError("Client must be an instance of OpenAI for GPT-4V model")
             # GPT-4V will always have a single payload
             completion = client.chat.completions.create(**payloads[0])
             candidate = completion.choices[-1]
@@ -497,6 +495,8 @@ class ImageTextGenerator(BaseGenerator):
             token_logprobs = list(map(lambda elt: elt.logprob, completion.choices[-1].logprobs.content))
 
         elif self.model_name == Model.GEMINI_1V.value:
+            if not isinstance(client, genai.GenerativeModel):
+                raise ValueError("Client must be an instance of genai.GenerativeModel for Gemini-1V model")
             # iterate through images to generate multiple responses
             answers, finish_reasons = [], []
             for idx, payload in enumerate(payloads):
@@ -550,13 +550,13 @@ class ImageTextGenerator(BaseGenerator):
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
         after=log_attempt_number,
     )
-    def generate(self, context: List[bytes], question: str) -> GenerationOutput:
+    def generate(self, context, prompt, **kwargs) -> GenerationOutput:
         # NOTE: context is list of base64 images and question is prompt
         # fetch model client
         client = self._get_model_client()
 
         # create payload
-        payloads = self._make_payloads(question, context)
+        payloads = self._make_payloads(prompt, context)
 
         # generate response
         if self.verbose:
@@ -605,7 +605,7 @@ def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose: 
 
 # Temporarily set default verbose to True for debugging
 def codeEnsembleExecution(
-    api: API, code_ensemble: List[Dict[str, str]], candidate_dict: Dict[str, Any], verbose: bool = True
+    api: API, code_ensemble: Dict[str, str], candidate_dict: Dict[str, Any], verbose: bool = True
 ) -> GenerationOutput:
     start_time = time.time()
     preds = list()
@@ -621,24 +621,18 @@ def codeEnsembleExecution(
     if len(preds) == 1:
         majority_response = preds[0]
         exec_stats = GenerationStats(
-            **{
-                "fn_call_duration_secs": time.time() - start_time,
-            }
+            fn_call_duration_secs=time.time() - start_time,
         )
         return majority_response, exec_stats
 
     if len(preds) > 0:
         majority_response = Counter(preds).most_common(1)[0][0]
         exec_stats = GenerationStats(
-            **{
-                "fn_call_duration_secs": time.time() - start_time,
-            }
+            fn_call_duration_secs=time.time() - start_time,
         )
         # return majority_response+(" (codegen)" if verbose else ""), ensemble_stats
         return majority_response, exec_stats
 
     return None, GenerationStats(
-        **{
-            "fn_call_duration_secs": time.time() - start_time,
-        }
+        fn_call_duration_secs=time.time() - start_time,
     )

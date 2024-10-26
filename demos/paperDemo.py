@@ -5,9 +5,10 @@ from pathlib import Path
 
 import gradio as gr
 import numpy as np
+from PIL import Image
+
 import palimpzest as pz
 from palimpzest.utils import udfs
-from PIL import Image
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -293,6 +294,7 @@ if __name__ == "__main__":
     # visualize output in Gradio
     if visualize:
         from palimpzest.utils import printTable
+
         plan_str = list(execution_stats.plan_strs.values())[-1]
         if workload == "enron":
             printTable(records, cols=["sender", "subject"], plan_str=plan_str)

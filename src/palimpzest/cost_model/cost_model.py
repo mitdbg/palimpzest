@@ -11,13 +11,6 @@ import math
 import warnings
 from typing import Any, Dict, List, Optional, Tuple
 
-from palimpzest.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
-from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
-from palimpzest.operators.convert import LLMConvert
-from palimpzest.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
-from palimpzest.operators.filter import LLMFilter, NonLLMFilter
-from palimpzest.operators.limit import LimitScanOp
-from palimpzest.operators.token_reduction_convert import TokenReducedConvert
 import pandas as pd
 import scipy.stats as stats
 
@@ -25,6 +18,13 @@ from palimpzest.constants import GPT_4_MODEL_CARD, MODEL_CARDS, Cardinality
 from palimpzest.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.operators import PhysicalOperator
+from palimpzest.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
+from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
+from palimpzest.operators.convert import LLMConvert
+from palimpzest.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
+from palimpzest.operators.filter import LLMFilter, NonLLMFilter
+from palimpzest.operators.limit import LimitScanOp
+from palimpzest.operators.token_reduction_convert import TokenReducedConvert
 from palimpzest.utils import getChampionModelName, getModels
 
 warnings.simplefilter(action="ignore", category=UserWarning)

@@ -1,3 +1,4 @@
+
 import dspy
 import requests
 from dsp.modules.hf import HFModel
@@ -69,7 +70,7 @@ class dspyCOT(dspy.Module):
     Invoke dspy in chain of thought mode
     """
 
-    def __init__(self, f_signature=FilterOverPaper):
+    def __init__(self, f_signature: type[dspy.Signature] = FilterOverPaper):
         super().__init__()
         self.generate_answer = dspy.ChainOfThought(f_signature)
 
@@ -155,9 +156,10 @@ class TogetherHFAdaptor(HFModel):
             }
 
         headers = {"Authorization": f"Bearer {self.token}"}
-        try:
-            with requests.Session().post(url, headers=headers, json=body) as resp:
-                resp_json = resp.json()
+
+        with requests.Session().post(url, headers=headers, json=body) as resp:
+            resp_json = resp.json()
+            try:
                 if use_chat_api:
                     completions = [resp_json["output"].get("choices", [])[0].get("message", {}).get("content", "")]
                 else:
@@ -173,8 +175,8 @@ class TogetherHFAdaptor(HFModel):
                     response["token_logprobs"] = resp_json["output"]["choices"][0]["token_logprobs"]
 
                 return response
-        except Exception as e:
-            if resp_json:
-                print(f"resp_json:{resp_json}")
-            print(f"Failed to parse JSON response: {e}")
-            raise Exception("Received invalid JSON response from server")
+            except Exception as e:
+                if resp_json:
+                    print(f"resp_json:{resp_json}")
+                print(f"Failed to parse JSON response: {e}")
+                raise Exception("Received invalid JSON response from server")
