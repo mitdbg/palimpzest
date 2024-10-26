@@ -6,12 +6,12 @@ import time
 from typing import BinaryIO, List
 from zipfile import ZipFile
 
+from palimpzest.datamanager.datamanager import DataDirectory
 import pandas as pd
 import requests
 from fastapi import status
 from pypdf import PdfReader
 
-import palimpzest as pz
 from palimpzest.config import Config
 
 COSMOS_ADDRESS = "https://xdd.wisc.edu/cosmos_service"
@@ -210,7 +210,7 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10):
 # 2. If not, call the cosmos_client function to process the PDF file and cache the text file
 ##
 def get_text_from_pdf(filename, pdf_bytes, enable_file_cache=True, file_cache_dir="/tmp"):
-    pdfprocessor = pz.DataDirectory().current_config.get("pdfprocessor")
+    pdfprocessor = DataDirectory().current_config.get("pdfprocessor")
 
     pdf_filename = filename
     file_name = os.path.basename(pdf_filename)

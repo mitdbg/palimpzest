@@ -11,10 +11,16 @@ import math
 import warnings
 from typing import Any, Dict, List, Optional, Tuple
 
+from palimpzest.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
+from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
+from palimpzest.operators.convert import LLMConvert
+from palimpzest.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
+from palimpzest.operators.filter import LLMFilter, NonLLMFilter
+from palimpzest.operators.limit import LimitScanOp
+from palimpzest.operators.token_reduction_convert import TokenReducedConvert
 import pandas as pd
 import scipy.stats as stats
 
-import palimpzest as pz
 from palimpzest.constants import GPT_4_MODEL_CARD, MODEL_CARDS, Cardinality
 from palimpzest.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
 from palimpzest.datamanager import DataDirectory
@@ -421,7 +427,7 @@ class CostModel:
         op_id = operator.get_op_id()
 
         # initialize estimates of operator metrics based on naive (but sometimes precise) logic
-        if isinstance(operator, pz.MarshalAndScanDataOp):
+        if isinstance(operator, MarshalAndScanDataOp):
             # get handle to DataSource and pre-compute its size (number of records)
             datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
             dataset_type = self.datadir.getRegisteredDatasetType(self.source_dataset_id)
@@ -442,7 +448,7 @@ class CostModel:
                 dataset_type=dataset_type,
             )
 
-        elif isinstance(operator, pz.CacheScanDataOp):
+        elif isinstance(operator, CacheScanDataOp):
             datasource = self.datadir.getCachedResult(operator.dataset_id)
             datasource_len = len(datasource)
             datasource_memsize = datasource.getSize()
@@ -466,12 +472,12 @@ class CostModel:
         # if we have sample execution data, update naive estimates with more informed ones
         sample_op_estimates = self.operator_estimates
         if sample_op_estimates is not None and op_id in sample_op_estimates:
-            if isinstance(operator, pz.MarshalAndScanDataOp) or isinstance(operator, pz.CacheScanDataOp):
+            if isinstance(operator, MarshalAndScanDataOp) or isinstance(operator, CacheScanDataOp):
                 op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
                 op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
                 op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
-            elif isinstance(operator, pz.ApplyGroupByOp):
+            elif isinstance(operator, ApplyGroupByOp):
                 # NOTE: in theory we should also treat this cardinality est. as a random variable, but in practice we will
                 #       have K samples of the number of groups produced by the groupby operator, where K is the number of
                 #       plans we generate sample data with. For now, we will simply use the estimate without bounds.
@@ -487,17 +493,17 @@ class CostModel:
                 op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
                 op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
-            elif isinstance(operator, pz.CountAggregateOp) or isinstance(operator, pz.AverageAggregateOp):
+            elif isinstance(operator, CountAggregateOp) or isinstance(operator, AverageAggregateOp):
                 op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
                 op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
                 op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
-            elif isinstance(operator, pz.LimitScanOp):
+            elif isinstance(operator, LimitScanOp):
                 op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
                 op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
                 op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
-            elif isinstance(operator, pz.NonLLMFilter):
+            elif isinstance(operator, NonLLMFilter):
                 op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
                 op_estimates.cardinality_lower_bound = (
                     source_op_estimates.cardinality_lower_bound * sample_op_estimates[op_id]["selectivity_lower_bound"]
@@ -514,7 +520,7 @@ class CostModel:
                 op_estimates.cost_per_record_lower_bound = sample_op_estimates[op_id]["cost_per_record_lower_bound"]
                 op_estimates.cost_per_record_upper_bound = sample_op_estimates[op_id]["cost_per_record_upper_bound"]
 
-            elif isinstance(operator, pz.LLMFilter):
+            elif isinstance(operator, LLMFilter):
                 model_name = operator.model.value
                 op_estimates.cardinality = (
                     source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
@@ -548,7 +554,7 @@ class CostModel:
                 op_estimates.quality_lower_bound = sample_op_estimates[op_id][model_name]["quality_lower_bound"]
                 op_estimates.quality_upper_bound = sample_op_estimates[op_id][model_name]["quality_upper_bound"]
 
-            elif isinstance(operator, pz.LLMConvert):
+            elif isinstance(operator, LLMConvert):
                 # TODO: EVEN BETTER: do similarity match (e.g. largest param intersection, more exotic techniques);
                 #       another heuristic: logical_op_id-->subclass_physical_op_id-->specific_physical_op_id-->most_param_match_physical_op_id
                 # TODO: instead of [op_id][model_name] --> [logical_op_id][physical_op_id]
@@ -589,7 +595,7 @@ class CostModel:
                 # NOTE: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
                 #       which would wildly mess up estimate of time and cost per-record
                 # do code synthesis adjustment
-                if isinstance(operator, pz.CodeSynthesisConvert):
+                if isinstance(operator, CodeSynthesisConvert):
                     op_estimates.time_per_record = 1e-5
                     op_estimates.time_per_record_lower_bound = op_estimates.time_per_record
                     op_estimates.time_per_record_upper_bound = op_estimates.time_per_record
@@ -605,7 +611,7 @@ class CostModel:
                     )
 
                 # token reduction adjustment
-                if isinstance(operator, pz.TokenReducedConvert):
+                if isinstance(operator, TokenReducedConvert):
                     total_input_tokens = (
                         operator.token_budget * sample_op_estimates[op_id][model_name]["total_input_tokens"]
                     )
