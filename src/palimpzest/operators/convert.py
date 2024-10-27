@@ -458,9 +458,6 @@ class LLMConvert(ConvertOp):
         else:
             raise ValueError("Invalid input types for generating fields.")
 
-        if not answer:
-            raise ValueError("No answer was generated.")
-
         return answer, query_stats
 
     def convert(
