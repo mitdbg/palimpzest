@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Type
 
 from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.corelib.schemas import Schema
@@ -23,8 +23,8 @@ class PhysicalOperator:
 
     def __init__(
         self,
-        outputSchema: Schema,
-        inputSchema: Optional[Schema] = None,
+        outputSchema: Type[Schema],
+        inputSchema: Optional[Type[Schema]] = None,
         logical_op_id: Optional[str] = None,
         max_workers: int = 1,
         targetCacheId: Optional[str] = None,

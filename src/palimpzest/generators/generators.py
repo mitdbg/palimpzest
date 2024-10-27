@@ -34,7 +34,7 @@ from palimpzest.generators.dspy_utils import (
     gen_filter_signature_class,
     gen_qa_signature_class,
 )
-from palimpzest.utils import API
+from palimpzest.utils.sandbox import API
 
 # DEFINITIONS
 GenerationOutput = Tuple[str | None, GenerationStats]
