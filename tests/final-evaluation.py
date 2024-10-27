@@ -515,7 +515,7 @@ def get_logical_tree(workload, nocache: bool = True, num_samples: int = None, sc
         )
         patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
-        case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality="oneToMany")
+        case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
 
         return case_data.getLogicalTree()
 

@@ -268,7 +268,7 @@ class LLMConvert(ConvertOp):
             else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.outputSchema.__doc__)
         )
 
-        # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
+        # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or pz.Cardinality.ONE_TO_MANY)
         if self.cardinality == Cardinality.ONE_TO_MANY:
             targetOutputDescriptor = prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
             outputSingleOrPlural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL

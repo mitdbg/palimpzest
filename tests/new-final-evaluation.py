@@ -230,7 +230,7 @@ def get_workload_for_eval_dataset(dataset):
         xls = pz.Dataset(dataset, schema=pz.XLSFile)
         patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
-        case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality="oneToMany")
+        case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
 
         return case_data
 

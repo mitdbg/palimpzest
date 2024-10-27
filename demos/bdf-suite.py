@@ -135,7 +135,7 @@ def integrate_tables(engine, policy):
     xls = pz.Dataset("biofabric-tiny", schema=pz.XLSFile)
     patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
     patient_tables = patient_tables.filter("The table contains biometric information about the patient")
-    case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality="oneToMany")
+    case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
 
     iterable = pz.Execute(
         case_data,
@@ -160,7 +160,7 @@ def integrate_tables(engine, policy):
 def extract_references(engine, policy):
     papers = pz.Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
     papers = papers.filter("The paper mentions phosphorylation of Exo1")
-    references = papers.convert(Reference, desc="A paper cited in the reference section", cardinality="oneToMany")
+    references = papers.convert(Reference, desc="A paper cited in the reference section", cardinality=pz.Cardinality.ONE_TO_MANY)
 
     output = references
     iterable = pz.Execute(
