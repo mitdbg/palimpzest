@@ -114,7 +114,7 @@ def ls_data() -> None:
     # print table of registered datasets
     t = PrettyTable(table[0])
     t.add_rows(table[1:])
-    _print_msg(t)
+    _print_msg(str(t))
     _print_msg("")
     _print_msg(f"Total datasets: {len(table) - 1}")
 

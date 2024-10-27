@@ -153,7 +153,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
                 pdfprocessor = self.current_config.get("pdfprocessor")
                 if not pdfprocessor:
                     raise Exception("No PDF processor found in the current config.")
-                file_cache_dir = self.getFileCacheDir()
+                file_cache_dir = self.get_file_cache_dir()
                 if not file_cache_dir:
                     raise Exception("No file cache directory found.")
                 return PDFFileDirectorySource(
