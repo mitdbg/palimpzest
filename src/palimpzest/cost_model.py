@@ -11,21 +11,21 @@ import math
 import warnings
 from typing import Any, Dict, List, Optional, Tuple
 
-from palimpzest.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
-from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
-from palimpzest.operators.convert import LLMConvert
-from palimpzest.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
-from palimpzest.operators.filter import LLMFilter, NonLLMFilter
-from palimpzest.operators.limit import LimitScanOp
-from palimpzest.operators.token_reduction_convert import TokenReducedConvert
 import pandas as pd
 import scipy.stats as stats
 
 from palimpzest.constants import GPT_4_MODEL_CARD, MODEL_CARDS, Cardinality
 from palimpzest.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
 from palimpzest.datamanager import DataDirectory
-from palimpzest.operators import PhysicalOperator
-from palimpzest.utils import getChampionModelName, getModels
+from palimpzest.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
+from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
+from palimpzest.operators.convert import LLMConvert
+from palimpzest.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
+from palimpzest.operators.filter import LLMFilter, NonLLMFilter
+from palimpzest.operators.limit import LimitScanOp
+from palimpzest.operators.physical import PhysicalOperator
+from palimpzest.operators.token_reduction_convert import TokenReducedConvert
+from palimpzest.utils.model_helpers import getChampionModelName, getModels
 
 warnings.simplefilter(action="ignore", category=UserWarning)
 
@@ -423,6 +423,8 @@ class CostModel:
     def __call__(
         self, operator: PhysicalOperator, source_op_estimates: Optional[OperatorCostEstimates] = None
     ) -> PlanCost:
+        if not isinstance(operator, PhysicalOperator):
+            raise ValueError(f"operator must be an instance of PhysicalOperator, got {type(operator)}")
         # get identifier for operation which is unique within sentinel plan but consistent across sentinels
         op_id = operator.get_op_id()
 
@@ -450,6 +452,8 @@ class CostModel:
 
         elif isinstance(operator, CacheScanDataOp):
             datasource = self.datadir.getCachedResult(operator.dataset_id)
+            if not datasource:
+                raise ValueError(f"CacheScanDataOp {operator.dataset_id} not found in cache")
             datasource_len = len(datasource)
             datasource_memsize = datasource.getSize()
 

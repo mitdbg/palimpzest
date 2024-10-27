@@ -1,10 +1,10 @@
 import os
 
-import palimpzest as pz
+from palimpzest.datamanager import DataDirectory
 
 
 def remove_cache():
-    pz.DataDirectory().clearCache(keep_registry=True)
+    DataDirectory().clearCache(keep_registry=True)
     bad_files = [
         "testdata/enron-eval/assertion.log",
         "testdata/enron-eval/azure_openai_usage.log",
@@ -12,7 +12,7 @@ def remove_cache():
     ]
     [os.remove(file) for file in bad_files if os.path.exists(file)]
 
-    cache = pz.DataDirectory().getCacheService()
+    cache = DataDirectory().getCacheService()
     cache.rmCachedData("codeEnsemble")
     cache.rmCachedData("codeSamples")
 

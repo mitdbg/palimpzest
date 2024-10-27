@@ -18,7 +18,8 @@ from tabulate import tabulate
 
 import palimpzest as pz
 from palimpzest.constants import Cardinality
-from palimpzest.elements import DataRecord, GroupBySig
+from palimpzest.elements.records import DataRecord
+from palimpzest.elements.groupbysig import GroupBySig
 
 
 class ScientificPaper(pz.PDFFile):

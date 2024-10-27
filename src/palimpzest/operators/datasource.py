@@ -3,9 +3,14 @@ from __future__ import annotations
 import time
 from typing import List, Union
 
-from palimpzest.constants import *
+from palimpzest.constants import (
+    LOCAL_SCAN_TIME_PER_KB,
+    MEMORY_SCAN_TIME_PER_KB,
+    NAIVE_EST_ONE_TO_MANY_SELECTIVITY,
+    Cardinality,
+)
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.elements import DataRecord
+from palimpzest.elements.records import DataRecord
 from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
 
 
@@ -42,7 +47,7 @@ class DataSourcePhysicalOp(PhysicalOperator):
     def naiveCostEstimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
-        input_cardinality: Union[int, float],
+        input_cardinality: Cardinality,
         input_record_size_in_bytes: Union[int, float],
     ) -> OperatorCostEstimates:
         """
@@ -66,7 +71,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
     def naiveCostEstimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
-        input_cardinality: Union[int, float],
+        input_cardinality: Cardinality,
         input_record_size_in_bytes: Union[int, float],
         dataset_type: str,
     ) -> OperatorCostEstimates:
@@ -127,7 +132,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
     def naiveCostEstimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
-        input_cardinality: Union[int, float],
+        input_cardinality: Cardinality,
         input_record_size_in_bytes: Union[int, float],
     ):
         # get inputs needed for naive cost estimation

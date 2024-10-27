@@ -1,9 +1,22 @@
-import palimpzest as pz
-from palimpzest.constants import Model
+from palimpzest.constants import Cardinality, Model
+from palimpzest.corelib.schemas import TextFile
 from palimpzest.cost_model import CostModel
-from palimpzest.operators import *
-from palimpzest.optimizer import Group, LogicalExpression, Optimizer
-from palimpzest.policy import *
+from palimpzest.elements.filters import Filter
+from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
+from palimpzest.operators.convert import LLMConvert, LLMConvertBonded
+from palimpzest.operators.datasource import MarshalAndScanDataOp
+from palimpzest.operators.filter import LLMFilter, NonLLMFilter
+from palimpzest.operators.logical import (
+    ConvertScan,
+    FilteredScan,
+)
+from palimpzest.optimizer.optimizer import Group, LogicalExpression, Optimizer
+from palimpzest.policy import (
+    MaxQuality,
+    MinCost,
+    MinTime,
+)
+from palimpzest.sets import Dataset
 
 
 class TestPrimitives:
@@ -72,7 +85,7 @@ class TestPrimitives:
 
 class TestOptimizer:
     def test_basic_functionality(self, enron_eval_tiny):
-        plan = pz.Dataset(enron_eval_tiny, schema=pz.TextFile)
+        plan = Dataset(enron_eval_tiny, schema=TextFile)
         policy = MaxQuality()
         cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
         optimizer = Optimizer(
@@ -89,7 +102,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
 
     def test_simple_max_quality_convert(self, enron_eval_tiny, email_schema):
-        plan = pz.Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny, schema=email_schema)
         policy = MaxQuality()
         cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
         optimizer = Optimizer(
@@ -108,7 +121,7 @@ class TestOptimizer:
         assert physical_plan[1].model == Model.GPT_4
 
     def test_simple_min_cost_convert(self, enron_eval_tiny, email_schema):
-        plan = pz.Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny, schema=email_schema)
         policy = MinCost()
         cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
         optimizer = Optimizer(
@@ -126,7 +139,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[1], CodeSynthesisConvert)
 
     def test_simple_min_time_convert(self, enron_eval_tiny, email_schema):
-        plan = pz.Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny, schema=email_schema)
         policy = MinTime()
         cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
         optimizer = Optimizer(
@@ -144,7 +157,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[1], CodeSynthesisConvert)
 
     def test_push_down_filter(self, enron_eval_tiny, email_schema):
-        plan = pz.Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny, schema=email_schema)
         plan = plan.filter("some text filter", depends_on=["contents"])
         policy = MinCost()
         cost_model = CostModel(enron_eval_tiny, sample_execution_data=[])
@@ -164,7 +177,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[2], CodeSynthesisConvert)
 
     def test_push_down_two_filters(self, enron_eval_tiny, email_schema):
-        plan = pz.Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny, schema=email_schema)
         plan = plan.filter("some text filter", depends_on=["contents"])
         plan = plan.filter("another text filter", depends_on=["contents"])
         policy = MinCost()
@@ -209,7 +222,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[5], LLMFilter)  # ImageRealEstateListing(attractive)
 
     def test_seven_filters(self, enron_eval_tiny, email_schema):
-        plan = pz.Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny, schema=email_schema)
         plan = plan.filter("filter1", depends_on=["contents"])
         plan = plan.filter("filter2", depends_on=["contents"])
         plan = plan.filter("filter3", depends_on=["contents"])

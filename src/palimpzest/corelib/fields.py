@@ -30,7 +30,7 @@ class Field:
     def __hash__(self) -> int:
         return hash(self._desc + str(self.required) + self.__class__.__name__)
 
-    def __eq__(self, other: Field) -> bool:
+    def __eq__(self, other) -> bool:
         return self._desc == other._desc and self.required == other.required and self.__class__ == other.__class__
 
     @property

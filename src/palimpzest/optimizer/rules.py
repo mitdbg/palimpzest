@@ -1,8 +1,23 @@
 from copy import deepcopy
-from typing import Set
+from typing import Dict, Set, Tuple
 
-from palimpzest.constants import AggFunc
-from palimpzest.operators import *
+from palimpzest.constants import AggFunc, Cardinality, PromptStrategy
+from palimpzest.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
+from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvertSingle
+from palimpzest.operators.convert import LLMConvertBonded, LLMConvertConventional, NonLLMConvert
+from palimpzest.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
+from palimpzest.operators.filter import LLMFilter, NonLLMFilter
+from palimpzest.operators.limit import LimitScanOp
+from palimpzest.operators.logical import (
+    Aggregate,
+    BaseScan,
+    CacheScan,
+    ConvertScan,
+    FilteredScan,
+    GroupByAggregate,
+    LimitScan,
+)
+from palimpzest.operators.token_reduction_convert import TokenReducedConvertBonded, TokenReducedConvertConventional
 from palimpzest.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
 from palimpzest.utils.model_helpers import getVisionModels
 

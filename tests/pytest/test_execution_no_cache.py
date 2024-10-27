@@ -1,10 +1,15 @@
 import time
 
 import pytest
-from conftest import *
 
-from palimpzest.execution import *
-from palimpzest.operators import CodeSynthesisConvert, LLMConvert, LLMFilter
+from palimpzest.execution.sentinel_execution import (
+    PipelinedParallelSentinelExecution,
+    PipelinedSingleThreadSentinelExecution,
+    SequentialSingleThreadSentinelExecution,
+)
+from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
+from palimpzest.operators.convert import LLMConvert
+from palimpzest.operators.filter import LLMFilter
 
 
 @pytest.mark.parametrize(

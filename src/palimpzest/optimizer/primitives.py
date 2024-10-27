@@ -4,7 +4,8 @@ import hashlib
 from typing import Dict, List, Optional, Set, Union
 
 from palimpzest.constants import MAX_ID_CHARS
-from palimpzest.operators import LogicalOperator, PhysicalOperator
+from palimpzest.operators.logical import LogicalOperator
+from palimpzest.operators.physical import PhysicalOperator
 
 
 class Expression:
@@ -68,7 +69,7 @@ class Group:
         self.physical_expressions = set()
         self.fields = fields
         self.explored = False
-        self.best_physical_expression: PhysicalExpression = None
+        self.best_physical_expression: PhysicalExpression | None = None
         self.ci_best_physical_expressions: List[PhysicalExpression] = []
         self.satisfies_constraint = False
 

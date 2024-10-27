@@ -4,12 +4,14 @@ from palimpzest.constants import OptimizationStrategy
 from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import ExecutionStats
 from palimpzest.execution.execution_engine import ExecutionEngine
-from palimpzest.execution.plan_executors import (
+from palimpzest.execution.plan_executors.parallel_execution_engine import (
     PipelinedParallelPlanExecutor,
+)
+from palimpzest.execution.plan_executors.single_threaded_execution_engine import (
     PipelinedSingleThreadPlanExecutor,
     SequentialSingleThreadPlanExecutor,
 )
-from palimpzest.optimizer import Optimizer
+from palimpzest.optimizer.optimizer import Optimizer
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 

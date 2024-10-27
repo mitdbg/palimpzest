@@ -1,15 +1,18 @@
 import time
 
 from palimpzest.corelib.schemas import SourceRecord
-from palimpzest.cost_model.cost_model import CostModel
+from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import OperatorStats, PlanStats
-from palimpzest.elements import DataRecord
+from palimpzest.elements.records import DataRecord
 from palimpzest.execution.execution_engine import ExecutionEngine
-from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
+from palimpzest.operators.aggregate import AggregateOp
+from palimpzest.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
+from palimpzest.operators.limit import LimitScanOp
 from palimpzest.optimizer.optimizer import Optimizer
+from palimpzest.optimizer.plan import PhysicalPlan
 from palimpzest.policy import Policy
-from palimpzest.sets import Set
+from palimpzest.sets import Dataset
 
 
 class StreamingSequentialExecution(ExecutionEngine):
@@ -18,14 +21,34 @@ class StreamingSequentialExecution(ExecutionEngine):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self._plan: PhysicalPlan | None = None
+        self._plan_stats: PlanStats | None = None
         self.last_record = False
-        self.current_scan_idx = 0
-        self.plan = None
-        self.plan_stats = None
-        self.plan_generated = False
-        self.records_count = 0
+        self.current_scan_idx: int = 0
+        self.plan_generated: bool = False
+        self.records_count: int = 0
 
-    def generate_plan(self, dataset: Set, policy: Policy):
+    @property
+    def plan(self) -> PhysicalPlan:
+        if self._plan is None:
+            raise Exception("Plan has not been generated yet.")
+        return self._plan
+
+    @plan.setter
+    def plan(self, plan: PhysicalPlan):
+        self._plan = plan
+
+    @property
+    def plan_stats(self) -> PlanStats:
+        if self._plan_stats is None:
+            raise Exception("Plan stats have not been generated yet.")
+        return self._plan_stats
+
+    @plan_stats.setter
+    def plan_stats(self, plan_stats: PlanStats):
+        self._plan_stats = plan_stats
+
+    def generate_plan(self, dataset: Dataset, policy: Policy):
         self.clear_cached_responses_and_examples()
 
         self.set_source_dataset_id(dataset)
@@ -61,7 +84,7 @@ class StreamingSequentialExecution(ExecutionEngine):
 
     def execute(
         self,
-        dataset: Set,
+        dataset: Dataset,
         policy: Policy,
     ):
         start_time = time.time()
@@ -86,6 +109,8 @@ class StreamingSequentialExecution(ExecutionEngine):
             if isinstance(scan_operator, MarshalAndScanDataOp)
             else self.datadir.getCachedResult(scan_operator.cachedDataIdentifier)
         )
+        if not datasource:
+            raise Exception("Data source not found")
         datasource_len = len(datasource)
 
         input_records = []
@@ -113,7 +138,11 @@ class StreamingSequentialExecution(ExecutionEngine):
         input_records = [record]
         record_op_stats_lst = []
 
+
         for op_idx, operator in enumerate(plan.operators):
+            # TODO: this being defined in the for loop potentially makes the return
+            # unbounded if plan.operators is empty. This should be defined outside the loop
+            # and the loop refactored to account for not redeclaring this for each operator
             output_records = []
             op_id = operator.get_op_id()
             prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
@@ -125,7 +154,7 @@ class StreamingSequentialExecution(ExecutionEngine):
             # elif isinstance(operator, AggregateOp):
             # output_records, record_op_stats_lst = operator(candidates=input_records)
             elif isinstance(operator, LimitScanOp):
-                if len(self.records_count) >= operator.limit:
+                if self.records_count >= operator.limit:
                     break
             else:
                 for r in input_records:

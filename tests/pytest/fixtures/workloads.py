@@ -1,6 +1,8 @@
 import pytest
 
-import palimpzest as pz
+from palimpzest.constants import Cardinality
+from palimpzest.corelib.schemas import Table, XLSFile
+from palimpzest.sets import Dataset
 from palimpzest.utils import udfs
 
 
@@ -42,7 +44,7 @@ def in_price_range(record):
 ### WORKLOADS ###
 @pytest.fixture
 def enron_workload(enron_eval_tiny, email_schema):
-    emails = pz.Dataset(enron_eval_tiny, schema=email_schema)
+    emails = Dataset(enron_eval_tiny, schema=email_schema)
     emails = emails.filter(
         'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
     )
@@ -59,7 +61,7 @@ def real_estate_workload(
     text_real_estate_listing_schema,
     image_real_estate_listing_schema,
 ):
-    listings = pz.Dataset(real_estate_eval_tiny, schema=real_estate_listing_files_schema)
+    listings = Dataset(real_estate_eval_tiny, schema=real_estate_listing_files_schema)
     listings = listings.convert(text_real_estate_listing_schema, depends_on="text_content")
     listings = listings.convert(image_real_estate_listing_schema, image_conversion=True, depends_on="image_contents")
     listings = listings.filter(
@@ -73,12 +75,12 @@ def real_estate_workload(
 
 @pytest.fixture
 def biofabric_workload(biofabric_tiny, case_data_schema):
-    xls = pz.Dataset(biofabric_tiny, schema=pz.XLSFile)
+    xls = Dataset(biofabric_tiny, schema=XLSFile)
     # patient_tables = xls.convert(
     #     pz.Table, desc="All tables in the file", cardinality=pz.Cardinality.ONE_TO_MANY)
-    patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+    patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
     patient_tables = patient_tables.filter("The rows of the table contain the patient age")
     case_data = patient_tables.convert(
-        case_data_schema, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY
+        case_data_schema, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
     )
     return case_data

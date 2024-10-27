@@ -10,9 +10,9 @@ from palimpzest.constants import (
     PromptStrategy,
 )
 from palimpzest.dataclasses import OperatorCostEstimates
-from palimpzest.generators import DSPyGenerator
-from palimpzest.operators import LLMConvert, LLMConvertBonded, LLMConvertConventional
-from palimpzest.utils import best_substring_match, find_best_range
+from palimpzest.generators.generators import DSPyGenerator
+from palimpzest.operators.convert import LLMConvert, LLMConvertBonded, LLMConvertConventional
+from palimpzest.utils.token_reduction_helpers import best_substring_match, find_best_range
 
 
 class TokenReducedConvert(LLMConvert):
@@ -44,7 +44,7 @@ class TokenReducedConvert(LLMConvert):
 
         return op_params
 
-    def __eq__(self, other: TokenReducedConvert):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.token_budget == other.token_budget
@@ -81,13 +81,16 @@ class TokenReducedConvert(LLMConvert):
 
         return naive_op_cost_estimates
 
-    def reduce_context(self, heatmap: List[int], full_context: str) -> str:
+    def reduce_context(self, heatmap: List[int], full_context: str | List[str]) -> str:
         if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-            si, ei = find_best_range(
+            range = find_best_range(
                 heatmap,
                 int(self.token_budget / self.TOKEN_REDUCTION_GRANULARITY),
                 trim_zeros=False,
             )
+            if not range:
+                raise Exception("No range found in heatmap")
+            si, ei = range
             print("si:", si, "ei:", ei)
             sr, er = (
                 si * self.TOKEN_REDUCTION_GRANULARITY,
@@ -106,12 +109,12 @@ class TokenReducedConvert(LLMConvert):
             raise NotImplementedError("Token reduction is only supported for DSPY_COT_QA prompts")
 
     def _dspy_generate_fields(
-        self, prompt: str, content: str | List[bytes] | None = None, verbose: bool = False
+        self, prompt: str, content: str | List[str], verbose: bool = False
     ) -> Tuple[List[Dict[str, List]] | Any]:
-        full_context = content
+        answer, query_stats = None, None
         if self.first_execution or self.heatmap_dict["count"] < self.MAX_HEATMAP_UPDATES:
             print("Warming up heatmap")
-            answer, query_stats = super()._dspy_generate_fields(prompt, full_context, verbose)
+            answer, query_stats = super()._dspy_generate_fields(prompt, content, verbose)
             self.first_execution = False
             # create the heatmap structure with default resolution of 0.001 and count of 0
             self.heatmap_dict = {
@@ -132,19 +135,28 @@ class TokenReducedConvert(LLMConvert):
             # only refer to the heatmap if the count is greater than a enough sample size
             # TODO: only trim the context if the attention is clustered in a small region
             if count >= self.TOKEN_REDUCTION_SAMPLE:
-                context = self.reduce_context(heatmap, full_context)
+                context = self.reduce_context(heatmap, content)
                 try:
-                    answer, query_stats = generator.generate(context=context, question=prompt)
+                    answer, query_stats = generator.generate(context=context, prompt=prompt)
                 except Exception as e:
                     print(f"DSPy generation error: {e}, falling back to unreduced generation")
                     answer, query_stats = super()._dspy_generate_fields(prompt, content, verbose)
 
+        # TODO: answer and query stats may be unbound if we hit the else block
+        # and count < TOKEN_REDUCTION_SAMPLE, which makes the below pretty clunky
+        # this throw asserts our view of the world and we should refactor this
+        if answer is None or query_stats is None:
+            raise Exception("answer or query_stats is None")
         try:
-            gsi, gei = best_substring_match(answer, full_context)
+            match = best_substring_match(answer, content)
+            if not match:
+                gsi, gei = 0, len(content)
+            else:
+                gsi, gei = match
         except Exception as e:
             print("Error in substring match:", e)
-            gsi, gei = 0, len(full_context)
-        context_len = len(full_context)
+            gsi, gei = 0, len(content)
+        context_len = len(content)
         gsr, ger = gsi / context_len, gei / context_len
         norm_si, norm_ei = int(gsr / self.resolution), int(ger / self.resolution)
         if verbose:

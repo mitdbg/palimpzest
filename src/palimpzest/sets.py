@@ -5,13 +5,11 @@ import json
 from typing import Callable, List, Optional, Type, Union
 
 from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
-from palimpzest.corelib import Number, Schema
+from palimpzest.corelib.schemas import Number, Schema
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import DataSource
-from palimpzest.elements import (
-    Filter,
-    GroupBySig,
-)
+from palimpzest.elements.filters import Filter
+from palimpzest.elements.groupbysig import GroupBySig
 
 
 #####################################################
@@ -40,16 +38,16 @@ class Set:
     def __init__(
         self,
         source: Union[Set, DataSource],
-        schema: Schema,
-        desc: str = None,
-        filter: Filter = None,
-        udf: Callable = None,
-        aggFunc: AggFunc = None,
-        groupBy: GroupBySig = None,
-        limit: int = None,
-        fnid: str = None,
+        schema: Type[Schema],
+        desc: str | None = None,
+        filter: Filter | None = None,
+        udf: Callable | None = None,
+        aggFunc: AggFunc | None = None,
+        groupBy: GroupBySig | None = None,
+        limit: int | None = None,
+        fnid: str | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-        image_conversion: bool = None,
+        image_conversion: bool | None = None,
         depends_on: List[str] | None = None,
         nocache: bool = False,
     ):
@@ -136,7 +134,7 @@ class Dataset(Set):
 
     def filter(
         self,
-        _filter: Union[str, callable],
+        _filter: Union[str, Callable],
         depends_on: Union[str, List[str]] | None = None,
         desc: str = "Apply filter(s)",
     ) -> Dataset:
@@ -160,7 +158,7 @@ class Dataset(Set):
 
     def convert(
         self,
-        outputSchema: Schema,
+        outputSchema: Type[Schema],
         udf: Optional[Callable] = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool = False,

@@ -7,7 +7,7 @@ import yaml
 from palimpzest import constants
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
-from palimpzest.datasources.datasources import (
+from palimpzest.datasources import (
     FileSource,
     HTMLFileDirectorySource,
     ImageFileDirectorySource,

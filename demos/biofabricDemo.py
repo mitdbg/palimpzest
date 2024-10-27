@@ -13,7 +13,7 @@ import palimpzest as pz
 from palimpzest.utils import udfs
 
 if not os.environ.get("OPENAI_API_KEY"):
-    from palimpzest.utils import load_env
+    from palimpzest.utils.env_helpers import load_env
 
     load_env()
 
@@ -100,8 +100,6 @@ if __name__ == "__main__":
         policy = pz.MinCost()
     elif policy == "quality":
         policy = pz.MaxQuality()
-    else:
-        policy = pz.UserChoice()
 
     if experiment == "collection":
         # papers = pz.Dataset("biofabric-pdf", schema=ScientificPaper)
@@ -133,14 +131,14 @@ if __name__ == "__main__":
     elif experiment == "matching":
         xls = pz.Dataset("biofabric-matching", schema=pz.XLSFile)
         patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
-        case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality="oneToMany")
+        case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
         output = case_data
 
     elif experiment == "endtoend":
         xls = pz.Dataset("biofabric-tiny", schema=pz.XLSFile)
         patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
-        case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality="oneToMany")
+        case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
         output = case_data
 
     tables, plan, stats = pz.Execute(

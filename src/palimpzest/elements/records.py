@@ -2,7 +2,7 @@ import hashlib
 from typing import Any, Type
 
 from palimpzest.constants import MAX_ID_CHARS
-from palimpzest.corelib import Schema
+from palimpzest.corelib.schemas import Schema
 
 
 class DataRecord:
