@@ -43,16 +43,6 @@ from palimpzest.policy import Policy
 from palimpzest.sets import Dataset, Set
 from palimpzest.utils.model_helpers import getChampionModel, getCodeChampionModel, getConventionalFallbackModel
 
-# DEFINITIONS
-# NOTE: the name pz.Dataset has always been a bit awkward; from a user-facing perspective,
-#       it makes sense for users to define a Dataset and then perform operations (e.g. convert,
-#       filter, etc.) over that dataset. The awkwardness arises from the fact that the "Dataset"
-#       doesn't actually contain data, but instead represents a declarative statement of a query plan
-#       which we then manipulate internally. For now, the simplest thing for me to do is simply to
-#       rename the class internally to make function signatures a bit clearer, but we may want to
-#       revisit the naming of Dataset.
-QueryPlan = Dataset
-
 
 class Optimizer:
     """
@@ -277,7 +267,7 @@ class Optimizer:
 
         return [group.group_id], all_fields, all_properties
 
-    def convert_query_plan_to_group_tree(self, query_plan: QueryPlan) -> str:
+    def convert_query_plan_to_group_tree(self, query_plan: Dataset) -> str:
         # Obtain ordered list of datasets
         dataset_nodes = []
         node = query_plan  # TODO: copy
