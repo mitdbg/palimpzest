@@ -470,6 +470,9 @@ class CostModel:
                 input_record_size_in_bytes=datasource_memsize / datasource_len,
             )
 
+        else:
+            op_estimates = operator.naiveCostEstimates(source_op_estimates)
+
         # if we have sample execution data, update naive estimates with more informed ones
         sample_op_estimates = self.operator_estimates
         if sample_op_estimates is not None and op_id in sample_op_estimates:
