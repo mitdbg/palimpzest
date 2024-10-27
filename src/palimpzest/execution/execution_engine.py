@@ -10,7 +10,8 @@ from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import PlanStats, RecordOpStats
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements.records import DataRecord
-from palimpzest.optimizer.optimizer import Optimizer, PhysicalPlan
+from palimpzest.optimizer.optimizer import Optimizer
+from palimpzest.optimizer.plan import PhysicalPlan
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 from palimpzest.utils.model_helpers import getModels
