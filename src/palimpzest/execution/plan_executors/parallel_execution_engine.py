@@ -7,7 +7,10 @@ from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements.records import DataRecord
 from palimpzest.execution.execution_engine import ExecutionEngine
-from palimpzest.operators import AggregateOp, LimitScanOp, MarshalAndScanDataOp, PhysicalOperator
+from palimpzest.operators.aggregate import AggregateOp
+from palimpzest.operators.datasource import MarshalAndScanDataOp
+from palimpzest.operators.limit import LimitScanOp
+from palimpzest.operators.physical import PhysicalOperator
 from palimpzest.optimizer.plan import PhysicalPlan
 
 
