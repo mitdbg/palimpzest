@@ -127,7 +127,7 @@ class StreamingSequentialExecution(ExecutionEngine):
         op_id = scan_operator.get_op_id()
         self.plan_stats.operator_stats[op_id].add_record_op_stats(
             record_op_stats,
-            source_op_id="",
+            source_op_id=None,
             plan_id=self.plan.plan_id,
         )
 
@@ -170,7 +170,7 @@ class StreamingSequentialExecution(ExecutionEngine):
 
             self.plan_stats.operator_stats[op_id].add_record_op_stats(
                 record_op_stats_lst,
-                source_op_id=prev_op_id or "",
+                source_op_id=prev_op_id,
                 plan_id=plan.plan_id,
             )
             input_records = output_records

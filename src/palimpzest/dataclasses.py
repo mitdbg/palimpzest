@@ -141,7 +141,7 @@ class RecordOpStats:
 
     ##### NOT-OPTIONAL, BUT FILLED BY EXECUTION CLASS AFTER CONSTRUCTOR CALL #####
     # the ID of the physical operation which produced the input record for this record at this operation
-    source_op_id: str = ""
+    source_op_id: Optional[str] = None
 
     # the ID of the physical plan which produced this record at this operation
     plan_id: str = ""
@@ -222,7 +222,7 @@ class OperatorStats:
     def add_record_op_stats(
         self,
         record_op_stats_lst: Union[RecordOpStats, List[RecordOpStats]],
-        source_op_id: str,
+        source_op_id: str | None,
         plan_id: str,
     ):
         # convert individual record into list

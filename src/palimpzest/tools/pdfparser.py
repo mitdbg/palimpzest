@@ -12,7 +12,6 @@ from fastapi import status
 from pypdf import PdfReader
 
 from palimpzest.config import Config
-from palimpzest.datamanager import DataDirectory
 
 COSMOS_ADDRESS = "https://xdd.wisc.edu/cosmos_service"
 
@@ -209,9 +208,13 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10):
 # 1. Check if the text file already exists in the cache, if so, read from the cache
 # 2. If not, call the cosmos_client function to process the PDF file and cache the text file
 ##
-def get_text_from_pdf(filename, pdf_bytes, enable_file_cache=True, file_cache_dir="/tmp"):
-    pdfprocessor = DataDirectory().current_config.get("pdfprocessor")
-
+# NOTE: I don't believe anyone actively depends on this function, but we need to remove the
+# dependency on DataDirectory() in order to prevent circular imports. The long-term solution
+# is to separate out the pieces of DataDirectory which the DataSources depend on, from the
+# pieces which are related to setting / reading external configurations (like "pdfprocessor").
+# However, given that I can fix this in two minutes by adding this is a kwarg, I'm going to
+# do that for now and revisit the issue if/when this matters.
+def get_text_from_pdf(filename, pdf_bytes, pdfprocessor="cosmos", enable_file_cache=True, file_cache_dir="/tmp"):
     pdf_filename = filename
     file_name = os.path.basename(pdf_filename)
     file_name_without_extension = os.path.splitext(file_name)[0]

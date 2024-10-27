@@ -47,7 +47,7 @@ class DataSourcePhysicalOp(PhysicalOperator):
     def naiveCostEstimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
-        input_cardinality: Union[int, float],
+        input_cardinality: Cardinality,
         input_record_size_in_bytes: Union[int, float],
     ) -> OperatorCostEstimates:
         """
@@ -71,7 +71,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
     def naiveCostEstimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
-        input_cardinality: Union[int, float],
+        input_cardinality: Cardinality,
         input_record_size_in_bytes: Union[int, float],
         dataset_type: str,
     ) -> OperatorCostEstimates:

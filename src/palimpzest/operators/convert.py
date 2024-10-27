@@ -453,11 +453,11 @@ class LLMConvert(ConvertOp):
         else:
             generator = DSPyGenerator(self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose)
 
-        try:
-            answer, query_stats = generator.generate(context=content, question=prompt)
-        except Exception as e:
-            print(f"DSPy generation error: {e}")
-            return "", GenerationStats()
+        # try:
+        answer, query_stats = generator.generate(context=content, prompt=prompt)
+        # except Exception as e:
+        #     print(f"DSPy generation error: {e}")
+        #     return "", GenerationStats()
 
         return answer, query_stats
 

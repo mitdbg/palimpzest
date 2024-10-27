@@ -1,4 +1,4 @@
-from palimpzest.constants import MAX_ROWS, Cardinality
+from palimpzest.constants import MAX_ROWS, Cardinality, OptimizationStrategy
 from palimpzest.corelib.fields import (
     BooleanField,
     BytesField,
@@ -86,6 +86,7 @@ __all__ = [
     # constants
     "Cardinality",
     "MAX_ROWS",
+    "OptimizationStrategy",
     # datasources
     "DataSource",
     "DirectorySource",

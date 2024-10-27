@@ -379,7 +379,7 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
             print("-------")
             print(f"{prompt}")
         # invoke the champion model to generate the code
-        pred, stats = self.code_champion_generator.generate(prompt=prompt)
+        pred, stats = self.code_champion_generator.generate(context=None, prompt=prompt)
         ordered_keys = [f"```{language}", f"```{language.lower()}", "```"]
         code = None
         for key in ordered_keys:
@@ -476,7 +476,7 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvert):
             "n": n_advices,
         }
         prompt = ADVICEGEN_PROMPT.format(**context)
-        pred, stats = self.code_champion_generator.generate(prompt=prompt)
+        pred, stats = self.code_champion_generator.generate(context=None, prompt=prompt)
         advs = self._parse_multiple_outputs(pred, outputs=[f"Idea {i}" for i in range(1, limit + 1)])
 
         return advs, stats

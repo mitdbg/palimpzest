@@ -134,7 +134,7 @@ class TokenReducedConvert(LLMConvert):
             if count >= self.TOKEN_REDUCTION_SAMPLE:
                 context = self.reduce_context(heatmap, full_context)
                 try:
-                    answer, query_stats = generator.generate(context=context, question=prompt)
+                    answer, query_stats = generator.generate(context=context, prompt=prompt)
                 except Exception as e:
                     print(f"DSPy generation error: {e}, falling back to unreduced generation")
                     answer, query_stats = super()._dspy_generate_fields(prompt, content, verbose)

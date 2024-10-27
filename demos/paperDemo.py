@@ -8,7 +8,7 @@ import numpy as np
 from PIL import Image
 
 import palimpzest as pz
-from palimpzest.utils import udfs
+from palimpzest.utils.udfs import xls_to_tables
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -270,7 +270,7 @@ if __name__ == "__main__":
     elif workload == "medical-schema-matching":
         # datasetid="biofabric-medium" for paper evaluation
         plan = pz.Dataset(datasetid, schema=pz.XLSFile)
-        plan = plan.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+        plan = plan.convert(pz.Table, udf=xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         plan = plan.filter("The rows of the table contain the patient age")
         plan = plan.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
 
@@ -293,7 +293,7 @@ if __name__ == "__main__":
 
     # visualize output in Gradio
     if visualize:
-        from palimpzest.utils import printTable
+        from palimpzest.utils.demo_helpers import printTable
 
         plan_str = list(execution_stats.plan_strs.values())[-1]
         if workload == "enron":
