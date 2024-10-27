@@ -381,7 +381,11 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
         # invoke the champion model to generate the code
         pred, stats = self.code_champion_generator.generate(context=None, prompt=prompt)
         ordered_keys = [f"```{language}", f"```{language.lower()}", "```"]
+
         code = None
+        if not pred:
+            return code, stats
+
         for key in ordered_keys:
             if key in pred:
                 code = pred.split(key)[1].split("```")[0].strip()
