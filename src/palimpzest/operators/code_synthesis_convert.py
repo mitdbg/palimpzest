@@ -476,7 +476,7 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvert):
             "n": n_advices,
         }
         prompt = ADVICEGEN_PROMPT.format(**context)
-        pred, stats = self.champion_llm.generate(prompt=prompt)
+        pred, stats = self.code_champion_generator.generate(prompt=prompt)
         advs = self._parse_multiple_outputs(pred, outputs=[f"Idea {i}" for i in range(1, limit + 1)])
 
         return advs, stats
