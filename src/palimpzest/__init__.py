@@ -28,6 +28,18 @@ from palimpzest.corelib.schemas import (
     XLSFile,
 )
 from palimpzest.datamanager import DataDirectory
+from palimpzest.datasources import (
+    DataSource,
+    DirectorySource,
+    FileSource,
+    HTMLFileDirectorySource,
+    ImageFileDirectorySource,
+    MemorySource,
+    PDFFileDirectorySource,
+    TextFileDirectorySource,
+    UserSource,
+    XLSFileDirectorySource,
+)
 from palimpzest.elements.records import DataRecord
 from palimpzest.execution.execute import Execute
 from palimpzest.execution.nosentinel_execution import (
@@ -74,6 +86,17 @@ __all__ = [
     # constants
     "Cardinality",
     "MAX_ROWS",
+    # datasources
+    "DataSource",
+    "DirectorySource",
+    "FileSource",
+    "HTMLFileDirectorySource",
+    "ImageFileDirectorySource",
+    "MemorySource",
+    "PDFFileDirectorySource",
+    "TextFileDirectorySource",
+    "UserSource",
+    "XLSFileDirectorySource",
     # elements
     "DataRecord",
     # fields

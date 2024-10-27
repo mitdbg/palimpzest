@@ -1,8 +1,7 @@
-from palimpzest.datamanager import DataDirectory
 import pytest
 
-import palimpzest as pz
 from palimpzest.cost_model import CostModel
+from palimpzest.datamanager import DataDirectory
 
 
 class TestCostModel:

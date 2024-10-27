@@ -363,7 +363,7 @@ class LLMConvert(ConvertOp):
         self,
         jsonObj: Any,
         candidate: DataRecord,
-        cardinality_idx: int = None,
+        cardinality_idx: int | None = None,
     ) -> DataRecord:
         # initialize data record
         dr = DataRecord(self.outputSchema, parent_id=candidate._id, cardinality_idx=cardinality_idx)
