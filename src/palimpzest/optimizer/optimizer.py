@@ -455,7 +455,7 @@ class Optimizer:
 
         return best_plans
 
-    def optimize(self, query_plan: QueryPlan) -> List[PhysicalPlan]:
+    def optimize(self, query_plan: Dataset) -> List[PhysicalPlan]:
         """
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
