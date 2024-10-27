@@ -4,7 +4,8 @@ import hashlib
 from typing import Dict, List, Optional, Set, Union
 
 from palimpzest.constants import MAX_ID_CHARS
-from palimpzest.operators import LogicalOperator, PhysicalOperator
+from palimpzest.operators.logical import LogicalOperator
+from palimpzest.operators.physical import PhysicalOperator
 
 
 class Expression:

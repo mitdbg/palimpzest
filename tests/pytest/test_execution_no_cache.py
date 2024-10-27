@@ -7,8 +7,9 @@ from palimpzest.execution.sentinel_execution import (
     PipelinedSingleThreadSentinelExecution,
     SequentialSingleThreadSentinelExecution,
 )
-from palimpzest.operators import LLMConvert, LLMFilter
 from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
+from palimpzest.operators.convert import LLMConvert
+from palimpzest.operators.filter import LLMFilter
 
 
 @pytest.mark.parametrize(

@@ -14,7 +14,7 @@ from palimpzest.constants import Model, PromptStrategy
 from palimpzest.corelib.schemas import File, TextFile
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements.records import DataRecord
-from palimpzest.operators import LLMConvertBonded, LLMConvertConventional
+from palimpzest.operators.convert import LLMConvertBonded, LLMConvertConventional
 from palimpzest.operators.datasource import MarshalAndScanDataOp
 
 if not os.environ.get("OPENAI_API_KEY"):

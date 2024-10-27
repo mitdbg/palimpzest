@@ -5,8 +5,10 @@ from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements.records import DataRecord
 from palimpzest.execution.execution_engine import ExecutionEngine
-from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
+from palimpzest.operators.aggregate import AggregateOp
+from palimpzest.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
+from palimpzest.operators.limit import LimitScanOp
 from palimpzest.optimizer.optimizer import Optimizer
 from palimpzest.policy import Policy
 from palimpzest.sets import Set

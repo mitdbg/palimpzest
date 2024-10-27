@@ -1,7 +1,9 @@
 import pytest
 
 from palimpzest.constants import Model
-from palimpzest.operators import ConvertOp, FilterOp, MarshalAndScanDataOp
+from palimpzest.operators.convert import ConvertOp
+from palimpzest.operators.datasource import MarshalAndScanDataOp
+from palimpzest.operators.filter import FilterOp
 from palimpzest.utils.model_helpers import getModels
 
 

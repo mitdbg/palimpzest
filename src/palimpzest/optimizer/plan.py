@@ -5,7 +5,7 @@ from typing import List, Optional, Set
 
 from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.dataclasses import PlanCost
-from palimpzest.operators import PhysicalOperator
+from palimpzest.operators.physical import PhysicalOperator
 
 
 class Plan:

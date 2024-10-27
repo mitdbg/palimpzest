@@ -11,7 +11,7 @@ from palimpzest.constants import (
 )
 from palimpzest.dataclasses import OperatorCostEstimates
 from palimpzest.generators.generators import DSPyGenerator
-from palimpzest.operators import LLMConvert, LLMConvertBonded, LLMConvertConventional
+from palimpzest.operators.convert import LLMConvert, LLMConvertBonded, LLMConvertConventional
 from palimpzest.utils.token_reduction_helpers import best_substring_match, find_best_range
 
 
