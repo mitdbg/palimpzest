@@ -28,7 +28,7 @@ class TestPrimitives:
             depends_on=[],
             target_cache_id="filter1",
         )
-        filter1_expr = LogicalExpression(
+        LogicalExpression(
             operator=filter1_op,
             input_group_ids=[0],
             input_fields=set(["contents"]),
