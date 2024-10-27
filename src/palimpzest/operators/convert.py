@@ -378,7 +378,7 @@ class LLMConvert(ConvertOp):
         # first, copy all fields from input schema
         # NOTE: the method is called _get_fields instead of getFields to avoid it being picked up as a data record attribute;
         #       in the future we will come up with a less ugly fix -- but for now do not remove the _ even though it's not private
-        for field_name in candidate._get_fields():
+        for field_name in candidate.get_fields():
             setattr(dr, field_name, getattr(candidate, field_name, None))
 
         # get input field names and output field names
