@@ -21,8 +21,8 @@ if not os.environ.get("OPENAI_API_KEY"):
 #     remove_cache()
 
 #     params = {
-#         "outputSchema": email_schema,
-#         "inputSchema": File,
+#         "output_schema": email_schema,
+#         "input_schema": File,
 #         "model": pz.Model.GPT_3_5,
 #         "cardinality": "oneToOne",
 #     }
@@ -49,8 +49,8 @@ if not os.environ.get("OPENAI_API_KEY"):
 #     remove_cache()
 
 #     params = {
-#         "outputSchema": email_schema,
-#         "inputSchema": email_schema,
+#         "output_schema": email_schema,
+#         "input_schema": email_schema,
 #         "filter": pz.Filter("This is a sample filter"),
 #     }
 

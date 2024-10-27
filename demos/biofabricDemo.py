@@ -94,7 +94,7 @@ if __name__ == "__main__":
         engine = pz.SequentialSingleThreadNoSentinelExecution
 
     if no_cache:
-        pz.DataDirectory().clearCache(keep_registry=True)
+        pz.DataDirectory().clear_cache(keep_registry=True)
 
     if policy == "cost":
         policy = pz.MinCost()
@@ -131,14 +131,18 @@ if __name__ == "__main__":
     elif experiment == "matching":
         xls = pz.Dataset("biofabric-matching", schema=pz.XLSFile)
         patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
-        case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
+        case_data = patient_tables.convert(
+            CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY
+        )
         output = case_data
 
     elif experiment == "endtoend":
         xls = pz.Dataset("biofabric-tiny", schema=pz.XLSFile)
         patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
-        case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
+        case_data = patient_tables.convert(
+            CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY
+        )
         output = case_data
 
     tables, plan, stats = pz.Execute(

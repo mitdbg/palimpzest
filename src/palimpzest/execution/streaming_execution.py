@@ -105,9 +105,9 @@ class StreamingSequentialExecution(ExecutionEngine):
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
         datasource = (
-            self.datadir.getRegisteredDataset(self.source_dataset_id)
+            self.datadir.get_registered_dataset(self.source_dataset_id)
             if isinstance(scan_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(scan_operator.cachedDataIdentifier)
+            else self.datadir.get_cached_result(scan_operator.cachedDataIdentifier)
         )
         if not datasource:
             raise Exception("Data source not found")
@@ -118,7 +118,7 @@ class StreamingSequentialExecution(ExecutionEngine):
         for idx in range(datasource_len):
             candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=idx)
             candidate.idx = idx
-            candidate.get_item_fn = datasource.getItem
+            candidate.get_item_fn = datasource.get_item
             candidate.cardinality = datasource.cardinality
             records, record_op_stats_lst = scan_operator(candidate)
             input_records += records
@@ -137,7 +137,6 @@ class StreamingSequentialExecution(ExecutionEngine):
         # initialize list of output records and intermediate variables
         input_records = [record]
         record_op_stats_lst = []
-
 
         for op_idx, operator in enumerate(plan.operators):
             # TODO: this being defined in the for loop potentially makes the return

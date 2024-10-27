@@ -43,17 +43,17 @@ class AbstractDataSource(abc.ABC):
     def __len__(self) -> int: ...
 
     @abc.abstractmethod
-    def getItem(self, idx: int) -> DataRecord: ...
+    def get_item(self, idx: int) -> DataRecord: ...
 
     @abc.abstractmethod
-    def getSize(self) -> int: ...
+    def get_size(self) -> int: ...
 
     @property
     def schema(self) -> Type[Schema]:
         return self._schema
 
     def serialize(self) -> Dict[str, Any]:
-        return {"schema": self._schema.jsonSchema()}
+        return {"schema": self._schema.json_schema()}
 
 
 class DataSource(AbstractDataSource):
@@ -64,7 +64,7 @@ class DataSource(AbstractDataSource):
         self.dataset_id = dataset_id
         self.cardinality = cardinality
 
-    def universalIdentifier(self):
+    def universal_identifier(self):
         """Return a unique identifier for this Set."""
         return self.dataset_id
 
@@ -87,7 +87,7 @@ class DirectorySource(DataSource):
 
     def serialize(self) -> Dict[str, Any]:
         return {
-            "schema": self.schema.jsonSchema(),
+            "schema": self.schema.json_schema(),
             "path": self.path,
             "source_type": "directory",
         }
@@ -95,11 +95,11 @@ class DirectorySource(DataSource):
     def __len__(self):
         return len(self.filepaths)
 
-    def getSize(self):
+    def get_size(self):
         # Get the memory size of the files in the directory
         return sum([os.path.getsize(filepath) for filepath in self.filepaths])
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         raise NotImplementedError("You are calling this method from an abstract class.")
 
 
@@ -114,10 +114,10 @@ class MemorySource(DataSource):
     def __len__(self):
         return len(self.vals)
 
-    def getSize(self):
-        return sum([sys.getsizeof(self.getItem(idx)) for idx in range(len(self))])
+    def get_size(self):
+        return sum([sys.getsizeof(self.get_item(idx)) for idx in range(len(self))])
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         value = self.vals[idx]
         dr = DataRecord(self.schema, scan_idx=idx)
         dr.value = value
@@ -134,7 +134,7 @@ class FileSource(DataSource):
 
     def serialize(self) -> Dict[str, Any]:
         return {
-            "schema": self.schema.jsonSchema(),
+            "schema": self.schema.json_schema(),
             "path": self.filepath,
             "source_type": "file",
         }
@@ -142,11 +142,11 @@ class FileSource(DataSource):
     def __len__(self):
         return 1
 
-    def getSize(self):
+    def get_size(self):
         # Get the memory size of the filepath
         return os.path.getsize(self.filepath)
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         dr = DataRecord(self.schema, scan_idx=idx)
         dr.filename = self.filepath
         with open(self.filepath, "rb") as f:
@@ -165,17 +165,17 @@ class UserSource(DataSource):
 
     def serialize(self) -> Dict[str, Any]:
         return {
-            "schema": self.schema.jsonSchema(),
+            "schema": self.schema.json_schema(),
             "source_type": "user-defined:" + self.__class__.__name__,
         }
 
     def __len__(self):
         raise NotImplementedError("User needs to implement this method")
 
-    def getSize(self):
+    def get_size(self):
         raise NotImplementedError("User may optionally implement this method.")
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         raise NotImplementedError("User needs to implement this method.")
 
 
@@ -200,19 +200,19 @@ class HTMLFileDirectorySource(DirectorySource):
         text = soup.get_text(separator="\n", strip=True)
         return text
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         filepath = self.filepaths[idx]
         dr = DataRecord(self.schema, scan_idx=idx)
         dr.filename = os.path.basename(filepath)
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             textcontent = f.read()
 
         html = textcontent
         tokens = html.split()[: constants.MAX_HTML_ROWS]
         dr.html = " ".join(tokens)
 
-        strippedHtml = self.html_to_text_with_links(textcontent)
-        tokens = strippedHtml.split()[: constants.MAX_HTML_ROWS]
+        stripped_html = self.html_to_text_with_links(textcontent)
+        tokens = stripped_html.split()[: constants.MAX_HTML_ROWS]
         dr.text = " ".join(tokens)
 
         return dr
@@ -223,7 +223,7 @@ class ImageFileDirectorySource(DirectorySource):
         super().__init__(path=path, dataset_id=dataset_id, schema=ImageFile)
         assert all([filename.endswith(tuple(constants.IMAGE_EXTENSIONS)) for filename in self.filepaths])
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         filepath = self.filepaths[idx]
         dr = DataRecord(self.schema, scan_idx=idx)
         dr.filename = os.path.basename(filepath)
@@ -245,7 +245,7 @@ class PDFFileDirectorySource(DirectorySource):
         self.pdfprocessor = pdfprocessor
         self.file_cache_dir = file_cache_dir
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         filepath = self.filepaths[idx]
         pdf_filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
@@ -253,14 +253,14 @@ class PDFFileDirectorySource(DirectorySource):
 
         if self.pdfprocessor == "modal":
             print("handling PDF processing remotely")
-            remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
+            remote_func = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
         else:
-            remoteFunc = None
+            remote_func = None
 
         # generate text_content from PDF
-        if remoteFunc is not None:
-            docJsonStr = remoteFunc.remote([pdf_bytes])
-            docdict = json.loads(docJsonStr[0])
+        if remote_func is not None:
+            doc_json_str = remote_func.remote([pdf_bytes])
+            docdict = json.loads(doc_json_str[0])
             doc = Document.from_json(docdict)
             text_content = ""
             for p in doc.pages:
@@ -281,11 +281,11 @@ class TextFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=TextFile)
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         filepath = self.filepaths[idx]
         dr = DataRecord(self.schema, scan_idx=idx)
         dr.filename = os.path.basename(filepath)
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             dr.contents = f.read()
         return dr
 
@@ -295,7 +295,7 @@ class XLSFileDirectorySource(DirectorySource):
         super().__init__(path=path, dataset_id=dataset_id, schema=XLSFile)
         assert all([filename.endswith(tuple(constants.XLS_EXTENSIONS)) for filename in self.filepaths])
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         filepath = self.filepaths[idx]
         dr = DataRecord(self.schema, scan_idx=idx)
         dr.filename = os.path.basename(filepath)

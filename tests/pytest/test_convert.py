@@ -27,25 +27,25 @@ if not os.environ.get("OPENAI_API_KEY"):
 def test_convert(convert_op, email_schema, enron_eval_tiny):
     """Test whether convert operators"""
     model = Model.GPT_4
-    scanOp = MarshalAndScanDataOp(outputSchema=TextFile, dataset_id=enron_eval_tiny)
-    convertOp = convert_op(
-        inputSchema=File,
-        outputSchema=email_schema,
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, dataset_id=enron_eval_tiny)
+    convert_op = convert_op(
+        input_schema=File,
+        output_schema=email_schema,
         model=model,
         prompt_strategy=PromptStrategy.DSPY_COT_QA,
     )
 
-    datasource = DataDirectory().getRegisteredDataset(enron_eval_tiny)
+    datasource = DataDirectory().get_registered_dataset(enron_eval_tiny)
     candidate = DataRecord(schema=File, parent_id=None, scan_idx=0)
     candidate.idx = 0
-    candidate.get_item_fn = datasource.getItem
+    candidate.get_item_fn = datasource.get_item
     candidate.cardinality = datasource.cardinality
     # run DataSourcePhysicalOp on record
 
     outputs = []
-    records, _ = scanOp(candidate)
+    records, _ = scan_op(candidate)
     for record in records:
-        output, _ = convertOp(record)
+        output, _ = convert_op(record)
         outputs.extend(output)
 
     for record in outputs:

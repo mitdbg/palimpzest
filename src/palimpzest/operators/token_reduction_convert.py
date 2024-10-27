@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from palimpzest.constants import (
     MODEL_CARDS,
@@ -51,12 +51,12 @@ class TokenReducedConvert(LLMConvert):
             and self.model == other.model
             and self.cardinality == other.cardinality
             and self.prompt_strategy == other.prompt_strategy
-            and self.outputSchema == other.outputSchema
-            and self.inputSchema == other.inputSchema
+            and self.output_schema == other.output_schema
+            and self.input_schema == other.input_schema
             and self.max_workers == other.max_workers
         )
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Update the cost per record and quality estimates produced by LLMConvert's naive estimates.
         We adjust the cost per record to account for the reduced number of input tokens following
@@ -64,7 +64,7 @@ class TokenReducedConvert(LLMConvert):
         using fewer tokens.
         """
         # get naive cost estimates from LLMConvert
-        naive_op_cost_estimates = super().naiveCostEstimates(source_op_cost_estimates)
+        naive_op_cost_estimates = super().naive_cost_estimates(source_op_cost_estimates)
 
         # re-compute cost per record assuming we use fewer input tokens
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS * self.token_budget
@@ -81,7 +81,7 @@ class TokenReducedConvert(LLMConvert):
 
         return naive_op_cost_estimates
 
-    def reduce_context(self, heatmap: List[int], full_context: str | List[str]) -> str:
+    def reduce_context(self, heatmap: list[int], full_context: str | list[str]) -> str:
         if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
             range = find_best_range(
                 heatmap,
@@ -109,8 +109,8 @@ class TokenReducedConvert(LLMConvert):
             raise NotImplementedError("Token reduction is only supported for DSPY_COT_QA prompts")
 
     def _dspy_generate_fields(
-        self, prompt: str, content: str | List[str], verbose: bool = False
-    ) -> Tuple[List[Dict[str, List]] | Any]:
+        self, prompt: str, content: str | list[str], verbose: bool = False
+    ) -> tuple[list[dict[str, list]] | Any]:
         answer, query_stats = None, None
         if self.first_execution or self.heatmap_dict["count"] < self.MAX_HEATMAP_UPDATES:
             print("Warming up heatmap")
@@ -122,8 +122,8 @@ class TokenReducedConvert(LLMConvert):
                 "heatmap": [0] * int(1.0 / self.resolution),
             }
         else:
-            doc_schema = str(self.outputSchema)
-            doc_type = self.outputSchema.className()
+            doc_schema = str(self.output_schema)
+            doc_type = self.output_schema.class_name()
 
             if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
                 generator = DSPyGenerator(self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose)

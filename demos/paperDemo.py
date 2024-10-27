@@ -43,7 +43,7 @@ def in_price_range(record):
         if isinstance(price, str):
             price = price.strip()
             price = int(price.replace("$", "").replace(",", ""))
-        return 6e5 < price and price <= 2e6
+        return price > 6e5 and price <= 2e6
     except Exception:
         return False
 
@@ -126,10 +126,10 @@ class RealEstateListingSource(pz.UserSource):
     def __len__(self):
         return len(self.listings)
 
-    def getSize(self):
+    def get_size(self):
         return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         # fetch listing
         listing = self.listings[idx]
 
@@ -253,7 +253,7 @@ if __name__ == "__main__":
         # datasetid="real-estate-eval-100" for paper evaluation
         data_filepath = f"testdata/{datasetid}"
         user_dataset_id = f"{datasetid}-user"
-        pz.DataDirectory().registerUserSource(
+        pz.DataDirectory().register_user_source(
             src=RealEstateListingSource(user_dataset_id, data_filepath),
             dataset_id=user_dataset_id,
         )

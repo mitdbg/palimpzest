@@ -26,7 +26,7 @@ class DataDirectorySingletonMeta(type):
     def __call__(cls, *args, **kwargs):
         with cls._lock:
             if cls not in cls._instances:
-                instance = super(DataDirectorySingletonMeta, cls).__call__(*args, **kwargs)
+                instance = super().__call__(*args, **kwargs)
                 cls._instances[cls] = instance
         return cls._instances[cls]
 
@@ -36,20 +36,20 @@ class CacheService:
     Eventually modify this to be durable and to have expiration policies."""
 
     def __init__(self):
-        self.allCaches = {}
+        self.all_caches = {}
 
-    def getCachedData(self, cacheName, cacheKey):
-        return self.allCaches.setdefault(cacheName, {}).get(cacheKey, None)
+    def get_cached_data(self, cache_name, cache_key):
+        return self.all_caches.setdefault(cache_name, {}).get(cache_key, None)
 
-    def putCachedData(self, cacheName, cacheKey, cacheVal):
-        self.allCaches.setdefault(cacheName, {})[cacheKey] = cacheVal
+    def put_cached_data(self, cache_name, cache_key, cache_val):
+        self.all_caches.setdefault(cache_name, {})[cache_key] = cache_val
 
-    def rmCachedData(self, cacheName):
-        if cacheName in self.allCaches:
-            del self.allCaches[cacheName]
+    def rm_cached_data(self, cache_name):
+        if cache_name in self.all_caches:
+            del self.all_caches[cache_name]
 
-    def rmCache(self):
-        self.allCaches = {}
+    def rm_cache(self):
+        self.all_caches = {}
 
 
 class DataDirectory(metaclass=DataDirectorySingletonMeta):
@@ -78,7 +78,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         # read current config (and dict. of configs) from disk
         self._current_config = None
         if os.path.exists(current_config_path):
-            with open(current_config_path, "r") as f:
+            with open(current_config_path) as f:
                 current_config_dict = yaml.safe_load(f)
                 self._current_config = Config(current_config_dict["current_config_name"])
 
@@ -96,8 +96,8 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         for root, _, files in os.walk(self._dir + "/data/cache"):
             for file in files:
                 if file.endswith(".cached"):
-                    cacheId = file[:-7]
-                    self._cache[cacheId] = root + "/" + file
+                    cache_id = file[:-7]
+                    self._cache[cache_id] = root + "/" + file
 
     @property
     def current_config(self):
@@ -105,42 +105,42 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             raise Exception("No current config found.")
         return self._current_config
 
-    def getCacheService(self):
+    def get_cache_service(self):
         return self.cacheService
 
-    def getConfig(self):
+    def get_config(self):
         return self.current_config._load_config()
 
-    def getFileCacheDir(self):
+    def get_file_cache_dir(self):
         return self.current_config.get("filecachedir")
 
     #
     # These methods handle properly registered data files, meant to be kept over the long haul
     #
-    def registerLocalDirectory(self, path, dataset_id):
+    def register_local_directory(self, path, dataset_id):
         """Register a local directory as a data source."""
         self._registry[dataset_id] = ("dir", path)
         with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
             pickle.dump(self._registry, f)
 
-    def registerLocalFile(self, path, dataset_id):
+    def register_local_file(self, path, dataset_id):
         """Register a local file as a data source."""
         self._registry[dataset_id] = ("file", path)
         with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
             pickle.dump(self._registry, f)
 
-    def registerDataset(self, vals, dataset_id):
+    def register_dataset(self, vals, dataset_id):
         """Register an in-memory dataset as a data source"""
         self._registry[dataset_id] = ("memory", vals)
         with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
             pickle.dump(self._registry, f)
 
-    def registerUserSource(self, src: UserSource, dataset_id: str):
+    def register_user_source(self, src: UserSource, dataset_id: str):
         """Register a user source as a data source."""
         # user sources are always ephemeral
         self._registry[dataset_id] = ("user", src)
 
-    def getRegisteredDataset(self, dataset_id):
+    def get_registered_dataset(self, dataset_id):
         """Return a dataset from the registry."""
         if dataset_id not in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
@@ -176,7 +176,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         else:
             raise Exception("Unknown entry type")
 
-    def getRegisteredDatasetType(self, dataset_id):
+    def get_registered_dataset_type(self, dataset_id):
         """Return the type of the given dataset in the registry."""
         if dataset_id not in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
@@ -185,7 +185,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
 
         return entry
 
-    def getCardinality(self, dataset_id):
+    def get_cardinality(self, dataset_id):
         """Return the number of records in a dataset."""
         if dataset_id not in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
@@ -206,11 +206,11 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         else:
             raise Exception("Unknown entry type")
 
-    def listRegisteredDatasets(self):
+    def list_registered_datasets(self):
         """Return a list of registered datasets."""
         return self._registry.items()
 
-    def rmRegisteredDataset(self, dataset_id):
+    def rm_registered_dataset(self, dataset_id):
         """Remove a dataset from the registry."""
         del self._registry[dataset_id]
         with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
@@ -220,18 +220,18 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
     # These methods handle cached results. They are meant to be persisted for performance reasons,
     # but can always be recomputed if necessary.
     #
-    def getCachedResult(self, cacheId):
+    def get_cached_result(self, cache_id):
         """Return a cached result."""
-        cachedResult = None
-        if cacheId not in self._cache:
-            return cachedResult
+        cached_result = None
+        if cache_id not in self._cache:
+            return cached_result
 
-        with open(self._cache[cacheId], "rb") as f:
-            cachedResult = pickle.load(f)
+        with open(self._cache[cache_id], "rb") as f:
+            cached_result = pickle.load(f)
 
-        return MemorySource(cachedResult, cacheId)
+        return MemorySource(cached_result, cache_id)
 
-    def clearCache(self, keep_registry=False):
+    def clear_cache(self, keep_registry=False):
         """Clear the cache."""
         self._cache = {}
         self._tempCache = {}
@@ -242,36 +242,36 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
                 if os.path.basename(file) != "registry.pkl" or keep_registry is False:
                     os.remove(root + "/" + file)
 
-    def hasCachedAnswer(self, cacheId):
+    def has_cached_answer(self, cache_id):
         """Check if a dataset is in the cache."""
-        return cacheId in self._cache
+        return cache_id in self._cache
 
-    def openCache(self, cacheId):
-        if cacheId is not None and cacheId not in self._cache and cacheId not in self._tempCache:
-            self._tempCache[cacheId] = []
+    def open_cache(self, cache_id):
+        if cache_id is not None and cache_id not in self._cache and cache_id not in self._tempCache:
+            self._tempCache[cache_id] = []
             return True
         return False
 
-    def appendCache(self, cacheId, data):
-        self._tempCache[cacheId].append(data)
+    def append_cache(self, cache_id, data):
+        self._tempCache[cache_id].append(data)
 
-    def closeCache(self, cacheId):
+    def close_cache(self, cache_id):
         """Close the cache."""
-        filename = self._dir + "/data/cache/" + cacheId + ".cached"
+        filename = self._dir + "/data/cache/" + cache_id + ".cached"
         try:
             with open(filename, "wb") as f:
-                pickle.dump(self._tempCache[cacheId], f)
+                pickle.dump(self._tempCache[cache_id], f)
         except pickle.PicklingError:
             print("Warning: Failed to save cache due to pickling error")
             os.remove(filename)
-        del self._tempCache[cacheId]
-        self._cache[cacheId] = filename
+        del self._tempCache[cache_id]
+        self._cache[cache_id] = filename
 
     def exists(self, dataset_id):
         print("Checking if exists", dataset_id, "in", self._registry)
         return dataset_id in self._registry
 
-    def getPath(self, dataset_id):
+    def get_path(self, dataset_id):
         if dataset_id not in self._registry:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
         entry, path = self._registry[dataset_id]

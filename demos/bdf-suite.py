@@ -20,7 +20,7 @@ if not os.environ.get("OPENAI_API_KEY"):
 
     load_env()
 
-pz.DataDirectory().clearCache(keep_registry=True)
+pz.DataDirectory().clear_cache(keep_registry=True)
 
 
 class ScientificPaper(pz.PDFFile):
@@ -135,7 +135,9 @@ def integrate_tables(engine, policy):
     xls = pz.Dataset("biofabric-tiny", schema=pz.XLSFile)
     patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
     patient_tables = patient_tables.filter("The table contains biometric information about the patient")
-    case_data = patient_tables.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
+    case_data = patient_tables.convert(
+        CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY
+    )
 
     iterable = pz.Execute(
         case_data,
@@ -160,7 +162,9 @@ def integrate_tables(engine, policy):
 def extract_references(engine, policy):
     papers = pz.Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
     papers = papers.filter("The paper mentions phosphorylation of Exo1")
-    references = papers.convert(Reference, desc="A paper cited in the reference section", cardinality=pz.Cardinality.ONE_TO_MANY)
+    references = papers.convert(
+        Reference, desc="A paper cited in the reference section", cardinality=pz.Cardinality.ONE_TO_MANY
+    )
 
     output = references
     iterable = pz.Execute(
@@ -185,7 +189,7 @@ def extract_references(engine, policy):
 pdfdir = "testdata/bdf-usecase3-pdf/"
 
 with st.sidebar:
-    datasets = pz.DataDirectory().listRegisteredDatasets()
+    datasets = pz.DataDirectory().list_registered_datasets()
     options = [name for name, path in datasets if path[0] == "dir"]
     options = [name for name in options if "bdf-usecase3" in name]
     dataset = st.radio("Select a dataset", options)

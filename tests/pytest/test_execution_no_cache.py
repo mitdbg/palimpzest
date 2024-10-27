@@ -110,7 +110,9 @@ class TestParallelExecutionNoCache:
         plan_stats.finalize(time.time() - start_time)
 
         # check that we get the expected set of output records
-        get_id = lambda record: record.listing if "real-estate" in dataset else record.filename
+        def get_id(record):
+            return record.listing if "real-estate" in dataset else record
+
         assert len(output_records) == len(expected_records)
         assert sorted(map(get_id, output_records)) == sorted(map(get_id, expected_records))
 

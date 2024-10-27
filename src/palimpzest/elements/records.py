@@ -54,12 +54,12 @@ class DataRecord:
         else:
             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
-    def _asJSONStr(self, include_bytes: bool = True, *args, **kwargs):
+    def _as_json_str(self, include_bytes: bool = True, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
-        record_dict = self._asDict(include_bytes)
-        return self.schema().asJSONStr(record_dict, *args, **kwargs)
+        record_dict = self._as_dict(include_bytes)
+        return self.schema().as_json_str(record_dict, *args, **kwargs)
 
-    def _asDict(self, include_bytes: bool = True):
+    def _as_dict(self, include_bytes: bool = True):
         """Return a dictionary representation of this DataRecord"""
         dct = self._data.copy()
         if not include_bytes:
@@ -69,13 +69,13 @@ class DataRecord:
         return dct
 
     def __str__(self):
-        items = ("{}={!r}...".format(k, str(v)[:15]) for k, v in sorted(self._data.items()))
+        items = (f"{k}={str(v)[:15]!r}..." for k, v in sorted(self._data.items()))
         return "{}({})".format(type(self).__name__, ", ".join(items))
 
     def __eq__(self, other):
         return isinstance(other, DataRecord) and self._data == other._data and self.schema == other.schema
 
-    # NOTE: the method is called _getFields instead of getFields to avoid it being picked up as a data record attribute;
+    # NOTE: the method is called _get_fields instead of getFields to avoid it being picked up as a data record attribute;
     #       in the future we will come up with a less ugly fix -- but for now do not remove the _ even though it's not private
-    def _getFields(self):
+    def _get_fields(self):
         return list(self._data.keys())

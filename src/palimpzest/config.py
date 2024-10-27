@@ -38,7 +38,7 @@ class Config:
         self.name = self.config["name"]
 
     def get(self, key, default=None):
-        return self.config[key] if key in self.config else default
+        return self.config.get(key, default)
 
     def set(self, key, value):
         self.config[key] = value
@@ -58,7 +58,7 @@ class Config:
         # reset current config if this config was the current config
         current_config_path = os.path.join(PZ_DIR, "current_config.yaml")
         current_config_dict = {}
-        with open(current_config_path, "r") as f:
+        with open(current_config_path) as f:
             current_config_dict = yaml.safe_load(f)
 
         if current_config_dict["current_config_name"] == self.name:
@@ -73,7 +73,7 @@ class Config:
     def _load_config(self):
         """Load YAML configuration from the specified path."""
         try:
-            with open(self.configfilepath, "r") as file:
+            with open(self.configfilepath) as file:
                 return yaml.safe_load(file)
         except Exception as e:
             print(f"Error loading configuration file: {e}")

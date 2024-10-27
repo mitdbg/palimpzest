@@ -1,7 +1,7 @@
 import modal
 
 app = modal.App("palimpzest.tools")
-pipPacks = [
+pip_packs = [
     "papermage",
     "tqdm",
     "transformers",
@@ -23,15 +23,15 @@ pipPacks = [
     "vila",
 ]
 
-pdfProcessingImage = (
+pdf_processing_image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install(["ffmpeg", "pkg-config", "libpoppler-cpp-dev", "poppler-utils"])
-    .pip_install(["torch==2.1.1", "pkgconfig", "python-poppler"] + pipPacks)
+    .pip_install(["torch==2.1.1", "pkgconfig", "python-poppler"] + pip_packs)
 )
 
 
-@app.function(image=pdfProcessingImage)
-def processPapermagePdf(pdfBytesDocs: list[bytes]):
+@app.function(image=pdf_processing_image)
+def process_papermage_pdf(pdf_bytes_docs: list[bytes]):
     """Process a PDF file and return the text contents."""
     import json
     import os
@@ -40,11 +40,11 @@ def processPapermagePdf(pdfBytesDocs: list[bytes]):
 
     os.makedirs("/tmp", exist_ok=True)
     results = []
-    for pdfBytes in pdfBytesDocs:
+    for pdf_bytes in pdf_bytes_docs:
         recipe = CoreRecipe()
 
         with open("/tmp/papermage.pdf", "wb") as file:
-            file.write(pdfBytes)
+            file.write(pdf_bytes)
 
         doc = recipe.run("/tmp/papermage.pdf")
 
@@ -61,9 +61,10 @@ def main():
 
     from papermage import Document
 
-    pdfBytes1 = open("test.pdf", "rb").read()
+    with open("test.pdf", "rb") as file:
+        pdf_bytes_1 = file.read()
 
-    results = processPapermagePdf.local([pdfBytes1])
+    results = process_papermage_pdf.local([pdf_bytes_1])
     for idx, r in enumerate(results):
         docdict = json.loads(r)
         doc = Document.from_json(docdict)

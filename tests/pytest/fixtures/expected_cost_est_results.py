@@ -4,7 +4,7 @@ from palimpzest.constants import Model
 from palimpzest.operators.convert import ConvertOp
 from palimpzest.operators.datasource import MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
-from palimpzest.utils.model_helpers import getModels
+from palimpzest.utils.model_helpers import get_models
 
 
 @pytest.fixture
@@ -15,7 +15,7 @@ def simple_plan_expected_operator_estimates(simple_plan_scan_data, simple_plan_c
     filter_op_id = simple_plan_filter_data["op_id"]
 
     # get set of model names
-    all_model_names = [m.value for m in getModels(include_vision=True)] + [None]
+    all_model_names = [m.value for m in get_models(include_vision=True)] + [None]
 
     # initialize expected operator estimates
     expected_operator_estimates = {

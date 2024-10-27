@@ -10,7 +10,7 @@ from palimpzest.utils import udfs
 def within_two_miles_of_mit(record):
     # NOTE: I'm using this hard-coded function so that folks w/out a
     #       Geocoding API key from google can still run this example
-    FAR_AWAY_ADDRS = [
+    far_away_addrs = [
         "Melcher St",
         "Sleeper St",
         "437 D St",
@@ -23,9 +23,7 @@ def within_two_miles_of_mit(record):
         "E 5th St",
     ]
     try:
-        if any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
-            return False
-        return True
+        return not any([street.lower() in record.address.lower() for street in far_away_addrs])
     except Exception:
         return False
 
@@ -33,10 +31,10 @@ def within_two_miles_of_mit(record):
 def in_price_range(record):
     try:
         price = record.price
-        if type(price) == str:
+        if type(price) is str:
             price = price.strip()
             price = int(price.replace("$", "").replace(",", ""))
-        return 6e5 < price and price <= 2e6
+        return price > 6e5 and price <= 2e6
     except Exception:
         return False
 

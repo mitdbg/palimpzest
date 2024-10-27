@@ -4,7 +4,7 @@ from typing import Any, Dict
 import regex as re  # Use regex instead of re to used variable length lookbehind
 
 
-def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
+def get_json_from_answer(answer: str) -> Dict[str, Any]:
     """
     This function parses an LLM response which is supposed to output a JSON object
     and optimistically searches for the substring containing the JSON object.

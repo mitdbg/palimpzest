@@ -22,7 +22,7 @@ class SchemaMetaclass(type):
         Emit a string that contains the names of all the class members that are Fields.
         """
         # get attributes that are Fields
-        fields = SchemaMetaclass.fieldNames(cls)
+        fields = SchemaMetaclass.field_names(cls)
 
         return f"{cls.__name__}({', '.join(fields)})"
 
@@ -30,18 +30,18 @@ class SchemaMetaclass(type):
         """
         Equality function for the Schema which checks that the ordered fields and class names are the same.
         """
-        cls_schema = SchemaMetaclass.getDesc(cls)
-        other_schema = SchemaMetaclass.getDesc(other)
+        cls_schema = SchemaMetaclass.get_desc(cls)
+        other_schema = SchemaMetaclass.get_desc(other)
 
         return cls_schema == other_schema
 
     def __hash__(cls) -> int:
         """Hash function for the Schema which is a simple hash of its ordered Fields and class name."""
-        ordered = SchemaMetaclass.getDesc(cls)
+        ordered = SchemaMetaclass.get_desc(cls)
 
         return hash(ordered.encode())
 
-    def fieldNames(cls, unique=False, id="") -> List[str]:
+    def field_names(cls, unique=False, id="") -> List[str]:
         """Return a list of the fields in this Schema
         The unique argument is used to determine if the class name should be prefixed to the field name for unique identification
         The id argument is used to provide a unique identifier for the class name"""
@@ -51,16 +51,16 @@ class SchemaMetaclass(type):
         fields = [prefix + attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
         return fields
 
-    def getDesc(cls) -> str:
+    def get_desc(cls) -> str:
         """Return a description of the schema"""
-        fields = SchemaMetaclass.fieldNames(cls)
+        fields = SchemaMetaclass.field_names(cls)
         d = {k: hash(getattr(cls, k)) for k in fields}
 
         # TODO: this causes an exception why trying to use Schema in a type definition
         # e.g. TaskDescriptor = Tuple[str, Union[tuple, None], Schema, Schema]
         # will throw the following exception:
         #
-        # File "/Users/matthewrusso/palimpzest/src/palimpzest/elements/elements.py", line 168, in getDesc
+        # File "/Users/matthewrusso/palimpzest/src/palimpzest/elements/elements.py", line 168, in get_desc
         #     d["__class__"] = o.__name__
         # AttributeError: '_SpecialForm' object has no attribute '__name__'
         #
@@ -68,9 +68,9 @@ class SchemaMetaclass(type):
 
         return json.dumps(d, sort_keys=True)
 
-    def jsonSchema(cls) -> Dict[str, TypingAny]:
+    def json_schema(cls) -> Dict[str, TypingAny]:
         """The JSON representation of the Schema"""
-        fields = SchemaMetaclass.fieldNames(cls)
+        fields = SchemaMetaclass.field_names(cls)
 
         schema = {
             "properties": {},
@@ -85,7 +85,7 @@ class SchemaMetaclass(type):
             if v is None:
                 continue
 
-            schema["properties"][k] = v.jsonSchema()
+            schema["properties"][k] = v.json_schema()
 
             if v.required:
                 schema["required"].append(k)
@@ -120,7 +120,7 @@ class Schema(metaclass=SchemaMetaclass):
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
 
-    def asJSONStr(self, record_dict: Dict[str, TypingAny], include_data_cols: bool = True) -> str:
+    def as_json_str(self, record_dict: Dict[str, TypingAny], include_data_cols: bool = True) -> str:
         """Return a JSON representation of a data record with this Schema"""
         if include_data_cols:
             record_dict["data type"] = str(self.__class__.__name__)
@@ -130,7 +130,7 @@ class Schema(metaclass=SchemaMetaclass):
 
     # TODO move logic from metaclass to here
     @classmethod
-    def className(cls) -> str:
+    def class_name(cls) -> str:
         """Return the name of this class"""
         return cls.__name__
 
@@ -148,13 +148,13 @@ class Any(Schema):
     is a PDF or a Word document, but you know it's one of those two.
     """
 
-    def __init__(self, possibleSchemas: List[Schema], desc: str):
+    def __init__(self, possible_schemas: list[Schema], desc: str):
         super().__init__(desc=desc)
-        self._possibleSchemas = possibleSchemas
+        self._possible_schemas = possible_schemas
 
     @property
     def children(self) -> List[Schema]:
-        return self._possibleSchemas
+        return self._possible_schemas
 
 
 class Download(Schema):
@@ -212,7 +212,7 @@ class Table(Schema):
     # TODO currently no support for nesting data records on data records
     rows = ListField(element_type=ListField, desc="The rows of the table", required=True)
 
-    def asJSONStr(self, record_dict: Dict[str, TypingAny], *args, **kwargs) -> str:
+    def as_json_str(self, record_dict: Dict[str, TypingAny], *args, **kwargs) -> str:
         """Return a JSON representation of an instantiated object of this Schema"""
         # Take the rows in the record_dict and turn them into comma separated strings
         rows = []
@@ -223,7 +223,7 @@ class Table(Schema):
         header = ",".join(record_dict["header"])
         record_dict["header"] = header
 
-        return super(Table, self).asJSONStr(record_dict, *args, **kwargs)
+        return super().as_json_str(record_dict, *args, **kwargs)
 
 
 class URL(Schema):

@@ -18,8 +18,8 @@ from tabulate import tabulate
 
 import palimpzest as pz
 from palimpzest.constants import Cardinality
-from palimpzest.elements.records import DataRecord
 from palimpzest.elements.groupbysig import GroupBySig
+from palimpzest.elements.records import DataRecord
 
 
 class ScientificPaper(pz.PDFFile):
@@ -68,7 +68,7 @@ class VLDBPaperListing(pz.Schema):
 
 def vldb_text_file_to_url(candidate: DataRecord):
     url_records = []
-    with open(candidate.filename, "r") as f:
+    with open(candidate.filename) as f:
         for line in f:
             dr = DataRecord(pz.URL, parent_id=candidate._id)
             dr.url = line.strip()
@@ -141,14 +141,14 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profi
         desc="A file full of URLs of VLDB journal pages",
     )
     urls = tfs.convert(
-        outputSchema=pz.URL,
+        output_schema=pz.URL,
         udf=vldb_text_file_to_url,
         desc="The actual URLs of the VLDB pages",
         cardinality=Cardinality.ONE_TO_MANY,  # one_to_many=True
     )
-    htmlContent = urls.convert(outputSchema=pz.WebPage, udf=download_html)
+    htmlContent = urls.convert(output_schema=pz.WebPage, udf=download_html)
     vldbPaperListings = htmlContent.convert(
-        outputSchema=VLDBPaperListing,
+        output_schema=VLDBPaperListing,
         desc="The actual listings for each VLDB paper",
         cardinality=Cardinality.ONE_TO_MANY,
     )
@@ -168,17 +168,17 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profi
     outputPath = os.path.join(outputDir, "vldbPaperListings.csv")
 
     with open(outputPath, "w", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=listing_records[0].__dict__.keys())
+        writer = csv.DictWriter(csvfile, field_names=listing_records[0].__dict__.keys())
         writer.writeheader()
         for record in listing_records:
-            writer.writerow(record._asDict())
+            writer.writerow(record._as_dict())
 
     if profile:
         with open("profiling-data/vldb1-profiling.json", "w") as f:
             json.dump(listing_execution_stats.to_json(), f)
 
     # 2. Get the PDF URL for each paper that's listed and download it
-    pdfContent = vldbPaperListings.convert(outputSchema=pz.Download, udf=download_pdf)
+    pdfContent = vldbPaperListings.convert(output_schema=pz.Download, udf=download_pdf)
 
     # 3. Save the paper listings to a CSV file and the PDFs to disk
     pdf_records, download_execution_stats = pz.Execute(
@@ -402,42 +402,42 @@ if __name__ == "__main__":
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     if task == "paper":
-        rootSet = buildMITBatteryPaperPlan(datasetid)
+        root_set = buildMITBatteryPaperPlan(datasetid)
         cols = ["title", "publicationYear", "author", "institution", "journal", "fundingAgency"]
         stat_path = "profiling-data/paper-profiling.json"
 
     elif task == "enron":
-        rootSet = buildEnronPlan(datasetid)
+        root_set = buildEnronPlan(datasetid)
         cols = ["sender", "subject"]
         stat_path = "profiling-data/enron-profiling.json"
 
     elif task == "enronGby":
-        rootSet = enronGbyPlan(datasetid)
+        root_set = enronGbyPlan(datasetid)
         cols = ["sender", "count(sender)"]
         stat_path = "profiling-data/egby-profiling.json"
 
     elif task in ("enronCount", "count"):
-        rootSet = enronCountPlan(datasetid)
+        root_set = enronCountPlan(datasetid)
         cols = ["count(sender)"]
         stat_path = "profiling-data/ecount-profiling.json"
 
     elif task in ("enronAvgCount", "average"):
-        rootSet = enronAverageCountPlan(datasetid)
+        root_set = enronAverageCountPlan(datasetid)
         cols = ["average(count(sender))"]
         stat_path = "profiling-data/e-profiling.json"
 
     elif task == "enronmap":
-        rootSet = computeEnronStats(datasetid)
+        root_set = computeEnronStats(datasetid)
         cols = ["sender", "subject", "value"]
         stat_path = "profiling-data/emap-profiling.json"
 
     elif task == "pdftest":
-        rootSet = buildTestPDFPlan(datasetid)
+        root_set = buildTestPDFPlan(datasetid)
         cols = ["filename"]
         stat_path = "profiling-data/pdftest-profiling.json"
 
     elif task == "scitest":
-        rootSet = buildSciPaperPlan(datasetid)
+        root_set = buildSciPaperPlan(datasetid)
         cols = ["title", "author", "institution", "journal", "fundingAgency"]
         stat_path = "profiling-data/scitest-profiling.json"
 
@@ -475,31 +475,31 @@ if __name__ == "__main__":
             def __len__(self):
                 return len(self.commits)
 
-            def getSize(self):
+            def get_size(self):
                 return sum(map(lambda commit: sys.getsizeof(commit), self.commits))
 
-            def getItem(self, idx: int):
-                # NOTE: we can make this a streaming demo again by modifying this getItem function
+            def get_item(self, idx: int):
+                # NOTE: we can make this a streaming demo again by modifying this get_item function
                 commit = self.commits[idx]
-                commitStr = json.dumps(commit)
+                commit_str = json.dumps(commit)
                 dr = pz.DataRecord(self.schema)
-                dr.json = commitStr
+                dr.json = commit_str
 
                 return dr
 
-        pz.DataDirectory().registerUserSource(GitHubCommitSource(datasetid), datasetid)
+        pz.DataDirectory().register_user_source(GitHubCommitSource(datasetid), datasetid)
 
-        rootSet = testUserSource(datasetid)
+        root_set = testUserSource(datasetid)
         cols = ["commitId", "reponame", "commit_message"]
         stat_path = "profiling-data/usersource-profiling.json"
 
     elif task == "gbyImage":
-        rootSet = buildImageAggPlan(datasetid)
+        root_set = buildImageAggPlan(datasetid)
         cols = ["breed", "count(breed)"]
         stat_path = "profiling-data/gbyImage-profiling.json"
 
     elif task == "image":
-        rootSet = buildImagePlan(datasetid)
+        root_set = buildImagePlan(datasetid)
         stat_path = "profiling-data/image-profiling.json"
 
     # NOTE: VLDB seems to rate limit downloads; causing the program to hang
@@ -507,7 +507,7 @@ if __name__ == "__main__":
         downloadVLDBPapers(datasetid, "vldbPapers", execution_engine, profile=args.profile)
 
     elif task == "limit":
-        rootSet = enronLimitPlan(datasetid, 5)
+        root_set = enronLimitPlan(datasetid, 5)
         cols = ["sender", "subject"]
         stat_path = "profiling-data/limit-profiling.json"
 
@@ -516,7 +516,7 @@ if __name__ == "__main__":
         exit(1)
 
     records, execution_stats = pz.Execute(
-        rootSet,
+        root_set,
         policy=policy,
         nocache=True,
         allow_token_reduction=False,

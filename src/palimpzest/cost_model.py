@@ -9,7 +9,7 @@ import math
 #       multiple w/the same count, but in the future we may want to cast the 'dict' --> 'str' or compute
 #       the mode on a per-field basis.
 import warnings
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 import scipy.stats as stats
@@ -25,7 +25,7 @@ from palimpzest.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.operators.limit import LimitScanOp
 from palimpzest.operators.physical import PhysicalOperator
 from palimpzest.operators.token_reduction_convert import TokenReducedConvert
-from palimpzest.utils.model_helpers import getChampionModelName, getModels
+from palimpzest.utils.model_helpers import get_champion_model_name, get_models
 
 warnings.simplefilter(action="ignore", category=UserWarning)
 
@@ -39,7 +39,7 @@ class CostModel:
     def __init__(
         self,
         source_dataset_id: str,
-        sample_execution_data: List[RecordOpStats] | None = None,
+        sample_execution_data: list[RecordOpStats] | None = None,
         confidence_level: float = 0.90,
     ):
         if sample_execution_data is None:
@@ -62,7 +62,7 @@ class CostModel:
         # compute per-operator estimates
         self.operator_estimates = self._compute_operator_estimates()
 
-    def _compute_ci(self, sample_mean: float, n_samples: int, std_dev: float) -> Tuple[float, float]:
+    def _compute_ci(self, sample_mean: float, n_samples: int, std_dev: float) -> tuple[float, float]:
         """
         Compute confidence interval (for non-proportion quantities) given the sample mean, number of samples,
         and sample std. deviation at the CostModel's given confidence level. We use a t-distribution for
@@ -76,7 +76,7 @@ class CostModel:
         )
         return ci
 
-    def _compute_proportion_ci(self, sample_prop: float, n_samples: int) -> Tuple[float, float]:
+    def _compute_proportion_ci(self, sample_prop: float, n_samples: int) -> tuple[float, float]:
         """
         Compute confidence interval for proportion quantities (i.e. selectivity) given the sample proportion
         and the number of samples. We use the normal distribution for computing the interval here, for reasons
@@ -97,8 +97,8 @@ class CostModel:
         return (lower_bound, upper_bound)
 
     def _compute_mean_and_ci(
-        self, df: pd.DataFrame, col: str, model_name: Optional[str] = None, non_negative_lb: bool = False
-    ) -> Tuple[float, float, float]:
+        self, df: pd.DataFrame, col: str, model_name: str | None = None, non_negative_lb: bool = False
+    ) -> tuple[float, float, float]:
         """
         Compute the mean and CI for the given column and dataframe. If the model_name is provided, filter
         for the subset of rows belonging to the model.
@@ -130,14 +130,14 @@ class CostModel:
 
         return col_mean, col_lb, col_ub
 
-    def _est_time_per_record(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> Tuple[float, float, float]:
+    def _est_time_per_record(self, op_df: pd.DataFrame, model_name: str | None = None) -> tuple[float, float, float]:
         """
         Given sample cost data observations for a specific operation, compute the mean and CI
         for the time per record.
         """
         return self._compute_mean_and_ci(df=op_df, col="time_per_record", model_name=model_name, non_negative_lb=True)
 
-    def _est_cost_per_record(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> Tuple[float, float, float]:
+    def _est_cost_per_record(self, op_df: pd.DataFrame, model_name: str | None = None) -> tuple[float, float, float]:
         """
         Given sample cost data observations for a specific operation, compute the mean and CI
         for the cost per record.
@@ -145,8 +145,8 @@ class CostModel:
         return self._compute_mean_and_ci(df=op_df, col="cost_per_record", model_name=model_name, non_negative_lb=True)
 
     def _est_tokens_per_record(
-        self, op_df: pd.DataFrame, model_name: Optional[str] = None
-    ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+        self, op_df: pd.DataFrame, model_name: str | None = None
+    ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         """
         Given sample cost data observations for a specific operation, compute the mean and CI
         for the total input tokens and total output tokens.
@@ -160,7 +160,7 @@ class CostModel:
 
         return total_input_tokens_tuple, total_output_tokens_tuple
 
-    def _est_cardinality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
+    def _est_cardinality(self, op_df: pd.DataFrame, model_name: str | None = None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the number of
         rows output by the operation.
@@ -175,7 +175,7 @@ class CostModel:
         """
         return op_df.shape[0] / len(op_df.plan_id.unique())
 
-    def _est_selectivity(self, df: pd.DataFrame, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
+    def _est_selectivity(self, df: pd.DataFrame, op_df: pd.DataFrame, model_name: str | None = None) -> float:
         """
         Given sample cost data observations for the plan and a specific operation, compute
         the ratio of records between this operator and its source operator.
@@ -266,7 +266,7 @@ class CostModel:
             row["num_answers"] = 1
             return row
 
-    def _est_quality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
+    def _est_quality(self, op_df: pd.DataFrame, model_name: str | None = None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the an estimate
         of the quality of its outputs by using GPT-4 as a champion model.
@@ -275,7 +275,7 @@ class CostModel:
         record_ids = op_df.record_id.unique()
 
         # get champion model name
-        champion_model_name = getChampionModelName()
+        champion_model_name = get_champion_model_name()
 
         # compute champion's answer (per-record) across all models; fall-back to most common answer if champion is not present
         record_id_to_answer = {}
@@ -309,7 +309,7 @@ class CostModel:
 
         return est_quality, est_quality_lb, est_quality_ub
 
-    def _compute_operator_estimates(self) -> Optional[Dict[str, Any]]:
+    def _compute_operator_estimates(self) -> dict[str, Any] | None:
         """
         Compute per-operator estimates of runtime, cost, and quality.
         """
@@ -339,7 +339,7 @@ class CostModel:
             op_name = str(op_df.op_name.iloc[0])
             if model_name is not None:
                 # compute estimates per-model, and add None which forces computation of avg. across all models
-                model_names = [m.value for m in getModels(include_vision=True)] + [None]
+                model_names = [m.value for m in get_models(include_vision=True)] + [None]
                 # model_names = op_df.model_name.unique().tolist()
                 estimates = {model_name: None for model_name in model_names}
                 for model_name in model_names:
@@ -421,7 +421,7 @@ class CostModel:
         return operator_estimates
 
     def __call__(
-        self, operator: PhysicalOperator, source_op_estimates: Optional[OperatorCostEstimates] = None
+        self, operator: PhysicalOperator, source_op_estimates: OperatorCostEstimates | None = None
     ) -> PlanCost:
         if not isinstance(operator, PhysicalOperator):
             raise ValueError(f"operator must be an instance of PhysicalOperator, got {type(operator)}")
@@ -431,10 +431,10 @@ class CostModel:
         # initialize estimates of operator metrics based on naive (but sometimes precise) logic
         if isinstance(operator, MarshalAndScanDataOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
-            dataset_type = self.datadir.getRegisteredDatasetType(self.source_dataset_id)
+            datasource = self.datadir.get_registered_dataset(self.source_dataset_id)
+            dataset_type = self.datadir.get_registered_dataset_type(self.source_dataset_id)
             datasource_len = len(datasource)
-            datasource_memsize = datasource.getSize()
+            datasource_memsize = datasource.get_size()
 
             source_op_estimates = OperatorCostEstimates(
                 cardinality=datasource_len,
@@ -443,7 +443,7 @@ class CostModel:
                 quality=1.0,
             )
 
-            op_estimates = operator.naiveCostEstimates(
+            op_estimates = operator.naive_cost_estimates(
                 source_op_estimates,
                 input_cardinality=datasource.cardinality,
                 input_record_size_in_bytes=datasource_memsize / datasource_len,
@@ -451,11 +451,11 @@ class CostModel:
             )
 
         elif isinstance(operator, CacheScanDataOp):
-            datasource = self.datadir.getCachedResult(operator.dataset_id)
+            datasource = self.datadir.get_cached_result(operator.dataset_id)
             if not datasource:
                 raise ValueError(f"CacheScanDataOp {operator.dataset_id} not found in cache")
             datasource_len = len(datasource)
-            datasource_memsize = datasource.getSize()
+            datasource_memsize = datasource.get_size()
 
             source_op_estimates = OperatorCostEstimates(
                 cardinality=datasource_len,
@@ -464,19 +464,19 @@ class CostModel:
                 quality=1.0,
             )
 
-            op_estimates = operator.naiveCostEstimates(
+            op_estimates = operator.naive_cost_estimates(
                 source_op_estimates,
                 input_cardinality=Cardinality.ONE_TO_ONE,
                 input_record_size_in_bytes=datasource_memsize / datasource_len,
             )
 
         else:
-            op_estimates = operator.naiveCostEstimates(source_op_estimates)
+            op_estimates = operator.naive_cost_estimates(source_op_estimates)
 
         # if we have sample execution data, update naive estimates with more informed ones
         sample_op_estimates = self.operator_estimates
         if sample_op_estimates is not None and op_id in sample_op_estimates:
-            if isinstance(operator, MarshalAndScanDataOp) or isinstance(operator, CacheScanDataOp):
+            if isinstance(operator, (MarshalAndScanDataOp, CacheScanDataOp)):
                 op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
                 op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
                 op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
@@ -497,12 +497,7 @@ class CostModel:
                 op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
                 op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
-            elif isinstance(operator, CountAggregateOp) or isinstance(operator, AverageAggregateOp):
-                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
-                op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
-                op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
-
-            elif isinstance(operator, LimitScanOp):
+            elif isinstance(operator, (CountAggregateOp, AverageAggregateOp, LimitScanOp)):
                 op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
                 op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
                 op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]

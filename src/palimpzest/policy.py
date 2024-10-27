@@ -249,7 +249,8 @@ class MinTimeAtFixedQuality(Policy):
         return plan.time < other_plan.time
 
 
-# TODO: add this back in a way which allows users to select a plan from a small pareto optimal set at the end of query optimization
+# TODO: add this back in a way which allows users to select a plan from a small pareto optimal set at the end of
+# query optimization
 # class UserChoice(Policy):
 #     """
 #     This policy asks the user to decide which of the pareto-optimal

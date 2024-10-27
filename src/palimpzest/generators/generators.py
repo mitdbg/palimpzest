@@ -29,8 +29,8 @@ from palimpzest.constants import (
 )
 from palimpzest.dataclasses import GenerationStats
 from palimpzest.generators.dspy_utils import (
+    DspyCOT,
     TogetherHFAdaptor,
-    dspyCOT,
     gen_filter_signature_class,
     gen_qa_signature_class,
 )
@@ -342,7 +342,7 @@ class DSPyGenerator(BaseGenerator[str, str]):
     def generate(self, context, prompt, **kwargs) -> GenerationOutput:
         dspy_lm = self._get_model()
         dspy.settings.configure(lm=dspy_lm)
-        cot = dspyCOT(self.promptSignature)
+        cot = DspyCOT(self.promptSignature)
 
         # execute LLM generation
         if self.verbose:
@@ -596,7 +596,7 @@ class ImageTextGenerator(BaseGenerator[List[str], str]):
 
 
 # TODO: refactor this to have a CodeSynthGenerator
-def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose: bool = False):
+def code_execution(api: API, code: str, candidate_dict: Dict[str, Any], verbose: bool = False):
     inputs = {field_name: candidate_dict[field_name] for field_name in api.inputs}
     response = api.api_execute(code, inputs)
     pred = response["response"] if response["status"] and response["response"] else None
@@ -604,13 +604,13 @@ def codeExecution(api: API, code: str, candidate_dict: Dict[str, Any], verbose: 
 
 
 # Temporarily set default verbose to True for debugging
-def codeEnsembleExecution(
+def code_ensemble_execution(
     api: API, code_ensemble: Dict[str, str], candidate_dict: Dict[str, Any], verbose: bool = True
 ) -> GenerationOutput:
     start_time = time.time()
     preds = list()
     for _, code in code_ensemble.items():
-        pred = codeExecution(api, code, candidate_dict)
+        pred = code_execution(api, code, candidate_dict)
         preds.append(pred)
 
     preds = [pred for pred in preds if pred is not None]

@@ -22,11 +22,11 @@ from palimpzest.sets import Dataset
 class TestPrimitives:
     def test_group_id_equality(self, email_schema):
         filter1_op = FilteredScan(
-            inputSchema=TextFile,
-            outputSchema=TextFile,
+            input_schema=TextFile,
+            output_schema=TextFile,
             filter=Filter("filter1"),
             depends_on=[],
-            targetCacheId="filter1",
+            target_cache_id="filter1",
         )
         filter1_expr = LogicalExpression(
             operator=filter1_op,
@@ -36,11 +36,11 @@ class TestPrimitives:
             group_id=None,
         )
         filter2_op = FilteredScan(
-            inputSchema=TextFile,
-            outputSchema=TextFile,
+            input_schema=TextFile,
+            output_schema=TextFile,
             filter=Filter("filter2"),
             depends_on=[],
-            targetCacheId="filter2",
+            target_cache_id="filter2",
         )
         filter2_expr = LogicalExpression(
             operator=filter2_op,
@@ -50,12 +50,12 @@ class TestPrimitives:
             group_id=None,
         )
         convert_op = ConvertScan(
-            inputSchema=TextFile,
-            outputSchema=email_schema,
+            input_schema=TextFile,
+            output_schema=email_schema,
             cardinality=Cardinality.ONE_TO_ONE,
             image_conversion=False,
             depends_on=[],
-            targetCacheId="convert1",
+            target_cache_id="convert1",
         )
         convert_expr = LogicalExpression(
             operator=convert_op,
@@ -65,7 +65,7 @@ class TestPrimitives:
             group_id=None,
         )
         g1_properties = {
-            "filter_strs": set([filter1_op.filter.getFilterStr(), filter2_op.filter.getFilterStr()]),
+            "filter_strs": set([filter1_op.filter.get_filter_str(), filter2_op.filter.get_filter_str()]),
         }
         g1 = Group(
             logical_expressions=[convert_expr],
@@ -73,7 +73,7 @@ class TestPrimitives:
             properties=g1_properties,
         )
         g2_properties = {
-            "filter_strs": set([filter2_op.filter.getFilterStr(), filter1_op.filter.getFilterStr()]),
+            "filter_strs": set([filter2_op.filter.get_filter_str(), filter1_op.filter.get_filter_str()]),
         }
         g2 = Group(
             logical_expressions=[filter2_expr],

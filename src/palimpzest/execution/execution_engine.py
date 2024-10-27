@@ -14,7 +14,7 @@ from palimpzest.optimizer.optimizer import Optimizer
 from palimpzest.optimizer.plan import PhysicalPlan
 from palimpzest.policy import Policy
 from palimpzest.sets import Dataset, Set
-from palimpzest.utils.model_helpers import getModels
+from palimpzest.utils.model_helpers import get_models
 
 
 class ExecutionEngine:
@@ -47,7 +47,7 @@ class ExecutionEngine:
         self.verbose = verbose
         self.available_models = available_models
         if self.available_models is None or len(self.available_models) == 0:
-            self.available_models = getModels(include_vision=True)
+            self.available_models = get_models(include_vision=True)
         if self.verbose:
             print("Available models: ", self.available_models)
         self.allow_bonded_query = allow_bonded_query
@@ -80,8 +80,8 @@ class ExecutionEngine:
         dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
         if os.path.exists(dspy_cache_dir):
             shutil.rmtree(dspy_cache_dir)
-        cache = self.datadir.getCacheService()
-        cache.rmCache()
+        cache = self.datadir.get_cache_service()
+        cache.rm_cache()
 
     def set_source_dataset_id(self, dataset: Set) -> str:
         """
@@ -92,7 +92,7 @@ class ExecutionEngine:
             dataset = dataset._source
 
         # throw an exception if datasource is not registered with PZ
-        _ = self.datadir.getRegisteredDataset(dataset.dataset_id)
+        _ = self.datadir.get_registered_dataset(dataset.dataset_id)
 
         # set the source dataset id
         self.source_dataset_id = dataset.dataset_id
@@ -218,7 +218,7 @@ class ExecutionEngine:
         records, plan_stats = [], []
 
         # get total number of input records in the datasource
-        datasource = self.datadir.getRegisteredDataset(self.source_dataset_id)
+        datasource = self.datadir.get_registered_dataset(self.source_dataset_id)
         datasource_len = len(datasource)
 
         # get the initial set of optimal plans according to the optimizer

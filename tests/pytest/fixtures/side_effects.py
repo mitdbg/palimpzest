@@ -17,7 +17,7 @@ def enron_filter():
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=candidate._asDict(include_bytes=False),
+            record_state=candidate._as_dict(include_bytes=False),
             op_id="MockFilterFoo",
             op_name="MockFilter",
             time_per_record=1.0,
@@ -65,7 +65,7 @@ def enron_convert(email_schema):
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=dr._asDict(include_bytes=False),
+            record_state=dr._as_dict(include_bytes=False),
             op_id="MockConvertFoo",
             op_name="MockConvert",
             time_per_record=1.0,
@@ -96,7 +96,7 @@ def real_estate_convert(image_real_estate_listing_schema):
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=dr._asDict(include_bytes=False),
+            record_state=dr._as_dict(include_bytes=False),
             op_id="MockConvertFoo",
             op_name="MockConvert",
             time_per_record=1.0,
@@ -138,7 +138,7 @@ def real_estate_one_to_many_convert(room_real_estate_listing_schema):
             record_op_stats = RecordOpStats(
                 record_id=candidate._id,
                 record_parent_id=candidate._parent_id,
-                record_state=dr._asDict(include_bytes=False),
+                record_state=dr._as_dict(include_bytes=False),
                 op_id="MockConvertFoo",
                 op_name="MockConvert",
                 time_per_record=1.0,

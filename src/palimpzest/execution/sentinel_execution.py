@@ -39,8 +39,8 @@ class SentinelExecutionEngine(ExecutionEngine):
         # NOTE: this checks if the entire computation is cached; it will re-run
         #       the sentinels even if the computation is partially cached
         # only run sentinels if there isn't a cached result already
-        uid = dataset.universalIdentifier()
-        run_sentinels = self.nocache or not self.datadir.hasCachedAnswer(uid)
+        uid = dataset.universal_identifier()
+        run_sentinels = self.nocache or not self.datadir.has_cached_answer(uid)
         if run_sentinels:
             # construct the CostModel
             cost_model = CostModel(source_dataset_id=self.source_dataset_id)

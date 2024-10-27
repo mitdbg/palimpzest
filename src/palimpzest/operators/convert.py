@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable
 
 from palimpzest import prompts
 from palimpzest.constants import (
@@ -19,7 +19,7 @@ from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, Recor
 from palimpzest.elements.records import DataRecord
 from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
 from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
-from palimpzest.utils.generation_helpers import getJsonFromAnswer
+from palimpzest.utils.generation_helpers import get_json_from_answer
 
 # TYPE DEFINITIONS
 FieldName = str
@@ -29,8 +29,8 @@ class ConvertOp(PhysicalOperator):
     def __init__(
         self,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-        udf: Optional[Callable] = None,
-        desc: Optional[str] = None,
+        udf: Callable | None = None,
+        desc: str | None = None,
         *args,
         **kwargs,
     ):
@@ -46,13 +46,13 @@ class ConvertOp(PhysicalOperator):
 
     def get_op_params(self):
         return {
-            "inputSchema": self.inputSchema,
-            "outputSchema": self.outputSchema,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
             "cardinality": self.cardinality.value,
             "udf": self.udf,
         }
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> list[DataRecordsWithStats]:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
 
 
@@ -60,8 +60,8 @@ class NonLLMConvert(ConvertOp):
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
-            and self.outputSchema == other.outputSchema
-            and self.inputSchema == other.inputSchema
+            and self.output_schema == other.output_schema
+            and self.input_schema == other.input_schema
             and self.cardinality == other.cardinality
             and self.udf == other.udf
             and self.max_workers == other.max_workers
@@ -72,7 +72,7 @@ class NonLLMConvert(ConvertOp):
         op += f"    UDF: {str(self.udf)}\n"
         return op
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Compute naive cost estimates for the NonLLMConvert operation. These estimates assume
         that the UDF convert (1) has no cost and (2) has perfect quality.
@@ -92,7 +92,7 @@ class NonLLMConvert(ConvertOp):
             quality=1.0,
         )
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> list[DataRecordsWithStats]:
         # apply UDF to input record
         start_time = time.time()
         try:
@@ -112,14 +112,14 @@ class NonLLMConvert(ConvertOp):
             record_op_stats = RecordOpStats(
                 record_id=dr._id,
                 record_parent_id=dr._parent_id,
-                record_state=dr._asDict(include_bytes=False),
+                record_state=dr._as_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),
                 time_per_record=fn_call_duration_secs / len(drs),
                 cost_per_record=0.0,
-                answer={field_name: getattr(dr, field_name) for field_name in self.outputSchema.fieldNames()},
-                input_fields=self.inputSchema.fieldNames(),
-                generated_fields=self.outputSchema.fieldNames(),
+                answer={field_name: getattr(dr, field_name) for field_name in self.output_schema.field_names()},
+                input_fields=self.input_schema.field_names(),
+                generated_fields=self.output_schema.field_names(),
                 fn_call_duration_secs=fn_call_duration_secs / len(drs),
             )
             record_op_stats_lst.append(record_op_stats)
@@ -148,8 +148,8 @@ class LLMConvert(ConvertOp):
             and self.cardinality == other.cardinality
             and self.image_conversion == other.image_conversion
             and self.prompt_strategy == other.prompt_strategy
-            and self.outputSchema == other.outputSchema
-            and self.inputSchema == other.inputSchema
+            and self.output_schema == other.output_schema
+            and self.input_schema == other.input_schema
             and self.max_workers == other.max_workers
         )
 
@@ -178,7 +178,7 @@ class LLMConvert(ConvertOp):
 
         return op_params
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Compute naive cost estimates for the LLMConvert operation. Implicitly, these estimates
         assume the use of a single LLM call for each input record. Child classes of LLMConvert
@@ -219,65 +219,69 @@ class LLMConvert(ConvertOp):
             quality=quality,
         )
 
-    def _generate_field_names(self, candidate: DataRecord, inputSchema: Schema, outputSchema: Schema) -> List[str]:
+    def _generate_field_names(self, candidate: DataRecord, input_schema: Schema, output_schema: Schema) -> list[str]:
         """
         Creates the list of field names that the convert operation needs to generate.
         """
-        # construct the list of fields in outputSchema which will need to be generated;
+        # construct the list of fields in output_schema which will need to be generated;
         # specifically, this is the set of fields which are:
         # 1. not declared in the input schema, and
         # 2. not present in the candidate's attributes
         #    a. if the field is present, but its value is None --> we will try to generate it
         fields_to_generate = []
-        for field_name in outputSchema.fieldNames():
-            if field_name not in inputSchema.fieldNames() and getattr(candidate, field_name, None) is None:
+        for field_name in output_schema.field_names():
+            if field_name not in input_schema.field_names() and getattr(candidate, field_name, None) is None:
                 fields_to_generate.append(field_name)
 
         return fields_to_generate
 
     def _construct_query_prompt(
         self,
-        fields_to_generate: List[str],
+        fields_to_generate: list[str],
     ) -> str:
         """
         This function constructs the prompt for a bonded query.
         """
         # set defaults
-        doc_type = self.outputSchema.className()
+        doc_type = self.output_schema.class_name()
         # build string of input fields and their descriptions
-        multilineInputFieldDescription = ""
-        for field_name in self.inputSchema.fieldNames():
-            field_desc = getattr(self.inputSchema, field_name).desc
-            multilineInputFieldDescription += prompts.INPUT_FIELD.format(field_name=field_name, field_desc=field_desc)
+        multiline_input_field_description = ""
+        for field_name in self.input_schema.field_names():
+            field_desc = getattr(self.input_schema, field_name).desc
+            multiline_input_field_description += prompts.INPUT_FIELD.format(
+                field_name=field_name, field_desc=field_desc
+            )
 
         # build string of output fields and their descriptions
-        multilineOutputFieldDescription = ""
+        multiline_output_field_description = ""
         for field_name in fields_to_generate:
-            field_desc = getattr(self.outputSchema, field_name).desc
-            multilineOutputFieldDescription += prompts.OUTPUT_FIELD.format(field_name=field_name, field_desc=field_desc)
+            field_desc = getattr(self.output_schema, field_name).desc
+            multiline_output_field_description += prompts.OUTPUT_FIELD.format(
+                field_name=field_name, field_desc=field_desc
+            )
 
         # add input/output schema descriptions (if they have a docstring)
-        optionalInputDesc = (
+        optional_input_desc = (
             ""
-            if self.inputSchema.__doc__ is None
-            else prompts.OPTIONAL_INPUT_DESC.format(desc=self.inputSchema.__doc__)
+            if self.input_schema.__doc__ is None
+            else prompts.OPTIONAL_INPUT_DESC.format(desc=self.input_schema.__doc__)
         )
-        optionalOutputDesc = (
+        optional_output_desc = (
             ""
-            if self.outputSchema.__doc__ is None
-            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.outputSchema.__doc__)
+            if self.output_schema.__doc__ is None
+            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.output_schema.__doc__)
         )
 
         # construct sentence fragments which depend on cardinality of conversion
         # (pz.Cardinality.ONE_TO_ONE or pz.Cardinality.ONE_TO_MANY)
         if self.cardinality == Cardinality.ONE_TO_MANY:
-            targetOutputDescriptor = prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
-            outputSingleOrPlural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
-            appendixInstruction = prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
+            target_output_descriptor = prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
+            output_single_or_plural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
+            appendix_instruction = prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
         else:
-            targetOutputDescriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
-            outputSingleOrPlural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
-            appendixInstruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
+            target_output_descriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
+            output_single_or_plural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
+            appendix_instruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
 
         # construct promptQuestion
         optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
@@ -287,14 +291,14 @@ class LLMConvert(ConvertOp):
             prompt_question = prompts.IMAGE_CONVERT_PROMPT
 
         prompt_question = prompt_question.format(
-            targetOutputDescriptor=targetOutputDescriptor,
-            input_type=self.inputSchema.className(),
-            outputSingleOrPlural=outputSingleOrPlural,
-            optionalInputDesc=optionalInputDesc,
-            optionalOutputDesc=optionalOutputDesc,
-            multilineInputFieldDescription=multilineInputFieldDescription,
-            multilineOutputFieldDescription=multilineOutputFieldDescription,
-            appendixInstruction=appendixInstruction,
+            target_output_descriptor=target_output_descriptor,
+            input_type=self.input_schema.class_name(),
+            output_single_or_plural=output_single_or_plural,
+            optional_input_desc=optional_input_desc,
+            optional_output_desc=optional_output_desc,
+            multiline_input_field_description=multiline_input_field_description,
+            multiline_output_field_description=multiline_output_field_description,
+            appendix_instruction=appendix_instruction,
             optional_desc=optional_desc,
         )
         # TODO: add this for boolean questions?
@@ -305,12 +309,12 @@ class LLMConvert(ConvertOp):
 
     def _create_record_op_stats_lst(
         self,
-        records: List[DataRecord],
-        fields: List[str],
+        records: list[DataRecord],
+        fields: list[str],
         generation_stats: GenerationStats,
         total_time: float,
-        parent_id: Optional[str] = None,
-    ) -> List[RecordOpStats]:
+        parent_id: str | None = None,
+    ) -> list[RecordOpStats]:
         """
         Construct list of RecordOpStats objects (one for each DataRecord).
         """
@@ -333,7 +337,7 @@ class LLMConvert(ConvertOp):
                 dr = records[idx]
                 record_id = dr._id
                 record_parent_id = dr._parent_id
-                record_state = dr._asDict(include_bytes=False)
+                record_state = dr._as_dict(include_bytes=False)
                 answer = {field_name: getattr(dr, field_name) for field_name in fields}
 
             record_op_stats = RecordOpStats(
@@ -346,7 +350,7 @@ class LLMConvert(ConvertOp):
                 cost_per_record=per_record_stats.cost_per_record,
                 model_name=model.value if model else None,
                 answer=answer,
-                input_fields=self.inputSchema.fieldNames(),
+                input_fields=self.input_schema.field_names(),
                 generated_fields=fields,
                 total_input_tokens=per_record_stats.total_input_tokens,
                 total_output_tokens=per_record_stats.total_output_tokens,
@@ -362,42 +366,42 @@ class LLMConvert(ConvertOp):
 
     def _create_data_record_from_json(
         self,
-        jsonObj: Any,
+        json_obj: Any,
         candidate: DataRecord,
         cardinality_idx: int | None = None,
     ) -> DataRecord:
         # initialize data record
-        dr = DataRecord(self.outputSchema, parent_id=candidate._id, cardinality_idx=cardinality_idx)
+        dr = DataRecord(self.output_schema, parent_id=candidate._id, cardinality_idx=cardinality_idx)
 
         # TODO: This inherits all pre-computed fields in an incremental fashion. The positive / pros of this approach is that it enables incremental schema computation, which tends to feel more natural for the end-user. The downside is it requires us to support an explicit projection to eliminate unwanted input / intermediate computation.
         #
         # first, copy all fields from input schema
-        # NOTE: the method is called _getFields instead of getFields to avoid it being picked up as a data record attribute;
+        # NOTE: the method is called _get_fields instead of getFields to avoid it being picked up as a data record attribute;
         #       in the future we will come up with a less ugly fix -- but for now do not remove the _ even though it's not private
-        for field_name in candidate._getFields():
+        for field_name in candidate._get_fields():
             setattr(dr, field_name, getattr(candidate, field_name, None))
 
         # get input field names and output field names
-        input_fields = self.inputSchema.fieldNames()
-        output_fields = self.outputSchema.fieldNames()
+        input_fields = self.input_schema.field_names()
+        output_fields = self.output_schema.field_names()
 
         # parse newly generated fields from the generated jsonObj
         for field_name in output_fields:
             if field_name not in input_fields:
                 # parse the json object and set the DataRecord's fields with their generated values
                 setattr(
-                    dr, field_name, jsonObj.get(field_name, None)
+                    dr, field_name, json_obj.get(field_name, None)
                 )  # the use of get prevents a KeyError if an individual field is missing.
 
         return dr
 
-    def parse_answer(self, answer: str, fields_to_generate: List[str]) -> Dict[FieldName, List[Any]]:
+    def parse_answer(self, answer: str, fields_to_generate: list[str]) -> dict[FieldName, list[Any]]:
         """
         This functions gets a string answer and parses it into an iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
         """
         try:
             # parse json from answer string
-            json_answer = getJsonFromAnswer(answer)
+            json_answer = get_json_from_answer(answer)
 
             # sanity check validity of parsed json
             assert json_answer != {}, "No output was found!"
@@ -437,13 +441,13 @@ class LLMConvert(ConvertOp):
     def _dspy_generate_fields(
         self,
         prompt: str,
-        content: Optional[Union[str, List[str]]] = None,  # either text or image
+        content: str | list[str] | None = None,  # either text or image
         verbose: bool = False,
-    ) -> Tuple[str, GenerationStats]:
+    ) -> tuple[str, GenerationStats]:
         """This functions wraps the call to the generator method to actually perform the field generation. Returns an answer which is a string and a query_stats which is a GenerationStats object."""
         # create DSPy generator and generate
-        doc_schema = str(self.outputSchema)
-        doc_type = self.outputSchema.className()
+        doc_schema = str(self.output_schema)
+        doc_type = self.output_schema.class_name()
 
         # generate LLM response and capture statistics
         if self.image_conversion:
@@ -451,9 +455,14 @@ class LLMConvert(ConvertOp):
         else:
             generator = DSPyGenerator(self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose)
 
-        if isinstance(generator, ImageTextGenerator) and isinstance(content, list) and isinstance(prompt, str):
-            answer, query_stats = generator.generate(context=content, prompt=prompt)
-        elif isinstance(generator, DSPyGenerator) and isinstance(content, str) and isinstance(prompt, str):
+        if (
+            isinstance(generator, ImageTextGenerator)
+            and isinstance(content, list)
+            and isinstance(prompt, str)
+            or isinstance(generator, DSPyGenerator)
+            and isinstance(content, str)
+            and isinstance(prompt, str)
+        ):
             answer, query_stats = generator.generate(context=content, prompt=prompt)
         else:
             raise ValueError("Invalid input types for generating fields.")
@@ -461,8 +470,8 @@ class LLMConvert(ConvertOp):
         return answer, query_stats
 
     def convert(
-        self, candidate_content: Union[str, List[str]], fields: List[str]
-    ) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+        self, candidate_content: str | list[str], fields: list[str]
+    ) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         """This function is responsible for the LLM conversion process.
         Different strategies may/should reimplement this function and leave the __call__ function untouched.
         The input is ...
@@ -472,9 +481,9 @@ class LLMConvert(ConvertOp):
         """
         raise NotImplementedError("This is an abstract class. Use a subclass instead!")
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> list[DataRecordsWithStats]:
         start_time = time.time()
-        fields_to_generate = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
+        fields_to_generate = self._generate_field_names(candidate, self.input_schema, self.output_schema)
 
         # get text or image content depending on prompt strategy
         if self.image_conversion:
@@ -489,9 +498,9 @@ class LLMConvert(ConvertOp):
                 ]
             content = base64_images
         else:
-            content = candidate._asJSONStr(include_bytes=False)
+            content = candidate._as_json_str(include_bytes=False)
 
-        field_answers: Dict[str, List]
+        field_answers: dict[str, list]
         field_answers, generation_stats = self.convert(fields=fields_to_generate, candidate_content=content)
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
@@ -510,7 +519,7 @@ class LLMConvert(ConvertOp):
                 record[field_name] = output
 
         drs = [
-            self._create_data_record_from_json(jsonObj=js, candidate=candidate, cardinality_idx=idx)
+            self._create_data_record_from_json(json_obj=js, candidate=candidate, cardinality_idx=idx)
             for idx, js in enumerate(records_json)
         ]
 
@@ -527,13 +536,13 @@ class LLMConvert(ConvertOp):
 
 
 class LLMConvertConventional(LLMConvert):
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Update the cost per record and time per record estimates to account for the additional
         LLM calls we incur by executing one query per-field.
         """
         # get naive cost estimates from LLMConvert
-        naive_op_cost_estimates = super().naiveCostEstimates(source_op_cost_estimates)
+        naive_op_cost_estimates = super().naive_cost_estimates(source_op_cost_estimates)
 
         # re-compute cost per record assuming we use fewer input tokens
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
@@ -542,8 +551,8 @@ class LLMConvertConventional(LLMConvert):
         # increase estimates of the input and output tokens by the number of fields generated
         # NOTE: this may over-estimate the number of fields that need to be generated
         generate_field_names = []
-        for field_name in self.outputSchema.fieldNames():
-            if field_name not in self.inputSchema.fieldNames():
+        for field_name in self.output_schema.field_names():
+            if field_name not in self.input_schema.field_names():
                 generate_field_names.append(field_name)
 
         num_fields_to_generate = len(generate_field_names)
@@ -571,8 +580,8 @@ class LLMConvertConventional(LLMConvert):
         return naive_op_cost_estimates
 
     def convert(
-        self, candidate_content: Union[str, List[str]], fields: List[str]
-    ) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+        self, candidate_content: str | list[str], fields: list[str]
+    ) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         fields_answers = {}
         fields_stats = {}
         for field_name in fields:
@@ -591,7 +600,7 @@ class LLMConvertConventional(LLMConvert):
 
 
 class LLMConvertBonded(LLMConvert):
-    def convert(self, candidate_content, fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+    def convert(self, candidate_content, fields) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         prompt = self._construct_query_prompt(fields_to_generate=fields)
 
         # generate all fields in a single query
@@ -606,8 +615,8 @@ class LLMConvertBonded(LLMConvert):
         for field, values in json_answers.items():
             if values == []:
                 conventional_op = LLMConvertConventional(
-                    inputSchema=self.inputSchema,
-                    outputSchema=self.outputSchema,
+                    input_schema=self.input_schema,
+                    output_schema=self.output_schema,
                     model=self.model,
                     prompt_strategy=self.prompt_strategy,
                     verbose=self.verbose,

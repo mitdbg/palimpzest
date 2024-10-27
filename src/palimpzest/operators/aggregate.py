@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from typing import List
 
 from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
 from palimpzest.corelib.schemas import Number
@@ -18,42 +17,42 @@ class AggregateOp(PhysicalOperator):
     these operators.
     """
 
-    def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
+    def __call__(self, candidates: list[DataRecord]) -> list[DataRecordsWithStats]:
         raise NotImplementedError("Using __call__ from abstract method")
 
 
 class ApplyGroupByOp(AggregateOp):
-    def __init__(self, gbySig: GroupBySig, *args, **kwargs):
+    def __init__(self, group_by_sig: GroupBySig, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.gbySig = gbySig
+        self.group_by_sig = group_by_sig
 
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
-            and self.gbySig == other.gbySig
-            and self.outputSchema == other.outputSchema
+            and self.group_by_sig == other.group_by_sig
+            and self.output_schema == other.output_schema
         )
 
     def __str__(self):
         op = super().__str__()
-        op += f"    Group-by Signature: {str(self.gbySig)}\n"
+        op += f"    Group-by Signature: {str(self.group_by_sig)}\n"
         return op
 
     def get_copy_kwargs(self):
         copy_kwargs = super().get_copy_kwargs()
-        return {"gbySig": self.gbySig, **copy_kwargs}
+        return {"group_by_sig": self.group_by_sig, **copy_kwargs}
 
     def get_op_params(self):
         """
-        We identify the operation by its outputSchema and group by signature.
-        inputSchema is ignored as it depends on how the Optimizer orders operations.
+        We identify the operation by its output_schema and group by signature.
+        input_schema is ignored as it depends on how the Optimizer orders operations.
         """
         return {
-            "outputSchema": self.outputSchema,
-            "gbySig": str(self.gbySig.serialize()),
+            "output_schema": self.output_schema,
+            "group_by_sig": str(self.group_by_sig.serialize()),
         }
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the groupby takes negligible additional time (and no cost in USD)
         return OperatorCostEstimates(
             cardinality=NAIVE_EST_NUM_GROUPS,
@@ -91,44 +90,44 @@ class ApplyGroupByOp(AggregateOp):
         else:
             raise Exception("Unknown agg function " + func)
 
-    def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
+    def __call__(self, candidates: list[DataRecord]) -> list[DataRecordsWithStats]:
         start_time = time.time()
 
         # build group array
-        aggState = {}
+        agg_state = {}
         for candidate in candidates:
             group = ()
-            for f in self.gbySig.gbyFields:
+            for f in self.group_by_sig.group_by_fields:
                 if not hasattr(candidate, f):
                     raise TypeError(f"ApplyGroupByOp record missing expected field {f}")
                 group = group + (getattr(candidate, f),)
-            if group in aggState:
-                state = aggState[group]
+            if group in agg_state:
+                state = agg_state[group]
             else:
                 state = []
-                for fun in self.gbySig.aggFuncs:
+                for fun in self.group_by_sig.agg_funcs:
                     state.append(ApplyGroupByOp.agg_init(fun))
-            for i in range(0, len(self.gbySig.aggFuncs)):
-                fun = self.gbySig.aggFuncs[i]
-                if not hasattr(candidate, self.gbySig.aggFields[i]):
-                    raise TypeError(f"ApplyGroupByOp record missing expected field {self.gbySig.aggFields[i]}")
-                field = getattr(candidate, self.gbySig.aggFields[i])
+            for i in range(0, len(self.group_by_sig.agg_funcs)):
+                fun = self.group_by_sig.agg_funcs[i]
+                if not hasattr(candidate, self.group_by_sig.agg_fields[i]):
+                    raise TypeError(f"ApplyGroupByOp record missing expected field {self.group_by_sig.agg_fields[i]}")
+                field = getattr(candidate, self.group_by_sig.agg_fields[i])
                 state[i] = ApplyGroupByOp.agg_merge(fun, state[i], field)
-            aggState[group] = state
+            agg_state[group] = state
 
         # return list of data records (one per group)
         drs = []
-        gbyFields = self.gbySig.gbyFields
-        aggFields = self.gbySig.getAggFieldNames()
-        for g in aggState.keys():
-            dr = DataRecord(self.gbySig.outputSchema())
+        group_by_fields = self.group_by_sig.group_by_fields
+        agg_fields = self.group_by_sig.get_agg_field_names()
+        for g in agg_state:
+            dr = DataRecord(self.group_by_sig.output_schema())
             for i in range(0, len(g)):
                 k = g[i]
-                setattr(dr, gbyFields[i], k)
-            vals = aggState[g]
+                setattr(dr, group_by_fields[i], k)
+            vals = agg_state[g]
             for i in range(0, len(vals)):
-                v = ApplyGroupByOp.agg_final(self.gbySig.aggFuncs[i], vals[i])
-                setattr(dr, aggFields[i], v)
+                v = ApplyGroupByOp.agg_final(self.group_by_sig.agg_funcs[i], vals[i])
+                setattr(dr, agg_fields[i], v)
 
             drs.append(dr)
 
@@ -139,7 +138,7 @@ class ApplyGroupByOp(AggregateOp):
             record_op_stats = RecordOpStats(
                 record_id=dr._id,
                 record_parent_id=dr._parent_id,
-                record_state=dr._asDict(include_bytes=False),
+                record_state=dr._as_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),
                 time_per_record=total_time / len(drs),
@@ -151,40 +150,40 @@ class ApplyGroupByOp(AggregateOp):
 
 
 class AverageAggregateOp(AggregateOp):
-    # NOTE: we don't actually need / use aggFunc here (yet)
+    # NOTE: we don't actually need / use agg_func here (yet)
 
-    def __init__(self, aggFunc: AggFunc, *args, **kwargs):
-        kwargs["outputSchema"] = Number
+    def __init__(self, agg_func: AggFunc, *args, **kwargs):
+        kwargs["output_schema"] = Number
         super().__init__(*args, **kwargs)
-        self.aggFunc = aggFunc
+        self.agg_func = agg_func
 
-        if not self.inputSchema == Number:
+        if not self.input_schema == Number:
             raise Exception("Aggregate function AVERAGE is only defined over Numbers")
 
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
-            and self.aggFunc == other.aggFunc
-            and self.outputSchema == other.outputSchema
+            and self.agg_func == other.agg_func
+            and self.output_schema == other.output_schema
         )
 
     def __str__(self):
         op = super().__str__()
-        op += f"    Function: {str(self.aggFunc)}\n"
+        op += f"    Function: {str(self.agg_func)}\n"
         return op
 
     def get_copy_kwargs(self):
         copy_kwargs = super().get_copy_kwargs()
-        return {"aggFunc": self.aggFunc, **copy_kwargs}
+        return {"agg_func": self.agg_func, **copy_kwargs}
 
     def get_op_params(self):
         """
         We identify the operation by its aggregation function.
-        inputSchema is ignored as it depends on how the Optimizer orders operations.
+        input_schema is ignored as it depends on how the Optimizer orders operations.
         """
-        return {"aggFunc": str(self.aggFunc)}
+        return {"agg_func": str(self.agg_func)}
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
         return OperatorCostEstimates(
             cardinality=1,
@@ -193,7 +192,7 @@ class AverageAggregateOp(AggregateOp):
             quality=1.0,
         )
 
-    def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
+    def __call__(self, candidates: list[DataRecord]) -> list[DataRecordsWithStats]:
         start_time = time.time()
 
         # NOTE: this will set the parent_id to be the id of the final source record;
@@ -205,7 +204,7 @@ class AverageAggregateOp(AggregateOp):
         record_op_stats = RecordOpStats(
             record_id=dr._id,
             record_parent_id=dr._parent_id,
-            record_state=dr._asDict(include_bytes=False),
+            record_state=dr._as_dict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),
             time_per_record=time.time() - start_time,
@@ -216,33 +215,33 @@ class AverageAggregateOp(AggregateOp):
 
 
 class CountAggregateOp(AggregateOp):
-    # NOTE: we don't actually need / use aggFunc here (yet)
+    # NOTE: we don't actually need / use agg_func here (yet)
 
-    def __init__(self, aggFunc: AggFunc, *args, **kwargs):
-        kwargs["outputSchema"] = Number
+    def __init__(self, agg_func: AggFunc, *args, **kwargs):
+        kwargs["output_schema"] = Number
         super().__init__(*args, **kwargs)
-        self.aggFunc = aggFunc
+        self.agg_func = agg_func
 
     def __eq__(self, other: PhysicalOperator):
-        return isinstance(other, self.__class__) and self.aggFunc == other.aggFunc
+        return isinstance(other, self.__class__) and self.agg_func == other.agg_func
 
     def __str__(self):
         op = super().__str__()
-        op += f"    Function: {str(self.aggFunc)}\n"
+        op += f"    Function: {str(self.agg_func)}\n"
         return op
 
     def get_copy_kwargs(self):
         copy_kwargs = super().get_copy_kwargs()
-        return {"aggFunc": self.aggFunc, **copy_kwargs}
+        return {"agg_func": self.agg_func, **copy_kwargs}
 
     def get_op_params(self):
         """
         We identify the operation by its aggregation function.
-        inputSchema is ignored as it depends on how the Optimizer orders operations.
+        input_schema is ignored as it depends on how the Optimizer orders operations.
         """
-        return {"aggFunc": str(self.aggFunc)}
+        return {"agg_func": str(self.agg_func)}
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
         return OperatorCostEstimates(
             cardinality=1,
@@ -251,7 +250,7 @@ class CountAggregateOp(AggregateOp):
             quality=1.0,
         )
 
-    def __call__(self, candidates: List[DataRecord]) -> List[DataRecordsWithStats]:
+    def __call__(self, candidates: list[DataRecord]) -> list[DataRecordsWithStats]:
         start_time = time.time()
 
         # NOTE: this will set the parent_id to be the id of the final source record;
@@ -263,7 +262,7 @@ class CountAggregateOp(AggregateOp):
         record_op_stats = RecordOpStats(
             record_id=dr._id,
             record_parent_id=dr._parent_id,
-            record_state=dr._asDict(include_bytes=False),
+            record_state=dr._as_dict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),
             time_per_record=time.time() - start_time,
