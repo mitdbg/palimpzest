@@ -13,7 +13,7 @@ from palimpzest.elements.records import DataRecord
 from palimpzest.optimizer.optimizer import Optimizer
 from palimpzest.optimizer.plan import PhysicalPlan
 from palimpzest.policy import Policy
-from palimpzest.sets import Set
+from palimpzest.sets import Dataset, Set
 from palimpzest.utils.model_helpers import getModels
 
 
@@ -268,7 +268,7 @@ class ExecutionEngine:
         """Execute the given plan and return the output records and plan stats."""
         raise NotImplementedError("Abstract method to be overwritten by sub-classes")
 
-    def execute(self, dataset: Set, policy: Policy):
+    def execute(self, dataset: Dataset, policy: Policy):
         """
         Execute the workload specified by the given dataset according to the policy provided by the user.
         """
