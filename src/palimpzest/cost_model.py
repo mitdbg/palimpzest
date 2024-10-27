@@ -423,6 +423,8 @@ class CostModel:
     def __call__(
         self, operator: PhysicalOperator, source_op_estimates: Optional[OperatorCostEstimates] = None
     ) -> PlanCost:
+        if not isinstance(operator, PhysicalOperator):
+            raise ValueError(f"operator must be an instance of PhysicalOperator, got {type(operator)}")
         # get identifier for operation which is unique within sentinel plan but consistent across sentinels
         op_id = operator.get_op_id()
 
@@ -469,7 +471,9 @@ class CostModel:
             )
 
         else:
-            op_estimates = operator.naiveCostEstimates(source_op_estimates)
+            # raise here as we don't know our operator and if the input source_op_estimates is None
+            # we can't guarantee a naiveCostEstimates method can process it
+            raise NotImplementedError(f"Operator {operator} not supported by this cost model")
 
         # if we have sample execution data, update naive estimates with more informed ones
         sample_op_estimates = self.operator_estimates
