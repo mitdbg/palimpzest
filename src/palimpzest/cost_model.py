@@ -450,6 +450,8 @@ class CostModel:
 
         elif isinstance(operator, CacheScanDataOp):
             datasource = self.datadir.getCachedResult(operator.dataset_id)
+            if not datasource:
+                raise ValueError(f"CacheScanDataOp {operator.dataset_id} not found in cache")
             datasource_len = len(datasource)
             datasource_memsize = datasource.getSize()
 
