@@ -437,7 +437,7 @@ class LLMConvert(ConvertOp):
     def _dspy_generate_fields(
         self,
         prompt: str,
-        content: Optional[Union[str, List[bytes]]] = None,  # either text or image
+        content: Optional[Union[str, List[str]]] = None,  # either text or image
         verbose: bool = False,
     ) -> Tuple[str, GenerationStats]:
         """This functions wraps the call to the generator method to actually perform the field generation. Returns an answer which is a string and a query_stats which is a GenerationStats object."""
@@ -446,23 +446,25 @@ class LLMConvert(ConvertOp):
         doc_type = self.outputSchema.className()
 
         # generate LLM response and capture statistics
-        answer: str
-        query_stats: GenerationStats
         if self.image_conversion:
             generator = ImageTextGenerator(self.model.value, verbose)
         else:
             generator = DSPyGenerator(self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose)
 
-        # try:
-        answer, query_stats = generator.generate(context=content, prompt=prompt)
-        # except Exception as e:
-        #     print(f"DSPy generation error: {e}")
-        #     return "", GenerationStats()
+        if isinstance(generator, ImageTextGenerator) and isinstance(content, list) and isinstance(prompt, str):
+            answer, query_stats = generator.generate(context=content, prompt=prompt)
+        elif isinstance(generator, DSPyGenerator) and isinstance(content, str) and isinstance(prompt, str):
+            answer, query_stats = generator.generate(context=content, prompt=prompt)
+        else:
+            raise ValueError("Invalid input types for generating fields.")
+
+        if not answer:
+            raise ValueError("No answer was generated.")
 
         return answer, query_stats
 
     def convert(
-        self, candidate_content: Union[str, List[bytes]], fields: List[str]
+        self, candidate_content: Union[str, List[str]], fields: List[str]
     ) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
         """This function is responsible for the LLM conversion process.
         Different strategies may/should reimplement this function and leave the __call__ function untouched.
@@ -572,7 +574,7 @@ class LLMConvertConventional(LLMConvert):
         return naive_op_cost_estimates
 
     def convert(
-        self, candidate_content: Union[str, List[bytes]], fields: List[str]
+        self, candidate_content: Union[str, List[str]], fields: List[str]
     ) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
         fields_answers = {}
         fields_stats = {}

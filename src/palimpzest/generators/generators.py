@@ -405,7 +405,7 @@ class DSPyGenerator(BaseGenerator[str, str]):
         return pred.answer, stats
 
 
-class ImageTextGenerator(BaseGenerator[List[bytes], str]):
+class ImageTextGenerator(BaseGenerator[List[str], str]):
     """
     Class for generating field descriptions for an image with a given image model.
     """

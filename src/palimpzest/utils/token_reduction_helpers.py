@@ -1,3 +1,4 @@
+from typing import List
 from fuzzywuzzy import fuzz, process
 
 
@@ -87,7 +88,7 @@ def get_range_from_hist(file_path, range_budget, resolution=0.001, trim_zeros=Tr
     return start * 1.0 / index_range, end * 1.0 / index_range
 
 
-def best_substring_match(query, context):
+def best_substring_match(query: str, context: str | List[str]):
     # This will extract all substrings of length equal to the query from the string
     candidates = [context[i : i + len(query)] for i in range(len(context) - len(query) + 1)]
     print("grd:", query)
