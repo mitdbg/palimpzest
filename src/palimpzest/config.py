@@ -9,13 +9,13 @@ from palimpzest.constants import PZ_DIR
 
 class Config:
     def __init__(self, name: str = "default", llmservice: str = "openai", parallel: bool = False):
-        self.configfilepath = os.path.join(PZ_DIR, f"config_{name}.yaml")
+        self.config_file_path = os.path.join(PZ_DIR, f"config_{name}.yaml")
         if not os.path.exists(PZ_DIR):
             raise Exception(
                 f"Target config directory does not exist at {PZ_DIR} :: Something is wrong with the installation."
             )
 
-        if not os.path.exists(self.configfilepath):
+        if not os.path.exists(self.config_file_path):
             # Get the system's temporary directory
             temp_dir = tempfile.gettempdir()
             pz_file_cache_dir = os.path.join(temp_dir, "pz")
@@ -68,12 +68,12 @@ class Config:
                 yaml.dump(current_config_dict, f)
 
         # delete config file
-        os.remove(self.configfilepath)
+        os.remove(self.config_file_path)
 
     def _load_config(self):
         """Load YAML configuration from the specified path."""
         try:
-            with open(self.configfilepath) as file:
+            with open(self.config_file_path) as file:
                 return yaml.safe_load(file)
         except Exception as e:
             print(f"Error loading configuration file: {e}")
@@ -82,7 +82,7 @@ class Config:
     def _save_config(self):
         """Save the configuration to the specified path."""
         try:
-            with open(self.configfilepath, "w") as file:
+            with open(self.config_file_path, "w") as file:
                 yaml.dump(self.config, file)
         except Exception as e:
             print(f"Error saving configuration file: {e}")
