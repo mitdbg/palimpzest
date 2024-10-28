@@ -79,7 +79,7 @@ class Set:
     def serialize(self):
         # NOTE: I needed to remove depends_on from the serialization dictionary because
         # the optimizer changes the name of the depends_on fields to be their "full" name.
-        # This created an issue with the node.universalIdentifier() not being consistent
+        # This created an issue with the node.universal_identifier() not being consistent
         # after changing the field to its full name.
         d = {
             "version": Set.SET_VERSION,

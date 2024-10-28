@@ -286,7 +286,7 @@ class Optimizer:
         for node_idx, node in enumerate(dataset_nodes):
             # update mapping from short to full field names
             short_field_names = node.schema.field_names()
-            full_field_names = node.schema.field_names(unique=True, id=node.universalIdentifier())
+            full_field_names = node.schema.field_names(unique=True, id=node.universal_identifier())
             for short_field_name, full_field_name in zip(short_field_names, full_field_names):
                 # set mapping automatically if this is a new field
                 if short_field_name not in short_to_full_field_name or (
@@ -306,7 +306,7 @@ class Optimizer:
             # otherwise, make the node depend on all upstream nodes
             node._depends_on = set()
             for upstream_node in dataset_nodes[:node_idx]:
-                node._depends_on.update(upstream_node.schema.field_names(unique=True, id=node.universalIdentifier()))
+                node._depends_on.update(upstream_node.schema.field_names(unique=True, id=node.universal_identifier()))
             node._depends_on = list(node._depends_on)
 
         # construct tree of groups
