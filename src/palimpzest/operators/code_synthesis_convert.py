@@ -228,7 +228,7 @@ class CodeSynthesisConvert(LLMConvert):
         #       keep an eye out for a regression in code synth performance and revert if necessary
         # update operator's set of exemplars
 
-        exemplars = [(candidate_dict, dr._as_dict(include_bytes=False)) for dr in drs]
+        exemplars = [(candidate_dict, dr.as_dict(include_bytes=False)) for dr in drs]
         self.exemplars.extend(exemplars)
 
         # if we are allowed to cache exemplars across plan executions, add exemplars to cache
@@ -248,7 +248,7 @@ class CodeSynthesisConvert(LLMConvert):
         #   candidate_dict_str = candidate._as_json_str(include_bytes=False, include_data_cols=False)
         #   candidate_dict = json.loads(candidate_dict_str)
         #   candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
-        candidate_dict = candidate._as_dict(include_bytes=False)
+        candidate_dict = candidate.as_dict(include_bytes=False)
 
         # Check if code was already synthesized, or if we have at least one converted sample
         generation_stats = GenerationStats()

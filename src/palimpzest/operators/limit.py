@@ -49,7 +49,7 @@ class LimitScanOp(PhysicalOperator):
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=candidate._as_dict(include_bytes=False),
+            record_state=candidate.as_dict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),
             time_per_record=0.0,

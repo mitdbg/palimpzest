@@ -87,7 +87,7 @@ class NonLLMFilter(FilterOp):
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=candidate._as_dict(include_bytes=False),
+            record_state=candidate.as_dict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),
             time_per_record=fn_call_duration_secs,
@@ -222,7 +222,7 @@ class LLMFilter(FilterOp):
                 ]
             content = base64_images
         else:
-            content = candidate._as_json_str(include_bytes=False)
+            content = candidate.as_json_str(include_bytes=False)
 
         # construct the prompt; for image filters we need to wrap the filter condition in an instruction
         prompt = self.filter.filter_condition
@@ -253,7 +253,7 @@ class LLMFilter(FilterOp):
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=candidate._as_dict(include_bytes=False),
+            record_state=candidate.as_dict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),
             time_per_record=time.time() - start_time,

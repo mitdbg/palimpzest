@@ -54,12 +54,19 @@ class DataRecord:
         else:
             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
-    def _as_json_str(self, include_bytes: bool = True, *args, **kwargs):
+    def __str__(self):
+        items = (f"{k}={str(v)[:15]!r}..." for k, v in sorted(self._data.items()))
+        return "{}({})".format(type(self).__name__, ", ".join(items))
+
+    def __eq__(self, other):
+        return isinstance(other, DataRecord) and self._data == other._data and self.schema == other.schema
+
+    def as_json_str(self, include_bytes: bool = True, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
-        record_dict = self._as_dict(include_bytes)
+        record_dict = self.as_dict(include_bytes)
         return self.schema().as_json_str(record_dict, *args, **kwargs)
 
-    def _as_dict(self, include_bytes: bool = True):
+    def as_dict(self, include_bytes: bool = True):
         """Return a dictionary representation of this DataRecord"""
         dct = self._data.copy()
         if not include_bytes:
@@ -67,13 +74,6 @@ class DataRecord:
                 if isinstance(v, bytes) or (isinstance(v, list) and len(v) > 0 and isinstance(v[0], bytes)):
                     dct[k] = "<bytes>"
         return dct
-
-    def __str__(self):
-        items = (f"{k}={str(v)[:15]!r}..." for k, v in sorted(self._data.items()))
-        return "{}({})".format(type(self).__name__, ", ".join(items))
-
-    def __eq__(self, other):
-        return isinstance(other, DataRecord) and self._data == other._data and self.schema == other.schema
 
     def get_fields(self):
         return list(self._data.keys())

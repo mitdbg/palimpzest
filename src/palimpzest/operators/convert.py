@@ -112,7 +112,7 @@ class NonLLMConvert(ConvertOp):
             record_op_stats = RecordOpStats(
                 record_id=dr._id,
                 record_parent_id=dr._parent_id,
-                record_state=dr._as_dict(include_bytes=False),
+                record_state=dr.as_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),
                 time_per_record=fn_call_duration_secs / len(drs),
@@ -337,7 +337,7 @@ class LLMConvert(ConvertOp):
                 dr = records[idx]
                 record_id = dr._id
                 record_parent_id = dr._parent_id
-                record_state = dr._as_dict(include_bytes=False)
+                record_state = dr.as_dict(include_bytes=False)
                 answer = {field_name: getattr(dr, field_name) for field_name in fields}
 
             record_op_stats = RecordOpStats(
@@ -498,7 +498,7 @@ class LLMConvert(ConvertOp):
                 ]
             content = base64_images
         else:
-            content = candidate._as_json_str(include_bytes=False)
+            content = candidate.as_json_str(include_bytes=False)
 
         field_answers: dict[str, list]
         field_answers, generation_stats = self.convert(fields=fields_to_generate, candidate_content=content)
