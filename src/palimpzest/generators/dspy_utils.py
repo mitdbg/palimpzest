@@ -64,7 +64,7 @@ def gen_qa_signature_class(doc_schema, doc_type):
 
 
 ### DSPy Modules ###
-class DspyCOT(dspy.Module):
+class DSPyCOT(dspy.Module):
     """
     Invoke dspy in chain of thought mode
     """

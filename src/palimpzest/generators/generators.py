@@ -29,7 +29,7 @@ from palimpzest.constants import (
 )
 from palimpzest.dataclasses import GenerationStats
 from palimpzest.generators.dspy_utils import (
-    DspyCOT,
+    DSPyCOT,
     TogetherHFAdaptor,
     gen_filter_signature_class,
     gen_qa_signature_class,
@@ -342,7 +342,7 @@ class DSPyGenerator(BaseGenerator[str, str]):
     def generate(self, context, prompt, **kwargs) -> GenerationOutput:
         dspy_lm = self._get_model()
         dspy.settings.configure(lm=dspy_lm)
-        cot = DspyCOT(self.promptSignature)
+        cot = DSPyCOT(self.promptSignature)
 
         # execute LLM generation
         if self.verbose:
