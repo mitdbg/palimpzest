@@ -111,7 +111,7 @@ class TestParallelExecutionNoCache:
 
         # check that we get the expected set of output records
         def get_id(record):
-            return record.listing if "real-estate" in dataset else record
+            return record.listing if "real-estate" in dataset else record.filename
 
         assert len(output_records) == len(expected_records)
         assert sorted(map(get_id, output_records)) == sorted(map(get_id, expected_records))
