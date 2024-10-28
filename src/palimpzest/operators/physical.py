@@ -93,7 +93,7 @@ class PhysicalOperator:
 
         return self.op_id
 
-    def __eq__(self, other: PhysicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         raise NotImplementedError("Calling __eq__ on abstract method")
 
     def __hash__(self):
