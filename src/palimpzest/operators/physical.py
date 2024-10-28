@@ -44,7 +44,7 @@ class PhysicalOperator:
     def __str__(self):
         op = f"{self.input_schema.class_name()} -> {self.op_name()} -> {self.output_schema.class_name()}\n"
         op += f"    ({', '.join(self.input_schema.field_names())[:30]}) "
-        op += "-> ({', '.join(self.output_schema.field_names())[:30]})\n"
+        op += f"-> ({', '.join(self.output_schema.field_names())[:30]})\n"
         if getattr(self, "model", None):
             op += f"    Model: {self.model}\n"
         return op
