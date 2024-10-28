@@ -99,7 +99,7 @@ class SentinelPlan(Plan):
         hash_str = str(tuple(op.get_op_id() for op_set in self.operator_sets for op in op_set))
         return hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
-    def __eq__(self, other: PhysicalPlan):
+    def __eq__(self, other):
         return self.operator_sets == other.operator_sets
 
     def __hash__(self):

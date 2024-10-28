@@ -25,7 +25,7 @@ class LimitScanOp(PhysicalOperator):
             "limit": self.limit,
         }
 
-    def __eq__(self, other: PhysicalOperator):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.limit == other.limit

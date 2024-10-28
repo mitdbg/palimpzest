@@ -26,7 +26,7 @@ class ApplyGroupByOp(AggregateOp):
         super().__init__(*args, **kwargs)
         self.group_by_sig = group_by_sig
 
-    def __eq__(self, other: PhysicalOperator):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.group_by_sig == other.group_by_sig
@@ -160,7 +160,7 @@ class AverageAggregateOp(AggregateOp):
         if not self.input_schema == Number:
             raise Exception("Aggregate function AVERAGE is only defined over Numbers")
 
-    def __eq__(self, other: PhysicalOperator):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.agg_func == other.agg_func
@@ -222,7 +222,7 @@ class CountAggregateOp(AggregateOp):
         super().__init__(*args, **kwargs)
         self.agg_func = agg_func
 
-    def __eq__(self, other: PhysicalOperator):
+    def __eq__(self, other):
         return isinstance(other, self.__class__) and self.agg_func == other.agg_func
 
     def __str__(self):

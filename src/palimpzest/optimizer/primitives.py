@@ -30,7 +30,7 @@ class Expression:
         self.rules_applied = set()
         self.plan_cost = None
 
-    def __eq__(self, other: Expression):
+    def __eq__(self, other):
         return self.operator == other.operator and self.input_group_ids == other.input_group_ids
 
     def __hash__(self):

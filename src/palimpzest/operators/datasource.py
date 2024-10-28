@@ -36,7 +36,7 @@ class DataSourcePhysicalOp(PhysicalOperator):
     def get_op_params(self):
         return {"output_schema": self.output_schema, "dataset_id": self.dataset_id}
 
-    def __eq__(self, other: PhysicalOperator):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.output_schema == other.output_schema

@@ -57,7 +57,7 @@ class ConvertOp(PhysicalOperator):
 
 
 class NonLLMConvert(ConvertOp):
-    def __eq__(self, other: PhysicalOperator):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.output_schema == other.output_schema
@@ -141,7 +141,7 @@ class LLMConvert(ConvertOp):
         self.prompt_strategy = prompt_strategy
         self.image_conversion = image_conversion
 
-    def __eq__(self, other: PhysicalOperator):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.model == other.model

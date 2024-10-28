@@ -39,7 +39,7 @@ class FilterOp(PhysicalOperator):
             "filter": self.filter,
         }
 
-    def __eq__(self, other: FilterOp):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.filter == other.filter
@@ -49,7 +49,7 @@ class FilterOp(PhysicalOperator):
 
 
 class NonLLMFilter(FilterOp):
-    def __eq__(self, other: NonLLMFilter):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.filter == other.filter
@@ -154,7 +154,7 @@ class LLMFilter(FilterOp):
 
         return op_params
 
-    def __eq__(self, other: LLMFilter):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.model == other.model
