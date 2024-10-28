@@ -139,7 +139,7 @@ class BaseScan(LogicalOperator):
         if kwargs.get("input_schema") is not None:
             raise Exception(
                 f"BaseScan must be initialized with `input_schema=None` but was initialized with "
-                f"`input_schema={kwargs.get('input_schema')}`",
+                f"`input_schema={kwargs.get('input_schema')}`"
             )
 
         super().__init__(*args, **kwargs)
