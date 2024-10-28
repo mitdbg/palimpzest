@@ -15,11 +15,11 @@ from functools import partial
 
 class FeverClaimsSchema(pz.Schema):
     claim = pz.StringField(desc="the claim being made")
-    
+
 class FeverIntermediateSchema(FeverClaimsSchema):
     relevant_wikipedia_articles = pz.ListField(desc="Most relevant wikipedia articles to the `claim`",
                                                element_type=pz.StringField, required=True)
-    
+
 # class FeverSummarySchema(FeverIntermediateSchema):
 #     summary = pz.StringField(desc="summary of the relevant wikipedia articles `file1`, `file2`, and `file3` to validate `claim`")
 
@@ -52,7 +52,7 @@ def set_input_schema(input: DataRecord):
     output = DataRecord.fromParent(FeverClaimsSchema, parent_record=input)
     output.claim = input.contents
     return output
-         
+
 def get_label_fields_to_values(claims, ground_truth_file):
     with open(ground_truth_file, "r") as f:
         ground_truth = [json.loads(line) for line in f]
@@ -74,13 +74,17 @@ def get_label_fields_to_values(claims, ground_truth_file):
     # print(claim_to_label)
     
     return claim_to_label           
-             
+
 class FeverValidationSource(pz.ValidationDataSource):
     def __init__(self, datasetId, claims_dir, split_idx: int=25, num_samples: int=5, shuffle: bool=False, seed: int=42):
         super().__init__(FeverClaimsSchema, datasetId)
         self.claims_dir = claims_dir
         self.split_idx = split_idx
         self.claims = os.listdir(self.claims_dir)
+        
+        # shuffle records if shuffle = True
+        if shuffle:
+            random.Random(seed).shuffle(self.claims)
 
         self.val_claims = self.claims[:split_idx]
         self.claims = self.claims[split_idx:]
@@ -97,10 +101,6 @@ class FeverValidationSource(pz.ValidationDataSource):
 
         # construct mapping from claim --> label (field, value) pairs
         self.label_fields_to_values = get_label_fields_to_values(self.val_claims, "testdata/paper_test.jsonl")
-    
-        # shuffle records if shuffle = True
-        if shuffle:
-            random.Random(seed).shuffle(self.val_claims)
 
         # trim to number of samples
         self.val_claims = self.val_claims[:num_samples]
@@ -148,13 +148,13 @@ class FeverValidationSource(pz.ValidationDataSource):
 
         return dr
 
-         
+
 if "DSP_CACHEBOOL" not in os.environ or os.environ["DSP_CACHEBOOL"].lower() != "false":
         raise Exception("TURN OFF DSPy CACHE BY SETTING `export DSP_CACHEBOOL=False")
-    
+
 if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
-        
+
 # params
 
 # parse arguments
@@ -202,7 +202,7 @@ parser.add_argument(
 )
 
 args = parser.parse_args()
-    
+
 num_claims = 100
 dataset_id = f"fever-{num_claims}"
 workload = "fever"
@@ -237,7 +237,7 @@ elif policy_type == "maxquality":
 else:
     print("Policy not supported for this demo")
     exit(1)
-    
+
 if engine == "sentinel":
     if executor == "sequential":
         execution_engine = pz.SequentialSingleThreadSentinelExecution
@@ -259,7 +259,7 @@ elif engine == "nosentinel":
 else:
     print("Unknown engine")
     exit(1)
-    
+
 # select optimization strategy and available models based on engine
 optimization_strategy, available_models = None, None
 if engine == "sentinel":
@@ -294,7 +294,7 @@ datasource = FeverValidationSource(
     shuffle=False,
     seed=42,
 )
-    
+
 pz.DataDirectory().registerUserSource(
     src=datasource,
     dataset_id=f"{user_dataset_id}",
@@ -303,10 +303,17 @@ pz.DataDirectory().registerUserSource(
 claims = pz.Dataset(user_dataset_id, schema=FeverClaimsSchema)
 
 # claims = pz.Dataset(dataset_id, schema=pz.TextFile,
-                    # desc="Contains the claims that need to be verified.") 
+# desc="Contains the claims that need to be verified.")
 # claims = claims.convert(outputSchema=FeverClaimsSchema, udf=set_input_schema)
-claims_and_relevant_files = claims.convert(outputSchema=FeverIntermediateSchema,
-                                           udf=partial(get_relevant_content, index, k))
+# claims_and_relevant_files = claims.convert(outputSchema=FeverIntermediateSchema,
+#                                            udf=partial(get_relevant_content, index, k))
+claims_and_relevant_files = claims.retrieve(
+    outputSchema=FeverIntermediateSchema,
+    index=index,
+    search_attr="claim",
+    output_attr="relevant_wikipedia_articles",
+    k=10,
+)
 output = claims_and_relevant_files.convert(outputSchema=FeverOutputSchema)
 
 # execute pz plan
@@ -341,7 +348,7 @@ for record in records:
     ### field_to_keep = ["claim", "id", "label"]
     ### record_dict = {k: v for k, v in record_dict.items() if k in fields_to_keep}
     record_jsons.append(record_dict)
-    
+
 with open(records_path, 'w') as f:
     json.dump(record_jsons, f)
 

@@ -577,3 +577,42 @@ class BasicSubstitutionRule(ImplementationRule):
             group_id=logical_expression.group_id,
         )
         return set([expression])
+
+
+class RetrieveRule(ImplementationRule):
+    """
+    Substitute a logical expression for a RetrieveScan with a Retrieve physical implementation.
+    """
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        return (
+            isinstance(logical_expression.operator, RetrieveScan)
+        )
+
+    @classmethod
+    def substitute(
+        cls, logical_expression: LogicalExpression, **physical_op_params
+    ) -> Set[PhysicalExpression]:
+        logical_op = logical_expression.operator
+
+        # get initial set of parameters for physical op
+        op_kwargs = logical_op.get_op_params()
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_op_id(),
+            }
+        )
+
+        # construct multi-expression
+        op = RetrieveOp(**op_kwargs)
+        expression = PhysicalExpression(
+            operator=op,
+            input_group_ids=logical_expression.input_group_ids,
+            input_fields=logical_expression.input_fields,
+            generated_fields=logical_expression.generated_fields,
+            group_id=logical_expression.group_id,
+        )
+
+        return set([expression])

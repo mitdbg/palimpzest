@@ -17,7 +17,7 @@ class FeverClaimsSchema(pz.Schema):
     claim = pz.StringField(desc="the claim being made")
     
 class FeverSearchQueriesSchema(pz.Schema):
-    query = pz.ListField(desc="two search queries to find the most relevant wikipedia articles", pz.StringField)
+    query = pz.ListField(desc="two search queries to find the most relevant wikipedia articles", element_type=pz.StringField)
     
 class FeverIntermediateSchema(FeverClaimsSchema):
     file1 = pz.StringField(desc="most relevant wikipedia article")

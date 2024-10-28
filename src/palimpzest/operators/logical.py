@@ -382,3 +382,60 @@ class Aggregate(LogicalOperator):
             "aggFunc": self.aggFunc,
             "targetCacheId": self.targetCacheId,
         }
+
+# TODO(Siva): Currently, retrieve is pretty much a convert!
+class RetrieveScan(LogicalOperator):
+    """A RetrieveScan is a logical operator that represents a scan of a particular data source, with a convert-like retrieve applied."""
+
+    def __init__(
+        self,
+        index,
+        search_attr,
+        output_attr,
+        k,
+        targetCacheId: str = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.index = index
+        self.search_attr = search_attr
+        self.output_attr = output_attr  
+        self.k = k
+        self.targetCacheId = targetCacheId
+
+    def __str__(self):
+        return f"RetrieveScan({self.inputSchema} -> {str(self.outputSchema)},{str(self.desc)})"
+
+    def __eq__(self, other: LogicalOperator) -> bool:
+        return (
+            isinstance(other, RetrieveScan)
+            and self.inputSchema == other.inputSchema
+            and self.outputSchema == other.outputSchema
+            and self.index == other.index
+            and self.search_attr == other.search_attr
+            and self.output_attr == other.output_attr
+            and self.k == other.k
+        )
+
+    def copy(self):
+        return RetrieveScan(
+            inputSchema=self.inputSchema,
+            outputSchema=self.outputSchema,
+            index=self.index,
+            search_attr=self.search_attr,
+            output_attr=self.output_attr,
+            k=self.k,
+            targetCacheId=self.targetCacheId,
+        )
+
+    def get_op_params(self):
+        return {
+            "inputSchema": self.inputSchema,
+            "outputSchema": self.outputSchema,
+            "index": self.index,
+            "search_attr": self.search_attr,
+            "output_attr": self.output_attr,
+            "k": self.k,
+            "targetCacheId": self.targetCacheId,
+        }

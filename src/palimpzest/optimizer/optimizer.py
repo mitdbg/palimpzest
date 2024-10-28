@@ -195,6 +195,17 @@ class Optimizer:
                 limit=node._limit,
                 targetCacheId=uid,
             )
+            
+        elif node._index is not None:
+            op = RetrieveScan(
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                index=node._index,
+                search_attr=node._search_attr,
+                output_attr=node._output_attr,
+                k=node._k,
+                targetCacheId=uid
+            )
 
         elif not outputSchema == inputSchema:
             op = ConvertScan(

@@ -52,6 +52,10 @@ class Set:
         image_conversion: bool = None,
         depends_on: List[str] = [],
         nocache: bool = False,
+        index = None,       #TODO(Siva): Abstract Index and add a type here and elsewhere
+        search_attr: str = None,
+        output_attr: str = None,
+        k: int = None,
     ):
         self.schema = schema
         self._source = source
@@ -65,6 +69,10 @@ class Set:
         self._image_conversion = image_conversion
         self._depends_on = depends_on
         self._nocache = nocache
+        self._index = index
+        self._search_attr = search_attr
+        self._output_attr = output_attr
+        self._k = k
 
     def __str__(self):
         return f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, filter={str(self._filter)}, udf={str(self._udf)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
@@ -146,6 +154,10 @@ class Dataset(Set):
             image_conversion=self._image_conversion,
             depends_on=self._depends_on,
             nocache=self._nocache,
+            index = self._index,
+            search_attr = self._search_attr,
+            output_attr = self._output_attr,
+            k = self._k
         )
         return dataset_copy
 
@@ -230,5 +242,17 @@ class Dataset(Set):
             schema=self.schema,
             desc="LIMIT " + str(n),
             limit=n,
+            nocache=self._nocache,
+        )
+        
+    def retrieve(self, outputSchema, index, search_attr, output_attr, k) -> Dataset:
+        return Dataset(
+            source=self,
+            schema=outputSchema,
+            desc="Retrieve",
+            index=index,
+            search_attr=search_attr,
+            output_attr=output_attr,
+            k=k,
             nocache=self._nocache,
         )

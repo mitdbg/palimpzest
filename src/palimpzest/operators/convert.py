@@ -60,7 +60,6 @@ class ConvertOp(PhysicalOperator):
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
 
-
 class NonLLMConvert(ConvertOp):
 
     def __eq__(self, other: PhysicalOperator):
