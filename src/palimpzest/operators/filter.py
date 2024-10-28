@@ -232,15 +232,10 @@ class LLMFilter(FilterOp):
         # invoke LLM to generate filter decision (True or False)
         response, gen_stats = None, GenerationStats()
         try:
-            if (
-                isinstance(self.generator, ImageTextGenerator)
-                and isinstance(content, list)
-                and isinstance(prompt, str)
-                or isinstance(self.generator, DSPyGenerator)
-                and isinstance(content, str)
-                and isinstance(prompt, str)
-            ):
-                response, gen_stats = self.generator.generate(context=content, prompt=prompt)
+            if isinstance(self.generator, ImageTextGenerator) and isinstance(content, list) and isinstance(prompt, str):  # noqa
+                answer, query_stats = self.generator.generate(context=content, prompt=prompt)
+            elif isinstance(self.generator, DSPyGenerator) and isinstance(content, str) and isinstance(prompt, str):  # noqa
+                answer, query_stats = self.generator.generate(context=content, prompt=prompt)
             else:
                 raise Exception("Mismatch between generator and content type")
         except Exception as e:
