@@ -289,11 +289,8 @@ class Optimizer:
             full_field_names = node.schema.field_names(unique=True, id=node.universalIdentifier())
             for short_field_name, full_field_name in zip(short_field_names, full_field_names):
                 # set mapping automatically if this is a new field
-                if (
-                    short_field_name not in short_to_full_field_name
-                    or node_idx > 0
-                    and dataset_nodes[node_idx - 1].schema != node.schema
-                    and node._udf is not None
+                if short_field_name not in short_to_full_field_name or (
+                    node_idx > 0 and dataset_nodes[node_idx - 1].schema != node.schema and node._udf is not None
                 ):
                     short_to_full_field_name[short_field_name] = full_field_name
 
