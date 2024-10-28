@@ -34,7 +34,7 @@ def in_price_range(record):
         if type(price) is str:
             price = price.strip()
             price = int(price.replace("$", "").replace(",", ""))
-        return price > 6e5 and price <= 2e6
+        return 6e5 < price <= 2e6
     except Exception:
         return False
 
