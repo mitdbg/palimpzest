@@ -30,9 +30,7 @@ def within_two_miles_of_mit(record):
     # NOTE: I'm using this hard-coded function so that folks w/out a
     #       Geocoding API key from google can still run this example
     try:
-        if any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
-            return False
-        return True
+        return not any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
     except Exception:
         return False
 
@@ -43,7 +41,7 @@ def in_price_range(record):
         if isinstance(price, str):
             price = price.strip()
             price = int(price.replace("$", "").replace(",", ""))
-        return price > 6e5 and price <= 2e6
+        return 6e5 < price <= 2e6
     except Exception:
         return False
 
