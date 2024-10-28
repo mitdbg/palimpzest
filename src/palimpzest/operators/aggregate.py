@@ -138,7 +138,7 @@ class ApplyGroupByOp(AggregateOp):
             record_op_stats = RecordOpStats(
                 record_id=dr._id,
                 record_parent_id=dr._parent_id,
-                record_state=dr._as_dict(include_bytes=False),
+                record_state=dr.as_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),
                 time_per_record=total_time / len(drs),

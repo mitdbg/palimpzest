@@ -17,7 +17,7 @@ def enron_filter():
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=candidate._as_dict(include_bytes=False),
+            record_state=candidate.as_dict(include_bytes=False),
             op_id="MockFilterFoo",
             op_name="MockFilter",
             time_per_record=1.0,

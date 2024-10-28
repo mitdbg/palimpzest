@@ -189,7 +189,7 @@ class CodeSynthesisConvert(LLMConvert):
 
     def _bonded_query_fallback(self, candidate, start_time):
         fields_to_generate = self._generate_field_names(candidate, self.input_schema, self.output_schema)
-        candidate_dict = candidate._as_dict(include_bytes=False)
+        candidate_dict = candidate.as_dict(include_bytes=False)
         candidate_content = json.dumps(candidate_dict)
 
         bonded_op = LLMConvertBonded(
@@ -244,8 +244,12 @@ class CodeSynthesisConvert(LLMConvert):
         start_time = time.time()
 
         fields_to_generate = self._generate_field_names(candidate, self.input_schema, self.output_schema)
-        # NOTE: the following is how we used to compute the candidate_dict; now that I am disallowing code synthesis for one-to-many queries, I don't think we need to invoke the _as_json_str() method, which helped format the tabular data in the "rows" column for Medical Schema Matching. In the longer term, we should come up with a proper solution to make _as_dict() properly format data which relies on the schema's _as_json_str method.
-        #   candidate_dict_str = candidate._as_json_str(include_bytes=False, include_data_cols=False)
+        # NOTE: the following is how we used to compute the candidate_dict; now that I am disallowing
+        # code synthesis for one-to-many queries, I don't think we need to invoke the as_json_str() method,
+        # which helped format the tabular data in the "rows" column for Medical Schema Matching.
+        # In the longer term, we should come up with a proper solution to make as_dict() properly format
+        # data which relies on the schema's as_json_str method.
+        #   candidate_dict_str = candidate.as_json_str(include_bytes=False, include_data_cols=False)
         #   candidate_dict = json.loads(candidate_dict_str)
         #   candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
         candidate_dict = candidate.as_dict(include_bytes=False)
@@ -407,8 +411,10 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
         return code_ensemble, generation_stats
 
 
-# NOTE A nicer truly class based approach would re-implement the code_synth_single method with calls to __super__ and then only re-implement the differences instead of having the code in the superclass know about the subclass-specific parameters (i.e., advice).
-class CodeSynthesisConvertExampleEnsemble(CodeSynthesisConvert):
+# NOTE A nicer truly class based approach would re-implement the code_synth_single method with calls to
+# __super__ and then only re-implement the differences instead of having the code in the superclass know
+# about the subclass-specific parameters (i.e., advice).
+class CodeSynthesisConvertExampleEnsemble(CodeSynthesisConvertSingle):
     def _should_synthesize(self, num_exemplars: int = 1, *args, **kwargs) -> bool:
         if len(self.exemplars) < num_exemplars:
             return False
@@ -429,7 +435,7 @@ class CodeSynthesisConvertExampleEnsemble(CodeSynthesisConvert):
         return code_ensemble, generation_stats
 
 
-class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvert):
+class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvertSingle):
     def _should_synthesize(self, *args, **kwargs):
         return False
 

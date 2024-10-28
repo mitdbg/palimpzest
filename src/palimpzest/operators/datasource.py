@@ -116,7 +116,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
             record_op_stats = RecordOpStats(
                 record_id=record._id,
                 record_parent_id=record._parent_id,
-                record_state=record._as_dict(include_bytes=False),
+                record_state=record.as_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),
                 time_per_record=(end_time - start_time) / len(records),
@@ -168,7 +168,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
             record_op_stats = RecordOpStats(
                 record_id=record._id,
                 record_parent_id=record._parent_id,
-                record_state=record._as_dict(include_bytes=False),
+                record_state=record.as_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 op_name=self.op_name(),
                 time_per_record=(end_time - start_time) / len(records),

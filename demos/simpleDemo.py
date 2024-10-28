@@ -29,33 +29,33 @@ class ScientificPaper(pz.PDFFile):
         desc="The title of the paper. This is a natural language title, not a number or letter.",
         required=True,
     )
-    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
+    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False) # noqa
     author = pz.Field(desc="The name of the first author of the paper", required=True)
     institution = pz.Field(desc="The institution of the first author of the paper", required=True)
     journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
-    fundingAgency = pz.Field(
+    fundingAgency = pz.Field( # noqa
         desc="The name of the funding agency that supported the research",
         required=False,
     )
 
 
-def buildSciPaperPlan(datasetId):
+def build_sci_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""
-    return pz.Dataset(datasetId, schema=ScientificPaper)
+    return pz.Dataset(dataset_id, schema=ScientificPaper)
 
 
-def buildTestPDFPlan(datasetId):
+def build_test_pdf_plan(dataset_id):
     """This tests whether we can process a PDF file"""
-    return pz.Dataset(datasetId, schema=pz.PDFFile)
+    return pz.Dataset(dataset_id, schema=pz.PDFFile)
 
 
-def buildMITBatteryPaperPlan(datasetId):
+def build_mit_battery_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""
-    sciPapers = pz.Dataset(datasetId, schema=ScientificPaper)
-    batteryPapers = sciPapers.filter("The paper is about batteries")
-    mitPapers = batteryPapers.filter("The paper is from MIT")
+    sci_papers = pz.Dataset(dataset_id, schema=ScientificPaper)
+    battery_papers = sci_papers.filter("The paper is about batteries")
+    mit_papers = battery_papers.filter("The paper is from MIT")
 
-    return mitPapers
+    return mit_papers
 
 
 class VLDBPaperListing(pz.Schema):
@@ -63,7 +63,7 @@ class VLDBPaperListing(pz.Schema):
 
     title = pz.Field(desc="The title of the paper", required=True)
     authors = pz.Field(desc="The authors of the paper", required=True)
-    pdfLink = pz.Field(desc="The link to the PDF of the paper", required=True)
+    pdfLink = pz.Field(desc="The link to the PDF of the paper", required=True) # noqa
 
 
 def vldb_text_file_to_url(candidate: DataRecord):
@@ -112,8 +112,8 @@ def download_html(candidate: DataRecord):
     tokens = html.split()[:5000]
     dr.html = " ".join(tokens)
 
-    strippedHtml = html_to_text_with_links(textcontent)
-    tokens = strippedHtml.split()[:5000]
+    stripped_html = html_to_text_with_links(textcontent)
+    tokens = stripped_html.split()[:5000]
     dr.text = " ".join(tokens)
 
     # get current timestamp, in nice ISO format
@@ -132,11 +132,11 @@ def download_pdf(candidate: DataRecord):
     return dr
 
 
-def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profile=False):
+def download_vldb_papers(vldb_listing_page_urls_id, output_dir, execution_engine, profile=False):
     """This function downloads a bunch of VLDB papers from an online listing and saves them to disk.  It also saves a CSV file of the paper listings."""
     # 1. Grab the input VLDB listing page(s) and scrape them for paper metadata
     tfs = pz.Dataset(
-        vldbListingPageURLsId,
+        vldb_listing_page_urls_id,
         schema=pz.TextFile,
         desc="A file full of URLs of VLDB journal pages",
     )
@@ -146,15 +146,15 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profi
         desc="The actual URLs of the VLDB pages",
         cardinality=Cardinality.ONE_TO_MANY,  # one_to_many=True
     )
-    htmlContent = urls.convert(output_schema=pz.WebPage, udf=download_html)
-    vldbPaperListings = htmlContent.convert(
+    html_content = urls.convert(output_schema=pz.WebPage, udf=download_html)
+    vldb_paper_listings = html_content.convert(
         output_schema=VLDBPaperListing,
         desc="The actual listings for each VLDB paper",
         cardinality=Cardinality.ONE_TO_MANY,
     )
 
     listing_records, listing_execution_stats = pz.Execute(
-        vldbPaperListings,
+        vldb_paper_listings,
         policy=pz.MaxQuality(),
         nocache=True,
         allow_token_reduction=False,
@@ -164,25 +164,25 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profi
     )
 
     # save the paper listings to a CSV file
-    os.makedirs(outputDir, exist_ok=True)
-    outputPath = os.path.join(outputDir, "vldbPaperListings.csv")
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "vldbPaperListings.csv")
 
-    with open(outputPath, "w", newline="") as csvfile:
+    with open(output_path, "w", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=listing_records[0].__dict__.keys())
         writer.writeheader()
         for record in listing_records:
-            writer.writerow(record._as_dict())
+            writer.writerow(record.as_dict())
 
     if profile:
         with open("profiling-data/vldb1-profiling.json", "w") as f:
             json.dump(listing_execution_stats.to_json(), f)
 
     # 2. Get the PDF URL for each paper that's listed and download it
-    pdfContent = vldbPaperListings.convert(output_schema=pz.Download, udf=download_pdf)
+    pdf_content = vldb_paper_listings.convert(output_schema=pz.Download, udf=download_pdf)
 
     # 3. Save the paper listings to a CSV file and the PDFs to disk
     pdf_records, download_execution_stats = pz.Execute(
-        pdfContent,
+        pdf_content,
         policy=pz.MaxQuality(),
         nocache=True,
         allow_token_reduction=False,
@@ -192,7 +192,7 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profi
     )
 
     for idx, pdf_record in enumerate(pdf_records):
-        with open(os.path.join(outputDir, str(idx) + ".pdf"), "wb") as f:
+        with open(os.path.join(output_dir, str(idx) + ".pdf"), "wb") as f:
             f.write(pdf_record.content)
 
     if profile:
@@ -203,7 +203,7 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profi
 class GitHubUpdate(pz.Schema):
     """GitHubUpdate represents a single commit message from a GitHub repo"""
 
-    commitId = pz.Field(desc="The unique identifier for the commit", required=True)
+    commitId = pz.Field(desc="The unique identifier for the commit", required=True) # noqa
     reponame = pz.Field(desc="The name of the repository", required=True)
     commit_message = pz.Field(desc="The message associated with the commit", required=True)
     commit_date = pz.Field(desc="The date the commit was made", required=True)
@@ -211,8 +211,8 @@ class GitHubUpdate(pz.Schema):
     file_names = pz.Field(desc="The list of files changed in the commit", required=False)
 
 
-def testUserSource(datasetId: str):
-    return pz.Dataset(datasetId, schema=GitHubUpdate)
+def test_user_source(dataset_id: str):
+    return pz.Dataset(dataset_id, schema=GitHubUpdate)
 
 
 class Email(pz.TextFile):
@@ -222,83 +222,83 @@ class Email(pz.TextFile):
     subject = pz.Field(desc="The subject of the email", required=True)
 
 
-def buildEnronPlan(datasetId):
-    emails = pz.Dataset(datasetId, schema=Email)
+def build_enron_plan(dataset_id):
+    emails = pz.Dataset(dataset_id, schema=Email)
     return emails
 
 
-def computeEnronStats(datasetId):
-    emails = pz.Dataset(datasetId, schema=Email)
-    subjectLineLengths = emails.convert(pz.Number, desc="The number of words in the subject field")
-    return subjectLineLengths
+def compute_enron_stats(dataset_id):
+    emails = pz.Dataset(dataset_id, schema=Email)
+    subject_line_lengths = emails.convert(pz.Number, desc="The number of words in the subject field")
+    return subject_line_lengths
 
 
-def enronGbyPlan(datasetId):
-    emails = pz.Dataset(datasetId, schema=Email)
+def enron_gby_plan(dataset_id):
+    emails = pz.Dataset(dataset_id, schema=Email)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
-    gbyDesc = GroupBySig(groupbyfields, ops, fields)
-    groupedEmails = emails.groupby(gbyDesc)
-    return groupedEmails
+    gby_desc = GroupBySig(groupbyfields, ops, fields)
+    grouped_emails = emails.groupby(gby_desc)
+    return grouped_emails
 
 
-def enronCountPlan(datasetId):
-    emails = pz.Dataset(datasetId, schema=Email)
+def enron_count_plan(dataset_id):
+    emails = pz.Dataset(dataset_id, schema=Email)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = []
-    gbyDesc = GroupBySig(groupbyfields, ops, fields)
-    countEmails = emails.groupby(gbyDesc)
-    return countEmails
+    gby_desc = GroupBySig(groupbyfields, ops, fields)
+    count_emails = emails.groupby(gby_desc)
+    return count_emails
 
 
-def enronAverageCountPlan(datasetId):
-    emails = pz.Dataset(datasetId, schema=Email)
+def enron_average_count_plan(dataset_id):
+    emails = pz.Dataset(dataset_id, schema=Email)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
-    gbyDesc = GroupBySig(groupbyfields, ops, fields)
-    groupedEmails = emails.groupby(gbyDesc)
+    gby_desc = GroupBySig(groupbyfields, ops, fields)
+    grouped_emails = emails.groupby(gby_desc)
     ops = ["average"]
     fields = ["count(sender)"]
     groupbyfields = []
-    gbyDesc = GroupBySig(groupbyfields, ops, fields)
-    averageEmailsPerSender = groupedEmails.groupby(gbyDesc)
+    gby_desc = GroupBySig(groupbyfields, ops, fields)
+    average_emails_per_sender = grouped_emails.groupby(gby_desc)
 
-    return averageEmailsPerSender
+    return average_emails_per_sender
 
 
-def enronLimitPlan(datasetId, limit=5):
-    data = pz.Dataset(datasetId, schema=Email)
-    limitData = data.limit(limit)
-    return limitData
+def enron_limit_plan(dataset_id, limit=5):
+    data = pz.Dataset(dataset_id, schema=Email)
+    limit_data = data.limit(limit)
+    return limit_data
 
 
 class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required=True)
 
 
-def buildImagePlan(datasetId):
-    images = pz.Dataset(datasetId, schema=pz.ImageFile)
-    filteredImages = images.filter("The image contains one or more dogs")
-    dogImages = filteredImages.convert(DogImage, desc="Images of dogs")
-    return dogImages
+def build_image_plan(dataset_id):
+    images = pz.Dataset(dataset_id, schema=pz.ImageFile)
+    filtered_images = images.filter("The image contains one or more dogs")
+    dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
+    return dog_images
 
 
-def buildImageAggPlan(datasetId):
-    images = pz.Dataset(datasetId, schema=pz.ImageFile)
-    filteredImages = images.filter("The image contains one or more dogs")
-    dogImages = filteredImages.convert(DogImage, desc="Images of dogs")
+def build_image_agg_plan(dataset_id):
+    images = pz.Dataset(dataset_id, schema=pz.ImageFile)
+    filtered_images = images.filter("The image contains one or more dogs")
+    dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
     ops = ["count"]
     fields = ["breed"]
     groupbyfields = ["breed"]
-    gbyDesc = GroupBySig(groupbyfields, ops, fields)
-    groupedDogImages = dogImages.groupby(gbyDesc)
-    return groupedDogImages
+    gby_desc = GroupBySig(groupbyfields, ops, fields)
+    grouped_dog_images = dog_images.groupby(gby_desc)
+    return grouped_dog_images
 
 
-def printTable(records, cols=None, gradio=False, plan_str=None):
+def print_table(records, cols=None, gradio=False, plan_str=None):
     records = [{key: record.__dict__[key] for key in record.__dict__ if not key.startswith("_")} for record in records]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
@@ -319,7 +319,7 @@ def printTable(records, cols=None, gradio=False, plan_str=None):
 
 if __name__ == "__main__":
     # parse arguments
-    startTime = time.time()
+    start_time = time.time()
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--profile", default=False, action="store_true", help="Profile execution")
@@ -402,42 +402,42 @@ if __name__ == "__main__":
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     if task == "paper":
-        root_set = buildMITBatteryPaperPlan(datasetid)
+        root_set = build_mit_battery_paper_plan(datasetid)
         cols = ["title", "publicationYear", "author", "institution", "journal", "fundingAgency"]
         stat_path = "profiling-data/paper-profiling.json"
 
     elif task == "enron":
-        root_set = buildEnronPlan(datasetid)
+        root_set = build_enron_plan(datasetid)
         cols = ["sender", "subject"]
         stat_path = "profiling-data/enron-profiling.json"
 
     elif task == "enronGby":
-        root_set = enronGbyPlan(datasetid)
+        root_set = enron_gby_plan(datasetid)
         cols = ["sender", "count(sender)"]
         stat_path = "profiling-data/egby-profiling.json"
 
     elif task in ("enronCount", "count"):
-        root_set = enronCountPlan(datasetid)
+        root_set = enron_count_plan(datasetid)
         cols = ["count(sender)"]
         stat_path = "profiling-data/ecount-profiling.json"
 
     elif task in ("enronAvgCount", "average"):
-        root_set = enronAverageCountPlan(datasetid)
+        root_set = enron_average_count_plan(datasetid)
         cols = ["average(count(sender))"]
         stat_path = "profiling-data/e-profiling.json"
 
     elif task == "enronmap":
-        root_set = computeEnronStats(datasetid)
+        root_set = compute_enron_stats(datasetid)
         cols = ["sender", "subject", "value"]
         stat_path = "profiling-data/emap-profiling.json"
 
     elif task == "pdftest":
-        root_set = buildTestPDFPlan(datasetid)
+        root_set = build_test_pdf_plan(datasetid)
         cols = ["filename"]
         stat_path = "profiling-data/pdftest-profiling.json"
 
     elif task == "scitest":
-        root_set = buildSciPaperPlan(datasetid)
+        root_set = build_sci_paper_plan(datasetid)
         cols = ["title", "author", "institution", "journal", "fundingAgency"]
         stat_path = "profiling-data/scitest-profiling.json"
 
@@ -447,11 +447,10 @@ if __name__ == "__main__":
         owner = "mikecafarella"
         repo = "palimpzest"
         url = f"https://api.github.com/repos/{owner}/{repo}/commits"
-        blockTime = 5
 
         class GitHubCommitSource(pz.UserSource):
-            def __init__(self, datasetId):
-                super().__init__(pz.RawJSONObject, datasetId)
+            def __init__(self, dataset_id):
+                super().__init__(pz.RawJSONObject, dataset_id)
                 per_page = 100
                 params = {"per_page": per_page, "page": 1}
                 self.commits = []
@@ -489,25 +488,25 @@ if __name__ == "__main__":
 
         pz.DataDirectory().register_user_source(GitHubCommitSource(datasetid), datasetid)
 
-        root_set = testUserSource(datasetid)
+        root_set = test_user_source(datasetid)
         cols = ["commitId", "reponame", "commit_message"]
         stat_path = "profiling-data/usersource-profiling.json"
 
     elif task == "gbyImage":
-        root_set = buildImageAggPlan(datasetid)
+        root_set = build_image_agg_plan(datasetid)
         cols = ["breed", "count(breed)"]
         stat_path = "profiling-data/gbyImage-profiling.json"
 
     elif task == "image":
-        root_set = buildImagePlan(datasetid)
+        root_set = build_image_plan(datasetid)
         stat_path = "profiling-data/image-profiling.json"
 
     # NOTE: VLDB seems to rate limit downloads; causing the program to hang
     elif task == "vldb":
-        downloadVLDBPapers(datasetid, "vldbPapers", execution_engine, profile=args.profile)
+        download_vldb_papers(datasetid, "vldbPapers", execution_engine, profile=args.profile)
 
     elif task == "limit":
-        root_set = enronLimitPlan(datasetid, 5)
+        root_set = enron_limit_plan(datasetid, 5)
         cols = ["sender", "subject"]
         stat_path = "profiling-data/limit-profiling.json"
 
@@ -529,8 +528,8 @@ if __name__ == "__main__":
     print("Executed plan:")
     plan_str = list(execution_stats.plan_strs.values())[0]
     print(plan_str)
-    endTime = time.time()
-    print("Elapsed time:", endTime - startTime)
+    end_time = time.time()
+    print("Elapsed time:", end_time - start_time)
 
     if args.profile:
         with open(stat_path, "w") as f:
@@ -561,4 +560,4 @@ if __name__ == "__main__":
         demo.launch()
 
     else:
-        printTable(records, cols=cols, gradio=False, plan_str=plan_str)
+        print_table(records, cols=cols, gradio=False, plan_str=plan_str)

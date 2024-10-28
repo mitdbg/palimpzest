@@ -30,7 +30,7 @@ def within_two_miles_of_mit(record):
     # NOTE: I'm using this hard-coded function so that folks w/out a
     #       Geocoding API key from google can still run this example
     try:
-        return not any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
+        return not any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS])
     except Exception:
         return False
 
@@ -116,8 +116,8 @@ class ImageRealEstateListing(RealEstateListingFiles):
 
 
 class RealEstateListingSource(pz.UserSource):
-    def __init__(self, datasetId, listings_dir):
-        super().__init__(RealEstateListingFiles, datasetId)
+    def __init__(self, dataset_id, listings_dir):
+        super().__init__(RealEstateListingFiles, dataset_id)
         self.listings_dir = listings_dir
         self.listings = sorted(os.listdir(self.listings_dir))
 
@@ -291,11 +291,11 @@ if __name__ == "__main__":
 
     # visualize output in Gradio
     if visualize:
-        from palimpzest.utils.demo_helpers import printTable
+        from palimpzest.utils.demo_helpers import print_table
 
         plan_str = list(execution_stats.plan_strs.values())[-1]
         if workload == "enron":
-            printTable(records, cols=["sender", "subject"], plan_str=plan_str)
+            print_table(records, cols=["sender", "subject"], plan_str=plan_str)
 
         elif workload == "real-estate":
             fst_imgs, snd_imgs, thrd_imgs, addrs, prices = [], [], [], [], []

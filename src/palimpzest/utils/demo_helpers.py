@@ -64,7 +64,7 @@ def print_table(records, cols=None, plan_str=None):
         print("No records met search criteria")
         return
 
-    records = [record._as_dict() for record in records]
+    records = [record.as_dict() for record in records]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
 
