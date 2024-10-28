@@ -40,7 +40,7 @@ class GenerationStats:
 
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
         # self.raw_answers.extend(other.raw_answers)
-        for database_field in [
+        for dataclass_field in [
             "total_input_tokens",
             "total_output_tokens",
             "total_input_cost",
@@ -49,7 +49,7 @@ class GenerationStats:
             "llm_call_duration_secs",
             "fn_call_duration_secs",
         ]:
-            setattr(self, database_field, getattr(self, database_field) + getattr(other, database_field))
+            setattr(self, dataclass_field, getattr(self, dataclass_field) + getattr(other, dataclass_field))
         return self
 
     def __add__(self, other: GenerationStats) -> GenerationStats:
