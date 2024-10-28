@@ -107,7 +107,7 @@ class Aggregate(LogicalOperator):
     def __str__(self):
         return f"{self.__class__.__name__}(function: {str(self.agg_func.value)})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, Aggregate)
             and self.input_schema == other.input_schema
@@ -148,7 +148,7 @@ class BaseScan(LogicalOperator):
     def __str__(self):
         return f"BaseScan({self.dataset_id},{str(self.output_schema)})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, BaseScan)
             and self.input_schema == other.input_schema
@@ -231,7 +231,7 @@ class ConvertScan(LogicalOperator):
     def __str__(self):
         return f"ConvertScan({self.input_schema} -> {str(self.output_schema)},{str(self.desc)})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, ConvertScan)
             and self.input_schema == other.input_schema
@@ -287,7 +287,7 @@ class FilteredScan(LogicalOperator):
     def __str__(self):
         return f"FilteredScan({str(self.output_schema)}, {str(self.filter)})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, FilteredScan)
             and self.input_schema == other.input_schema
@@ -336,7 +336,7 @@ class GroupByAggregate(LogicalOperator):
     def __str__(self):
         return f"GroupBy({self.group_by_sig.serialize()})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, GroupByAggregate)
             and self.input_schema == other.input_schema
@@ -378,7 +378,7 @@ class LimitScan(LogicalOperator):
             target_cache_id=self.target_cache_id,
         )
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, LimitScan)
             and self.input_schema == other.input_schema
