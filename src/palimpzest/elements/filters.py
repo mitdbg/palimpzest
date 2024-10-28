@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict
+from typing import Any, Callable
 
 
 #############################
@@ -11,27 +11,27 @@ from typing import Any, Callable, Dict
 class Filter:
     """A filter that can be applied to a Set"""
 
-    def __init__(self, filterCondition: str | None = None, filterFn: Callable | None = None) -> None:
-        self.filterCondition = filterCondition
-        self.filterFn = filterFn
+    def __init__(self, filter_condition: str | None = None, filter_fn: Callable | None = None) -> None:
+        self.filter_condition = filter_condition
+        self.filter_fn = filter_fn
 
-    def serialize(self) -> Dict[str, Any]:
-        return {"filterCondition": self.filterCondition, "filterFn": str(self.filterFn)}
+    def serialize(self) -> dict[str, Any]:
+        return {"filter_condition": self.filter_condition, "filter_fn": str(self.filter_fn)}
 
     def __str__(self) -> str:
-        return "Filter(" + self.getFilterStr() + ")"
+        return "Filter(" + self.get_filter_str() + ")"
 
-    def getFilterStr(self) -> str:
-        return self.filterCondition if self.filterCondition is not None else str(self.filterFn)
+    def get_filter_str(self) -> str:
+        return self.filter_condition if self.filter_condition is not None else str(self.filter_fn)
 
     def __hash__(self) -> int:
         # custom hash function
-        return hash(self.filterCondition) if self.filterCondition is not None else hash(str(self.filterFn))
+        return hash(self.filter_condition) if self.filter_condition is not None else hash(str(self.filter_fn))
 
     def __eq__(self, other) -> bool:
         # __eq__ should be defined for consistency with __hash__
         return (
             isinstance(other, Filter)
-            and self.filterCondition == other.filterCondition
-            and self.filterFn == other.filterFn
+            and self.filter_condition == other.filter_condition
+            and self.filter_fn == other.filter_fn
         )

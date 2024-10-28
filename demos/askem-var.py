@@ -67,8 +67,8 @@ if __name__ == "__main__":
         #                  'prompt_strategy': pz.PromptStrategy.DSPY_COT_QA})
         #
         # bonded_convert = physical_op_type(
-        #     inputSchema=engine.plan.operators[1].inputSchema,
-        #     outputSchema=engine.plan.operators[1].outputSchema,
+        #     input_schema=engine.plan.operators[1].input_schema,
+        #     output_schema=engine.plan.operators[1].output_schema,
         #     query_strategy=pz.QueryStrategy.BONDED_WITH_FALLBACK,
         #     shouldProfile=False,
         #     cardinality=pz.Cardinality.ONE_TO_MANY,

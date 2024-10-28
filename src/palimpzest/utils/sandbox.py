@@ -96,20 +96,20 @@ class API:
     def from_task_descriptor(cls, td, field_name, input_fields=None):
         name, inputs, outputs = "extraction", list(), list()
         if input_fields is None:
-            input_fields = td.inputSchema.fieldNames()
+            input_fields = td.input_schema.field_names()
         for input_field_name in input_fields:
-            inputs.append({"name": input_field_name, "desc": getattr(td.inputSchema, input_field_name).desc})
-        outputs = [{"name": field_name, "desc": getattr(td.outputSchema, field_name).desc}]
+            inputs.append({"name": input_field_name, "desc": getattr(td.input_schema, input_field_name).desc})
+        outputs = [{"name": field_name, "desc": getattr(td.output_schema, field_name).desc}]
         return cls(name=name, inputs=inputs, outputs=outputs)
 
     @classmethod
-    def from_input_output_schemas(cls, inputSchema, outputSchema, field_name, input_fields=None):
+    def from_input_output_schemas(cls, input_schema, output_schema, field_name, input_fields=None):
         name, inputs, outputs = "extraction", list(), list()
         if input_fields is None:
-            input_fields = inputSchema.fieldNames()
+            input_fields = input_schema.field_names()
         for input_field_name in input_fields:
-            inputs.append({"name": input_field_name, "desc": getattr(inputSchema, input_field_name).desc})
-        outputs = [{"name": field_name, "desc": getattr(outputSchema, field_name).desc}]
+            inputs.append({"name": input_field_name, "desc": getattr(input_schema, input_field_name).desc})
+        outputs = [{"name": field_name, "desc": getattr(output_schema, field_name).desc}]
         return cls(name=name, inputs=inputs, outputs=outputs)
 
     @property
@@ -136,7 +136,7 @@ class API:
 
     @property
     def doc(self):
-        return self.config["doc"] if "doc" in self.config else ""
+        return self.config.get("doc", "")
 
     @property
     def args(self):

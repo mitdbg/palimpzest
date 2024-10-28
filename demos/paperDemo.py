@@ -30,9 +30,7 @@ def within_two_miles_of_mit(record):
     # NOTE: I'm using this hard-coded function so that folks w/out a
     #       Geocoding API key from google can still run this example
     try:
-        if any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS]):
-            return False
-        return True
+        return not any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS])
     except Exception:
         return False
 
@@ -43,7 +41,7 @@ def in_price_range(record):
         if isinstance(price, str):
             price = price.strip()
             price = int(price.replace("$", "").replace(",", ""))
-        return 6e5 < price and price <= 2e6
+        return 6e5 < price <= 2e6
     except Exception:
         return False
 
@@ -118,18 +116,18 @@ class ImageRealEstateListing(RealEstateListingFiles):
 
 
 class RealEstateListingSource(pz.UserSource):
-    def __init__(self, datasetId, listings_dir):
-        super().__init__(RealEstateListingFiles, datasetId)
+    def __init__(self, dataset_id, listings_dir):
+        super().__init__(RealEstateListingFiles, dataset_id)
         self.listings_dir = listings_dir
         self.listings = sorted(os.listdir(self.listings_dir))
 
     def __len__(self):
         return len(self.listings)
 
-    def getSize(self):
+    def get_size(self):
         return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         # fetch listing
         listing = self.listings[idx]
 
@@ -253,7 +251,7 @@ if __name__ == "__main__":
         # datasetid="real-estate-eval-100" for paper evaluation
         data_filepath = f"testdata/{datasetid}"
         user_dataset_id = f"{datasetid}-user"
-        pz.DataDirectory().registerUserSource(
+        pz.DataDirectory().register_user_source(
             src=RealEstateListingSource(user_dataset_id, data_filepath),
             dataset_id=user_dataset_id,
         )
@@ -293,11 +291,11 @@ if __name__ == "__main__":
 
     # visualize output in Gradio
     if visualize:
-        from palimpzest.utils.demo_helpers import printTable
+        from palimpzest.utils.demo_helpers import print_table
 
         plan_str = list(execution_stats.plan_strs.values())[-1]
         if workload == "enron":
-            printTable(records, cols=["sender", "subject"], plan_str=plan_str)
+            print_table(records, cols=["sender", "subject"], plan_str=plan_str)
 
         elif workload == "real-estate":
             fst_imgs, snd_imgs, thrd_imgs, addrs, prices = [], [], [], [], []

@@ -35,15 +35,15 @@ def file_to_pdf(candidate):
     pdfprocessor = DataDirectory().current_config.get("pdfprocessor")
     if pdfprocessor == "modal":
         print("handling PDF processing remotely")
-        remoteFunc = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
+        remote_func = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
     else:
-        remoteFunc = None
+        remote_func = None
 
     pdf_bytes = candidate.contents
     # generate text_content from PDF
-    if remoteFunc is not None:
-        docJsonStr = remoteFunc.remote([pdf_bytes])
-        docdict = json.loads(docJsonStr[0])
+    if remote_func is not None:
+        doc_json_str = remote_func.remote([pdf_bytes])
+        docdict = json.loads(doc_json_str[0])
         doc = Document.from_json(docdict)
         text_content = ""
         for p in doc.pages:

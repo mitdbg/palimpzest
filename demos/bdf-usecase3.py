@@ -79,7 +79,7 @@ def run_workload():
 pdfdir = "testdata/bdf-usecase3-pdf/"
 
 with st.sidebar:
-    datasets = pz.DataDirectory().listRegisteredDatasets()
+    datasets = pz.DataDirectory().list_registered_datasets()
     options = [name for name, path in datasets if path[0] == "dir"]
     options = [name for name in options if "bdf-usecase3" in name]
     dataset = st.radio("Select a dataset", options)

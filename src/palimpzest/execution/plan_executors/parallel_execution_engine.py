@@ -77,9 +77,9 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         source_operator = plan.operators[0]
         source_op_id = source_operator.get_op_id()
         datasource = (
-            self.datadir.getRegisteredDataset(self.source_dataset_id)
+            self.datadir.get_registered_dataset(self.source_dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(source_operator.dataset_id)
+            else self.datadir.get_cached_result(source_operator.dataset_id)
         )
         datasource_len = len(datasource)
 
@@ -94,7 +94,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
             # construct input DataRecord for DataSourcePhysicalOp
             candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)
             candidate.idx = current_scan_idx
-            candidate.get_item_fn = datasource.getItem
+            candidate.get_item_fn = datasource.get_item
             candidate.cardinality = datasource.cardinality
             futures.append(
                 executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate)
@@ -136,7 +136,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
                         # add records (which are not filtered) to the cache, if allowed
                         if not self.nocache:
-                            self.datadir.appendCache(operator.targetCacheId, record)
+                            self.datadir.append_cache(operator.target_cache_id, record)
 
                         # add records to processing queue if there is a next_operator; otherwise add to output_records
                         next_operator = op_id_to_next_operator[op_id]
@@ -154,7 +154,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                             # construct input DataRecord for DataSourcePhysicalOp
                             candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)
                             candidate.idx = current_scan_idx
-                            candidate.get_item_fn = datasource.getItem
+                            candidate.get_item_fn = datasource.get_item
                             candidate.cardinality = datasource.cardinality
                             new_futures.append(
                                 executor.submit(
@@ -226,7 +226,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         # if caching was allowed, close the cache
         if not self.nocache:
             for operator in plan.operators:
-                self.datadir.closeCache(operator.targetCacheId)
+                self.datadir.close_cache(operator.target_cache_id)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time

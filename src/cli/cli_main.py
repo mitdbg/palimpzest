@@ -9,7 +9,7 @@ from prettytable import PrettyTable
 
 
 ############ DEFINITIONS ############
-class InvalidCommandException(Exception):
+class InvalidCommandError(Exception):
     pass
 
 
@@ -104,7 +104,7 @@ def ls_data() -> None:
     # fetch list of registered datasets
     import palimpzest as pz
 
-    ds = pz.DataDirectory().listRegisteredDatasets()
+    ds = pz.DataDirectory().list_registered_datasets()
 
     # construct table for printing
     table = [["Name", "Type", "Path"]]
@@ -114,7 +114,7 @@ def ls_data() -> None:
     # print table of registered datasets
     t = PrettyTable(table[0])
     t.add_rows(table[1:])
-    _print_msg(t)
+    _print_msg(str(t))
     _print_msg("")
     _print_msg(f"Total datasets: {len(table) - 1}")
 
@@ -141,7 +141,7 @@ def synthesize_data(name: str, count: int) -> None:
     vals = []
     for i in range(0, count):
         vals.append(i)
-    pz.DataDirectory().registerDataset(vals, name)
+    pz.DataDirectory().register_dataset(vals, name)
 
     _print_msg(f"Registered {name}")
 
@@ -169,13 +169,13 @@ def register_data(path: str, name: str) -> None:
 
     # register dataset
     if os.path.isfile(path):
-        pz.DataDirectory().registerLocalFile(os.path.abspath(path), name)
+        pz.DataDirectory().register_local_file(os.path.abspath(path), name)
 
     elif os.path.isdir(path):
-        pz.DataDirectory().registerLocalDirectory(os.path.abspath(path), name)
+        pz.DataDirectory().register_local_directory(os.path.abspath(path), name)
 
     else:
-        raise InvalidCommandException(f"Path {path} is invalid. Does not point to a file or directory.")
+        raise InvalidCommandError(f"Path {path} is invalid. Does not point to a file or directory.")
 
     _print_msg(f"Registered {name}")
 
@@ -197,7 +197,7 @@ def rm_data(name: str) -> None:
     name = name.strip()
 
     # remove dataset from registry
-    pz.DataDirectory().rmRegisteredDataset(name)
+    pz.DataDirectory().rm_registered_dataset(name)
 
     _print_msg(f"Deleted {name}")
 
@@ -209,7 +209,7 @@ def clear_cache() -> None:
     """
     import palimpzest as pz
 
-    pz.DataDirectory().clearCache(keep_registry=True)
+    pz.DataDirectory().clear_cache(keep_registry=True)
     _print_msg("Cache cleared")
 
 
@@ -221,7 +221,7 @@ def print_config() -> None:
     import palimpzest as pz
 
     # load config yaml file
-    config = pz.DataDirectory().getConfig()
+    config = pz.DataDirectory().get_config()
 
     # print contents of config
     _print_msg(f"--- {config['name']} ---\n{yaml.dump(config)}")
@@ -259,7 +259,7 @@ def create_config(name: str, llmservice: str, parallel: bool, set: bool) -> None
 
     # check that config name is unique
     if os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
-        raise InvalidCommandException(f"Config with name {name} already exists.")
+        raise InvalidCommandError(f"Config with name {name} already exists.")
 
     # create config
     config = Config(name, llmservice, parallel)
@@ -288,7 +288,7 @@ def rm_config(name: str) -> None:
 
     # check that config exists
     if not os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
-        raise InvalidCommandException(f"Config with name {name} does not exist.")
+        raise InvalidCommandError(f"Config with name {name} does not exist.")
 
     # load the specified config
     config = Config(name)
@@ -314,7 +314,7 @@ def set_config(name: str) -> None:
 
     # check that config exists
     if not os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
-        raise InvalidCommandException(f"Config with name {name} does not exist.")
+        raise InvalidCommandError(f"Config with name {name} does not exist.")
 
     # load the specified config
     config = Config(name)

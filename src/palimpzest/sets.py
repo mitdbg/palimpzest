@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Callable, List, Optional, Type, Union
+from typing import Callable
 
 from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
 from palimpzest.corelib.schemas import Number, Schema
@@ -37,18 +37,18 @@ class Set:
 
     def __init__(
         self,
-        source: Union[Set, DataSource],
-        schema: Type[Schema],
+        source: Set | DataSource,
+        schema: type[Schema],
         desc: str | None = None,
         filter: Filter | None = None,
         udf: Callable | None = None,
-        aggFunc: AggFunc | None = None,
-        groupBy: GroupBySig | None = None,
+        agg_func: AggFunc | None = None,
+        group_by: GroupBySig | None = None,
         limit: int | None = None,
         fnid: str | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool | None = None,
-        depends_on: List[str] | None = None,
+        depends_on: list[str] | None = None,
         nocache: bool = False,
     ):
         self._schema = schema
@@ -56,8 +56,8 @@ class Set:
         self._desc = desc
         self._filter = filter
         self._udf = udf
-        self._aggFunc = aggFunc
-        self._groupBy = groupBy
+        self._agg_func = agg_func
+        self._group_by = group_by
         self._limit = limit
         self._fnid = fnid
         self._cardinality = cardinality
@@ -66,44 +66,48 @@ class Set:
         self._nocache = nocache
 
     def __str__(self):
-        return f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, filter={str(self._filter)}, udf={str(self._udf)}, aggFunc={str(self._aggFunc)}, limit={str(self._limit)}, uid={self.universalIdentifier()})"
+        return (
+            f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, "
+            f"filter={str(self._filter)}, udf={str(self._udf)}, agg_func={str(self._agg_func)}, limit={str(self._limit)}, "
+            f"uid={self.universal_identifier()})"
+        )
 
     @property
-    def schema(self) -> Type[Schema]:
+    def schema(self) -> type[Schema]:
         return self._schema
 
     def serialize(self):
         # NOTE: I needed to remove depends_on from the serialization dictionary because
         # the optimizer changes the name of the depends_on fields to be their "full" name.
-        # This created an issue with the node.universalIdentifier() not being consistent
+        # This created an issue with the node.universal_identifier() not being consistent
         # after changing the field to its full name.
         d = {
             "version": Set.SET_VERSION,
-            "schema": self.schema.jsonSchema(),
+            "schema": self.schema.json_schema(),
             "source": self._source.serialize(),
             "desc": repr(self._desc),
             "filter": None if self._filter is None else self._filter.serialize(),
             "udf": None if self._udf is None else str(self._udf),
-            "aggFunc": None if self._aggFunc is None else self._aggFunc.serialize(),
+            "agg_func": None if self._agg_func is None else self._agg_func.serialize(),
             "fnid": self._fnid,
             "cardinality": self._cardinality,
             "image_conversion": self._image_conversion,
             "limit": self._limit,
-            "groupBy": (None if self._groupBy is None else self._groupBy.serialize()),
+            "group_by": (None if self._group_by is None else self._group_by.serialize()),
         }
 
         return d
 
-    def universalIdentifier(self):
+    def universal_identifier(self):
         """Return a unique identifier for this Set."""
         d = self.serialize()
         ordered = json.dumps(d, sort_keys=True)
         result = hashlib.sha256(ordered.encode()).hexdigest()
         return result[:MAX_ID_CHARS]
 
-    def jsonSchema(self):
+    def json_schema(self):
         """Return the JSON schema for this Set."""
-        return self.schema.jsonSchema()
+        return self.schema.json_schema()
 
 
 class Dataset(Set):
@@ -119,9 +123,9 @@ class Dataset(Set):
     previously cached computation by providing it as a `source` to some future Dataset.
     """
 
-    def __init__(self, source: Union[str, DataSource], *args, **kwargs):
+    def __init__(self, source: str | DataSource, *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
-        source = DataDirectory().getRegisteredDataset(source) if isinstance(source, str) else source
+        source = DataDirectory().get_registered_dataset(source) if isinstance(source, str) else source
 
         # intialize class
         super().__init__(source, *args, **kwargs)
@@ -134,8 +138,8 @@ class Dataset(Set):
 
     def filter(
         self,
-        _filter: Union[str, Callable],
-        depends_on: Union[str, List[str]] | None = None,
+        _filter: str | Callable,
+        depends_on: str | list[str] | None = None,
         desc: str = "Apply filter(s)",
     ) -> Dataset:
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
@@ -143,7 +147,7 @@ class Dataset(Set):
         if type(_filter) is str:
             f = Filter(_filter)
         elif callable(_filter):
-            f = Filter(filterFn=_filter)
+            f = Filter(filter_fn=_filter)
         else:
             raise Exception("Filter type not supported.", type(_filter))
 
@@ -158,17 +162,17 @@ class Dataset(Set):
 
     def convert(
         self,
-        outputSchema: Type[Schema],
-        udf: Optional[Callable] = None,
+        output_schema: type[Schema],
+        udf: Callable | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool = False,
-        depends_on: Union[str, List[str]] | None = None,
+        depends_on: str | list[str] | None = None,
         desc: str = "Convert to new schema",
     ) -> Dataset:
         """Convert the Set to a new schema."""
         return Dataset(
             source=self,
-            schema=outputSchema,
+            schema=output_schema,
             udf=udf,
             cardinality=cardinality,
             image_conversion=image_conversion,
@@ -183,7 +187,7 @@ class Dataset(Set):
             source=self,
             schema=Number,
             desc="Count results",
-            aggFunc=AggFunc.COUNT,
+            agg_func=AggFunc.COUNT,
             nocache=self._nocache,
         )
 
@@ -193,16 +197,16 @@ class Dataset(Set):
             source=self,
             schema=Number,
             desc="Average results",
-            aggFunc=AggFunc.AVERAGE,
+            agg_func=AggFunc.AVERAGE,
             nocache=self._nocache,
         )
 
-    def groupby(self, groupBy: GroupBySig) -> Dataset:
+    def groupby(self, groupby: GroupBySig) -> Dataset:
         return Dataset(
             source=self,
-            schema=groupBy.outputSchema(),
+            schema=groupby.output_schema(),
             desc="Group By",
-            groupBy=groupBy,
+            group_by=groupby,
             nocache=self._nocache,
         )
 

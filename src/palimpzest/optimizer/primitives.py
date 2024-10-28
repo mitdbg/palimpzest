@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Dict, List, Optional, Set, Union
 
 from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.operators.logical import LogicalOperator
@@ -17,11 +16,11 @@ class Expression:
 
     def __init__(
         self,
-        operator: Union[LogicalOperator, PhysicalOperator],
-        input_group_ids: List[int],
-        input_fields: Set[str],
-        generated_fields: Set[str],
-        group_id: Optional[int] = None,
+        operator: LogicalOperator | PhysicalOperator,
+        input_group_ids: list[int],
+        input_fields: set[str],
+        generated_fields: set[str],
+        group_id: int | None = None,
     ):
         self.operator = operator
         self.input_group_ids = input_group_ids
@@ -31,7 +30,7 @@ class Expression:
         self.rules_applied = set()
         self.plan_cost = None
 
-    def __eq__(self, other: Expression):
+    def __eq__(self, other):
         return self.operator == other.operator and self.input_group_ids == other.input_group_ids
 
     def __hash__(self):
@@ -64,13 +63,13 @@ class Group:
     Maintains a set of logical multi-expressions and physical multi-expressions.
     """
 
-    def __init__(self, logical_expressions: List[Expression], fields: Set[str], properties: Dict[str, Set[str]]):
+    def __init__(self, logical_expressions: list[Expression], fields: set[str], properties: dict[str, set[str]]):
         self.logical_expressions = set(logical_expressions)
         self.physical_expressions = set()
         self.fields = fields
         self.explored = False
         self.best_physical_expression: PhysicalExpression | None = None
-        self.ci_best_physical_expressions: List[PhysicalExpression] = []
+        self.ci_best_physical_expressions: list[PhysicalExpression] = []
         self.satisfies_constraint = False
 
         # properties of the Group which distinguish it from groups w/identical fields,

@@ -11,7 +11,7 @@ from palimpzest.execution.nosentinel_execution import (
     SequentialSingleThreadNoSentinelExecution,
 )
 from palimpzest.policy import MinCost
-from palimpzest.utils.model_helpers import getModels
+from palimpzest.utils.model_helpers import get_models
 
 
 def score_biofabric_plans(dataset, records, policy_str=None, reopt=False) -> float:
@@ -38,8 +38,8 @@ def score_biofabric_plans(dataset, records, policy_str=None, reopt=False) -> flo
     ]
     output_rows = []
     for rec in records:
-        dct = {k: v for k, v in rec._asDict().items() if k in matching_columns}
-        filename = os.path.basename(rec._asDict()["filename"])
+        dct = {k: v for k, v in rec.as_dict().items() if k in matching_columns}
+        filename = os.path.basename(rec.as_dict()["filename"])
         dct["study"] = os.path.basename(filename).split("_")[0]
         output_rows.append(dct)
 
@@ -109,7 +109,7 @@ def score_plan(dataset, records, policy_str=None, reopt=False) -> float:
     if "biofabric" in dataset:
         return score_biofabric_plans(dataset, records, policy_str, reopt)
 
-    records_df = pd.DataFrame([rec._asDict() for rec in records])
+    records_df = pd.DataFrame([rec.as_dict() for rec in records])
 
     # save predictions for this plan
     # if not reopt:
@@ -181,7 +181,7 @@ def test_workload(dataset, workload, execution_engine):
     dataset_size = dataset_to_size[dataset]
     num_samples = int(0.05 * dataset_size) if dataset != "biofabric-tiny" else 1
 
-    available_models = getModels(include_vision=True)
+    available_models = get_models(include_vision=True)
     records, stats = Execute(
         workload,
         policy=MinCost(),

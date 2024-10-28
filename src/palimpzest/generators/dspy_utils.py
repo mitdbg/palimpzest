@@ -64,7 +64,7 @@ def gen_qa_signature_class(doc_schema, doc_type):
 
 
 ### DSPy Modules ###
-class dspyCOT(dspy.Module):
+class DSPyCOT(dspy.Module):
     """
     Invoke dspy in chain of thought mode
     """
@@ -81,10 +81,10 @@ class dspyCOT(dspy.Module):
 
 ### DSPy wrapped LLM calls ###
 class TogetherHFAdaptor(HFModel):
-    def __init__(self, model, apiKey, **kwargs):
+    def __init__(self, model, api_key, **kwargs):
         super().__init__(model=model, is_client=True)
         self.api_base = "https://api.together.xyz/inference"
-        self.token = apiKey
+        self.token = api_key
         self.model = model
 
         self.use_inst_template = False

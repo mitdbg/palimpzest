@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import time
-from typing import List
 
 from palimpzest.constants import (
     MODEL_CARDS,
@@ -22,7 +21,7 @@ from palimpzest.prompts import IMAGE_FILTER_PROMPT
 class FilterOp(PhysicalOperator):
     def __init__(self, filter: Filter, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        assert self.inputSchema == self.outputSchema, "Input and output schemas must match for FilterOp"
+        assert self.input_schema == self.output_schema, "Input and output schemas must match for FilterOp"
         self.filter = filter
 
     def __str__(self):
@@ -36,28 +35,28 @@ class FilterOp(PhysicalOperator):
 
     def get_op_params(self):
         return {
-            "outputSchema": self.outputSchema,
+            "output_schema": self.output_schema,
             "filter": self.filter,
         }
 
-    def __eq__(self, other: FilterOp):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.filter == other.filter
-            and self.inputSchema == other.outputSchema
-            and self.outputSchema == other.outputSchema
+            and self.input_schema == other.output_schema
+            and self.output_schema == other.output_schema
         )
 
 
 class NonLLMFilter(FilterOp):
-    def __eq__(self, other: NonLLMFilter):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.filter == other.filter
-            and self.outputSchema == other.outputSchema
+            and self.output_schema == other.output_schema
         )
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates):
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate output cardinality using a constant assumption of the filter selectivity
         selectivity = NAIVE_EST_FILTER_SELECTIVITY
         cardinality = selectivity * source_op_cost_estimates.cardinality
@@ -73,11 +72,11 @@ class NonLLMFilter(FilterOp):
             quality=1.0,
         )
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> list[DataRecordsWithStats]:
         # apply filter to input record
         start_time = time.time()
         try:
-            result = self.filter.filterFn(candidate)
+            result = self.filter.filter_fn(candidate)
         except Exception as e:
             print(f"Error invoking user-defined function for filter: {e}")
 
@@ -88,12 +87,12 @@ class NonLLMFilter(FilterOp):
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=candidate._asDict(include_bytes=False),
+            record_state=candidate.as_dict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),
             time_per_record=fn_call_duration_secs,
             cost_per_record=0.0,
-            filter_str=self.filter.getFilterStr(),
+            filter_str=self.filter.get_filter_str(),
             passed_filter=result,
             fn_call_duration_secs=fn_call_duration_secs,
             answer=result,
@@ -103,7 +102,7 @@ class NonLLMFilter(FilterOp):
         candidate._passed_filter = result
 
         if self.verbose:
-            output_str = f"{self.filter.getFilterStr()}:\n{result}"
+            output_str = f"{self.filter.get_filter_str()}:\n{result}"
             print(output_str)
 
         return [candidate], [record_op_stats]
@@ -123,8 +122,8 @@ class LLMFilter(FilterOp):
         self.prompt_strategy = prompt_strategy
         self.image_filter = image_filter
 
-        doc_schema = str(self.inputSchema)
-        doc_type = self.inputSchema.className()
+        doc_schema = str(self.input_schema)
+        doc_type = self.input_schema.class_name()
         if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
             if not self.image_filter:
                 self.generator = DSPyGenerator(
@@ -155,17 +154,17 @@ class LLMFilter(FilterOp):
 
         return op_params
 
-    def __eq__(self, other: LLMFilter):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.model == other.model
             and self.filter == other.filter
             and self.prompt_strategy == other.prompt_strategy
             and self.image_filter == other.image_filter
-            and self.outputSchema == other.outputSchema
+            and self.output_schema == other.output_schema
         )
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates):
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
         if self.image_filter:
@@ -223,19 +222,19 @@ class LLMFilter(FilterOp):
                 ]
             content = base64_images
         else:
-            content = candidate._asJSONStr(include_bytes=False)
+            content = candidate.as_json_str(include_bytes=False)
 
         # construct the prompt; for image filters we need to wrap the filter condition in an instruction
-        prompt = self.filter.filterCondition
+        prompt = self.filter.filter_condition
         if self.image_filter:
-            prompt = IMAGE_FILTER_PROMPT.format(filter_condition=self.filter.filterCondition)
+            prompt = IMAGE_FILTER_PROMPT.format(filter_condition=self.filter.filter_condition)
 
         # invoke LLM to generate filter decision (True or False)
         response, gen_stats = None, GenerationStats()
         try:
-            if isinstance(self.generator, ImageTextGenerator) and isinstance(content, list) and isinstance(prompt, str):
+            if isinstance(self.generator, ImageTextGenerator) and isinstance(content, list) and isinstance(prompt, str):  # noqa
                 response, gen_stats = self.generator.generate(context=content, prompt=prompt)
-            elif isinstance(self.generator, DSPyGenerator) and isinstance(content, str) and isinstance(prompt, str):
+            elif isinstance(self.generator, DSPyGenerator) and isinstance(content, str) and isinstance(prompt, str):  # noqa
                 response, gen_stats = self.generator.generate(context=content, prompt=prompt)
             else:
                 raise Exception("Mismatch between generator and content type")
@@ -249,13 +248,13 @@ class LLMFilter(FilterOp):
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=candidate._asDict(include_bytes=False),
+            record_state=candidate.as_dict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),
             time_per_record=time.time() - start_time,
             cost_per_record=gen_stats.cost_per_record,
             model_name=self.model.value,
-            filter_str=self.filter.getFilterStr(),
+            filter_str=self.filter.get_filter_str(),
             total_input_tokens=gen_stats.total_input_tokens,
             total_output_tokens=gen_stats.total_output_tokens,
             total_input_cost=gen_stats.total_input_cost,

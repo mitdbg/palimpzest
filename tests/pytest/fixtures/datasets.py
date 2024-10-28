@@ -23,18 +23,18 @@ class RealEstateListingFiles(pz.Schema):
 
 
 class RealEstateListingSource(pz.UserSource):
-    def __init__(self, datasetId, listings_dir):
-        super().__init__(RealEstateListingFiles, datasetId)
+    def __init__(self, dataset_id, listings_dir):
+        super().__init__(RealEstateListingFiles, dataset_id)
         self.listings_dir = listings_dir
         self.listings = sorted(os.listdir(self.listings_dir))
 
     def __len__(self):
         return len(self.listings)
 
-    def getSize(self):
+    def get_size(self):
         return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         # fetch listing
         listing = self.listings[idx]
 
@@ -75,7 +75,7 @@ def biofabric_tiny_data():
 @pytest.fixture
 def enron_eval_tiny(enron_eval_tiny_data):
     dataset_id = "enron-eval-tiny"
-    pz.DataDirectory().registerLocalDirectory(
+    pz.DataDirectory().register_local_directory(
         path=enron_eval_tiny_data,
         dataset_id=dataset_id,
     )
@@ -86,7 +86,7 @@ def enron_eval_tiny(enron_eval_tiny_data):
 def real_estate_eval_tiny(real_estate_eval_tiny_data):
     dataset_id = "real-estate-eval-tiny"
 
-    pz.DataDirectory().registerUserSource(
+    pz.DataDirectory().register_user_source(
         src=RealEstateListingSource(dataset_id, real_estate_eval_tiny_data),
         dataset_id=dataset_id,
     )
@@ -96,7 +96,7 @@ def real_estate_eval_tiny(real_estate_eval_tiny_data):
 @pytest.fixture
 def biofabric_tiny(biofabric_tiny_data):
     dataset_id = "biofabric-tiny"
-    pz.DataDirectory().registerLocalDirectory(
+    pz.DataDirectory().register_local_directory(
         path=biofabric_tiny_data,
         dataset_id=dataset_id,
     )

@@ -19,15 +19,16 @@ COSMOS_ADDRESS = "https://xdd.wisc.edu/cosmos_service"
 class PdfParser:
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
-        self.pdf = open(pdf_path).read()
+        with open(pdf_path, "rb") as f:
+            self.pdf = f.read()
         self.text = ""
         self.pages = []
         self._parse()
 
     def _parse(self):
         for page in self.pdf:
-            self.text += page.get_text()
-            self.pages.append(page.get_text())
+            self.text += page.get_text()  # type: ignore
+            self.pages.append(page.get_text())  # type: ignore
 
     def get_text(self) -> str:
         return self.text
@@ -234,11 +235,9 @@ def get_text_from_pdf(filename, pdf_bytes, pdfprocessor="cosmos", enable_file_ca
         # Check if pz_file_cache_dir exists in the file system
         pz_file_cache_dir = os.path.join(file_cache_dir, cached_extraction_folder)
         if enable_file_cache and os.path.exists(pz_file_cache_dir):
-            print(
-                f"Text file {text_file_name} already exists in system tmp folder {pz_file_cache_dir}, reading from cache"
-            )
+            print(f"File {text_file_name} already exists in system tmp folder {pz_file_cache_dir}, reading from cache")
             text_file_path = os.path.join(pz_file_cache_dir, text_file_name)
-            with open(text_file_path, "r") as file:
+            with open(text_file_path) as file:
                 text_content = file.read()
                 return text_content
 
@@ -247,11 +246,12 @@ def get_text_from_pdf(filename, pdf_bytes, pdfprocessor="cosmos", enable_file_ca
         # It checks to see if the text file name is in the registry, but there are two things wrong here.
         # 1) The registry is for 'official' datasets that have been inserted by the user, not cached objects.
         # 2) The filename isn't enough to check for cached results. Maybe the file moved directories, or maybe there are
-        # multiple different files with the same name. You need the checksum of the original file to ensure the cached object is valid.
+        # multiple different files with the same name. You need the checksum of the original file to ensure the cached
+        # object is valid.
         #
         #    if DataDirectory().exists(text_file_name):
         #        print(f"Text file {text_file_name} already exists, reading from cache")
-        #        text_file_path = DataDirectory().getPath(text_file_name)
+        #        text_file_path = DataDirectory().get_path(text_file_name)
         #        with open(text_file_path, 'r') as file:
         #            text_content = file.read()
         #            return text_content
@@ -264,8 +264,8 @@ def get_text_from_pdf(filename, pdf_bytes, pdfprocessor="cosmos", enable_file_ca
         text_file_path = os.path.join(pz_file_cache_dir, text_file_name)
         if not os.path.exists(text_file_path):
             raise FileNotFoundError(f"Text file {text_file_name} not found in {pz_file_cache_dir}/{text_file_name}")
-        # DataDirectory().registerLocalFile(text_file_path, text_file_name)
-        with open(text_file_path, "r") as file:
+        # DataDirectory().register_local_file(text_file_path, text_file_name)
+        with open(text_file_path) as file:
             text_content = file.read()
             return text_content
 
@@ -280,4 +280,4 @@ if __name__ == "__main__":
         # file_name = os.path.basename(file_path)
         # # Call the cosmos_client function
         # cosmos_client(file_name, file, output_dir)
-    # DataDirectory().rmRegisteredDataset("sidarthe.annotations.txt")
+    # DataDirectory().rm_registered_dataset("sidarthe.annotations.txt")

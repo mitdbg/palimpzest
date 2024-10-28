@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Dict
-
 
 class Field:
     """
@@ -37,7 +35,7 @@ class Field:
     def desc(self) -> str:
         return self._desc
 
-    def jsonSchema(self) -> Dict[str, str]:
+    def json_schema(self) -> dict[str, str]:
         return {"description": self._desc, "type": "undefined"}
 
 
@@ -47,7 +45,7 @@ class BooleanField(Field):
     def __init__(self, desc: str, required: bool = False):
         super().__init__(desc=desc, required=required)
 
-    def jsonSchema(self) -> Dict[str, str]:
+    def json_schema(self) -> dict[str, str]:
         return {"description": self._desc, "type": "boolean"}
 
 
@@ -57,7 +55,7 @@ class BytesField(Field):
     def __init__(self, desc: str, required: bool = False):
         super().__init__(desc=desc, required=required)
 
-    def jsonSchema(self) -> Dict[str, str]:
+    def json_schema(self) -> dict[str, str]:
         return {
             "description": self._desc,
             "type": "string",
@@ -72,7 +70,7 @@ class CallableField(Field):
     def __init__(self, desc: str, required: bool = False):
         super().__init__(desc=desc, required=required)
 
-    def jsonSchema(self) -> Dict[str, str]:
+    def json_schema(self) -> dict[str, str]:
         return {"description": self._desc, "type": "callable"}
 
 
@@ -119,7 +117,7 @@ class NumericField(Field):
     def __init__(self, desc: str, required: bool = False):
         super().__init__(desc=desc, required=required)
 
-    def jsonSchema(self) -> Dict[str, str]:
+    def json_schema(self) -> dict[str, str]:
         return {"description": self._desc, "type": "numeric"}
 
 
@@ -129,5 +127,5 @@ class StringField(Field):
     def __init__(self, desc: str, required: bool = False):
         super().__init__(desc=desc, required=required)
 
-    def jsonSchema(self) -> Dict[str, str]:
+    def json_schema(self) -> dict[str, str]:
         return {"description": self._desc, "type": "string"}

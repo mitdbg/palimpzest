@@ -37,8 +37,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     no_cache = args.no_cache
     datasetid = "images-tiny"
-    if datasetid not in pz.DataDirectory().listRegisteredDatasets():
-        pz.DataDirectory().registerLocalDirectory(path="testdata/images-tiny", dataset_id="images-tiny")
+    if datasetid not in pz.DataDirectory().list_registered_datasets():
+        pz.DataDirectory().register_local_directory(path="testdata/images-tiny", dataset_id="images-tiny")
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")

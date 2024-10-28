@@ -3,7 +3,7 @@ line-length = 120
 indent-width = 4
 
 [lint]
-extend-select = ["I", "B"]
+ignore = ["E501"]
 fixable = ["ALL"]
 unfixable = []
-ignore = ["E712"]
+select = ["E", "F", "UP", "B", "SIM", "I", "N"]

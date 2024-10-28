@@ -32,6 +32,8 @@ class Execute:
         if available_models is None:
             available_models = []
         return execution_engine(
+            *args,
+            **kwargs,
             num_samples=num_samples,
             nocache=nocache,
             include_baselines=include_baselines,
@@ -45,6 +47,4 @@ class Execute:
             allow_model_selection=allow_model_selection,
             allow_token_reduction=allow_token_reduction,
             optimization_strategy=optimization_strategy,
-            *args,
-            **kwargs,
         ).execute(dataset=dataset, policy=policy)

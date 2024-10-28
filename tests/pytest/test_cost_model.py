@@ -56,7 +56,7 @@ class TestCostModel:
         # register a fake dataset
         dataset_id = "foobar"
         vals = [1, 2, 3, 4, 5, 6]
-        DataDirectory().registerDataset(
+        DataDirectory().register_dataset(
             vals=vals,
             dataset_id=dataset_id,
         )

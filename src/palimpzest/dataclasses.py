@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 
 @dataclass
@@ -10,7 +10,7 @@ class GenerationStats:
     Dataclass for storing statistics about the execution of an operator on a single record.
     """
 
-    model_name: Optional[str] = None
+    model_name: str | None = None
 
     # The raw answer as output from the generator (a list of strings, possibly of len 1)
     # raw_answers: Optional[List[str]] = field(default_factory=list)
@@ -40,7 +40,7 @@ class GenerationStats:
 
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
         # self.raw_answers.extend(other.raw_answers)
-        for field in [
+        for dataclass_field in [
             "total_input_tokens",
             "total_output_tokens",
             "total_input_cost",
@@ -49,7 +49,7 @@ class GenerationStats:
             "llm_call_duration_secs",
             "fn_call_duration_secs",
         ]:
-            setattr(self, field, getattr(self, field) + getattr(other, field))
+            setattr(self, dataclass_field, getattr(self, dataclass_field) + getattr(other, dataclass_field))
         return self
 
     def __add__(self, other: GenerationStats) -> GenerationStats:
@@ -125,7 +125,7 @@ class RecordOpStats:
     record_parent_id: str
 
     # a dictionary with the record state after being processed by the operator
-    record_state: Dict[str, Any]
+    record_state: dict[str, Any]
 
     # operation id; an identifier for this operation
     op_id: str
@@ -141,26 +141,26 @@ class RecordOpStats:
 
     ##### NOT-OPTIONAL, BUT FILLED BY EXECUTION CLASS AFTER CONSTRUCTOR CALL #####
     # the ID of the physical operation which produced the input record for this record at this operation
-    source_op_id: Optional[str] = None
+    source_op_id: str | None = None
 
     # the ID of the physical plan which produced this record at this operation
     plan_id: str = ""
 
     ##### OPTIONAL FIELDS (I.E. ONLY MANDATORY FOR CERTAIN OPERATORS) #####
     # (if applicable) the name of the model used to generate the output for this record
-    model_name: Optional[str] = None
+    model_name: str | None = None
 
     # (if applicable) the mapping from field-name to generated output for this record
-    answer: Optional[Dict[str, Any]] = None
+    answer: dict[str, Any] | None = None
 
     # (if applicable) the mapping from field-name to generated output for this record
     # raw_answers: Optional[List[str, Any]] = field(default_factory=list)
 
     # (if applicable) the list of input fields for the generation for this record
-    input_fields: Optional[List[str]] = None
+    input_fields: list[str] | None = None
 
     # (if applicable) the list of generated fields for this record
-    generated_fields: Optional[List[str]] = None
+    generated_fields: list[str] | None = None
 
     # the total number of input tokens processed by this operator; None if this operation did not use an LLM
     # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
@@ -177,10 +177,10 @@ class RecordOpStats:
     total_output_cost: float = 0.0
 
     # (if applicable) the filter text (or a string representation of the filter function) applied to this record
-    filter_str: Optional[str] = None
+    filter_str: str | None = None
 
     # (if applicable) the True/False result of whether this record passed the filter or not
-    passed_filter: Optional[bool] = None
+    passed_filter: bool | None = None
 
     # (if applicable) the time (in seconds) spent executing a call to an LLM
     llm_call_duration_secs: float = 0.0
@@ -189,7 +189,7 @@ class RecordOpStats:
     fn_call_duration_secs: float = 0.0
 
     # (if applicable) a boolean indicating whether this is the statistics captured from a failed convert operation
-    failed_convert: Optional[bool] = None
+    failed_convert: bool | None = None
 
     def to_json(self):
         return {field.name: getattr(self, field.name) for field in fields(self)}
@@ -214,14 +214,14 @@ class OperatorStats:
     total_op_cost: float = 0.0
 
     # a list of RecordOpStats processed by the operation
-    record_op_stats_lst: List[RecordOpStats] = field(default_factory=list)
+    record_op_stats_lst: list[RecordOpStats] = field(default_factory=list)
 
     # an OPTIONAL dictionary with more detailed information about this operation;
-    op_details: Dict[str, Any] = field(default_factory=dict)
+    op_details: dict[str, Any] = field(default_factory=dict)
 
     def add_record_op_stats(
         self,
-        record_op_stats_lst: Union[RecordOpStats, List[RecordOpStats]],
+        record_op_stats_lst: RecordOpStats | list[RecordOpStats],
         source_op_id: str | None,
         plan_id: str,
     ):
@@ -268,7 +268,7 @@ class PlanStats:
     plan_str: str | None = None
 
     # dictionary of OperatorStats objects (one for each operator)
-    operator_stats: Dict[str, OperatorStats] = field(default_factory=dict)
+    operator_stats: dict[str, OperatorStats] = field(default_factory=dict)
 
     # total runtime for the plan measured from the start to the end of PhysicalPlan.execute()
     total_plan_time: float = 0.0
@@ -323,7 +323,7 @@ class ExecutionStats:
     execution_id: str | None = None
 
     # dictionary of PlanStats objects (one for each plan run during execution)
-    plan_stats: Dict[str, PlanStats] = field(default_factory=dict)
+    plan_stats: dict[str, PlanStats] = field(default_factory=dict)
 
     # total runtime for a call to pz.Execute
     total_execution_time: float = 0.0
@@ -332,7 +332,7 @@ class ExecutionStats:
     total_execution_cost: float = 0.0
 
     # dictionary of plan strings; useful for printing executed plans in demos
-    plan_strs: Dict[str, str] = field(default_factory=dict)
+    plan_strs: dict[str, str] = field(default_factory=dict)
 
     def to_json(self):
         return {

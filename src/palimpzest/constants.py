@@ -76,7 +76,7 @@ XLS_EXTENSIONS = [".xls", ".xlsx"]
 HTML_EXTENSIONS = [".html", ".htm"]
 
 # the number of seconds the parallel execution will sleep for while waiting for futures to complete
-PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.1
+PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.3
 
 # character limit for various IDs
 MAX_ID_CHARS = 10

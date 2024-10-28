@@ -26,26 +26,26 @@ ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR = (
 ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL = "the output objects"
 ONE_TO_MANY_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields {fields}. You must decide the correct number of output objects."
 
-STRUCTURED_CONVERT_PROMPT = """I would like you to create {targetOutputDescriptor}
+STRUCTURED_CONVERT_PROMPT = """I would like you to create {target_output_descriptor}
 You will use the information in an input JSON object that I will provide. The input object has type {input_type}.
-All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
-{optionalInputDesc}
-{optionalOutputDesc}
+All of the fields in {output_single_or_plural} can be derived using information from the input object.
+{optional_input_desc}
+{optional_output_desc}
 Here is every input field name and a description: 
-{multilineInputFieldDescription}
+{multiline_input_field_description}
 Here is every output field name and a description:
-{multilineOutputFieldDescription}
-{appendixInstruction}
+{multiline_output_field_description}
+{appendix_instruction}
 {optional_desc}"""
 
-IMAGE_CONVERT_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor}.
+IMAGE_CONVERT_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and create {target_output_descriptor}.
 You will use the information in the image that I will provide. The input image(s) has type {input_type}.
-All of the fields in {outputSingleOrPlural} can be derived using information from the input image(s).
-{optionalInputDesc}
-{optionalOutputDesc}
+All of the fields in {output_single_or_plural} can be derived using information from the input image(s).
+{optional_input_desc}
+{optional_output_desc}
 Here is every output field name and a description:
-{multilineOutputFieldDescription}
-{appendixInstruction}
+{multiline_output_field_description}
+{appendix_instruction}
 {optional_desc}"""
 
 IMAGE_FILTER_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Callable, List, Optional, Type
+from typing import Callable
 
 from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
 from palimpzest.corelib.schemas import ImageFile, Schema
@@ -29,11 +29,11 @@ class LogicalOperator:
 
     def __init__(
         self,
-        outputSchema: Type[Schema],
-        inputSchema: Type[Schema] | None = None,
+        output_schema: type[Schema],
+        input_schema: type[Schema] | None = None,
     ):
-        self.outputSchema = outputSchema
-        self.inputSchema = inputSchema
+        self.output_schema = output_schema
+        self.input_schema = input_schema
         self.op_id: str | None = None
 
     def __str__(self) -> str:
@@ -95,40 +95,40 @@ class Aggregate(LogicalOperator):
 
     def __init__(
         self,
-        aggFunc: AggFunc,
-        targetCacheId: str | None = None,
+        agg_func: AggFunc,
+        target_cache_id: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.aggFunc = aggFunc
-        self.targetCacheId = targetCacheId
+        self.agg_func = agg_func
+        self.target_cache_id = target_cache_id
 
     def __str__(self):
-        return f"{self.__class__.__name__}(function: {str(self.aggFunc.value)})"
+        return f"{self.__class__.__name__}(function: {str(self.agg_func.value)})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, Aggregate)
-            and self.inputSchema == other.inputSchema
-            and self.outputSchema == other.outputSchema
-            and self.aggFunc == other.aggFunc
+            and self.input_schema == other.input_schema
+            and self.output_schema == other.output_schema
+            and self.agg_func == other.agg_func
         )
 
     def copy(self):
         return self.__class__(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
-            aggFunc=self.aggFunc,
-            targetCacheId=self.targetCacheId,
+            input_schema=self.input_schema,
+            output_schema=self.output_schema,
+            agg_func=self.agg_func,
+            target_cache_id=self.target_cache_id,
         )
 
     def get_op_params(self) -> dict:
         return {
-            "inputSchema": self.inputSchema,
-            "outputSchema": self.outputSchema,
-            "aggFunc": self.aggFunc,
-            "targetCacheId": self.targetCacheId,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
+            "agg_func": self.agg_func,
+            "target_cache_id": self.target_cache_id,
         }
 
 
@@ -136,103 +136,106 @@ class BaseScan(LogicalOperator):
     """A BaseScan is a logical operator that represents a scan of a particular data source."""
 
     def __init__(self, dataset_id: str, *args, **kwargs):
-        if kwargs.get("inputSchema", None) is not None:
+        if kwargs.get("input_schema") is not None:
             raise Exception(
-                f"BaseScan must be initialized with `inputSchema=None` but was initialized with `inputSchema={kwargs.get('inputSchema')}`"
+                f"BaseScan must be initialized with `input_schema=None` but was initialized with "
+                f"`input_schema={kwargs.get('input_schema')}`"
             )
 
         super().__init__(*args, **kwargs)
         self.dataset_id = dataset_id
 
     def __str__(self):
-        return f"BaseScan({self.dataset_id},{str(self.outputSchema)})"
+        return f"BaseScan({self.dataset_id},{str(self.output_schema)})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, BaseScan)
-            and self.inputSchema == other.inputSchema
-            and self.outputSchema == other.outputSchema
+            and self.input_schema == other.input_schema
+            and self.output_schema == other.output_schema
             and self.dataset_id == other.dataset_id
         )
 
     def copy(self):
         return BaseScan(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
+            input_schema=self.input_schema,
+            output_schema=self.output_schema,
             dataset_id=self.dataset_id,
         )
 
     def get_op_params(self) -> dict:
-        return {"outputSchema": self.outputSchema, "dataset_id": self.dataset_id}
+        return {"output_schema": self.output_schema, "dataset_id": self.dataset_id}
 
 
 class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached Set."""
 
     def __init__(self, dataset_id: str, *args, **kwargs):
-        if kwargs.get("inputSchema", None) is not None:
+        if kwargs.get("input_schema") is not None:
             raise Exception(
-                f"CacheScan must be initialized with `inputSchema=None` but was initialized with `inputSchema={kwargs.get('inputSchema')}`"
+                f"CacheScan must be initialized with `input_schema=None` but was initialized with "
+                f"`input_schema={kwargs.get('input_schema')}`"
             )
 
         super().__init__(*args, **kwargs)
         self.dataset_id = dataset_id
 
     def __str__(self):
-        return f"CacheScan({str(self.outputSchema)},{str(self.dataset_id)})"
+        return f"CacheScan({str(self.output_schema)},{str(self.dataset_id)})"
 
     def __eq__(self, other) -> bool:
         return (
             isinstance(other, CacheScan)
-            and self.inputSchema == other.inputSchema
-            and self.outputSchema == other.outputSchema
+            and self.input_schema == other.input_schema
+            and self.output_schema == other.output_schema
             and self.dataset_id == other.dataset_id
         )
 
     def copy(self):
         return CacheScan(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
+            input_schema=self.input_schema,
+            output_schema=self.output_schema,
             dataset_id=self.dataset_id,
         )
 
     def get_op_params(self):
         return {
-            "outputSchema": self.outputSchema,
+            "output_schema": self.output_schema,
             "dataset_id": self.dataset_id,
         }
 
 
 class ConvertScan(LogicalOperator):
-    """A ConvertScan is a logical operator that represents a scan of a particular data source, with conversion applied."""
+    """A ConvertScan is a logical operator that represents a scan of a particular data source,
+    with conversion applied."""
 
     def __init__(
         self,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-        udf: Optional[Callable] = None,
+        udf: Callable | None = None,
         image_conversion: bool = False,
-        depends_on: List[str] | None = None,
+        depends_on: list[str] | None = None,
         desc: str | None = None,
-        targetCacheId: str | None = None,
+        target_cache_id: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.cardinality = cardinality
         self.udf = udf
-        self.image_conversion = image_conversion or (self.inputSchema == ImageFile)
+        self.image_conversion = image_conversion or (self.input_schema == ImageFile)
         self.depends_on = [] if depends_on is None else depends_on
         self.desc = desc
-        self.targetCacheId = targetCacheId
+        self.target_cache_id = target_cache_id
 
     def __str__(self):
-        return f"ConvertScan({self.inputSchema} -> {str(self.outputSchema)},{str(self.desc)})"
+        return f"ConvertScan({self.input_schema} -> {str(self.output_schema)},{str(self.desc)})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, ConvertScan)
-            and self.inputSchema == other.inputSchema
-            and self.outputSchema == other.outputSchema
+            and self.input_schema == other.input_schema
+            and self.output_schema == other.output_schema
             and self.cardinality == other.cardinality
             and self.udf == other.udf
             and self.image_conversion == other.image_conversion
@@ -241,25 +244,25 @@ class ConvertScan(LogicalOperator):
 
     def copy(self):
         return ConvertScan(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
+            input_schema=self.input_schema,
+            output_schema=self.output_schema,
             cardinality=self.cardinality,
             image_conversion=self.image_conversion,
             udf=self.udf,
             depends_on=self.depends_on,
             desc=self.desc,
-            targetCacheId=self.targetCacheId,
+            target_cache_id=self.target_cache_id,
         )
 
     def get_op_params(self):
         return {
-            "inputSchema": self.inputSchema,
-            "outputSchema": self.outputSchema,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
             "cardinality": self.cardinality,
             "udf": self.udf,
             "image_conversion": self.image_conversion,
             "desc": self.desc,
-            "targetCacheId": self.targetCacheId,
+            "target_cache_id": self.target_cache_id,
         }
 
 
@@ -270,123 +273,123 @@ class FilteredScan(LogicalOperator):
         self,
         filter: Filter,
         image_filter: bool = False,
-        depends_on: List[str] | None = None,
-        targetCacheId: str | None = None,
+        depends_on: list[str] | None = None,
+        target_cache_id: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.filter = filter
-        self.image_filter = image_filter or (self.inputSchema == ImageFile)
+        self.image_filter = image_filter or (self.input_schema == ImageFile)
         self.depends_on = [] if depends_on is None else depends_on
-        self.targetCacheId = targetCacheId
+        self.target_cache_id = target_cache_id
 
     def __str__(self):
-        return f"FilteredScan({str(self.outputSchema)}, {str(self.filter)})"
+        return f"FilteredScan({str(self.output_schema)}, {str(self.filter)})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, FilteredScan)
-            and self.inputSchema == other.inputSchema
-            and self.outputSchema == other.outputSchema
+            and self.input_schema == other.input_schema
+            and self.output_schema == other.output_schema
             and self.filter == other.filter
             and self.image_filter == other.image_filter
         )
 
     def copy(self):
         return FilteredScan(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
+            input_schema=self.input_schema,
+            output_schema=self.output_schema,
             filter=self.filter,
             image_filter=self.image_filter,
             depends_on=self.depends_on,
-            targetCacheId=self.targetCacheId,
+            target_cache_id=self.target_cache_id,
         )
 
     def get_op_params(self) -> dict:
         return {
-            "inputSchema": self.inputSchema,
-            "outputSchema": self.outputSchema,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
             "filter": self.filter,
             "image_filter": self.image_filter,
-            "targetCacheId": self.targetCacheId,
+            "target_cache_id": self.target_cache_id,
         }
 
 
 class GroupByAggregate(LogicalOperator):
     def __init__(
         self,
-        gbySig: GroupBySig,
-        targetCacheId: str | None = None,
+        group_by_sig: GroupBySig,
+        target_cache_id: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        if not self.inputSchema:
+        if not self.input_schema:
             raise ValueError("GroupByAggregate requires an input schema")
-        (valid, error) = gbySig.validateSchema(self.inputSchema)
+        (valid, error) = group_by_sig.validate_schema(self.input_schema)
         if not valid:
             raise TypeError(error)
-        self.gbySig = gbySig
-        self.targetCacheId = targetCacheId
+        self.group_by_sig = group_by_sig
+        self.target_cache_id = target_cache_id
 
     def __str__(self):
-        return f"GroupBy({self.gbySig.serialize()})"
+        return f"GroupBy({self.group_by_sig.serialize()})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, GroupByAggregate)
-            and self.inputSchema == other.inputSchema
-            and self.outputSchema == other.outputSchema
-            and self.gbySig == other.gbySig
+            and self.input_schema == other.input_schema
+            and self.output_schema == other.output_schema
+            and self.group_by_sig == other.group_by_sig
         )
 
     def copy(self):
         return GroupByAggregate(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
-            gbySig=self.gbySig,
-            targetCacheId=self.targetCacheId,
+            input_schema=self.input_schema,
+            output_schema=self.output_schema,
+            group_by_sig=self.group_by_sig,
+            target_cache_id=self.target_cache_id,
         )
 
     def get_op_params(self) -> dict:
         return {
-            "inputSchema": self.inputSchema,
-            "outputSchema": self.outputSchema,
-            "gbySig": self.gbySig,
-            "targetCacheId": self.targetCacheId,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
+            "group_by_sig": self.group_by_sig,
+            "target_cache_id": self.target_cache_id,
         }
 
 
 class LimitScan(LogicalOperator):
-    def __init__(self, limit: int, targetCacheId: str | None = None, *args, **kwargs):
+    def __init__(self, limit: int, target_cache_id: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.limit = limit
-        self.targetCacheId = targetCacheId
+        self.target_cache_id = target_cache_id
 
     def __str__(self):
-        return f"LimitScan({str(self.inputSchema)}, {str(self.outputSchema)})"
+        return f"LimitScan({str(self.input_schema)}, {str(self.output_schema)})"
 
     def copy(self):
         return LimitScan(
-            inputSchema=self.inputSchema,
-            outputSchema=self.outputSchema,
+            input_schema=self.input_schema,
+            output_schema=self.output_schema,
             limit=self.limit,
-            targetCacheId=self.targetCacheId,
+            target_cache_id=self.target_cache_id,
         )
 
-    def __eq__(self, other: LogicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         return (
             isinstance(other, LimitScan)
-            and self.inputSchema == other.inputSchema
-            and self.outputSchema == other.outputSchema
+            and self.input_schema == other.input_schema
+            and self.output_schema == other.output_schema
             and self.limit == other.limit
         )
 
     def get_op_params(self) -> dict:
         return {
-            "inputSchema": self.inputSchema,
-            "outputSchema": self.outputSchema,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
             "limit": self.limit,
-            "targetCacheId": self.targetCacheId,
+            "target_cache_id": self.target_cache_id,
         }

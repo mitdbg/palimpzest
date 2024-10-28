@@ -74,7 +74,7 @@ def find_best_range(values, budget, trim_zeros=False):
 def get_range_from_hist(file_path, range_budget, resolution=0.001, trim_zeros=True):
     # Load data from csv file and extract he second column as values
     values = []
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         for line in file:
             line = line.strip()
             values.append(int(float(line.split(",")[1])))
