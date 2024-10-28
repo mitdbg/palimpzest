@@ -55,9 +55,9 @@ class GroupBySig:
 
         for g in self.group_by_fields:
             f = Field(desc=g, required=True)
-            setattr(Schema, g, f)
+            setattr(schema, g, f)
         ops = self.get_agg_field_names()
         for op in ops:
             f = Field(desc=op, required=True)
-            setattr(Schema, op, f)
+            setattr(schema, op, f)
         return schema
