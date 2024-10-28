@@ -453,14 +453,9 @@ class LLMConvert(ConvertOp):
         else:
             generator = DSPyGenerator(self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose)
 
-        if (
-            isinstance(generator, ImageTextGenerator)
-            and isinstance(content, list)
-            and isinstance(prompt, str)
-            or isinstance(generator, DSPyGenerator)
-            and isinstance(content, str)
-            and isinstance(prompt, str)
-        ):
+        if isinstance(generator, ImageTextGenerator) and isinstance(content, list) and isinstance(prompt, str):  # noqa
+            answer, query_stats = generator.generate(context=content, prompt=prompt)
+        elif isinstance(generator, DSPyGenerator) and isinstance(content, str) and isinstance(prompt, str):  # noqa
             answer, query_stats = generator.generate(context=content, prompt=prompt)
         else:
             raise ValueError("Invalid input types for generating fields.")
