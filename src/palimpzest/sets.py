@@ -56,8 +56,8 @@ class Set:
         self._desc = desc
         self._filter = filter
         self._udf = udf
-        self._aggFunc = agg_func
-        self._groupBy = group_by
+        self._agg_func = agg_func
+        self._group_by = group_by
         self._limit = limit
         self._fnid = fnid
         self._cardinality = cardinality
@@ -68,8 +68,8 @@ class Set:
     def __str__(self):
         return (
             f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, "
-            "filter={str(self._filter)}, udf={str(self._udf)}, agg_func={str(self._aggFunc)}, limit={str(self._limit)}, "
-            "uid={self.universal_identifier()})"
+            f"filter={str(self._filter)}, udf={str(self._udf)}, agg_func={str(self._agg_func)}, limit={str(self._limit)}, "
+            f"uid={self.universal_identifier()})"
         )
 
     @property
@@ -88,12 +88,12 @@ class Set:
             "desc": repr(self._desc),
             "filter": None if self._filter is None else self._filter.serialize(),
             "udf": None if self._udf is None else str(self._udf),
-            "agg_func": None if self._aggFunc is None else self._aggFunc.serialize(),
+            "agg_func": None if self._agg_func is None else self._agg_func.serialize(),
             "fnid": self._fnid,
             "cardinality": self._cardinality,
             "image_conversion": self._image_conversion,
             "limit": self._limit,
-            "groupBy": (None if self._groupBy is None else self._groupBy.serialize()),
+            "groupBy": (None if self._group_by is None else self._group_by.serialize()),
         }
 
         return d

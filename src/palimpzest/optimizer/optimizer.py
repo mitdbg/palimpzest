@@ -173,18 +173,18 @@ class Optimizer:
                 depends_on=node._depends_on,
                 target_cache_id=uid,
             )
-        elif node._groupBy is not None:
+        elif node._group_by is not None:
             op = GroupByAggregate(
                 input_schema=input_schema,
                 output_schema=output_schema,
-                group_by_sig=node._groupBy,
+                group_by_sig=node._group_by,
                 target_cache_id=uid,
             )
-        elif node._aggFunc is not None:
+        elif node._agg_func is not None:
             op = Aggregate(
                 input_schema=input_schema,
                 output_schema=output_schema,
-                agg_func=node._aggFunc,
+                agg_func=node._agg_func,
                 target_cache_id=uid,
             )
         elif node._limit is not None:
