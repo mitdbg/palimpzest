@@ -168,7 +168,7 @@ def downloadVLDBPapers(vldbListingPageURLsId, outputDir, execution_engine, profi
     outputPath = os.path.join(outputDir, "vldbPaperListings.csv")
 
     with open(outputPath, "w", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile, field_names=listing_records[0].__dict__.keys())
+        writer = csv.DictWriter(csvfile, fieldnames=listing_records[0].__dict__.keys())
         writer.writeheader()
         for record in listing_records:
             writer.writerow(record._as_dict())
