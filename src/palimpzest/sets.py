@@ -93,7 +93,7 @@ class Set:
             "cardinality": self._cardinality,
             "image_conversion": self._image_conversion,
             "limit": self._limit,
-            "groupBy": (None if self._group_by is None else self._group_by.serialize()),
+            "group_by": (None if self._group_by is None else self._group_by.serialize()),
         }
 
         return d
@@ -206,7 +206,7 @@ class Dataset(Set):
             source=self,
             schema=groupby.output_schema(),
             desc="Group By",
-            groupBy=groupby,
+            group_by=groupby,
             nocache=self._nocache,
         )
 
