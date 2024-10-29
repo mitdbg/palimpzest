@@ -583,6 +583,7 @@ class RetrieveRule(ImplementationRule):
     """
     Substitute a logical expression for a RetrieveScan with a Retrieve physical implementation.
     """
+    k_budgets = [1, 3, 5, 10]
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
@@ -596,23 +597,55 @@ class RetrieveRule(ImplementationRule):
     ) -> Set[PhysicalExpression]:
         logical_op = logical_expression.operator
 
-        # get initial set of parameters for physical op
-        op_kwargs = logical_op.get_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_op_id(),
-            }
-        )
+        physical_expressions = []
 
-        # construct multi-expression
-        op = RetrieveOp(**op_kwargs)
-        expression = PhysicalExpression(
-            operator=op,
-            input_group_ids=logical_expression.input_group_ids,
-            input_fields=logical_expression.input_fields,
-            generated_fields=logical_expression.generated_fields,
-            group_id=logical_expression.group_id,
-        )
+        if logical_op.k is -1:
+            ks = cls.k_budgets
+        else:
+            ks = [logical_op.k]
 
-        return set([expression])
+        for k in ks:
+            # get initial set of parameters for physical op
+            op_kwargs = logical_op.get_op_params()
+            op_kwargs.update(
+                {
+                    "verbose": physical_op_params["verbose"],
+                    "logical_op_id": logical_op.get_op_id(),
+                    "k": k,
+                }
+            )
+
+            # construct multi-expression
+            op = RetrieveOp(**op_kwargs)
+            expression = PhysicalExpression(
+                operator=op,
+                input_group_ids=logical_expression.input_group_ids,
+                input_fields=logical_expression.input_fields,
+                generated_fields=logical_expression.generated_fields,
+                group_id=logical_expression.group_id,
+            )
+
+            physical_expressions.append(expression)
+
+        return set(physical_expressions)
+
+        # # get initial set of parameters for physical op
+        # op_kwargs = logical_op.get_op_params()
+        # op_kwargs.update(
+        #     {
+        #         "verbose": physical_op_params["verbose"],
+        #         "logical_op_id": logical_op.get_op_id(),
+        #     }
+        # )
+
+        # # construct multi-expression
+        # op = RetrieveOp(**op_kwargs)
+        # expression = PhysicalExpression(
+        #     operator=op,
+        #     input_group_ids=logical_expression.input_group_ids,
+        #     input_fields=logical_expression.input_fields,
+        #     generated_fields=logical_expression.generated_fields,
+        #     group_id=logical_expression.group_id,
+        # )
+
+        # return set([expression])

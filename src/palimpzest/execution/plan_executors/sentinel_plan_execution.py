@@ -55,24 +55,32 @@ def getChampionConvertOperator(operators):
         Model.LLAMA3_V: 1,
     }
 
-    # compute product of operator and model ranking
-    champion_convert_operator, champion_product = None, 0
-    for operator in operators:
-        operator_ranking = (
-            convert_operator_class_ranking[operator.__class__]
-            if isinstance(operator, ConvertOp)
-            else filter_operator_class_ranking[operator.__class__]
-        )
-        product = (
-            operator_ranking * model_ranking[operator.model]
-            if not isinstance(operator, CodeSynthesisConvert)
-            else operator_ranking * 1.0
-        )
-        if product > champion_product:
-            champion_convert_operator = operator
+    assert len(operators) != 0 and "operators must not be empty for champion output selection"
 
-    return champion_convert_operator
-
+    champion_operator = max(
+        operators,
+        key=lambda operator: (
+            # pick the largest k as the champion operator for RetrieveOp
+            operator.k
+            if isinstance(operator, RetrieveOp)
+            # compute product of operator and model ranking for other operators
+            else (
+                operator_ranking := (
+                    convert_operator_class_ranking[operator.__class__]
+                    if isinstance(operator, ConvertOp)
+                    else filter_operator_class_ranking[operator.__class__]
+                )
+            )
+            * (
+                model_ranking_factor := (
+                    model_ranking[operator.model]
+                    if not isinstance(operator, CodeSynthesisConvert)
+                    else 1.0
+                )
+            )
+        ),
+    )
+    return champion_operator
 
 class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecutor):
     """

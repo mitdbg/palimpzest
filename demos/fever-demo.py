@@ -56,23 +56,33 @@ def set_input_schema(input: DataRecord):
 def get_label_fields_to_values(claims, ground_truth_file):
     with open(ground_truth_file, "r") as f:
         ground_truth = [json.loads(line) for line in f]
-    
+
     claim_to_label = {}
-    
+
     for entry in ground_truth:
         if str(entry["id"]) in claims:
+            evidence_sets = entry["evidence"]
+            evidence_file_ids = list(
+                {
+                    evidence[2]
+                    for evidence_set in evidence_sets
+                    for evidence in evidence_set
+                }
+            )
             if entry["label"] == "SUPPORTS":
                 claim_to_label[str(entry["id"])] = {"label": "TRUE"}
             else:
                 claim_to_label[str(entry["id"])] = {"label": "FALSE"}
-                
+            claim_to_label[str(entry["id"])]["_evidence_file_ids"] = evidence_file_ids
+            claim_to_label[str(entry["id"])]["relevant_wikipedia_articles"] = ["IGNORED_FIELD"]
+
     # print(claims)
     # print(claim_to_label)
-    
+
     # assert(len(claim_to_label) == len(claims))
-    
+
     # print(claim_to_label)
-    
+
     return claim_to_label           
 
 class FeverValidationSource(pz.ValidationDataSource):
@@ -81,7 +91,7 @@ class FeverValidationSource(pz.ValidationDataSource):
         self.claims_dir = claims_dir
         self.split_idx = split_idx
         self.claims = os.listdir(self.claims_dir)
-        
+
         # shuffle records if shuffle = True
         if shuffle:
             random.Random(seed).shuffle(self.claims)
@@ -118,11 +128,24 @@ class FeverValidationSource(pz.ValidationDataSource):
         return sum(file.stat().st_size for file in Path(self.claims_dir).rglob('*'))
 
     def getFieldToMetricFn(self):
-        def bool_eval(price: str, expected_price: str):
-            return str(price).upper() == str(expected_price).upper()
+        def bool_eval(label, expected_label):
+            return str(label).upper() == str(expected_label).upper()
+        
+        def skip_eval(label, expected_label):
+            return 1
+
+        def list_eval(label, expected_label):
+            # print("label: ", label)
+            # print("expected_label: ", expected_label)
+            if len(expected_label) == 0:
+                return 1
+
+            return len(set(label).intersection(set(expected_label))) * 1.0 / len(expected_label)
 
         fields_to_metric_fn = {
-            "label": bool_eval
+            "label": bool_eval,
+            "relevant_wikipedia_articles": skip_eval,
+            "_evidence_file_ids": list_eval
         }
 
         return fields_to_metric_fn
@@ -133,7 +156,7 @@ class FeverValidationSource(pz.ValidationDataSource):
 
         # create data record
         dr = pz.DataRecord(self.schema, source_id=claim)
-        
+
         claim_file = os.path.join(self.claims_dir, claim)
         with open(claim_file, "rb") as f:
             dr.claim = f.read().decode("utf-8")
@@ -210,13 +233,16 @@ num_docs = 1000
 
 index_path = f".ragatouille/colbert/indexes/fever-articles-{num_claims}-{num_docs}-index"
 index = RAGPretrainedModel.from_index(index_path)
-k = 10
 
 rank=4
 num_samples=10
+k = 10
 
 engine = args.engine
-# engine = "nosentinel"
+
+if engine == "sentinel":
+    k = -1
+
 if engine == "sentinel":
     executor = "parallel"
 else:
@@ -307,12 +333,20 @@ claims = pz.Dataset(user_dataset_id, schema=FeverClaimsSchema)
 # claims = claims.convert(outputSchema=FeverClaimsSchema, udf=set_input_schema)
 # claims_and_relevant_files = claims.convert(outputSchema=FeverIntermediateSchema,
 #                                            udf=partial(get_relevant_content, index, k))
+# claims_and_relevant_files = claims.retrieve(
+#     outputSchema=FeverIntermediateSchema,
+#     index=index,
+#     search_attr="claim",
+#     output_attr="relevant_wikipedia_articles",
+#     k=10,
+# )
+
 claims_and_relevant_files = claims.retrieve(
     outputSchema=FeverIntermediateSchema,
     index=index,
     search_attr="claim",
     output_attr="relevant_wikipedia_articles",
-    k=10,
+    k=k
 )
 output = claims_and_relevant_files.convert(outputSchema=FeverOutputSchema)
 

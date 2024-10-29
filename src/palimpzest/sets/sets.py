@@ -245,7 +245,7 @@ class Dataset(Set):
             nocache=self._nocache,
         )
         
-    def retrieve(self, outputSchema, index, search_attr, output_attr, k) -> Dataset:
+    def retrieve(self, outputSchema, index, search_attr, output_attr, k=-1) -> Dataset:
         return Dataset(
             source=self,
             schema=outputSchema,

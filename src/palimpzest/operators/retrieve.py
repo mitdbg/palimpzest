@@ -53,11 +53,17 @@ class RetrieveOp(PhysicalOperator):
         start_time = time.time()
 
         query = getattr(candidate, self.search_attr)
-        
-        top_k_strs = self.index.search(query, k=self.k)
+
+        results = self.index.search(query, k=self.k)
+        top_k_strs = [result["content"] for result in results]
+
+        # This is hacky, fix this later.
+        evidence_file_ids = list({result["document_id"] for result in results})
 
         output_dr = DataRecord.fromParent(self.outputSchema, parent_record=candidate)
         setattr(output_dr, self.output_attr, top_k_strs)
+
+        setattr(output_dr, "_evidence_file_ids", evidence_file_ids)
 
         duration_secs = time.time() - start_time
 
@@ -68,11 +74,14 @@ class RetrieveOp(PhysicalOperator):
             },
         )
 
+        record_state = output_dr._asDict(include_bytes=False)
+        record_state["_evidence_file_ids"] = evidence_file_ids
+        
         record_op_stats = RecordOpStats(
             record_id=output_dr._id,
             record_parent_id=output_dr._parent_id,
             record_source_id=output_dr._source_id,
-            record_state=output_dr._asDict(include_bytes=False),
+            record_state=record_state,
             op_id=self.get_op_id(),
             logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
@@ -80,7 +89,7 @@ class RetrieveOp(PhysicalOperator):
             cost_per_record=0.0,
             answer=answer,
             input_fields=self.inputSchema.fieldNames(),
-            generated_fields=self.outputSchema.fieldNames(),
+            generated_fields=self.outputSchema.fieldNames() + ["_evidence_file_ids"],
             fn_call_duration_secs=duration_secs,  # TODO(Siva): Currently tracking retrieval time in fn_call_duration_secs
             op_details={k: str(v) for k, v in self.get_op_params().items()},
         )

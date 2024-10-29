@@ -337,6 +337,7 @@ class MatrixCompletionCostModel:
         is_perfect_quality_op = (
             not isinstance(physical_op, LLMConvert)
             and not isinstance(physical_op, LLMFilter)
+            and not isinstance(physical_op, RetrieveOp)
         )
 
         # pull out the execution data from this operator; place the upstream execution data in a new list

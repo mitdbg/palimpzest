@@ -6,7 +6,7 @@ do
     python demos/fever-demo.py --verbose --engine nosentinel --executor sequential --policy maxquality --model $model
 done
 
-python demos/fever-demo.py --verbose --engine sentinel
+# python demos/fever-demo.py --verbose --engine sentinel
 
 # for model in "gpt-4o" "gpt-4o-mini" "llama" "mixtral"
 # do
