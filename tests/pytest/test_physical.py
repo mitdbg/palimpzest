@@ -1,20 +1,16 @@
-""" This script contains tests for the refactoring of the physical operators
-"""
+"""This script contains tests for the refactoring of the physical operators"""
 
 import os
 import sys
-import time
-import pdb
-
-from palimpzest.corelib import File, TextFile
 
 sys.path.append("./tests/")
 sys.path.append("./tests/refactor-tests/")
-import context
 
-import pytest
-import palimpzest as pz
-from utils import remove_cache
+if not os.environ.get("OPENAI_API_KEY"):
+    from palimpzest.utils.env_helpers import load_env
+
+    load_env()
+
 
 # TODO: uncomment once I understand what is supposed to be happening with
 #       ParallelConvertFromCandidateOp and ParallelFilterCandidateOp (I don't
@@ -25,8 +21,8 @@ from utils import remove_cache
 #     remove_cache()
 
 #     params = {
-#         "outputSchema": email_schema,
-#         "inputSchema": File,
+#         "output_schema": email_schema,
+#         "input_schema": File,
 #         "model": pz.Model.GPT_3_5,
 #         "cardinality": "oneToOne",
 #     }
@@ -53,8 +49,8 @@ from utils import remove_cache
 #     remove_cache()
 
 #     params = {
-#         "outputSchema": email_schema,
-#         "inputSchema": email_schema,
+#         "output_schema": email_schema,
+#         "input_schema": email_schema,
 #         "filter": pz.Filter("This is a sample filter"),
 #     }
 

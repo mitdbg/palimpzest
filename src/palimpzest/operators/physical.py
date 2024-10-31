@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from palimpzest.constants import MAX_ID_CHARS
-from palimpzest.corelib import Schema
-from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.datamanager import DataDirectory
-from palimpzest.elements import DataRecord
-
-from typing import List, Tuple, Optional
-
 import hashlib
 import json
+from typing import List, Tuple
+
+from palimpzest.constants import MAX_ID_CHARS
+from palimpzest.corelib.schemas import Schema
+from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
+from palimpzest.datamanager import DataDirectory
+from palimpzest.elements.records import DataRecord
 
 # TYPE DEFINITIONS
 DataRecordsWithStats = Tuple[List[DataRecord], List[RecordOpStats]]
@@ -24,26 +23,28 @@ class PhysicalOperator:
 
     def __init__(
         self,
-        outputSchema: Schema,
-        inputSchema: Optional[Schema] = None,
-        logical_op_id: Optional[str] = None,
+        output_schema: type[Schema],
+        input_schema: type[Schema] | None = None,
+        logical_op_id: str | None = None,
         max_workers: int = 1,
-        targetCacheId: Optional[str] = None,
+        target_cache_id: str | None = None,
         verbose: bool = False,
-        *args, **kwargs
+        *args,
+        **kwargs,
     ) -> None:
-        self.outputSchema = outputSchema
-        self.inputSchema = inputSchema
+        self.output_schema = output_schema
+        self.input_schema = input_schema
         self.datadir = DataDirectory()
         self.max_workers = max_workers
-        self.targetCacheId = targetCacheId
+        self.target_cache_id = target_cache_id
         self.verbose = verbose
         self.logical_op_id = logical_op_id
         self.op_id = None
 
     def __str__(self):
-        op = f"{self.inputSchema.className()} -> {self.op_name()} -> {self.outputSchema.className()}\n"
-        op += f"    ({', '.join(self.inputSchema.fieldNames())[:30]}) -> ({', '.join(self.outputSchema.fieldNames())[:30]})\n"
+        op = f"{self.input_schema.class_name()} -> {self.op_name()} -> {self.output_schema.class_name()}\n"
+        op += f"    ({', '.join(self.input_schema.field_names())[:30]}) "
+        op += f"-> ({', '.join(self.output_schema.field_names())[:30]})\n"
         if getattr(self, "model", None):
             op += f"    Model: {self.model}\n"
         return op
@@ -51,11 +52,11 @@ class PhysicalOperator:
     def get_copy_kwargs(self):
         """Return kwargs to assist sub-classes w/copy() calls."""
         return {
-            "outputSchema": self.outputSchema,
-            "inputSchema": self.inputSchema,
+            "output_schema": self.output_schema,
+            "input_schema": self.input_schema,
             "logical_op_id": self.logical_op_id,
             "max_workers": self.max_workers,
-            "targetCacheId": self.targetCacheId,
+            "target_cache_id": self.target_cache_id,
             "verbose": self.verbose,
         }
 
@@ -75,7 +76,7 @@ class PhysicalOperator:
               returned by self.get_op_params() after they call to super().__init__().
 
         NOTE: This is NOT a universal ID.
-        
+
         Two different PhysicalOperator instances with the identical returned values
         from the call to self.get_op_params() will have equivalent op_ids.
         """
@@ -92,7 +93,7 @@ class PhysicalOperator:
 
         return self.op_id
 
-    def __eq__(self, other: PhysicalOperator) -> bool:
+    def __eq__(self, other) -> bool:
         raise NotImplementedError("Calling __eq__ on abstract method")
 
     def __hash__(self):
@@ -102,10 +103,10 @@ class PhysicalOperator:
         copy_kwargs = self.get_copy_kwargs()
         return self.__class__(**copy_kwargs)
 
-    def __call__(self, candidate: DataRecord) -> List[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> list[DataRecordsWithStats]:
         raise NotImplementedError("Calling __call__ from abstract method")
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         This function returns a naive estimate of this operator's:
         - cardinality
@@ -115,7 +116,7 @@ class PhysicalOperator:
 
         The function takes an argument which contains the OperatorCostEstimates
         of the physical operator whose output is the input to this operator.
-    
+
         For the implemented operator. These will be used by the CostModel
         when PZ does not have sample execution data -- and it will be necessary
         in some cases even when sample execution data is present. (For example,

@@ -1,17 +1,19 @@
+import time
+
 from palimpzest.constants import OptimizationStrategy
 from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import ExecutionStats
-from palimpzest.execution import (
-    ExecutionEngine,
+from palimpzest.execution.execution_engine import ExecutionEngine
+from palimpzest.execution.plan_executors.parallel_execution_engine import (
     PipelinedParallelPlanExecutor,
+)
+from palimpzest.execution.plan_executors.single_threaded_execution_engine import (
     PipelinedSingleThreadPlanExecutor,
     SequentialSingleThreadPlanExecutor,
 )
-from palimpzest.optimizer import Optimizer
+from palimpzest.optimizer.optimizer import Optimizer
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
-
-import time
 
 
 class NoSentinelExecutionEngine(ExecutionEngine):
@@ -64,7 +66,9 @@ class NoSentinelExecutionEngine(ExecutionEngine):
             execution_id=self.execution_id(),
             plan_stats=aggregate_plan_stats,
             total_execution_time=time.time() - execution_start_time,
-            total_execution_cost=sum(list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats.values()))),
+            total_execution_cost=sum(
+                list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats.values()))
+            ),
             plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 
@@ -75,6 +79,7 @@ class SequentialSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, Seque
     """
     This class performs non-sample based execution while executing plans in a sequential, single-threaded fashion.
     """
+
     pass
 
 
@@ -82,6 +87,7 @@ class PipelinedSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, Pipeli
     """
     This class performs non-sample based execution while executing plans in a pipelined, single-threaded fashion.
     """
+
     pass
 
 
@@ -89,4 +95,5 @@ class PipelinedParallelNoSentinelExecution(NoSentinelExecutionEngine, PipelinedP
     """
     This class performs non-sample based execution while executing plans in a pipelined, parallel fashion.
     """
+
     pass

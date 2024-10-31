@@ -1,11 +1,10 @@
-from palimpzest.constants import Model
-
+import os
 from typing import List, Optional
 
-import os
+from palimpzest.constants import Model
 
 
-def getVisionModels() -> List[Model]:
+def get_vision_models() -> List[Model]:
     """
     Return the set of vision models which the system has access to based on the set of environment variables.
     """
@@ -18,7 +17,7 @@ def getVisionModels() -> List[Model]:
     return models
 
 
-def getModels(include_vision: Optional[bool] = False) -> List[Model]:
+def get_models(include_vision: Optional[bool] = False) -> List[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
     """
@@ -33,12 +32,13 @@ def getModels(include_vision: Optional[bool] = False) -> List[Model]:
     #     models.extend([Model.GEMINI_1])
 
     if include_vision:
-        vision_models = getVisionModels()
+        vision_models = get_vision_models()
         models.extend(vision_models)
 
     return models
 
-def getChampionModel():
+
+def get_champion_model():
     champion_model = None
     if os.environ.get("OPENAI_API_KEY", None) is not None:
         champion_model = Model.GPT_4
@@ -47,11 +47,17 @@ def getChampionModel():
     elif os.environ.get("GOOGLE_API_KEY", None) is not None:
         champion_model = Model.GEMINI_1
     else:
-        raise Exception("No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]")
+        raise Exception(
+            (
+                "No models available to create physical plans! You must set at least one of the following environment",
+                "variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]",
+            )
+        )
 
     return champion_model
 
-def getConventionalFallbackModel():
+
+def get_conventional_fallback_model():
     fallback_model = None
     if os.environ.get("OPENAI_API_KEY", None) is not None:
         fallback_model = Model.GPT_3_5
@@ -60,13 +66,20 @@ def getConventionalFallbackModel():
     elif os.environ.get("GOOGLE_API_KEY", None) is not None:
         fallback_model = Model.GEMINI_1
     else:
-        raise Exception("No models available to create physical plans! You must set at least one of the following environment variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]")
+        raise Exception(
+            (
+                "No models available to create physical plans! You must set at least one of the following environment",
+                "variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]",
+            )
+        )
 
     return fallback_model
 
-def getCodeChampionModel():
-    # NOTE: for now, assume same champion as getChampionModel()
-    return getChampionModel()
 
-def getChampionModelName():
-    return getChampionModel().value
+def get_code_champion_model():
+    # NOTE: for now, assume same champion as getChampionModel()
+    return get_champion_model()
+
+
+def get_champion_model_name():
+    return get_champion_model().value

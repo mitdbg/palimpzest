@@ -1,11 +1,9 @@
-""" This file contains prompts used by Palimpzest 
+"""This file contains prompts used by Palimpzest
 Whenever they are called, they can be parameterize with the str.format() method using the parameter names that are in brackets.
 For now, this is an easy decoupling. In the future, we maybe want a more sophisticated approach like a PromptBuilder.
 """
 
-from enum import Enum
-
-### CONVERT PROMPTS ### 
+### CONVERT PROMPTS ###
 INPUT_FIELD = "{field_name}: {field_desc}\n"
 OUTPUT_FIELD = "{field_name}: {field_desc}\n"
 
@@ -17,33 +15,37 @@ OPTIONAL_DESC = "Keep in mind that this process is described by this text: {desc
 ### ONE TO ONE ###
 ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR = "an output JSON object that describes an object of type {doc_type}."
 ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL = "the output object"
-ONE_TO_ONE_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The dictionary should only have the output fields: {fields}."
+ONE_TO_ONE_APPENDIX_INSTRUCTION = (
+    "Be sure to emit a JSON object only. The dictionary should only have the output fields: {fields}."
+)
 
 ### ONE_TO_MANY ###
-ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR = "an output array of zero or more JSON objects that describe objects of type {doc_type}."
+ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR = (
+    "an output array of zero or more JSON objects that describe objects of type {doc_type}."
+)
 ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL = "the output objects"
 ONE_TO_MANY_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields {fields}. You must decide the correct number of output objects."
 
-STRUCTURED_CONVERT_PROMPT = """I would like you to create {targetOutputDescriptor}
+STRUCTURED_CONVERT_PROMPT = """I would like you to create {target_output_descriptor}
 You will use the information in an input JSON object that I will provide. The input object has type {input_type}.
-All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
-{optionalInputDesc}
-{optionalOutputDesc}
+All of the fields in {output_single_or_plural} can be derived using information from the input object.
+{optional_input_desc}
+{optional_output_desc}
 Here is every input field name and a description: 
-{multilineInputFieldDescription}
+{multiline_input_field_description}
 Here is every output field name and a description:
-{multilineOutputFieldDescription}
-{appendixInstruction}
+{multiline_output_field_description}
+{appendix_instruction}
 {optional_desc}"""
 
-IMAGE_CONVERT_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor}.
+IMAGE_CONVERT_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and create {target_output_descriptor}.
 You will use the information in the image that I will provide. The input image(s) has type {input_type}.
-All of the fields in {outputSingleOrPlural} can be derived using information from the input image(s).
-{optionalInputDesc}
-{optionalOutputDesc}
+All of the fields in {output_single_or_plural} can be derived using information from the input image(s).
+{optional_input_desc}
+{optional_output_desc}
 Here is every output field name and a description:
-{multilineOutputFieldDescription}
-{appendixInstruction}
+{multiline_output_field_description}
+{appendix_instruction}
 {optional_desc}"""
 
 IMAGE_FILTER_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and:
@@ -86,4 +88,3 @@ Now, consider the following {language} programming task that extracts `{output}`
 {examples_desc}
 Please provide me with {n} different ideas to complete this task. Return the ideas only, following the format above.
 """
-

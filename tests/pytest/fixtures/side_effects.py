@@ -1,10 +1,10 @@
+import json
+
 import pytest
 
 from palimpzest.dataclasses import RecordOpStats
-from palimpzest.elements import DataRecord
+from palimpzest.elements.records import DataRecord
 
-import json
-import time
 
 ### Side-Effects for Mocking LLM Calls ###
 @pytest.fixture
@@ -12,12 +12,12 @@ def enron_filter():
     def mock_call(candidate):
         # determine the answer based on the record filename
         passed_filter = candidate.filename in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
-        
+
         # create RecordOpStats object with positive time and cost per record
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=candidate._asDict(include_bytes=False),
+            record_state=candidate.as_dict(include_bytes=False),
             op_id="MockFilterFoo",
             op_name="MockFilter",
             time_per_record=1.0,
@@ -27,7 +27,7 @@ def enron_filter():
         )
 
         # set _passed_filter attribute and return
-        setattr(candidate, "_passed_filter", passed_filter)
+        candidate._passed_filter = passed_filter
 
         return [candidate], [record_op_stats]
 
@@ -65,7 +65,7 @@ def enron_convert(email_schema):
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=dr._asDict(include_bytes=False),
+            record_state=dr.as_dict(include_bytes=False),
             op_id="MockConvertFoo",
             op_name="MockConvert",
             time_per_record=1.0,
@@ -96,15 +96,17 @@ def real_estate_convert(image_real_estate_listing_schema):
         record_op_stats = RecordOpStats(
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
-            record_state=dr._asDict(include_bytes=False),
+            record_state=dr.as_dict(include_bytes=False),
             op_id="MockConvertFoo",
             op_name="MockConvert",
             time_per_record=1.0,
             cost_per_record=1.0,
-            answer=json.dumps({
-                "is_modern_and_attractive": dr.is_modern_and_attractive,
-                "has_natural_sunlight": dr.has_natural_sunlight,
-            }),
+            answer=json.dumps(
+                {
+                    "is_modern_and_attractive": dr.is_modern_and_attractive,
+                    "has_natural_sunlight": dr.has_natural_sunlight,
+                }
+            ),
         )
 
         return [dr], [record_op_stats]
@@ -136,7 +138,7 @@ def real_estate_one_to_many_convert(room_real_estate_listing_schema):
             record_op_stats = RecordOpStats(
                 record_id=candidate._id,
                 record_parent_id=candidate._parent_id,
-                record_state=dr._asDict(include_bytes=False),
+                record_state=dr.as_dict(include_bytes=False),
                 op_id="MockConvertFoo",
                 op_name="MockConvert",
                 time_per_record=1.0,

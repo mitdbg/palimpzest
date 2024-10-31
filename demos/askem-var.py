@@ -1,37 +1,28 @@
 #!/usr/bin/env python3
-""" This scripts is a demo for the biofabric data integration.
+"""This scripts is a demo for the biofabric data integration.
 python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usecase3-pdf
 
 """
-from pypdf import PdfReader
 
-import networkx as nx
-import streamlit as st
-from palimpzest.constants import PZ_DIR
-import palimpzest as pz
-import pdb 
-import gradio as gr
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-import argparse
-import requests
 import json
 import time
-import os
 
-from palimpzest.strategies import LLMBondedQueryConvert
+import pandas as pd
+import streamlit as st
+
+import palimpzest as pz
 
 
 class Papersnippet(pz.TextFile):
     """Represents an excerpt from a scientific research paper, which potentially contains variables"""
+
     excerptid = pz.Field(desc="The unique identifier for the excerpt", required=True)
     excerpt = pz.Field(desc="The text of the excerpt", required=True)
 
 
 class Variable(pz.Schema):
-    """ Represents a variable of scientific model in a scientific paper"""
+    """Represents a variable of scientific model in a scientific paper"""
+
     name = pz.Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
     description = pz.Field(desc="A description of the variable, optional, set 'null' if not found", required=False)
     value = pz.Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
@@ -44,8 +35,9 @@ if __name__ == "__main__":
     if run_pz:
         # reference, plan, stats = run_workload()
         excerpts = pz.Dataset(dataset, schema=pz.TextFile)
-        output = excerpts.convert(Variable, desc="A variable used or introduced in the paper snippet",
-                                  cardinality=pz.Cardinality.ONE_TO_MANY)
+        output = excerpts.convert(
+            Variable, desc="A variable used or introduced in the paper snippet", cardinality=pz.Cardinality.ONE_TO_MANY
+        )
 
         engine = pz.StreamingSequentialExecution
         # policy = pz.MinCost()
@@ -75,8 +67,8 @@ if __name__ == "__main__":
         #                  'prompt_strategy': pz.PromptStrategy.DSPY_COT_QA})
         #
         # bonded_convert = physical_op_type(
-        #     inputSchema=engine.plan.operators[1].inputSchema,
-        #     outputSchema=engine.plan.operators[1].outputSchema,
+        #     input_schema=engine.plan.operators[1].input_schema,
+        #     output_schema=engine.plan.operators[1].output_schema,
         #     query_strategy=pz.QueryStrategy.BONDED_WITH_FALLBACK,
         #     shouldProfile=False,
         #     cardinality=pz.Cardinality.ONE_TO_MANY,
@@ -121,14 +113,16 @@ if __name__ == "__main__":
                     # set value to None if not found
                     if var.value is None:
                         var.value = "null"
-                except:
+                except Exception:
                     continue
-                variables.append({
-                    "id": index,
-                    "name": var.name,
-                    "description": var.description,
-                    "value": var.value,
-                })
+                variables.append(
+                    {
+                        "id": index,
+                        "name": var.name,
+                        "description": var.description,
+                        "value": var.value,
+                    }
+                )
 
                 # write variables into json file with readable format for every 10 variables
                 if index % 10 == 0:
@@ -146,18 +140,16 @@ if __name__ == "__main__":
             json.dump(variables, f, indent=4)
         vars_df = pd.DataFrame(variables)
 
-
-
     # G = nx.DiGraph()
     # try:
     #     G.add_nodes_from(references_df["key"].values)
-    # except:
+    # except Exception:
     #     breakpoint()
     # try:
     #     G.add_nodes_from(references_df["source"].unique())
     #     for idx, row in references_df.iterrows():
     #         G.add_edge(row["source"], row["key"])
-    # except:
+    # except Exception:
     #     G.add_nodes_from(references_df["filename"].unique())
     #     for idx, row in references_df.iterrows():
     #         G.add_edge(row["filename"], row["key"])

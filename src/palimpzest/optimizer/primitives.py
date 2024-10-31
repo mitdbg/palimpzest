@@ -1,9 +1,10 @@
 from __future__ import annotations
-from palimpzest.constants import MAX_ID_CHARS
-from palimpzest.operators import LogicalOperator, PhysicalOperator
-from typing import Dict, List, Optional, Set, Union
 
 import hashlib
+
+from palimpzest.constants import MAX_ID_CHARS
+from palimpzest.operators.logical import LogicalOperator
+from palimpzest.operators.physical import PhysicalOperator
 
 
 class Expression:
@@ -12,14 +13,15 @@ class Expression:
     (if it's a logical expression) or a physical operator (if it's a physical expression)
     and the group ids which are inputs to this expression
     """
+
     def __init__(
-            self,
-            operator: Union[LogicalOperator, PhysicalOperator],
-            input_group_ids: List[int],
-            input_fields: Set[str],
-            generated_fields: Set[str],
-            group_id: Optional[int] = None,
-        ):
+        self,
+        operator: LogicalOperator | PhysicalOperator,
+        input_group_ids: list[int],
+        input_fields: set[str],
+        generated_fields: set[str],
+        group_id: int | None = None,
+    ):
         self.operator = operator
         self.input_group_ids = input_group_ids
         self.input_fields = input_fields
@@ -28,7 +30,7 @@ class Expression:
         self.rules_applied = set()
         self.plan_cost = None
 
-    def __eq__(self, other: Expression):
+    def __eq__(self, other):
         return self.operator == other.operator and self.input_group_ids == other.input_group_ids
 
     def __hash__(self):
@@ -60,13 +62,14 @@ class Group:
     Represents the execution of an un-ordered set of logical operators.
     Maintains a set of logical multi-expressions and physical multi-expressions.
     """
-    def __init__(self, logical_expressions: List[Expression], fields: Set[str], properties: Dict[str, Set[str]]):
+
+    def __init__(self, logical_expressions: list[Expression], fields: set[str], properties: dict[str, set[str]]):
         self.logical_expressions = set(logical_expressions)
         self.physical_expressions = set()
         self.fields = fields
         self.explored = False
-        self.best_physical_expression: PhysicalExpression = None
-        self.ci_best_physical_expressions: List[PhysicalExpression] = []
+        self.best_physical_expression: PhysicalExpression | None = None
+        self.ci_best_physical_expressions: list[PhysicalExpression] = []
         self.satisfies_constraint = False
 
         # properties of the Group which distinguish it from groups w/identical fields,
