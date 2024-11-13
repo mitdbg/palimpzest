@@ -1,10 +1,10 @@
+import json
 from typing import Any, Dict
 
-import json
-import regex as re # Use regex instead of re to used variable length lookbehind
+import regex as re  # Use regex instead of re to used variable length lookbehind
 
 
-def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
+def get_json_from_answer(answer: str) -> Dict[str, Any]:
     """
     This function parses an LLM response which is supposed to output a JSON object
     and optimistically searches for the substring containing the JSON object.
@@ -38,11 +38,11 @@ def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
     try:
         response = json.loads(answer)
     except Exception as e:
-        if "items" in answer: # If we are in one to many
+        if "items" in answer:  # If we are in one to many
             # Find the last dictionary item not closed
             last_idx = answer.rfind("},")
             # Close the last dictionary item
-            answer = answer[:last_idx+1] + "]}"
+            answer = answer[: last_idx + 1] + "]}"
             response = json.loads(answer)
         else:
             raise e

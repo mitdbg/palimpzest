@@ -1,11 +1,13 @@
 from __future__ import annotations
+
+from typing import Any
+
 from palimpzest.constants import OptimizationStrategy
-from palimpzest.dataclasses import PlanCost
 from palimpzest.cost_model import CostModel
+from palimpzest.dataclasses import PlanCost
 from palimpzest.optimizer.primitives import Expression, Group
-from palimpzest.optimizer.rules import TransformationRule, ImplementationRule, Rule
+from palimpzest.optimizer.rules import ImplementationRule, Rule, TransformationRule
 from palimpzest.policy import Policy
-from typing import Any, Dict, List, Tuple
 
 
 class Task:
@@ -14,7 +16,8 @@ class Task:
     Examples of tasks include optimizing and exploring groups, optimizing expressions, applying
     rules, and optimizing inputs / costing the full group tree.
     """
-    def perform(self, groups: Dict[int, Group], context: Dict[str, Any]={}) -> List[Task]:
+
+    def perform(self, groups: dict[int, Group], context: dict[str, Any] | None = None) -> list[Task]:
         """
         NOTE: At the moment we do not make use of the context, but in the future
         this can be used to store required physical properties (e.g. sort conditions
@@ -33,11 +36,14 @@ class OptimizeGroup(Task):
     and OptimizePhysicalExpression tasks will indirectly schedule new tasks to apply
     rules and to optimize input groups and expressions.
     """
+
     def __init__(self, group_id: int):
         self.group_id = group_id
 
-    def perform(self, groups: Dict[int, Group], context: Dict[str, Any]={}) -> List[Task]:
+    def perform(self, groups: dict[int, Group], context: dict[str, Any] | None = None) -> list[Task]:
         # get updated instance of the group to be optimized
+        if context is None:
+            context = {}
         group = groups[self.group_id]
 
         # if this group has already been optimized, there's nothing more to do
@@ -49,7 +55,7 @@ class OptimizeGroup(Task):
         for logical_expr in group.logical_expressions:
             task = OptimizeLogicalExpression(logical_expr)
             new_tasks.append(task)
-        
+
         # and optimize all of the physical expressions in the group
         for physical_expr in group.physical_expressions:
             task = OptimizePhysicalExpression(physical_expr)
@@ -65,11 +71,14 @@ class ExpandGroup(Task):
     NOTE: we currently do not use this task, but I'm keeping it around in case we need it
     once we add join operations.
     """
+
     def __init__(self, group_id: int):
         self.group_id = group_id
 
-    def perform(self, groups: Dict[int, Group], context: Dict[str, Any]={}) -> List[Task]:
+    def perform(self, groups: dict[int, Group], context: dict[str, Any] | None = None) -> list[Task]:
         # fetch group
+        if context is None:
+            context = {}
         group = groups[self.group_id]
 
         # if the group has been explored before, return []
@@ -95,22 +104,25 @@ class OptimizeLogicalExpression(Task):
     This task filters for the subset of rules which may be applied to the given logical expression
     and schedules ApplyRule tasks for each rule.
     """
+
     def __init__(self, logical_expression: Expression, exploring: bool = False):
         self.logical_expression = logical_expression
         self.exploring = exploring
 
     def perform(
         self,
-        transformation_rules: List[TransformationRule],
-        implementation_rules: List[ImplementationRule],
-        context: Dict[str, Any]={},
-    ) -> List[Task]:
+        transformation_rules: list[TransformationRule],
+        implementation_rules: list[ImplementationRule],
+        context: dict[str, Any] | None = None,
+    ) -> list[Task]:
         # if we're exploring, only apply transformation rules
+        if context is None:
+            context = {}
         rules = transformation_rules if self.exploring else transformation_rules + implementation_rules
 
         # filter out rules that have already been applied to logical expression
         rules = list(filter(lambda rule: rule.get_rule_id() not in self.logical_expression.rules_applied, rules))
-        
+
         # filter for rules that match on this logical expression
         rules = list(filter(lambda rule: rule.matches_pattern(self.logical_expression), rules))
 
@@ -136,7 +148,7 @@ class ApplyRule(Task):
       - NOTE: we don't filter new groups because this implicitly must be done by the
               transformation rule in order to assign the correct group_id to any
               new expressions.
-    - add new expressions to their group's set of logical expressions 
+    - add new expressions to their group's set of logical expressions
     - schedule OptimizeGroup and OptimizeLogicalExpression tasks
 
     For ImplementationRules, this task will:
@@ -145,13 +157,22 @@ class ApplyRule(Task):
     - add new expressions to their group's set of physical expressions
     - schedule OptimizePhysicalExpression tasks
     """
+
     def __init__(self, rule: Rule, logical_expression: Expression, exploring: bool = False):
         self.rule = rule
         self.logical_expression = logical_expression
         self.exploring = exploring
 
-    def perform(self, groups: Dict[int, Group], expressions: Dict[int, Expression], context: Dict[str, Any]={}, **physical_op_params) -> Tuple[List[Task], int]:
+    def perform(
+        self,
+        groups: dict[int, Group],
+        expressions: dict[int, Expression],
+        context: dict[str, Any] | None = None,
+        **physical_op_params,
+    ) -> tuple[list[Task], int]:
         # check if rule has already been applied to this logical expression; return [] if so
+        if context is None:
+            context = {}
         if self.rule.get_rule_id() in self.logical_expression.rules_applied:
             return []
 
@@ -166,7 +187,9 @@ class ApplyRule(Task):
         new_tasks = []
         if issubclass(self.rule, TransformationRule):
             # apply transformation rule
-            new_expressions, new_groups = self.rule.substitute(self.logical_expression, groups, expressions, **physical_op_params)
+            new_expressions, new_groups = self.rule.substitute(
+                self.logical_expression, groups, expressions, **physical_op_params
+            )
 
             # add all new groups to the groups mapping and create a task to optimize them
             for group in new_groups:
@@ -212,6 +235,7 @@ class OptimizePhysicalExpression(Task):
     the expression's group depending on whether this expression is its best_physical_expression
     or in its ci_best_physical_expressions.
     """
+
     def __init__(self, physical_expression: Expression, exploring: bool = False):
         self.physical_expression = physical_expression
         self.exploring = exploring
@@ -222,9 +246,7 @@ class OptimizePhysicalExpression(Task):
         """
         # get the PlanCosts for the current best expression and this physical expression
         best_plan_cost = (
-            group.best_physical_expression.plan_cost
-            if group.best_physical_expression is not None
-            else None
+            group.best_physical_expression.plan_cost if group.best_physical_expression is not None else None
         )
         expr_plan_cost = self.physical_expression.plan_cost
 
@@ -238,18 +260,13 @@ class OptimizePhysicalExpression(Task):
 
         # if the group currently satisfies the constraint, only update the best physical expression
         # if this expression also satisfies the constraint and is more policy optimal
-        elif (
-            group.satisfies_constraint
-            and expr_satisfies_constraint
-            and policy.choose(expr_plan_cost, best_plan_cost)
-        ):
+        elif group.satisfies_constraint and expr_satisfies_constraint and policy.choose(expr_plan_cost, best_plan_cost):
             group.best_physical_expression = self.physical_expression
 
         # finally, if the group does not satisfy the constraint, update the best physical expression if
         # this expression does satisfy the constraint, or if it is more policy optimal
-        elif (
-            not group.satisfies_constraint
-            and (expr_satisfies_constraint or policy.choose(expr_plan_cost, best_plan_cost))
+        elif not group.satisfies_constraint and (
+            expr_satisfies_constraint or policy.choose(expr_plan_cost, best_plan_cost)
         ):
             group.best_physical_expression = self.physical_expression
             group.satisfies_constraint = expr_satisfies_constraint
@@ -288,14 +305,11 @@ class OptimizePhysicalExpression(Task):
         # if the group currently satisfies the constraint, only update the CI best physical expressions
         # if this expression also satisfies the constraint and has an upper bound on the policy metric
         # above the group's lower bound on the policy metric
-        elif (
-            group.satisfies_constraint
-            and expr_satisfies_constraint
-            and expr_upper_bound > group_lower_bound
-        ):
+        elif group.satisfies_constraint and expr_satisfies_constraint and expr_upper_bound > group_lower_bound:
             # filter out any current best expressions whose upper bound is below the lower bound of this expression
             group.ci_best_physical_expressions = [
-                curr_expr for curr_expr in group.ci_best_physical_expressions
+                curr_expr
+                for curr_expr in group.ci_best_physical_expressions
                 if not getattr(curr_expr, upper_bound) < expr_lower_bound
             ]
 
@@ -303,8 +317,12 @@ class OptimizePhysicalExpression(Task):
             group.ci_best_physical_expressions.append(self.physical_expression)
 
             # compute the upper and lower bounds for the group
-            new_group_upper_bound = max(map(lambda expr: getattr(expr, upper_bound), group.ci_best_physical_expressions))
-            new_group_lower_bound = max(map(lambda expr: getattr(expr, lower_bound), group.ci_best_physical_expressions))
+            new_group_upper_bound = max(
+                map(lambda expr: getattr(expr, upper_bound), group.ci_best_physical_expressions)
+            )
+            new_group_lower_bound = max(
+                map(lambda expr: getattr(expr, lower_bound), group.ci_best_physical_expressions)
+            )
 
             # set the new upper and lower bounds for the group
             setattr(group, lower_bound, new_group_lower_bound)
@@ -321,14 +339,11 @@ class OptimizePhysicalExpression(Task):
         # finally, update the CI best physical expressions if the group does not satisfy the constraint
         # and the expression does not satisfy the constraint, but the expression has an upper bound on the
         # policy metric above the group's lower bound on the policy metric
-        elif (
-            not group.satisfies_constraint
-            and not expr_satisfies_constraint
-            and expr_upper_bound > group_lower_bound
-        ):
+        elif not group.satisfies_constraint and not expr_satisfies_constraint and expr_upper_bound > group_lower_bound:
             # filter out any current best expressions whose upper bound is below the lower bound of this expression
             group.ci_best_physical_expressions = [
-                curr_expr for curr_expr in group.ci_best_physical_expressions
+                curr_expr
+                for curr_expr in group.ci_best_physical_expressions
                 if not getattr(curr_expr, upper_bound) < expr_lower_bound
             ]
 
@@ -336,18 +351,25 @@ class OptimizePhysicalExpression(Task):
             group.ci_best_physical_expressions.append(self.physical_expression)
 
             # compute the upper and lower bounds for the group
-            new_group_upper_bound = max(map(lambda expr: getattr(expr, upper_bound), group.ci_best_physical_expressions))
-            new_group_lower_bound = max(map(lambda expr: getattr(expr, lower_bound), group.ci_best_physical_expressions))
+            new_group_upper_bound = max(
+                map(lambda expr: getattr(expr, upper_bound), group.ci_best_physical_expressions)
+            )
+            new_group_lower_bound = max(
+                map(lambda expr: getattr(expr, lower_bound), group.ci_best_physical_expressions)
+            )
 
             # set the new upper and lower bounds for the group
             setattr(group, lower_bound, new_group_lower_bound)
             setattr(group, upper_bound, new_group_upper_bound)
-        
+
         return group
 
-
-    def perform(self, cost_model: CostModel, groups: Dict[int, Group], policy: Policy, context: Dict[str, Any]={}) -> List[Task]:
+    def perform(
+        self, cost_model: CostModel, groups: dict[int, Group], policy: Policy, context: dict[str, Any] | None = None
+    ) -> list[Task]:
         # return if we've already computed the cost of this physical expression
+        if context is None:
+            context = {}
         if self.physical_expression.plan_cost is not None:
             return []
 
@@ -362,7 +384,9 @@ class OptimizePhysicalExpression(Task):
                 # TODO: apply policy constraint here
                 # NOTE: assumes sequential execution of input groups
                 total_input_plan_cost += expr_plan_cost
-                source_op_estimates = expr_plan_cost.op_estimates # TODO: this needs to be handled correctly for joins w/multiple inputs
+                source_op_estimates = (
+                    expr_plan_cost.op_estimates
+                )  # TODO: this needs to be handled correctly for joins w/multiple inputs
             else:
                 task = OptimizeGroup(input_group_id)
                 new_tasks.append(task)
@@ -381,16 +405,16 @@ class OptimizePhysicalExpression(Task):
         self.physical_expression.plan_cost = full_plan_cost
 
         group = groups[self.physical_expression.group_id]
-        if context['optimization_strategy'] == OptimizationStrategy.OPTIMAL:
+        if context["optimization_strategy"] == OptimizationStrategy.OPTIMAL:
             group = self.update_best_physical_expression(group, policy)
             groups[self.physical_expression.group_id] = group
 
-        elif context['optimization_strategy'] == OptimizationStrategy.CONFIDENCE_INTERVAL:
+        elif context["optimization_strategy"] == OptimizationStrategy.CONFIDENCE_INTERVAL:
             group = self.update_best_physical_expression(group, policy)
             group = self.update_ci_best_physical_expressions(group, policy)
             groups[self.physical_expression.group_id] = group
 
-        elif context['optimization_strategy'] == OptimizationStrategy.SENTINEL:
+        elif context["optimization_strategy"] == OptimizationStrategy.SENTINEL:
             group = self.update_best_physical_expression(group, policy)
             groups[self.physical_expression.group_id] = group
 

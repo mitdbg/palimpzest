@@ -33,3 +33,8 @@ eval-results/
 testdata/enron-eval/*.txt
 
 src/palimpzest/agents/
+
+# your zed using open source contributor who only installs in a virtual environment
+.venv
+.zed
+pyrightconfig.json

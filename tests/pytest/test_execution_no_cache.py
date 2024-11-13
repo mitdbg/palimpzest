@@ -1,9 +1,15 @@
-from conftest import *
-from palimpzest.execution import *
-from palimpzest.operators import LLMConvert, LLMFilter, CodeSynthesisConvert
-
 import time
+
 import pytest
+
+from palimpzest.execution.sentinel_execution import (
+    PipelinedParallelSentinelExecution,
+    PipelinedSingleThreadSentinelExecution,
+    SequentialSingleThreadSentinelExecution,
+)
+from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
+from palimpzest.operators.convert import LLMConvert
+from palimpzest.operators.filter import LLMFilter
 
 
 @pytest.mark.parametrize(
@@ -12,10 +18,9 @@ import pytest
         pytest.param(SequentialSingleThreadSentinelExecution, id="seq-single-thread"),
         pytest.param(PipelinedSingleThreadSentinelExecution, id="pipe-single-thread"),
         pytest.param(PipelinedParallelSentinelExecution, id="pipe-parallel"),
-    ]
+    ],
 )
 class TestParallelExecutionNoCache:
-
     # the number of sentinel samples to be drawn for each execution of test_execute_sentinel_plan
     TEST_SENTINEL_NUM_SAMPLES: int = 3
 
@@ -53,17 +58,39 @@ class TestParallelExecutionNoCache:
             pytest.param("enron-eval-tiny", "scan-only", "enron-all-records", None, id="scan-only"),
             pytest.param("enron-eval-tiny", "non-llm-filter", "enron-filtered-records", None, id="non-llm-filter"),
             pytest.param("enron-eval-tiny", "llm-filter", "enron-filtered-records", "enron-filter", id="llm-filter"),
-            pytest.param("enron-eval-tiny", "bonded-llm-convert", "enron-all-records", "enron-convert", id="bonded-llm-convert"),
-            pytest.param("enron-eval-tiny", "code-synth-convert", "enron-all-records", "enron-convert", id="code-synth-convert"),
-            pytest.param("enron-eval-tiny", "token-reduction-convert", "enron-all-records", "enron-convert", id="token-reduction-convert"),
-            pytest.param("real-estate-eval-tiny", "image-convert", "real-estate-all-records", "real-estate-convert", id="image-convert"),
-            pytest.param("real-estate-eval-tiny", "one-to-many-convert", "real-estate-one-to-many-records", "real-estate-one-to-many-convert", id="one-to-many-convert"),
+            pytest.param(
+                "enron-eval-tiny", "bonded-llm-convert", "enron-all-records", "enron-convert", id="bonded-llm-convert"
+            ),
+            pytest.param(
+                "enron-eval-tiny", "code-synth-convert", "enron-all-records", "enron-convert", id="code-synth-convert"
+            ),
+            pytest.param(
+                "enron-eval-tiny",
+                "token-reduction-convert",
+                "enron-all-records",
+                "enron-convert",
+                id="token-reduction-convert",
+            ),
+            pytest.param(
+                "real-estate-eval-tiny",
+                "image-convert",
+                "real-estate-all-records",
+                "real-estate-convert",
+                id="image-convert",
+            ),
+            pytest.param(
+                "real-estate-eval-tiny",
+                "one-to-many-convert",
+                "real-estate-one-to-many-records",
+                "real-estate-one-to-many-convert",
+                id="one-to-many-convert",
+            ),
         ],
         indirect=True,
     )
     def test_execute_full_plan(self, mocker, execution_engine, dataset, physical_plan, expected_records, side_effect):
         """
-        This test executes the given 
+        This test executes the given
         """
         start_time = time.time()
 
@@ -83,7 +110,9 @@ class TestParallelExecutionNoCache:
         plan_stats.finalize(time.time() - start_time)
 
         # check that we get the expected set of output records
-        get_id = lambda record: record.listing if "real-estate" in dataset else record.filename
+        def get_id(record):
+            return record.listing if "real-estate" in dataset else record.filename
+
         assert len(output_records) == len(expected_records)
         assert sorted(map(get_id, output_records)) == sorted(map(get_id, expected_records))
 

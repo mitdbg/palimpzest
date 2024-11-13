@@ -1,24 +1,26 @@
 import pytest
+
 from palimpzest.constants import Model
 from palimpzest.dataclasses import RecordOpStats
+
 
 @pytest.fixture
 def sample_op_data_factory():
     # this fixture returns a function which generates sample execution data as specified by the fcn. parameters
     def sample_op_data_generator(
-            op_id,
-            op_name,
-            source_op_id,
-            plan_ids,
-            record_ids,
-            parent_record_ids,
-            time_per_records,
-            cost_per_records,
-            total_input_tokens=None,
-            total_output_tokens=None,
-            model_names=None,
-            answers=None
-        ):
+        op_id,
+        op_name,
+        source_op_id,
+        plan_ids,
+        record_ids,
+        parent_record_ids,
+        time_per_records,
+        cost_per_records,
+        total_input_tokens=None,
+        total_output_tokens=None,
+        model_names=None,
+        answers=None,
+    ):
         sample_op_data = [
             RecordOpStats(
                 record_id=record_ids[idx],
@@ -61,6 +63,7 @@ def simple_plan_scan_data():
         "answers": None,
     }
 
+
 @pytest.fixture
 def simple_plan_convert_data(simple_plan_scan_data):
     # we simulate converting the records output by the simple plan's scan operation
@@ -77,8 +80,11 @@ def simple_plan_convert_data(simple_plan_scan_data):
         "total_input_tokens": [200, 400, 600, 800, 100, 1200],
         "total_output_tokens": [20, 40, 60, 80, 100, 120],
         "model_names": [Model.GPT_4.value] * 2 + [Model.GPT_3_5.value] * 2 + [Model.MIXTRAL.value] * 2,
-        "answers": [{"a": 1, "b": 2}, {"a": 3, "b": 4}] + [{"a": 1, "b": 1}, {"a": 3, "b": 3}] + [{"a": 1, "b": 0}, {"a": 0, "b": 0}],
+        "answers": [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
+        + [{"a": 1, "b": 1}, {"a": 3, "b": 3}]
+        + [{"a": 1, "b": 0}, {"a": 0, "b": 0}],
     }
+
 
 @pytest.fixture
 def simple_plan_filter_data(simple_plan_convert_data):
@@ -98,6 +104,7 @@ def simple_plan_filter_data(simple_plan_convert_data):
         "model_names": [Model.GPT_4.value] * 2 + [Model.GPT_3_5.value] * 2 + [Model.MIXTRAL.value] * 2,
         "answers": [True, False] + [False, True] + [True, True],
     }
+
 
 @pytest.fixture
 def simple_plan_sample_execution_data(

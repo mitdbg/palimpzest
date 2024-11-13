@@ -1,9 +1,10 @@
-from palimpzest.constants import log_attempt_number, RETRY_MAX_ATTEMPTS, RETRY_MAX_SECS, RETRY_MULTIPLIER
+import dspy
+import requests
 from dsp.modules.hf import HFModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-import dspy
-import requests
+from palimpzest.constants import RETRY_MAX_ATTEMPTS, RETRY_MAX_SECS, RETRY_MULTIPLIER, log_attempt_number
+
 
 ### DSPy Signatures ###
 # Given a questionn, we'll feed it with the paper context for answer generation.
@@ -14,6 +15,7 @@ class FilterOverPaper(dspy.Signature):
     question = dspy.InputField(desc="one or more conditions about the paper")
     answer = dspy.OutputField(desc="often a TRUE/FALSE answer to the condition question(s) about the paper")
 
+
 class QuestionOverPaper(dspy.Signature):
     """Answer question(s) about a scientific paper."""
 
@@ -21,22 +23,29 @@ class QuestionOverPaper(dspy.Signature):
     question = dspy.InputField(desc="one or more question about the paper")
     answer = dspy.OutputField(desc="print the answer only, separated by a newline character")
 
+
 class SingleQuestionOverSample(dspy.Signature):
     """Answer question(s) about a scientific paper."""
 
-    context = dspy.InputField(desc="contains a snippet of the paper, including the most possible answer to the question.")
+    context = dspy.InputField(
+        desc="contains a snippet of the paper, including the most possible answer to the question."
+    )
     question = dspy.InputField(desc="one question about the paper")
-    answer = dspy.OutputField(desc="print the answer close to the original text as you can, and print 'None' if an answer cannot be found. Please do not helucinate the answer")
+    answer = dspy.OutputField(
+        desc="print the answer close to the original text as you can, and print 'None' if an answer cannot be found. Please do not helucinate the answer"
+    )
 
 
 # functions which generate signatures
 def gen_signature_class(instruction, context_desc, question_desc, answer_desc):
     class QuestionOverDoc(dspy.Signature):
         __doc__ = instruction
-        context = dspy.InputField(desc= context_desc)
-        question = dspy.InputField(desc= question_desc)
-        answer = dspy.OutputField(desc= answer_desc)
+        context = dspy.InputField(desc=context_desc)
+        question = dspy.InputField(desc=question_desc)
+        answer = dspy.OutputField(desc=answer_desc)
+
     return QuestionOverDoc
+
 
 def gen_filter_signature_class(doc_schema, doc_type):
     instruction = f"Answer condition questions about a {doc_schema}."
@@ -45,20 +54,22 @@ def gen_filter_signature_class(doc_schema, doc_type):
     answer_desc = f"often a TRUE/FALSE answer to the condition question(s) about the {doc_type}"
     return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
+
 def gen_qa_signature_class(doc_schema, doc_type):
     instruction = f"Answer question(s) about a {doc_schema}."
     context_desc = f"contains full text of the {doc_type}"
     question_desc = f"one or more question about the {doc_type}"
-    answer_desc = f"print the answer only, separated by a newline character"
+    answer_desc = "print the answer only, separated by a newline character"
     return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
 
 ### DSPy Modules ###
-class dspyCOT(dspy.Module):
+class DSPyCOT(dspy.Module):
     """
     Invoke dspy in chain of thought mode
     """
-    def __init__(self, f_signature=FilterOverPaper):
+
+    def __init__(self, f_signature: type[dspy.Signature] = FilterOverPaper):
         super().__init__()
         self.generate_answer = dspy.ChainOfThought(f_signature)
 
@@ -70,28 +81,27 @@ class dspyCOT(dspy.Module):
 
 ### DSPy wrapped LLM calls ###
 class TogetherHFAdaptor(HFModel):
-    def __init__(self, model, apiKey, **kwargs):
+    def __init__(self, model, api_key, **kwargs):
         super().__init__(model=model, is_client=True)
         self.api_base = "https://api.together.xyz/inference"
-        self.token = apiKey
+        self.token = api_key
         self.model = model
 
         self.use_inst_template = False
         if any(keyword in self.model.lower() for keyword in ["inst", "instruct"]):
             self.use_inst_template = True
 
-        stop_default = "\n\n---"
-
+        # stop_default = "\n\n---"
         # print("Stop procedure", stop_default)
         self.kwargs = {
             "temperature": 0.0,
-            "max_tokens": 512, # 8192
+            "max_tokens": 512,  # 8192
             "top_p": 1,
             "top_k": 20,
             "repetition_penalty": 1,
             "n": 1,
             # "stop": stop_default if "stop" not in kwargs else kwargs["stop"],
-            **kwargs
+            **kwargs,
         }
 
     @retry(
@@ -114,8 +124,11 @@ class TogetherHFAdaptor(HFModel):
 
         if use_chat_api:
             messages = [
-                {"role": "system", "content": "You are a helpful assistant. You must continue the user text directly without *any* additional interjections."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant. You must continue the user text directly without *any* additional interjections.",
+                },
+                {"role": "user", "content": prompt},
             ]
             body = {
                 "model": self.model,
@@ -142,26 +155,27 @@ class TogetherHFAdaptor(HFModel):
             }
 
         headers = {"Authorization": f"Bearer {self.token}"}
-        try:
-            with requests.Session().post(url, headers=headers, json=body) as resp:
-                resp_json = resp.json()
+
+        with requests.Session().post(url, headers=headers, json=body) as resp:
+            resp_json = resp.json()
+            try:
                 if use_chat_api:
-                    completions = [resp_json['output'].get('choices', [])[0].get('message', {}).get('content', "")]
+                    completions = [resp_json["output"].get("choices", [])[0].get("message", {}).get("content", "")]
                 else:
-                    completions = [resp_json['output'].get('choices', [])[0].get('text', "")]
+                    completions = [resp_json["output"].get("choices", [])[0].get("text", "")]
                 response = {
-                    "prompt": resp_json['prompt'][-1],
+                    "prompt": resp_json["prompt"][-1],
                     "choices": [{"text": c} for c in completions],
                 }
-                response['usage'] = resp_json['output']['usage']
-                response['finish_reason'] = resp_json['output']['finish_reason']
+                response["usage"] = resp_json["output"]["usage"]
+                response["finish_reason"] = resp_json["output"]["finish_reason"]
                 if logprobs > 0:
-                    response['tokens'] = resp_json['output']['choices'][0]['tokens']
-                    response['token_logprobs'] = resp_json['output']['choices'][0]['token_logprobs']
+                    response["tokens"] = resp_json["output"]["choices"][0]["tokens"]
+                    response["token_logprobs"] = resp_json["output"]["choices"][0]["token_logprobs"]
 
                 return response
-        except Exception as e:
-            if resp_json:
-                print(f"resp_json:{resp_json}")
-            print(f"Failed to parse JSON response: {e}")
-            raise Exception("Received invalid JSON response from server")
+            except Exception as e:
+                if resp_json:
+                    print(f"resp_json:{resp_json}")
+                print(f"Failed to parse JSON response: {e}")
+                raise Exception("Received invalid JSON response from server") from e

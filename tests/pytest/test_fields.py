@@ -1,9 +1,8 @@
-from palimpzest.corelib import (
+from palimpzest.corelib.fields import (
     BooleanField,
     StringField,
 )
 
-import pytest
 
 def test_field_equality():
     # test that equality depends on having the same desc and the same required state
