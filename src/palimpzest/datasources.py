@@ -229,6 +229,7 @@ class ImageFileDirectorySource(DirectorySource):
         dr.filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
             dr.contents = f.read()
+        dr.text_description = f"Image file {dr.filename}"
         return dr
 
 
