@@ -206,7 +206,8 @@ class Optimizer:
                 target_cache_id=uid,
             )
         else:
-            raise NotImplementedError("No logical operator exists for the specified dataset construction.")
+            raise NotImplementedError(f"""No logical operator exists for the specified dataset construction.
+                                      {input_schema}->{output_schema} {"with filter:'"+node._filter+"'" if node._filter is not None else ""}""")
 
         # compute the input group ids and fields for this node
         input_group_ids, input_group_fields, input_group_properties = (

@@ -267,7 +267,9 @@ class PDFFileDirectorySource(DirectorySource):
             for p in doc.pages:
                 text_content += p.text
         else:
-            text_content = get_text_from_pdf(pdf_filename, pdf_bytes, file_cache_dir=self.file_cache_dir)
+            text_content = get_text_from_pdf(pdf_filename, pdf_bytes,
+            pdfprocessor=self.pdfprocessor,
+            file_cache_dir=self.file_cache_dir)
 
         # construct data record
         dr = DataRecord(self.schema, scan_idx=idx)
