@@ -52,8 +52,8 @@ def in_price_range(record):
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
 
-    sender = pz.Field(desc="The email address of the sender", required=True)
-    subject = pz.Field(desc="The subject of the email", required=True)
+    sender = pz.StringField(desc="The email address of the sender", required=True)
+    subject = pz.StringField(desc="The subject of the email", required=True)
 
 
 class CaseData(pz.Schema):
@@ -288,7 +288,7 @@ if __name__ == "__main__":
         plan,
         policy,
         nocache=True,
-        optimization_strategy=pz.OptimizationStrategy.OPTIMAL,
+        optimization_strategy=pz.OptimizationStrategy.PARETO,
         execution_engine=execution_engine,
         verbose=verbose,
     )

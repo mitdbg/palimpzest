@@ -120,18 +120,18 @@ def scan_convert_filter_varied_override_qualities(scan_convert_filter_varied_exe
 
                         # using expected_record and match found
                         if source_idx % 3 > 0 and source_idx < 6 and str(Model.GPT_4o_MINI) in record_op_stats.op_id:
-                            quality = int(record_op_stats.passed_filter)
+                            quality = int(record_op_stats.passed_operator)
                         
                         elif source_idx % 3 > 0 and source_idx >= 6 and str(Model.MIXTRAL) in record_op_stats.op_id:
-                            quality = int(record_op_stats.passed_filter)
+                            quality = int(record_op_stats.passed_operator)
 
                         # using champion record and it thinks record should pass
                         elif source_idx % 2:
-                            quality = int(record_op_stats.passed_filter)
+                            quality = int(record_op_stats.passed_operator)
 
                         # using champion record and it thinks record should not pass
                         else:
-                            quality = int(not record_op_stats.passed_filter)
+                            quality = int(not record_op_stats.passed_operator)
 
                     record_set_expected_qualities.append(quality)
                 expected_qualities[op_set_id][source_id].append(record_set_expected_qualities)
@@ -172,9 +172,9 @@ def scan_multi_convert_multi_filter_qualities(scan_multi_convert_multi_filter_ex
                         match = re.match(r"source(.+?)", source_id)
                         source_idx = int(match.group(1))
                         if source_idx < 7:
-                            quality = int(record_op_stats.passed_filter)
+                            quality = int(record_op_stats.passed_operator)
                         else:
-                            quality = int(not record_op_stats.passed_filter)
+                            quality = int(not record_op_stats.passed_operator)
 
                     elif record_op_stats.logical_op_id == "filter2-logical":
                         # by construction, expected output passes all records with source_idx < 7
@@ -184,21 +184,21 @@ def scan_multi_convert_multi_filter_qualities(scan_multi_convert_multi_filter_ex
                         
                         # the champion model and expected output agree on the filter decision for all records with source_idx < 5
                         if source_idx < 5:
-                            quality = int(record_op_stats.passed_filter)
+                            quality = int(record_op_stats.passed_operator)
 
                         # for records with source_ids in [5, 6] if the *convert& model used was GPT_3_5, then the
                         # expected record will match and we expect the record to pass
                         elif source_idx < 7 and str(Model.GPT_4o_MINI) in record_op_stats.record_state['bar']:
-                            quality = int(record_op_stats.passed_filter)
+                            quality = int(record_op_stats.passed_operator)
 
                         # for records with source_ids in [5, 6] if the model used was *not* GPT_3_5, then the champion model will be used
                         # and it does *not* expect the record to pass
                         elif source_idx < 7:
-                            quality = int(not record_op_stats.passed_filter)
+                            quality = int(not record_op_stats.passed_operator)
 
                         # for all records with source_ids >= 7, the champion is used and it does not pass the record
                         else:
-                            quality = int(not record_op_stats.passed_filter)
+                            quality = int(not record_op_stats.passed_operator)
 
                     elif record_op_stats.logical_op_id == "convert2-logical":
                         # by construction, expected output is used to score records with source_idx < 7

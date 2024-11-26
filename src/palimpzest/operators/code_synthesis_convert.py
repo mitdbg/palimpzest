@@ -118,8 +118,14 @@ class CodeSynthesisConvert(LLMConvert):
         """
         naive_op_cost_estimates = super().naiveCostEstimates(source_op_cost_estimates)
         naive_op_cost_estimates.time_per_record = 1e-5
-        naive_op_cost_estimates.cost_per_record = 1e-4 # amortize code synth cost across records
+        naive_op_cost_estimates.time_per_record_lower_bound = 1e-5
+        naive_op_cost_estimates.time_per_record_upper_bound = 1e-5
+        naive_op_cost_estimates.cost_per_record = 1e-6 # amortize code synth cost across records
+        naive_op_cost_estimates.cost_per_record_lower_bound = 1e-6
+        naive_op_cost_estimates.cost_per_record_upper_bound = 1e-6
         naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * (GPT_4o_MODEL_CARD["code"] / 100.0) * 0.7
+        naive_op_cost_estimates.quality_lower_bound = naive_op_cost_estimates.quality
+        naive_op_cost_estimates.quality_upper_bound = naive_op_cost_estimates.quality
 
         return naive_op_cost_estimates
 
@@ -202,8 +208,10 @@ class CodeSynthesisConvert(LLMConvert):
 
     def _bonded_query_fallback(self, candidate, start_time):
         fields_to_generate = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
-        candidate_dict = candidate._asDict(include_bytes=False, project_cols=self.depends_on)
-        candidate_content = json.dumps(candidate_dict)
+        # candidate_dict = candidate._asDict(include_bytes=False, project_cols=self.depends_on)
+        # candidate_content = json.dumps(candidate_dict)
+
+        candidate = candidate._copy(include_bytes=False, project_cols=self.depends_on)
 
         bonded_op = LLMConvertBonded(
             inputSchema=self.inputSchema,
@@ -211,7 +219,7 @@ class CodeSynthesisConvert(LLMConvert):
             model=self.exemplar_generation_model,
             prompt_strategy=self.prompt_strategy,
         )
-        field_answers, generation_stats = bonded_op.convert(candidate_content, fields_to_generate)
+        field_answers, generation_stats = bonded_op.convert(candidate, fields_to_generate)
 
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
@@ -314,7 +322,7 @@ class CodeSynthesisConvert(LLMConvert):
                 # if there is a failure, run a conventional query
                 if self.verbose:
                     print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
-                candidate_content = json.dumps(candidate_dict)
+                # candidate_content = json.dumps(candidate_dict)
                 conventional_op = LLMConvertConventional(
                     inputSchema=self.inputSchema,
                     outputSchema=self.outputSchema,
@@ -322,7 +330,7 @@ class CodeSynthesisConvert(LLMConvert):
                     prompt_strategy=self.prompt_strategy,
                 )
 
-                json_answers, field_stats = conventional_op.convert(candidate_content, [field_name])
+                json_answers, field_stats = conventional_op.convert(candidate, [field_name])
 
                 # include code execution time in field_stats
                 field_stats.fn_call_duration_secs += exec_stats.fn_call_duration_secs

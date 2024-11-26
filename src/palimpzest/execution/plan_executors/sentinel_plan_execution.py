@@ -55,23 +55,49 @@ def getChampionConvertOperator(operators):
         Model.LLAMA3_V: 1,
     }
 
-    # compute product of operator and model ranking
-    champion_convert_operator, champion_product = None, 0
-    for operator in operators:
-        operator_ranking = (
-            convert_operator_class_ranking[operator.__class__]
-            if isinstance(operator, ConvertOp)
-            else filter_operator_class_ranking[operator.__class__]
-        )
-        product = (
-            operator_ranking * model_ranking[operator.model]
-            if not isinstance(operator, CodeSynthesisConvert)
-            else operator_ranking * 1.0
-        )
-        if product > champion_product:
-            champion_convert_operator = operator
+    # # compute product of operator and model ranking
+    # champion_convert_operator, champion_product = None, 0
+    # for operator in operators:
+    #     operator_ranking = (
+    #         convert_operator_class_ranking[operator.__class__]
+    #         if isinstance(operator, ConvertOp)
+    #         else filter_operator_class_ranking[operator.__class__]
+    #     )
+    #     product = (
+    #         operator_ranking * model_ranking[operator.model]
+    #         if not isinstance(operator, CodeSynthesisConvert)
+    #         else operator_ranking * 1.0
+    #     )
+    #     if product > champion_product:
+    #         champion_convert_operator = operator
 
-    return champion_convert_operator
+    # return champion_convert_operator
+    assert len(operators) != 0 and "operators must not be empty for champion output selection"
+
+    champion_operator = max(
+        operators,
+        key=lambda operator: (
+            # pick the largest k as the champion operator for RetrieveOp
+            operator.k
+            if isinstance(operator, RetrieveOp)
+            # compute product of operator and model ranking for other operators
+            else (
+                operator_ranking := (
+                    convert_operator_class_ranking[operator.__class__]
+                    if isinstance(operator, ConvertOp)
+                    else filter_operator_class_ranking[operator.__class__]
+                )
+            )
+            * (
+                model_ranking_factor := (
+                    model_ranking[operator.model]
+                    if not isinstance(operator, CodeSynthesisConvert)
+                    else 1.0
+                )
+            )
+        ),
+    )
+    return champion_operator
 
 
 class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecutor):
@@ -325,7 +351,7 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
             # add records (which are not filtered) to the cache, if allowed
             if not self.nocache:
                 for record in all_records:
-                    if getattr(record, "_passed_filter", True):
+                    if getattr(record, "_passed_operator", True):
                         self.datadir.appendCache(op_set_id, record)
 
             # update candidates for next operator; we use champion outputs as input
@@ -334,7 +360,7 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
                 for _, record_set in champion_outputs[op_set_id].items():
                     for record in record_set:
                         if isinstance(op_set[0], FilterOp):
-                            if not record._passed_filter:
+                            if not record._passed_operator:
                                 continue
                         candidates.append(record)
 
@@ -607,7 +633,7 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
             # add records (which are not filtered) to the cache, if allowed
             if not self.nocache:
                 for record in all_records:
-                    if getattr(record, "_passed_filter", True):
+                    if getattr(record, "_passed_operator", True):
                         self.datadir.appendCache(op_set_id, record)
 
             # update candidates for next operator; we use champion outputs as input
@@ -616,7 +642,7 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
                 for _, record_set in champion_outputs[op_set_id].items():
                     for record in record_set:
                         if isinstance(op_set[0], FilterOp):
-                            if not record._passed_filter:
+                            if not record._passed_operator:
                                 continue
                         candidates.append(record)
 

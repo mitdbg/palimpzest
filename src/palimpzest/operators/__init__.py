@@ -5,6 +5,8 @@ from .convert import *
 from .datasource import *
 from .filter import *
 from .limit import *
+from .mixture_of_agents_convert import *
+from .retrieve import *
 from .token_reduction_convert import *
 from .code_synthesis_convert import *
 
@@ -28,6 +30,7 @@ PHYSICAL_OPERATORS = (
     + classesinmodule(datasource)
     + classesinmodule(filter)
     + classesinmodule(limit)
+    + classesinmodule(retrieve)
 )
 
 LOGICAL_OPERATORS = classesinmodule(logical)

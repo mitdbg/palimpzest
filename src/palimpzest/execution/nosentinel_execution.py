@@ -48,14 +48,11 @@ class NoSentinelExecutionEngine(ExecutionEngine):
 
         # execute plan(s) according to the optimization strategy
         records, plan_stats = [], []
-        if self.optimization_strategy == OptimizationStrategy.OPTIMAL:
-            records, plan_stats = self.execute_optimal_strategy(dataset, optimizer)
-
-        elif self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
-            records, plan_stats = self.execute_confidence_interval_strategy(dataset, optimizer)
+        if self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
+            records, plan_stats = self.execute_confidence_interval_strategy(dataset, policy, optimizer)
         
-        elif self.optimization_strategy == OptimizationStrategy.NONE:
-            records, plan_stats = self.execute_naive_strategy(dataset, optimizer)
+        else:
+            records, plan_stats = self.execute_strategy(dataset, policy, optimizer)
 
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)

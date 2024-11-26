@@ -5,8 +5,51 @@ import scipy
 import torch
 from numpy.linalg import inv
 from sklearn.linear_model import Ridge
+from typing import Dict
 
+# Used in jupyter
+# def create_sample_mask(num_rows: int, num_cols: int, rank: int, seed: int):
+#     """
+#     Compute the observation matrix which will determine which optimizations (cols)
+#     are applied to which records (rows).
+#     """
+#     # if there are fewer physical operators than the rank + 1 for this operation, then every
+#     # operation must execute on every record
+#     if num_cols <= rank + 1:
+#         return np.ones((num_rows, num_cols))
 
+#     # otherwise, we construct an observation matrix which is guaranteed to
+#     # have rank + 1 samples per column and per row
+#     sample_matrix = np.zeros((num_rows, num_cols))
+
+#     # construct matrix in a way that guarantees rank + 1 samples per column,
+#     # with minimal overlap across rows
+#     start_idx = 0
+#     for col in range(num_cols):
+#         end_idx = (start_idx + rank + 1) % num_rows
+#         if end_idx > start_idx:
+#             sample_matrix[start_idx:end_idx, col] = 1
+#         else:
+#             sample_matrix[start_idx:num_rows, col] = 1
+#             sample_matrix[0:end_idx, col] = 1
+#         start_idx = (end_idx - 1) % num_rows
+
+#     # go row-by-row and add samples until all rows also have rank + 1 samples per row
+#     row_sums = np.sum(sample_matrix, axis=1)
+#     col = 0
+#     for row in range(num_rows):
+#         row_sum = row_sums[row]
+#         while row_sum < rank + 1:
+#             if sample_matrix[row, col] == 0:
+#                 sample_matrix[row, col] = 1
+#                 row_sum += 1
+#             col = (col + 1) % num_cols
+
+#     # finally shuffle the rows and columns of the sample matrix
+#     rng = np.random.default_rng(seed=seed)
+#     rng.shuffle(sample_matrix, axis=0)
+
+#     return sample_matrix
 
 def create_sample_mask(records: list, physical_ops: list, rank: int):
     """
@@ -121,6 +164,177 @@ def create_sample_mask_from_budget(num_rows: int, num_cols: int, budget: int, se
     return sample_mask
 
 
+def adaptive_stratified_sampling(
+    matrices: Dict[str, np.array],
+    num_rows: int,
+    num_cols: int,
+    sample_budget: int,
+    batch_size: int=None,
+    p_distr: Dict[str, float]={"cost": 1/3, "time": 1/3, "quality": 1/3},
+    seed: int=42,
+):
+    # ensure that each matrix has float dtype (not int)
+    matrices = {metric: matrix.astype(float) for metric, matrix in matrices.items()}
+
+    # initialize rng and sample mask
+    rng = np.random.default_rng(seed=seed)
+    sample_mask = np.zeros((num_rows, num_cols))
+
+    # throw an exception if the sample_budget is less than the number of columns
+    assert sample_budget >= 3 * num_cols, "sample budget smaller than initial budget size!"
+
+    # fully sample three rows at random
+    sample_row_indices = rng.choice(np.arange(num_rows), size=3, replace=False)
+    sample_mask[sample_row_indices, :] = 1
+
+    # set batch size if not specified
+    if batch_size is None:
+        batch_size = min(8, int(num_cols / 2))
+
+    # iteratively: complete matrices, compute uncertainty, and pick next samples until sample budget is exhausted
+    samples_drawn = np.sum(sample_mask)
+    while samples_drawn < sample_budget:
+        # compute std. dev. of each column for each matrix
+        metric_to_stds = {}
+        for metric in ["cost", "time", "quality"]:
+            col_stds = np.std(matrices[metric], axis=0, where=sample_mask.astype(bool))
+            metric_to_stds[metric] = col_stds
+
+        # compute weighted avg. of col. stds
+        col_stds = (
+            p_distr["cost"] * metric_to_stds["cost"]
+            + p_distr["time"] * metric_to_stds["time"]
+            + p_distr["quality"] * metric_to_stds["quality"]
+        )
+
+        # compute number of samples to draw
+        num_samples_to_draw = min(batch_size, sample_budget - samples_drawn)
+
+        if (col_stds == 0).all():
+            # give all columns equal weight
+            col_alloc_weights = np.ones(num_cols) / num_samples_to_draw
+        else:
+            # compute ratio of std relative to sum
+            col_alloc_weights = col_stds / np.sum(col_stds)
+
+        # allocate samples to columns based on weight
+        col_order = np.argsort(-col_alloc_weights)
+        allocated_samples = np.zeros(num_cols)
+        for col in col_order:
+            ideal_weight_allocation = int(np.ceil(col_alloc_weights[col] * num_samples_to_draw))
+            samples_left_to_draw = num_samples_to_draw - np.sum(allocated_samples)
+            samples_left_in_col = np.sum(sample_mask[:,col]==0) - allocated_samples[col]
+            num_alloc_samples = min(ideal_weight_allocation, samples_left_to_draw, samples_left_in_col)
+            allocated_samples[col] += num_alloc_samples
+
+            if np.sum(allocated_samples) == num_samples_to_draw:
+                break
+
+        # if we still have samples left-over, allocate them one-at-time to columns w/fewest samples --> most
+        while np.sum(allocated_samples) < num_samples_to_draw:
+            col_order = np.argsort(np.sum(sample_mask, axis=0))
+            for col in col_order:
+                allocated_samples[col] += 1
+                if np.sum(allocated_samples) == num_samples_to_draw:
+                    break
+
+        # for each column with non-zero weight, randomly sample a set of previously unobserved entries
+        for col, sample_size in enumerate(allocated_samples):
+            if int(sample_size) > 0:
+                sampled_rows = rng.choice(np.where(sample_mask[:,col]==0)[0], size=int(sample_size), replace=False)
+                sample_mask[sampled_rows, col] = 1
+
+        samples_drawn += num_samples_to_draw
+
+    # sanity check that matrix was properly sampled
+    assert int(np.sum(sample_mask)) == int(sample_budget)
+
+    # return final completed matrix
+    return sample_mask
+
+
+def adaptive_mab_sampling(
+    matrices: Dict[str, np.array],
+    num_rows: int,
+    num_cols: int,
+    sample_budget: int,
+    alpha: float=0.25,
+    p_distr: Dict[str, float]={"cost": 1/3, "time": 1/3, "quality": 1/3},
+    seed: int=42,
+):
+    # TODO: if we have constraint values, we can make reward 1.0 if it satisfies constraint and 0.0 if it does not
+
+    # ensure that each matrix has float dtype (not int)
+    matrices = {metric: matrix.astype(float) for metric, matrix in matrices.items()}
+
+    # compute initial sample budget and perform sanity check
+    init_sample_budget = 3 * num_cols
+    assert sample_budget >= init_sample_budget, "sample budget smaller than initial budget size!"
+
+    # initialize sample mask by running every operator on same row
+    rng = np.random.default_rng(seed=seed)
+    sample_row_indices = rng.choice(np.arange(num_rows), size=3, replace=False)
+    sample_mask = np.zeros((num_rows, num_cols))
+    sample_mask[sample_row_indices, :] = 1
+
+    # initialize column stats
+    ucbs = np.ones(num_cols) * np.inf
+    col_num_samples = np.ones(num_cols) * 3
+    col_costs = {col: list(matrices["cost"][sample_row_indices, col].flatten()) for col in range(num_cols)}
+    col_times = {col: list(matrices["time"][sample_row_indices, col].flatten()) for col in range(num_cols)}
+    col_qualities = {col: list(matrices["quality"][sample_row_indices, col].flatten()) for col in range(num_cols)}
+
+    # iteratively: compute upper confidence bounds and sample next entry
+    samples_drawn = init_sample_budget
+    while samples_drawn < sample_budget:
+        # sample random row from max ucb column which still has rows to sample
+        cols_not_fully_sampled = col_num_samples < num_rows
+        ucb_max = np.max(ucbs[cols_not_fully_sampled])
+        max_ucb_cols = np.argwhere((ucbs == ucb_max) & cols_not_fully_sampled)
+        max_ucb_col = rng.choice(max_ucb_cols.flatten(), size=1)[0]
+
+        # randomly sample an unsampled row in max_ucb_col
+        sampled_row = rng.choice(np.where(sample_mask[:, max_ucb_col] == 0)[0], size=1)[0]
+        sample_mask[sampled_row, max_ucb_col] = 1
+
+        # observe matrix entries
+        cost = matrices["cost"][sampled_row, max_ucb_col]
+        time = matrices["time"][sampled_row, max_ucb_col]
+        quality = matrices["quality"][sampled_row, max_ucb_col]
+
+        # increment number of samples drawn
+        samples_drawn += 1
+
+        # update col_num_samples and col metrics for sampled column
+        col_num_samples[max_ucb_col] += 1
+        col_costs[max_ucb_col].append(cost)
+        col_times[max_ucb_col].append(time)
+        col_qualities[max_ucb_col].append(quality)
+
+        # update ucbs of each column
+        for col in range(num_cols):
+            n_col = col_num_samples[col]
+            if n_col > 1:
+                # compute std. dev. of each metric normalized into the range [0,1]
+                cost_std = np.std(col_costs[col] / np.max(col_costs[col])) if np.max(col_costs[col]) > 0 else 0.0
+                time_std = np.std(col_times[col] / np.max(col_times[col]))
+                quality_std = np.std(col_qualities[col])
+
+                # compute weighted reward and update ucb
+                weighted_reward = p_distr["cost"] * cost_std + p_distr["time"] * time_std + p_distr["quality"] * quality_std
+                ucbs[col] = weighted_reward + alpha * np.sqrt(2 * np.log(samples_drawn) / n_col)
+
+    # sanity check that matrix was properly sampled
+    assert int(np.sum(sample_mask)) == int(sample_budget)
+
+    # return final completed matrix
+    return sample_mask
+
+
+#########################################################
+#########################################################
+#########################################################
+
 class CustomALS(object):
     """
     Predicts using ALS
@@ -173,13 +387,13 @@ def als_complete_matrix(obs_matrix, sample_mask, rank):
     col_means = np.mean(obs_matrix, axis=0)
     col_stds = np.std(obs_matrix, axis=0)
 
-    # in some cases we may have zero variance in ALL of our observed sample data;
-    # in this case, the rational way to complete the matrix is to assume it is
-    # rank = 1 and every data point is equal to the sample mean
-    if (col_stds == 0.0).all():
-        als_completed_matrix = np.zeros((obs_matrix.shape))
-        als_completed_matrix[:, :] = col_means
-        return als_completed_matrix
+    # # in some cases we may have zero variance in ALL of our observed sample data;
+    # # in this case, the rational way to complete the matrix is to assume it is
+    # # rank = 1 and every data point is equal to the sample mean
+    # if (col_stds == 0.0).all():
+    #     als_completed_matrix = np.zeros((obs_matrix.shape))
+    #     als_completed_matrix[:, :] = col_means
+    #     return als_completed_matrix
 
     # if we have some columns with 0 variance, set their true_col_stds entries equal to 1;
     # this will ensure that these entries are not scaled, but still have their mean translation
@@ -200,6 +414,143 @@ def als_complete_matrix(obs_matrix, sample_mask, rank):
     als_completed_matrix = scaled_completed_matrix * col_stds + col_means
 
     return als_completed_matrix
+
+def complete_matrix(
+        matrix: np.array,
+        sample_mask: np.array,
+        rank: int,
+        # sample_budget: int,
+        metric: str,
+        seed: int,
+    ):
+    # if sample_mask is all 1's, no need to complete the matrix (it is already complete)
+    if (sample_mask == 1.0).all():
+        return matrix
+
+    # ensure that matrix has float dtype (not int)
+    matrix = matrix.astype(float)
+
+    # complete the matrix
+    losses, recon_losses, col_losses = [], [], []
+    # completed_matrix, losses, recon_losses, col_losses = sgd_complete_matrix(matrix, sample_mask, rank)
+    completed_matrix = als_complete_matrix(matrix, sample_mask, rank)
+    # completed_matrix = adaptive_complete_matrix(matrix, sample_mask, sample_budget, seed)
+
+    # fix completed matrix entries to match groundtruth samples where we have them
+    completed_matrix[sample_mask.astype(bool)] = matrix[sample_mask.astype(bool)]
+
+    # clamp all matrices to be non-negative
+    completed_matrix = np.clip(completed_matrix, 0.0, None)
+
+    # clamp quality matrix to be less than 1.0
+    if metric == "quality":
+        completed_matrix = np.clip(completed_matrix, 0.0, 1.0)
+
+    return completed_matrix, losses, recon_losses, col_losses
+
+def k_largest_index_argpartition(arr, k):
+    """
+    Get indices of k largest elements in array arr.
+    See: https://stackoverflow.com/questions/43386432/how-to-get-indexes-of-k-maximum-values-from-a-numpy-multidimensional-array
+    """
+    idx = np.argpartition(-arr.ravel(),k)[:k]
+    return np.column_stack(np.unravel_index(idx, arr.shape))
+
+def abacus_complete_matrices(
+    matrices: Dict[str, np.array],
+    sample_budget: int,
+    p_distribution: Dict[str, float],
+    abacus_num_iters: int,
+    S=16,
+    rank=1,
+    seed=42,
+):
+    
+    # ensure that each matrix has float dtype (not int)
+    matrices = {metric: matrix.astype(float) for metric, matrix in matrices.items()}
+
+    # compute initial sample budget and perform sanity check
+    num_rows, num_cols = matrices["cost"].shape
+    init_sample_budget = num_cols # num_rows + num_cols + 1
+    assert sample_budget >= init_sample_budget, "sample budget smaller than initial budget size!"
+
+    # # create initial sample mask via random sampling
+    # sample_mask = np.zeros((num_rows, num_cols))
+    # xs, ys = np.where(sample_mask==0)
+    # unobserved_entries = list(zip(xs, ys))
+    # rng = np.random.default_rng(seed=seed)
+    # sampled_entries = rng.choice(unobserved_entries, size=init_sample_budget, replace=False)
+    # for row, col in sampled_entries:
+    #     sample_mask[row, col] = 1.0
+
+    # create initial sample mask
+    sample_mask = np.zeros((num_rows, num_cols))
+    rng = np.random.default_rng(seed=seed)
+    init_sample_row = rng.choice(np.arange(num_rows), size=1, replace=False)
+    sample_mask[init_sample_row, :] = 1.0
+
+    # compute k
+    k = int(np.ceil((sample_budget - init_sample_budget) / abacus_num_iters))
+
+    # iteratively: complete matrices, compute uncertainty, and pick next samples until sample budget is exhausted
+    samples_drawn = init_sample_budget
+    sample_budget_exhausted = False
+    while not sample_budget_exhausted:
+        # complete matrices
+        completed_matrices = {metric: [] for metric in ["cost", "time", "quality"]}
+        for metric in ["cost", "time", "quality"]:
+            for idx in range(S):
+                completed_matrix, _, _, _ = complete_matrix(matrices[metric], sample_mask, rank, metric)
+                completed_matrices[metric].append(completed_matrix)
+
+        # compute average of completed matrices
+        avg_completed_matrices = {
+            metric: np.mean(matrices_lst, axis=0)
+            for metric, matrices_lst in completed_matrices.items()
+        }
+
+        # compute uncertainty matrices; R = RMSE((1-Obs) * (E - E_hat))
+        uncertainty_matrices = {}
+        for metric in ["cost", "time", "quality"]:
+            completed_mats = completed_matrices[metric]
+            avg_mat = avg_completed_matrices[metric]
+            uncertainty_matrix = np.sqrt(np.mean(
+                [((1 - sample_mask) * (mat - avg_mat))**2 for mat in completed_mats],
+                axis=0,
+            ))
+            uncertainty_matrices[metric] = uncertainty_matrix
+
+        # compute weighted avg. of uncertainty matrices
+        uncertainty_matrix = sum([
+            p_distribution[metric] * uncertainty_matrices[metric]
+            for metric in ["cost", "time", "quality"]
+        ])
+
+        # TODO?: handle corner case where matrix is fully/over-sampled
+        # sample top-k entries from uncertainty matrix which have not already been sampled;
+        # we set the uncertainty of sampled values to negative infinity to prevent them
+        # from being picked
+        uncertainty_matrix[sample_mask.astype(bool)] = -np.inf
+        num_samples_to_draw = min(k, sample_budget - samples_drawn)
+        sampled_entries = k_largest_index_argpartition(uncertainty_matrix, num_samples_to_draw)
+        for row, col in sampled_entries:
+            sample_mask[row, col] = 1.0
+
+        if samples_drawn == sample_budget:
+            sample_budget_exhausted = True
+        else:
+            samples_drawn += num_samples_to_draw
+
+    # sanity check that matrix was properly sampled
+    assert np.sum(sample_mask) == sample_budget
+
+    # compute and return average of final completed matrices
+    abacus_completed_matrices = {
+        metric: np.mean(matrices_lst, axis=0)
+        for metric, matrices_lst in completed_matrices.items()
+    }
+
+    return abacus_completed_matrices, sample_mask
 
 
 # def gradient_descent(init, steps, grad, proj=lambda x: x, num_to_keep=None):
@@ -376,3 +727,89 @@ def als_complete_matrix(obs_matrix, sample_mask, rank):
 #     # R_scaled[:, zero_variance_cols] = true_col_means[zero_variance_cols]
 
 #     return R_scaled.detach().numpy(), losses, recon_losses, col_losses
+
+
+
+### OG: stratified-sampling single-matrix algo
+# def adaptive_complete_matrix(
+#     matrix: np.array,
+#     sample_budget: int,
+#     seed=42,
+# ):  
+#     # ensure that each matrix has float dtype (not int)
+#     matrix = matrix.astype(float)
+
+#     # compute initial sample budget and perform sanity check
+#     num_rows, num_cols = matrix.shape
+#     init_sample_budget = 3*num_cols
+#     assert sample_budget >= init_sample_budget, "sample budget smaller than initial budget size!"
+
+#     # create initial sample mask
+#     sample_mask = create_sample_mask_from_budget(num_rows, num_cols, init_sample_budget, seed)
+
+#     # scale matrix columns
+#     obs_matrix = matrix.copy()
+#     col_means = np.mean(obs_matrix, axis=0, where=sample_mask.astype(bool))
+#     col_stds = np.std(obs_matrix, axis=0, where=sample_mask.astype(bool))
+
+#     # if we have some columns with 0 variance, set their true_col_stds entries equal to 1;
+#     # this will ensure that these entries are not scaled, but still have their mean translation
+#     zero_variance_cols = (col_stds == 0.0)
+#     col_stds[zero_variance_cols] = 1.0
+
+#     # create scaled version of observation matrix
+#     scaled_obs_matrix = (obs_matrix - col_means) / col_stds
+
+#     # compute k
+#     k = int(np.ceil((sample_budget - init_sample_budget) / 10))
+
+#     # iteratively: complete matrices, compute uncertainty, and pick next samples until sample budget is exhausted
+#     samples_drawn = init_sample_budget
+#     sample_budget_exhausted = False
+#     while not sample_budget_exhausted:
+#         # compute std of each column
+#         col_stds = np.std(obs_matrix, axis=0, where=sample_mask.astype(bool))
+#         zero_variance_cols = (col_stds == 0.0)
+#         col_stds[zero_variance_cols] = np.min(col_stds) # TODO: error?
+
+#         # compute number of samples to draw
+#         num_samples_to_draw = min(k, sample_budget - samples_drawn)
+
+#         if (col_stds == 0).all():
+#             # give all columns equal weight
+#             col_alloc_weights = np.ones(num_cols) / num_samples_to_draw
+#         else:
+#             # compute ratio of std relative to sum
+#             col_alloc_weights = col_stds / np.sum(col_stds)
+
+#         # allocate samples to columns based on weight
+#         idx = 0
+#         col_order = np.argsort(-col_alloc_weights)
+#         allocated_samples = np.zeros(num_cols)
+#         while np.sum(allocated_samples) < num_samples_to_draw:
+#             col = col_order[idx % num_cols]
+#             ideal_weight_allocation = int(np.ceil(col_alloc_weights[col] * num_samples_to_draw))
+#             samples_left_to_draw = num_samples_to_draw - np.sum(allocated_samples)
+#             samples_left_in_col = np.sum(sample_mask[:,col]==0) - allocated_samples[col]
+#             num_alloc_samples = min(ideal_weight_allocation, samples_left_to_draw, samples_left_in_col)
+#             allocated_samples[col] += num_alloc_samples
+#             idx += 1
+
+#         assert np.sum(allocated_samples) == num_samples_to_draw
+
+#         # for each column with non-zero weight, randomly sample a set of previously unobserved entries
+#         for col, sample_size in enumerate(allocated_samples):
+#             if int(sample_size) > 0:
+#                 sampled_rows = rng.choice(np.where(sample_mask[:,col]==0)[0], size=int(sample_size), replace=False)
+#                 sample_mask[sampled_rows, col] = 1
+
+#         if samples_drawn == sample_budget:
+#             sample_budget_exhausted = True
+#         else:
+#             samples_drawn += num_samples_to_draw
+
+#     # sanity check that matrix was properly sampled
+#     assert int(np.sum(sample_mask)) == int(sample_budget)
+
+#     # compute and return col estimates from final completed matrix
+#     return np.mean(obs_matrix, axis=0, where=sample_mask.astype(bool)), sample_mask

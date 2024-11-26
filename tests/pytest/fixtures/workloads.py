@@ -1,9 +1,8 @@
-from io import BytesIO
+from palimpzest.corelib import TextFile
 from palimpzest.utils import udfs
 
 import pytest
 import palimpzest as pz
-import pandas as pd
 
 ### UDFs ###
 def within_two_miles_of_mit(record):
@@ -79,3 +78,31 @@ def biofabric_workload(biofabric_tiny, case_data_schema):
         case_data_schema, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY
     )
     return case_data
+
+@pytest.fixture
+def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_schema):
+    # construct plan with three converts
+    dataset = pz.Dataset(enron_eval_tiny, schema=email_schema)
+    dataset = dataset.convert(foobar_schema)
+    dataset = dataset.convert(baz_schema)
+
+    return dataset
+
+@pytest.fixture
+def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
+    # construct plan with two converts and two filters
+    dataset = pz.Dataset(enron_eval_tiny, schema=TextFile)
+    dataset = dataset.filter("filter1")
+    dataset = dataset.convert(email_schema)
+
+    return dataset
+
+@pytest.fixture
+def two_converts_two_filters_workload(enron_eval_tiny, email_schema, foobar_schema):
+    # construct plan with two converts and two filters
+    dataset = pz.Dataset(enron_eval_tiny, schema=email_schema)
+    dataset = dataset.convert(foobar_schema)
+    dataset = dataset.filter("filter1", depends_on=["sender"])
+    dataset = dataset.filter("filter2", depends_on=["subject"])
+
+    return dataset

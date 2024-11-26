@@ -40,3 +40,6 @@ class Filter():
             and self.filterCondition == other.filterCondition
             and self.filterFn == other.filterFn
         )
+
+    def __str__(self) -> str:
+        return self.getFilterStr()

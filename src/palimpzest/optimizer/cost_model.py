@@ -43,12 +43,183 @@ class BaseCostModel:
         """
         pass
 
+    def get_costed_phys_op_ids(self) -> set[str]:
+        """
+        Return the set of physical op ids which the cost model has cost estimates for.
+        """
+        raise NotImplementedError("Calling get_costed_phys_op_ids from abstract method")
+
     def __call__(self, operator: PhysicalOperator) -> PlanCost:
         """
         The interface exposed by the CostModel to the Optimizer. Subclasses may require
         additional arguments in order to make their predictions.
         """
         raise NotImplementedError("Calling __call__ from abstract method")
+
+
+class SampleBasedCostModel:
+    """
+    """
+    def __init__(
+        self,
+        sentinel_plan: SentinelPlan,
+        execution_data: Dict[str, Dict[str, List[DataRecordSet]]],
+        verbose: bool = False,
+        exp_name: str | None = None,
+    ):
+        # TODO: remove this
+        self.sentinel_plan = sentinel_plan
+
+        # store verbose argument
+        self.verbose = verbose
+
+        # store experiment name if one is provided
+        self.exp_name = exp_name
+
+        # construct cost, time, quality, and selectivity matrices for each operator set;
+        self.operator_to_stats = self.compute_operator_stats(execution_data, sentinel_plan.operator_sets)
+
+        # compute set of costed physical op ids from operator_to_stats
+        self.costed_phys_op_ids = set([
+            phys_op_id
+            for _, phys_op_id_to_stats in self.operator_to_stats.items()
+            for phys_op_id, _ in phys_op_id_to_stats.items()
+        ])
+
+        # reference to data directory
+        self.datadir = DataDirectory()
+
+        # import pdb; pdb.set_trace()
+
+    def get_costed_phys_op_ids(self):
+        return self.costed_phys_op_ids
+
+
+    def compute_operator_stats(
+            self,
+            execution_data: Dict[str, Dict[str, List[DataRecordSet]]],
+            operator_sets: List[List[PhysicalOperator]],
+        ):
+        # flatten the nested dictionary of execution data and pull out fields relevant to cost estimation
+        execution_record_op_stats = []
+        for idx, op_set in enumerate(operator_sets):
+            # initialize variables
+            logical_op_id = op_set[0].logical_op_id
+            upstream_op_set_id = SentinelPlan.compute_op_set_id(operator_sets[idx - 1]) if idx > 0 else None
+            op_set_id = SentinelPlan.compute_op_set_id(op_set)
+
+            # filter for the execution data from this operator set
+            op_set_execution_data = execution_data[op_set_id]
+
+            # flatten the execution data into a list of RecordOpStats
+            op_set_execution_data = [
+                record_op_stats
+                for _, record_sets in op_set_execution_data.items()
+                for record_set in record_sets
+                for record_op_stats in record_set.record_op_stats
+            ]
+
+            # add entries from execution data into matrices
+            for record_op_stats in op_set_execution_data:
+                record_op_stats_dict = {
+                    "logical_op_id": logical_op_id,
+                    "op_set_id": op_set_id,
+                    "physical_op_id": record_op_stats.op_id,
+                    "upstream_op_set_id": upstream_op_set_id,
+                    "record_id": record_op_stats.record_id,
+                    "record_parent_id": record_op_stats.record_parent_id,
+                    "cost_per_record": record_op_stats.cost_per_record,
+                    "time_per_record": record_op_stats.time_per_record,
+                    "quality": record_op_stats.quality,
+                    "passed_operator": record_op_stats.passed_operator,
+                    "source_id": record_op_stats.record_source_id,  # TODO: remove
+                    "op_details": record_op_stats.op_details,       # TODO: remove
+                    "answer": record_op_stats.answer,               # TODO: remove
+                }
+                execution_record_op_stats.append(record_op_stats_dict)
+
+        # convert flattened execution data into dataframe
+        operator_stats_df = pd.DataFrame(execution_record_op_stats)
+
+        # for each physical_op_id, compute its average cost_per_record, time_per_record, selectivity, and quality
+        operator_to_stats = {}
+        for logical_op_id, logical_op_df in operator_stats_df.groupby("logical_op_id"):
+            operator_to_stats[logical_op_id] = {}
+
+            # get the op_set_id of the upstream operator
+            upstream_op_set_ids = logical_op_df.upstream_op_set_id.unique()
+            assert len(upstream_op_set_ids) == 1, "More than one upstream op id"
+            upstream_op_set_id = upstream_op_set_ids[0]
+
+            for physical_op_id, physical_op_df in logical_op_df.groupby("physical_op_id"):
+                # find set of parent records for this operator
+                num_upstream_records = len(physical_op_df.record_parent_id.unique())
+
+                # compute selectivity 
+                selectivity = (
+                    1.0 if upstream_op_set_id is None else physical_op_df.passed_operator.sum() / num_upstream_records
+                )
+
+                operator_to_stats[logical_op_id][physical_op_id] = {
+                    "cost": physical_op_df.cost_per_record.mean(),
+                    "time": physical_op_df.time_per_record.mean(),
+                    "quality": physical_op_df.quality.mean(),
+                    "selectivity": selectivity,
+                }
+
+        # if this is an experiment, log the dataframe and operator_to_stats dictionary
+        if self.exp_name is not None:
+            operator_stats_df.to_csv(f"opt-profiling-data/{self.exp_name}-operator-stats.csv", index=False)
+            with open(f"opt-profiling-data/{self.exp_name}-operator-stats.json", "w") as f:
+                json.dump(operator_to_stats, f)
+
+        return operator_to_stats
+
+
+    def __call__(self, operator: PhysicalOperator, source_op_estimates: Optional[OperatorCostEstimates]=None) -> PlanCost:
+        # NOTE: some physical operators may not have any sample execution data in this cost model;
+        #       these physical operators are filtered out of the Optimizer, thus we can assume that
+        #       we will have execution data for each operator passed into __call__; nevertheless, we
+        #       still perform a sanity check
+        # look up logical op id and matrix column associated with this physical operator
+        phys_op_id = operator.get_op_id()
+        logical_op_id = operator.logical_op_id
+        assert self.operator_to_stats.get(logical_op_id).get(phys_op_id) is not None, f"No execution data for {str(operator)}"
+
+        # look up stats for this operation
+        est_cost_per_record = self.operator_to_stats[logical_op_id][phys_op_id]["cost"]
+        est_time_per_record = self.operator_to_stats[logical_op_id][phys_op_id]["time"]
+        est_quality = self.operator_to_stats[logical_op_id][phys_op_id]["quality"]
+        est_selectivity = self.operator_to_stats[logical_op_id][phys_op_id]["selectivity"]
+
+        # create source_op_estimates for datasources if they are not provided
+        if isinstance(operator, DataSourcePhysicalOp):
+            # get handle to DataSource and pre-compute its size (number of records)
+            datasource = self.datadir.getRegisteredDataset(operator.dataset_id)
+            datasource_len = len(datasource)
+
+            source_op_estimates = OperatorCostEstimates(
+                cardinality=datasource_len,
+                time_per_record=0.0,
+                cost_per_record=0.0,
+                quality=1.0,
+            )
+
+        # generate new set of OperatorCostEstimates
+        op_estimates = OperatorCostEstimates(
+            cardinality=est_selectivity * source_op_estimates.cardinality,
+            time_per_record=est_time_per_record,
+            cost_per_record=est_cost_per_record,
+            quality=est_quality,
+        )
+
+        # compute estimates for this operator
+        op_time = op_estimates.time_per_record * source_op_estimates.cardinality
+        op_cost = op_estimates.cost_per_record * source_op_estimates.cardinality
+        op_quality = op_estimates.quality
+
+        # construct and return op estimates
+        return PlanCost(cost=op_cost, time=op_time, quality=op_quality, op_estimates=op_estimates)
 
 
 class MatrixCompletionCostModel:
@@ -163,13 +334,18 @@ class MatrixCompletionCostModel:
         self.physical_op_id_to_matrix_col = {}
         for logical_op_id, (_, _, phys_op_to_col_map) in self.logical_op_id_to_sample_masks.items():
             for phys_op_id, col in phys_op_to_col_map.items():
-                self.physical_op_id_to_matrix_col[phys_op_id] = (logical_op_id, col) 
+                self.physical_op_id_to_matrix_col[phys_op_id] = (logical_op_id, col)
+
+        # compute set of costed physical op ids from operator_to_stats
+        self.costed_phys_op_ids = set(self.physical_op_id_to_matrix_col.keys())
 
         # reference to data directory
         self.datadir = DataDirectory()
 
         # import pdb; pdb.set_trace()
 
+    def get_costed_phys_op_ids(self):
+        return self.costed_phys_op_ids
 
     def compute_quality(
             self,
@@ -207,7 +383,7 @@ class MatrixCompletionCostModel:
             record_op_stats = record_set.record_op_stats[0]
             if only_using_champion:
                 champion_record = champion_record_set[0]
-                record_op_stats.quality = int(record_op_stats.passed_filter == champion_record._passed_filter)
+                record_op_stats.quality = int(record_op_stats.passed_operator == champion_record._passed_operator)
 
             # - if we are using validation data, we may have multiple expected records in the expected_record_set for this source_id,
             #   thus, if we can identify an exact match, we can use that to evaluate the filter's quality
@@ -227,10 +403,10 @@ class MatrixCompletionCostModel:
                         break
 
                 if found_match_in_output:
-                    record_op_stats.quality = int(record_op_stats.passed_filter == expected_record._passed_filter)
+                    record_op_stats.quality = int(record_op_stats.passed_operator == expected_record._passed_operator)
                 else:
                     champion_record = champion_record_set[0]
-                    record_op_stats.quality = int(record_op_stats.passed_filter == champion_record._passed_filter)
+                    record_op_stats.quality = int(record_op_stats.passed_operator == champion_record._passed_operator)
 
         # if this is a succesful convert operation
         else:
@@ -337,6 +513,7 @@ class MatrixCompletionCostModel:
         is_perfect_quality_op = (
             not isinstance(physical_op, LLMConvert)
             and not isinstance(physical_op, LLMFilter)
+            and not isinstance(physical_op, RetrieveOp)
         )
 
         # pull out the execution data from this operator; place the upstream execution data in a new list
@@ -434,8 +611,8 @@ class MatrixCompletionCostModel:
                 # NOTE: for filter operations the selectivity of this operator on the input record is determined
                 # by whether or not it passed the filter; for convert operations, we increment by 1 for every output
                 # which had this input record as its parent
-                if record_op_stats.passed_filter is not None:
-                    sel_arr[row, col] = int(record_op_stats.passed_filter)
+                if record_op_stats.passed_operator is not None:
+                    sel_arr[row, col] = int(record_op_stats.passed_operator)
                 else:
                     sel_arr[row, col] += 1
 
@@ -624,6 +801,12 @@ class CostModel(BaseCostModel):
         # compute per-operator estimates
         self.operator_estimates = self._compute_operator_estimates()
 
+        # compute set of costed physical op ids from operator_to_stats
+        self.costed_phys_op_ids = None if self.operator_estimates is None else set(self.operator_estimates.keys())
+
+    def get_costed_phys_op_ids(self):
+        return self.costed_phys_op_ids
+
     def _compute_ci(self, sample_mean: float, n_samples: int, std_dev: float) -> Tuple[float, float]:
         """
         Compute confidence interval (for non-proportion quantities) given the sample mean, number of samples,
@@ -746,7 +929,7 @@ class CostModel(BaseCostModel):
                 # get subset of records that were the source to this operator
                 num_output_records = None
                 if is_filter_op:
-                    num_output_records = model_op_df.passed_filter.sum()
+                    num_output_records = model_op_df.passed_operator.sum()
                 else:
                     op_ids = model_op_df.op_id.unique().tolist()
                     plan_ids = model_op_df.plan_id.unique().tolist()
@@ -771,7 +954,7 @@ class CostModel(BaseCostModel):
         # get subset of records that were the source to this operator
         num_output_records = None
         if is_filter_op:
-            num_output_records = op_df.passed_filter.sum()
+            num_output_records = op_df.passed_operator.sum()
         else:
             op_ids = op_df.op_id.unique().tolist()
             num_output_records = df[df.source_op_id.isin(op_ids)].shape[0]

@@ -6,6 +6,7 @@ from palimpzest.constants import *
 from palimpzest.generators import (
     dspyCOT,
     gen_filter_signature_class,
+    gen_moa_agg_qa_signature_class,
     gen_qa_signature_class,
     TogetherHFAdaptor,
 )
@@ -64,7 +65,7 @@ class CustomGenerator(BaseGenerator):
         self.model_name = model_name
         self.verbose = verbose
 
-    def _get_model(self) -> dsp.LM:
+    def _get_model(self, temperature: float=0.0) -> dsp.LM:
         model = None
         if self.model_name in [Model.GPT_4o.value, Model.GPT_4o_MINI.value]:
             openai_key = get_api_key("OPENAI_API_KEY")
@@ -72,14 +73,14 @@ class CustomGenerator(BaseGenerator):
             model = dspy.OpenAI(
                 model=self.model_name,
                 api_key=openai_key,
-                temperature=0.0,
+                temperature=temperature,
                 max_tokens=max_tokens,
                 logprobs=True,
             )
 
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
             together_key = get_api_key("TOGETHER_API_KEY")
-            model = TogetherHFAdaptor(self.model_name, together_key, logprobs=1)
+            model = TogetherHFAdaptor(self.model_name, together_key, temperature=temperature, logprobs=1)
 
         # elif self.model_name in [Model.GEMINI_1.value]:
         #     google_key = get_api_key("GOOGLE_API_KEY")
@@ -166,15 +167,16 @@ class CustomGenerator(BaseGenerator):
         # return those tokens log probabilities
         return answer_log_probs
 
-    @retry(
-        wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
-        stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
-        after=log_attempt_number,
-        reraise=True,
-    )
-    def generate(self, prompt: str) -> GenerationOutput:
+    # TODO: undo after paper submission
+    # @retry(
+    #     wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
+    #     stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
+    #     after=log_attempt_number,
+    #     reraise=True,
+    # )
+    def generate(self, prompt: str, temperature: float=0.0) -> GenerationOutput:
         # fetch model
-        dspy_lm = self._get_model()
+        dspy_lm = self._get_model(temperature=temperature)
 
         start_time = time.time()
 
@@ -240,29 +242,31 @@ class DSPyGenerator(BaseGenerator):
             self.promptSignature = gen_filter_signature_class(doc_schema, doc_type)
         elif prompt_strategy == PromptStrategy.DSPY_COT_QA:
             self.promptSignature = gen_qa_signature_class(doc_schema, doc_type)
+        elif prompt_strategy == PromptStrategy.DSPY_COT_MOA_AGG:
+            self.promptSignature = gen_moa_agg_qa_signature_class(doc_type)
         else:
             raise ValueError(
                 f"DSPyGenerator does not support prompt_strategy: {prompt_strategy.value}"
             )
 
-    def _get_model(self) -> dsp.LM:
+    def _get_model(self, temperature: float=0.0) -> dsp.LM:
         model = None
         if self.model_name in [Model.GPT_4o.value, Model.GPT_4o_MINI.value]:
             openai_key = get_api_key("OPENAI_API_KEY")
             max_tokens = (
-                4096 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 250
+                4096 if self.prompt_strategy in [PromptStrategy.DSPY_COT_QA, PromptStrategy.DSPY_COT_MOA_AGG] else 250
             )
             model = dspy.OpenAI(
                 model=self.model_name,
                 api_key=openai_key,
-                temperature=0.0,
+                temperature=temperature,
                 max_tokens=max_tokens,
                 logprobs=True,
             )
 
         elif self.model_name in [Model.MIXTRAL.value, Model.LLAMA3.value]:
             together_key = get_api_key("TOGETHER_API_KEY")
-            model = TogetherHFAdaptor(self.model_name, together_key, logprobs=1)
+            model = TogetherHFAdaptor(self.model_name, together_key, temperature=temperature, logprobs=1)
 
         # elif self.model_name in [Model.GEMINI_1.value]:
         #     google_key = get_api_key(f"GOOGLE_API_KEY")
@@ -349,19 +353,21 @@ class DSPyGenerator(BaseGenerator):
         # return those tokens log probabilities
         return answer_log_probs
 
-    @retry(
-        wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
-        stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
-        after=log_attempt_number,
-        reraise=True,
-    )
+    # TODO: undo after paper submission
+    # @retry(
+    #     wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
+    #     stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
+    #     after=log_attempt_number,
+    #     reraise=True,
+    # )
     def generate(
         self,
         context: str,
         question: str,
+        temperature: float=0.0,
     ) -> GenerationOutput:
         # configure DSPy
-        dspy_lm = self._get_model()
+        dspy_lm = self._get_model(temperature=temperature)
         dspy.settings.configure(lm=dspy_lm)
         cot = dspyCOT(self.promptSignature)
 
@@ -375,7 +381,12 @@ class DSPyGenerator(BaseGenerator):
             if len(context) * TOKENS_PER_CHARACTER > 6000:
                 context_factor = len(context) * TOKENS_PER_CHARACTER / 6000.0
                 context = context[:int(len(context)/context_factor)]
-        pred = cot(question, context)
+
+        pred = (
+            cot(question, context=context)
+            if self.prompt_strategy != PromptStrategy.DSPY_COT_MOA_AGG
+            else cot(question, responses=context)
+        )
         end_time = time.time()
 
         # extract the log probabilities for the actual result(s) which are returned
@@ -446,7 +457,7 @@ class ImageTextGenerator(BaseGenerator):
 
     def _get_model_client(self) -> Union[OpenAI, genai.GenerativeModel]:
         client = None
-        if self.model_name in [Model.GPT_4o_V.value, Model.GPT_4o_MINI_V]:
+        if self.model_name in [Model.GPT_4o_V.value, Model.GPT_4o_MINI_V.value]:
             api_key = get_api_key("OPENAI_API_KEY")
             client = OpenAI(api_key=api_key)
 
@@ -455,7 +466,7 @@ class ImageTextGenerator(BaseGenerator):
         #     genai.configure(api_key=api_key)
         #     client = genai.GenerativeModel("gemini-pro-vision")
 
-        elif self.model_name in [Model.LLAMA3_V]:
+        elif self.model_name in [Model.LLAMA3_V.value]:
             api_key = get_api_key("TOGETHER_API_KEY")
             client = Together(api_key=api_key)
 
@@ -466,9 +477,9 @@ class ImageTextGenerator(BaseGenerator):
 
         return client
 
-    def _make_payload(self, prompt: str, base64_images: List[str]):
+    def _make_payload(self, prompt: str, base64_images: List[str], temperature: float=0.0):
         payload = None
-        if self.model_name in [Model.GPT_4o_V.value, Model.GPT_4o_MINI_V]:
+        if self.model_name in [Model.GPT_4o_V.value, Model.GPT_4o_MINI_V.value]:
             # create content list
             content = [{"type": "text", "text": prompt}]
             for base64_image in base64_images:
@@ -489,7 +500,7 @@ class ImageTextGenerator(BaseGenerator):
                     }
                 ],
                 "max_tokens": 4000,
-                "temperature": 0.0,
+                "temperature": temperature,
                 "logprobs": True,
             }
 
@@ -522,7 +533,7 @@ class ImageTextGenerator(BaseGenerator):
                 "model": self.model_name,
                 "messages": messages,
                 "max_tokens": 4000,
-                "temperature": 0.0,
+                "temperature": temperature,
                 "logprobs": 1,
             }
 
@@ -538,7 +549,7 @@ class ImageTextGenerator(BaseGenerator):
     ) -> Tuple[str, str, dict]:
         answer, finish_reason, usage = None, None, None
 
-        if self.model_name in [Model.GPT_4o_V.value, Model.GPT_4o_MINI_V]:
+        if self.model_name in [Model.GPT_4o_V.value, Model.GPT_4o_MINI_V.value]:
             # GPT-4V will always have a single payload
             completion = client.chat.completions.create(**payload)
             candidate = completion.choices[-1]
@@ -611,18 +622,19 @@ class ImageTextGenerator(BaseGenerator):
         # return those tokens log probabilities
         return answer_log_probs
 
-    @retry(
-        wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
-        stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
-        after=log_attempt_number,
-    )
-    def generate(self, context: List[bytes], question: str) -> GenerationOutput:
+    # TODO: undo after paper submission
+    # @retry(
+    #     wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
+    #     stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
+    #     after=log_attempt_number,
+    # )
+    def generate(self, context: List[bytes], question: str, temperature: float=0.0) -> GenerationOutput:
         # NOTE: context is list of base64 images and question is prompt
         # fetch model client
         client = self._get_model_client()
 
         # create payload
-        payload = self._make_payload(question, context)
+        payload = self._make_payload(question, context, temperature=temperature)
 
         # generate response
         if self.verbose:

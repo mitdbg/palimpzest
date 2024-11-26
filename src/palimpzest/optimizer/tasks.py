@@ -7,6 +7,8 @@ from palimpzest.optimizer.rules import TransformationRule, ImplementationRule, R
 from palimpzest.policy import Policy
 from typing import Any, Dict, List, Tuple
 
+from palimpzest.constants import Model
+from palimpzest.operators import LLMConvertBonded
 
 class Task:
     """
@@ -41,7 +43,7 @@ class OptimizeGroup(Task):
         group = groups[self.group_id]
 
         # if this group has already been optimized, there's nothing more to do
-        if group.best_physical_expression is not None:
+        if group.optimized:
             return []
 
         # otherwise, optimize all the logical expressions for the group
@@ -49,7 +51,7 @@ class OptimizeGroup(Task):
         for logical_expr in group.logical_expressions:
             task = OptimizeLogicalExpression(logical_expr)
             new_tasks.append(task)
-        
+
         # and optimize all of the physical expressions in the group
         for physical_expr in group.physical_expressions:
             task = OptimizePhysicalExpression(physical_expr)
@@ -168,27 +170,38 @@ class ApplyRule(Task):
             # apply transformation rule
             new_expressions, new_groups = self.rule.substitute(self.logical_expression, groups, expressions, **physical_op_params)
 
-            # add all new groups to the groups mapping and create a task to optimize them
-            for group in new_groups:
-                groups[group.group_id] = group
-                task = OptimizeGroup(group.group_id)
-                new_tasks.append(task)
-
             # filter out any expressions which are duplicates (i.e. they've been previously computed)
             new_expressions = [expr for expr in new_expressions if expr.get_expr_id() not in expressions]
             expressions.update({expr.get_expr_id(): expr for expr in new_expressions})
 
+            # add all new groups to the groups mapping
+            for group in new_groups:
+                groups[group.group_id] = group
+                task = OptimizeGroup(group.group_id)
+
+            # add new expressions to their respective groups
             for expr in new_expressions:
                 group = groups[expr.group_id]
                 group.logical_expressions.add(expr)
 
-                # create new task
+            # NOTE: we place new tasks for groups on the top of the stack so that they may be
+            #       optimized before we optimize expressions which take new groups as inputs
+            # create new tasks for optimizing new logical expressions
+            for expr in new_expressions:
                 task = OptimizeLogicalExpression(expr, self.exploring)
                 new_tasks.append(task)
+
+            # create new tasks for optimizing new groups
+            for group in new_groups:
+                task = OptimizeGroup(group.group_id)
+                new_tasks.append(task)
+
         else:
             # apply implementation rule
             new_expressions = self.rule.substitute(self.logical_expression, **physical_op_params)
             new_expressions = [expr for expr in new_expressions if expr.get_expr_id() not in expressions]
+            if context['costed_phys_op_ids'] is not None:
+                new_expressions = [expr for expr in new_expressions if expr.operator.get_op_id() in context['costed_phys_op_ids']]
             expressions.update({expr.get_expr_id(): expr for expr in new_expressions})
             group.physical_expressions.update(new_expressions)
 
@@ -256,6 +269,106 @@ class OptimizePhysicalExpression(Task):
 
         return group
 
+    def _is_dominated(self, plan_cost: PlanCost, other_plan_cost: PlanCost, policy: Policy):
+        """
+        Return true if plan_cost is dominated by other_plan_cost and False otherwise.
+
+        If plan costs are perfectly tied on dimensions of interest, other dimensions
+        will be used as a tiebreaker.
+        """
+        # get the dictionary representation of this poicy
+        policy_dict = policy.get_dict()
+
+        # get the metrics which matter for this policy
+        metrics_of_interest = {metric for metric, weight in policy_dict.items() if weight > 0.0}
+        remaining_metrics = {metric for metric, weight in policy_dict.items() if weight == 0.0}
+
+        # corner case: if the two plan costs are perfectly tied on all dimensions of interest,
+        # use other dimensions as tiebreaker
+        if (
+            all([getattr(plan_cost, metric) == getattr(other_plan_cost, metric) for metric in metrics_of_interest])
+            and plan_cost.op_estimates.cardinality == other_plan_cost.op_estimates.cardinality
+        ):
+            for metric in remaining_metrics:
+                if metric == "cost" and plan_cost.cost < other_plan_cost.cost:
+                    return False
+                elif metric == "time" and plan_cost.time < other_plan_cost.time:
+                    return False
+                elif metric == "quality" and plan_cost.quality > other_plan_cost.quality:
+                    return False
+
+            # if plan_cost is dominated by other_plan_cost on remaining metrics, return True
+            return True
+
+        # normal case: identify whether plan_cost is dominated by other_plan_cost
+        cost_dominated = True if policy_dict["cost"] == 0.0 else other_plan_cost.cost <= plan_cost.cost
+        time_dominated = True if policy_dict["time"] == 0.0 else other_plan_cost.time <= plan_cost.time
+        quality_dominated = True if policy_dict["quality"] == 0.0 else other_plan_cost.quality >= plan_cost.quality
+        cardinality_dominated = other_plan_cost.op_estimates.cardinality <= plan_cost.op_estimates.cardinality
+
+        return cost_dominated and time_dominated and quality_dominated and cardinality_dominated
+
+    def _is_pareto_optimal(self, expr_plan_cost: PlanCost, pareto_optimal_physical_expressions: list[Expression], policy: Policy) -> bool:
+        """
+        Return True if expr_plan_cost is pareto optimal and False otherwise.
+        """
+        pareto_optimal = True
+        for pareto_phys_expr in pareto_optimal_physical_expressions:
+            for other_expr_plan_cost, _ in pareto_phys_expr.pareto_optimal_plan_costs:
+                if self._is_dominated(expr_plan_cost, other_expr_plan_cost, policy):
+                    pareto_optimal = False
+                    break
+
+        return pareto_optimal
+
+    def update_pareto_optimal_physical_expressions(self, group: Group, policy: Policy) -> Group:
+        """
+        Update the pareto optimal physical expressions for the given group and policy (if necessary).
+        """
+        for pareto_expr_plan_cost, _ in self.physical_expression.pareto_optimal_plan_costs:
+            # if the pareto optimal physical expressions are empty, set the pareto optimal
+            # physical expressions to be this expression
+            if group.pareto_optimal_physical_expressions is None:
+                group.pareto_optimal_physical_expressions = [self.physical_expression]
+
+            # otherwise, if this expression is pareto optimal, update the pareto frontier
+            elif self._is_pareto_optimal(pareto_expr_plan_cost, group.pareto_optimal_physical_expressions, policy):
+                all_physical_expressions = [self.physical_expression] + group.pareto_optimal_physical_expressions
+
+                # compute the pareto optimal set of expressions (or plan costs)
+                pareto_optimal_physical_expressions = []
+                for idx, expr in enumerate(all_physical_expressions):
+                    for plan_cost, _ in expr.pareto_optimal_plan_costs:
+                        pareto_optimal = True
+
+                        # check if any other_expr has a plan cost which dominates plan_cost
+                        for other_idx, other_expr in enumerate(all_physical_expressions):
+                            if idx == other_idx:
+                                continue
+
+                            # if plan is dominated by other_expr, set pareto_optimal = False and break
+                            for other_plan_cost, _ in other_expr.pareto_optimal_plan_costs:
+                                if self._is_dominated(plan_cost, other_plan_cost, policy):
+                                    pareto_optimal = False
+                                    break
+
+                            # break early if plan_cost is already dominated by another expression's plan_cost
+                            if not pareto_optimal:
+                                break
+
+                        # add expr to pareto frontier if it has at least one plan cost which is not dominated
+                        if pareto_optimal:
+                            pareto_optimal_physical_expressions.append(expr)
+
+                            # we can break now because we've identified that this expression has a plan on the pareto frontier
+                            break
+
+                # set pareto optimal physical expressions for the group
+                group.pareto_optimal_physical_expressions = pareto_optimal_physical_expressions
+
+        return group
+
+
     def update_ci_best_physical_expressions(self, group: Group, policy: Policy) -> Group:
         """
         Update the CI best physical expressions for the given group and policy (if necessary).
@@ -263,7 +376,7 @@ class OptimizePhysicalExpression(Task):
         # get the primary metric for the policy
         policy_metric = policy.get_primary_metric()
 
-        # get the PlanCosts for the current best expression and this physical expression
+        # get the PlanCost for this physical expression
         expr_plan_cost = self.physical_expression.plan_cost
 
         # pre-compute whether or not this physical expression satisfies the policy constraint
@@ -278,52 +391,24 @@ class OptimizePhysicalExpression(Task):
         expr_upper_bound = getattr(expr_plan_cost, upper_bound)
         group_lower_bound = getattr(group, lower_bound)
 
-        # if the CI best physical expressions is empty, add this expression
-        if group.ci_best_physical_expressions == []:
+        # if either of the following is true:
+        # 1) the CI best physical expressions are empty
+        # 2) the group does not satisfy the constrant but this physical expression does 
+        # set the CI best physical expressions to be this expression
+        if (
+            group.ci_best_physical_expressions == []
+            or (not group.satisfies_constraint and expr_satisfies_constraint)
+        ):
             group.ci_best_physical_expressions = [self.physical_expression]
             group.satisfies_constraint = expr_satisfies_constraint
             setattr(group, lower_bound, expr_lower_bound)
             setattr(group, upper_bound, expr_upper_bound)
 
-        # if the group currently satisfies the constraint, only update the CI best physical expressions
-        # if this expression also satisfies the constraint and has an upper bound on the policy metric
+        # otherwise, if this expression and the group both satisfy the constraint (or both do not satisfy the constraint),
+        # then update the CI best physical expressions if this expression also has an upper bound on the policy metric
         # above the group's lower bound on the policy metric
         elif (
-            group.satisfies_constraint
-            and expr_satisfies_constraint
-            and expr_upper_bound > group_lower_bound
-        ):
-            # filter out any current best expressions whose upper bound is below the lower bound of this expression
-            group.ci_best_physical_expressions = [
-                curr_expr for curr_expr in group.ci_best_physical_expressions
-                if not getattr(curr_expr, upper_bound) < expr_lower_bound
-            ]
-
-            # add this expression to the CI best physical expressions
-            group.ci_best_physical_expressions.append(self.physical_expression)
-
-            # compute the upper and lower bounds for the group
-            new_group_upper_bound = max(map(lambda expr: getattr(expr, upper_bound), group.ci_best_physical_expressions))
-            new_group_lower_bound = max(map(lambda expr: getattr(expr, lower_bound), group.ci_best_physical_expressions))
-
-            # set the new upper and lower bounds for the group
-            setattr(group, lower_bound, new_group_lower_bound)
-            setattr(group, upper_bound, new_group_upper_bound)
-
-        # if the group does not satisfy the constraint and the expression does satisfy the constraint,
-        # set the CI best physical expressions to be this expression
-        elif not group.satisfies_constraint and expr_satisfies_constraint:
-            group.ci_best_physical_expressions = [self.physical_expression]
-            group.satisfies_constraint = expr_satisfies_constraint
-            setattr(group, lower_bound, expr_lower_bound)
-            setattr(group, upper_bound, expr_upper_bound)
-
-        # finally, update the CI best physical expressions if the group does not satisfy the constraint
-        # and the expression does not satisfy the constraint, but the expression has an upper bound on the
-        # policy metric above the group's lower bound on the policy metric
-        elif (
-            not group.satisfies_constraint
-            and not expr_satisfies_constraint
+            (group.satisfies_constraint == expr_satisfies_constraint)
             and expr_upper_bound > group_lower_bound
         ):
             # filter out any current best expressions whose upper bound is below the lower bound of this expression
@@ -348,45 +433,124 @@ class OptimizePhysicalExpression(Task):
 
     def perform(self, cost_model: BaseCostModel, groups: Dict[int, Group], policy: Policy, context: Dict[str, Any]={}) -> List[Task]:
         # return if we've already computed the cost of this physical expression
-        if self.physical_expression.plan_cost is not None:
+        if (
+            context['optimization_strategy'] in [OptimizationStrategy.GREEDY, OptimizationStrategy.SENTINEL, OptimizationStrategy.NONE]
+            and self.physical_expression.plan_cost is not None
+        ):
             return []
 
-        # compute the cumulative cost of the input groups
-        new_tasks = []
-        total_input_plan_cost = PlanCost(cost=0, time=0, quality=1)
-        source_op_estimates = None
-        for input_group_id in self.physical_expression.input_group_ids:
-            group = groups[input_group_id]
-            if group.best_physical_expression is not None:
-                expr_plan_cost = group.best_physical_expression.plan_cost
+        elif (
+            context['optimization_strategy'] == OptimizationStrategy.PARETO
+            and self.physical_expression.pareto_optimal_plan_costs is not None
+        ):
+            return []
+
+        # for expressions with an input group, compute the input plan cost(s)
+        best_input_plan_cost = PlanCost(cost=0, time=0, quality=1)
+        input_plan_costs = [PlanCost(cost=0, time=0, quality=1)]
+        if len(self.physical_expression.input_group_ids) > 0:
+            # get the input group
+            input_group_id = self.physical_expression.input_group_ids[0]  # TODO: need to handle joins
+            input_group = groups[input_group_id]
+
+            # compute the input plan cost or list of input plan costs
+            new_tasks = []
+            if (
+                context['optimization_strategy'] in [OptimizationStrategy.GREEDY, OptimizationStrategy.SENTINEL, OptimizationStrategy.NONE]
+                and input_group.best_physical_expression is not None
+            ):
                 # TODO: apply policy constraint here
-                # NOTE: assumes sequential execution of input groups
-                total_input_plan_cost += expr_plan_cost
-                source_op_estimates = expr_plan_cost.op_estimates # TODO: this needs to be handled correctly for joins w/multiple inputs
+                best_input_plan_cost = input_group.best_physical_expression.plan_cost
+
+            elif (
+                context['optimization_strategy'] == OptimizationStrategy.CONFIDENCE_INTERVAL
+                and input_group.ci_best_physical_expressions is not None
+            ):
+                # TODO: fix this to properly compute set of potential input plan costs
+                raise Exception("NotImplementedError")
+
+            elif (
+                context['optimization_strategy'] == OptimizationStrategy.PARETO
+                and input_group.pareto_optimal_physical_expressions is not None
+            ):
+                # TODO: apply policy constraint here
+                input_plan_costs = []
+                for pareto_physical_expression in input_group.pareto_optimal_physical_expressions:
+                    plan_costs = list(map(lambda tup: tup[0], pareto_physical_expression.pareto_optimal_plan_costs))
+                    input_plan_costs.extend(plan_costs)
+
+                # NOTE: this list will not necessarily be pareto-optimal, as a plan cost on the pareto frontier of
+                # one pareto_optimal_physical_expression might be dominated by the plan cost on another physical
+                # expression's pareto frontier; we handle this below by taking the pareto frontier of all_possible_plan_costs
+                # de-duplicate equivalent plan costs; we will still reconstruct plans with equivalent cost in optimizer.py
+                input_plan_costs = list(set(input_plan_costs))
+
             else:
                 task = OptimizeGroup(input_group_id)
                 new_tasks.append(task)
 
-        # if not all input groups have been costed, we need to compute these first and then retry this task
-        if len(new_tasks) > 0:
-            return [self] + new_tasks
-
-        # otherwise, compute the cost of this operator
-        op_plan_cost = cost_model(self.physical_expression.operator, source_op_estimates)
-
-        # compute the total cost for this physical expression by summing its operator's PlanCost
-        # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
-        full_plan_cost = op_plan_cost + total_input_plan_cost
-        full_plan_cost.op_estimates = op_plan_cost.op_estimates
-        self.physical_expression.plan_cost = full_plan_cost
+            # if not all input groups have been costed, we need to compute these first and then retry this task
+            if len(new_tasks) > 0:
+                return [self] + new_tasks
 
         group = groups[self.physical_expression.group_id]
         if context['optimization_strategy'] == OptimizationStrategy.CONFIDENCE_INTERVAL:
-            group = self.update_best_physical_expression(group, policy)
+            # TODO: fix this to properly compute and update set of possible plan costs
+            raise Exception("NotImplementedError")
             group = self.update_ci_best_physical_expressions(group, policy)
-            groups[self.physical_expression.group_id] = group
+
+        elif context['optimization_strategy'] == OptimizationStrategy.PARETO:
+            # compute all possible plan costs for this physical expression given the pareto optimal input plan costs
+            all_possible_plan_costs = []
+            for input_plan_cost in input_plan_costs:
+                op_plan_cost = cost_model(self.physical_expression.operator, input_plan_cost.op_estimates)
+
+                # compute the total cost for this physical expression by summing its operator's PlanCost
+                # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
+                full_plan_cost = op_plan_cost + input_plan_cost
+                full_plan_cost.op_estimates = op_plan_cost.op_estimates
+                all_possible_plan_costs.append((full_plan_cost, input_plan_cost))
+
+            # reduce the set of possible plan costs to the subset which are pareto-optimal
+            pareto_optimal_plan_costs = []
+            for idx, (plan_cost, input_plan_cost) in enumerate(all_possible_plan_costs):
+                pareto_optimal = True
+
+                # check if any other_expr dominates expr
+                for other_idx, (other_plan_cost, _) in enumerate(all_possible_plan_costs):
+                    if idx == other_idx:
+                        continue
+
+                    # if plan is dominated by other_expr, set pareto_optimal = False and break
+                    if self._is_dominated(plan_cost, other_plan_cost, policy):
+                        pareto_optimal = False
+                        break
+
+                # add expr to pareto frontier if it's not dominated
+                if pareto_optimal:
+                    pareto_optimal_plan_costs.append((plan_cost, input_plan_cost))
+
+            # set the pareto frontier of plan costs which can be obtained by this physical expression
+            self.physical_expression.pareto_optimal_plan_costs = pareto_optimal_plan_costs
+
+            # update the group's pareto optimal costs
+            group = self.update_pareto_optimal_physical_expressions(group, policy)
+
         else:
+            # otherwise, compute the cost of this operator given the optimal input plan cost
+            op_plan_cost = cost_model(self.physical_expression.operator, best_input_plan_cost.op_estimates)
+
+            # compute the total cost for this physical expression by summing its operator's PlanCost
+            # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
+            full_plan_cost = op_plan_cost + best_input_plan_cost
+            full_plan_cost.op_estimates = op_plan_cost.op_estimates
+            self.physical_expression.plan_cost = full_plan_cost
+
+            # update the best physical expression for the group
             group = self.update_best_physical_expression(group, policy)
-            groups[self.physical_expression.group_id] = group
+
+        # set the group's optimized flag to True, store the updated group, and return
+        group.optimized = True
+        groups[self.physical_expression.group_id] = group
 
         return []

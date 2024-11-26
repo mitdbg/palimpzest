@@ -79,7 +79,11 @@ class TokenReducedConvert(LLMConvert):
         # set refined estimate of cost per record and, for now,
         # assume quality multiplier is proportional to sqrt(sqrt(token_budget))
         naive_op_cost_estimates.cost_per_record = model_conversion_usd_per_record
-        naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * math.sqrt(math.sqrt(self.token_budget))  
+        naive_op_cost_estimates.cost_per_record_lower_bound = naive_op_cost_estimates.cost_per_record
+        naive_op_cost_estimates.cost_per_record_upper_bound = naive_op_cost_estimates.cost_per_record
+        naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * math.sqrt(math.sqrt(self.token_budget))
+        naive_op_cost_estimates.quality_lower_bound = naive_op_cost_estimates.quality
+        naive_op_cost_estimates.quality_upper_bound = naive_op_cost_estimates.quality
 
         return naive_op_cost_estimates
 

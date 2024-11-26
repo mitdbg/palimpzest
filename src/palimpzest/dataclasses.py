@@ -142,8 +142,9 @@ class RecordOpStats:
     # (if applicable) the filter text (or a string representation of the filter function) applied to this record
     filter_str: Optional[str] = None
 
-    # (if applicable) the True/False result of whether this record passed the filter or not
-    passed_filter: Optional[bool] = None
+    # the True/False result of whether this record was output by the operator or not
+    # (can only be False if the operator is as Filter)
+    passed_operator: bool = True
 
     # (if applicable) the time (in seconds) spent executing a call to an LLM
     llm_call_duration_secs: float = 0.0
@@ -419,6 +420,9 @@ class PlanCost:
 
     # upper bound on the expression quality
     quality_upper_bound: float = None
+
+    def __hash__(self):
+        return hash(f"{self.cost}-{self.time}-{self.quality}")
 
     def __post_init__(self):
         if self.time_lower_bound is None and self.time_upper_bound is None:

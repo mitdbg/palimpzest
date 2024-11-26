@@ -37,7 +37,7 @@ class Execute:
         allow_model_selection: Optional[bool]=True,
         allow_code_synth: Optional[bool]=True,
         allow_token_reduction: Optional[bool]=True,
-        optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
+        optimization_strategy: OptimizationStrategy=OptimizationStrategy.PARETO,
         execution_engine: ExecutionEngine = SequentialSingleThreadSentinelExecution,
         *args,
         **kwargs

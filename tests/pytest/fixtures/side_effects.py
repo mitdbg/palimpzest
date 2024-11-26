@@ -11,7 +11,7 @@ import time
 def enron_filter():
     def mock_call(candidate):
         # determine the answer based on the record filename
-        passed_filter = candidate.filename in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
+        passed_operator = candidate.filename in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
         
         # create RecordOpStats object with positive time and cost per record
         record_op_stats = RecordOpStats(
@@ -24,12 +24,12 @@ def enron_filter():
             op_name="MockFilter",
             time_per_record=1.0,
             cost_per_record=1.0,
-            answer=str(passed_filter),
-            passed_filter=passed_filter,
+            answer=str(passed_operator),
+            passed_operator=passed_operator,
         )
 
-        # set _passed_filter attribute and return
-        setattr(candidate, "_passed_filter", passed_filter)
+        # set _passed_operator attribute and return
+        setattr(candidate, "_passed_operator", passed_operator)
 
         return DataRecordSet([candidate], [record_op_stats])
 

@@ -65,13 +65,17 @@ class Optimizer:
             allow_conventional_query: bool=False,
             allow_code_synth: bool=True,
             allow_token_reduction: bool=True,
-            optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
+            allow_mixtures: bool=True,
+            optimization_strategy: OptimizationStrategy=OptimizationStrategy.PARETO,
         ):
         # store the policy
         self.policy = policy
 
         # store the cost model
         self.cost_model = cost_model
+
+        # store the set of physical operators for which our cost model has cost estimates
+        self.costed_phys_op_ids = cost_model.get_costed_phys_op_ids()
 
         # mapping from each group id to its Group object
         self.groups = {}
@@ -97,6 +101,7 @@ class Optimizer:
             self.allow_conventional_query = False
             self.allow_code_synth = False
             self.allow_token_reduction = False
+            self.allow_mixtures = False
             self.available_models = [available_models[0]]
 
         # store optimization hyperparameters
@@ -107,6 +112,7 @@ class Optimizer:
         self.allow_conventional_query = allow_conventional_query
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
+        self.allow_mixtures = allow_mixtures
         self.optimization_strategy = optimization_strategy
 
         # prune implementation rules based on boolean flags
@@ -132,6 +138,12 @@ class Optimizer:
             self.implementation_rules = [
                 rule for rule in self.implementation_rules
                 if not issubclass(rule, TokenReducedConvertRule)
+            ]
+
+        if not self.allow_mixtures:
+            self.implementation_rules = [
+                rule for rule in self.implementation_rules
+                if not issubclass(rule, MixtureOfAgentsConvertRule)
             ]
 
     def update_cost_model(self, cost_model: CostModel):
@@ -194,6 +206,17 @@ class Optimizer:
                 outputSchema=outputSchema,
                 limit=node._limit,
                 targetCacheId=uid,
+            )
+
+        elif node._index is not None:
+            op = RetrieveScan(
+                inputSchema=inputSchema,
+                outputSchema=outputSchema,
+                index=node._index,
+                search_attr=node._search_attr,
+                output_attr=node._output_attr,
+                k=node._k,
+                targetCacheId=uid
             )
 
         elif not outputSchema == inputSchema:
@@ -264,7 +287,6 @@ class Optimizer:
 
         return [group.group_id], all_fields, all_properties
 
-
     def convert_query_plan_to_group_tree(self, query_plan: QueryPlan) -> str:
         # Obtain ordered list of datasets
         dataset_nodes = []
@@ -310,7 +332,7 @@ class Optimizer:
             # otherwise, make the node depend on all upstream nodes
             node._depends_on = set()
             for upstream_node in dataset_nodes[:node_idx]:
-                node._depends_on.update(upstream_node.schema.fieldNames(unique=True, id=node.universalIdentifier()))
+                node._depends_on.update(upstream_node.schema.fieldNames(unique=True, id=upstream_node.universalIdentifier()))
             node._depends_on = list(node._depends_on)
 
         # construct tree of groups
@@ -344,7 +366,8 @@ class Optimizer:
             elif isinstance(task, OptimizeLogicalExpression):
                 new_tasks = task.perform(self.transformation_rules, self.implementation_rules)
             elif isinstance(task, ApplyRule):
-                new_tasks = task.perform(self.groups, self.expressions, **self.get_physical_op_params())
+                context = {"costed_phys_op_ids": self.costed_phys_op_ids}
+                new_tasks = task.perform(self.groups, self.expressions, context=context, **self.get_physical_op_params())
             elif isinstance(task, OptimizePhysicalExpression):
                 context = {"optimization_strategy": self.optimization_strategy}
                 new_tasks = task.perform(self.cost_model, self.groups, self.policy, context=context)
@@ -377,7 +400,7 @@ class Optimizer:
         return SentinelPlan.fromOpsAndSubPlan([phys_op_set], best_phys_subplan)
 
 
-    def get_optimal_physical_plan(self, group_id: int) -> PhysicalPlan:
+    def get_greedy_physical_plan(self, group_id: int) -> PhysicalPlan:
         """
         Return the best plan with respect to the user provided policy.
         """
@@ -389,15 +412,58 @@ class Optimizer:
         if len(best_phys_expr.input_group_ids) == 0:
             return PhysicalPlan(operators=[best_phys_expr.operator], plan_cost=best_phys_expr.plan_cost)
 
-        # TODO: need to handle joins
         # get the best physical plan(s) for this group's inputs
-        best_phys_subplan = PhysicalPlan(operators=[])
-        for input_group_id in best_phys_expr.input_group_ids:
-            input_best_phys_plan = self.get_optimal_physical_plan(input_group_id)
-            best_phys_subplan = PhysicalPlan.fromOpsAndSubPlan(best_phys_subplan.operators, best_phys_subplan.plan_cost, input_best_phys_plan)
+        input_group_id = best_phys_expr.input_group_ids[0] # TODO: need to handle joins
+        input_best_phys_plan = self.get_greedy_physical_plan(input_group_id)
 
         # add this operator to best physical plan and return
-        return PhysicalPlan.fromOpsAndSubPlan([best_phys_expr.operator], best_phys_expr.plan_cost, best_phys_subplan)
+        return PhysicalPlan.fromOpsAndSubPlan([best_phys_expr.operator], input_best_phys_plan, best_phys_expr.plan_cost)
+
+
+    def get_candidate_pareto_physical_plans(self, group_id: int, policy: Policy) -> list[PhysicalPlan]:
+        """
+        Return a list of plans which will contain all of the pareto optimal plans (and some additional
+        plans which may not be pareto optimal).
+
+        TODO: can we cache group_id --> final_pareto_optimal_plans to avoid re-computing upstream
+        groups' pareto-optimal plans for each expression?
+        """
+        # get the pareto optimal physical expressions for this group
+        pareto_optimal_phys_exprs = self.groups[group_id].pareto_optimal_physical_expressions
+
+        # construct list of pareto optimal plans
+        pareto_optimal_plans = []
+        for phys_expr in pareto_optimal_phys_exprs:
+            # if this expression has no inputs (i.e. it is a BaseScan or CacheScan),
+            # create and return the physical plan
+            if len(phys_expr.input_group_ids) == 0:
+                for plan_cost, _ in phys_expr.pareto_optimal_plan_costs:
+                    plan = PhysicalPlan(operators=[phys_expr.operator], plan_cost=plan_cost)
+                    pareto_optimal_plans.append(plan)
+
+            # otherwise, get the pareto optimal physical plan(s) for this group's inputs
+            else:
+                # get the pareto optimal physical plan(s) for this group's inputs
+                input_group_id = phys_expr.input_group_ids[0] # TODO: need to handle joins
+                pareto_optimal_phys_subplans = self.get_candidate_pareto_physical_plans(input_group_id, policy)
+
+                # iterate over the input subplans and find the one(s) which combine with this physical expression
+                # to make a pareto-optimal plan
+                for plan_cost, input_plan_cost in phys_expr.pareto_optimal_plan_costs:
+                    for subplan in pareto_optimal_phys_subplans:
+                        if (
+                            subplan.plan_cost.cost == input_plan_cost.cost
+                            and subplan.plan_cost.time == input_plan_cost.time
+                            and subplan.plan_cost.quality == input_plan_cost.quality
+                        ):
+                            # TODO: The plan_cost gets summed with subplan.plan_cost;
+                            #       am I defining expression.best_plan_cost to be the cost of that operator,
+                            #       and expression.pareto_optimal_plan_costs to be the cost(s) of the subplan including that operator?
+                            #       i.e. are my definitions inconsistent?
+                            plan = PhysicalPlan.fromOpsAndSubPlan([phys_expr.operator], subplan, plan_cost)
+                            pareto_optimal_plans.append(plan)
+
+        return pareto_optimal_plans
 
 
     def get_confidence_interval_optimal_plans(self, group_id: int) -> List[PhysicalPlan]:
@@ -429,20 +495,20 @@ class Optimizer:
                 for input_group_id in phys_expr.input_group_ids:
                     input_best_phys_plans = self.get_confidence_interval_optimal_plans(input_group_id)
                     best_phys_subplans = [
-                        PhysicalPlan.fromOpsAndSubPlan(subplan.operators, subplan.plan_cost, input_subplan)
+                        PhysicalPlan.fromOpsAndSubPlan(subplan.operators, input_subplan, subplan.plan_cost)
                         for subplan in best_phys_subplans
                         for input_subplan in input_best_phys_plans
                     ]
 
                 # add this operator to best physical plan and return
                 for subplan in best_phys_subplans:
-                    plan = PhysicalPlan.fromOpsAndSubPlan([phys_expr.operator], phys_expr.plan_cost, subplan)
+                    plan = PhysicalPlan.fromOpsAndSubPlan([phys_expr.operator], subplan, phys_expr.plan_cost)
                     best_plans.append(plan)
 
         return best_plans
 
 
-    def optimize(self, query_plan: QueryPlan) -> List[PhysicalPlan]:
+    def optimize(self, query_plan: QueryPlan, policy: Policy | None=None) -> List[PhysicalPlan]:
         """
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
@@ -462,13 +528,30 @@ class Optimizer:
         if self.optimization_strategy == OptimizationStrategy.SENTINEL:
             plans = [self.get_sentinel_plan(final_group_id)]
 
-        elif self.optimization_strategy == OptimizationStrategy.OPTIMAL:
-            plans = [self.get_optimal_physical_plan(final_group_id)]
+        elif self.optimization_strategy == OptimizationStrategy.GREEDY:
+            plans = [self.get_greedy_physical_plan(final_group_id)]
+
+        elif self.optimization_strategy == OptimizationStrategy.PARETO:
+            # compute all of the pareto optimal physical plans
+            plans = self.get_candidate_pareto_physical_plans(final_group_id, policy)
+
+            # filter pareto optimal plans for ones which satisfy policy constraint (if at least one of them does)
+            if any([policy.constraint(plan.plan_cost) for plan in plans]):
+                plans = [plan for plan in plans if policy.constraint(plan.plan_cost)]
+
+            # select the plan which is best for the given policy
+            optimal_plan, plans = plans[0], plans[1:]
+            for plan in plans:
+                optimal_plan = optimal_plan if policy.choose(optimal_plan.plan_cost, plan.plan_cost) else plan
+
+            plans = [optimal_plan]
 
         elif self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
+            # TODO: fix this to properly handle multiple potential plans
+            raise Exception("NotImplementedError")
             plans = self.get_confidence_interval_optimal_plans(final_group_id)
 
         elif self.optimization_strategy == OptimizationStrategy.NONE:
-            plans = [self.get_optimal_physical_plan(final_group_id)]
+            plans = [self.get_greedy_physical_plan(final_group_id)]
 
         return plans

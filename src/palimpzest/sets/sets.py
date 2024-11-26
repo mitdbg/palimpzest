@@ -47,6 +47,10 @@ class Set:
         udf: Callable = None,
         aggFunc: AggFunc = None,
         groupBy: GroupBySig = None,
+        index = None, # TODO(Siva): Abstract Index and add a type here and elsewhere
+        search_attr: str = None,
+        output_attr: str = None,
+        k: int = None, # TODO: disambiguate `k` to be something like `retrieve_k`
         limit: int = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool = None,
@@ -60,6 +64,10 @@ class Set:
         self._udf = udf
         self._aggFunc = aggFunc
         self._groupBy = groupBy
+        self._index = index
+        self._search_attr = search_attr
+        self._output_attr = output_attr
+        self._k = k
         self._limit = limit
         self._cardinality = cardinality
         self._image_conversion = image_conversion
@@ -88,6 +96,10 @@ class Set:
             "groupBy": (
                 None if self._groupBy is None else self._groupBy.serialize()
             ),
+            "index": str(self._index),
+            "search_attr": self._search_attr,
+            "output_attr": self._output_attr,
+            "k": self._k,
         }
 
         return d
@@ -141,6 +153,10 @@ class Dataset(Set):
             udf=self._udf,
             aggFunc=self._aggFunc,
             groupBy=self._groupBy,
+            index=self._index,
+            search_attr=self._search_attr,
+            output_attr=self._output_attr,
+            k=self._k,
             limit=self._limit,
             cardinality=self._cardinality,
             image_conversion=self._image_conversion,
@@ -220,6 +236,18 @@ class Dataset(Set):
             schema=groupBy.outputSchema(),
             desc="Group By",
             groupBy=groupBy,
+            nocache=self._nocache,
+        )
+
+    def retrieve(self, outputSchema, index, search_attr, output_attr, k=-1) -> Dataset:
+        return Dataset(
+            source=self,
+            schema=outputSchema,
+            desc="Retrieve",
+            index=index,
+            search_attr=search_attr,
+            output_attr=output_attr,
+            k=k,
             nocache=self._nocache,
         )
 

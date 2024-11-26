@@ -35,7 +35,7 @@ class ConvertOp(PhysicalOperator):
         self.cardinality = cardinality
         self.udf = udf
         self.desc = desc
-        self.depends_on = depends_on
+        self.depends_on = depends_on if depends_on is None else sorted(depends_on)
         self.heatmap_json_obj = None
 
     def get_copy_kwargs(self):
@@ -258,22 +258,6 @@ class LLMConvert(ConvertOp):
             quality=quality,
         )
 
-    def _generate_field_names(self, candidate: DataRecord, inputSchema: Schema, outputSchema: Schema) -> List[str]:
-        """
-        Creates the list of field names that the convert operation needs to generate.
-        """
-        # construct the list of fields in outputSchema which will need to be generated;
-        # specifically, this is the set of fields which are:
-        # 1. not declared in the input schema, and
-        # 2. not present in the candidate's attributes
-        #    a. if the field is present, but its value is None --> we will try to generate it
-        fields_to_generate = []
-        for field_name in outputSchema.fieldNames():
-            if field_name not in inputSchema.fieldNames() and getattr(candidate, field_name, None) is None:
-                fields_to_generate.append(field_name)
-
-        return fields_to_generate
-
     def _construct_query_prompt(
         self,
         fields_to_generate: List[str],
@@ -285,10 +269,15 @@ class LLMConvert(ConvertOp):
         doc_type = self.outputSchema.className()
         # build string of input fields and their descriptions
         multilineInputFieldDescription = ""
+        depends_on_fields = (
+            [field.split(".")[-1] for field in self.depends_on]
+            if self.depends_on is not None and len(self.depends_on) > 0
+            else None
+        )
         input_fields = (
             self.inputSchema.fieldNames()
-            if not self.depends_on
-            else [field.split(".")[-1] for field in self.depends_on]
+            if depends_on_fields is None
+            else [field for field in self.inputSchema.fieldNames() if field in depends_on_fields]
         )
         for field_name in input_fields:
             field_desc = getattr(self.inputSchema, field_name).desc
@@ -508,50 +497,7 @@ class LLMConvert(ConvertOp):
 
         return field_answers
 
-    def _dspy_generate_fields(
-        self,
-        prompt: str,
-        content: Optional[Union[str, List[bytes]]] = None, #either text or image
-        verbose: bool = False,
-    ) -> Tuple[str, GenerationStats]:
-        """ This functions wraps the call to the generator method to actually perform the field generation. Returns an answer which is a string and a query_stats which is a GenerationStats object.
-        """
-        # create DSPy generator and generate
-        doc_schema = str(self.outputSchema)
-        doc_type = self.outputSchema.className()
-
-        # generate LLM response and capture statistics
-        answer:str
-        query_stats:GenerationStats
-        if self.image_conversion:
-            generator = ImageTextGenerator(self.model.value, verbose)
-        else:
-            generator = DSPyGenerator(
-                self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
-            )
-
-        try:
-            answer, query_stats = generator.generate(context=content, question=prompt)
-        except Exception as e:
-            print(f"DSPy generation error: {e}")
-            return "", GenerationStats()
-
-        return answer, query_stats
-
-    def convert(self, candidate_content: Union[str,List[bytes]], fields: List[str]) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
-        """ This function is responsible for the LLM conversion process. 
-        Different strategies may/should reimplement this function and leave the __call__ function untouched.
-        The input is ...
-        Outputs:
-         - field_outputs: a dictionary where keys are the fields and values are lists of JSON corresponding to the value of the field in that record.
-         - query_stats
-        """
-        raise NotImplementedError("This is an abstract class. Use a subclass instead!")
-
-    def __call__(self, candidate: DataRecord) -> DataRecordSet:
-        start_time = time.time()
-        fields_to_generate = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
-
+    def _get_candidate_content(self, model: Model, candidate: DataRecord):
         # get text or image content depending on prompt strategy
         if self.image_conversion:
             base64_images = []
@@ -560,7 +506,7 @@ class LLMConvert(ConvertOp):
                 base64_images = [
                     base64.b64encode(candidate.contents).decode("utf-8")  
                 ]
-            elif self.model in [Model.GPT_4o_V, Model.GPT_4o_MINI_V]:
+            elif model in [Model.GPT_4o_V, Model.GPT_4o_MINI_V]:
                 for image_file in candidate.image_filepaths:  # TODO: (see note above)
                     image = Image.open(image_file)
                     buffered = BytesIO()
@@ -569,7 +515,7 @@ class LLMConvert(ConvertOp):
                     base64_images.append(base64_image)
 
             # for LLAMA vision model, we must concatenate images into a single image
-            elif self.model in [Model.LLAMA3_V]:
+            elif model in [Model.LLAMA3_V]:
                 # # load images, get their dimensions, and create new image to fit them horizontally
                 # images = [Image.open(image_file) for image_file in candidate.image_filepaths]
                 # widths, heights = zip(*(img.size for img in images))
@@ -603,10 +549,60 @@ class LLMConvert(ConvertOp):
         else:
             content = candidate._asJSONStr(include_bytes=False, project_cols=self.depends_on)
 
+        return content
+
+    def _dspy_generate_fields(
+        self,
+        prompt: str,
+        content: Optional[Union[str, List[bytes]]] = None, #either text or image
+        verbose: bool = False,
+    ) -> Tuple[str, GenerationStats]:
+        """ This functions wraps the call to the generator method to actually perform the field generation. Returns an answer which is a string and a query_stats which is a GenerationStats object.
+        """
+        # create DSPy generator and generate
+        doc_schema = str(self.outputSchema)
+        doc_type = self.outputSchema.className()
+
+        # generate LLM response and capture statistics
+        answer:str
+        query_stats:GenerationStats
+        if self.image_conversion:
+            generator = ImageTextGenerator(self.model.value, verbose)
+        else:
+            generator = DSPyGenerator(
+                self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
+            )
+
+        try:
+            answer, query_stats = generator.generate(context=content, question=prompt)
+        except Exception as e:
+            print(f"DSPy generation error: {e}")
+            return "", GenerationStats()
+
+        return answer, query_stats
+
+    def convert(self, candidate: DataRecord, fields: List[str]) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+        """ This function is responsible for the LLM conversion process. 
+        Different strategies may/should reimplement this function and leave the __call__ function untouched.
+        The input is ...
+        Outputs:
+         - field_outputs: a dictionary where keys are the fields and values are lists of JSON corresponding to the value of the field in that record.
+         - query_stats
+        """
+        raise NotImplementedError("This is an abstract class. Use a subclass instead!")
+
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
+        start_time = time.time()
+
+        # get fields to generate with this convert
+        fields_to_generate = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
+
+        # # get the content to be fed into the model
+        # content = self._get_candidate_content(self.model, candidate)
+
+        # execute the convert
         field_answers: Dict[str, List]
-        field_answers, generation_stats = self.convert(
-            fields=fields_to_generate, candidate_content=content
-        )
+        field_answers, generation_stats = self.convert(candidate=candidate, fields=fields_to_generate)
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
@@ -689,15 +685,20 @@ class LLMConvertConventional(LLMConvert):
 
         # set refined estimate of time and cost per record
         naive_op_cost_estimates.time_per_record = model_conversion_time_per_record
+        naive_op_cost_estimates.time_per_record_lower_bound = naive_op_cost_estimates.time_per_record
+        naive_op_cost_estimates.time_per_record_upper_bound = naive_op_cost_estimates.time_per_record
         naive_op_cost_estimates.cost_per_record = model_conversion_usd_per_record
+        naive_op_cost_estimates.cost_per_record_lower_bound = naive_op_cost_estimates.cost_per_record
+        naive_op_cost_estimates.cost_per_record_upper_bound = naive_op_cost_estimates.cost_per_record
 
         return naive_op_cost_estimates
 
     def convert(
-        self, candidate_content: Union[str, List[bytes]], fields: List[str]
+        self, candidate: DataRecord, fields: List[str]
     ) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
         fields_answers = {}
         fields_stats = {}
+        candidate_content = self._get_candidate_content(self.model, candidate)
         for field_name in fields:
             prompt = self._construct_query_prompt(fields_to_generate=[field_name])
             answer, stats = self._dspy_generate_fields(
@@ -716,9 +717,10 @@ class LLMConvertConventional(LLMConvert):
 class LLMConvertBonded(LLMConvert):
 
     def convert(self,
-                candidate_content,
+                candidate,
                 fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
         prompt = self._construct_query_prompt(fields_to_generate=fields)
+        candidate_content = self._get_candidate_content(self.model, candidate)
 
         # generate all fields in a single query
         answer, generation_stats = self._dspy_generate_fields(
@@ -733,7 +735,7 @@ class LLMConvertBonded(LLMConvert):
             if values == []:
                 conventional_op = LLMConvertConventional(**self.get_copy_kwargs())
 
-                field_answer, field_stats = conventional_op.convert(candidate_content, [field])
+                field_answer, field_stats = conventional_op.convert(candidate, [field])
                 json_answers[field] = field_answer[field]
                 generation_stats += field_stats
 

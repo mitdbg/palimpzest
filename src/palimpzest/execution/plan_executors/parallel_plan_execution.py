@@ -132,7 +132,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                     # process each record output by the future's operator
                     for record in record_set:
                         # skip records which are filtered out
-                        if not getattr(record, "_passed_filter", True):
+                        if not getattr(record, "_passed_operator", True):
                             continue
 
                         # add records (which are not filtered) to the cache, if allowed

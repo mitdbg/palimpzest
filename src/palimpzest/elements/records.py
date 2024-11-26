@@ -52,6 +52,32 @@ class DataRecord:
         self._id = hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
         self._parent_id = parent_id
 
+    def _copy(self, include_bytes: bool = True, project_cols: List[str] | None = None):
+        # make new record which has parent_record as its parent (and the same source_id)
+        new_dr = DataRecord(
+            self.schema,
+            source_id=self._source_id,
+            parent_id=self._id,
+            cardinality_idx=self._cardinality_idx,
+        )
+
+        # get the set of fields to copy from the parent record
+        copy_fields = project_cols if project_cols is not None else self._getFields()
+
+        # copy fields from the parent
+        for field in copy_fields:
+            if (
+                not include_bytes
+                and isinstance(self.__dict__[field], bytes)
+                or (isinstance(self.__dict__[field], list) and len(self.__dict__[field]) > 0 and isinstance(self.__dict__[field][0], bytes))
+            ):
+                continue
+
+            # set attribute
+            setattr(new_dr, field, getattr(self, field))
+
+        return new_dr
+
     @staticmethod
     def fromParent(
         schema: Schema,

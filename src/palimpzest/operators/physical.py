@@ -104,6 +104,22 @@ class PhysicalOperator:
         copy_kwargs = self.get_copy_kwargs()
         return self.__class__(**copy_kwargs)
 
+    def _generate_field_names(self, candidate: DataRecord, inputSchema: Schema, outputSchema: Schema) -> list[str]:
+        """
+        Creates the list of field names that the convert operation needs to generate.
+        """
+        # construct the list of fields in outputSchema which will need to be generated;
+        # specifically, this is the set of fields which are:
+        # 1. not declared in the input schema, and
+        # 2. not present in the candidate's attributes
+        #    a. if the field is present, but its value is None --> we will try to generate it
+        fields_to_generate = []
+        for field_name in outputSchema.fieldNames():
+            if field_name not in inputSchema.fieldNames() and getattr(candidate, field_name, None) is None:
+                fields_to_generate.append(field_name)
+
+        return fields_to_generate
+
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         raise NotImplementedError("Calling __call__ from abstract method")
 

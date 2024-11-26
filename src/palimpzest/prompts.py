@@ -55,9 +55,43 @@ Your answer must be TRUE or FALSE.
 
 FILTER CONDITION: {filter_condition}
 
-ANSWER: 
-"""
+ANSWER: """
 
+### MIXTURE-OF-AGENTS PROMPTS ###
+MOA_ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR = "an output that describes an object of type {doc_type}."
+MOA_ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR = "an output that describes one or more objects of type {doc_type}."
+
+MOA_STRUCTURED_CONVERT_PROMPT = """I would like you to create {targetOutputDescriptor}
+You will use the information in an input JSON object that I will provide. The input object has type {input_type}.
+All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
+{optionalInputDesc}
+{optionalOutputDesc}
+Here is every input field name and a description: 
+{multilineInputFieldDescription}
+Here is the field name and a description of every field which should be present in your output:
+{multilineOutputFieldDescription}
+Your output should be a paragraph or two describing what you believe should be the keys and values of the output object of type {doc_type}. Be sure to cite information from the Context as evidence of why your output is correct. Do not hallucinate evidence, and if you are uncertain about any parts of the output -- say so."""
+
+MOA_IMAGE_CONVERT_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor}.
+You will use the information in the image that I will provide. The input image(s) has type {input_type}.
+All of the fields in {outputSingleOrPlural} can be derived using information from the input image(s).
+{optionalInputDesc}
+{optionalOutputDesc}
+Here is the field name and a description of every field which should be present in your output:
+{multilineOutputFieldDescription}.
+Your output should be a paragraph or two describing what you believe should be the keys and values of the output object of type {doc_type}.
+**Include text snippets from the Context as evidence of why your output is correct.**
+Do not hallucinate evidence, and if you are uncertain about any parts of the output -- say so."""
+
+MOA_AGGREGATOR_CONVERT_PROMPT = """I would like you to create {targetOutputDescriptor}
+You will use the information in the provided model responses to synthesize your response.
+All of the fields in {outputSingleOrPlural} can be derived using information from the responses.
+{optionalOutputDesc}
+Here is the field name and a description of every field which should be present in your output:
+{multilineOutputFieldDescription}
+{appendixInstruction}
+{optional_desc}
+"""
 
 ### CODE SYNTHESIS PROMPTS ###
 EXAMPLE_PROMPT = """Example{idx}:
