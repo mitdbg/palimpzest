@@ -299,7 +299,7 @@ def build_image_agg_plan(dataset_id):
 
 
 def print_table(records, cols=None, gradio=False, plan_str=None):
-    records = [{key: record.__dict__[key] for key in record.__dict__ if not key.startswith("_")} for record in records]
+    records = [{key: record[key] for key in record.get_fields()} for record in records]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
     final_df = records_df[print_cols] if not records_df.empty else pd.DataFrame(columns=print_cols)

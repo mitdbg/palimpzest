@@ -54,6 +54,9 @@ class DataRecord:
         else:
             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
+    def __getitem__(self, key):
+        return self.__getattr__(key)
+
     def __str__(self):
         items = (f"{k}={str(v)[:15]!r}..." for k, v in sorted(self._data.items()))
         return "{}({})".format(type(self).__name__, ", ".join(items))
