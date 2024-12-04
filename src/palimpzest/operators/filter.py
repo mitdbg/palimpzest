@@ -133,14 +133,14 @@ class LLMFilter(FilterOp):
         if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
             if not self.image_filter:
                 self.generator = DSPyGenerator(
-                    self.model.value,
+                    self.model,
                     self.prompt_strategy,
                     doc_schema,
                     doc_type,
                     verbose=self.verbose,
                 )
             else:
-                self.generator = ImageTextGenerator(self.model.value, self.verbose)
+                self.generator = ImageTextGenerator(self.model, self.verbose)
 
         else:
             raise Exception(f"Prompt strategy {self.prompt_strategy} not implemented yet")
@@ -260,7 +260,7 @@ class LLMFilter(FilterOp):
         # invoke LLM to generate filter decision (True or False)
         response, gen_stats = None, GenerationStats()
         try:
-            response, gen_stats = self.generator.generate(context=content, question=prompt)
+            response, _, gen_stats = self.generator.generate(context=content, question=prompt)
         except Exception as e:
             print(f"Error invoking LLM for filter: {e}")
 

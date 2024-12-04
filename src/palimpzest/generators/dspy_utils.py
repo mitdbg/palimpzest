@@ -4,6 +4,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 import dspy
 import requests
+import tiktoken
 
 ### DSPy Signatures ###
 # functions which generate signatures
@@ -64,6 +65,8 @@ class TogetherHFAdaptor(HFModel):
         self.api_base = "https://api.together.xyz/inference"
         self.token = apiKey
         self.model = model
+        # using tiktoken as a rough approximation for both Llama3 and Mixtral (which are based on tiktoken tokenizers)
+        self.tokenizer = tiktoken.get_encoding('cl100k_base')
 
         self.use_inst_template = False
         if any(keyword in self.model.lower() for keyword in ["inst", "instruct"]):
@@ -73,13 +76,13 @@ class TogetherHFAdaptor(HFModel):
 
         # print("Stop procedure", stop_default)
         self.kwargs = {
-            "max_tokens": 512, # 8192
+            "max_tokens": 4096, # 8192
             "top_p": 1,
             "top_k": 20,
             "repetition_penalty": 1,
             "frequency_penalty": 1,
             "n": 1,
-            # "stop": stop_default if "stop" not in kwargs else kwargs["stop"],
+            "stop": stop_default if "stop" not in kwargs else kwargs["stop"],
             **kwargs
         }
 
@@ -95,9 +98,10 @@ class TogetherHFAdaptor(HFModel):
         kwargs = {**self.kwargs, **kwargs}
         stop = kwargs.get("stop")
         temperature = kwargs.get("temperature")
-        max_tokens = kwargs.get("max_tokens", 150)
-        top_p = kwargs.get("top_p", 0.7)
-        top_k = kwargs.get("top_k", 50)
+        prompt_tokens = len(self.tokenizer.encode(prompt)) + 150 # buffer for differences between tiktoken and actual tokenizers
+        max_tokens = kwargs.get("max_tokens") if prompt_tokens + kwargs.get("max_tokens") < 8192 else 8192 - prompt_tokens
+        # top_p = kwargs.get("top_p", 0.7)
+        # top_k = kwargs.get("top_k", 50)
         repetition_penalty = kwargs.get("repetition_penalty", 1)
         logprobs = kwargs.get("logprobs", 0)
         prompt = f"[INST]{prompt}[/INST]" if self.use_inst_template else prompt
@@ -112,8 +116,8 @@ class TogetherHFAdaptor(HFModel):
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
-                "top_p": top_p,
-                "top_k": top_k,
+                # "top_p": top_p,
+                # "top_k": top_k,
                 "repetition_penalty": repetition_penalty,
                 "stop": stop,
                 "logprobs": logprobs,
@@ -124,8 +128,8 @@ class TogetherHFAdaptor(HFModel):
                 "prompt": prompt,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
-                "top_p": top_p,
-                "top_k": top_k,
+                # "top_p": top_p,
+                # "top_k": top_k,
                 "repetition_penalty": repetition_penalty,
                 "stop": stop,
                 "logprobs": logprobs,

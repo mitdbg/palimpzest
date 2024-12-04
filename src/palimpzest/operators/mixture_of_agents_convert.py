@@ -39,6 +39,21 @@ class MixtureOfAgentsConvert(LLMConvert):
         self.aggregator_model = aggregator_model
         self.proposer_prompt = proposer_prompt
 
+        # create generators
+        doc_schema = str(self.outputSchema)
+        doc_type = self.outputSchema.className()
+
+        self.proposer_generators = []
+        for model in proposer_models:
+            generator = (
+                ImageTextGenerator(model, self.verbose)
+                if self.image_conversion
+                else DSPyGenerator(model, self.prompt_strategy, doc_schema, doc_type, self.verbose)
+            )
+            self.proposer_generators.append(generator)
+
+        self.aggregator_generator = DSPyGenerator(aggregator_model, self.prompt_strategy, doc_schema, doc_type, self.verbose)
+
     def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
@@ -115,37 +130,24 @@ class MixtureOfAgentsConvert(LLMConvert):
 
     def _dspy_generate_fields(
             self,
-            model: Model,
+            generator: DSPyGenerator | ImageTextGenerator,
             prompt: str,
             content: str | list[str] | None = None,
-            prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_QA,
             temperature: float=0.0,
-            verbose: bool = False,
         ) -> tuple[str | GenerationStats]:
-        # create DSPy generator and generate
-        doc_schema = str(self.outputSchema)
-        doc_type = self.outputSchema.className()
-
         # generate LLM response and capture statistics
         answer:str
         query_stats:GenerationStats
 
-        if self.image_conversion:
-            generator = ImageTextGenerator(model.value, verbose)
-        else:
-            generator = DSPyGenerator(
-                model.value, prompt_strategy, doc_schema, doc_type, verbose
-            )
-
         try:
-            answer, query_stats = generator.generate(context=content, question=prompt, temperature=temperature)
+            answer, rationale, query_stats = generator.generate(context=content, question=prompt, temperature=temperature)
         except Exception as e:
             print(f"DSPy generation error: {e}")
-            return "", GenerationStats()
+            return "", "", GenerationStats()
 
-        return answer, query_stats
+        return answer, rationale, query_stats
 
-    def _construct_proposer_prompt(self, fields_to_generate: list[str]) -> str:
+    def _construct_proposer_prompt(self, fields_to_generate: list[str], model: Model) -> str:
         # set defaults
         doc_type = self.outputSchema.className()
 
@@ -192,6 +194,7 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         # construct promptQuestion
         optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
+        model_instruction = prompts.LLAMA_INSTRUCTION if model in [Model.LLAMA3, Model.LLAMA3_V] else ""
         if not self.image_conversion:
             prompt_question = prompts.MOA_STRUCTURED_CONVERT_PROMPT
         else:
@@ -206,11 +209,13 @@ class MixtureOfAgentsConvert(LLMConvert):
             multilineInputFieldDescription=multilineInputFieldDescription,
             multilineOutputFieldDescription=multilineOutputFieldDescription,
             doc_type=doc_type,
+            model_instruction=model_instruction,
         )
 
         return prompt_question
 
     def _construct_aggregator_prompt(self, fields_to_generate: list[str]) -> str:
+        # TODO: self.aggregator_model to add instruction for Llama
         # set defaults
         doc_type = self.outputSchema.className()
 
@@ -259,6 +264,7 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         # construct promptQuestion
         optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
+        model_instruction = prompts.LLAMA_INSTRUCTION if self.aggregator_model in [Model.LLAMA3, Model.LLAMA3_V] else ""
         prompt_question = prompts.MOA_AGGREGATOR_CONVERT_PROMPT
 
         prompt_question = prompt_question.format(
@@ -268,22 +274,35 @@ class MixtureOfAgentsConvert(LLMConvert):
             multilineOutputFieldDescription=multilineOutputFieldDescription,
             optional_desc=optional_desc,
             appendixInstruction=appendixInstruction,
+            model_instruction=model_instruction,
         )
 
         return prompt_question
 
-    def _call_proposer(self, proposer_model, temperature, proposer_prompt, candidate, verbose):
+    def _call_proposer(self, proposer_generator, temperature, fields, candidate):
+        # TODO: maybe we accept general prompts; but this should also work for default prompts;
+        # ask the model to output natural language instead of JSON, and justify its response with
+        # citations from the Context
+        # get the proposer prompt (this formats the Question in the DSPy/ImageTextGenerator)
+        proposer_model = proposer_generator.model
+        proposer_prompt = self._construct_proposer_prompt(fields_to_generate=fields, model=proposer_model)
         proposer_candidate_content = self._get_candidate_content(proposer_model, candidate)
-        answer, generation_stats = self._dspy_generate_fields(
-            model=proposer_model,
+        answer, rationale, generation_stats = self._dspy_generate_fields(
+            generator=proposer_generator,
             prompt=proposer_prompt,
             content=proposer_candidate_content,
             temperature=temperature,
-            verbose=verbose,
         )
-        return answer, generation_stats
+        final_answer = f"Reasoning: Let's think step by step in order to {rationale}\n\nAnswer: {answer}"
 
-    def _call_aggregator(self, aggregator_prompt: str, proposer_model_answers: list[str]) -> str:
+        return final_answer, generation_stats
+
+    def _call_aggregator(self, proposer_model_answers: list[str], fields: list[str]) -> str:
+        # TODO: one issue here is that the model does not see the input fields, which are specified
+        # in the standard self._construct_query_prompt, so this may cause confusion and it would
+        # be better to modify the aggregator_prompt to only specify the expected output; e.g. add aggregator=True to the call below
+        aggregator_prompt = self._construct_aggregator_prompt(fields_to_generate=fields)
+
         # format proposer_model_answers for DSPyCOT prompt
         responses = "\n"
         for idx, proposer_model_answer in enumerate(proposer_model_answers):
@@ -292,45 +311,21 @@ class MixtureOfAgentsConvert(LLMConvert):
         # remove final \n
         responses = responses[:-1]
 
-        answer, generation_stats = self._dspy_generate_fields(
-            model=self.aggregator_model,
+        answer, _, generation_stats = self._dspy_generate_fields(
+            generator=self.aggregator_generator,
             prompt=aggregator_prompt,
             content=responses,
-            prompt_strategy=PromptStrategy.DSPY_COT_MOA_AGG,
-            verbose=self.verbose,
         )
 
         return answer, generation_stats
 
     def convert(self, candidate, fields) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
-        # TODO: maybe we accept general prompts; but this should also work for default prompts;
-        # ask the model to output natural language instead of JSON, and justify its response with
-        # citations from the Context
-        # get the proposer prompt (this formats the Question in the DSPy/ImageTextGenerator)
-        proposer_prompt = self._construct_proposer_prompt(fields_to_generate=fields)
-
-        # proposer_prompt = (
-        #     self._construct_query_prompt(fields_to_generate=fields)
-        #     if self.proposer_prompt is None
-        #     else self.proposer_prompt
-        # )
-        # TODO: one issue here is that the model does not see the input fields, which are specified
-        # in the standard self._construct_query_prompt, so this may cause confusion and it would
-        # be better to modify the aggregator_prompt to only specify the expected output; e.g. add aggregator=True to the call below
-        aggregator_prompt = self._construct_aggregator_prompt(fields_to_generate=fields)
-        
-        # aggregator_prompt = self._construct_query_prompt(fields_to_generate=fields)
-
         # call proposers asynchronously in parallel
         proposer_model_answers, proposer_model_stats = [], []
-        # for proposer_model, temperature in zip(self.proposer_models, self.temperatures):
-        #     answer, stats = self._call_proposer(proposer_model, temperature, proposer_prompt, candidate, self.verbose)
-        #     proposer_model_answers.append(answer)
-        #     proposer_model_stats.append(stats)
-        with ThreadPoolExecutor(max_workers=len(self.proposer_models)) as executor:
+        with ThreadPoolExecutor(max_workers=len(self.proposer_generators)) as executor:
             futures = []
-            for proposer_model, temperature in zip(self.proposer_models, self.temperatures):
-                generate_answer = partial(self._call_proposer, proposer_model, temperature, proposer_prompt, candidate, self.verbose)
+            for proposer_generator, temperature in zip(self.proposer_generators, self.temperatures):
+                generate_answer = partial(self._call_proposer, proposer_generator, temperature, fields, candidate)
                 futures.append(executor.submit(generate_answer))
 
             # block until all futures have finished
@@ -341,13 +336,13 @@ class MixtureOfAgentsConvert(LLMConvert):
             # get outputs
             proposer_model_answers, proposer_model_stats = zip(*[future.result() for future in done_futures])
 
-        # call the aggregator model
-        final_answer, aggregator_gen_stats = self._call_aggregator(aggregator_prompt, proposer_model_answers)
+        # call the aggregator
+        final_answer, aggregator_gen_stats = self._call_aggregator(proposer_model_answers, fields)
 
         # compute the total generation stats
         generation_stats = sum(proposer_model_stats) + aggregator_gen_stats
 
         # parse the final answer
-        json_answers = self.parse_answer(final_answer, fields)
+        json_answers = self.parse_answer(final_answer, fields, self.aggregator_model)
 
         return json_answers, generation_stats

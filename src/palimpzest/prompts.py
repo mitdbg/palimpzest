@@ -13,6 +13,7 @@ OPTIONAL_INPUT_DESC = "Here is a description of the input object: {desc}."
 OPTIONAL_OUTPUT_DESC = "Here is a description of the output object: {desc}."
 
 OPTIONAL_DESC = "Keep in mind that this process is described by this text: {desc}."
+LLAMA_INSTRUCTION = "Keep your answer brief and to the point. Do not repeat yourself endlessly."
 
 ### ONE TO ONE ###
 ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR = "an output JSON object that describes an object of type {doc_type}."
@@ -35,7 +36,8 @@ Here is every input field name and a description:
 Here is every output field name and a description:
 {multilineOutputFieldDescription}
 {appendixInstruction}
-{optional_desc}"""
+{optional_desc}
+{model_instruction}"""
 
 IMAGE_CONVERT_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor}.
 You will use the information in the image that I will provide. The input image(s) has type {input_type}.
@@ -45,7 +47,8 @@ All of the fields in {outputSingleOrPlural} can be derived using information fro
 Here is every output field name and a description:
 {multilineOutputFieldDescription}
 {appendixInstruction}
-{optional_desc}"""
+{optional_desc}
+{model_instruction}"""
 
 IMAGE_FILTER_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and:
 - Output TRUE if the given image satisfies the filter condition
@@ -81,7 +84,8 @@ Here is the field name and a description of every field which should be present 
 {multilineOutputFieldDescription}.
 Your output should be a paragraph or two describing what you believe should be the keys and values of the output object of type {doc_type}.
 **Include text snippets from the Context as evidence of why your output is correct.**
-Do not hallucinate evidence, and if you are uncertain about any parts of the output -- say so."""
+Do not hallucinate evidence, and if you are uncertain about any parts of the output -- say so.
+{model_instruction}"""
 
 MOA_AGGREGATOR_CONVERT_PROMPT = """I would like you to create {targetOutputDescriptor}
 You will use the information in the provided model responses to synthesize your response.
@@ -91,6 +95,7 @@ Here is the field name and a description of every field which should be present 
 {multilineOutputFieldDescription}
 {appendixInstruction}
 {optional_desc}
+{model_instruction}
 """
 
 ### CODE SYNTHESIS PROMPTS ###

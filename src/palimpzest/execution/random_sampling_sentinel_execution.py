@@ -54,6 +54,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             sample_all_records: bool = False,
             sample_start_idx: int | None = None,
             sample_end_idx: int | None = None,
+            use_final_op_quality: bool = False,
             seed: int = 42,
             exp_name: str | None = None,
             *args,
@@ -70,6 +71,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         self.sample_all_records = sample_all_records
         self.sample_start_idx = sample_start_idx
         self.sample_end_idx = sample_end_idx
+        self.use_final_op_quality = use_final_op_quality
         self.pick_output_fn = self.pick_ensemble_output
         self.rng = np.random.default_rng(seed=seed)
         self.exp_name = exp_name
@@ -630,6 +632,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
             optimization_strategy=self.optimization_strategy,
+            use_final_op_quality=self.use_final_op_quality,
         )
         total_optimization_time = time.time() - execution_start_time
 
@@ -640,7 +643,6 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             all_plan_stats.extend(plan_stats)
 
         else:
-            print(policy)
             records, plan_stats = self.execute_strategy(dataset, policy, optimizer)
             all_records.extend(records)
             all_plan_stats.extend(plan_stats)

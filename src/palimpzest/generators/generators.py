@@ -30,7 +30,7 @@ import os
 import time
 
 # DEFINITIONS
-GenerationOutput = Tuple[str, GenerationStats]
+GenerationOutput = Tuple[str, str | None, GenerationStats]
 
 
 def get_api_key(key: str) -> str:
@@ -60,9 +60,10 @@ class CustomGenerator(BaseGenerator):
     Class for generating outputs with a given model using a custom prompt.
     """
 
-    def __init__(self, model_name: str, verbose: bool = False):
+    def __init__(self, model: Model, verbose: bool = False):
         super().__init__()
-        self.model_name = model_name
+        self.model = model
+        self.model_name = model.value
         self.verbose = verbose
 
     def _get_model(self, temperature: float=0.0) -> dsp.LM:
@@ -216,7 +217,7 @@ class CustomGenerator(BaseGenerator):
             print("Prompt history:")
             dspy_lm.inspect_history(n=1)
 
-        return answer, stats
+        return answer, None, stats
 
 
 class DSPyGenerator(BaseGenerator):
@@ -226,14 +227,15 @@ class DSPyGenerator(BaseGenerator):
 
     def __init__(
         self,
-        model_name: str,
+        model: Model,
         prompt_strategy: PromptStrategy,
         doc_schema: str,
         doc_type: str,
         verbose: bool = False,
     ):
         super().__init__()
-        self.model_name = model_name
+        self.model = model
+        self.model_name = model.value
         self.prompt_strategy = prompt_strategy
         self.verbose = verbose
 
@@ -439,7 +441,7 @@ class DSPyGenerator(BaseGenerator):
             # )
             # print(output_str)
 
-        return pred.answer, stats
+        return pred.answer, pred.rationale, stats
 
 
 class ImageTextGenerator(BaseGenerator):
@@ -447,9 +449,10 @@ class ImageTextGenerator(BaseGenerator):
     Class for generating field descriptions for an image with a given image model.
     """
 
-    def __init__(self, model_name: str, verbose: bool = False):
+    def __init__(self, model: Model, verbose: bool = False):
         super().__init__()
-        self.model_name = model_name
+        self.model = model
+        self.model_name = model.value
         self.verbose = verbose
 
     def _decode_image(self, base64_string: str) -> bytes:
@@ -668,7 +671,7 @@ class ImageTextGenerator(BaseGenerator):
             # "answer": pred.answer,
         })
 
-        return answer, stats
+        return answer, None, stats
 
 
 

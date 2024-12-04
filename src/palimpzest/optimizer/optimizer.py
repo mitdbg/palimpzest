@@ -67,6 +67,7 @@ class Optimizer:
             allow_token_reduction: bool=True,
             allow_mixtures: bool=True,
             optimization_strategy: OptimizationStrategy=OptimizationStrategy.PARETO,
+            use_final_op_quality: bool=True, # TODO: make this func(plan) -> final_quality
         ):
         # store the policy
         self.policy = policy
@@ -114,6 +115,7 @@ class Optimizer:
         self.allow_token_reduction = allow_token_reduction
         self.allow_mixtures = allow_mixtures
         self.optimization_strategy = optimization_strategy
+        self.use_final_op_quality = use_final_op_quality
 
         # prune implementation rules based on boolean flags
         if not self.allow_bonded_query:
@@ -535,14 +537,27 @@ class Optimizer:
             # compute all of the pareto optimal physical plans
             plans = self.get_candidate_pareto_physical_plans(final_group_id, policy)
 
+            import pdb; pdb.set_trace()
+
             # filter pareto optimal plans for ones which satisfy policy constraint (if at least one of them does)
             if any([policy.constraint(plan.plan_cost) for plan in plans]):
                 plans = [plan for plan in plans if policy.constraint(plan.plan_cost)]
+
+            import pdb; pdb.set_trace()
+
+            # adjust plans' plan_cost.quality to reflect only the quality of the final operator
+            if self.use_final_op_quality:
+                for plan in plans:
+                    plan.plan_cost.quality = plan.plan_cost.op_estimates.quality
+
+            import pdb; pdb.set_trace()
 
             # select the plan which is best for the given policy
             optimal_plan, plans = plans[0], plans[1:]
             for plan in plans:
                 optimal_plan = optimal_plan if policy.choose(optimal_plan.plan_cost, plan.plan_cost) else plan
+            
+            import pdb; pdb.set_trace()
 
             plans = [optimal_plan]
 

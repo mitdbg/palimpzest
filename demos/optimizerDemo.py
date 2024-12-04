@@ -220,14 +220,6 @@ class BiodexEntry(pz.Schema):
     abstract = pz.StringField(desc="The abstract of the medical paper", required=True)
     fulltext = pz.StringField(desc="The full text of the medical paper, which contains information relevant for creating a drug safety report.", required=True)
 
-# class BiodexEmbeddings(pz.Schema):
-#     pmid = pz.StringField(desc="The PubMed ID of the medical paper", required=True)
-#     serious_embeddings = pz.StringField(desc="text chunks related to severity of adverse reaction", required=True)
-#     patientsex_embeddings = pz.StringField(desc="text chunks related to patient sex", required=True)
-#     drugs_embeddings = pz.StringField(desc="text chunks related to drugs mentioned in paper", required=True)
-#     reactions_embeddings = pz.StringField(desc="text chunks related to adverse reactions mentioned in paper", required=True)
-
-# class BiodexSerious(BiodexEmbeddings):
 class BiodexSerious(BiodexEntry):
     """
     You will be presented with the text of a medical article which is partially or entirely about
@@ -478,7 +470,7 @@ if __name__ == "__main__":
         "--model", default='gpt-4o', type=str, help="One of 'gpt-4o', 'gpt-4o-mini', 'llama', 'mixtral'",
     )
     parser.add_argument(
-        "--seed", default=123, type=int, help="Seed used to initialize RNG for MAB sampling algorithm",
+        "--seed", default=42, type=int, help="Seed used to initialize RNG for MAB sampling algorithm",
     )
     parser.add_argument(
         "--k", default=10, type=int, help="Number of columns to sample in Random Sampling or MAB sentinel execution",
@@ -576,7 +568,7 @@ if __name__ == "__main__":
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     # create pz plan
-    plan = None
+    plan, use_final_op_quality = None, False
     if workload == "enron":
         # datasetid="enron-eval" for paper evaluation
         plan = pz.Dataset(datasetid, schema=Email)
@@ -598,7 +590,7 @@ if __name__ == "__main__":
             listings_dir=data_filepath,
             num_samples=val_examples,
             shuffle=False,
-            seed=42,
+            seed=seed,
         )
         pz.DataDirectory().registerUserSource(
             src=datasource,
@@ -629,7 +621,7 @@ if __name__ == "__main__":
             datasetId=f"{user_dataset_id}",
             num_samples=val_examples,
             shuffle=False,
-            seed=42,
+            seed=seed,
         )
         pz.DataDirectory().registerUserSource(
             src=datasource,
@@ -646,6 +638,9 @@ if __name__ == "__main__":
         ) # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
         plan = plan.convert(BiodexRankedReactions)
 
+        # only use final op quality
+        use_final_op_quality = True
+
     elif workload == "biodex":
         user_dataset_id = f"biodex-user"
 
@@ -659,7 +654,7 @@ if __name__ == "__main__":
             reactions_only=False,
             num_samples=val_examples,
             shuffle=False,
-            seed=42,
+            seed=seed,
         )
         pz.DataDirectory().registerUserSource(
             src=datasource,
@@ -678,6 +673,9 @@ if __name__ == "__main__":
             # k=10, # if we set k, then it will be fixed; if we leave it unspecified then the optimizer will choose
         ) # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
         plan = plan.convert(BiodexRankedReactions)
+
+        # only use final op quality
+        use_final_op_quality = True
 
     # select optimization strategy and available models based on engine
     optimization_strategy, available_models = None, None
@@ -701,9 +699,10 @@ if __name__ == "__main__":
         available_models = [model_str_to_model[args.model]] + [model_str_to_vision_model[args.model]]
 
     # execute pz plan
+    from palimpzest.policy import MinCostAtFixedQuality
     records, execution_stats = pz.Execute(
         plan,
-        policy,
+        MinCostAtFixedQuality(min_quality=0.05), # policy,
         nocache=True,
         available_models=available_models,
         optimization_strategy=optimization_strategy,
@@ -718,6 +717,7 @@ if __name__ == "__main__":
         verbose=verbose,
         exp_name=exp_name,
         allow_code_synth=False, #(workload != "biodex"),
+        use_final_op_quality=use_final_op_quality,
         max_workers=20,
     )
 

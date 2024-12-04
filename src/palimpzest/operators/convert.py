@@ -180,6 +180,17 @@ class LLMConvert(ConvertOp):
         self.prompt_strategy = prompt_strategy
         self.image_conversion = image_conversion
 
+        # create DSPy generator
+        if self.model is not None:
+            doc_schema = str(self.outputSchema)
+            doc_type = self.outputSchema.className()
+            if self.image_conversion:
+                self.generator = ImageTextGenerator(self.model, self.verbose)
+            else:
+                self.generator = DSPyGenerator(
+                    self.model, self.prompt_strategy, doc_schema, doc_type, self.verbose
+                )
+
     def __eq__(self, other: PhysicalOperator):
         return (
             isinstance(other, self.__class__)
@@ -261,6 +272,7 @@ class LLMConvert(ConvertOp):
     def _construct_query_prompt(
         self,
         fields_to_generate: List[str],
+        model: Model,
     ) -> str:
         """
         This function constructs the prompt for a bonded query.
@@ -304,6 +316,9 @@ class LLMConvert(ConvertOp):
             if self.outputSchema.__doc__ is None
             else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.outputSchema.__doc__)
         )
+
+        # add optional model instruction
+        model_instruction = prompts.LLAMA_INSTRUCTION if model in [Model.LLAMA3, Model.LLAMA3_V] else ""
 
         # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
         if self.cardinality == Cardinality.ONE_TO_MANY:
@@ -349,7 +364,8 @@ class LLMConvert(ConvertOp):
             multilineInputFieldDescription = multilineInputFieldDescription,
             multilineOutputFieldDescription = multilineOutputFieldDescription,
             appendixInstruction = appendixInstruction,
-            optional_desc = optional_desc
+            optional_desc = optional_desc,
+            model_instruction = model_instruction,
         )
         # TODO: add this for boolean questions?
         # if prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
@@ -451,14 +467,14 @@ class LLMConvert(ConvertOp):
         return dr
 
     def parse_answer(
-        self, answer: str, fields_to_generate: List[str]
+        self, answer: str, fields_to_generate: List[str], model: Model,
     ) -> Dict[FieldName, List[Any]]:
         """ 
         This functions gets a string answer and parses it into an iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
         # """
         try:
             # parse json from answer string
-            json_answer = getJsonFromAnswer(answer, self.model)
+            json_answer = getJsonFromAnswer(answer, model)
 
             # sanity check validity of parsed json
             assert json_answer != {}, "No output was found!"
@@ -555,26 +571,14 @@ class LLMConvert(ConvertOp):
         self,
         prompt: str,
         content: Optional[Union[str, List[bytes]]] = None, #either text or image
-        verbose: bool = False,
     ) -> Tuple[str, GenerationStats]:
         """ This functions wraps the call to the generator method to actually perform the field generation. Returns an answer which is a string and a query_stats which is a GenerationStats object.
         """
-        # create DSPy generator and generate
-        doc_schema = str(self.outputSchema)
-        doc_type = self.outputSchema.className()
-
         # generate LLM response and capture statistics
         answer:str
         query_stats:GenerationStats
-        if self.image_conversion:
-            generator = ImageTextGenerator(self.model.value, verbose)
-        else:
-            generator = DSPyGenerator(
-                self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
-            )
-
         try:
-            answer, query_stats = generator.generate(context=content, question=prompt)
+            answer, _, query_stats = self.generator.generate(context=content, question=prompt)
         except Exception as e:
             print(f"DSPy generation error: {e}")
             return "", GenerationStats()
@@ -700,13 +704,9 @@ class LLMConvertConventional(LLMConvert):
         fields_stats = {}
         candidate_content = self._get_candidate_content(self.model, candidate)
         for field_name in fields:
-            prompt = self._construct_query_prompt(fields_to_generate=[field_name])
-            answer, stats = self._dspy_generate_fields(
-                content=candidate_content,
-                prompt=prompt,
-                verbose=self.verbose,
-            )
-            json_answer = self.parse_answer(answer, [field_name])
+            prompt = self._construct_query_prompt(fields_to_generate=[field_name], model=self.model)
+            answer, stats = self._dspy_generate_fields(content=candidate_content, prompt=prompt)
+            json_answer = self.parse_answer(answer, [field_name], self.model)
             fields_answers.update(json_answer)
             fields_stats[field_name] = stats
 
@@ -719,16 +719,12 @@ class LLMConvertBonded(LLMConvert):
     def convert(self,
                 candidate,
                 fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
-        prompt = self._construct_query_prompt(fields_to_generate=fields)
+        prompt = self._construct_query_prompt(fields_to_generate=fields, model=self.model)
         candidate_content = self._get_candidate_content(self.model, candidate)
 
         # generate all fields in a single query
-        answer, generation_stats = self._dspy_generate_fields(
-            content=candidate_content,
-            prompt=prompt,
-            verbose=self.verbose,
-        )
-        json_answers = self.parse_answer(answer, fields)
+        answer, generation_stats = self._dspy_generate_fields(content=candidate_content, prompt=prompt)
+        json_answers = self.parse_answer(answer, fields, self.model)
 
         # if there was an error for any field, execute a conventional query on that field
         for field, values in json_answers.items():
