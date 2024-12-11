@@ -27,6 +27,7 @@ from palimpzest.corelib.schemas import (
     WebPage,
     XLSFile,
 )
+from palimpzest.corelib.schema_builder import SchemaBuilder
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import (
     DataSource,
