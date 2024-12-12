@@ -79,6 +79,7 @@ namespaces = false
 
 
 [tool.pytest.ini_options]
+testpaths = ["tests/pytest"]
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning",
