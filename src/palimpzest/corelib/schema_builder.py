@@ -115,8 +115,16 @@ class SchemaBuilder:
         fields = []
         for col in columns:
             required = not df[col].isnull().values.any()
+
+            field_type = df[col].dtype
+            if field_type == float or field_type == int:  # noqa
+                field_type = "NumericField"
+            else:
+                field_type = "Field"
+
             fields.append({"name":col,
                            "description":"",
+                           "type":field_type,
                            "required":required})
         
         return {
