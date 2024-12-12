@@ -537,27 +537,20 @@ class Optimizer:
             # compute all of the pareto optimal physical plans
             plans = self.get_candidate_pareto_physical_plans(final_group_id, policy)
 
-            import pdb; pdb.set_trace()
-
-            # filter pareto optimal plans for ones which satisfy policy constraint (if at least one of them does)
-            if any([policy.constraint(plan.plan_cost) for plan in plans]):
-                plans = [plan for plan in plans if policy.constraint(plan.plan_cost)]
-
-            import pdb; pdb.set_trace()
-
             # adjust plans' plan_cost.quality to reflect only the quality of the final operator
             if self.use_final_op_quality:
                 for plan in plans:
                     plan.plan_cost.quality = plan.plan_cost.op_estimates.quality
 
-            import pdb; pdb.set_trace()
+            # filter pareto optimal plans for ones which satisfy policy constraint (if at least one of them does)
+            # import pdb; pdb.set_trace()
+            if any([policy.constraint(plan.plan_cost) for plan in plans]):
+                plans = [plan for plan in plans if policy.constraint(plan.plan_cost)]
 
             # select the plan which is best for the given policy
             optimal_plan, plans = plans[0], plans[1:]
             for plan in plans:
                 optimal_plan = optimal_plan if policy.choose(optimal_plan.plan_cost, plan.plan_cost) else plan
-            
-            import pdb; pdb.set_trace()
 
             plans = [optimal_plan]
 

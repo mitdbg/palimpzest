@@ -476,6 +476,9 @@ if __name__ == "__main__":
         "--k", default=10, type=int, help="Number of columns to sample in Random Sampling or MAB sentinel execution",
     )
     parser.add_argument(
+        "--j", default=3, type=int, help="Number of columns to sample in Random Sampling or MAB sentinel execution",
+    )
+    parser.add_argument(
         "--sample-budget", default=100, type=int, help="Total sample budget in Random Sampling or MAB sentinel execution",
     )
     parser.add_argument(
@@ -516,6 +519,7 @@ if __name__ == "__main__":
     seed = args.seed
     val_examples = args.val_examples
     k = args.k
+    j = args.j
     sample_budget = args.sample_budget
     sample_all_ops = args.sample_all_ops
     sample_all_records = args.sample_all_records
@@ -702,12 +706,13 @@ if __name__ == "__main__":
     from palimpzest.policy import MinCostAtFixedQuality
     records, execution_stats = pz.Execute(
         plan,
-        MinCostAtFixedQuality(min_quality=0.05), # policy,
+        policy,
         nocache=True,
         available_models=available_models,
         optimization_strategy=optimization_strategy,
         execution_engine=execution_engine,
         k=k,
+        j=j,
         sample_budget=sample_budget,
         sample_all_ops=sample_all_ops,
         sample_all_records=sample_all_records,

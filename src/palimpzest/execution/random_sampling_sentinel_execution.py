@@ -448,7 +448,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             op_set_id = SentinelPlan.compute_op_set_id(op_set)
             prev_op_set_id = (
                 SentinelPlan.compute_op_set_id(plan.operator_sets[op_set_idx - 1])
-                if op_set_idx > 1
+                if op_set_idx > 0
                 else None
             )
             next_op_set_id = (

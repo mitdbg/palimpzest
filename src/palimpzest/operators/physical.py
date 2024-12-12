@@ -5,6 +5,7 @@ from palimpzest.corelib import Schema
 from palimpzest.dataclasses import OperatorCostEstimates
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import DataRecord, DataRecordSet
+from palimpzest.utils import get_index_str
 
 from typing import Optional
 
@@ -88,7 +89,7 @@ class PhysicalOperator:
         # compute, set, and return the op_id
         op_name = self.op_name()
         op_params = self.get_op_params()
-        op_params = {k: str(v) for k, v in op_params.items()}
+        op_params = {k: str(v) if k != "index" else get_index_str(v) for k, v in op_params.items()}
         hash_str = json.dumps({"op_name": op_name, **op_params}, sort_keys=True)
         self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 

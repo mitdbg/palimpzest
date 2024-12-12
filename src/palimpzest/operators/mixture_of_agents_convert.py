@@ -34,8 +34,9 @@ class MixtureOfAgentsConvert(LLMConvert):
     ):
         kwargs["model"] = None
         super().__init__(*args, **kwargs)
-        self.proposer_models = proposer_models
-        self.temperatures = temperatures
+        sorted_proposers, sorted_temps = zip(*[(m, t) for m, t in sorted(zip(proposer_models, temperatures), key=lambda pair: pair[0])])
+        self.proposer_models = list(sorted_proposers)
+        self.temperatures = list(sorted_temps)
         self.aggregator_model = aggregator_model
         self.proposer_prompt = proposer_prompt
 

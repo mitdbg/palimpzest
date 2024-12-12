@@ -8,6 +8,7 @@ from palimpzest.elements import (
     GroupBySig,
 )
 from palimpzest.datasources import DataSource
+from palimpzest.utils import get_index_str
 
 from typing import Callable, List, Optional, Union
 
@@ -96,7 +97,7 @@ class Set:
             "groupBy": (
                 None if self._groupBy is None else self._groupBy.serialize()
             ),
-            "index": str(self._index),
+            "index": None if self._index is None else get_index_str(self._index),
             "search_attr": self._search_attr,
             "output_attr": self._output_attr,
             "k": self._k,

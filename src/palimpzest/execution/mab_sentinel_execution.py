@@ -188,7 +188,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                         op_to_num_inputs[op_id] += 1
                         op_to_num_outputs[op_id] += num_outputs
 
-            op_to_mean_selectivity = {op_to_num_outputs[op_id] / op_to_num_inputs[op_id] for op_id in op_to_num_inputs.keys()}
+            op_to_mean_selectivity = {op_id: op_to_num_outputs[op_id] / op_to_num_inputs[op_id] for op_id in op_to_num_inputs.keys()}
 
             # compute average cost, time, and quality
             op_to_costs, op_to_times, op_to_qualities = {}, {}, {}
@@ -241,11 +241,13 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         pareto_op_sets = {}
         for op_set_id, op_metrics in op_set_id_to_op_metrics.items():
             pareto_op_sets[op_set_id] = set()
-            for op_id, (cost, time, quality, selectivity) in op_metrics["mean"].items():
+            for op_id, metrics in op_metrics.items():
+                cost, time, quality, selectivity = metrics["mean"]
                 pareto_frontier = True
 
                 # check if any other operator dominates op_id
-                for other_op_id, (other_cost, other_time, other_quality, other_selectivity) in op_metrics["mean"].items():
+                for other_op_id, other_metrics in op_metrics.items():
+                    other_cost, other_time, other_quality, other_selectivity = other_metrics["mean"]
                     if op_id == other_op_id:
                         continue
 
@@ -267,12 +269,17 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         new_reservoir_ops = {op_set_id: [] for op_set_id in reservoir_ops.keys()}
         for op_set_id, pareto_op_set in pareto_op_sets.items():
             num_dropped_from_frontier = 0
-            for op, next_shuffled_sample_idx, new_operator in frontier_ops[op_set_id]:
+            for op, next_shuffled_sample_idx, new_operator, fully_sampled in frontier_ops[op_set_id]:
                 op_id = op.get_op_id()
 
-                # if this op is on the pareto frontier, keep it in our frontier ops
+                # if this op is fully sampled, remove it from the frontier
+                if fully_sampled:
+                    num_dropped_from_frontier += 1
+                    continue
+
+                # if this op is pareto optimal keep it in our frontier ops
                 if op_id in pareto_op_set:
-                    new_frontier_ops[op_set_id].append((op, next_shuffled_sample_idx, new_operator))
+                    new_frontier_ops[op_set_id].append((op, next_shuffled_sample_idx, new_operator, fully_sampled))
                     continue
 
                 # otherwise, if this op overlaps with an op on the pareto frontier, keep it in our frontier ops
@@ -303,6 +310,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                 else:
                     num_dropped_from_frontier += 1
 
+            # TODO: handle smaller ops like Retrieve getting fully sampled w/large sample budgets
             # replace the ops dropped from the frontier with new ops from the reservoir
             for idx in range(num_dropped_from_frontier):
                 new_frontier_ops[op_set_id].append((reservoir_ops[op_set_id][idx], 0, True))
@@ -441,6 +449,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
     def score_quality(
             self,
             op_set: List[PhysicalOperator],
+            op_set_id: str,
             execution_data: Dict[str, Dict[str, List[DataRecordSet]]],
             champion_outputs: Dict[str, Dict[str, DataRecordSet]],
             expected_outputs: Optional[Dict[str, DataRecordSet]] = None,
@@ -470,7 +479,6 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         # NOTE: we can infer these fields from context clues, but in the long-term we should have a more
         #       principled way of getting these directly from attributes either stored in the sentinel_plan
         #       or in the PhysicalOperator
-        op_set_id = SentinelPlan.compute_op_set_id(op_set)
         physical_op = op_set[0]
         is_filter_op = isinstance(physical_op, FilterOp)
         is_convert_op = isinstance(physical_op, ConvertOp)
@@ -554,18 +562,24 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         # aggregate records at each index in the response
         idx_to_records = {}
         for record_set, _ in op_set_record_sets:
-            for idx, record in enumerate(record_set):
+            for idx in range(len(record_set)):
+                record, record_op_stats = record_set[idx], record_set.record_op_stats[idx]
                 if idx not in idx_to_records:
-                    idx_to_records[idx] = [record]
+                    idx_to_records[idx] = [(record, record_op_stats)]
                 else:
-                    idx_to_records[idx].append(record)
+                    idx_to_records[idx].append((record, record_op_stats))
 
         # compute highest quality answer at each index
         out_records = []
         for idx in range(len(idx_to_records)):
-            records = idx_to_records[idx]
-            highest_quality_record = max(set(records), key=lambda record: record.quality)
-            out_records.append(highest_quality_record)
+            records_lst, record_op_stats_lst = zip(*idx_to_records[idx])
+            max_quality_record, max_quality = records_lst[0], record_op_stats_lst[0].quality
+            for record, record_op_stats in zip(records_lst[1:], record_op_stats_lst[1:]):
+                record_quality = record_op_stats.quality
+                if record_quality > max_quality:
+                    max_quality_record = record
+                    max_quality = record_quality
+            out_records.append(max_quality_record)
 
         # create and return final DataRecordSet
         return DataRecordSet(out_records, [])
@@ -615,17 +629,24 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
             # compute mapping from source_id to record sets for all operators and for champion operator
             all_record_sets, champion_record_sets = {}, {}
-            for _, candidate in op_candidate_pairs:
-                candidate_output_record_sets = []
+            for op, candidate in op_candidate_pairs:
+                candidate_output_record_sets, source_id = [], None
                 for record_set, operator, candidate_ in output_record_sets:
                     if candidate == candidate_:
                         candidate_output_record_sets.append((record_set, operator))
 
-                # select the champion (i.e. best) record_set from all the record sets computed for this operator
-                champion_record_set = self.pick_output_fn(candidate_output_record_sets)
+                        # NOTE: we should resolve this issue in a more thoughtful way, but currently the source_id for
+                        #       scan candidate records is the sample_idx, when we want it to be the source_id which is
+                        #       set by the scan operator when it returns the record
+                        # get the source_id associated with this input record
+                        source_id = (
+                            candidate._source_id
+                            if not (isinstance(op, MarshalAndScanDataOp) or isinstance(op, CacheScanDataOp))
+                            else record_set[0]._source_id
+                        )
 
-                # get the source_id associated with this input record
-                source_id = candidate._source_id
+                # select the champion (i.e. best) record_set from all the record sets computed for this candidate
+                champion_record_set = self.pick_output_fn(candidate_output_record_sets)
 
                 # add champion record_set to mapping from source_id --> champion record_set
                 champion_record_sets[source_id] = champion_record_set
@@ -649,8 +670,12 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
         # initialize plan stats and operator stats
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
+        full_op_sets, full_op_set_ids = [], []
         for op_set in plan.operator_sets:
             op_set_id = SentinelPlan.compute_op_set_id(op_set)
+            full_op_sets.append(op_set)
+            full_op_set_ids.append(op_set_id)
+
             op_set_str = ",".join([op.op_name() for op in op_set])
             op_set_name = f"OpSet({op_set_str})"
             op_set_details = {
@@ -669,23 +694,23 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
         # shuffle the indices of records to sample
         total_num_samples = self.datasource.getValLength()
-        shuffled_sample_indices = np.arange(total_num_samples)
+        shuffled_sample_indices = [int(idx) for idx in np.arange(total_num_samples)]
         self.rng.shuffle(shuffled_sample_indices)
 
         # sample k initial operators for each operator set; for each operator maintain a tuple of:
         # (operator, next_shuffled_sample_idx, new_operator); new_operator is True when an operator
         # is added to the frontier
         frontier_ops, reservoir_ops = {}, {}
-        for op_set in plan.operator_sets:
-            op_set_id = SentinelPlan.compute_op_set_id(op_set)
-            k = min(self.k, len(op_set))
-            shuffled_ops = self.rng.shuffle(op_set)
-            frontier_ops[op_set_id] = [(op, 0, True) for op in shuffled_ops[:k]]
-            reservoir_ops[op_set_id] = [op for op in shuffled_ops[k:]]
+        for op_set, op_set_id in zip(full_op_sets, full_op_set_ids):
+            op_set_copy = [op for op in op_set]
+            self.rng.shuffle(op_set_copy)
+            k = min(self.k, len(op_set_copy))
+            frontier_ops[op_set_id] = [(op, 0, True, False) for op in op_set_copy[:k]]
+            reservoir_ops[op_set_id] = [op for op in op_set_copy[k:]]
 
         # create mapping from op_set_id and op_ids to the number of samples drawn
-        op_set_id_to_num_samples = {SentinelPlan.compute_op_set_id(op_set): 0 for op_set in plan.operator_sets}
-        op_id_to_num_samples = {op.get_op_id(): 0 for op_set in plan.operator_sets for op in op_set}
+        op_set_id_to_num_samples = {op_set_id: 0 for op_set_id in full_op_set_ids}
+        op_id_to_num_samples = {op.get_op_id(): 0 for op_set in full_op_sets for op in op_set}
 
         # TODO: long-term, we should do something which does not rely on scanning validation source to build this mapping
         sample_idx_to_source_id = {
@@ -697,24 +722,19 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         samples_drawn = 0
         while samples_drawn < self.sample_budget:
             # execute operator sets in sequence
-            for op_set_idx, op_set in enumerate(plan.operator_sets):
-                op_set_id = SentinelPlan.compute_op_set_id(op_set)
-                prev_op_set_id = (
-                    SentinelPlan.compute_op_set_id(plan.operator_sets[op_set_idx - 1])
-                    if op_set_idx > 1
-                    else None
-                )
+            for op_set_idx, (op_set, op_set_id) in enumerate(zip(full_op_sets, full_op_set_ids)):
+                prev_op_set_id = full_op_set_ids[op_set_idx - 1] if op_set_idx > 0 else None
 
                 # create list of tuples for (op, candidate) which we should execute
                 op_candidate_pairs = []
                 updated_frontier_ops_lst = []
-                for op, next_shuffled_sample_idx, new_operator in frontier_ops[op_set_id]:
+                for op, next_shuffled_sample_idx, new_operator, fully_sampled in frontier_ops[op_set_id]:
                     # execute new operators on first j candidates
                     j = min(self.j, len(shuffled_sample_indices)) if new_operator else 1
                     for j_idx in range(j):
-                        sample_idx = shuffled_sample_indices[next_shuffled_sample_idx + j_idx]
                         candidates = []
                         if isinstance(op, MarshalAndScanDataOp) or isinstance(op, CacheScanDataOp):
+                            sample_idx = shuffled_sample_indices[(next_shuffled_sample_idx + j_idx) % len(shuffled_sample_indices)]
                             candidate = DataRecord(schema=SourceRecord, source_id=sample_idx)
                             candidate.idx = sample_idx
                             candidate.get_item_fn = partial(datasource.getItem, val=True)
@@ -723,7 +743,12 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                             op_set_id_to_num_samples[op_set_id] += 1
                             op_id_to_num_samples[op.get_op_id()] += 1
                         else:
+                            if next_shuffled_sample_idx + j_idx == len(shuffled_sample_indices):
+                                fully_sampled = True
+                                break
+
                             # pick best output from all_outputs for prev_set_id
+                            sample_idx = shuffled_sample_indices[next_shuffled_sample_idx + j_idx]
                             source_id = sample_idx_to_source_id[sample_idx]
                             record_sets = all_outputs[prev_op_set_id][source_id]
                             all_source_record_sets = [(record_set, None) for record_set in record_sets]
@@ -738,10 +763,10 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                                 candidates = [record for record in max_quality_record_set]
 
                         if len(candidates) > 0:
-                            op_candidate_pairs.append((op, candidate))
+                            op_candidate_pairs.extend([(op, candidate) for candidate in candidates])
 
                     # set new_operator = False and update next_shuffled_sample_idx
-                    updated_frontier_ops_lst.append((op, next_shuffled_sample_idx + j, False))
+                    updated_frontier_ops_lst.append((op, next_shuffled_sample_idx + j, False, fully_sampled))
 
                 frontier_ops[op_set_id] = updated_frontier_ops_lst
 
@@ -763,7 +788,9 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                             champion_outputs[op_set_id][source_id] = source_id_to_champion_record_set[source_id]
                         else:
                             all_outputs[op_set_id][source_id].extend(record_sets)
-                            champion_outputs[op_set_id][source_id].extend(source_id_to_champion_record_set[source_id])
+                            # NOTE: short-term solution; in practice we can get multiple champion records from different
+                            # sets of operators, so we should try to find a way to only take one
+                            champion_outputs[op_set_id][source_id] = source_id_to_champion_record_set[source_id]
 
                 # flatten lists of records and record_op_stats
                 all_records, all_record_op_stats = [], []
@@ -787,15 +814,14 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
                 # compute quality for each operator (and time and cost) and put them into matrix
                 field_to_metric_fn = self.datasource.getFieldToMetricFn()
-                all_outputs = self.score_quality(op_set, all_outputs, champion_outputs, expected_outputs, field_to_metric_fn)
+                all_outputs = self.score_quality(op_set, op_set_id, all_outputs, champion_outputs, expected_outputs, field_to_metric_fn)
 
             # update the (pareto) frontier for each set of operators
             frontier_ops, reservoir_ops = self.update_frontier_ops(frontier_ops, reservoir_ops, policy, all_outputs, op_set_id_to_num_samples, op_id_to_num_samples)
 
         # if caching was allowed, close the cache
         if not self.nocache:
-            for op_set in plan.operator_sets:
-                op_set_id = SentinelPlan.compute_op_set_id(op_set)
+            for op_set_id in full_op_set_ids:
                 self.datadir.closeCache(op_set_id)
 
         # finalize plan stats
