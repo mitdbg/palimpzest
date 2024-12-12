@@ -84,6 +84,8 @@ from palimpzest.policy import (
 from palimpzest.sets import Dataset
 
 __all__ = [
+    #corelib
+    "SchemaBuilder",
     # constants
     "Cardinality",
     "MAX_ROWS",
