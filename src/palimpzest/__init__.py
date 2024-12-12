@@ -27,6 +27,7 @@ from palimpzest.corelib.schemas import (
     WebPage,
     XLSFile,
 )
+from palimpzest.corelib.schema_builder import SchemaBuilder
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import (
     DataSource,
@@ -83,6 +84,8 @@ from palimpzest.policy import (
 from palimpzest.sets import Dataset
 
 __all__ = [
+    #corelib
+    "SchemaBuilder",
     # constants
     "Cardinality",
     "MAX_ROWS",

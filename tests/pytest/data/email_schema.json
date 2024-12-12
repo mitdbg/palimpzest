@@ -1,0 +1,17 @@
+{
+    "name": "Email",
+    "type": "TextFile",
+    "description": "Represents an email, which in practice is usually from a text file",
+    "fields": [
+        {
+            "name": "sender",
+            "description": "The email address of the sender",
+            "required": true
+        },
+        {
+            "name": "subject",
+            "description": "The subject of the email",
+            "required": true
+        }
+    ]
+}
