@@ -252,7 +252,7 @@ if __name__ == "__main__":
         plan,
         policy,
         nocache=True,
-        optimization_strategy=pz.OptimizationStrategy.OPTIMAL,
+        optimization_strategy=pz.OptimizationStrategy.PARETO,
         execution_engine=pz.SequentialSingleThreadSentinelExecution,
         verbose=verbose,
         num_samples=num_samples,

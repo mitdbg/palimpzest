@@ -38,7 +38,7 @@ def sample_op_data_factory():
                 plan_id=plan_ids[idx],
                 model_name=model_names[idx] if model_names is not None else None,
                 answer=answers[idx] if answers is not None else None,
-                passed_filter=answers[idx] if "filter" in op_name.lower() else None,
+                passed_operator=answers[idx] if "filter" in op_name.lower() else None,
             )
             for idx in range(len(time_per_records))
         ]

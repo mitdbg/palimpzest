@@ -32,7 +32,7 @@ class ExecutionEngine:
             allow_model_selection: bool=True,
             allow_code_synth: bool=True,
             allow_token_reduction: bool=True,
-            optimization_strategy: OptimizationStrategy=OptimizationStrategy.OPTIMAL,
+            optimization_strategy: OptimizationStrategy=OptimizationStrategy.PARETO,
             max_workers: Optional[int]=None,
             num_workers_per_plan: int=1,
             *args, **kwargs
@@ -85,19 +85,6 @@ class ExecutionEngine:
             shutil.rmtree(dspy_cache_dir)
         cache = self.datadir.getCacheService()
         cache.rmCache()
-
-
-    # def set_datasource(self, dataset: Set, source: DataSource):
-    #     """
-    #     Sets the DataSource for the dataset; can be used to switch between executing
-    #     on validation data vs. workload data.
-    #     """
-    #     # iterate until we reach DataSource
-    #     while isinstance(dataset._source, Set):
-    #         dataset = dataset._source
-
-    #     # set the source for the dataset
-    #     dataset._source = source
 
 
     def get_parallel_max_workers(self):
@@ -196,33 +183,15 @@ class ExecutionEngine:
 
         return all_sample_execution_data, return_records, all_plan_stats
 
-    def execute_naive_strategy(
+    def execute_strategy(
             self,
             dataset: Set,
+            policy: Policy,
             optimizer: Optimizer,
             execution_data: List[RecordOpStats]=[],
         ) -> Tuple[List[DataRecord], List[PlanStats]]:
         # get the optimal plan according to the optimizer
-        plans = optimizer.optimize(dataset)
-        final_plan = plans[0]
-
-        # execute the plan
-        records, plan_stats = self.execute_plan(
-            plan=final_plan,
-            plan_workers=self.max_workers,
-        )
-
-        # return the output records and plan stats
-        return records, [plan_stats]
-
-    def execute_optimal_strategy(
-            self,
-            dataset: Set,
-            optimizer: Optimizer,
-            execution_data: List[RecordOpStats]=[],
-        ) -> Tuple[List[DataRecord], List[PlanStats]]:
-        # get the optimal plan according to the optimizer
-        plans = optimizer.optimize(dataset)
+        plans = optimizer.optimize(dataset, policy)
         final_plan = plans[0]
 
         # execute the plan
@@ -239,6 +208,7 @@ class ExecutionEngine:
     def execute_confidence_interval_strategy(
             self,
             dataset: Set,
+            policy: Policy,
             optimizer: Optimizer,
             execution_data: List[RecordOpStats]=[],
         ) -> Tuple[List[DataRecord], List[PlanStats]]:
@@ -246,7 +216,7 @@ class ExecutionEngine:
         records, plan_stats = [], []
 
         # get the initial set of optimal plans according to the optimizer
-        plans = optimizer.optimize(dataset)
+        plans = optimizer.optimize(dataset, policy)
         while len(plans) > 1 and self.scan_start_idx < len(self.datasource):
             # identify the plan with the highest quality in the set
             max_quality_plan_id = self.get_max_quality_plan_id(plans)
@@ -263,7 +233,7 @@ class ExecutionEngine:
                 optimizer.update_cost_model(cost_model)
 
                 # get new set of plans
-                plans = optimizer.optimize(dataset)
+                plans = optimizer.optimize(dataset, policy)
 
                 # update scan start idx
                 self.scan_start_idx += self.num_samples

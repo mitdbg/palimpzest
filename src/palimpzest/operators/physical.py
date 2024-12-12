@@ -5,6 +5,7 @@ from palimpzest.corelib import Schema
 from palimpzest.dataclasses import OperatorCostEstimates
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements import DataRecord, DataRecordSet
+from palimpzest.utils import get_index_str
 
 from typing import Optional
 
@@ -88,7 +89,7 @@ class PhysicalOperator:
         # compute, set, and return the op_id
         op_name = self.op_name()
         op_params = self.get_op_params()
-        op_params = {k: str(v) for k, v in op_params.items()}
+        op_params = {k: str(v) if k != "index" else get_index_str(v) for k, v in op_params.items()}
         hash_str = json.dumps({"op_name": op_name, **op_params}, sort_keys=True)
         self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
@@ -103,6 +104,22 @@ class PhysicalOperator:
     def copy(self):
         copy_kwargs = self.get_copy_kwargs()
         return self.__class__(**copy_kwargs)
+
+    def _generate_field_names(self, candidate: DataRecord, inputSchema: Schema, outputSchema: Schema) -> list[str]:
+        """
+        Creates the list of field names that the convert operation needs to generate.
+        """
+        # construct the list of fields in outputSchema which will need to be generated;
+        # specifically, this is the set of fields which are:
+        # 1. not declared in the input schema, and
+        # 2. not present in the candidate's attributes
+        #    a. if the field is present, but its value is None --> we will try to generate it
+        fields_to_generate = []
+        for field_name in outputSchema.fieldNames():
+            if field_name not in inputSchema.fieldNames() and getattr(candidate, field_name, None) is None:
+                fields_to_generate.append(field_name)
+
+        return fields_to_generate
 
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         raise NotImplementedError("Calling __call__ from abstract method")

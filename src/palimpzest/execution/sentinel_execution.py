@@ -4,7 +4,7 @@ from palimpzest.elements import DataRecordSet
 from palimpzest.execution import (
     ExecutionEngine,
     SequentialSingleThreadSentinelPlanExecutor,
-    SequentialParallelSentinelPlanExecutor
+    SequentialParallelSentinelPlanExecutor,
 )
 from palimpzest.optimizer import (
     CostModel,
@@ -20,12 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 import warnings
 
-# TODO: we've removed the dataset_id; now we need this execution engine to:
-#       - run on validation data (if present); otherwise run on first num_samples
-#           - this should also be true for other execution engines
-#       - have generate_sample_observations return records if there's no validation data (and only return observations otherwise)
-#       - have execute_sentinel_plan mimic execute_plans; but handle copying the sentinel plan, and possibly passing a list of (record, col) --> plan
-#           - then have it call the sentinel plan executor
+
 class SentinelExecutionEngine(ExecutionEngine):
     """
     This class implements the abstract execute() method from the ExecutionEngine.
@@ -125,7 +120,7 @@ class SentinelExecutionEngine(ExecutionEngine):
         #     self.set_datasource(dataset, self.validation_data_source)
 
         # use optimizer to generate sentinel plans
-        sentinel_plans = optimizer.optimize(dataset)
+        sentinel_plans = optimizer.optimize(dataset, policy)
         sentinel_plan = sentinel_plans[0]
 
         # # swap back to the original datasource if necessary
@@ -153,7 +148,8 @@ class SentinelExecutionEngine(ExecutionEngine):
         if not self.using_validation_data:
             final_op_set = sentinel_plan.operator_sets[-1]
             final_op_set_id = SentinelPlan.compute_op_set_id(final_op_set)
-            all_records = champion_outputs[final_op_set_id]
+            source_id_to_record_set = champion_outputs[final_op_set_id]
+            all_records = [record for _, record_set in source_id_to_record_set.items() for record in record_set]
 
         # put sentinel plan execution stats into list
         all_plan_stats = [plan_stats]
@@ -190,18 +186,13 @@ class SentinelExecutionEngine(ExecutionEngine):
         total_optimization_time = time.time() - execution_start_time
 
         # execute plan(s) according to the optimization strategy
-        if self.optimization_strategy == OptimizationStrategy.OPTIMAL:
-            records, plan_stats = self.execute_optimal_strategy(dataset, optimizer)
+        if self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
+            records, plan_stats = self.execute_confidence_interval_strategy(dataset, policy, optimizer)
             all_records.extend(records)
             all_plan_stats.extend(plan_stats)
 
-        elif self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
-            records, plan_stats = self.execute_confidence_interval_strategy(dataset, optimizer)
-            all_records.extend(records)
-            all_plan_stats.extend(plan_stats)
-
-        elif self.optimization_strategy == OptimizationStrategy.NONE:
-            records, plan_stats = self.execute_naive_strategy(dataset, optimizer)
+        else:
+            records, plan_stats = self.execute_strategy(dataset, policy, optimizer)
             all_records.extend(records)
             all_plan_stats.extend(plan_stats)
 

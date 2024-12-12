@@ -68,7 +68,7 @@ class PhysicalPlan(Plan):
         return int(self.plan_id, 16)
 
     @staticmethod
-    def fromOpsAndSubPlan(ops: List[PhysicalOperator], ops_plan_cost: PlanCost, subPlan: PhysicalPlan) -> PhysicalPlan:
+    def fromOpsAndSubPlan(ops: List[PhysicalOperator], subPlan: PhysicalPlan, plan_cost: PlanCost,) -> PhysicalPlan:
         # create copies of all logical operators
         copySubPlan = [op.copy() for op in subPlan.operators]
         copyOps = [op.copy() for op in ops]
@@ -76,19 +76,15 @@ class PhysicalPlan(Plan):
         # construct full set of operators
         copySubPlan.extend(copyOps)
 
-        # aggregate cost of ops and subplan
-        full_plan_cost = subPlan.plan_cost + ops_plan_cost
-        full_plan_cost.op_estimates = ops_plan_cost.op_estimates
-
         # return the PhysicalPlan
-        return PhysicalPlan(operators=copySubPlan, plan_cost=full_plan_cost)
+        return PhysicalPlan(operators=copySubPlan, plan_cost=plan_cost)
 
 
 class SentinelPlan(Plan):
     def __init__(self, operator_sets: List[List[PhysicalOperator]]):
         self.operator_sets = operator_sets
         self.plan_id = self.compute_plan_id()
-        self.sample_matrices = {SentinelPlan.compute_op_set_id(op_set): None for op_set in self.operator_sets}
+        self.sample_masks = {SentinelPlan.compute_op_set_id(op_set): None for op_set in self.operator_sets}
 
     def compute_plan_id(self) -> str:
         """

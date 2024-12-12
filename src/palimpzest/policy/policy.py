@@ -24,6 +24,13 @@ class Policy:
         """
         raise NotImplementedError("Calling this method from an abstract base class.")
 
+    def get_dict(self) -> dict:
+        """
+        Returns a dict representation of the policy which specifies how much weight
+        (in [0,1]) should be given to each metric.
+        """
+        raise NotImplementedError("Calling this method from an abstract base class.")
+
     def constraint(self, plan: PlanCost) -> bool:
         """
         Return True if the given (cost, runtime, quality) for a plan (or subplan)
@@ -49,6 +56,9 @@ class MaxQuality(Policy):
 
     def get_primary_metric(self) -> str:
         return "quality"
+
+    def get_dict(self) -> dict:
+        return {"cost": 0.0, "time": 0.0, "quality": 1.0}
 
     def constraint(self, plan: PlanCost) -> bool:
         """There is no constraint."""
@@ -79,6 +89,9 @@ class MinCost(Policy):
     def get_primary_metric(self) -> str:
         return "cost"
 
+    def get_dict(self) -> dict:
+        return {"cost": 1.0, "time": 0.0, "quality": 0.0}
+
     def constraint(self, plan: PlanCost) -> bool:
         """There is no constraint."""
         return True
@@ -107,7 +120,10 @@ class MinTime(Policy):
 
     def get_primary_metric(self) -> str:
         return "time"
-    
+
+    def get_dict(self) -> dict:
+        return {"cost": 0.0, "time": 1.0, "quality": 0.0}
+
     def constraint(self, plan: PlanCost) -> bool:
         """There is no constraint."""
         return True
@@ -139,6 +155,9 @@ class MaxQualityAtFixedCost(Policy):
     def get_primary_metric(self) -> str:
         return "quality"
 
+    def get_dict(self) -> dict:
+        return {"cost": 0.5, "time": 0.0, "quality": 0.5}
+
     def constraint(self, plan: PlanCost) -> bool:
         return plan.cost < self.max_cost
 
@@ -168,6 +187,9 @@ class MaxQualityAtFixedTime(Policy):
 
     def get_primary_metric(self) -> str:
         return "quality"
+
+    def get_dict(self) -> dict:
+        return {"cost": 0.0, "time": 0.5, "quality": 0.5}
 
     def constraint(self, plan: PlanCost) -> bool:
         return plan.time < self.max_time
@@ -199,6 +221,9 @@ class MinCostAtFixedQuality(Policy):
     def get_primary_metric(self) -> str:
         return "cost"
 
+    def get_dict(self) -> dict:
+        return {"cost": 0.5, "time": 0.0, "quality": 0.5}
+
     def constraint(self, plan: PlanCost) -> bool:
         return plan.quality > self.min_quality
 
@@ -228,6 +253,9 @@ class MinTimeAtFixedQuality(Policy):
 
     def get_primary_metric(self) -> str:
         return "time"
+
+    def get_dict(self) -> dict:
+        return {"cost": 0.0, "time": 0.5, "quality": 0.5}
 
     def constraint(self, plan: PlanCost) -> bool:
         return plan.quality > self.min_quality

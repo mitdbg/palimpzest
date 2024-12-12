@@ -1,6 +1,7 @@
 from __future__ import annotations
 from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.operators import LogicalOperator, PhysicalOperator
+from palimpzest.optimizer.plan import PlanCost
 from typing import Dict, List, Optional, Set, Union
 
 import hashlib
@@ -26,7 +27,14 @@ class Expression:
         self.generated_fields = generated_fields
         self.group_id = group_id
         self.rules_applied = set()
-        self.plan_cost = None
+
+        # NOTE: this will be the best possible plan cost achieved by this expression for some
+        # greedy definition of "best"
+        self.plan_cost: PlanCost | None = None
+
+        # NOTE: this will be a list of tuples where each tuple has a (pareto-optimal) plan cost
+        # and the input plan cost for which that pareto-optimal plan cost is attainable
+        self.pareto_optimal_plan_costs: list[tuple[PlanCost, PlanCost]] | None = None
 
     def __eq__(self, other: Expression):
         return self.operator == other.operator and self.input_group_ids == other.input_group_ids
@@ -66,8 +74,9 @@ class Group:
         self.fields = fields
         self.explored = False
         self.best_physical_expression: PhysicalExpression = None
-        self.ci_best_physical_expressions: List[PhysicalExpression] = []
-        self.satisfies_constraint = False
+        self.pareto_optimal_physical_expressions: list[PhysicalExpression] | None = None
+        self.ci_best_physical_expressions: list[PhysicalExpression] | None = None
+        self.optimized = False
 
         # properties of the Group which distinguish it from groups w/identical fields,
         # e.g. which filters, limits have been applied; is the output sorted, etc.

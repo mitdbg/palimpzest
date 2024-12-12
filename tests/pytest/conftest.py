@@ -1,4 +1,5 @@
 from palimpzest.constants import Model
+from palimpzest.policy import MinCost, MaxQuality, MinCostAtFixedQuality, MaxQualityAtFixedCost
 
 import pytest
 
@@ -14,9 +15,11 @@ pytest_plugins = [
     "fixtures.execution_data",
     "fixtures.expected_cost_est_results",
     "fixtures.expected_matrices",
+    "fixtures.expected_physical_plans",
     "fixtures.expected_qualities",
     "fixtures.expected_records",
     "fixtures.physical_plans",
+    "fixtures.operator_to_stats",
     "fixtures.schemas",
     "fixtures.side_effects",
     "fixtures.workloads",
@@ -45,14 +48,32 @@ def workload(
     enron_workload,
     real_estate_workload,
     biofabric_workload,
+    three_converts_workload,
+    one_filter_one_convert_workload,
+    two_converts_two_filters_workload,
 ):
     workload_id = request.param
     workload_id_to_workload = {
         "enron-workload": enron_workload,
         "real-estate-workload": real_estate_workload,
         "biofabric-workload": biofabric_workload,
+        "three-converts": three_converts_workload,
+        "one-filter-one-convert": one_filter_one_convert_workload,
+        "two-converts-two-filters": two_converts_two_filters_workload,
     }
     return workload_id_to_workload[workload_id]
+
+
+@pytest.fixture
+def policy(request):
+    policy_id = request.param
+    policy_id_to_policy = {
+        "mincost": MinCost(),
+        "maxquality": MaxQuality(),
+        "mincost@quality=0.8": MinCostAtFixedQuality(0.8),
+        "maxquality@cost=1.0": MaxQualityAtFixedCost(1.0),
+    }
+    return policy_id_to_policy[policy_id]
 
 
 @pytest.fixture
@@ -233,3 +254,61 @@ def expected_cost_est_results(
     }
 
     return cost_est_results_id_to_cost_est_results[cost_est_results_id]
+
+
+@pytest.fixture
+def operator_to_stats(
+    request,
+    three_converts_min_cost_operator_to_stats,
+    three_converts_max_quality_operator_to_stats,
+    three_converts_min_cost_at_fixed_quality_operator_to_stats,
+    three_converts_max_quality_at_fixed_cost_operator_to_stats,
+    one_filter_one_convert_min_cost_operator_to_stats,
+    two_converts_two_filters_min_cost_operator_to_stats,
+    two_converts_two_filters_max_quality_operator_to_stats,
+    two_converts_two_filters_min_cost_at_fixed_quality_operator_to_stats,
+    two_converts_two_filters_max_quality_at_fixed_cost_operator_to_stats,
+):
+    operator_to_stats_id = request.param
+    operator_to_stats_id_to_operator_to_stats = {
+        "3c-mincost": three_converts_min_cost_operator_to_stats,
+        "3c-maxquality": three_converts_max_quality_operator_to_stats,
+        "3c-mincost@quality=0.8": three_converts_min_cost_at_fixed_quality_operator_to_stats,
+        "3c-maxquality@cost=1.0": three_converts_max_quality_at_fixed_cost_operator_to_stats,
+        "1f-1c-mincost": one_filter_one_convert_min_cost_operator_to_stats,
+        "2c-2f-mincost": two_converts_two_filters_min_cost_operator_to_stats,
+        "2c-2f-maxquality": two_converts_two_filters_max_quality_operator_to_stats,
+        "2c-2f-mincost@quality=0.8": two_converts_two_filters_min_cost_at_fixed_quality_operator_to_stats,
+        "2c-2f-maxquality@cost=1.0": two_converts_two_filters_max_quality_at_fixed_cost_operator_to_stats,
+    }
+
+    return operator_to_stats_id_to_operator_to_stats[operator_to_stats_id]
+
+
+@pytest.fixture
+def expected_plan(
+    request,
+    three_converts_min_cost_expected_plan,
+    three_converts_max_quality_expected_plan,
+    three_converts_min_cost_at_fixed_quality_expected_plan,
+    three_converts_max_quality_at_fixed_cost_expected_plan,
+    one_filter_one_convert_min_cost_expected_plan,
+    two_converts_two_filters_min_cost_expected_plan,
+    two_converts_two_filters_max_quality_expected_plan,
+    two_converts_two_filters_min_cost_at_fixed_quality_expected_plan,
+    two_converts_two_filters_max_quality_at_fixed_cost_expected_plan,
+):
+    expected_plan_id = request.param
+    expected_plan_id_to_expected_plan = {
+        "3c-mincost": three_converts_min_cost_expected_plan,
+        "3c-maxquality": three_converts_max_quality_expected_plan,
+        "3c-mincost@quality=0.8": three_converts_min_cost_at_fixed_quality_expected_plan,
+        "3c-maxquality@cost=1.0": three_converts_max_quality_at_fixed_cost_expected_plan,
+        "1f-1c-mincost": one_filter_one_convert_min_cost_expected_plan,
+        "2c-2f-mincost": two_converts_two_filters_min_cost_expected_plan,
+        "2c-2f-maxquality": two_converts_two_filters_max_quality_expected_plan,
+        "2c-2f-mincost@quality=0.8": two_converts_two_filters_min_cost_at_fixed_quality_expected_plan,
+        "2c-2f-maxquality@cost=1.0": two_converts_two_filters_max_quality_at_fixed_cost_expected_plan,
+    }
+
+    return expected_plan_id_to_expected_plan[expected_plan_id]

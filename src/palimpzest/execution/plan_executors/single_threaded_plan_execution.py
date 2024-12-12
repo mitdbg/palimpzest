@@ -20,7 +20,6 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.max_workers = 1 if self.max_workers is None else self.max_workers
 
     def execute_plan(self, plan: PhysicalPlan,
                      num_samples: Union[int, float] = float("inf"),
@@ -31,6 +30,7 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
             print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
             print(plan)
             print("---")
+            exit(0)
 
         plan_start_time = time.time()
 
@@ -128,13 +128,13 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
             # add records (which are not filtered) to the cache, if allowed
             if not self.nocache:
                 for record in records:
-                    if getattr(record, "_passed_filter", True):
+                    if getattr(record, "_passed_operator", True):
                         self.datadir.appendCache(operator.targetCacheId, record)
 
             # update processing_queues or output_records
             for record in records:
                 if isinstance(operator, FilterOp):
-                    if not record._passed_filter:
+                    if not record._passed_operator:
                         continue
                 if next_op_id is not None:
                     processing_queues[next_op_id].append(record)
@@ -291,13 +291,13 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
                     # add records (which are not filtered) to the cache, if allowed
                     if not self.nocache:
                         for record in records:
-                            if getattr(record, "_passed_filter", True):
+                            if getattr(record, "_passed_operator", True):
                                 self.datadir.appendCache(operator.targetCacheId, record)
 
                     # update processing_queues or output_records
                     for record in records:
                         if isinstance(operator, FilterOp):
-                            if not record._passed_filter:
+                            if not record._passed_operator:
                                 continue
                         if next_op_id is not None:
                             processing_queues[next_op_id].append(record)

@@ -37,6 +37,7 @@ class PromptStrategy(str, Enum):
     IMAGE_TO_TEXT = "image-to-text"
     DSPY_COT_BOOL = "dspy-chain-of-thought-bool"
     DSPY_COT_QA = "dspy-chain-of-thought-question"
+    DSPY_COT_MOA_AGG = "dspy-chain-of-thought-mixture-of-agents-aggregation"
     CODE_GEN_BOOL = "code-gen-bool"
 
 class OptimizationStrategy(str, Enum):
@@ -44,8 +45,9 @@ class OptimizationStrategy(str, Enum):
     OptimizationStrategy determines which (set of) plan(s) the Optimizer
     will return to the Execution layer.
     """
-    OPTIMAL = "optimal"
+    GREEDY = "greedy"
     CONFIDENCE_INTERVAL = "confidence-interval"
+    PARETO = "pareto" 
     SENTINEL = "sentinel"
     NONE = "none"
 
@@ -211,7 +213,7 @@ GPT_4o_V_MODEL_CARD = {
     "usd_per_input_token": 2.5 / 1E6,
     "usd_per_output_token": 10.0 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.0079 / 10.0,
+    "seconds_per_output_token": 0.0079,
     ##### Agg. Benchmark #####
     "overall": 89.0,
 }
@@ -232,7 +234,7 @@ GPT_4o_MINI_V_MODEL_CARD = {
     "usd_per_input_token": 0.15 / 1E6,
     "usd_per_output_token": 0.6 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.0098 / 10.0,
+    "seconds_per_output_token": 0.0098,
     ##### Agg. Benchmark #####
     "overall": 82.0,
 }

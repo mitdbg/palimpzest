@@ -44,7 +44,7 @@ class StreamingSequentialExecution(ExecutionEngine):
         )
 
         # Effectively always use the optimal strategy
-        plans = optimizer.optimize(dataset)
+        plans = optimizer.optimize(dataset, policy)
         self.plan = plans[0]
         self.plan_stats = PlanStats(plan_id=self.plan.plan_id)
         for op in self.plan.operators:
@@ -136,7 +136,7 @@ class StreamingSequentialExecution(ExecutionEngine):
 
                 if isinstance(operator, FilterOp):
                     # delete all records that did not pass the filter
-                    output_records = [r for r in output_records if r._passed_filter]
+                    output_records = [r for r in output_records if r._passed_operator]
                     if not output_records:
                         break
                 

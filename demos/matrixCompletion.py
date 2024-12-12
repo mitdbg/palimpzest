@@ -361,7 +361,7 @@ if __name__ == "__main__":
         plan = plan.convert(BiodexDrugs)
 
     # select optimization strategy and available models based on engine
-    optimization_strategy = pz.OptimizationStrategy.OPTIMAL
+    optimization_strategy = pz.OptimizationStrategy.PARETO
     available_models = getModels(include_vision=True)
 
     # execute pz plan

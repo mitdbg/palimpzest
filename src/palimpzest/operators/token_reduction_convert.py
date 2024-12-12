@@ -79,7 +79,11 @@ class TokenReducedConvert(LLMConvert):
         # set refined estimate of cost per record and, for now,
         # assume quality multiplier is proportional to sqrt(sqrt(token_budget))
         naive_op_cost_estimates.cost_per_record = model_conversion_usd_per_record
-        naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * math.sqrt(math.sqrt(self.token_budget))  
+        naive_op_cost_estimates.cost_per_record_lower_bound = naive_op_cost_estimates.cost_per_record
+        naive_op_cost_estimates.cost_per_record_upper_bound = naive_op_cost_estimates.cost_per_record
+        naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * math.sqrt(math.sqrt(self.token_budget))
+        naive_op_cost_estimates.quality_lower_bound = naive_op_cost_estimates.quality
+        naive_op_cost_estimates.quality_upper_bound = naive_op_cost_estimates.quality
 
         return naive_op_cost_estimates
 
@@ -112,31 +116,22 @@ class TokenReducedConvert(LLMConvert):
         if self.first_execution or self.count < self.MAX_HEATMAP_UPDATES:
             if self.verbose:
                 print(f"Warming up heatmap: {0 if self.first_execution else self.count}")
-            answer, query_stats = super()._dspy_generate_fields(prompt, full_context, verbose)
+            answer, query_stats = super()._dspy_generate_fields(prompt, full_context)
             self.first_execution = False
 
         else:
             if self.verbose:
                 print("Using heatmap")
-            doc_schema = str(self.outputSchema)
-            doc_type = self.outputSchema.className()
-
-            if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-                generator = DSPyGenerator(
-                    self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose
-                )
-            else:
-                raise Exception(f"Token reduction not implemented for {self.prompt_strategy}")
 
             # only refer to the heatmap if the count is greater than a enough sample size
             # TODO: only trim the context if the attention is clustered in a small region
             if self.count >= self.TOKEN_REDUCTION_SAMPLE:
                 context = self.reduce_context(full_context)
                 try:
-                    answer, query_stats = generator.generate(context=context, question=prompt)
+                    answer, _, query_stats = self.generator.generate(context=context, question=prompt)
                 except Exception as e:
                     print(f"DSPy generation error: {e}, falling back to unreduced generation")
-                    answer, query_stats = super()._dspy_generate_fields(prompt, content, verbose)
+                    answer, query_stats = super()._dspy_generate_fields(prompt, content)
 
         try:
             gsi, gei = best_substring_match(answer, full_context)

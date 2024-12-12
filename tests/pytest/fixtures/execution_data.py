@@ -53,7 +53,7 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
             cost_per_record=0.0,
             logical_op_id=f"scan1-logical",
             record_state=scan_dr._asDict(),
-            passed_filter=None,
+            passed_operator=None,
             generated_fields=None,
         )
         scan_record_set = DataRecordSet([scan_dr], [record_op_stats])
@@ -76,7 +76,7 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
                 cost_per_record=1.0,
                 logical_op_id=f"convert1-logical",
                 record_state=convert_dr._asDict(),
-                passed_filter=None,
+                passed_operator=None,
                 generated_fields=["foo", "bar"],
             )
             convert_record_set = DataRecordSet([convert_dr], [record_op_stats])
@@ -104,7 +104,7 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
                 cost_per_record=1.0,
                 logical_op_id=f"filter1-logical",
                 record_state=filter_dr._asDict(),
-                passed_filter=bool(source_idx % 2), # odd examples pass filter
+                passed_operator=bool(source_idx % 2), # odd examples pass filter
                 generated_fields=None,
             )
             filter_record_set = DataRecordSet([filter_dr], [record_op_stats])
@@ -163,7 +163,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             cost_per_record=0.0,
             logical_op_id=f"scan1-logical",
             record_state=scan_dr._asDict(),
-            passed_filter=None,
+            passed_operator=None,
             generated_fields=None,
         )
         scan_record_set = DataRecordSet([scan_dr], [record_op_stats])
@@ -183,7 +183,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             cost_per_record=1.0,
             logical_op_id=f"convert1-logical",
             record_state=convert_dr._asDict(),
-            passed_filter=None,
+            passed_operator=None,
             generated_fields=["foo", "bar"],
         )
         convert_record_set = DataRecordSet([convert_dr], [record_op_stats])
@@ -201,13 +201,13 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
         # GPT-4 passes odd examples
         # GPT-3.5 passes even examples
         # Mixtral passes all examples
-        passed_filter = None
+        passed_operator = None
         if model == Model.GPT_4o:
-            passed_filter = bool(source_idx % 2)
+            passed_operator = bool(source_idx % 2)
         elif model == Model.GPT_4o_MINI:
-            passed_filter = not bool(source_idx % 2)
+            passed_operator = not bool(source_idx % 2)
         elif model == Model.MIXTRAL:
-            passed_filter = True
+            passed_operator = True
 
         record_op_stats = RecordOpStats(
             record_id=filter_dr._id,
@@ -219,7 +219,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             cost_per_record=1.0,
             logical_op_id=f"filter1-logical",
             record_state=filter_dr._asDict(),
-            passed_filter=passed_filter,
+            passed_operator=passed_operator,
             generated_fields=None,
         )
         filter_record_set = DataRecordSet([filter_dr], [record_op_stats])
@@ -296,7 +296,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
             cost_per_record=0.0,
             logical_op_id=f"scan1-logical",
             record_state=scan_dr._asDict(),
-            passed_filter=None,
+            passed_operator=None,
             generated_fields=None,
         )
         scan_record_set = DataRecordSet([scan_dr], [record_op_stats])
@@ -320,7 +320,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     cost_per_record=1.0,
                     logical_op_id=f"convert1-logical",
                     record_state=convert_dr._asDict(),
-                    passed_filter=None,
+                    passed_operator=None,
                     generated_fields=["foo", "bar"],
                 )
                 drs.append(convert_dr)
@@ -341,13 +341,13 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                 model = models[model_idx]
 
                 # GPT-4 filters final 6 records it sees
-                passed_filter = True
+                passed_operator = True
                 if model_idx == 0 and source_idx > 6:
-                    passed_filter = False
+                    passed_operator = False
 
                 # GPT-3.5 filters all records with one_to_many_idx == 1
                 elif model_idx == 1 and one_to_many_idx == 1:
-                    passed_filter = False
+                    passed_operator = False
 
                 # MIXTRAL passes all records
 
@@ -361,7 +361,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     cost_per_record=1.0,
                     logical_op_id=f"filter1-logical",
                     record_state=filter_dr._asDict(),
-                    passed_filter=passed_filter,
+                    passed_operator=passed_operator,
                     generated_fields=None,
                 )
                 filter_record_set = DataRecordSet([filter_dr], [record_op_stats])
@@ -381,13 +381,13 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
 
                 # TODO: this makes # of records seen by convert2 more complicated
                 # GPT-4 filters out final 4 records it sees
-                passed_filter = True
+                passed_operator = True
                 if model_idx == 0 and source_idx > 4:
-                    passed_filter = False
+                    passed_operator = False
 
                 # GPT-3.5 filters all records with one_to_many_idx == 1
                 elif model_idx == 1 and one_to_many_idx == 1:
-                    passed_filter = False
+                    passed_operator = False
 
                 # MIXTRAL passes all records
 
@@ -402,7 +402,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     cost_per_record=1.0,
                     logical_op_id=f"filter2-logical",
                     record_state=filter_dr._asDict(),
-                    passed_filter=passed_filter,
+                    passed_operator=passed_operator,
                     generated_fields=None,
                 )
                 filter_record_set = DataRecordSet([filter_dr], [record_op_stats])
@@ -428,7 +428,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     cost_per_record=1.0,
                     logical_op_id=f"convert2-logical",
                     record_state=convert_dr._asDict(),
-                    passed_filter=None,
+                    passed_operator=None,
                     generated_fields=["baz"],
                 )
                 convert_record_set = DataRecordSet([convert_dr], [record_op_stats])

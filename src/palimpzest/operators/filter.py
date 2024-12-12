@@ -21,7 +21,7 @@ class FilterOp(PhysicalOperator):
         super().__init__(*args, **kwargs)
         assert self.inputSchema == self.outputSchema, "Input and output schemas must match for FilterOp"
         self.filter = filter
-        self.depends_on = depends_on
+        self.depends_on = depends_on if depends_on is None else sorted(depends_on)
 
     def __str__(self):
         op = super().__str__()
@@ -35,7 +35,7 @@ class FilterOp(PhysicalOperator):
     def get_op_params(self):
         return {
             "outputSchema": self.outputSchema,
-            "filter": self.filter,
+            "filter": self.filter.getFilterStr(),
             "depends_on": self.depends_on,
         }
 
@@ -43,7 +43,7 @@ class FilterOp(PhysicalOperator):
         return (
             isinstance(other, self.__class__)
             and self.filter == other.filter
-            and self.inputSchema == other.outputSchema
+            and self.inputSchema == other.inputSchema
             and self.outputSchema == other.outputSchema
         )
 
@@ -84,9 +84,9 @@ class NonLLMFilter(FilterOp):
         # time spent executing the filter function
         fn_call_duration_secs = time.time() - start_time
 
-        # create copy of candidate and set _passed_filter attribute
+        # create copy of candidate and set _passed_operator attribute
         dr = DataRecord.fromParent(candidate.schema, parent_record=candidate)
-        dr._passed_filter = result
+        dr._passed_operator = result
 
         # create RecordOpStats object and return
         record_op_stats = RecordOpStats(
@@ -100,7 +100,7 @@ class NonLLMFilter(FilterOp):
             time_per_record=fn_call_duration_secs,
             cost_per_record=0.0,
             filter_str=self.filter.getFilterStr(),
-            passed_filter=result,
+            passed_operator=result,
             fn_call_duration_secs=fn_call_duration_secs,
             answer=result,
             op_details={k: str(v) for k, v in self.get_op_params().items()},
@@ -133,14 +133,14 @@ class LLMFilter(FilterOp):
         if self.prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
             if not self.image_filter:
                 self.generator = DSPyGenerator(
-                    self.model.value,
+                    self.model,
                     self.prompt_strategy,
                     doc_schema,
                     doc_type,
                     verbose=self.verbose,
                 )
             else:
-                self.generator = ImageTextGenerator(self.model.value, self.verbose)
+                self.generator = ImageTextGenerator(self.model, self.verbose)
 
         else:
             raise Exception(f"Prompt strategy {self.prompt_strategy} not implemented yet")
@@ -260,20 +260,20 @@ class LLMFilter(FilterOp):
         # invoke LLM to generate filter decision (True or False)
         response, gen_stats = None, GenerationStats()
         try:
-            response, gen_stats = self.generator.generate(context=content, question=prompt)
+            response, _, gen_stats = self.generator.generate(context=content, question=prompt)
         except Exception as e:
             print(f"Error invoking LLM for filter: {e}")
 
         # compute whether the record passed the filter or not
-        passed_filter = (
+        passed_operator = (
             "true" in response.lower()
             if response is not None
             else False
         )
 
-        # create new DataRecord and set _passed_filter attribute
+        # create new DataRecord and set _passed_operator attribute
         dr = DataRecord.fromParent(candidate.schema, parent_record=candidate)
-        dr._passed_filter = passed_filter
+        dr._passed_operator = passed_operator
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
@@ -294,7 +294,7 @@ class LLMFilter(FilterOp):
             total_output_cost=gen_stats.total_output_cost,
             llm_call_duration_secs=gen_stats.llm_call_duration_secs,
             answer=response,
-            passed_filter=passed_filter,
+            passed_operator=passed_operator,
             image_operation=self.image_filter,
             op_details={k: str(v) for k, v in self.get_op_params().items()},
         )
