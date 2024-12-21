@@ -725,8 +725,11 @@ class MABSentinelExecutionEngine(ExecutionEngine):
             for sample_idx in range(total_num_samples)
         }
 
-        all_outputs, champion_outputs = {}, {}
+        # NOTE: to maintain parity with our count of samples drawn in the random sampling execution,
+        # for each op_set_id, we count the number of (record, op) executions as the number of samples within that op_set;
+        # the samples drawn is equal to the max of that number across all operator sets
         samples_drawn = 0
+        all_outputs, champion_outputs = {}, {}
         while samples_drawn < self.sample_budget:
             # execute operator sets in sequence
             for op_set_idx, (op_set, op_set_id) in enumerate(zip(full_op_sets, full_op_set_ids)):
@@ -736,7 +739,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                 op_candidate_pairs = []
                 updated_frontier_ops_lst = []
                 for op, next_shuffled_sample_idx, new_operator, fully_sampled in frontier_ops[op_set_id]:
-                    # execute new operators on first j candidates
+                    # execute new operators on first j candidates, and previously sampled operators on one additional candidate
                     j = min(self.j, len(shuffled_sample_indices)) if new_operator else 1
                     for j_idx in range(j):
                         candidates = []
@@ -746,7 +749,6 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                             candidate.idx = sample_idx
                             candidate.get_item_fn = partial(datasource.getItem, val=True)
                             candidates = [candidate]
-                            samples_drawn += 1
                             op_set_id_to_num_samples[op_set_id] += 1
                             op_id_to_num_samples[op.get_op_id()] += 1
                         else:
@@ -830,6 +832,9 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
             # update the (pareto) frontier for each set of operators
             frontier_ops, reservoir_ops = self.update_frontier_ops(frontier_ops, reservoir_ops, policy, all_outputs, op_set_id_to_num_samples, op_id_to_num_samples, is_filter_op_set)
+
+            # update the number of samples drawn to be the max across all op_sets of the op_set_id_to_num_samples
+            samples_drawn = max(op_set_id_to_num_samples.values())
 
         # if caching was allowed, close the cache
         if not self.nocache:
