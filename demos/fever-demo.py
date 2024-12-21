@@ -121,13 +121,13 @@ class FeverValidationSource(pz.ValidationDataSource):
     def __len__(self):
         return len(self.claims)
 
-    def getValLength(self):
+    def get_val_length(self):
         return len(self.val_claims)
 
-    def getSize(self):
+    def get_size(self):
         return sum(file.stat().st_size for file in Path(self.claims_dir).rglob('*'))
 
-    def getFieldToMetricFn(self):
+    def get_field_to_metric_fn(self):
         def bool_eval(label, expected_label):
             return str(label).upper() == str(expected_label).upper()
         
@@ -150,7 +150,7 @@ class FeverValidationSource(pz.ValidationDataSource):
 
         return fields_to_metric_fn
 
-    def getItem(self, idx: int, val: bool=False, include_label: bool=False):
+    def get_item(self, idx: int, val: bool=False, include_label: bool=False):
         # fetch listing
         claim = self.claims[idx] if not val else self.val_claims[idx]
 

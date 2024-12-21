@@ -1,23 +1,16 @@
-import palimpzest as pz
-from palimpzest.constants import Model
-from palimpzest.elements import DataRecord
-from palimpzest.utils import udfs, getModels, getVisionModels
-from io import BytesIO
-from openai import OpenAI
-from pathlib import Path
-from ragatouille import RAGPretrainedModel
-
-from numpy import dot
-from numpy.linalg import norm
-import numpy as np
-import pandas as pd
-
 import argparse
-import datasets
 import json
 import os
 import random
 import time
+from pathlib import Path
+
+import datasets
+from ragatouille import RAGPretrainedModel
+
+import palimpzest as pz
+from palimpzest.constants import Model
+from palimpzest.utils import getModels
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -34,30 +27,26 @@ FAR_AWAY_ADDRS = [
     "E 5th St",
 ]
 
+
 def within_two_miles_of_mit(record):
     # NOTE: I'm using this hard-coded function so that folks w/out a
     #       Geocoding API key from google can still run this example
     try:
-        if any(
-            [
-                street.lower() in record.address.lower()
-                for street in FAR_AWAY_ADDRS
-            ]
-        ):
-            return False
-        return True
-    except:
+        return not any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS])
+    except Exception:
         return False
+
 
 def in_price_range(record):
     try:
         price = record.price
-        if type(price) == str:
+        if isinstance(price, str):
             price = price.strip()
             price = int(price.replace("$", "").replace(",", ""))
-        return 6e5 < price and price <= 2e6
-    except:
+        return 6e5 < price <= 2e6
+    except Exception:
         return False
+
 
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
@@ -70,9 +59,7 @@ class RealEstateListingFiles(pz.Schema):
     """The source text and image data for a real estate listing."""
 
     listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.StringField(
-        desc="The content of the listing's text description", required=True
-    )
+    text_content = pz.StringField(desc="The content of the listing's text description", required=True)
     image_filepaths = pz.ListField(
         element_type=pz.StringField,
         desc="A list of the filepaths for each image of the listing",
@@ -97,12 +84,15 @@ class ImageRealEstateListing(RealEstateListingFiles):
         desc="True if the home interior has lots of natural sunlight and False otherwise"
     )
 
+
 class RealEstateValidationSource(pz.ValidationDataSource):
-    def __init__(self, datasetId, listings_dir, split_idx: int=25, num_samples: int=5, shuffle: bool=False, seed: int=42):
-        super().__init__(RealEstateListingFiles, datasetId)
+    def __init__(
+        self, dataset_id, listings_dir, split_idx: int = 25, num_samples: int = 5, shuffle: bool = False, seed: int = 42
+    ):
+        super().__init__(RealEstateListingFiles, dataset_id)
         self.listings_dir = listings_dir
         self.split_idx = split_idx
-        self.listings = sorted(os.listdir(self.listings_dir), key=lambda listing: int(listing.split('listing')[-1]))
+        self.listings = sorted(os.listdir(self.listings_dir), key=lambda listing: int(listing.split("listing")[-1]))
 
         self.val_listings = self.listings[:split_idx]
         self.listings = self.listings[split_idx:]
@@ -119,31 +109,181 @@ class RealEstateValidationSource(pz.ValidationDataSource):
 
         # construct mapping from listing --> label (field, value) pairs
         self.label_fields_to_values = {
-            "listing1": {"address": "161 Auburn St Unit 161, Cambridge, MA 02139", "price": 1550000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": True},
-            "listing2": {"address": "14 Concord Unit 712, Cambridge, MA, 02138", "price": 610000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing3": {"address": "10 Dana St Unit 7, Cambridge, MA, 02138", "price": 524900, "is_modern_and_attractive": False, "has_natural_sunlight": False, "_passed_operator": False},
-            "listing4": {"address": "27 Winter St, Cambridge, MA, 02141", "price": 739000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing5": {"address": "59 Kelly Rd Unit 59, Cambridge, MA, 02139", "price": 1775000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": True},
-            "listing6": {"address": "24 Greenough Ave, Cambridge, MA, 02139", "price": 4999999, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing7": {"address": "362-366 Commonwealth Ave Unit 4C, Boston, MA, 02115", "price": 609900, "is_modern_and_attractive": False, "has_natural_sunlight": False, "_passed_operator": False},
-            "listing8": {"address": "188 Brookline Ave Unit 21H, Boston, MA, 02215", "price": 1485000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": True},
-            "listing9": {"address": "11 Aberdeen St Unit 4, Boston, MA, 02215", "price": 699000, "is_modern_and_attractive": False, "has_natural_sunlight": False, "_passed_operator": False},
-            "listing10": {"address": "188 Brookline Ave Unit 19A, Boston, MA, 02215", "price": 3200000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing11": {"address": "49 Melcher St Unit 205, Boston, MA, 02210", "price": 860000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing12": {"address": "15 Sleeper St Unit 406, Boston, MA, 02210", "price": 1450000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing13": {"address": "437 D St Unit 6C, Boston, MA, 02210", "price": 1025000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing14": {"address": "133 Seaport Blvd Unit 1715, Boston, MA, 02210", "price": 1299999, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing15": {"address": "50 Liberty Dr Unit 5E, Boston, MA, 02210", "price": 2995000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing16": {"address": "133 Seaport Blvd Unit 802, Boston, MA, 02210", "price": 1679000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing17": {"address": "14 Ware St Unit 44, Cambridge, MA, 02138", "price": 660000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing18": {"address": "20 Mcternan Unit 203, Cambridge, MA, 02139", "price": 825000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing19": {"address": "150 Hampshire St Unit 5, Cambridge, MA, 02139", "price": 895000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing20": {"address": "144 Spring St, Cambridge, MA, 02141", "price": 2350000, "is_modern_and_attractive": False, "has_natural_sunlight": False, "_passed_operator": False},
-            "listing21": {"address": "41-41A Pleasant St, Cambridge, MA, 02139", "price": 4450000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing22": {"address": "1 Pine St, Cambridge, MA, 02139", "price": 1875000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing23": {"address": "1055 Cambridge Unit 200, Cambridge, MA, 02139", "price": 1390000, "is_modern_and_attractive": True, "has_natural_sunlight": True, "_passed_operator": True},
-            "listing24": {"address": "570 Franklin St Unit 1, Cambridge, MA, 02139", "price": 589000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_operator": False},
-            "listing25": {"address": "12 Kinnaird, Cambridge, MA, 02139", "price": 1200000, "is_modern_and_attractive": False, "has_natural_sunlight": True, "_passed_operator": False},
+            "listing1": {
+                "address": "161 Auburn St Unit 161, Cambridge, MA 02139",
+                "price": 1550000,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": True,
+            },
+            "listing2": {
+                "address": "14 Concord Unit 712, Cambridge, MA, 02138",
+                "price": 610000,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing3": {
+                "address": "10 Dana St Unit 7, Cambridge, MA, 02138",
+                "price": 524900,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": False,
+                "_passed_operator": False,
+            },
+            "listing4": {
+                "address": "27 Winter St, Cambridge, MA, 02141",
+                "price": 739000,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing5": {
+                "address": "59 Kelly Rd Unit 59, Cambridge, MA, 02139",
+                "price": 1775000,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": True,
+            },
+            "listing6": {
+                "address": "24 Greenough Ave, Cambridge, MA, 02139",
+                "price": 4999999,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing7": {
+                "address": "362-366 Commonwealth Ave Unit 4C, Boston, MA, 02115",
+                "price": 609900,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": False,
+                "_passed_operator": False,
+            },
+            "listing8": {
+                "address": "188 Brookline Ave Unit 21H, Boston, MA, 02215",
+                "price": 1485000,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": True,
+            },
+            "listing9": {
+                "address": "11 Aberdeen St Unit 4, Boston, MA, 02215",
+                "price": 699000,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": False,
+                "_passed_operator": False,
+            },
+            "listing10": {
+                "address": "188 Brookline Ave Unit 19A, Boston, MA, 02215",
+                "price": 3200000,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing11": {
+                "address": "49 Melcher St Unit 205, Boston, MA, 02210",
+                "price": 860000,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing12": {
+                "address": "15 Sleeper St Unit 406, Boston, MA, 02210",
+                "price": 1450000,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing13": {
+                "address": "437 D St Unit 6C, Boston, MA, 02210",
+                "price": 1025000,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing14": {
+                "address": "133 Seaport Blvd Unit 1715, Boston, MA, 02210",
+                "price": 1299999,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing15": {
+                "address": "50 Liberty Dr Unit 5E, Boston, MA, 02210",
+                "price": 2995000,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing16": {
+                "address": "133 Seaport Blvd Unit 802, Boston, MA, 02210",
+                "price": 1679000,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing17": {
+                "address": "14 Ware St Unit 44, Cambridge, MA, 02138",
+                "price": 660000,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing18": {
+                "address": "20 Mcternan Unit 203, Cambridge, MA, 02139",
+                "price": 825000,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing19": {
+                "address": "150 Hampshire St Unit 5, Cambridge, MA, 02139",
+                "price": 895000,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing20": {
+                "address": "144 Spring St, Cambridge, MA, 02141",
+                "price": 2350000,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": False,
+                "_passed_operator": False,
+            },
+            "listing21": {
+                "address": "41-41A Pleasant St, Cambridge, MA, 02139",
+                "price": 4450000,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing22": {
+                "address": "1 Pine St, Cambridge, MA, 02139",
+                "price": 1875000,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing23": {
+                "address": "1055 Cambridge Unit 200, Cambridge, MA, 02139",
+                "price": 1390000,
+                "is_modern_and_attractive": True,
+                "has_natural_sunlight": True,
+                "_passed_operator": True,
+            },
+            "listing24": {
+                "address": "570 Franklin St Unit 1, Cambridge, MA, 02139",
+                "price": 589000,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
+            "listing25": {
+                "address": "12 Kinnaird, Cambridge, MA, 02139",
+                "price": 1200000,
+                "is_modern_and_attractive": False,
+                "has_natural_sunlight": True,
+                "_passed_operator": False,
+            },
         }
 
         # shuffle records if shuffle = True
@@ -154,25 +294,27 @@ class RealEstateValidationSource(pz.ValidationDataSource):
         self.val_listings = self.val_listings[:num_samples]
 
     def copy(self):
-        return RealEstateValidationSource(self.dataset_id, self.listings_dir, self.split_idx, self.num_samples, self.shuffle, self.seed)
+        return RealEstateValidationSource(
+            self.dataset_id, self.listings_dir, self.split_idx, self.num_samples, self.shuffle, self.seed
+        )
 
     def __len__(self):
         return len(self.listings)
 
-    def getValLength(self):
+    def get_val_length(self):
         return len(self.val_listings)
 
-    def getSize(self):
-        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob('*'))
+    def get_size(self):
+        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
 
-    def getFieldToMetricFn(self):
+    def get_field_to_metric_fn(self):
         # define quality eval function for price field
         def price_eval(price: str, expected_price: int):
-            if type(price) == str:
+            if isinstance(price, str):
                 try:
                     price = price.strip()
                     price = int(price.replace("$", "").replace(",", ""))
-                except:
+                except Exception:
                     return False
             return price == expected_price
 
@@ -185,7 +327,7 @@ class RealEstateValidationSource(pz.ValidationDataSource):
 
         return fields_to_metric_fn
 
-    def getItem(self, idx: int, val: bool=False, include_label: bool=False):
+    def get_item(self, idx: int, val: bool = False, include_label: bool = False):
         # fetch listing
         listing = self.listings[idx] if not val else self.val_listings[idx]
 
@@ -218,7 +360,11 @@ class BiodexEntry(pz.Schema):
     pmid = pz.StringField(desc="The PubMed ID of the medical paper", required=True)
     title = pz.StringField(desc="The title of the medical paper", required=True)
     abstract = pz.StringField(desc="The abstract of the medical paper", required=True)
-    fulltext = pz.StringField(desc="The full text of the medical paper, which contains information relevant for creating a drug safety report.", required=True)
+    fulltext = pz.StringField(
+        desc="The full text of the medical paper, which contains information relevant for creating a drug safety report.",
+        required=True,
+    )
+
 
 class BiodexSerious(BiodexEntry):
     """
@@ -227,7 +373,12 @@ class BiodexSerious(BiodexEntry):
     you will be asked to extract a rating of how serious the event was, with a definition of `serious`
     provided below.
     """
-    serious = pz.NumericField(desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.", required=True)
+
+    serious = pz.NumericField(
+        desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.",
+        required=True,
+    )
+
 
 class BiodexPatientSex(BiodexEntry):
     """
@@ -236,7 +387,12 @@ class BiodexPatientSex(BiodexEntry):
     you will be asked to extract the sex of the patient (if provided), with a definition of the
     expected output `patientsex` provided below.
     """
-    patientsex = pz.NumericField(desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.", required=True)
+
+    patientsex = pz.NumericField(
+        desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.",
+        required=True,
+    )
+
 
 class BiodexDrugs(BiodexEntry):
     """
@@ -244,7 +400,13 @@ class BiodexDrugs(BiodexEntry):
     an adverse event experienced by a patient in response to taking one or more drugs. In this task,
     you will be asked to extract a list of every drug mentioned in the article.
     """
-    drugs = pz.ListField(desc="The **list** of all active substance names of the drugs discussed in the report.\n - For example: [\"azathioprine\", \"infliximab\", \"mesalamine\", \"prednisolone\"]", element_type=pz.StringField, required=True)
+
+    drugs = pz.ListField(
+        desc='The **list** of all active substance names of the drugs discussed in the report.\n - For example: ["azathioprine", "infliximab", "mesalamine", "prednisolone"]',
+        element_type=pz.StringField,
+        required=True,
+    )
+
 
 class BiodexReactions(BiodexEntry):
     """
@@ -252,14 +414,25 @@ class BiodexReactions(BiodexEntry):
     an adverse event experienced by a patient in response to taking one or more drugs. In this task,
     you will be asked to extract a list of the primary adverse reactions which are experienced by the patient.
     """
-    reactions = pz.ListField(desc="The **list** of all reaction terms discussed in the report.\n - For example: [\"Epstein-Barr virus\", \"infection reactivation\", \"Idiopathic interstitial pneumonia\"]", element_type=pz.StringField, required=True)
+
+    reactions = pz.ListField(
+        desc='The **list** of all reaction terms discussed in the report.\n - For example: ["Epstein-Barr virus", "infection reactivation", "Idiopathic interstitial pneumonia"]',
+        element_type=pz.StringField,
+        required=True,
+    )
+
 
 class BiodexReactionLabels(BiodexReactions):
     """
     Retrieve the labels which are most relevant for the given set of inferred reactions.
     """
-    reaction_labels = pz.ListField(desc="Most relevant official terms for adverse reactions for the provided `reactions`",
-                                   element_type=pz.StringField, required=True)
+
+    reaction_labels = pz.ListField(
+        desc="Most relevant official terms for adverse reactions for the provided `reactions`",
+        element_type=pz.StringField,
+        required=True,
+    )
+
 
 class BiodexRankedReactions(BiodexEntry):
     """
@@ -272,26 +445,54 @@ class BiodexRankedReactions(BiodexEntry):
     - place the most likely label first and the least likely label last
     - you may omit labels if you think they do not describe a reaction experienced by the patient
     """
-    ranked_reaction_labels = pz.ListField(desc="The ranked list of labels for adverse reactions experienced by the patient. The most likely label occurs first in the list.",
-                                          element_type=pz.StringField, required=True)
+
+    ranked_reaction_labels = pz.ListField(
+        desc="The ranked list of labels for adverse reactions experienced by the patient. The most likely label occurs first in the list.",
+        element_type=pz.StringField,
+        required=True,
+    )
 
 
 class BiodexOutput(BiodexEntry):
     """The target output fields for an entry in the Biodex ICSR Dataset."""
-    serious = pz.NumericField(desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.", required=True)
-    patientsex = pz.NumericField(desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.", required=True)
-    drugs = pz.ListField(desc="The **list** of all active substance names of the drugs discussed in the report.\n - For example: [\"azathioprine\", \"infliximab\", \"mesalamine\", \"prednisolone\"]", element_type=pz.StringField, required=True)
-    reactions = pz.ListField(desc="The **list** of all reaction terms discussed in the report.\n - For example: [\"Epstein-Barr virus\", \"infection reactivation\", \"Idiopathic interstitial pneumonia\"]", element_type=pz.StringField, required=True)
+
+    serious = pz.NumericField(
+        desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.",
+        required=True,
+    )
+    patientsex = pz.NumericField(
+        desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.",
+        required=True,
+    )
+    drugs = pz.ListField(
+        desc='The **list** of all active substance names of the drugs discussed in the report.\n - For example: ["azathioprine", "infliximab", "mesalamine", "prednisolone"]',
+        element_type=pz.StringField,
+        required=True,
+    )
+    reactions = pz.ListField(
+        desc='The **list** of all reaction terms discussed in the report.\n - For example: ["Epstein-Barr virus", "infection reactivation", "Idiopathic interstitial pneumonia"]',
+        element_type=pz.StringField,
+        required=True,
+    )
+
 
 class BiodexValidationSource(pz.ValidationDataSource):
-    def __init__(self, datasetId, reactions_only: bool=True, rp_at_k: int=5, num_samples: int=5, shuffle: bool=False, seed: int=42):
-        super().__init__(BiodexEntry, datasetId)
+    def __init__(
+        self,
+        dataset_id,
+        reactions_only: bool = True,
+        rp_at_k: int = 5,
+        num_samples: int = 5,
+        shuffle: bool = False,
+        seed: int = 42,
+    ):
+        super().__init__(BiodexEntry, dataset_id)
         self.dataset = datasets.load_dataset("BioDEX/BioDEX-ICSR")
-        self.train_dataset = [self.dataset['train'][idx] for idx in range(250)]
+        self.train_dataset = [self.dataset["train"][idx] for idx in range(250)]
 
         # sample from full test dataset
-        self.test_dataset = [self.dataset['test'][idx] for idx in range(len(self.dataset['test']))]
-        self.test_dataset = self.test_dataset[:250] # use first 250 to compare directly with biodex
+        self.test_dataset = [self.dataset["test"][idx] for idx in range(len(self.dataset["test"]))]
+        self.test_dataset = self.test_dataset[:250]  # use first 250 to compare directly with biodex
 
         self.reactions_only = reactions_only
         self.rp_at_k = rp_at_k
@@ -300,15 +501,17 @@ class BiodexValidationSource(pz.ValidationDataSource):
         self.seed = seed
 
         # construct mapping from listing --> label (field, value) pairs
-        def compute_target_record(entry, reactions_only: bool=False):
-            target_lst = entry['target'].split('\n')
+        def compute_target_record(entry, reactions_only: bool = False):
+            target_lst = entry["target"].split("\n")
             label_dict = {
-                "serious": int(target_lst[0].split(':')[-1]),
-                "patientsex": int(target_lst[1].split(':')[-1]),
-                "drugs": [drug.strip().lower() for drug in target_lst[2].split(':')[-1].split(",")],
-                "reactions": [reaction.strip().lower() for reaction in target_lst[3].split(':')[-1].split(",")],
-                "reaction_labels": [reaction.strip().lower() for reaction in target_lst[3].split(':')[-1].split(",")],
-                "ranked_reaction_labels": [reaction.strip().lower() for reaction in target_lst[3].split(':')[-1].split(",")],
+                "serious": int(target_lst[0].split(":")[-1]),
+                "patientsex": int(target_lst[1].split(":")[-1]),
+                "drugs": [drug.strip().lower() for drug in target_lst[2].split(":")[-1].split(",")],
+                "reactions": [reaction.strip().lower() for reaction in target_lst[3].split(":")[-1].split(",")],
+                "reaction_labels": [reaction.strip().lower() for reaction in target_lst[3].split(":")[-1].split(",")],
+                "ranked_reaction_labels": [
+                    reaction.strip().lower() for reaction in target_lst[3].split(":")[-1].split(",")
+                ],
             }
             if reactions_only:
                 label_dict = {
@@ -319,8 +522,7 @@ class BiodexValidationSource(pz.ValidationDataSource):
             return label_dict
 
         self.label_fields_to_values = {
-            entry['pmid']: compute_target_record(entry, reactions_only=reactions_only)
-            for entry in self.train_dataset
+            entry["pmid"]: compute_target_record(entry, reactions_only=reactions_only) for entry in self.train_dataset
         }
 
         # shuffle records if shuffle = True
@@ -336,13 +538,13 @@ class BiodexValidationSource(pz.ValidationDataSource):
     def __len__(self):
         return len(self.test_dataset)
 
-    def getValLength(self):
+    def get_val_length(self):
         return len(self.train_dataset)
 
-    def getSize(self):
+    def get_size(self):
         return 0
 
-    def getFieldToMetricFn(self):
+    def get_field_to_metric_fn(self):
         # define f1 function
         def f1_eval(preds: list, targets: list):
             if preds is None:
@@ -363,7 +565,7 @@ class BiodexValidationSource(pz.ValidationDataSource):
 
                 return f1
 
-            except:
+            except Exception:
                 os.makedirs("f1-errors", exist_ok=True)
                 ts = time.time()
                 with open(f"f1-errors/error-{ts}.txt", "w") as f:
@@ -381,21 +583,20 @@ class BiodexValidationSource(pz.ValidationDataSource):
                 targets = set([target.lower() for target in targets])
 
                 # compute rank-precision at k
-                Rn = len(targets)
-                denom = min(self.rp_at_k, Rn)
+                rn = len(targets)
+                denom = min(self.rp_at_k, rn)
                 total = 0.0
                 for i in range(self.rp_at_k):
                     total += preds[i] in targets if i < len(preds) else 0.0
 
                 return total / denom
 
-            except:
+            except Exception:
                 os.makedirs("rp@k-errors", exist_ok=True)
                 ts = time.time()
                 with open(f"rp@k-errors/error-{ts}.txt", "w") as f:
                     f.write(str(preds))
                 return 0.0
-
 
         # define quality eval function for drugs and reactions fields
         fields_to_metric_fn = {}
@@ -416,21 +617,21 @@ class BiodexValidationSource(pz.ValidationDataSource):
 
         return fields_to_metric_fn
 
-    def getItem(self, idx: int, val: bool=False, include_label: bool=False):
+    def get_item(self, idx: int, val: bool = False, include_label: bool = False):
         # fetch entry
         entry = self.test_dataset[idx] if not val else self.train_dataset[idx]
 
         # create data record
-        dr = pz.DataRecord(self.schema, source_id=entry['pmid'])
-        dr.pmid = entry['pmid']
-        dr.title = entry['title']
-        dr.abstract = entry['abstract']
-        dr.fulltext = entry['fulltext']
-  
+        dr = pz.DataRecord(self.schema, source_id=entry["pmid"])
+        dr.pmid = entry["pmid"]
+        dr.title = entry["title"]
+        dr.abstract = entry["abstract"]
+        dr.fulltext = entry["fulltext"]
+
         # if requested, also return the label information
         if include_label:
             # augment data record with label info
-            labels_dict = self.label_fields_to_values[entry['pmid']]
+            labels_dict = self.label_fields_to_values[entry["pmid"]]
 
             for field, value in labels_dict.items():
                 setattr(dr, field, value)
@@ -445,56 +646,84 @@ if __name__ == "__main__":
 
     # parse arguments
     parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument(
-        "--verbose", default=False, action="store_true", help="Print verbose output"
-    )
-    parser.add_argument(
-        "--datasetid", type=str, help="The dataset id"
-    )
+    parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
+    parser.add_argument("--datasetid", type=str, help="The dataset id")
     parser.add_argument(
         "--workload", type=str, help="The workload to run. One of enron, real-estate, medical-schema-matching."
     )
     parser.add_argument(
-        "--engine", default='sentinel', type=str, help='The engine to use. One of sentinel, nosentinel',
+        "--engine",
+        default="sentinel",
+        type=str,
+        help="The engine to use. One of sentinel, nosentinel",
     )
     parser.add_argument(
-        "--executor", default='parallel-mab', type=str, help='The plan executor to use.',
+        "--executor",
+        default="parallel-mab",
+        type=str,
+        help="The plan executor to use.",
     )
     parser.add_argument(
-        "--policy", default='mincost', type=str, help="One of 'mincost', 'mintime', 'maxquality'",
+        "--policy",
+        default="mincost",
+        type=str,
+        help="One of 'mincost', 'mintime', 'maxquality'",
     )
     parser.add_argument(
-        "--val-examples", default=5, type=int, help="Number of validation examples to sample from",
+        "--val-examples",
+        default=5,
+        type=int,
+        help="Number of validation examples to sample from",
     )
     parser.add_argument(
-        "--model", default='gpt-4o', type=str, help="One of 'gpt-4o', 'gpt-4o-mini', 'llama', 'mixtral'",
+        "--model",
+        default="gpt-4o",
+        type=str,
+        help="One of 'gpt-4o', 'gpt-4o-mini', 'llama', 'mixtral'",
     )
     parser.add_argument(
-        "--seed", default=42, type=int, help="Seed used to initialize RNG for MAB sampling algorithm",
+        "--seed",
+        default=42,
+        type=int,
+        help="Seed used to initialize RNG for MAB sampling algorithm",
     )
     parser.add_argument(
-        "--k", default=10, type=int, help="Number of columns to sample in Random Sampling or MAB sentinel execution",
+        "--k",
+        default=10,
+        type=int,
+        help="Number of columns to sample in Random Sampling or MAB sentinel execution",
     )
     parser.add_argument(
-        "--j", default=3, type=int, help="Number of columns to sample in Random Sampling or MAB sentinel execution",
+        "--j",
+        default=3,
+        type=int,
+        help="Number of columns to sample in Random Sampling or MAB sentinel execution",
     )
     parser.add_argument(
-        "--sample-budget", default=100, type=int, help="Total sample budget in Random Sampling or MAB sentinel execution",
+        "--sample-budget",
+        default=100,
+        type=int,
+        help="Total sample budget in Random Sampling or MAB sentinel execution",
+    )
+    parser.add_argument("--sample-all-ops", default=False, action="store_true", help="Sample all operators")
+    parser.add_argument("--sample-all-records", default=False, action="store_true", help="Sample all records")
+    parser.add_argument(
+        "--sample-start-idx",
+        default=None,
+        type=int,
+        help="",
     )
     parser.add_argument(
-        "--sample-all-ops", default=False, action="store_true", help="Sample all operators"
+        "--sample-end-idx",
+        default=None,
+        type=int,
+        help="",
     )
     parser.add_argument(
-        "--sample-all-records", default=False, action="store_true", help="Sample all records"
-    )
-    parser.add_argument(
-        "--sample-start-idx", default=None, type=int, help="",
-    )
-    parser.add_argument(
-        "--sample-end-idx", default=None, type=int, help="",
-    )
-    parser.add_argument(
-        "--exp-name", default=None, type=str, help="Name of experiment which is used in output filename",
+        "--exp-name",
+        default=None,
+        type=str,
+        help="Name of experiment which is used in output filename",
     )
 
     args = parser.parse_args()
@@ -603,9 +832,7 @@ if __name__ == "__main__":
 
         plan = pz.Dataset(user_dataset_id, schema=RealEstateListingFiles)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
-        plan = plan.convert(
-            ImageRealEstateListing, image_conversion=True, depends_on="image_filepaths"
-        )
+        plan = plan.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_filepaths")
         plan = plan.filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
@@ -614,10 +841,10 @@ if __name__ == "__main__":
         plan = plan.filter(in_price_range, depends_on="price")
 
     elif workload == "biodex-reactions":
-        user_dataset_id = f"biodex-user"
+        user_dataset_id = "biodex-user"
 
         # load index
-        index_path = f".ragatouille/colbert/indexes/reaction-terms"
+        index_path = ".ragatouille/colbert/indexes/reaction-terms"
         index = RAGPretrainedModel.from_index(index_path)
 
         # create and register validation data source
@@ -632,24 +859,24 @@ if __name__ == "__main__":
             dataset_id=f"{user_dataset_id}",
         )
         plan = pz.Dataset(user_dataset_id, schema=BiodexEntry)
-        plan = plan.convert(BiodexReactions) # infer
+        plan = plan.convert(BiodexReactions)  # infer
         plan = plan.retrieve(
             outputSchema=BiodexReactionLabels,
             index=index,
             search_attr="reactions",
             output_attr="reaction_labels",
             # k=10, # if we set k, then it will be fixed; if we leave it unspecified then the optimizer will choose
-        ) # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
+        )  # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
         plan = plan.convert(BiodexRankedReactions)
 
         # only use final op quality
         use_final_op_quality = True
 
     elif workload == "biodex":
-        user_dataset_id = f"biodex-user"
+        user_dataset_id = "biodex-user"
 
         # load index
-        index_path = f".ragatouille/colbert/indexes/reaction-terms"
+        index_path = ".ragatouille/colbert/indexes/reaction-terms"
         index = RAGPretrainedModel.from_index(index_path)
 
         # create and register validation data source
@@ -675,7 +902,7 @@ if __name__ == "__main__":
             search_attr="reactions",
             output_attr="reaction_labels",
             # k=10, # if we set k, then it will be fixed; if we leave it unspecified then the optimizer will choose
-        ) # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
+        )  # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
         plan = plan.convert(BiodexRankedReactions)
 
         # only use final op quality
@@ -703,7 +930,6 @@ if __name__ == "__main__":
         available_models = [model_str_to_model[args.model]] + [model_str_to_vision_model[args.model]]
 
     # execute pz plan
-    from palimpzest.policy import MinCostAtFixedQuality
     records, execution_stats = pz.Execute(
         plan,
         policy,
@@ -721,7 +947,7 @@ if __name__ == "__main__":
         seed=seed,
         verbose=verbose,
         exp_name=exp_name,
-        allow_code_synth=False, #(workload != "biodex"),
+        allow_code_synth=False,  # (workload != "biodex"),
         use_final_op_quality=use_final_op_quality,
         max_workers=10,
     )
@@ -743,12 +969,18 @@ if __name__ == "__main__":
     for record in records:
         record_dict = record._asDict()
         if workload == "biodex":
-            record_dict = {k: v for k, v in record_dict.items() if k in ["pmid", "serious", "patientsex", "drugs", "reactions"]}
+            record_dict = {
+                k: v for k, v in record_dict.items() if k in ["pmid", "serious", "patientsex", "drugs", "reactions"]
+            }
         elif workload == "biodex-reactions":
-            record_dict = {k: v for k, v in record_dict.items() if k in ["pmid", "reactions", "reaction_labels", "ranked_reaction_labels"]}
+            record_dict = {
+                k: v
+                for k, v in record_dict.items()
+                if k in ["pmid", "reactions", "reaction_labels", "ranked_reaction_labels"]
+            }
         record_jsons.append(record_dict)
 
-    with open(records_path, 'w') as f:
+    with open(records_path, "w") as f:
         json.dump(record_jsons, f)
 
     # save statistics
