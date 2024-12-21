@@ -441,7 +441,7 @@ class BiodexValidationSource(pz.ValidationDataSource):
 if __name__ == "__main__":
     # NOTE: set DSP_CACHEBOOL=False before executing this script (if running an experimental/benchmarking evaluation)
     if "DSP_CACHEBOOL" not in os.environ or os.environ["DSP_CACHEBOOL"].lower() != "false":
-        raise Exception("TURN OFF DSPy CACHE BY SETTING `export DSP_CACHEBOOL=False")
+        raise Exception("TURN OFF DSPy CACHE BY SETTING `export DSP_CACHEBOOL=False`")
 
     # parse arguments
     parser = argparse.ArgumentParser(description="Run a simple demo")
@@ -723,7 +723,7 @@ if __name__ == "__main__":
         exp_name=exp_name,
         allow_code_synth=False, #(workload != "biodex"),
         use_final_op_quality=use_final_op_quality,
-        max_workers=20,
+        max_workers=10,
     )
 
     # create filepaths for records and stats

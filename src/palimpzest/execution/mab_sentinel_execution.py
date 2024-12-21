@@ -164,7 +164,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         self.op_id_to_col_idx = {}
 
 
-    def update_frontier_ops(self, frontier_ops, reservoir_ops, policy, all_outputs, op_set_id_to_num_samples, op_id_to_num_samples):
+    def update_frontier_ops(self, frontier_ops, reservoir_ops, policy, all_outputs, op_set_id_to_num_samples, op_id_to_num_samples, is_filter_op_set):
         """
         Update the set of frontier operators, pulling in new ones from the reservoir as needed.
         This function will (for each op_set):
@@ -252,10 +252,13 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                         continue
 
                     # if op_id is dominated by other_op_id, set pareto_frontier = False and break
-                    cost_dominated = True if policy_dict["cost"] == 0.0 else other_cost <= cost
-                    time_dominated = True if policy_dict["time"] == 0.0 else other_time <= time
-                    quality_dominated = True if policy_dict["quality"] == 0.0 else other_quality >= quality
-                    selectivity_dominated = other_selectivity <= selectivity
+                    # NOTE: here we use a strict inequality (instead of the usual <= or >=) because
+                    #       all ops which have equal cost / time / quality / sel. should not be
+                    #       filtered out from sampling by our logic in this function
+                    cost_dominated = True if policy_dict["cost"] == 0.0 else other_cost < cost
+                    time_dominated = True if policy_dict["time"] == 0.0 else other_time < time
+                    quality_dominated = True if policy_dict["quality"] == 0.0 else other_quality > quality
+                    selectivity_dominated = True if not is_filter_op_set[op_set_id] else other_selectivity < selectivity
                     if cost_dominated and time_dominated and quality_dominated and selectivity_dominated:
                         pareto_frontier = False
                         break
@@ -264,7 +267,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                 if pareto_frontier:
                     pareto_op_sets[op_set_id].add(op_id)
 
-        # Titerate over frontier ops and replace any which do not overlap with pareto frontier
+        # iterate over frontier ops and replace any which do not overlap with pareto frontier
         new_frontier_ops = {op_set_id: [] for op_set_id in frontier_ops.keys()}
         new_reservoir_ops = {op_set_id: [] for op_set_id in reservoir_ops.keys()}
         for op_set_id, pareto_op_set in pareto_op_sets.items():
@@ -299,26 +302,26 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                     cost_dominated = True if policy_dict["cost"] == 0.0 else pareto_cost <= op_cost
                     time_dominated = True if policy_dict["time"] == 0.0 else pareto_time <= op_time
                     quality_dominated = True if policy_dict["quality"] == 0.0 else pareto_quality >= op_quality
-                    selectivity_dominated = pareto_selectivity <= op_selectivity
+                    selectivity_dominated = True if not is_filter_op_set[op_set_id] else pareto_selectivity <= op_selectivity
                     if cost_dominated and time_dominated and quality_dominated and selectivity_dominated:
                         pareto_frontier = False
                         break
                 
                 # add op_id to pareto frontier if it's not dominated
                 if pareto_frontier:
-                    new_frontier_ops[op_set_id].append((op, next_shuffled_sample_idx, new_operator))
+                    new_frontier_ops[op_set_id].append((op, next_shuffled_sample_idx, new_operator, fully_sampled))
                 else:
                     num_dropped_from_frontier += 1
 
-            # TODO: handle smaller ops like Retrieve getting fully sampled w/large sample budgets
             # replace the ops dropped from the frontier with new ops from the reservoir
+            num_dropped_from_frontier = min(num_dropped_from_frontier, len(reservoir_ops[op_set_id]))
             for idx in range(num_dropped_from_frontier):
-                new_frontier_ops[op_set_id].append((reservoir_ops[op_set_id][idx], 0, True))
+                new_frontier_ops[op_set_id].append((reservoir_ops[op_set_id][idx], 0, True, False))
 
             # update reservoir ops for this op_set_id
             new_reservoir_ops[op_set_id] = reservoir_ops[op_set_id][num_dropped_from_frontier:]
 
-        return frontier_ops, reservoir_ops
+        return new_frontier_ops, new_reservoir_ops
 
 
     def compute_quality(
@@ -711,6 +714,10 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         # create mapping from op_set_id and op_ids to the number of samples drawn
         op_set_id_to_num_samples = {op_set_id: 0 for op_set_id in full_op_set_ids}
         op_id_to_num_samples = {op.get_op_id(): 0 for op_set in full_op_sets for op in op_set}
+        is_filter_op_set = {
+            full_op_set_id: isinstance(full_op_set[0], FilterOp)
+            for full_op_set_id, full_op_set in zip(full_op_set_ids, full_op_sets)
+        }
 
         # TODO: long-term, we should do something which does not rely on scanning validation source to build this mapping
         sample_idx_to_source_id = {
@@ -761,6 +768,11 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                                 )
                             ):
                                 candidates = [record for record in max_quality_record_set]
+
+                            # increment number of samples drawn for this op_set_id and op_id; even if we get multiple
+                            # candidates from the previous stage in the pipeline, we only count this as one sample
+                            op_set_id_to_num_samples[op_set_id] += 1
+                            op_id_to_num_samples[op.get_op_id()] += 1
 
                         if len(candidates) > 0:
                             op_candidate_pairs.extend([(op, candidate) for candidate in candidates])
@@ -817,7 +829,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                 all_outputs = self.score_quality(op_set, op_set_id, all_outputs, champion_outputs, expected_outputs, field_to_metric_fn)
 
             # update the (pareto) frontier for each set of operators
-            frontier_ops, reservoir_ops = self.update_frontier_ops(frontier_ops, reservoir_ops, policy, all_outputs, op_set_id_to_num_samples, op_id_to_num_samples)
+            frontier_ops, reservoir_ops = self.update_frontier_ops(frontier_ops, reservoir_ops, policy, all_outputs, op_set_id_to_num_samples, op_id_to_num_samples, is_filter_op_set)
 
         # if caching was allowed, close the cache
         if not self.nocache:
