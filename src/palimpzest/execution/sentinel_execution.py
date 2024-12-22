@@ -1,24 +1,18 @@
+import time
+
 from palimpzest.constants import OptimizationStrategy
 from palimpzest.dataclasses import ExecutionStats
-from palimpzest.elements import DataRecordSet
-from palimpzest.execution import (
-    ExecutionEngine,
-    SequentialSingleThreadSentinelPlanExecutor,
+from palimpzest.elements.records import DataRecordSet
+from palimpzest.execution.execution_engine import ExecutionEngine
+from palimpzest.execution.plan_executors.sentinel_plan_execution import (
     SequentialParallelSentinelPlanExecutor,
+    SequentialSingleThreadSentinelPlanExecutor,
 )
-from palimpzest.optimizer import (
-    CostModel,
-    MatrixCompletionCostModel,
-    Optimizer,
-    SentinelPlan,
-)
+from palimpzest.optimizer.cost_model import CostModel, MatrixCompletionCostModel
+from palimpzest.optimizer.optimizer import Optimizer
+from palimpzest.optimizer.plan import SentinelPlan
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
-
-from concurrent.futures import ThreadPoolExecutor
-
-import time
-import warnings
 
 
 class SentinelExecutionEngine(ExecutionEngine):
@@ -36,7 +30,7 @@ class SentinelExecutionEngine(ExecutionEngine):
 
         # TODO: relax this constraint once we've implemented an end-to-end working version of sentinel execution
         # check that the user provided at least 3 validation samples
-        num_val_records = self.datasource.getValLength() if self.using_validation_data else self.num_samples
+        num_val_records = self.datasource.get_val_length() if self.using_validation_data else self.num_samples
         assert num_val_records >= 3, "Number of validation examples (or samples) must be >= 3 to allow for low-rank approximation."
 
         # check that we have enough records for the specified rank
@@ -72,7 +66,7 @@ class SentinelExecutionEngine(ExecutionEngine):
         """
         # run sentinel plan
         num_samples = (
-            self.datasource.getValLength()
+            self.datasource.get_val_length()
             if self.using_validation_data
             else min(self.num_samples, len(self.datasource))
         )
@@ -85,11 +79,11 @@ class SentinelExecutionEngine(ExecutionEngine):
         # if we're using validation data, get the set of expected output records
         expected_outputs, field_to_metric_fn = None, None
         if self.using_validation_data:
-            field_to_metric_fn = self.datasource.getFieldToMetricFn()
+            field_to_metric_fn = self.datasource.get_field_to_metric_fn()
             expected_outputs = {}
-            for idx in range(self.datasource.getValLength()):
-                data_records = self.datasource.getItem(idx, val=True, include_label=True)
-                if type(data_records) != type([]):
+            for idx in range(self.datasource.get_val_length()):
+                data_records = self.datasource.get_item(idx, val=True, include_label=True)
+                if not isinstance(data_records, list):
                     data_records = [data_records]
                 record_set = DataRecordSet(data_records, None)
                 expected_outputs[record_set.source_id] = record_set

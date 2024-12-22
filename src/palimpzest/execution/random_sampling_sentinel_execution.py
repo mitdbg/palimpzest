@@ -414,13 +414,13 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         # get handle to DataSource (# making the assumption that first operator_set can only be a scan
         source_operator = plan.operator_sets[0][0]
         datasource = (
-            self.datadir.getRegisteredDataset(source_operator.dataset_id)
+            self.datadir.get_registered_dataset(source_operator.dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(source_operator.dataset_id)
+            else self.datadir.get_cached_result(source_operator.dataset_id)
         )
 
         # sample validation records
-        total_num_samples = self.datasource.getValLength()
+        total_num_samples = self.datasource.get_val_length()
         sample_indices = np.arange(total_num_samples)
         if self.sample_start_idx is not None:
             assert self.sample_end_idx is not None
@@ -438,7 +438,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         for sample_idx in sample_indices:
             candidate = DataRecord(schema=SourceRecord, source_id=sample_idx)
             candidate.idx = sample_idx
-            candidate.get_item_fn = partial(datasource.getItem, val=True)
+            candidate.get_item_fn = partial(datasource.get_item, val=True)
             candidates.append(candidate)
 
         # NOTE: because we need to dynamically create sample matrices for each operator,
@@ -495,7 +495,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             if not self.nocache:
                 for record in all_records:
                     if getattr(record, "_passed_operator", True):
-                        self.datadir.appendCache(op_set_id, record)
+                        self.datadir.append_cache(op_set_id, record)
 
             # update candidates for next operator; we use champion outputs as input
             candidates = []
@@ -512,14 +512,14 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
                 break
 
         # compute quality for each operator (and time and cost) and put them into matrix
-        field_to_metric_fn = self.datasource.getFieldToMetricFn()
+        field_to_metric_fn = self.datasource.get_field_to_metric_fn()
         all_outputs = self.score_quality(plan.operator_sets, all_outputs, champion_outputs, expected_outputs, field_to_metric_fn)
 
         # if caching was allowed, close the cache
         if not self.nocache:
             for op_set in plan.operator_sets:
                 op_set_id = SentinelPlan.compute_op_set_id(op_set)
-                self.datadir.closeCache(op_set_id)
+                self.datadir.close_cache(op_set_id)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
@@ -541,8 +541,8 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         """
         # if we're using validation data, get the set of expected output records
         expected_outputs = {}
-        for idx in range(self.datasource.getValLength()):
-            data_records = self.datasource.getItem(idx, val=True, include_label=True)
+        for idx in range(self.datasource.get_val_length()):
+            data_records = self.datasource.get_item(idx, val=True, include_label=True)
             if type(data_records) != type([]):
                 data_records = [data_records]
             record_set = DataRecordSet(data_records, None)

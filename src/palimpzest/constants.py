@@ -1,7 +1,6 @@
 ### This file contains constants used by Palimpzest ###
-from enum import Enum
-
 import os
+from enum import Enum
 
 
 # ENUMS
@@ -14,24 +13,21 @@ class Model(str, Enum):
     LLAMA3 = "meta-llama/Llama-3-8b-chat-hf"
     LLAMA3_V = "meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo"
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    # GPT_3_5 = "gpt-3.5-turbo-0125"
-    # GPT_4 = "gpt-4-0125-preview"
-    # GPT_4V = "gpt-4-vision-preview"
     GPT_4o = "gpt-4o-2024-08-06"
     GPT_4o_V = "gpt-4o-2024-08-06"
     GPT_4o_MINI = "gpt-4o-mini-2024-07-18"
     GPT_4o_MINI_V = "gpt-4o-mini-2024-07-18"
-    # GEMINI_1 = "gemini-1.0-pro-001"
-    # GEMINI_1V = "gemini-1.0-pro-vision-latest"
 
     def __repr__(self):
-        return f'{self.name}'
+        return f"{self.name}"
+
 
 class PromptStrategy(str, Enum):
     """
     PromptStrategy describes the prompting technique to be used by a Generator when
     performing some task with a specified Model.
     """
+
     ZERO_SHOT = "zero-shot"
     FEW_SHOT = "few-shot"
     IMAGE_TO_TEXT = "image-to-text"
@@ -39,6 +35,7 @@ class PromptStrategy(str, Enum):
     DSPY_COT_QA = "dspy-chain-of-thought-question"
     DSPY_COT_MOA_AGG = "dspy-chain-of-thought-mixture-of-agents-aggregation"
     CODE_GEN_BOOL = "code-gen-bool"
+
 
 class OptimizationStrategy(str, Enum):
     """
@@ -51,20 +48,22 @@ class OptimizationStrategy(str, Enum):
     SENTINEL = "sentinel"
     NONE = "none"
 
+
 class AggFunc(str, Enum):
     COUNT = "count"
     AVERAGE = "average"
 
-class Cardinality(str, Enum): 
+
+class Cardinality(str, Enum):
     ONE_TO_ONE = "one-to-one"
     ONE_TO_MANY = "one-to-many"
 
     @classmethod
     def _missing_(cls, value):
         if value:
-            normalized_value = ''.join([x for x in value if x.isalpha()]).lower()
+            normalized_value = "".join([x for x in value if x.isalpha()]).lower()
             for member in cls:
-                normalized_member = ''.join([x for x in member if x.isalpha()]).lower()
+                normalized_member = "".join([x for x in member if x.isalpha()]).lower()
                 if normalized_member == normalized_value:
                     return member
         return cls.ONE_TO_ONE
@@ -79,7 +78,7 @@ XLS_EXTENSIONS = [".xls", ".xlsx"]
 HTML_EXTENSIONS = [".html", ".htm"]
 
 # the number of seconds the parallel execution will sleep for while waiting for futures to complete
-PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.1
+PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.3
 
 # character limit for various IDs
 MAX_ID_CHARS = 10
@@ -95,9 +94,11 @@ MAX_ROWS = 5
 # maximum number of rows to parse from an HTML
 MAX_HTML_ROWS = 10000
 
+
 def log_attempt_number(retry_state):
     """return the result of the last call attempt"""
     print(f"Retrying: {retry_state.attempt_number}...")
+
 
 # Palimpzest root directory
 PZ_DIR = os.path.join(os.path.expanduser("~"), ".palimpzest")
@@ -159,7 +160,7 @@ LOG_LLM_OUTPUT = False
 #
 # Cost is presented in terms of USD / token for input tokens and USD / token for
 # generated tokens.
-# 
+#
 # Time is presented in seconds per output token. I grabbed some semi-recent estimates
 # from the internet for this quick POC, but we can and should do more to model these
 # values more precisely:
@@ -187,8 +188,8 @@ LLAMA3_11B_V_MODEL_CARD = {
 }
 MIXTRAL_8X_7B_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 0.6 / 1E6,
-    "usd_per_output_token": 0.6 / 1E6,
+    "usd_per_input_token": 0.6 / 1e6,
+    "usd_per_output_token": 0.6 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0112,
     ##### Agg. Benchmark #####

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.elements import DataRecord, DataRecordSet
-from palimpzest.operators import PhysicalOperator
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.operators.physical import PhysicalOperator
 
 
 class LimitScanOp(PhysicalOperator):
-
     def __init__(self, limit: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.limit = limit
@@ -22,19 +21,19 @@ class LimitScanOp(PhysicalOperator):
 
     def get_op_params(self):
         return {
-            "outputSchema": self.outputSchema,
+            "output_schema": self.output_schema,
             "limit": self.limit,
         }
 
-    def __eq__(self, other: PhysicalOperator):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.limit == other.limit
-            and self.outputSchema == other.outputSchema
-            and self.inputSchema == other.inputSchema
+            and self.output_schema == other.output_schema
+            and self.input_schema == other.input_schema
         )
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the limit takes negligible additional time (and no cost in USD)
         return OperatorCostEstimates(
             cardinality=min(self.limit, source_op_cost_estimates.cardinality),
@@ -47,14 +46,14 @@ class LimitScanOp(PhysicalOperator):
         # NOTE: execution layer ensures that no more than self.limit
         #       records are returned to the user by this operator.
         # create new DataRecord
-        dr = DataRecord.fromParent(schema=candidate.schema, parent_record=candidate)
+        dr = DataRecord.from_parent(schema=candidate.schema, parent_record=candidate)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
             record_id=dr._id,
             record_parent_id=dr._parent_id,
             record_source_id=dr._source_id,
-            record_state=dr._asDict(include_bytes=False),
+            record_state=dr.as_dict(include_bytes=False),
             op_id=self.get_op_id(),
             logical_op_id=self.logical_op_id,
             op_name=self.op_name(),

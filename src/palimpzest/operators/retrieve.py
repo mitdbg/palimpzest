@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from palimpzest.constants import *
-from palimpzest.corelib import *
-from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.elements import *
-from palimpzest.operators import PhysicalOperator
-
 import os
 import time
+
+from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.operators.physical import PhysicalOperator
 
 
 class RetrieveOp(PhysicalOperator):
@@ -50,6 +48,18 @@ class RetrieveOp(PhysicalOperator):
             "k": self.k,
         }
 
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        """
+        Compute naive cost estimates for the Retrieve operation. These estimates assume
+        that the Retrieve (1) has no cost and (2) has perfect quality.
+        """
+        return OperatorCostEstimates(
+            cardinality=source_op_cost_estimates.cardinality,
+            time_per_record=0.001,  # estimate 1 ms single-threaded execution for index lookup
+            cost_per_record=0.0,
+            quality=1.0,
+        )
+
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         start_time = time.time()
 
@@ -73,7 +83,7 @@ class RetrieveOp(PhysicalOperator):
                 sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
                 top_k_results = [result["content"] for result in sorted_results[:self.k]]
                 top_k_result_doc_ids = [result["document_id"] for result in sorted_results[:self.k]]
-            except:
+            except Exception:
                 os.makedirs("retrieve-errors", exist_ok=True)
                 ts = time.time()
                 with open(f"retrieve-errors/error-{ts}.txt", "w") as f:
@@ -82,22 +92,22 @@ class RetrieveOp(PhysicalOperator):
                 top_k_results = ["error-in-retrieve"]
                 top_k_result_doc_ids = ["error-in-retrieve"]
 
-        output_dr = DataRecord.fromParent(self.outputSchema, parent_record=candidate)
+        output_dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
         setattr(output_dr, self.output_attr, top_k_results)
-        setattr(output_dr, "_evidence_file_ids", top_k_result_doc_ids)
+        output_dr._evidence_file_ids = top_k_result_doc_ids
 
         duration_secs = time.time() - start_time
 
         # answer = (
         #     {
         #         field_name: getattr(output_dr, field_name)
-        #         for field_name in self.outputSchema.fieldNames()
+        #         for field_name in self.output_schema.field_names()
         #     },
         # )
         answer = {self.output_attr: top_k_results}
-        record_state = output_dr._asDict(include_bytes=False)
+        record_state = output_dr.as_dict(include_bytes=False)
         record_state["_evidence_file_ids"] = top_k_result_doc_ids
-        generated_fields = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
+        generated_fields = self._generate_field_names(candidate, self.input_schema, self.output_schema)
         
         record_op_stats = RecordOpStats(
             record_id=output_dr._id,
@@ -110,7 +120,7 @@ class RetrieveOp(PhysicalOperator):
             time_per_record=duration_secs,
             cost_per_record=0.0,
             answer=answer,
-            input_fields=self.inputSchema.fieldNames(),
+            input_fields=self.input_schema.field_names(),
             generated_fields=generated_fields,
             fn_call_duration_secs=duration_secs,  # TODO(Siva): Currently tracking retrieval time in fn_call_duration_secs
             op_details={k: str(v) for k, v in self.get_op_params().items()},
@@ -123,17 +133,3 @@ class RetrieveOp(PhysicalOperator):
         record_set = DataRecordSet(drs, record_op_stats_lst)
 
         return record_set
-
-    def naiveCostEstimates(
-        self, source_op_cost_estimates: OperatorCostEstimates
-    ) -> OperatorCostEstimates:
-        """
-        Compute naive cost estimates for the Retrieve operation. These estimates assume
-        that the Retrieve (1) has no cost and (2) has perfect quality.
-        """
-        return OperatorCostEstimates(
-            cardinality=source_op_cost_estimates.cardinality,
-            time_per_record=0.001,  # estimate 1 ms single-threaded execution for index lookup
-            cost_per_record=0.0,
-            quality=1.0,
-        )

@@ -1,11 +1,10 @@
-from palimpzest.constants import Model
-
+import os
 from typing import List, Optional
 
-import os
+from palimpzest.constants import Model
 
 
-def getVisionModels() -> List[Model]:
+def get_vision_models() -> List[Model]:
     """
     Return the set of vision models which the system has access to based on the set of environment variables.
     """
@@ -19,7 +18,7 @@ def getVisionModels() -> List[Model]:
     return models
 
 
-def getModels(include_vision: Optional[bool] = False) -> List[Model]:
+def get_models(include_vision: Optional[bool] = False) -> List[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
     """
@@ -31,13 +30,13 @@ def getModels(include_vision: Optional[bool] = False) -> List[Model]:
         models.extend([Model.LLAMA3, Model.MIXTRAL])
 
     if include_vision:
-        vision_models = getVisionModels()
+        vision_models = get_vision_models()
         models.extend(vision_models)
 
     return models
 
 
-def getChampionModel(available_models, vision=False):
+def get_champion_model(available_models, vision=False):
     champion_model = None
 
     # non-vision
@@ -59,19 +58,23 @@ def getChampionModel(available_models, vision=False):
         champion_model = Model.LLAMA3_V
 
     else:
-        raise Exception(f"No models available to create physical plans! available_models: {available_models}")
+        raise Exception(
+            "No models available to create physical plans! You must set at least one of the following environment"
+            " variables: [OPENAI_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY]\n"
+            f"available_models: {available_models}"
+        )
 
     return champion_model
 
 
-def getConventionalFallbackModel(available_models, vision=False):
-    return getChampionModel(available_models, vision)
+def get_conventional_fallback_model(available_models, vision=False):
+    return get_champion_model(available_models, vision)
 
 
-def getCodeChampionModel(available_models):
-    # NOTE: for now, assume same champion as getChampionModel()
-    return getChampionModel(available_models, vision=False)
+def get_code_champion_model(available_models):
+    # NOTE: for now, assume same champion as get_champion_model()
+    return get_champion_model(available_models, vision=False)
 
 
-def getChampionModelName(available_models, vision=False):
-    return getChampionModel(available_models, vision=vision).value
+def get_champion_model_name(available_models, vision=False):
+    return get_champion_model(available_models, vision).value

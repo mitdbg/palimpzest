@@ -1,10 +1,10 @@
-from palimpzest.constants import log_attempt_number, RETRY_MAX_ATTEMPTS, RETRY_MAX_SECS, RETRY_MULTIPLIER
-from dsp.modules.hf import HFModel
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 import dspy
 import requests
 import tiktoken
+from dsp.modules.hf import HFModel
+
+# from tenacity import retry, stop_after_attempt, wait_exponential
+
 
 ### DSPy Signatures ###
 # functions which generate signatures
@@ -15,6 +15,7 @@ def gen_signature_class(instruction, context_desc, question_desc, answer_desc):
         question = dspy.InputField(desc=question_desc)
         answer = dspy.OutputField(desc=answer_desc)
     return QuestionOverDoc
+
 
 def gen_filter_signature_class(doc_schema, doc_type):
     instruction = f"Answer condition questions about a {doc_schema}."
@@ -35,16 +36,16 @@ def gen_qa_signature_class(doc_schema, doc_type):
     instruction = f"Answer question(s) about a {doc_schema}."
     context_desc = f"contains full text of the {doc_type}"
     question_desc = f"one or more question about the {doc_type}"
-    answer_desc = f"print the answer only, separated by a newline character"
+    answer_desc = "print the answer only, separated by a newline character"
     return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
 
 ### DSPy Modules ###
-class dspyCOT(dspy.Module):
+class DSPyCOT(dspy.Module):
     """
     Invoke dspy in chain of thought mode
     """
-    def __init__(self, f_signature):
+    def __init__(self, f_signature: type[dspy.Signature]):
         super().__init__()
         self.generate_answer = dspy.ChainOfThought(f_signature)
 
@@ -60,10 +61,10 @@ class dspyCOT(dspy.Module):
 
 ### DSPy wrapped LLM calls ###
 class TogetherHFAdaptor(HFModel):
-    def __init__(self, model, apiKey, **kwargs):
+    def __init__(self, model, api_key, **kwargs):
         super().__init__(model=model, is_client=True)
         self.api_base = "https://api.together.xyz/inference"
-        self.token = apiKey
+        self.token = api_key
         self.model = model
         # using tiktoken as a rough approximation for both Llama3 and Mixtral (which are based on tiktoken tokenizers)
         self.tokenizer = tiktoken.get_encoding('cl100k_base')
@@ -73,8 +74,8 @@ class TogetherHFAdaptor(HFModel):
             self.use_inst_template = True
 
         stop_default = "\n\n---"
-
         # print("Stop procedure", stop_default)
+
         self.kwargs = {
             "max_tokens": 4096, # 8192
             "top_p": 1,
@@ -82,7 +83,7 @@ class TogetherHFAdaptor(HFModel):
             "repetition_penalty": 1,
             "frequency_penalty": 1,
             "n": 1,
-            "stop": stop_default if "stop" not in kwargs else kwargs["stop"],
+            "stop": kwargs.get("stop", stop_default),
             **kwargs
         }
 
@@ -108,8 +109,11 @@ class TogetherHFAdaptor(HFModel):
 
         if use_chat_api:
             messages = [
-                {"role": "system", "content": "You are a helpful assistant. You must continue the user text directly without *any* additional interjections."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant. You must continue the user text directly without *any* additional interjections.",
+                },
+                {"role": "user", "content": prompt},
             ]
             body = {
                 "model": self.model,
@@ -136,26 +140,27 @@ class TogetherHFAdaptor(HFModel):
             }
 
         headers = {"Authorization": f"Bearer {self.token}"}
-        try:
-            with requests.Session().post(url, headers=headers, json=body) as resp:
-                resp_json = resp.json()
+
+        with requests.Session().post(url, headers=headers, json=body) as resp:
+            resp_json = resp.json()
+            try:
                 if use_chat_api:
-                    completions = [resp_json['output'].get('choices', [])[0].get('message', {}).get('content', "")]
+                    completions = [resp_json["output"].get("choices", [])[0].get("message", {}).get("content", "")]
                 else:
-                    completions = [resp_json['output'].get('choices', [])[0].get('text', "")]
+                    completions = [resp_json["output"].get("choices", [])[0].get("text", "")]
                 response = {
-                    "prompt": resp_json['prompt'][-1],
+                    "prompt": resp_json["prompt"][-1],
                     "choices": [{"text": c} for c in completions],
                 }
-                response['usage'] = resp_json['output']['usage']
-                response['finish_reason'] = resp_json['output']['finish_reason']
+                response["usage"] = resp_json["output"]["usage"]
+                response["finish_reason"] = resp_json["output"]["finish_reason"]
                 if logprobs > 0:
-                    response['tokens'] = resp_json['output']['choices'][0]['tokens']
-                    response['token_logprobs'] = resp_json['output']['choices'][0]['token_logprobs']
+                    response["tokens"] = resp_json["output"]["choices"][0]["tokens"]
+                    response["token_logprobs"] = resp_json["output"]["choices"][0]["token_logprobs"]
 
                 return response
-        except Exception as e:
-            if resp_json:
-                print(f"resp_json:{resp_json}")
-            print(f"Failed to parse JSON response: {e}")
-            raise Exception("Received invalid JSON response from server")
+            except Exception as e:
+                if resp_json:
+                    print(f"resp_json:{resp_json}")
+                print(f"Failed to parse JSON response: {e}")
+                raise Exception("Received invalid JSON response from server") from e

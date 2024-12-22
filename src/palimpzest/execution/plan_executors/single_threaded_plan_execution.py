@@ -1,15 +1,14 @@
+import time
+
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
-from palimpzest.corelib import Schema
-from palimpzest.elements import DataRecord
-from palimpzest.execution import ExecutionEngine
-from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
+from palimpzest.elements.records import DataRecord
+from palimpzest.execution.execution_engine import ExecutionEngine
+from palimpzest.operators.aggregate import AggregateOp
+from palimpzest.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
-from palimpzest.optimizer import PhysicalPlan
-
-from typing import Union
-
-import time
+from palimpzest.operators.limit import LimitScanOp
+from palimpzest.optimizer.plan import PhysicalPlan
 
 
 class SequentialSingleThreadPlanExecutor(ExecutionEngine):
@@ -21,9 +20,7 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def execute_plan(self, plan: PhysicalPlan,
-                     num_samples: Union[int, float] = float("inf"),
-                     plan_workers: int = 1):
+    def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
@@ -49,30 +46,20 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
         datasource = (
-            self.datadir.getRegisteredDataset(source_operator.dataset_id)
+            self.datadir.get_registered_dataset(source_operator.dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(source_operator.dataset_id)
+            else self.datadir.get_cached_result(source_operator.dataset_id)
         )
         datasource_len = len(datasource)
 
         # initialize processing queues for each operation
-        processing_queues = {
-            op.get_op_id(): []
-            for op in plan.operators
-            if not isinstance(op, DataSourcePhysicalOp)
-        }
+        processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, DataSourcePhysicalOp)}
 
         # execute the plan one operator at a time
         for op_idx, operator in enumerate(plan.operators):
             op_id = operator.get_op_id()
-            prev_op_id = (
-                plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
-            )
-            next_op_id = (
-                plan.operators[op_idx + 1].get_op_id()
-                if op_idx + 1 < len(plan.operators)
-                else None
-            )
+            prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
+            next_op_id = plan.operators[op_idx + 1].get_op_id() if op_idx + 1 < len(plan.operators) else None
 
             # initialize output records and record_op_stats for this operator
             records, record_op_stats = [], []
@@ -86,7 +73,7 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
                     #       it is simply a vessel to inform the scan_operator which record to fetch
                     candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
                     candidate.idx = current_scan_idx
-                    candidate.get_item_fn = datasource.getItem
+                    candidate.get_item_fn = datasource.get_item
 
                     # run DataSourcePhysicalOp on record
                     record_set = operator(candidate)
@@ -97,10 +84,7 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
                     current_scan_idx += 1
 
                     # update whether to keep scanning source records
-                    keep_scanning_source_records = (
-                        current_scan_idx < datasource_len
-                        and len(records) < num_samples
-                    )
+                    keep_scanning_source_records = current_scan_idx < datasource_len and len(records) < num_samples
 
             # aggregate operators accept all input records at once
             elif isinstance(operator, AggregateOp):
@@ -129,27 +113,25 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
             if not self.nocache:
                 for record in records:
                     if getattr(record, "_passed_operator", True):
-                        self.datadir.appendCache(operator.targetCacheId, record)
+                        self.datadir.append_cache(operator.target_cache_id, record)
 
             # update processing_queues or output_records
             for record in records:
-                if isinstance(operator, FilterOp):
-                    if not record._passed_operator:
-                        continue
+                if isinstance(operator, FilterOp) and not record._passed_operator:
+                    continue
                 if next_op_id is not None:
                     processing_queues[next_op_id].append(record)
                 else:
                     output_records.append(record)
 
             # if we've filtered out all records, terminate early
-            if next_op_id is not None:
-                if processing_queues[next_op_id] == []:
-                    break
+            if next_op_id is not None and processing_queues[next_op_id] == []:
+                break
 
         # if caching was allowed, close the cache
         if not self.nocache:
             for operator in plan.operators:
-                self.datadir.closeCache(operator.targetCacheId)
+                self.datadir.close_cache(operator.target_cache_id)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
@@ -168,9 +150,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
         super().__init__(*args, **kwargs)
         self.max_workers = 1 if self.max_workers is None else self.max_workers
 
-    def execute_plan(self, plan: PhysicalPlan,
-                     num_samples: Union[int, float] = float("inf"),
-                     plan_workers: int = 1):
+    def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
@@ -182,7 +162,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
 
         # initialize plan stats and operator stats
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
-        for op_idx, op in enumerate(plan.operators):
+        for op in plan.operators:
             op_id = op.get_op_id()
             op_name = op.op_name()
             op_details = {k: str(v) for k, v in op.get_op_params().items()}
@@ -196,18 +176,14 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
         datasource = (
-            self.datadir.getRegisteredDataset(source_operator.dataset_id)
+            self.datadir.get_registered_dataset(source_operator.dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(source_operator.dataset_id)
+            else self.datadir.get_cached_result(source_operator.dataset_id)
         )
         datasource_len = len(datasource)
 
         # initialize processing queues for each operation
-        processing_queues = {
-            op.get_op_id(): []
-            for op in plan.operators
-            if not isinstance(op, DataSourcePhysicalOp)
-        }
+        processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, DataSourcePhysicalOp)}
 
         # execute the plan until either:
         # 1. all records have been processed, or
@@ -217,14 +193,8 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
             for op_idx, operator in enumerate(plan.operators):
                 op_id = operator.get_op_id()
 
-                prev_op_id = (
-                    plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
-                )
-                next_op_id = (
-                    plan.operators[op_idx + 1].get_op_id()
-                    if op_idx + 1 < len(plan.operators)
-                    else None
-                )
+                prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
+                next_op_id = plan.operators[op_idx + 1].get_op_id() if op_idx + 1 < len(plan.operators) else None
 
                 # create empty lists for records and execution stats generated by executing this operator on its next input(s)
                 records, record_op_stats = [], []
@@ -237,7 +207,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
                         #       it is simply a vessel to inform the scan_operator which record to fetch
                         candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
                         candidate.idx = current_scan_idx
-                        candidate.get_item_fn = datasource.getItem
+                        candidate.get_item_fn = datasource.get_item
 
                         # run DataSourcePhysicalOp on record
                         record_set = operator(candidate)
@@ -262,8 +232,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
                         # check upstream ops which do have a processing queue
                         upstream_op_id = plan.operators[upstream_op_idx].get_op_id()
                         upstream_ops_are_finished = (
-                            upstream_ops_are_finished
-                            and len(processing_queues[upstream_op_id]) == 0
+                            upstream_ops_are_finished and len(processing_queues[upstream_op_id]) == 0
                         )
 
                     if not keep_scanning_source_records and upstream_ops_are_finished:
@@ -292,13 +261,12 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
                     if not self.nocache:
                         for record in records:
                             if getattr(record, "_passed_operator", True):
-                                self.datadir.appendCache(operator.targetCacheId, record)
+                                self.datadir.append_cache(operator.target_cache_id, record)
 
                     # update processing_queues or output_records
                     for record in records:
-                        if isinstance(operator, FilterOp):
-                            if not record._passed_operator:
-                                continue
+                        if isinstance(operator, FilterOp) and not record._passed_operator:
+                            continue
                         if next_op_id is not None:
                             processing_queues[next_op_id].append(record)
                         else:
@@ -306,20 +274,17 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
 
             # update finished_executing based on whether all records have been processed
             still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
-            keep_scanning_source_records = (
-                current_scan_idx < datasource_len
-                and source_records_scanned < num_samples
-            )
+            keep_scanning_source_records = current_scan_idx < datasource_len and source_records_scanned < num_samples
             finished_executing = not keep_scanning_source_records and not still_processing
 
             # update finished_executing based on limit
             if isinstance(operator, LimitScanOp):
-                finished_executing = (len(output_records) == operator.limit)
+                finished_executing = len(output_records) == operator.limit
 
         # if caching was allowed, close the cache
         if not self.nocache:
             for operator in plan.operators:
-                self.datadir.closeCache(operator.targetCacheId)
+                self.datadir.close_cache(operator.target_cache_id)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time

@@ -29,14 +29,14 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
 
     # create convert data records
     for idx in range(30):
-        convert_dr = DataRecord.fromParent(foobar_schema, scan_drs[idx % 10])
+        convert_dr = DataRecord.from_parent(foobar_schema, scan_drs[idx % 10])
         convert_dr.foo = f"foo{idx % 10}"
         convert_dr.bar = f"bar{idx % 10}"
         convert_drs.append(convert_dr)
 
     # create filter data records
     for idx in range(30):
-        filter_dr = DataRecord.fromParent(foobar_schema, convert_drs[idx])
+        filter_dr = DataRecord.from_parent(foobar_schema, convert_drs[idx])
         filter_drs.append(filter_dr)
 
     # create execution data entries for scan operator
@@ -51,8 +51,8 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
             cost_per_record=0.0,
-            logical_op_id=f"scan1-logical",
-            record_state=scan_dr._asDict(),
+            logical_op_id="scan1-logical",
+            record_state=scan_dr.as_dict(),
             passed_operator=None,
             generated_fields=None,
         )
@@ -74,8 +74,8 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
                 op_name="LLMConvertBonded",
                 time_per_record=1.0,
                 cost_per_record=1.0,
-                logical_op_id=f"convert1-logical",
-                record_state=convert_dr._asDict(),
+                logical_op_id="convert1-logical",
+                record_state=convert_dr.as_dict(),
                 passed_operator=None,
                 generated_fields=["foo", "bar"],
             )
@@ -102,8 +102,8 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
                 op_name="LLMFilter",
                 time_per_record=1.0,
                 cost_per_record=1.0,
-                logical_op_id=f"filter1-logical",
-                record_state=filter_dr._asDict(),
+                logical_op_id="filter1-logical",
+                record_state=filter_dr.as_dict(),
                 passed_operator=bool(source_idx % 2), # odd examples pass filter
                 generated_fields=None,
             )
@@ -140,14 +140,14 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
     models = [Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL]
     for model in models:
         for idx in range(10):
-            convert_dr = DataRecord.fromParent(foobar_schema, scan_drs[idx])
+            convert_dr = DataRecord.from_parent(foobar_schema, scan_drs[idx])
             convert_dr.foo = f"foo{idx}"
             convert_dr.bar = f"bar{idx}-{str(model)}"
             convert_drs.append(convert_dr)
 
     # create filter data records
     for idx in range(30):
-        filter_dr = DataRecord.fromParent(foobar_schema, convert_drs[idx])
+        filter_dr = DataRecord.from_parent(foobar_schema, convert_drs[idx])
         filter_drs.append(filter_dr)
 
     # create execution data entries for scan operator
@@ -157,12 +157,12 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             record_id=scan_dr._id,
             record_parent_id=scan_dr._parent_id,
             record_source_id=scan_dr._source_id,
-            op_id=f"scan1-phys",
+            op_id="scan1-phys",
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
             cost_per_record=0.0,
-            logical_op_id=f"scan1-logical",
-            record_state=scan_dr._asDict(),
+            logical_op_id="scan1-logical",
+            record_state=scan_dr.as_dict(),
             passed_operator=None,
             generated_fields=None,
         )
@@ -181,8 +181,8 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             op_name="LLMConvertBonded",
             time_per_record=1.0,
             cost_per_record=1.0,
-            logical_op_id=f"convert1-logical",
-            record_state=convert_dr._asDict(),
+            logical_op_id="convert1-logical",
+            record_state=convert_dr.as_dict(),
             passed_operator=None,
             generated_fields=["foo", "bar"],
         )
@@ -217,8 +217,8 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             op_name="LLMFilter",
             time_per_record=1.0,
             cost_per_record=1.0,
-            logical_op_id=f"filter1-logical",
-            record_state=filter_dr._asDict(),
+            logical_op_id="filter1-logical",
+            record_state=filter_dr.as_dict(),
             passed_operator=passed_operator,
             generated_fields=None,
         )
@@ -231,6 +231,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
     return execution_data
 
 
+# TODO: are we still using this?
 @pytest.fixture
 def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filter_sentinel_plan, foobar_schema, baz_schema):
     # initialize execution data
@@ -257,29 +258,29 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
     for model in models:
         for idx in range(10):
             for one_to_many_idx in range(2):
-                convert_dr = DataRecord.fromParent(foobar_schema, scan_drs[idx])
+                convert_dr = DataRecord.from_parent(foobar_schema, scan_drs[idx])
                 convert_dr.foo = f"foo{idx}-one-to-many-{one_to_many_idx}"
                 convert_dr.bar = f"bar{idx}-{str(model)}"
                 convert1_drs.append(convert_dr)
 
     # create first filter data records
-    for model in models:
+    for _ in models:
         for gpt4_convert_dr in convert1_drs[:20]:
-            filter_dr = DataRecord.fromParent(foobar_schema, gpt4_convert_dr)
+            filter_dr = DataRecord.from_parent(foobar_schema, gpt4_convert_dr)
             filter1_drs.append(filter_dr)
 
     # NOTE: assume GPT-4 in filter1 filtered out last 6 out of 20 records
     # create second filter data records
-    for model in models:
+    for _ in models:
         for gpt4_filter_dr in filter1_drs[:14]:
-            filter_dr = DataRecord.fromParent(foobar_schema, gpt4_filter_dr)
+            filter_dr = DataRecord.from_parent(foobar_schema, gpt4_filter_dr)
             filter2_drs.append(filter_dr)
 
     # NOTE: assume GPT-4 in filter2 filtered out last 4 out of 14 records
     # create second convert data records (second half of records will be filtered out)
     for model in models:
         for gpt4_filter_dr in filter2_drs[:10]:
-            convert_dr = DataRecord.fromParent(baz_schema, gpt4_filter_dr)
+            convert_dr = DataRecord.from_parent(baz_schema, gpt4_filter_dr)
             convert_dr.baz = f"baz{str(model)}"
             convert2_drs.append(convert_dr)
 
@@ -290,12 +291,12 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
             record_id=scan_dr._id,
             record_parent_id=scan_dr._parent_id,
             record_source_id=scan_dr._source_id,
-            op_id=f"scan1-phys",
+            op_id="scan1-phys",
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
             cost_per_record=0.0,
-            logical_op_id=f"scan1-logical",
-            record_state=scan_dr._asDict(),
+            logical_op_id="scan1-logical",
+            record_state=scan_dr.as_dict(),
             passed_operator=None,
             generated_fields=None,
         )
@@ -318,8 +319,8 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     op_name="LLMConvertBonded",
                     time_per_record=1.0,
                     cost_per_record=1.0,
-                    logical_op_id=f"convert1-logical",
-                    record_state=convert_dr._asDict(),
+                    logical_op_id="convert1-logical",
+                    record_state=convert_dr.as_dict(),
                     passed_operator=None,
                     generated_fields=["foo", "bar"],
                 )
@@ -342,9 +343,10 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
 
                 # GPT-4 filters final 6 records it sees
                 passed_operator = True
-                if model_idx == 0 and source_idx > 6:
+                if model_idx == 0 and source_idx > 6:  # noqa: SIM114
                     passed_operator = False
 
+                # TODO: are we still using this?
                 # GPT-3.5 filters all records with one_to_many_idx == 1
                 elif model_idx == 1 and one_to_many_idx == 1:
                     passed_operator = False
@@ -359,8 +361,8 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     op_name="LLMFilter",
                     time_per_record=1.0,
                     cost_per_record=1.0,
-                    logical_op_id=f"filter1-logical",
-                    record_state=filter_dr._asDict(),
+                    logical_op_id="filter1-logical",
+                    record_state=filter_dr.as_dict(),
                     passed_operator=passed_operator,
                     generated_fields=None,
                 )
@@ -382,7 +384,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                 # TODO: this makes # of records seen by convert2 more complicated
                 # GPT-4 filters out final 4 records it sees
                 passed_operator = True
-                if model_idx == 0 and source_idx > 4:
+                if model_idx == 0 and source_idx > 4:  # noqa: SIM114
                     passed_operator = False
 
                 # GPT-3.5 filters all records with one_to_many_idx == 1
@@ -400,8 +402,8 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     op_name="LLMFilter",
                     time_per_record=1.0,
                     cost_per_record=1.0,
-                    logical_op_id=f"filter2-logical",
-                    record_state=filter_dr._asDict(),
+                    logical_op_id="filter2-logical",
+                    record_state=filter_dr.as_dict(),
                     passed_operator=passed_operator,
                     generated_fields=None,
                 )
@@ -426,8 +428,8 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     op_name="LLMConvertBonded",
                     time_per_record=1.0,
                     cost_per_record=1.0,
-                    logical_op_id=f"convert2-logical",
-                    record_state=convert_dr._asDict(),
+                    logical_op_id="convert2-logical",
+                    record_state=convert_dr.as_dict(),
                     passed_operator=None,
                     generated_fields=["baz"],
                 )

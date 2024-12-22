@@ -1,24 +1,8 @@
 from __future__ import annotations
 
-from palimpzest.constants import Cardinality, GPT_4o_MODEL_CARD, MODEL_CARDS
-from palimpzest.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
-from palimpzest.datamanager import DataDirectory
-from palimpzest.elements import DataRecordSet
-from palimpzest.operators import *
-from palimpzest.optimizer import SentinelPlan
-from palimpzest.utils import getChampionModelName, getModels
-
-import palimpzest as pz
-
-from tqdm import tqdm
-from typing import Any, Callable, Dict, List, Optional, Tuple
-
-import numpy as np
-import pandas as pd
-import scipy.stats as stats
+import json
 import math
 import os
-import torch
 
 # NOTE: the answer.mode() call(s) inside of _est_quality() throw a UserWarning when there are multiple
 #       answers to a convert with the same mode. This is because pandas tries to sort the answers
@@ -27,6 +11,27 @@ import torch
 #       multiple w/the same count, but in the future we may want to cast the 'dict' --> 'str' or compute
 #       the mode on a per-field basis.
 import warnings
+from typing import Any, Callable
+
+import numpy as np
+import pandas as pd
+import scipy.stats as stats
+import torch
+from tqdm import tqdm
+
+import palimpzest as pz
+from palimpzest.constants import MODEL_CARDS, GPT_4o_MODEL_CARD, Model
+from palimpzest.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
+from palimpzest.datamanager import DataDirectory
+from palimpzest.elements.records import DataRecordSet
+from palimpzest.operators.convert import ConvertOp, LLMConvert
+from palimpzest.operators.datasource import CacheScanDataOp, DataSourcePhysicalOp, MarshalAndScanDataOp
+from palimpzest.operators.filter import FilterOp, LLMFilter
+from palimpzest.operators.physical import PhysicalOperator
+from palimpzest.operators.retrieve import RetrieveOp
+from palimpzest.optimizer.plan import SentinelPlan
+from palimpzest.utils.model_helpers import get_champion_model_name, get_models
+
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 class BaseCostModel:
@@ -63,7 +68,7 @@ class SampleBasedCostModel:
     def __init__(
         self,
         sentinel_plan: SentinelPlan,
-        execution_data: Dict[str, Dict[str, List[DataRecordSet]]],
+        execution_data: dict[str, dict[str, list[DataRecordSet]]],
         verbose: bool = False,
         exp_name: str | None = None,
     ):
@@ -97,8 +102,8 @@ class SampleBasedCostModel:
 
     def compute_operator_stats(
             self,
-            execution_data: Dict[str, Dict[str, List[DataRecordSet]]],
-            operator_sets: List[List[PhysicalOperator]],
+            execution_data: dict[str, dict[str, list[DataRecordSet]]],
+            operator_sets: list[list[PhysicalOperator]],
         ):
         # flatten the nested dictionary of execution data and pull out fields relevant to cost estimation
         execution_record_op_stats = []
@@ -176,7 +181,7 @@ class SampleBasedCostModel:
         return operator_to_stats
 
 
-    def __call__(self, operator: PhysicalOperator, source_op_estimates: Optional[OperatorCostEstimates]=None) -> PlanCost:
+    def __call__(self, operator: PhysicalOperator, source_op_estimates: OperatorCostEstimates | None = None) -> PlanCost:
         # NOTE: some physical operators may not have any sample execution data in this cost model;
         #       these physical operators are filtered out of the Optimizer, thus we can assume that
         #       we will have execution data for each operator passed into __call__; nevertheless, we
@@ -195,7 +200,7 @@ class SampleBasedCostModel:
         # create source_op_estimates for datasources if they are not provided
         if isinstance(operator, DataSourcePhysicalOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.getRegisteredDataset(operator.dataset_id)
+            datasource = self.datadir.get_registered_dataset(operator.dataset_id)
             datasource_len = len(datasource)
 
             source_op_estimates = OperatorCostEstimates(
@@ -232,10 +237,10 @@ class MatrixCompletionCostModel:
             self,
             sentinel_plan: SentinelPlan,
             rank: int,
-            execution_data: Dict[str, Dict[str, List[DataRecordSet]]],
-            champion_outputs: Dict[str, Dict[str, DataRecordSet]],
-            expected_outputs: Optional[Dict[str, DataRecordSet]] = None,
-            field_to_metric_fn: Optional[Dict[str, Union[str, Callable]]] = None,
+            execution_data: dict[str, dict[str, list[DataRecordSet]]],
+            champion_outputs: dict[str, dict[str, DataRecordSet]],
+            expected_outputs: dict[str, DataRecordSet] | None = None,
+            field_to_metric_fn: dict[str, str | Callable] | None = None,
             num_epochs: int = 5000,
             verbose: bool = False,
         ):
@@ -350,11 +355,11 @@ class MatrixCompletionCostModel:
     def compute_quality(
             self,
             record_set: DataRecordSet,
-            expected_record_set: DataRecordSet=None,
-            champion_record_set: DataRecordSet=None,
-            is_filter_op: bool=False,
-            is_convert_op: bool=False,
-            field_to_metric_fn: Optional[Dict[str, Union[str, Callable]]] = None,
+            expected_record_set: DataRecordSet | None = None,
+            champion_record_set: DataRecordSet | None = None,
+            is_filter_op: bool = False,
+            is_convert_op: bool = False,
+            field_to_metric_fn: dict[str, str | Callable] | None = None,
         ) -> DataRecordSet:
         """
         Compute the quality for the given `record_set` by comparing it to the `expected_record_set`.
@@ -474,12 +479,12 @@ class MatrixCompletionCostModel:
 
     def score_quality(
             self,
-            operator_sets: List[List[PhysicalOperator]],
-            execution_data: Dict[str, Dict[str, List[DataRecordSet]]],
-            champion_outputs: Dict[str, Dict[str, DataRecordSet]],
-            expected_outputs: Optional[Dict[str, DataRecordSet]] = None,
-            field_to_metric_fn: Optional[Dict[str, Union[str, Callable]]] = None,
-        ) -> List[RecordOpStats]:
+            operator_sets: list[list[PhysicalOperator]],
+            execution_data: dict[str, dict[str, list[DataRecordSet]]],
+            champion_outputs: dict[str, dict[str, DataRecordSet]],
+            expected_outputs: dict[str, DataRecordSet] = None,
+            field_to_metric_fn: dict[str, str | Callable] = None,
+        ) -> list[RecordOpStats]:
         """
         NOTE: This approach to cost modeling does not work directly for aggregation queries;
               for these queries, we would ask the user to provide validation data for the step immediately
@@ -507,7 +512,7 @@ class MatrixCompletionCostModel:
         op_set = operator_sets[-1]
         op_set_id = SentinelPlan.compute_op_set_id(op_set)
         physical_op = op_set[0]
-        is_source_op = isinstance(physical_op, MarshalAndScanDataOp) or isinstance(physical_op, CacheScanDataOp)
+        is_source_op = isinstance(physical_op, (MarshalAndScanDataOp, CacheScanDataOp))
         is_filter_op = isinstance(physical_op, FilterOp)
         is_convert_op = isinstance(physical_op, ConvertOp)
         is_perfect_quality_op = (
@@ -560,9 +565,9 @@ class MatrixCompletionCostModel:
 
     def construct_matrices(
             self,
-            execution_data: Dict[str, Dict[str, List[DataRecordSet]]],
-            operator_sets: List[List[PhysicalOperator]],
-            logical_op_id_to_sample_masks: Dict[str, Tuple[np.array, Dict[str, int], Dict[str, int]]],
+            execution_data: dict[str, dict[str, list[DataRecordSet]]],
+            operator_sets: list[list[PhysicalOperator]],
+            logical_op_id_to_sample_masks: dict[str, tuple[np.array, dict[str, int], dict[str, int]]],
         ):
         # given a set of execution data, construct the mappings
         # from logical_op_id --> cost, runtime, selectivity, and quality matrices
@@ -639,42 +644,42 @@ class MatrixCompletionCostModel:
         num_rows, num_cols = true_mat.shape
         mat_mask = mat_mask.astype(bool)
 
-        X = torch.empty((num_rows, self.rank), requires_grad=True)
-        torch.nn.init.normal_(X)
-        Y = torch.empty((self.rank, num_cols), requires_grad=True)
-        torch.nn.init.normal_(Y)
+        x = torch.empty((num_rows, self.rank), requires_grad=True)
+        torch.nn.init.normal_(x)
+        y = torch.empty((self.rank, num_cols), requires_grad=True)
+        torch.nn.init.normal_(y)
 
         mse_loss = torch.nn.MSELoss()
-        opt_X = torch.optim.Adam([X], lr=1e-3, weight_decay=1e-5)
-        opt_Y = torch.optim.Adam([Y], lr=1e-3, weight_decay=1e-5)
+        opt_x = torch.optim.Adam([x], lr=1e-3, weight_decay=1e-5)
+        opt_y = torch.optim.Adam([y], lr=1e-3, weight_decay=1e-5)
 
         true_matrix = torch.as_tensor(true_mat, dtype=torch.float32, device=device)
 
         for _ in range(self.num_epochs):
-            opt_X.zero_grad()
-            opt_Y.zero_grad()
+            opt_x.zero_grad()
+            opt_y.zero_grad()
 
-            loss = mse_loss(torch.matmul(X,Y)[mat_mask], true_matrix[mat_mask])
+            loss = mse_loss(torch.matmul(x, y)[mat_mask], true_matrix[mat_mask])
 
             loss.backward()
 
-            opt_X.step()
-            opt_Y.step()
+            opt_x.step()
+            opt_y.step()
 
             with torch.no_grad():
-                X[:] = X.clamp_(min=0)
-                Y[:] = Y.clamp_(min=0)
+                x[:] = x.clamp_(min=0)
+                y[:] = y.clamp_(min=0)
 
-        return [X, Y]
+        return [x, y]
 
     def _complete_matrix(self, matrix: np.array, sample_mask: np.array) -> np.array:
-        X, Y = self._learn_factor_matrices(matrix, sample_mask)
-        return torch.matmul(X, Y).detach().numpy()
+        x, y = self._learn_factor_matrices(matrix, sample_mask)
+        return torch.matmul(x, y).detach().numpy()
 
     def complete_matrices(
             self,
-            logical_op_id_to_matrices: Dict[str, Dict[str, np.array]],
-            logical_op_id_to_sample_masks: Dict[str, np.array],
+            logical_op_id_to_matrices: dict[str, dict[str, np.array]],
+            logical_op_id_to_sample_masks: dict[str, np.array],
         ):
 
         # for each logical operator (or op_set)...
@@ -713,7 +718,7 @@ class MatrixCompletionCostModel:
 
         return logical_op_id_to_completed_matrices
 
-    def __call__(self, operator: PhysicalOperator, source_op_estimates: Optional[OperatorCostEstimates]=None) -> PlanCost:
+    def __call__(self, operator: PhysicalOperator, source_op_estimates: OperatorCostEstimates | None = None) -> PlanCost:
         # look up logical op id and matrix column associated with this physical operator
         phys_op_id = operator.get_op_id()
         logical_op_id, col = self.physical_op_id_to_matrix_col[phys_op_id]
@@ -740,7 +745,7 @@ class MatrixCompletionCostModel:
         # create source_op_estimates for datasources if they are not provided
         if isinstance(operator, DataSourcePhysicalOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.getRegisteredDataset(operator.dataset_id)
+            datasource = self.datadir.get_registered_dataset(operator.dataset_id)
             datasource_len = len(datasource)
 
             source_op_estimates = OperatorCostEstimates(
@@ -779,7 +784,17 @@ class CostModel(BaseCostModel):
     by taking the average of any sample execution that the CostModel has for that operator. If no
     such data exists, it returns a naive estimate.
     """
-    def __init__(self, sample_execution_data: List[RecordOpStats] = [], available_models: List[Model] = [], confidence_level: float = 0.90):
+    def __init__(
+        self,
+        sample_execution_data: list[RecordOpStats] | None = None,
+        available_models: list[Model] | None = None,
+        confidence_level: float = 0.90,
+    ) -> None:
+        if sample_execution_data is None:
+            sample_execution_data = []
+        if available_models is None:
+            available_models = []
+
         # construct full dataset of samples
         self.sample_execution_data_df = (
             pd.DataFrame(sample_execution_data)
@@ -807,7 +822,7 @@ class CostModel(BaseCostModel):
     def get_costed_phys_op_ids(self):
         return self.costed_phys_op_ids
 
-    def _compute_ci(self, sample_mean: float, n_samples: int, std_dev: float) -> Tuple[float, float]:
+    def _compute_ci(self, sample_mean: float, n_samples: int, std_dev: float) -> tuple[float, float]:
         """
         Compute confidence interval (for non-proportion quantities) given the sample mean, number of samples,
         and sample std. deviation at the CostModel's given confidence level. We use a t-distribution for
@@ -821,7 +836,7 @@ class CostModel(BaseCostModel):
         )
         return ci
 
-    def _compute_proportion_ci(self, sample_prop: float, n_samples: int) -> Tuple[float, float]:
+    def _compute_proportion_ci(self, sample_prop: float, n_samples: int) -> tuple[float, float]:
         """
         Compute confidence interval for proportion quantities (i.e. selectivity) given the sample proportion
         and the number of samples. We use the normal distribution for computing the interval here, for reasons
@@ -841,7 +856,7 @@ class CostModel(BaseCostModel):
 
         return (lower_bound, upper_bound)
 
-    def _compute_mean_and_ci(self, df: pd.DataFrame, col: str, model_name: Optional[str] = None, non_negative_lb: bool = False) -> Tuple[float, float, float]:
+    def _compute_mean_and_ci(self, df: pd.DataFrame, col: str, model_name: str | None = None, non_negative_lb: bool = False) -> tuple[float, float, float]:
         """
         Compute the mean and CI for the given column and dataframe. If the model_name is provided, filter
         for the subset of rows belonging to the model.
@@ -873,21 +888,21 @@ class CostModel(BaseCostModel):
 
         return col_mean, col_lb, col_ub
 
-    def _est_time_per_record(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> Tuple[float, float, float]:
+    def _est_time_per_record(self, op_df: pd.DataFrame, model_name: str | None = None) -> tuple[float, float, float]:
         """
         Given sample cost data observations for a specific operation, compute the mean and CI
         for the time per record.
         """
         return self._compute_mean_and_ci(df=op_df, col="time_per_record", model_name=model_name, non_negative_lb=True)
 
-    def _est_cost_per_record(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> Tuple[float, float, float]:
+    def _est_cost_per_record(self, op_df: pd.DataFrame, model_name: str | None = None) -> tuple[float, float, float]:
         """
         Given sample cost data observations for a specific operation, compute the mean and CI
         for the cost per record.
         """
         return self._compute_mean_and_ci(df=op_df, col="cost_per_record", model_name=model_name, non_negative_lb=True)
 
-    def _est_tokens_per_record(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+    def _est_tokens_per_record(self, op_df: pd.DataFrame, model_name: str | None = None) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         """
         Given sample cost data observations for a specific operation, compute the mean and CI
         for the total input tokens and total output tokens.
@@ -897,7 +912,7 @@ class CostModel(BaseCostModel):
 
         return total_input_tokens_tuple, total_output_tokens_tuple
 
-    def _est_cardinality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
+    def _est_cardinality(self, op_df: pd.DataFrame, model_name: str | None = None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the number of
         rows output by the operation.
@@ -912,7 +927,7 @@ class CostModel(BaseCostModel):
         """
         return op_df.shape[0] / len(op_df.plan_id.unique())
 
-    def _est_selectivity(self, df: pd.DataFrame, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
+    def _est_selectivity(self, df: pd.DataFrame, op_df: pd.DataFrame, model_name: str | None = None) -> float:
         """
         Given sample cost data observations for the plan and a specific operation, compute
         the ratio of records between this operator and its source operator.
@@ -999,7 +1014,7 @@ class CostModel(BaseCostModel):
             row["num_answers"] = 1
             return row
 
-    def _est_quality(self, op_df: pd.DataFrame, model_name: Optional[str] = None) -> float:
+    def _est_quality(self, op_df: pd.DataFrame, model_name: str | None = None) -> float:
         """
         Given sample cost data observations for a specific operation, compute the an estimate
         of the quality of its outputs by using GPT-4 as a champion model.
@@ -1009,7 +1024,7 @@ class CostModel(BaseCostModel):
 
         # get champion model name
         vision = ("image_operation" in op_df.columns and op_df.image_operation.any())
-        champion_model_name = getChampionModelName(self.available_models, vision)
+        champion_model_name = get_champion_model_name(self.available_models, vision)
 
         # compute champion's answer (per-record) across all models; fall-back to most common answer if champion is not present
         record_id_to_answer = {}
@@ -1049,7 +1064,7 @@ class CostModel(BaseCostModel):
 
         return est_quality, est_quality_lb, est_quality_ub
 
-    def _compute_operator_estimates(self) -> Optional[Dict[str, Any]]:
+    def _compute_operator_estimates(self) -> dict[str, Any] | None:
         """
         Compute per-operator estimates of runtime, cost, and quality.
         """
@@ -1081,7 +1096,7 @@ class CostModel(BaseCostModel):
             op_name = str(op_df.op_name.iloc[0])
             if model_name is not None:
                 # compute estimates per-model, and add None which forces computation of avg. across all models
-                model_names = [m.value for m in getModels(include_vision=True)] + [None]
+                model_names = [m.value for m in get_models(include_vision=True)] + [None]
                 # model_names = op_df.model_name.unique().tolist()
                 estimates = {model_name: None for model_name in model_names}
                 for model_name in model_names:
@@ -1148,17 +1163,17 @@ class CostModel(BaseCostModel):
 
         return operator_estimates
 
-    def __call__(self, operator: PhysicalOperator, source_op_estimates: Optional[OperatorCostEstimates]=None) -> PlanCost:
+    def __call__(self, operator: PhysicalOperator, source_op_estimates: OperatorCostEstimates | None = None) -> PlanCost:
         # get identifier for operation which is unique within sentinel plan but consistent across sentinels
         op_id = operator.get_op_id()
 
         # initialize estimates of operator metrics based on naive (but sometimes precise) logic
         if isinstance(operator, pz.MarshalAndScanDataOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.getRegisteredDataset(operator.dataset_id)
-            dataset_type = self.datadir.getRegisteredDatasetType(operator.dataset_id)
+            datasource = self.datadir.get_registered_dataset(operator.dataset_id)
+            dataset_type = self.datadir.get_registered_dataset_type(operator.dataset_id)
             datasource_len = len(datasource)
-            datasource_memsize = datasource.getSize()
+            datasource_memsize = datasource.get_size()
 
             source_op_estimates = OperatorCostEstimates(
                 cardinality=datasource_len,
@@ -1172,9 +1187,9 @@ class CostModel(BaseCostModel):
                                                     dataset_type=dataset_type)
 
         elif isinstance(operator, pz.CacheScanDataOp):
-            datasource = self.datadir.getCachedResult(operator.dataset_id)
+            datasource = self.datadir.get_cached_result(operator.dataset_id)
             datasource_len = len(datasource)
-            datasource_memsize = datasource.getSize()
+            datasource_memsize = datasource.get_size()
 
             source_op_estimates = OperatorCostEstimates(
                 cardinality=datasource_len,
@@ -1191,7 +1206,7 @@ class CostModel(BaseCostModel):
         # if we have sample execution data, update naive estimates with more informed ones
         sample_op_estimates = self.operator_estimates
         if sample_op_estimates is not None and op_id in sample_op_estimates:
-            if isinstance(operator, pz.MarshalAndScanDataOp) or isinstance(operator, pz.CacheScanDataOp):
+            if isinstance(operator, (pz.MarshalAndScanDataOp, pz.CacheScanDataOp)):
                 op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
                 op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
                 op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
@@ -1212,7 +1227,7 @@ class CostModel(BaseCostModel):
                 op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
                 op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]
 
-            elif isinstance(operator, pz.CountAggregateOp) or isinstance(operator, pz.AverageAggregateOp):
+            elif isinstance(operator, (pz.CountAggregateOp, pz.AverageAggregateOp)):  # noqa: SIM114
                 op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
                 op_estimates.time_per_record_lower_bound = sample_op_estimates[op_id]["time_per_record_lower_bound"]
                 op_estimates.time_per_record_upper_bound = sample_op_estimates[op_id]["time_per_record_upper_bound"]

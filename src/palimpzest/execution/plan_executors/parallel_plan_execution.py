@@ -1,15 +1,16 @@
+import time
+from concurrent.futures import ThreadPoolExecutor, wait
+
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
-from palimpzest.elements import DataRecord, DataRecordSet
-from palimpzest.execution import ExecutionEngine
-from palimpzest.operators import AggregateOp, LimitScanOp, MarshalAndScanDataOp, PhysicalOperator
-from palimpzest.optimizer import PhysicalPlan
-
-from concurrent.futures import ThreadPoolExecutor, wait
-from typing import List, Tuple, Union
-
-import time
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.execution.execution_engine import ExecutionEngine
+from palimpzest.operators.aggregate import AggregateOp
+from palimpzest.operators.datasource import MarshalAndScanDataOp
+from palimpzest.operators.limit import LimitScanOp
+from palimpzest.operators.physical import PhysicalOperator
+from palimpzest.optimizer.plan import PhysicalPlan
 
 
 class PipelinedParallelPlanExecutor(ExecutionEngine):
@@ -18,6 +19,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
     This class still needs to be sub-classed by another Execution class which implements
     the higher-level execute() method.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.max_workers = (
@@ -27,7 +29,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         )
 
     @staticmethod
-    def execute_op_wrapper(operator: PhysicalOperator, op_input: Union[DataRecord, List[DataRecord]]) -> Tuple[DataRecordSet, PhysicalOperator]:
+    def execute_op_wrapper(operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
         """
         Wrapper function around operator execution which also and returns the operator.
         This is useful in the parallel setting(s) where operators are executed by a worker pool,
@@ -37,9 +39,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
         return record_set, operator
 
-    def execute_plan(self, plan: PhysicalPlan,
-                     num_samples: Union[int, float] = float("inf"),
-                     plan_workers: int = 1):
+    def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
@@ -66,8 +66,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         op_id_to_futures_in_flight = {op.get_op_id(): 0 for op in plan.operators}
         op_id_to_operator = {op.get_op_id(): op for op in plan.operators}
         op_id_to_prev_operator = {
-            op.get_op_id(): plan.operators[idx - 1] if idx > 0 else None
-            for idx, op in enumerate(plan.operators)
+            op.get_op_id(): plan.operators[idx - 1] if idx > 0 else None for idx, op in enumerate(plan.operators)
         }
         op_id_to_next_operator = {
             op.get_op_id(): plan.operators[idx + 1] if idx + 1 < len(plan.operators) else None
@@ -79,9 +78,9 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         source_operator = plan.operators[0]
         source_op_id = source_operator.get_op_id()
         datasource = (
-            self.datadir.getRegisteredDataset(source_operator.dataset_id)
+            self.datadir.get_registered_dataset(source_operator.dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(source_operator.dataset_id)
+            else self.datadir.get_cached_result(source_operator.dataset_id)
         )
         datasource_len = len(datasource)
 
@@ -98,7 +97,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
             #       it is simply a vessel to inform the scan_operator which record to fetch
             candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
             candidate.idx = current_scan_idx
-            candidate.get_item_fn = datasource.getItem
+            candidate.get_item_fn = datasource.get_item
             futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
             op_id_to_futures_in_flight[source_op_id] += 1
             current_scan_idx += 1
@@ -137,7 +136,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
                         # add records (which are not filtered) to the cache, if allowed
                         if not self.nocache:
-                            self.datadir.appendCache(operator.targetCacheId, record)
+                            self.datadir.append_cache(operator.target_cache_id, record)
 
                         # add records to processing queue if there is a next_operator; otherwise add to output_records
                         next_operator = op_id_to_next_operator[op_id]
@@ -157,7 +156,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                             #       it is simply a vessel to inform the scan_operator which record to fetch
                             candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
                             candidate.idx = current_scan_idx
-                            candidate.get_item_fn = datasource.getItem
+                            candidate.get_item_fn = datasource.get_item
                             new_futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
                             op_id_to_futures_in_flight[source_op_id] += 1
                             current_scan_idx += 1
@@ -176,7 +175,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                         future = executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, operator, candidate)
                         new_futures.append(future)
                         op_id_to_futures_in_flight[operator.get_op_id()] += 1
-                    
+
                     # otherwise, put it back on the queue
                     else:
                         temp_processing_queue.append((operator, candidate))
@@ -192,7 +191,9 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                     upstream_ops_are_finished = True
                     for upstream_op_idx in range(agg_op_idx):
                         upstream_op_id = plan.operators[upstream_op_idx].get_op_id()
-                        upstream_op_id_queue = list(filter(lambda tup: tup[0].get_op_id() == upstream_op_id, temp_processing_queue))
+                        upstream_op_id_queue = list(
+                            filter(lambda tup: tup[0].get_op_id() == upstream_op_id, temp_processing_queue)
+                        )
 
                         upstream_ops_are_finished = (
                             upstream_ops_are_finished
@@ -222,7 +223,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         # if caching was allowed, close the cache
         if not self.nocache:
             for operator in plan.operators:
-                self.datadir.closeCache(operator.targetCacheId)
+                self.datadir.close_cache(operator.target_cache_id)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time

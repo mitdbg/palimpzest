@@ -1,8 +1,10 @@
-from palimpzest.constants import Model
-from palimpzest.corelib import TextFile
-from palimpzest.elements import DataRecord, DataRecordSet
-from palimpzest.optimizer import SentinelPlan
 import pytest
+
+from palimpzest.constants import Model
+from palimpzest.corelib.schemas import TextFile
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.optimizer.plan import SentinelPlan
+
 
 # NOTE: this relies on knowledge of the fixtures in fixtures/execution_data.py
 @pytest.fixture

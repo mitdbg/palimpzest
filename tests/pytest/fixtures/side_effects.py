@@ -1,10 +1,10 @@
+import json
+
 import pytest
 
 from palimpzest.dataclasses import RecordOpStats
-from palimpzest.elements import DataRecord, DataRecordSet
+from palimpzest.elements.records import DataRecord, DataRecordSet
 
-import json
-import time
 
 ### Side-Effects for Mocking LLM Calls ###
 @pytest.fixture
@@ -18,7 +18,7 @@ def enron_filter():
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
             record_source_id=candidate._source_id,
-            record_state=candidate._asDict(include_bytes=False),
+            record_state=candidate.as_dict(include_bytes=False),
             op_id="MockFilterFoo",
             logical_op_id="LogicalMockFilterFoo",
             op_name="MockFilter",
@@ -29,7 +29,7 @@ def enron_filter():
         )
 
         # set _passed_operator attribute and return
-        setattr(candidate, "_passed_operator", passed_operator)
+        candidate._passed_operator = passed_operator
 
         return DataRecordSet([candidate], [record_op_stats])
 
@@ -57,7 +57,7 @@ def enron_convert(email_schema):
         }
 
         # construct data record
-        dr = DataRecord.fromParent(schema=email_schema, parent_record=candidate, cardinality_idx=0)
+        dr = DataRecord.from_parent(schema=email_schema, parent_record=candidate, cardinality_idx=0)
         dr.sender = filename_to_sender[candidate.filename]
         dr.subject = filename_to_subject[candidate.filename]
         dr.filename = candidate.filename
@@ -68,7 +68,7 @@ def enron_convert(email_schema):
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
             record_source_id=candidate._source_id,
-            record_state=dr._asDict(include_bytes=False),
+            record_state=dr.as_dict(include_bytes=False),
             op_id="MockConvertFoo",
             logical_op_id="LogicalMockConvertFoo",
             op_name="MockConvert",
@@ -89,7 +89,7 @@ def real_estate_convert(image_real_estate_listing_schema):
         listing_to_has_natural_sunlight = {"listing1": True, "listing2": True, "listing3": False}
 
         # construct data record
-        dr = DataRecord.fromParent(schema=image_real_estate_listing_schema, parent_record=candidate, cardinality_idx=0)
+        dr = DataRecord.from_parent(schema=image_real_estate_listing_schema, parent_record=candidate, cardinality_idx=0)
         dr.is_modern_and_attractive = listing_to_modern_and_attractive[candidate.listing]
         dr.has_natural_sunlight = listing_to_has_natural_sunlight[candidate.listing]
         dr.listing = candidate.listing
@@ -101,16 +101,18 @@ def real_estate_convert(image_real_estate_listing_schema):
             record_id=candidate._id,
             record_parent_id=candidate._parent_id,
             record_source_id=candidate._source_id,
-            record_state=dr._asDict(include_bytes=False),
+            record_state=dr.as_dict(include_bytes=False),
             op_id="MockConvertFoo",
             logical_op_id="LogicalMockConvertFoo",
             op_name="MockConvert",
             time_per_record=1.0,
             cost_per_record=1.0,
-            answer=json.dumps({
-                "is_modern_and_attractive": dr.is_modern_and_attractive,
-                "has_natural_sunlight": dr.has_natural_sunlight,
-            }),
+            answer=json.dumps(
+                {
+                    "is_modern_and_attractive": dr.is_modern_and_attractive,
+                    "has_natural_sunlight": dr.has_natural_sunlight,
+                }
+            ),
         )
 
         return DataRecordSet([dr], [record_op_stats])
@@ -131,7 +133,7 @@ def real_estate_one_to_many_convert(room_real_estate_listing_schema):
         data_records, record_op_stats_lst = [], []
         for idx, room in enumerate(listing_to_rooms[candidate.listing]):
             # create data record
-            dr = DataRecord.fromParent(schema=room_real_estate_listing_schema, parent_record=candidate, cardinality_idx=idx)
+            dr = DataRecord.from_parent(schema=room_real_estate_listing_schema, parent_record=candidate, cardinality_idx=idx)
             dr.room = room
             dr.listing = candidate.listing
             dr.text_content = candidate.text_content
@@ -143,7 +145,7 @@ def real_estate_one_to_many_convert(room_real_estate_listing_schema):
                 record_id=candidate._id,
                 record_parent_id=candidate._parent_id,
                 record_source_id=candidate._source_id,
-                record_state=dr._asDict(include_bytes=False),
+                record_state=dr.as_dict(include_bytes=False),
                 op_id="MockConvertFoo",
                 logical_op_id="LogicalMockConvertFoo",
                 op_name="MockConvert",

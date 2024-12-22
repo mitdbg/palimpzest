@@ -1,22 +1,20 @@
 from __future__ import annotations
 
-from palimpzest import prompts
-from palimpzest.constants import (
-    Cardinality,
-    Model,
-    MODEL_CARDS,
-    PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS,
-    PromptStrategy,
-)
-from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates
-from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-from palimpzest.operators import LLMConvert
-
+import json
 from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
 from typing import Any
 
-import json
+from palimpzest import prompts
+from palimpzest.constants import (
+    MODEL_CARDS,
+    PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS,
+    Cardinality,
+    Model,
+)
+from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates
+from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
+from palimpzest.operators.convert import LLMConvert
 
 # TYPE DEFINITIONS
 FieldName = str
@@ -41,8 +39,8 @@ class MixtureOfAgentsConvert(LLMConvert):
         self.proposer_prompt = proposer_prompt
 
         # create generators
-        doc_schema = str(self.outputSchema)
-        doc_type = self.outputSchema.className()
+        doc_schema = str(self.output_schema)
+        doc_type = self.output_schema.class_name()
 
         self.proposer_generators = []
         for model in proposer_models:
@@ -63,7 +61,7 @@ class MixtureOfAgentsConvert(LLMConvert):
             and self.aggregator_model == other.aggregator_model
             and self.cardinality == other.cardinality
             and self.prompt_strategy == other.prompt_strategy
-            and self.outputSchema == other.outputSchema
+            and self.output_schema == other.output_schema
             and self.max_workers == other.max_workers
         )
 
@@ -98,7 +96,7 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         return op_params
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Currently, we are using multiple proposer models with different temperatures to synthesize
         answers, which are then aggregated and summarized by a single aggregator model. Thus, we
@@ -106,11 +104,11 @@ class MixtureOfAgentsConvert(LLMConvert):
         In practice, this naive quality estimate will be overwritten by the CostModel's estimate
         once it executes a few code generated examples.
         """
-        # temporarily set self.model so that super().naiveCostEstimates(...) can compute an estimate
+        # temporarily set self.model so that super().naive_cost_estimates(...) can compute an estimate
         self.model = self.proposer_models[0]
 
         # get naive cost estimates for single LLM call and scale it by number of LLMs used in MoA
-        naive_op_cost_estimates = super().naiveCostEstimates(source_op_cost_estimates)
+        naive_op_cost_estimates = super().naive_cost_estimates(source_op_cost_estimates)
         naive_op_cost_estimates.time_per_record *= (len(self.proposer_models) + 1)
         naive_op_cost_estimates.time_per_record_lower_bound = naive_op_cost_estimates.time_per_record
         naive_op_cost_estimates.time_per_record_upper_bound = naive_op_cost_estimates.time_per_record
@@ -150,51 +148,51 @@ class MixtureOfAgentsConvert(LLMConvert):
 
     def _construct_proposer_prompt(self, fields_to_generate: list[str], model: Model) -> str:
         # set defaults
-        doc_type = self.outputSchema.className()
+        doc_type = self.output_schema.class_name()
 
         # build string of input fields and their descriptions
-        multilineInputFieldDescription = ""
+        multiline_input_field_description = ""
         input_fields = (
-            self.inputSchema.fieldNames()
+            self.input_schema.field_names()
             if not self.depends_on
             else [field.split(".")[-1] for field in self.depends_on]
         )
         for field_name in input_fields:
-            field_desc = getattr(self.inputSchema, field_name).desc
-            multilineInputFieldDescription += prompts.INPUT_FIELD.format(
+            field_desc = getattr(self.input_schema, field_name).desc
+            multiline_input_field_description += prompts.INPUT_FIELD.format(
                 field_name=field_name, field_desc=field_desc
             )
 
         # build string of output fields and their descriptions
-        multilineOutputFieldDescription = ""
+        multiline_output_field_description = ""
         for field_name in fields_to_generate:
-            field_desc = getattr(self.outputSchema, field_name).desc
-            multilineOutputFieldDescription += prompts.OUTPUT_FIELD.format(
+            field_desc = getattr(self.output_schema, field_name).desc
+            multiline_output_field_description += prompts.OUTPUT_FIELD.format(
                 field_name=field_name, field_desc=field_desc
             )
 
         # add input/output schema descriptions (if they have a docstring)
-        optionalInputDesc = (
+        optional_input_desc = (
             ""
-            if self.inputSchema.__doc__ is None
-            else prompts.OPTIONAL_INPUT_DESC.format(desc=self.inputSchema.__doc__)
+            if self.input_schema.__doc__ is None
+            else prompts.OPTIONAL_INPUT_DESC.format(desc=self.input_schema.__doc__)
         )
-        optionalOutputDesc = (
+        optional_output_desc = (
             ""
-            if self.outputSchema.__doc__ is None
-            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.outputSchema.__doc__)
+            if self.output_schema.__doc__ is None
+            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.output_schema.__doc__)
         )
 
         # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
         if self.cardinality == Cardinality.ONE_TO_MANY:
-            targetOutputDescriptor = prompts.MOA_ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
-            outputSingleOrPlural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
+            target_output_descriptor = prompts.MOA_ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
+            output_single_or_plural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
         else:
-            targetOutputDescriptor = prompts.MOA_ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
-            outputSingleOrPlural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
+            target_output_descriptor = prompts.MOA_ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
+            output_single_or_plural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
 
         # construct promptQuestion
-        optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
+        # optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
         model_instruction = prompts.LLAMA_INSTRUCTION if model in [Model.LLAMA3, Model.LLAMA3_V] else ""
         if not self.image_conversion:
             prompt_question = prompts.MOA_STRUCTURED_CONVERT_PROMPT
@@ -202,13 +200,13 @@ class MixtureOfAgentsConvert(LLMConvert):
             prompt_question = prompts.MOA_IMAGE_CONVERT_PROMPT
 
         prompt_question = prompt_question.format(
-            targetOutputDescriptor=targetOutputDescriptor,
-            input_type=self.inputSchema.className(),
-            outputSingleOrPlural=outputSingleOrPlural,
-            optionalInputDesc=optionalInputDesc,
-            optionalOutputDesc=optionalOutputDesc,
-            multilineInputFieldDescription=multilineInputFieldDescription,
-            multilineOutputFieldDescription=multilineOutputFieldDescription,
+            target_output_descriptor=target_output_descriptor,
+            input_type=self.input_schema.class_name(),
+            output_single_or_plural=output_single_or_plural,
+            optional_input_desc=optional_input_desc,
+            optional_output_desc=optional_output_desc,
+            multiline_input_field_description=multiline_input_field_description,
+            multiline_output_field_description=multiline_output_field_description,
             doc_type=doc_type,
             model_instruction=model_instruction,
         )
@@ -218,35 +216,35 @@ class MixtureOfAgentsConvert(LLMConvert):
     def _construct_aggregator_prompt(self, fields_to_generate: list[str]) -> str:
         # TODO: self.aggregator_model to add instruction for Llama
         # set defaults
-        doc_type = self.outputSchema.className()
+        doc_type = self.output_schema.class_name()
 
         # build string of output fields and their descriptions
-        multilineOutputFieldDescription = ""
+        multiline_output_field_description = ""
         for field_name in fields_to_generate:
-            field_desc = getattr(self.outputSchema, field_name).desc
-            multilineOutputFieldDescription += prompts.OUTPUT_FIELD.format(
+            field_desc = getattr(self.output_schema, field_name).desc
+            multiline_output_field_description += prompts.OUTPUT_FIELD.format(
                 field_name=field_name, field_desc=field_desc
             )
 
         # add output schema description (if it has a docstring)
-        optionalOutputDesc = (
+        optional_output_desc = (
             ""
-            if self.outputSchema.__doc__ is None
-            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.outputSchema.__doc__)
+            if self.output_schema.__doc__ is None
+            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.output_schema.__doc__)
         )
 
         # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
         if self.cardinality == Cardinality.ONE_TO_MANY:
-            targetOutputDescriptor = prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
-            outputSingleOrPlural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
-            appendixInstruction = prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
+            target_output_descriptor = prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
+            output_single_or_plural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
+            appendix_instruction = prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
         else:
-            targetOutputDescriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
-            outputSingleOrPlural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
+            target_output_descriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
+            output_single_or_plural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
 
             fields_example_dict = {}
             for field in fields_to_generate:
-                type_str = self.outputSchema.jsonSchema()['properties'][field]['type']
+                type_str = self.output_schema.json_schema()['properties'][field]['type']
                 if type_str == "string":
                     fields_example_dict[field] = "abc"
                 elif type_str == "numeric":
@@ -261,7 +259,7 @@ class MixtureOfAgentsConvert(LLMConvert):
                     fields_example_dict[field] = ["<bool>", "<bool>", "..."]
 
             fields_example_dict_str = json.dumps(fields_example_dict, indent=2)
-            appendixInstruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(fields=fields_to_generate, fields_example_dict=fields_example_dict_str)
+            appendix_instruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(fields=fields_to_generate, fields_example_dict=fields_example_dict_str)
 
         # construct promptQuestion
         optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
@@ -269,12 +267,12 @@ class MixtureOfAgentsConvert(LLMConvert):
         prompt_question = prompts.MOA_AGGREGATOR_CONVERT_PROMPT
 
         prompt_question = prompt_question.format(
-            targetOutputDescriptor=targetOutputDescriptor,
-            outputSingleOrPlural=outputSingleOrPlural,
-            optionalOutputDesc=optionalOutputDesc,
-            multilineOutputFieldDescription=multilineOutputFieldDescription,
+            target_output_descriptor=target_output_descriptor,
+            output_single_or_plural=output_single_or_plural,
+            optional_output_desc=optional_output_desc,
+            multiline_output_field_description=multiline_output_field_description,
             optional_desc=optional_desc,
-            appendixInstruction=appendixInstruction,
+            appendix_instruction=appendix_instruction,
             model_instruction=model_instruction,
         )
 

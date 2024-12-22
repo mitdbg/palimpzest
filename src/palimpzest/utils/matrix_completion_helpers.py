@@ -64,7 +64,7 @@ def create_sample_mask(records: list, physical_ops: list, rank: int):
     record_to_row_map = {}
     for row_idx, record in enumerate(records):
         # NOTE: for scan records only, we need to use record._source_id instead of record._id
-        # because the DataSource.getItem method will swap out the input record with a newly
+        # because the DataSource.get_item method will swap out the input record with a newly
         # constructed record. Thus, one way to ensure that the first operator after the scan
         # will lookup the correct parent record is to simply use the source
         record_id = record._id if record.schema != SourceRecord else record._source_id

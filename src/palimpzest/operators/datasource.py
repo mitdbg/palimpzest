@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from palimpzest.constants import *
-from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.elements import DataRecord, DataRecordSet
-from palimpzest.operators import PhysicalOperator
-
-from typing import Union
-
 import time
+
+from palimpzest.constants import (
+    LOCAL_SCAN_TIME_PER_KB,
+    MEMORY_SCAN_TIME_PER_KB,
+    Cardinality,
+)
+from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.operators.physical import PhysicalOperator
 
 
 class DataSourcePhysicalOp(PhysicalOperator):
@@ -16,13 +18,14 @@ class DataSourcePhysicalOp(PhysicalOperator):
     in order to accurately compute naive cost estimates. Thus, we use a slightly
     modified abstract base class for these operators.
     """
+
     def __init__(self, dataset_id: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dataset_id = dataset_id
 
     def __str__(self):
-        op = f"{self.op_name()}({self.dataset_id}) -> {self.outputSchema}\n"
-        op += f"    ({', '.join(self.outputSchema.fieldNames())[:30]})\n"
+        op = f"{self.op_name()}({self.dataset_id}) -> {self.output_schema}\n"
+        op += f"    ({', '.join(self.output_schema.field_names())[:30]})\n"
         return op
 
     def get_copy_kwargs(self):
@@ -30,29 +33,28 @@ class DataSourcePhysicalOp(PhysicalOperator):
         return {"dataset_id": self.dataset_id, **copy_kwargs}
 
     def get_op_params(self):
-        return {"outputSchema": self.outputSchema, "dataset_id": self.dataset_id}
+        return {"output_schema": self.output_schema, "dataset_id": self.dataset_id}
 
-    def __eq__(self, other: PhysicalOperator):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
-            and self.outputSchema == other.outputSchema
+            and self.output_schema == other.output_schema
             and self.dataset_id == other.dataset_id
         )
 
-    def naiveCostEstimates(
+    def naive_cost_estimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
-        input_cardinality: Union[int, float],
-        input_record_size_in_bytes: Union[int, float],
+        input_cardinality: Cardinality,
+        input_record_size_in_bytes: int | float,
     ) -> OperatorCostEstimates:
         """
-        In addition to 
         This function returns a naive estimate of this operator's:
         - cardinality
         - time_per_record
         - cost_per_record
         - quality
-    
+
         For the implemented operator. These will be used by the CostModel
         when PZ does not have sample execution data -- and it will be necessary
         in some cases even when sample execution data is present. (For example,
@@ -64,22 +66,21 @@ class DataSourcePhysicalOp(PhysicalOperator):
 
 
 class MarshalAndScanDataOp(DataSourcePhysicalOp):
-
-    def naiveCostEstimates(
+    def naive_cost_estimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
-        input_record_size_in_bytes: Union[int, float],
+        input_record_size_in_bytes: int | float,
         dataset_type: str,
     ) -> OperatorCostEstimates:
         # get inputs needed for naive cost estimation
         # TODO: we should rename cardinality --> "multiplier" or "selectivity" one-to-one / one-to-many
 
         # estimate time spent reading each record
-        perRecordSizeInKb = input_record_size_in_bytes / 1024.0
-        timePerRecord = (
-            LOCAL_SCAN_TIME_PER_KB * perRecordSizeInKb
+        per_record_size_kb = input_record_size_in_bytes / 1024.0
+        time_per_record = (
+            LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
             if dataset_type in ["dir", "file"]
-            else MEMORY_SCAN_TIME_PER_KB * perRecordSizeInKb
+            else MEMORY_SCAN_TIME_PER_KB * per_record_size_kb
         )
 
         # estimate output cardinality
@@ -88,7 +89,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         # for now, assume no cost per record for reading data
         return OperatorCostEstimates(
             cardinality=cardinality,
-            time_per_record=timePerRecord,
+            time_per_record=time_per_record,
             cost_per_record=0,
             quality=1.0,
         )
@@ -108,7 +109,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
 
         # assert that every element of records is a DataRecord and has a source_id
         for dr in records:
-            assert isinstance(dr, DataRecord), "Output from DataSource.getItem() must be a DataRecord or List[DataRecord]"
+            assert isinstance(dr, DataRecord), "Output from DataSource.get_item() must be a DataRecord or List[DataRecord]"
 
         # create RecordOpStats objects
         record_op_stats_lst = []
@@ -117,7 +118,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
                 record_id=record._id,
                 record_parent_id=record._parent_id,
                 record_source_id=record._source_id,
-                record_state=record._asDict(include_bytes=False),
+                record_state=record.as_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 logical_op_id=self.logical_op_id,
                 op_name=self.op_name(),
@@ -132,19 +133,19 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
 
         return record_set
 
-class CacheScanDataOp(DataSourcePhysicalOp):
 
-    def naiveCostEstimates(
-        self, 
+class CacheScanDataOp(DataSourcePhysicalOp):
+    def naive_cost_estimates(
+        self,
         source_op_cost_estimates: OperatorCostEstimates,
-        input_record_size_in_bytes: Union[int, float],
+        input_record_size_in_bytes: int | float,
     ):
         # get inputs needed for naive cost estimation
         # TODO: we should rename cardinality --> "multiplier" or "selectivity" one-to-one / one-to-many
 
         # estimate time spent reading each record
-        perRecordSizeInKb = input_record_size_in_bytes / 1024.0
-        timePerRecord = LOCAL_SCAN_TIME_PER_KB * perRecordSizeInKb
+        per_record_size_kb = input_record_size_in_bytes / 1024.0
+        time_per_record = LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
 
         # estimate output cardinality
         cardinality = source_op_cost_estimates.cardinality
@@ -152,7 +153,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
         # for now, assume no cost per record for reading from cache
         return OperatorCostEstimates(
             cardinality=cardinality,
-            time_per_record=timePerRecord,
+            time_per_record=time_per_record,
             cost_per_record=0,
             quality=1.0,
         )
@@ -168,7 +169,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
 
         # assert that every element of records is a DataRecord and has a source_id
         for dr in records:
-            assert isinstance(dr, DataRecord), "Output from DataSource.getItem() must be a DataRecord or List[DataRecord]"
+            assert isinstance(dr, DataRecord), "Output from DataSource.get_item() must be a DataRecord or List[DataRecord]"
 
         # create RecordOpStats objects
         record_op_stats_lst = []
@@ -177,7 +178,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
                 record_id=record._id,
                 record_parent_id=record._parent_id,
                 record_source_id=record._source_id,
-                record_state=record._asDict(include_bytes=False),
+                record_state=record.as_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 logical_op_id=self.logical_op_id,
                 op_name=self.op_name(),

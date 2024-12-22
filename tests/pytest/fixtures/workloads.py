@@ -1,44 +1,49 @@
-from palimpzest.corelib import TextFile
+import pytest
+
+import palimpzest as pz
+from palimpzest.constants import Cardinality
+from palimpzest.corelib.schemas import Table, TextFile, XLSFile
+from palimpzest.sets import Dataset
 from palimpzest.utils import udfs
 
-import pytest
-import palimpzest as pz
 
 ### UDFs ###
 def within_two_miles_of_mit(record):
     # NOTE: I'm using this hard-coded function so that folks w/out a
     #       Geocoding API key from google can still run this example
-    FAR_AWAY_ADDRS = [
-        "Melcher St", "Sleeper St", "437 D St",
-        "Seaport Blvd", "50 Liberty Dr", "Telegraph St",
-        "Columbia Rd", "E 6th St", "E 7th St", "E 5th St",
+    far_away_addrs = [
+        "Melcher St",
+        "Sleeper St",
+        "437 D St",
+        "Seaport Blvd",
+        "50 Liberty Dr",
+        "Telegraph St",
+        "Columbia Rd",
+        "E 6th St",
+        "E 7th St",
+        "E 5th St",
     ]
     try:
-        if any(
-            [
-                street.lower() in record.address.lower()
-                for street in FAR_AWAY_ADDRS
-            ]
-        ):
-            return False
-        return True
-    except:
+        return not any([street.lower() in record.address.lower() for street in far_away_addrs])
+    except Exception:
         return False
+
 
 def in_price_range(record):
     try:
         price = record.price
-        if type(price) == str:
+        if type(price) is str:
             price = price.strip()
             price = int(price.replace("$", "").replace(",", ""))
-        return 6e5 < price and price <= 2e6
-    except:
+        return 6e5 < price <= 2e6
+    except Exception:
         return False
+
 
 ### WORKLOADS ###
 @pytest.fixture
 def enron_workload(enron_eval_tiny, email_schema):
-    emails = pz.Dataset(enron_eval_tiny, schema=email_schema)
+    emails = Dataset(enron_eval_tiny, schema=email_schema)
     emails = emails.filter(
         'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
     )
@@ -47,6 +52,7 @@ def enron_workload(enron_eval_tiny, email_schema):
     )
     return emails
 
+
 @pytest.fixture
 def real_estate_workload(
     real_estate_eval_tiny,
@@ -54,7 +60,7 @@ def real_estate_workload(
     text_real_estate_listing_schema,
     image_real_estate_listing_schema,
 ):
-    listings = pz.Dataset(real_estate_eval_tiny, schema=real_estate_listing_files_schema)
+    listings = Dataset(real_estate_eval_tiny, schema=real_estate_listing_files_schema)
     listings = listings.convert(text_real_estate_listing_schema, depends_on="text_content")
     listings = listings.convert(image_real_estate_listing_schema, image_conversion=True, depends_on="image_filepaths")
     listings = listings.filter(
@@ -65,17 +71,16 @@ def real_estate_workload(
     listings = listings.filter(in_price_range, depends_on="price")
     return listings
 
+
 @pytest.fixture
 def biofabric_workload(biofabric_tiny, case_data_schema):
-    xls = pz.Dataset(biofabric_tiny, schema=pz.XLSFile)
+    xls = Dataset(biofabric_tiny, schema=XLSFile)
     # patient_tables = xls.convert(
     #     pz.Table, desc="All tables in the file", cardinality=pz.Cardinality.ONE_TO_MANY)
-    patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
-    patient_tables = patient_tables.filter(
-        "The rows of the table contain the patient age"
-    )
+    patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
+    patient_tables = patient_tables.filter("The rows of the table contain the patient age")
     case_data = patient_tables.convert(
-        case_data_schema, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY
+        case_data_schema, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
     )
     return case_data
 

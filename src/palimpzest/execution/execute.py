@@ -1,16 +1,15 @@
 from palimpzest.constants import Model, OptimizationStrategy
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import DataSource
-from palimpzest.execution import ExecutionEngine, SequentialSingleThreadSentinelExecution
+from palimpzest.execution.execution_engine import ExecutionEngine
+from palimpzest.execution.nosentinel_execution import SequentialSingleThreadNoSentinelExecution
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
-
-from typing import List, Optional, Union
 
 
 class Execute:
     @classmethod
-    def get_datasource(cls, dataset: Union[Set, DataSource]) -> str:
+    def get_datasource(cls, dataset: Set | DataSource) -> str:
         """
         Gets the DataSource for the given dataset.
         """
@@ -19,31 +18,34 @@ class Execute:
             dataset = dataset._source
 
         # this will throw an exception if datasource is not registered with PZ
-        return DataDirectory().getRegisteredDataset(dataset.dataset_id)
+        return DataDirectory().get_registered_dataset(dataset.dataset_id)
 
     def __new__(
         cls,
         dataset: Set,
         policy: Policy,
-        num_samples: int=20,
-        nocache: bool=False,
-        include_baselines: bool=False,
-        min_plans: Optional[int] = None,
-        max_workers: int=1,
+        num_samples: int = 20,
+        nocache: bool = False,
+        include_baselines: bool = False,
+        min_plans: int | None = None,
+        max_workers: int = 1,
         verbose: bool = False,
-        available_models: Optional[List[Model]] = [],
-        allow_bonded_query: Optional[bool]=True,
-        allow_conventional_query: Optional[bool]=False,
-        allow_model_selection: Optional[bool]=True,
-        allow_code_synth: Optional[bool]=True,
-        allow_token_reduction: Optional[bool]=True,
-        optimization_strategy: OptimizationStrategy=OptimizationStrategy.PARETO,
-        execution_engine: ExecutionEngine = SequentialSingleThreadSentinelExecution,
+        available_models: list[Model] | None = None,
+        allow_bonded_query: bool = True,
+        allow_conventional_query: bool = False,
+        allow_model_selection: bool = True,
+        allow_code_synth: bool = True,
+        allow_token_reduction: bool = True,
+        optimization_strategy: OptimizationStrategy = OptimizationStrategy.PARETO,
+        execution_engine: ExecutionEngine = SequentialSingleThreadNoSentinelExecution,
         *args,
-        **kwargs
+        **kwargs,
     ):
-
+        if available_models is None:
+            available_models = []
         return execution_engine(
+            *args,
+            **kwargs,
             datasource=cls.get_datasource(dataset),
             num_samples=num_samples,
             nocache=nocache,
@@ -58,9 +60,4 @@ class Execute:
             allow_model_selection=allow_model_selection,
             allow_token_reduction=allow_token_reduction,
             optimization_strategy=optimization_strategy,
-            *args,
-            **kwargs
-        ).execute(
-            dataset=dataset,
-            policy=policy
-        )
+        ).execute(dataset=dataset, policy=policy)

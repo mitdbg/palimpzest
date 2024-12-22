@@ -1,31 +1,54 @@
 import time
+
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
-from palimpzest.elements import DataRecord
+from palimpzest.elements.records import DataRecord
 from palimpzest.execution.execution_engine import ExecutionEngine
-from palimpzest.operators import AggregateOp, DataSourcePhysicalOp, LimitScanOp, MarshalAndScanDataOp
+from palimpzest.operators.aggregate import AggregateOp
+from palimpzest.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
-from palimpzest.optimizer.optimizer import CostModel, Optimizer
+from palimpzest.operators.limit import LimitScanOp
+from palimpzest.optimizer.cost_model import CostModel
+from palimpzest.optimizer.optimizer import Optimizer
+from palimpzest.optimizer.plan import PhysicalPlan
 from palimpzest.policy import Policy
-from palimpzest.sets import Set
+from palimpzest.sets import Dataset
 
 
 class StreamingSequentialExecution(ExecutionEngine):
-    """ This class can be used for a streaming, record-based execution.
+    """This class can be used for a streaming, record-based execution.
     Results are returned as an iterable that can be consumed by the caller."""
 
-    def __init__(self,
-            *args, **kwargs
-        ) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self._plan: PhysicalPlan | None = None
+        self._plan_stats: PlanStats | None = None
         self.last_record = False
-        self.current_scan_idx = 0
-        self.plan = None
-        self.plan_stats = None
-        self.plan_generated = False
-        self.records_count = 0
+        self.current_scan_idx: int = 0
+        self.plan_generated: bool = False
+        self.records_count: int = 0
 
-    def generate_plan(self, dataset: Set, policy: Policy):
+    @property
+    def plan(self) -> PhysicalPlan:
+        if self._plan is None:
+            raise Exception("Plan has not been generated yet.")
+        return self._plan
+
+    @plan.setter
+    def plan(self, plan: PhysicalPlan):
+        self._plan = plan
+
+    @property
+    def plan_stats(self) -> PlanStats:
+        if self._plan_stats is None:
+            raise Exception("Plan stats have not been generated yet.")
+        return self._plan_stats
+
+    @plan_stats.setter
+    def plan_stats(self, plan_stats: PlanStats):
+        self._plan_stats = plan_stats
+
+    def generate_plan(self, dataset: Dataset, policy: Policy):
         self.clear_cached_responses_and_examples()
         start_time = time.time()
 
@@ -58,8 +81,9 @@ class StreamingSequentialExecution(ExecutionEngine):
         self.plan_generated = True
         return self.plan
 
-    def execute(self,
-        dataset: Set,
+    def execute(
+        self,
+        dataset: Dataset,
         policy: Policy,
     ):
         start_time = time.time()
@@ -80,10 +104,12 @@ class StreamingSequentialExecution(ExecutionEngine):
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
         datasource = (
-            self.datadir.getRegisteredDataset(scan_operator.dataset_id)
+            self.datadir.get_registered_dataset(scan_operator.dataset_id)
             if isinstance(scan_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(scan_operator.dataset_id)
+            else self.datadir.get_cached_result(scan_operator.dataset_id)
         )
+        if not datasource:
+            raise Exception("Data source not found")
         datasource_len = len(datasource)
 
         input_records = []
@@ -93,11 +119,11 @@ class StreamingSequentialExecution(ExecutionEngine):
             #       it is simply a vessel to inform the scan_operator which record to fetch
             candidate = DataRecord(schema=SourceRecord, source_id=idx)
             candidate.idx = idx
-            candidate.get_item_fn = datasource.getItem
+            candidate.get_item_fn = datasource.get_item
             records, record_op_stats_lst = scan_operator(candidate)
             input_records += records
             record_op_stats += record_op_stats_lst
-        
+
         op_id = scan_operator.get_op_id()
         self.plan_stats.operator_stats[op_id].add_record_op_stats(
             record_op_stats,
@@ -113,20 +139,21 @@ class StreamingSequentialExecution(ExecutionEngine):
         record_op_stats_lst = []
 
         for op_idx, operator in enumerate(plan.operators):
+            # TODO: this being defined in the for loop potentially makes the return
+            # unbounded if plan.operators is empty. This should be defined outside the loop
+            # and the loop refactored to account for not redeclaring this for each operator
             output_records = []
             op_id = operator.get_op_id()
-            prev_op_id = (
-                plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
-            )
+            prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
 
             if isinstance(operator, DataSourcePhysicalOp):
                 continue
             # only invoke aggregate operator(s) once there are no more source records and all
             # upstream operators' processing queues are empty
             # elif isinstance(operator, AggregateOp):
-                # output_records, record_op_stats_lst = operator(candidates=input_records)
+            # output_records, record_op_stats_lst = operator(candidates=input_records)
             elif isinstance(operator, LimitScanOp):
-                if len(self.records_count) >= operator.limit:
+                if self.records_count >= operator.limit:
                     break
             else:
                 for r in input_records:
@@ -139,7 +166,7 @@ class StreamingSequentialExecution(ExecutionEngine):
                     output_records = [r for r in output_records if r._passed_operator]
                     if not output_records:
                         break
-                
+
             self.plan_stats.operator_stats[op_id].add_record_op_stats(
                 record_op_stats_lst,
                 source_op_id=prev_op_id,

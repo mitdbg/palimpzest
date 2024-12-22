@@ -1,10 +1,17 @@
-from palimpzest.constants import MAX_ROWS
-from palimpzest.corelib.fields import *
-from typing import Any, Dict, List
-
 import json
+from typing import Any as TypingAny
+from typing import Dict, List
+
+from palimpzest.constants import MAX_ROWS
+from palimpzest.corelib.fields import BytesField, CallableField, Field, ListField, NumericField, StringField
 
 
+# TODO: Under the definition of __eq__ in SchemaMetaclass, I think that an equality check like
+#       Any([TextFile, PDFFile]) == TextFile will return `False`. I believe this is the behavior
+#       that we want (these schemas are not the same), but I need to make sure that an equality
+#       check between two instances of these schemas will not return `False` if they are both the
+#       the same object (e.g. the same file of text), but one has Schema == Any([TextFile, PDFFile])
+#       and the other has Schema = TextFile
 class SchemaMetaclass(type):
     """
     This is a metaclass for our Schema class.
@@ -15,7 +22,7 @@ class SchemaMetaclass(type):
         Emit a string that contains the names of all the class members that are Fields.
         """
         # get attributes that are Fields
-        fields = SchemaMetaclass.fieldNames(cls)
+        fields = SchemaMetaclass.field_names(cls)
 
         return f"{cls.__name__}({', '.join(fields)})"
 
@@ -23,37 +30,37 @@ class SchemaMetaclass(type):
         """
         Equality function for the Schema which checks that the ordered fields and class names are the same.
         """
-        cls_schema = SchemaMetaclass.getDesc(cls)
-        other_schema = SchemaMetaclass.getDesc(other)
+        cls_schema = SchemaMetaclass.get_desc(cls)
+        other_schema = SchemaMetaclass.get_desc(other)
 
         return cls_schema == other_schema
 
     def __hash__(cls) -> int:
         """Hash function for the Schema which is a simple hash of its ordered Fields and class name."""
-        ordered = SchemaMetaclass.getDesc(cls)
+        ordered = SchemaMetaclass.get_desc(cls)
 
         return hash(ordered.encode())
 
-    def fieldNames(cls, unique = False, id = "") -> List[str]:
+    def field_names(cls, unique=False, id="") -> List[str]:
         """Return a list of the fields in this Schema
         The unique argument is used to determine if the class name should be prefixed to the field name for unique identification
         The id argument is used to provide a unique identifier for the class name"""
         attributes = dir(cls)
         attributes = [attr for attr in attributes if not attr.startswith("__")]
         prefix = f"{cls.__name__}.{id}." if unique else ""
-        fields = [prefix+attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
+        fields = [prefix + attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
         return fields
 
-    def getDesc(cls) -> str:
+    def get_desc(cls) -> str:
         """Return a description of the schema"""
-        fields = SchemaMetaclass.fieldNames(cls)
+        fields = SchemaMetaclass.field_names(cls)
         d = {k: hash(getattr(cls, k)) for k in fields}
 
         # TODO: this causes an exception why trying to use Schema in a type definition
         # e.g. TaskDescriptor = Tuple[str, Union[tuple, None], Schema, Schema]
         # will throw the following exception:
         #
-        # File "/Users/matthewrusso/palimpzest/src/palimpzest/elements/elements.py", line 168, in getDesc
+        # File "/Users/matthewrusso/palimpzest/src/palimpzest/elements/elements.py", line 168, in get_desc
         #     d["__class__"] = o.__name__
         # AttributeError: '_SpecialForm' object has no attribute '__name__'
         #
@@ -61,9 +68,9 @@ class SchemaMetaclass(type):
 
         return json.dumps(d, sort_keys=True)
 
-    def jsonSchema(cls) -> Dict[str, Any]:
+    def json_schema(cls) -> Dict[str, TypingAny]:
         """The JSON representation of the Schema"""
-        fields = SchemaMetaclass.fieldNames(cls)
+        fields = SchemaMetaclass.field_names(cls)
 
         schema = {
             "properties": {},
@@ -78,7 +85,7 @@ class SchemaMetaclass(type):
             if v is None:
                 continue
 
-            schema["properties"][k] = v.jsonSchema()
+            schema["properties"][k] = v.json_schema()
 
             if v.required:
                 schema["required"].append(k)
@@ -105,12 +112,15 @@ class Schema(metaclass=SchemaMetaclass):
     Note that because not all papers are published in journals, this field might be optional (`required=False`).
     """
 
+    def __init__(self, desc: str | None = None):
+        self._desc = ""
+        if desc is not None:
+            self._desc = desc
+
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
 
-    def asJSONStr(
-        self, record_dict: Dict[str, Any], include_data_cols: bool = True
-    ) -> str:
+    def as_json_str(self, record_dict: Dict[str, TypingAny], include_data_cols: bool = True) -> str:
         """Return a JSON representation of a data record with this Schema"""
         if include_data_cols:
             record_dict["data type"] = str(self.__class__.__name__)
@@ -120,52 +130,39 @@ class Schema(metaclass=SchemaMetaclass):
 
     # TODO move logic from metaclass to here
     @classmethod
-    def className(cls) -> str:
+    def class_name(cls) -> str:
         """Return the name of this class"""
         return cls.__name__
-
-
-# TODO: Under the definition of __eq__ in SchemaMetaclass, I think that an equality check like
-#       Any([TextFile, PDFFile]) == TextFile will return `False`. I believe this is the behavior
-#       that we want (these schemas are not the same), but I need to make sure that an equality
-#       check between two instances of these schemas will not return `False` if they are both the
-#       the same object (e.g. the same file of text), but one has Schema == Any([TextFile, PDFFile])
-#       and the other has Schema = TextFile
-#
-#####################################################
-# A Schema that can be one of multiple other kinds of Schemas.
-# For example, I might want to process Any([PDF, WordDoc, TextFile])
-#####################################################
-class Any(Schema):
-    """
-    This represents ANY of the specified Schemas. For example, you may not know if a document
-    is a PDF or a Word document, but you know it's one of those two.
-    """
-
-    def __init__(self, possibleSchemas: List[Schema], desc: str):
-        super().__init__(desc=desc)
-        self._possibleSchemas = possibleSchemas
-
-    @property
-    def children(self) -> List[Schema]:
-        return self._possibleSchemas
-
-
-class OperatorDerivedSchema(Schema):
-    """Schema defined by an operator, e.g., a join or a group by"""
 
 
 ###################################################################################
 # "Core" useful Schemas. These are Schemas that almost everyone will need.
 # File, TextFile, Image, PDF, etc.
 ###################################################################################
-class SourceRecord(Schema):
+
+
+# First-level Schema's
+class Any(Schema):
     """
-    Schema used inside of Execution.execute_dag to produce a candidate for operators
-    which implement the BaseScan or CacheScan logical operators.
+    This represents ANY of the specified Schemas. For example, you may not know if a document
+    is a PDF or a Word document, but you know it's one of those two.
     """
-    idx = NumericField(desc="The scan index of the record", required=True)
-    get_item_fn = CallableField(desc="The get_item() function from the DataSource", required=True)
+
+    def __init__(self, possible_schemas: list[Schema], desc: str):
+        super().__init__(desc=desc)
+        self._possible_schemas = possible_schemas
+
+    @property
+    def children(self) -> List[Schema]:
+        return self._possible_schemas
+
+
+class Download(Schema):
+    """A download is a URL and the contents of the download."""
+
+    url = StringField(desc="The URL of the download", required=True)
+    content = BytesField(desc="The contents of the download", required=True)
+    timestamp = StringField(desc="The timestamp of the download", required=True)
 
 
 class File(Schema):
@@ -185,8 +182,8 @@ class Number(Schema):
     value = NumericField(desc="A single number", required=True)
 
 
-class TextFile(File):
-    """A text file is a File that contains only text. No binary data."""
+class OperatorDerivedSchema(Schema):
+    """Schema defined by an operator, e.g., a join or a group by"""
 
 
 class RawJSONObject(Schema):
@@ -195,47 +192,43 @@ class RawJSONObject(Schema):
     json = StringField(desc="String representation of a JSON object", required=True)
 
 
-class PDFFile(File):
-    """A PDF file is a File that is a PDF. It has specialized fields, font information, etc."""
+class SourceRecord(Schema):
+    """
+    Schema used inside of Execution.execute_dag to produce a candidate for operators
+    which implement the BaseScan or CacheScan logical operators.
+    """
 
-    # This class is currently very impoverished. It needs a lot more fields before it can correctly represent a PDF.
-    text_contents = StringField(desc="The text-only contents of the PDF", required=True)
-
-
-class ImageFile(File):
-    """A file that contains an image."""
-
-    text_description = StringField(
-        desc="A text description of the image", required=False
-    )
+    idx = NumericField(desc="The scan index of the record", required=True)
+    get_item_fn = CallableField(desc="The get_item() function from the DataSource", required=True)
 
 
-class EquationImage(ImageFile):
-    """An image that contains a mathematical equation."""
+class Table(Schema):
+    """A Table is an object composed of a header and rows."""
 
-    equation_text = StringField(
-        desc="The text representation of the equation in the image", required=True
-    )
+    filename = StringField(desc="The name of the file the table was extracted from", required=False)
+    name = StringField(desc="The name of the table", required=False)
+    header = ListField(element_type=StringField, desc="The header of the table", required=True)
+    # TODO currently no support for nesting data records on data records
+    rows = ListField(element_type=ListField, desc="The rows of the table", required=True)
 
+    def as_json_str(self, record_dict: Dict[str, TypingAny], *args, **kwargs) -> str:
+        """Return a JSON representation of an instantiated object of this Schema"""
+        # Take the rows in the record_dict and turn them into comma separated strings
+        rows = []
+        # only sample the first MAX_ROWS
+        for row in record_dict["rows"][:MAX_ROWS]:
+            rows += [",".join(map(str, row)) + "\n"]
+        record_dict["rows"] = rows
+        header = ",".join(record_dict["header"])
+        record_dict["header"] = header
 
-class PlotImage(ImageFile):
-    """An image that contains a plot, such as a graph or chart."""
-
-    plot_description = StringField(desc="A description of the plot", required=True)
+        return super().as_json_str(record_dict, *args, **kwargs)
 
 
 class URL(Schema):
     """A URL is a string that represents a web address."""
 
     url = StringField(desc="A URL", required=True)
-
-
-class Download(Schema):
-    """A download is a URL and the contents of the download."""
-
-    url = StringField(desc="The URL of the download", required=True)
-    content = BytesField(desc="The contents of the download", required=True)
-    timestamp = StringField(desc="The timestamp of the download", required=True)
 
 
 class WebPage(Schema):
@@ -247,12 +240,28 @@ class WebPage(Schema):
     timestamp = StringField(desc="The timestamp of the download", required=True)
 
 
+# Second-level Schemas
+class ImageFile(File):
+    """A file that contains an image."""
+
+    text_description = StringField(desc="A text description of the image", required=False)
+
+
+class PDFFile(File):
+    """A PDF file is a File that is a PDF. It has specialized fields, font information, etc."""
+
+    # This class is currently very impoverished. It needs a lot more fields before it can correctly represent a PDF.
+    text_contents = StringField(desc="The text-only contents of the PDF", required=True)
+
+
+class TextFile(File):
+    """A text file is a File that contains only text. No binary data."""
+
+
 class XLSFile(File):
     """An XLS file is a File that contains one or more Excel spreadsheets."""
 
-    number_sheets = NumericField(
-        desc="The number of sheets in the Excel file", required=True
-    )
+    number_sheets = NumericField(desc="The number of sheets in the Excel file", required=True)
     sheet_names = ListField(
         element_type=NumericField,
         desc="The names of the sheets in the Excel file",
@@ -260,30 +269,14 @@ class XLSFile(File):
     )
 
 
-class Table(Schema):
-    """A Table is an object composed of a header and rows."""
+# Third-level Schemas
+class EquationImage(ImageFile):
+    """An image that contains a mathematical equation."""
 
-    filename = StringField(
-        desc="The name of the file the table was extracted from", required=False
-    )
-    name = StringField(desc="The name of the table", required=False)
-    header = ListField(
-        element_type=StringField, desc="The header of the table", required=True
-    )
-    # TODO currently no support for nesting data records on data records
-    rows = ListField(
-        element_type=ListField, desc="The rows of the table", required=True
-    )
+    equation_text = StringField(desc="The text representation of the equation in the image", required=True)
 
-    def asJSONStr(self, record_dict: Dict[str, Any], *args, **kwargs) -> str:
-        """Return a JSON representation of an instantiated object of this Schema"""
-        # Take the rows in the record_dict and turn them into comma separated strings
-        rows = []
-        # only sample the first MAX_ROWS
-        for i, row in enumerate(record_dict["rows"][:MAX_ROWS]):
-            rows += [",".join(map(str, row)) + "\n"]
-        record_dict["rows"] = rows
-        header = ",".join(record_dict["header"])
-        record_dict["header"] = header
 
-        return super(Table, self).asJSONStr(record_dict, *args, **kwargs)
+class PlotImage(ImageFile):
+    """An image that contains a plot, such as a graph or chart."""
+
+    plot_description = StringField(desc="A description of the plot", required=True)

@@ -48,7 +48,7 @@ def create_mab_initial_sample_mask(records: list, physical_ops: list, num_sample
     record_to_row_map = {}
     for row_idx, record in enumerate(records):
         # NOTE: for scan records only, we need to use record._source_id instead of record._id
-        # because the DataSource.getItem method will swap out the input record with a newly
+        # because the DataSource.get_item method will swap out the input record with a newly
         # constructed record. Thus, one way to ensure that the first operator after the scan
         # will lookup the correct parent record is to simply use the source
         record_id = record._id if record.schema != SourceRecord else record._source_id
@@ -690,13 +690,13 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         # get handle to DataSource (# making the assumption that first operator_set can only be a scan
         source_operator = plan.operator_sets[0][0]
         datasource = (
-            self.datadir.getRegisteredDataset(source_operator.dataset_id)
+            self.datadir.get_registered_dataset(source_operator.dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(source_operator.dataset_id)
+            else self.datadir.get_cached_result(source_operator.dataset_id)
         )
 
         # shuffle the indices of records to sample
-        total_num_samples = self.datasource.getValLength()
+        total_num_samples = self.datasource.get_val_length()
         shuffled_sample_indices = [int(idx) for idx in np.arange(total_num_samples)]
         self.rng.shuffle(shuffled_sample_indices)
 
@@ -721,7 +721,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
         # TODO: long-term, we should do something which does not rely on scanning validation source to build this mapping
         sample_idx_to_source_id = {
-            sample_idx: datasource.getItem(sample_idx, val=True)._source_id
+            sample_idx: datasource.get_item(sample_idx, val=True)._source_id
             for sample_idx in range(total_num_samples)
         }
 
@@ -747,7 +747,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                             sample_idx = shuffled_sample_indices[(next_shuffled_sample_idx + j_idx) % len(shuffled_sample_indices)]
                             candidate = DataRecord(schema=SourceRecord, source_id=sample_idx)
                             candidate.idx = sample_idx
-                            candidate.get_item_fn = partial(datasource.getItem, val=True)
+                            candidate.get_item_fn = partial(datasource.get_item, val=True)
                             candidates = [candidate]
                             op_set_id_to_num_samples[op_set_id] += 1
                             op_id_to_num_samples[op.get_op_id()] += 1
@@ -824,10 +824,10 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                 if not self.nocache:
                     for record in all_records:
                         if getattr(record, "_passed_operator", True):
-                            self.datadir.appendCache(op_set_id, record)
+                            self.datadir.append_cache(op_set_id, record)
 
                 # compute quality for each operator (and time and cost) and put them into matrix
-                field_to_metric_fn = self.datasource.getFieldToMetricFn()
+                field_to_metric_fn = self.datasource.get_field_to_metric_fn()
                 all_outputs = self.score_quality(op_set, op_set_id, all_outputs, champion_outputs, expected_outputs, field_to_metric_fn)
 
             # update the (pareto) frontier for each set of operators
@@ -839,7 +839,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         # if caching was allowed, close the cache
         if not self.nocache:
             for op_set_id in full_op_set_ids:
-                self.datadir.closeCache(op_set_id)
+                self.datadir.close_cache(op_set_id)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
@@ -861,8 +861,8 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         """
         # if we're using validation data, get the set of expected output records
         expected_outputs = {}
-        for idx in range(self.datasource.getValLength()):
-            data_records = self.datasource.getItem(idx, val=True, include_label=True)
+        for idx in range(self.datasource.get_val_length()):
+            data_records = self.datasource.get_item(idx, val=True, include_label=True)
             if type(data_records) != type([]):
                 data_records = [data_records]
             record_set = DataRecordSet(data_records, None)

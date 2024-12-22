@@ -1,33 +1,41 @@
 from __future__ import annotations
 
-from palimpzest import prompts
-from palimpzest.constants import *
-from palimpzest.corelib import *
-from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
-from palimpzest.elements import *
-from palimpzest.generators import DSPyGenerator, ImageTextGenerator
-from palimpzest.operators import PhysicalOperator
-from palimpzest.utils import getJsonFromAnswer
-
-from io import BytesIO
-from PIL import Image
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-
 import base64
+import json
 import time
+from io import BytesIO
+from typing import Any, Callable
+
+from PIL import Image
+
+from palimpzest import prompts
+from palimpzest.constants import (
+    MODEL_CARDS,
+    NAIVE_EST_NUM_INPUT_TOKENS,
+    NAIVE_EST_NUM_OUTPUT_TOKENS,
+    NAIVE_EST_ONE_TO_MANY_SELECTIVITY,
+    Cardinality,
+    Model,
+    PromptStrategy,
+)
+from palimpzest.corelib.schemas import Schema
+from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
+from palimpzest.operators.physical import PhysicalOperator
+from palimpzest.utils.generation_helpers import get_json_from_answer
 
 # TYPE DEFINITIONS
 FieldName = str
 
 
 class ConvertOp(PhysicalOperator):
-
     def __init__(
         self,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-        udf: Optional[Callable] = None,
-        desc: Optional[str] = None,
-        depends_on: Optional[List[str]] = None,
+        udf: Callable | None = None,
+        desc: str | None = None,
+        depends_on: list[str] | None = None,
         *args,
         **kwargs,
     ):
@@ -50,8 +58,8 @@ class ConvertOp(PhysicalOperator):
 
     def get_op_params(self):
         return {
-            "inputSchema": self.inputSchema,
-            "outputSchema": self.outputSchema,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
             "cardinality": self.cardinality.value,
             "udf": self.udf,
             "depends_on": self.depends_on,
@@ -62,12 +70,11 @@ class ConvertOp(PhysicalOperator):
 
 
 class NonLLMConvert(ConvertOp):
-
-    def __eq__(self, other: PhysicalOperator):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
-            and self.outputSchema == other.outputSchema
-            and self.inputSchema == other.inputSchema
+            and self.output_schema == other.output_schema
+            and self.input_schema == other.input_schema
             and self.cardinality == other.cardinality
             and self.udf == other.udf
             and self.max_workers == other.max_workers
@@ -78,7 +85,7 @@ class NonLLMConvert(ConvertOp):
         op += f"    UDF: {str(self.udf)}\n"
         return op
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Compute naive cost estimates for the NonLLMConvert operation. These estimates assume
         that the UDF convert (1) has no cost and (2) has perfect quality.
@@ -137,8 +144,8 @@ class NonLLMConvert(ConvertOp):
                 record_id = dr._id
                 record_parent_id = dr._parent_id
                 record_source_id = dr._source_id
-                record_state = dr._asDict(include_bytes=False)
-                answer = {field_name: getattr(dr, field_name) for field_name in self.outputSchema.fieldNames()},
+                record_state = dr.as_dict(include_bytes=False)
+                answer = {field_name: getattr(dr, field_name) for field_name in self.output_schema.field_names()},
 
             record_op_stats = RecordOpStats(
                 record_id=record_id,
@@ -151,8 +158,8 @@ class NonLLMConvert(ConvertOp):
                 time_per_record=fn_call_duration_secs / len(drs),
                 cost_per_record=0.0,
                 answer=answer,
-                input_fields=self.inputSchema.fieldNames(),
-                generated_fields=self.outputSchema.fieldNames(),
+                input_fields=self.input_schema.field_names(),
+                generated_fields=self.output_schema.field_names(),
                 fn_call_duration_secs=fn_call_duration_secs / len(drs),
                 failed_convert=(not successful_convert),
                 op_details={k: str(v) for k, v in self.get_op_params().items()},
@@ -166,7 +173,6 @@ class NonLLMConvert(ConvertOp):
 
 
 class LLMConvert(ConvertOp):
-
     def __init__(
         self,
         model: Model,
@@ -182,8 +188,8 @@ class LLMConvert(ConvertOp):
 
         # create DSPy generator
         if self.model is not None:
-            doc_schema = str(self.outputSchema)
-            doc_type = self.outputSchema.className()
+            doc_schema = str(self.output_schema)
+            doc_type = self.output_schema.class_name()
             if self.image_conversion:
                 self.generator = ImageTextGenerator(self.model, self.verbose)
             else:
@@ -191,15 +197,15 @@ class LLMConvert(ConvertOp):
                     self.model, self.prompt_strategy, doc_schema, doc_type, self.verbose
                 )
 
-    def __eq__(self, other: PhysicalOperator):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.model == other.model
             and self.cardinality == other.cardinality
             and self.image_conversion == other.image_conversion
             and self.prompt_strategy == other.prompt_strategy
-            and self.outputSchema == other.outputSchema
-            and self.inputSchema == other.inputSchema
+            and self.output_schema == other.output_schema
+            and self.input_schema == other.input_schema
             and self.max_workers == other.max_workers
         )
 
@@ -214,7 +220,7 @@ class LLMConvert(ConvertOp):
             "model": self.model,
             "prompt_strategy": self.prompt_strategy,
             "image_conversion": self.image_conversion,
-            **copy_kwargs
+            **copy_kwargs,
         }
 
     def get_op_params(self):
@@ -228,7 +234,7 @@ class LLMConvert(ConvertOp):
 
         return op_params
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Compute naive cost estimates for the LLMConvert operation. Implicitly, these estimates
         assume the use of a single LLM call for each input record. Child classes of LLMConvert
@@ -240,7 +246,7 @@ class LLMConvert(ConvertOp):
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
 
         if self.image_conversion:
-            est_num_input_tokens = 765 / 10 # 1024x1024 image is 765 tokens
+            est_num_input_tokens = 765 / 10  # 1024x1024 image is 765 tokens
 
         # get est. of conversion time per record from model card;
         # NOTE: model will only be None for code synthesis, which uses GPT-3.5 as fallback
@@ -271,67 +277,67 @@ class LLMConvert(ConvertOp):
 
     def _construct_query_prompt(
         self,
-        fields_to_generate: List[str],
+        fields_to_generate: list[str],
         model: Model,
     ) -> str:
         """
         This function constructs the prompt for a bonded query.
         """
         # set defaults
-        doc_type = self.outputSchema.className()
+        doc_type = self.output_schema.class_name()
         # build string of input fields and their descriptions
-        multilineInputFieldDescription = ""
+        multiline_input_field_description = ""
         depends_on_fields = (
             [field.split(".")[-1] for field in self.depends_on]
             if self.depends_on is not None and len(self.depends_on) > 0
             else None
         )
         input_fields = (
-            self.inputSchema.fieldNames()
+            self.input_schema.field_names()
             if depends_on_fields is None
-            else [field for field in self.inputSchema.fieldNames() if field in depends_on_fields]
+            else [field for field in self.input_schema.field_names() if field in depends_on_fields]
         )
         for field_name in input_fields:
-            field_desc = getattr(self.inputSchema, field_name).desc
-            multilineInputFieldDescription += prompts.INPUT_FIELD.format(
+            field_desc = getattr(self.input_schema, field_name).desc
+            multiline_input_field_description += prompts.INPUT_FIELD.format(
                 field_name=field_name, field_desc=field_desc
             )
 
         # build string of output fields and their descriptions
-        multilineOutputFieldDescription = ""
+        multiline_output_field_description = ""
         for field_name in fields_to_generate:
-            field_desc = getattr(self.outputSchema, field_name).desc
-            multilineOutputFieldDescription += prompts.OUTPUT_FIELD.format(
+            field_desc = getattr(self.output_schema, field_name).desc
+            multiline_output_field_description += prompts.OUTPUT_FIELD.format(
                 field_name=field_name, field_desc=field_desc
             )
 
         # add input/output schema descriptions (if they have a docstring)
-        optionalInputDesc = (
+        optional_input_desc = (
             ""
-            if self.inputSchema.__doc__ is None
-            else prompts.OPTIONAL_INPUT_DESC.format(desc=self.inputSchema.__doc__)
+            if self.input_schema.__doc__ is None
+            else prompts.OPTIONAL_INPUT_DESC.format(desc=self.input_schema.__doc__)
         )
-        optionalOutputDesc = (
+        optional_output_desc = (
             ""
-            if self.outputSchema.__doc__ is None
-            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.outputSchema.__doc__)
+            if self.output_schema.__doc__ is None
+            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.output_schema.__doc__)
         )
 
         # add optional model instruction
         model_instruction = prompts.LLAMA_INSTRUCTION if model in [Model.LLAMA3, Model.LLAMA3_V] else ""
 
-        # construct sentence fragments which depend on cardinality of conversion ("oneToOne" or "oneToMany")
+        # construct sentence fragments which depend on cardinality of conversion (pz.Cardinality.ONE_TO_ONE or pz.Cardinality.ONE_TO_MANY)
         if self.cardinality == Cardinality.ONE_TO_MANY:
-            targetOutputDescriptor = prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
-            outputSingleOrPlural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
-            appendixInstruction = prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
+            target_output_descriptor = prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
+            output_single_or_plural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
+            appendix_instruction = prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
         else:
-            targetOutputDescriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
-            outputSingleOrPlural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
+            target_output_descriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
+            output_single_or_plural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
 
             fields_example_dict = {}
             for field in fields_to_generate:
-                type_str = self.outputSchema.jsonSchema()['properties'][field]['type']
+                type_str = self.output_schema.json_schema()['properties'][field]['type']
                 if type_str == "string":
                     fields_example_dict[field] = "abc"
                 elif type_str == "numeric":
@@ -346,7 +352,7 @@ class LLMConvert(ConvertOp):
                     fields_example_dict[field] = ["<bool>", "<bool>", "..."]
 
             fields_example_dict_str = json.dumps(fields_example_dict, indent=2)
-            appendixInstruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(fields=fields_to_generate, fields_example_dict=fields_example_dict_str)
+            appendix_instruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(fields=fields_to_generate, fields_example_dict=fields_example_dict_str)
 
         # construct promptQuestion
         optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
@@ -356,15 +362,15 @@ class LLMConvert(ConvertOp):
             prompt_question = prompts.IMAGE_CONVERT_PROMPT
 
         prompt_question = prompt_question.format(
-            targetOutputDescriptor=targetOutputDescriptor,
-            input_type = self.inputSchema.className(),
-            outputSingleOrPlural = outputSingleOrPlural,
-            optionalInputDesc = optionalInputDesc,
-            optionalOutputDesc = optionalOutputDesc,
-            multilineInputFieldDescription = multilineInputFieldDescription,
-            multilineOutputFieldDescription = multilineOutputFieldDescription,
-            appendixInstruction = appendixInstruction,
-            optional_desc = optional_desc,
+            target_output_descriptor=target_output_descriptor,
+            input_type=self.input_schema.class_name(),
+            output_single_or_plural=output_single_or_plural,
+            optional_input_desc=optional_input_desc,
+            optional_output_desc=optional_output_desc,
+            multiline_input_field_description=multiline_input_field_description,
+            multiline_output_field_description=multiline_output_field_description,
+            appendix_instruction=appendix_instruction,
+            optional_desc=optional_desc,
             model_instruction = model_instruction,
         )
         # TODO: add this for boolean questions?
@@ -375,8 +381,8 @@ class LLMConvert(ConvertOp):
 
     def _create_record_set(
         self,
-        records: List[DataRecord],
-        fields: List[str],
+        records: list[DataRecord],
+        fields: list[str],
         generation_stats: GenerationStats,
         total_time: float,
         successful_convert: bool,
@@ -401,7 +407,7 @@ class LLMConvert(ConvertOp):
             record_id = dr._id
             record_parent_id = dr._parent_id
             record_source_id = dr._source_id
-            record_state = dr._asDict(include_bytes=False)
+            record_state = dr.as_dict(include_bytes=False)
             answer = {field_name: getattr(dr, field_name) for field_name in fields}
 
             record_op_stats = RecordOpStats(
@@ -416,7 +422,7 @@ class LLMConvert(ConvertOp):
                 cost_per_record=per_record_stats.cost_per_record,
                 model_name=model.value if model else None,
                 answer=answer,
-                input_fields=self.inputSchema.fieldNames(),
+                input_fields=self.input_schema.field_names(),
                 generated_fields=fields,
                 total_input_tokens=per_record_stats.total_input_tokens,
                 total_output_tokens=per_record_stats.total_output_tokens,
@@ -437,49 +443,45 @@ class LLMConvert(ConvertOp):
 
     def _create_data_record_from_json(
         self,
-        jsonObj: Any, 
+        json_obj: Any,
         candidate: DataRecord,
-        cardinality_idx: int = None,
+        cardinality_idx: int | None = None,
     ) -> DataRecord:
         # initialize data record
-        dr = DataRecord.fromParent(self.outputSchema, parent_record=candidate, cardinality_idx=cardinality_idx)
+        dr = DataRecord.from_parent(self.output_schema, parent_record=candidate, cardinality_idx=cardinality_idx)
 
         # TODO: This inherits all pre-computed fields in an incremental fashion. The positive / pros of this approach is that it enables incremental schema computation, which tends to feel more natural for the end-user. The downside is it requires us to support an explicit projection to eliminate unwanted input / intermediate computation.
         #
         # first, copy all fields from input schema
-        # NOTE: the method is called _getFields instead of getFields to avoid it being picked up as a data record attribute;
-        #       in the future we will come up with a less ugly fix -- but for now do not remove the _ even though it's not private
-        for field_name in candidate._getFields():
+        for field_name in candidate.get_fields():
             setattr(dr, field_name, getattr(candidate, field_name, None))
 
         # get input field names and output field names
-        input_fields = self.inputSchema.fieldNames()
-        output_fields = self.outputSchema.fieldNames()
+        input_fields = self.input_schema.field_names()
+        output_fields = self.output_schema.field_names()
 
         # parse newly generated fields from the generated jsonObj
         for field_name in output_fields:
             if field_name not in input_fields:
                 # parse the json object and set the DataRecord's fields with their generated values
                 setattr(
-                    dr, field_name, jsonObj.get(field_name, None)
+                    dr, field_name, json_obj.get(field_name, None)
                 )  # the use of get prevents a KeyError if an individual field is missing.
 
         return dr
 
-    def parse_answer(
-        self, answer: str, fields_to_generate: List[str], model: Model,
-    ) -> Dict[FieldName, List[Any]]:
+    def parse_answer(self, answer: str, fields_to_generate: list[str], model: Model) -> dict[FieldName, list[Any]]:
         """ 
         This functions gets a string answer and parses it into an iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
-        # """
+        """
         try:
             # parse json from answer string
-            json_answer = getJsonFromAnswer(answer, model)
+            json_answer = get_json_from_answer(answer, model)
 
             # sanity check validity of parsed json
             assert json_answer != {}, "No output was found!"
             if self.cardinality == Cardinality.ONE_TO_MANY:
-                assert "items" in json_answer, "\"items\" key missing from one-to-many JSON"
+                assert "items" in json_answer, '"items" key missing from one-to-many JSON'
                 assert (
                     isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0
                 ), "No output objects were generated for one-to-many query"
@@ -491,8 +493,8 @@ class LLMConvert(ConvertOp):
             print(f"\tAnswer: {answer}")
             # msg = str(e)
             # if "line" in msg:
-                # line = int(str(msg).split("line ")[1].split(" ")[0])
-                # print(f"\tAnswer snippet: {answer.splitlines()[line]}")
+            #     line = int(str(msg).split("line ")[1].split(" ")[0])
+            #     print(f"\tAnswer snippet: {answer.splitlines()[line]}")
             return {field_name: [] for field_name in fields_to_generate}
 
         field_answers = {}
@@ -503,13 +505,11 @@ class LLMConvert(ConvertOp):
                 for item in json_answer["items"]:
                     try:
                         field_answers[field].append(item[field])
-                    except Exception as e:
+                    except Exception:
                         print(f"Error parsing field {field} in one-to-many answer: {item}")
 
         else:
-            field_answers = {
-                field: [json_answer[field]] for field in fields_to_generate
-            }
+            field_answers = {field: [json_answer[field]] for field in fields_to_generate}
 
         return field_answers
 
@@ -532,6 +532,7 @@ class LLMConvert(ConvertOp):
 
             # for LLAMA vision model, we must concatenate images into a single image
             elif model in [Model.LLAMA3_V]:
+                # TODO: revert after paper submission
                 # # load images, get their dimensions, and create new image to fit them horizontally
                 # images = [Image.open(image_file) for image_file in candidate.image_filepaths]
                 # widths, heights = zip(*(img.size for img in images))
@@ -563,29 +564,32 @@ class LLMConvert(ConvertOp):
 
             content = base64_images
         else:
-            content = candidate._asJSONStr(include_bytes=False, project_cols=self.depends_on)
+            content = candidate.as_json_str(include_bytes=False, project_cols=self.depends_on)
 
         return content
 
     def _dspy_generate_fields(
         self,
         prompt: str,
-        content: Optional[Union[str, List[bytes]]] = None, #either text or image
-    ) -> Tuple[str, GenerationStats]:
-        """ This functions wraps the call to the generator method to actually perform the field generation. Returns an answer which is a string and a query_stats which is a GenerationStats object.
+        content: str | list[bytes] | None = None,  # either text or image
+    ) -> tuple[str, GenerationStats]:
+        """
+        This functions wraps the call to the generator method to actually perform the field generation.
+        Returns an answer which is a string and a query_stats which is a GenerationStats object.
         """
         # generate LLM response and capture statistics
         answer:str
         query_stats:GenerationStats
         try:
-            answer, _, query_stats = self.generator.generate(context=content, question=prompt)
+            answer, _, query_stats = self.generator.generate(context=content, prompt=prompt)
+
         except Exception as e:
             print(f"DSPy generation error: {e}")
             return "", GenerationStats()
 
         return answer, query_stats
 
-    def convert(self, candidate: DataRecord, fields: List[str]) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         """ This function is responsible for the LLM conversion process. 
         Different strategies may/should reimplement this function and leave the __call__ function untouched.
         The input is ...
@@ -599,20 +603,17 @@ class LLMConvert(ConvertOp):
         start_time = time.time()
 
         # get fields to generate with this convert
-        fields_to_generate = self._generate_field_names(candidate, self.inputSchema, self.outputSchema)
-
-        # # get the content to be fed into the model
-        # content = self._get_candidate_content(self.model, candidate)
+        fields_to_generate = self._generate_field_names(candidate, self.input_schema, self.output_schema)
 
         # execute the convert
-        field_answers: Dict[str, List]
+        field_answers: dict[str, list]
         field_answers, generation_stats = self.convert(candidate=candidate, fields=fields_to_generate)
 
         # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
         # list is indexed per record
         try:
             n_records = max([len(lst) for lst in field_answers.values()])
-        except:
+        except Exception:
             print(f"Error in field answers: {field_answers}. Returning empty records.")
             n_records = 0
             field_answers = {}
@@ -627,14 +628,12 @@ class LLMConvert(ConvertOp):
 
             # construct list of data records
             drs = [
-                self._create_data_record_from_json(
-                    jsonObj=js, candidate=candidate, cardinality_idx=idx
-                )
+                self._create_data_record_from_json(json_obj=js, candidate=candidate, cardinality_idx=idx)
                 for idx, js in enumerate(records_json)
             ]
         else:
             null_js = {field: None for field in fields_to_generate}
-            drs = [self._create_data_record_from_json(jsonObj=null_js, candidate=candidate, cardinality_idx=0)]
+            drs = [self._create_data_record_from_json(json_obj=null_js, candidate=candidate, cardinality_idx=0)]
 
         # construct and return DataRecordSet
         record_set = self._create_record_set(
@@ -649,14 +648,13 @@ class LLMConvert(ConvertOp):
 
 
 class LLMConvertConventional(LLMConvert):
-
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Update the cost per record and time per record estimates to account for the additional
         LLM calls we incur by executing one query per-field.
         """
         # get naive cost estimates from LLMConvert
-        naive_op_cost_estimates = super().naiveCostEstimates(source_op_cost_estimates)
+        naive_op_cost_estimates = super().naive_cost_estimates(source_op_cost_estimates)
 
         # re-compute cost per record assuming we use fewer input tokens
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
@@ -665,8 +663,8 @@ class LLMConvertConventional(LLMConvert):
         # increase estimates of the input and output tokens by the number of fields generated
         # NOTE: this may over-estimate the number of fields that need to be generated
         generate_field_names = []
-        for field_name in self.outputSchema.fieldNames():
-            if field_name not in self.inputSchema.fieldNames():
+        for field_name in self.output_schema.field_names():
+            if field_name not in self.input_schema.field_names():
                 generate_field_names.append(field_name)
 
         num_fields_to_generate = len(generate_field_names)
@@ -674,7 +672,7 @@ class LLMConvertConventional(LLMConvert):
         est_num_output_tokens *= num_fields_to_generate
 
         if self.image_conversion:
-            est_num_input_tokens = 765 / 10 # 1024x1024 image is 765 tokens
+            est_num_input_tokens = 765 / 10  # 1024x1024 image is 765 tokens
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
@@ -697,9 +695,7 @@ class LLMConvertConventional(LLMConvert):
 
         return naive_op_cost_estimates
 
-    def convert(
-        self, candidate: DataRecord, fields: List[str]
-    ) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         fields_answers = {}
         fields_stats = {}
         candidate_content = self._get_candidate_content(self.model, candidate)
@@ -716,9 +712,7 @@ class LLMConvertConventional(LLMConvert):
 
 class LLMConvertBonded(LLMConvert):
 
-    def convert(self,
-                candidate,
-                fields) -> Tuple[Dict[FieldName, List[Any]], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         prompt = self._construct_query_prompt(fields_to_generate=fields, model=self.model)
         candidate_content = self._get_candidate_content(self.model, candidate)
 

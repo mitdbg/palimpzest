@@ -1,23 +1,38 @@
-from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, PickOutputStrategy
-from palimpzest.corelib.schemas import SourceRecord
-from palimpzest.dataclasses import OperatorStats, PlanStats
-from palimpzest.elements import DataRecord, DataRecordSet
-from palimpzest.execution import ExecutionEngine, SequentialSingleThreadPlanExecutor
-from palimpzest.operators import *
-from palimpzest.optimizer import SentinelPlan
-from palimpzest.utils import create_sample_mask, getChampionModel
-
+import time
 from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
-from typing import List, Tuple, Union
 
 import numpy as np
 
-import time
+from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, Model, PickOutputStrategy
+from palimpzest.corelib.schemas import SourceRecord
+from palimpzest.dataclasses import OperatorStats, PlanStats
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.execution.plan_executors.single_threaded_plan_execution import SequentialSingleThreadPlanExecutor
+from palimpzest.operators.aggregate import AggregateOp
+from palimpzest.operators.code_synthesis_convert import (
+    CodeSynthesisConvert,
+    CodeSynthesisConvertAdviceEnsemble,
+    CodeSynthesisConvertAdviceEnsembleValidation,
+    CodeSynthesisConvertExampleEnsemble,
+    CodeSynthesisConvertNone,
+    CodeSynthesisConvertSingle,
+)
+from palimpzest.operators.convert import ConvertOp, LLMConvertBonded, LLMConvertConventional
+from palimpzest.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
+from palimpzest.operators.filter import FilterOp, LLMFilter
+from palimpzest.operators.limit import LimitScanOp
+from palimpzest.operators.physical import PhysicalOperator
+from palimpzest.operators.retrieve import RetrieveOp
+from palimpzest.operators.token_reduction_convert import TokenReducedConvertBonded, TokenReducedConvertConventional
+from palimpzest.optimizer.plan import SentinelPlan
+from palimpzest.utils.matrix_completion_helpers import create_sample_mask
+from palimpzest.utils.model_helpers import get_champion_model
+
 
 # NOTE: I would like for this to be a util, but its reliance on operator specifics
 #       makes it impossible to put in utils (which multiple operator files import from)
-def getChampionConvertOperator(operators):
+def get_champion_convert_operator(operators):
     """
     NOTE: this function is one place where inductive bias (in the form of our prior belief
     about the best operator(s)) is inserted into the PZ optimizer.
@@ -82,14 +97,14 @@ def getChampionConvertOperator(operators):
             if isinstance(operator, RetrieveOp)
             # compute product of operator and model ranking for other operators
             else (
-                operator_ranking := (
+                operator_ranking := (  # noqa: F841
                     convert_operator_class_ranking[operator.__class__]
                     if isinstance(operator, ConvertOp)
                     else filter_operator_class_ranking[operator.__class__]
                 )
             )
             * (
-                model_ranking_factor := (
+                model_ranking_factor := (  # noqa: F841
                     model_ranking[operator.model]
                     if not isinstance(operator, CodeSynthesisConvert)
                     else 1.0
@@ -120,7 +135,7 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
             else self.pick_ensemble_output
         )
 
-    def pick_champion_output(self, op_set_record_sets: List[Tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
+    def pick_champion_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
         """
         NOTE: this function is one place where inductive bias (in the form of our prior belief
         about the best operator(s)) is inserted into the PZ optimizer.
@@ -132,11 +147,11 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
 
         # get the preferred convert operator
         operators = set(map(lambda tup: tup[1], op_set_record_sets))
-        champion_convert_operator = getChampionConvertOperator(operators)
+        champion_convert_operator = get_champion_convert_operator(operators)
 
         # get the champion model(s) (for filters)
-        champion_model = getChampionModel(self.available_models)
-        champion_vision_model = getChampionModel(self.available_models, vision=True)
+        champion_model = get_champion_model(self.available_models)
+        champion_vision_model = get_champion_model(self.available_models, vision=True)
 
         # return output from the bonded query or filter with the best model;
         # ignore response from all other operations
@@ -152,7 +167,7 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
 
         return champion_record_set
 
-    def pick_ensemble_output(self, op_set_record_sets: List[Tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
+    def pick_ensemble_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
         if len(op_set_record_sets) == 1:
             record_set, _ = op_set_record_sets[0]
@@ -182,15 +197,16 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
         return DataRecordSet(out_records, [])
 
     def execute_op_set(
-            self,
-            input_records: List[DataRecord],
-            op_set: List[PhysicalOperator],
-            sample_matrix: np.ndarray,
-        ) -> Tuple[Dict[str, List[DataRecordSet]], Dict[str, DataRecordSet]]:
+        self,
+        input_records: list[DataRecord],
+        op_set: list[PhysicalOperator],
+        sample_matrix: np.ndarray,
+    ) -> tuple[dict[str, list[DataRecordSet]], dict[str, DataRecordSet]]:
         # handle aggregate operators
         if isinstance(op_set[0], AggregateOp):
             # NOTE: will need to change this if we ever have competing aggregate implemenations
             operator = op_set[0]
+            all_record_sets, champion_record_sets = {}, {}
             record_set = operator(input_records)
 
             # NOTE: the convention for now is to use the source_id of the final input record
@@ -272,9 +288,9 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
         # get handle to DataSource (# making the assumption that first operator_set can only be a scan
         source_operator = plan.operator_sets[0][0]
         datasource = (
-            self.datadir.getRegisteredDataset(source_operator.dataset_id)
+            self.datadir.get_registered_dataset(source_operator.dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(source_operator.dataset_id)
+            else self.datadir.get_cached_result(source_operator.dataset_id)
         )
 
         # initialize output variables
@@ -285,7 +301,7 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
         for sample_idx in range(num_samples):
             candidate = DataRecord(schema=SourceRecord, source_id=sample_idx)
             candidate.idx = sample_idx
-            candidate.get_item_fn = partial(datasource.getItem, val=True)
+            candidate.get_item_fn = partial(datasource.get_item, val=True)
             candidates.append(candidate)
 
         # NOTE: because we need to dynamically create sample matrices for each operator,
@@ -310,7 +326,7 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
             # run operator set on records
             source_id_to_record_sets, source_id_to_champion_record_set = self.execute_op_set(candidates, op_set, sample_matrix)
             
-            # for scan operators, we need to correct the source_id to match what is provided by the DataSource.getItem() method
+            # for scan operators, we need to correct the source_id to match what is provided by the DataSource.get_item() method
             if isinstance(op_set[0], DataSourcePhysicalOp):
                 new_source_id_to_record_sets, new_source_id_to_champion_record_set, new_record_to_row_map = {}, {}, {}
                 for source_id, record_sets in source_id_to_record_sets.items():
@@ -352,16 +368,15 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
             if not self.nocache:
                 for record in all_records:
                     if getattr(record, "_passed_operator", True):
-                        self.datadir.appendCache(op_set_id, record)
+                        self.datadir.append_cache(op_set_id, record)
 
             # update candidates for next operator; we use champion outputs as input
             candidates = []
             if next_op_set_id is not None:
                 for _, record_set in champion_outputs[op_set_id].items():
                     for record in record_set:
-                        if isinstance(op_set[0], FilterOp):
-                            if not record._passed_operator:
-                                continue
+                        if isinstance(op_set[0], FilterOp) and not record._passed_operator:
+                            continue
                         candidates.append(record)
 
             # if we've filtered out all records, terminate early
@@ -372,7 +387,7 @@ class SequentialSingleThreadSentinelPlanExecutor(SequentialSingleThreadPlanExecu
         if not self.nocache:
             for op_set in plan.operator_sets:
                 op_set_id = SentinelPlan.compute_op_set_id(op_set)
-                self.datadir.closeCache(op_set_id)
+                self.datadir.close_cache(op_set_id)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
@@ -399,7 +414,7 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
         )
 
     # TODO: factor out into shared base class
-    def pick_champion_output(self, op_set_record_sets: List[Tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
+    def pick_champion_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
         """
         NOTE: this function is one place where inductive bias (in the form of our prior belief
         about the best operator(s)) is inserted into the PZ optimizer.
@@ -411,11 +426,11 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
 
         # get the preferred convert operator
         operators = set(map(lambda tup: tup[1], op_set_record_sets))
-        champion_convert_operator = getChampionConvertOperator(operators)
+        champion_convert_operator = get_champion_convert_operator(operators)
 
         # get the champion model(s) (for filters)
-        champion_model = getChampionModel(self.available_models)
-        champion_vision_model = getChampionModel(self.available_models, vision=True)
+        champion_model = get_champion_model(self.available_models)
+        champion_vision_model = get_champion_model(self.available_models, vision=True)
 
         # return output from the bonded query or filter with the best model;
         # ignore response from all other operations
@@ -432,7 +447,7 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
         return champion_record_set
 
     # TODO: factor out into shared base class
-    def pick_ensemble_output(self, op_set_record_sets: List[Tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
+    def pick_ensemble_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
         if len(op_set_record_sets) == 1:
             record_set, _ = op_set_record_sets[0]
@@ -462,7 +477,7 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
         return DataRecordSet(out_records, [])
 
     @staticmethod
-    def execute_op_wrapper(operator: PhysicalOperator, op_input: Union[DataRecord, List[DataRecord]]) -> Tuple[DataRecordSet, PhysicalOperator]:
+    def execute_op_wrapper(operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
         """
         Wrapper function around operator execution which also and returns the operator.
         This is useful in the parallel setting(s) where operators are executed by a worker pool,
@@ -554,9 +569,9 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
         # get handle to DataSource (# making the assumption that first operator_set can only be a scan
         source_operator = plan.operator_sets[0][0]
         datasource = (
-            self.datadir.getRegisteredDataset(source_operator.dataset_id)
+            self.datadir.get_registered_dataset(source_operator.dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.getCachedResult(source_operator.dataset_id)
+            else self.datadir.get_cached_result(source_operator.dataset_id)
         )
 
         # initialize output variables
@@ -567,7 +582,7 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
         for sample_idx in range(num_samples):
             candidate = DataRecord(schema=SourceRecord, source_id=sample_idx)
             candidate.idx = sample_idx
-            candidate.get_item_fn = partial(datasource.getItem, val=True)
+            candidate.get_item_fn = partial(datasource.get_item, val=True)
             candidates.append(candidate)
 
         # NOTE: because we need to dynamically create sample matrices for each operator,
@@ -592,7 +607,7 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
             # run operator set on records
             source_id_to_record_sets, source_id_to_champion_record_set = self.execute_op_set(candidates, op_set, sample_matrix)
             
-            # for scan operators, we need to correct the source_id to match what is provided by the DataSource.getItem() method
+            # for scan operators, we need to correct the source_id to match what is provided by the DataSource.get_item() method
             if isinstance(op_set[0], DataSourcePhysicalOp):
                 new_source_id_to_record_sets, new_source_id_to_champion_record_set, new_record_to_row_map = {}, {}, {}
                 for source_id, record_sets in source_id_to_record_sets.items():
@@ -634,16 +649,15 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
             if not self.nocache:
                 for record in all_records:
                     if getattr(record, "_passed_operator", True):
-                        self.datadir.appendCache(op_set_id, record)
+                        self.datadir.append_cache(op_set_id, record)
 
             # update candidates for next operator; we use champion outputs as input
             candidates = []
             if next_op_set_id is not None:
                 for _, record_set in champion_outputs[op_set_id].items():
                     for record in record_set:
-                        if isinstance(op_set[0], FilterOp):
-                            if not record._passed_operator:
-                                continue
+                        if isinstance(op_set[0], FilterOp) and not record._passed_operator:
+                            continue
                         candidates.append(record)
 
             # if we've filtered out all records, terminate early
@@ -654,7 +668,7 @@ class SequentialParallelSentinelPlanExecutor(SequentialSingleThreadPlanExecutor)
         if not self.nocache:
             for op_set in plan.operator_sets:
                 op_set_id = SentinelPlan.compute_op_set_id(op_set)
-                self.datadir.closeCache(op_set_id)
+                self.datadir.close_cache(op_set_id)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time

@@ -1,9 +1,11 @@
-from palimpzest.constants import Model
-from palimpzest.corelib import File
-from palimpzest.elements import DataRecord, DataRecordSet
-
 import os
+
 import pytest
+
+from palimpzest.constants import Model
+from palimpzest.corelib.schemas import File
+from palimpzest.elements.records import DataRecord, DataRecordSet
+
 
 ### EXPECTED RECORDS ###
 @pytest.fixture
@@ -21,6 +23,7 @@ def enron_all_expected_records(enron_eval_tiny_data):
 
     return data_records
 
+
 @pytest.fixture
 def enron_filter_expected_records(enron_all_expected_records):
     data_records = [
@@ -30,6 +33,7 @@ def enron_filter_expected_records(enron_all_expected_records):
     ]
     return data_records
 
+
 @pytest.fixture
 def real_estate_all_expected_records(real_estate_eval_tiny_data, image_real_estate_listing_schema):
     expected_listings = sorted(os.listdir(real_estate_eval_tiny_data))
@@ -37,7 +41,7 @@ def real_estate_all_expected_records(real_estate_eval_tiny_data, image_real_esta
     listing_to_has_natural_sunlight = {"listing1": True, "listing2": True, "listing3": False}
 
     data_records = []
-    for idx, listing in enumerate(expected_listings):
+    for _, listing in enumerate(expected_listings):
         dr = DataRecord(schema=image_real_estate_listing_schema, source_id=listing)
         dr.listing = listing
         dr.is_modern_and_attractive = listing_to_modern_and_attractive[listing]
@@ -46,10 +50,11 @@ def real_estate_all_expected_records(real_estate_eval_tiny_data, image_real_esta
 
     return data_records
 
+
 @pytest.fixture
 def real_estate_one_to_many_expected_records(real_estate_eval_tiny_data, room_real_estate_listing_schema):
     expected_listings = sorted(os.listdir(real_estate_eval_tiny_data))
-    listing_to_rooms= {
+    listing_to_rooms = {
         "listing1": ["other", "living_room", "kitchen"],
         "listing2": ["other", "living_room", "living_room"],
         "listing3": ["other", "living_room", "other"],

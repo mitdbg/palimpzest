@@ -1,20 +1,21 @@
+import time
+
 from palimpzest.constants import OptimizationStrategy
 from palimpzest.dataclasses import ExecutionStats
-from palimpzest.execution import (
-    ExecutionEngine,
+from palimpzest.execution.execution_engine import ExecutionEngine
+from palimpzest.execution.plan_executors.parallel_plan_execution import (
     PipelinedParallelPlanExecutor,
+)
+from palimpzest.execution.plan_executors.single_threaded_plan_execution import (
     PipelinedSingleThreadPlanExecutor,
     SequentialSingleThreadPlanExecutor,
 )
-from palimpzest.optimizer import CostModel, Optimizer
+from palimpzest.optimizer.cost_model import CostModel
+from palimpzest.optimizer.optimizer import Optimizer
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
-import time
 
-# TODO: we've removed the dataset_id; now we need this execution engine to:
-#       - run on validation data (if present); otherwise run on first num_samples
-#           - this should also be true for other execution engines
 class NoSentinelExecutionEngine(ExecutionEngine):
     """
     This class implements the abstract execute() method from the ExecutionEngine.
@@ -62,7 +63,9 @@ class NoSentinelExecutionEngine(ExecutionEngine):
             execution_id=self.execution_id(),
             plan_stats=aggregate_plan_stats,
             total_execution_time=time.time() - execution_start_time,
-            total_execution_cost=sum(list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats.values()))),
+            total_execution_cost=sum(
+                list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats.values()))
+            ),
             plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 

@@ -1,7 +1,9 @@
-from palimpzest.constants import Model
+import re
 
 import pytest
-import re
+
+from palimpzest.constants import Model
+
 
 # NOTE: this relies on knowledge of the fixtures in fixtures/execution_data.py
 @pytest.fixture
@@ -26,7 +28,7 @@ def scan_convert_filter_empty_qualities(scan_convert_filter_execution_data):
                 record_set_expected_qualities = []
                 for record_op_stats in record_set.record_op_stats:
                     quality = None
-                    if record_op_stats.logical_op_id == "scan1-logical":
+                    if record_op_stats.logical_op_id == "scan1-logical":  # noqa: SIM114
                         quality = 1.0
                     elif record_op_stats.logical_op_id == "convert1-logical":
                         quality = 1.0
@@ -119,10 +121,10 @@ def scan_convert_filter_varied_override_qualities(scan_convert_filter_varied_exe
                         source_idx = int(match.group(1))
 
                         # using expected_record and match found
-                        if source_idx % 3 > 0 and source_idx < 6 and str(Model.GPT_4o_MINI) in record_op_stats.op_id:
+                        if source_idx % 3 > 0 and source_idx < 6 and str(Model.GPT_4o_MINI) in record_op_stats.op_id:  # noqa: SIM114
                             quality = int(record_op_stats.passed_operator)
                         
-                        elif source_idx % 3 > 0 and source_idx >= 6 and str(Model.MIXTRAL) in record_op_stats.op_id:
+                        elif source_idx % 3 > 0 and source_idx >= 6 and str(Model.MIXTRAL) in record_op_stats.op_id:  # noqa: SIM114
                             quality = int(record_op_stats.passed_operator)
 
                         # using champion record and it thinks record should pass
@@ -183,7 +185,7 @@ def scan_multi_convert_multi_filter_qualities(scan_multi_convert_multi_filter_ex
                         source_idx = int(match.group(1))
                         
                         # the champion model and expected output agree on the filter decision for all records with source_idx < 5
-                        if source_idx < 5:
+                        if source_idx < 5:  # noqa: SIM114
                             quality = int(record_op_stats.passed_operator)
 
                         # for records with source_ids in [5, 6] if the *convert& model used was GPT_3_5, then the

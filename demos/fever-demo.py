@@ -1,16 +1,14 @@
-from pathlib import Path
-import palimpzest as pz
+import argparse
 import json
 import os
 import random
-import argparse
-
-from palimpzest.constants import Model
-from palimpzest.elements import DataRecord
-from palimpzest.utils import getModels
+from pathlib import Path
 
 from ragatouille import RAGPretrainedModel
-from functools import partial
+
+import palimpzest as pz
+from palimpzest.constants import Model
+from palimpzest.utils.model_helpers import get_models
 
 
 class FeverClaimsSchema(pz.Schema):
@@ -36,7 +34,7 @@ class FeverOutputSchema(FeverIntermediateSchema):
 #     most_relevant_files = [relevant_file["content"] for relevant_file in relevant_files]
    
 #     # create output DataRecord
-#     out_record = pz.DataRecord.fromParent(FeverIntermediateSchema, parent_record=record)
+#     out_record = pz.DataRecord.from_parent(FeverIntermediateSchema, parent_record=record)
     
 #     out_record.relevant_wikipedia_articles = most_relevant_files
 #     # if len(most_relevant_files) < 3:
@@ -49,12 +47,12 @@ class FeverOutputSchema(FeverIntermediateSchema):
 
 # def set_input_schema(input: DataRecord):
 #     # , project_cols=[]
-#     output = DataRecord.fromParent(FeverClaimsSchema, parent_record=input)
+#     output = DataRecord.from_parent(FeverClaimsSchema, parent_record=input)
 #     output.claim = input.contents
 #     return output
 
 def get_label_fields_to_values(claims, ground_truth_file):
-    with open(ground_truth_file, "r") as f:
+    with open(ground_truth_file) as f:
         ground_truth = [json.loads(line) for line in f]
 
     claim_to_label = {}
@@ -86,8 +84,8 @@ def get_label_fields_to_values(claims, ground_truth_file):
     return claim_to_label           
 
 class FeverValidationSource(pz.ValidationDataSource):
-    def __init__(self, datasetId, claims_dir, split_idx: int=25, num_samples: int=5, shuffle: bool=False, seed: int=42):
-        super().__init__(FeverClaimsSchema, datasetId)
+    def __init__(self, dataset_id, claims_dir, split_idx: int=25, num_samples: int=5, shuffle: bool=False, seed: int=42):
+        super().__init__(FeverClaimsSchema, dataset_id)
         self.claims_dir = claims_dir
         self.split_idx = split_idx
         self.claims = os.listdir(self.claims_dir)
@@ -243,10 +241,7 @@ engine = args.engine
 if engine == "sentinel":
     k = -1
 
-if engine == "sentinel":
-    executor = "parallel"
-else:
-    executor = "sequential"
+executor = "parallel" if engine == "sentinel" else "sequential"
 model = args.model
 policy_type = "maxquality"
 
@@ -290,7 +285,7 @@ else:
 optimization_strategy, available_models = None, None
 if engine == "sentinel":
     optimization_strategy = pz.OptimizationStrategy.PARETO
-    available_models = getModels(include_vision=True)
+    available_models = get_models(include_vision=True)
 else:
     model_str_to_model = {
         "gpt-4o": Model.GPT_4o,
@@ -321,7 +316,7 @@ datasource = FeverValidationSource(
     seed=42,
 )
 
-pz.DataDirectory().registerUserSource(
+pz.DataDirectory().register_user_source(
     src=datasource,
     dataset_id=f"{user_dataset_id}",
 )
@@ -330,11 +325,11 @@ claims = pz.Dataset(user_dataset_id, schema=FeverClaimsSchema)
 
 # claims = pz.Dataset(dataset_id, schema=pz.TextFile,
 # desc="Contains the claims that need to be verified.")
-# claims = claims.convert(outputSchema=FeverClaimsSchema, udf=set_input_schema)
-# claims_and_relevant_files = claims.convert(outputSchema=FeverIntermediateSchema,
+# claims = claims.convert(output_schema=FeverClaimsSchema, udf=set_input_schema)
+# claims_and_relevant_files = claims.convert(output_schema=FeverIntermediateSchema,
 #                                            udf=partial(get_relevant_content, index, k))
 # claims_and_relevant_files = claims.retrieve(
-#     outputSchema=FeverIntermediateSchema,
+#     output_schema=FeverIntermediateSchema,
 #     index=index,
 #     search_attr="claim",
 #     output_attr="relevant_wikipedia_articles",
@@ -342,13 +337,13 @@ claims = pz.Dataset(user_dataset_id, schema=FeverClaimsSchema)
 # )
 
 claims_and_relevant_files = claims.retrieve(
-    outputSchema=FeverIntermediateSchema,
+    output_schema=FeverIntermediateSchema,
     index=index,
     search_attr="claim",
     output_attr="relevant_wikipedia_articles",
     k=k
 )
-output = claims_and_relevant_files.convert(outputSchema=FeverOutputSchema)
+output = claims_and_relevant_files.convert(output_schema=FeverOutputSchema)
 
 # execute pz plan
 
@@ -378,7 +373,7 @@ stats_path = (
 
 record_jsons = []
 for record in records:
-    record_dict = record._asDict()
+    record_dict = record.as_dict()
     ### field_to_keep = ["claim", "id", "label"]
     ### record_dict = {k: v for k, v in record_dict.items() if k in fields_to_keep}
     record_jsons.append(record_dict)

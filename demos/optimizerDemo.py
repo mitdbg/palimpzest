@@ -10,7 +10,7 @@ from ragatouille import RAGPretrainedModel
 
 import palimpzest as pz
 from palimpzest.constants import Model
-from palimpzest.utils import getModels
+from palimpzest.utils.model_helpers import get_models
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -825,7 +825,7 @@ if __name__ == "__main__":
             shuffle=False,
             seed=seed,
         )
-        pz.DataDirectory().registerUserSource(
+        pz.DataDirectory().register_user_source(
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
@@ -854,14 +854,14 @@ if __name__ == "__main__":
             shuffle=False,
             seed=seed,
         )
-        pz.DataDirectory().registerUserSource(
+        pz.DataDirectory().register_user_source(
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
         plan = pz.Dataset(user_dataset_id, schema=BiodexEntry)
         plan = plan.convert(BiodexReactions)  # infer
         plan = plan.retrieve(
-            outputSchema=BiodexReactionLabels,
+            output_schema=BiodexReactionLabels,
             index=index,
             search_attr="reactions",
             output_attr="reaction_labels",
@@ -887,7 +887,7 @@ if __name__ == "__main__":
             shuffle=False,
             seed=seed,
         )
-        pz.DataDirectory().registerUserSource(
+        pz.DataDirectory().register_user_source(
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
@@ -897,7 +897,7 @@ if __name__ == "__main__":
         plan = plan.convert(BiodexDrugs, depends_on=["title", "abstract", "fulltext"])
         plan = plan.convert(BiodexReactions, depends_on=["title", "abstract", "fulltext"])
         plan = plan.retrieve(
-            outputSchema=BiodexReactionLabels,
+            output_schema=BiodexReactionLabels,
             index=index,
             search_attr="reactions",
             output_attr="reaction_labels",
@@ -912,7 +912,7 @@ if __name__ == "__main__":
     optimization_strategy, available_models = None, None
     if engine == "sentinel":
         optimization_strategy = pz.OptimizationStrategy.PARETO
-        available_models = getModels(include_vision=True)
+        available_models = get_models(include_vision=True)
     else:
         model_str_to_model = {
             "gpt-4o": Model.GPT_4o,
@@ -967,7 +967,7 @@ if __name__ == "__main__":
     # save record outputs
     record_jsons = []
     for record in records:
-        record_dict = record._asDict()
+        record_dict = record.as_dict()
         if workload == "biodex":
             record_dict = {
                 k: v for k, v in record_dict.items() if k in ["pmid", "serious", "patientsex", "drugs", "reactions"]

@@ -1,7 +1,6 @@
-from palimpzest.optimizer import SentinelPlan
-
 import numpy as np
 import pytest
+
 
 @pytest.fixture
 def scan_convert_filter_matrices(scan_convert_filter_sentinel_plan):

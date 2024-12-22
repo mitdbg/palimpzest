@@ -1,5 +1,8 @@
-
 from __future__ import annotations
+
+import math
+from typing import Any
+
 from palimpzest.constants import (
     MODEL_CARDS,
     NAIVE_EST_NUM_INPUT_TOKENS,
@@ -7,21 +10,16 @@ from palimpzest.constants import (
     PromptStrategy,
 )
 from palimpzest.dataclasses import OperatorCostEstimates
-from palimpzest.generators import DSPyGenerator
-from palimpzest.operators import LLMConvert, LLMConvertConventional, LLMConvertBonded
-from palimpzest.utils import best_substring_match, find_best_range
-
-from typing import Any, Dict, List, Tuple
-
-import math
+from palimpzest.operators.convert import LLMConvert, LLMConvertBonded, LLMConvertConventional
+from palimpzest.utils.token_reduction_helpers import best_substring_match, find_best_range
 
 
 class TokenReducedConvert(LLMConvert):
     # NOTE: moving these closer to the TokenReducedConvert class for now (in part to make
     #       them easier to mock); we can make these parameterized as well
-    MAX_HEATMAP_UPDATES: int=5
-    TOKEN_REDUCTION_SAMPLE: int=0
-    TOKEN_REDUCTION_GRANULARITY: float=0.001
+    MAX_HEATMAP_UPDATES: int = 5
+    TOKEN_REDUCTION_SAMPLE: int = 0
+    TOKEN_REDUCTION_GRANULARITY: float = 0.001
 
     def __init__(self, token_budget: float, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -46,19 +44,19 @@ class TokenReducedConvert(LLMConvert):
 
         return op_params
 
-    def __eq__(self, other: TokenReducedConvert):
+    def __eq__(self, other):
         return (
             isinstance(other, self.__class__)
             and self.token_budget == other.token_budget
             and self.model == other.model
             and self.cardinality == other.cardinality
             and self.prompt_strategy == other.prompt_strategy
-            and self.outputSchema == other.outputSchema
-            and self.inputSchema == other.inputSchema
+            and self.output_schema == other.output_schema
+            and self.input_schema == other.input_schema
             and self.max_workers == other.max_workers
         )
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Update the cost per record and quality estimates produced by LLMConvert's naive estimates.
         We adjust the cost per record to account for the reduced number of input tokens following
@@ -66,7 +64,7 @@ class TokenReducedConvert(LLMConvert):
         using fewer tokens.
         """
         # get naive cost estimates from LLMConvert
-        naive_op_cost_estimates = super().naiveCostEstimates(source_op_cost_estimates)
+        naive_op_cost_estimates = super().naive_cost_estimates(source_op_cost_estimates)
 
         # re-compute cost per record assuming we use fewer input tokens
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS * self.token_budget
@@ -94,6 +92,9 @@ class TokenReducedConvert(LLMConvert):
                 int(self.token_budget / self.TOKEN_REDUCTION_GRANULARITY),
                 trim_zeros=False,
             )
+            if not range:
+                raise Exception("No range found in heatmap")
+            si, ei = range
             print("si:", si, "ei:", ei)
             sr, er = (
                 si * self.TOKEN_REDUCTION_GRANULARITY,
@@ -111,12 +112,12 @@ class TokenReducedConvert(LLMConvert):
         else:
             raise NotImplementedError("Token reduction is only supported for DSPY_COT_QA prompts")
 
-    def _dspy_generate_fields(self, prompt: str, content: str | List[bytes] | None = None, verbose: bool = False) -> Tuple[List[Dict[str, List]] | Any]:
-        full_context = content
-        if self.first_execution or self.count < self.MAX_HEATMAP_UPDATES:
+    def _dspy_generate_fields(self, prompt: str, content: str | list[str]) -> tuple[list[dict[str, list]] | Any]:
+        answer, query_stats = None, None
+        if self.first_execution or self.heatmap_dict["count"] < self.MAX_HEATMAP_UPDATES:
             if self.verbose:
-                print(f"Warming up heatmap: {0 if self.first_execution else self.count}")
-            answer, query_stats = super()._dspy_generate_fields(prompt, full_context)
+                print("Warming up heatmap")
+            answer, query_stats = super()._dspy_generate_fields(prompt, content)
             self.first_execution = False
 
         else:
@@ -126,31 +127,42 @@ class TokenReducedConvert(LLMConvert):
             # only refer to the heatmap if the count is greater than a enough sample size
             # TODO: only trim the context if the attention is clustered in a small region
             if self.count >= self.TOKEN_REDUCTION_SAMPLE:
-                context = self.reduce_context(full_context)
+                context = self.reduce_context(content)
                 try:
-                    answer, _, query_stats = self.generator.generate(context=context, question=prompt)
+                    answer, _, query_stats = self.generator.generate(context=context, prompt=prompt)
                 except Exception as e:
                     print(f"DSPy generation error: {e}, falling back to unreduced generation")
                     answer, query_stats = super()._dspy_generate_fields(prompt, content)
 
+        # TODO: answer and query stats may be unbound if we hit the else block
+        # and count < TOKEN_REDUCTION_SAMPLE, which makes the below pretty clunky
+        # this throw asserts our view of the world and we should refactor this
+        if answer is None or query_stats is None:
+            raise Exception("answer or query_stats is None")
         try:
-            gsi, gei = best_substring_match(answer, full_context)
+            match = best_substring_match(answer, content)
+            if not match:
+                gsi, gei = 0, len(content)
+            else:
+                gsi, gei = match
         except Exception as e:
             print("Error in substring match:", e)
-            gsi, gei = 0, len(full_context)
-        context_len = len(full_context)
+            gsi, gei = 0, len(content)
+        context_len = len(content)
         gsr, ger = gsi / context_len, gei / context_len
-        norm_si, norm_ei = int(gsr/self.resolution), int(ger/self.resolution)
+        norm_si, norm_ei = int(gsr / self.resolution), int(ger / self.resolution)
         if self.verbose:
             print(f"best_start: {gsi} -- best_end: {gei}")
 
         self.count += 1
-        self.heatmap[norm_si:norm_ei] = map(lambda x: x+1, self.heatmap[norm_si:norm_ei])
+        self.heatmap[norm_si:norm_ei] = map(lambda x: x + 1, self.heatmap[norm_si:norm_ei])
 
         return answer, query_stats
 
+
 class TokenReducedConvertConventional(TokenReducedConvert, LLMConvertConventional):
     pass
+
 
 class TokenReducedConvertBonded(TokenReducedConvert, LLMConvertBonded):
     pass

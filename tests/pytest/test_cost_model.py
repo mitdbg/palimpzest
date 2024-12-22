@@ -1,22 +1,18 @@
-from palimpzest.datamanager import DataDirectory
-from palimpzest.optimizer import (
-    CostModel,
-    MatrixCompletionCostModel,
-    SentinelPlan,
-)
-from palimpzest.utils import getModels
-import palimpzest as pz
-
-import numpy as np
 import pytest
+
+from palimpzest.datamanager import DataDirectory
+from palimpzest.optimizer.cost_model import CostModel
+from palimpzest.utils.model_helpers import get_models
 
 
 class TestCostModel:
-    def test_compute_operator_estimates(self, simple_plan_sample_execution_data, simple_plan_expected_operator_estimates):
+    def test_compute_operator_estimates(
+        self, simple_plan_sample_execution_data, simple_plan_expected_operator_estimates
+    ):
         # construct estimator
         estimator = CostModel(
             sample_execution_data=simple_plan_sample_execution_data,
-            available_models=getModels(),
+            available_models=get_models(),
         )
 
         # get computed operator estimates
@@ -38,7 +34,6 @@ class TestCostModel:
                     for metric, expected_value in expected_model_estimates.items():
                         assert operator_estimates[op_id][model_name][metric] == expected_value
 
-
     # TODO: rewrite this test to be agnostic to the simple plan
     @pytest.mark.parametrize(
         argnames=("physical_plan", "expected_cost_est_results"),
@@ -59,7 +54,7 @@ class TestCostModel:
         # register a fake dataset
         dataset_id = "foobar"
         vals = [1, 2, 3, 4, 5, 6]
-        pz.DataDirectory().registerDataset(
+        DataDirectory().register_dataset(
             vals=vals,
             dataset_id=dataset_id,
         )
@@ -347,7 +342,7 @@ class TestCostModel:
 #             cost_model.logical_op_id_to_matrices[logical_op_id]["selectivity"] = np.ones((3, len(op_set)))
 
 #         # validate outputs
-#         cardinality = len(cost_model.datadir.getRegisteredDataset(cost_model_test_dataset))
+#         cardinality = len(cost_model.datadir.get_registered_dataset(cost_model_test_dataset))
 #         source_op_estimates = None
 #         for op_set in scan_convert_filter_sentinel_plan.operator_sets:
 #             for idx, physical_op in enumerate(op_set):

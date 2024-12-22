@@ -146,6 +146,7 @@ class MaxQualityAtFixedCost(Policy):
     This policy applies a constraint (upper bound) on the cost of the plan
     and tries to maximize quality subject to that constraint.
     """
+
     def __init__(self, max_cost: float):
         self.max_cost = max_cost
 
@@ -179,6 +180,7 @@ class MaxQualityAtFixedTime(Policy):
     This policy applies a constraint (upper bound) on the runtime of the plan
     and tries to maximize quality subject to that constraint.
     """
+
     def __init__(self, max_time: float):
         self.max_time = max_time
 
@@ -212,6 +214,7 @@ class MinCostAtFixedQuality(Policy):
     This policy applies a constraint (lower bound) on the quality of the plan
     and tries to minimize cost subject to that constraint.
     """
+
     def __init__(self, min_quality: float):
         self.min_quality = min_quality
 
@@ -245,6 +248,7 @@ class MinTimeAtFixedQuality(Policy):
     This policy applies a constraint (lower bound) on the quality of the plan
     and tries to minimize runtime subject to that constraint.
     """
+
     def __init__(self, min_quality: float):
         self.min_quality = min_quality
 
@@ -273,7 +277,8 @@ class MinTimeAtFixedQuality(Policy):
         return plan.time < other_plan.time
 
 
-# TODO: add this back in a way which allows users to select a plan from a small pareto optimal set at the end of query optimization
+# TODO: add this back in a way which allows users to select a plan from a small pareto optimal set at the end of
+# query optimization
 # class UserChoice(Policy):
 #     """
 #     This policy asks the user to decide which of the pareto-optimal
