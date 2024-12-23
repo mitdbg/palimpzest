@@ -1,132 +1,27 @@
-from palimpzest.constants import OptimizationStrategy
-from palimpzest.dataclasses import ExecutionStats
-from palimpzest.elements import DataRecordSet
-from palimpzest.execution import (
-    ExecutionEngine,
-    SequentialSingleThreadSentinelPlanExecutor,
-    SequentialParallelSentinelPlanExecutor,
-)
-from palimpzest.optimizer import (
-    CostModel,
-    Optimizer,
-    SampleBasedCostModel,
-    SentinelPlan,
-)
-from palimpzest.policy import Policy
-from palimpzest.sets import Set
-
-from concurrent.futures import ThreadPoolExecutor
-
 import time
-import warnings
-
-
-from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, PickOutputStrategy
-from palimpzest.corelib.schemas import SourceRecord
-from palimpzest.dataclasses import OperatorStats, PlanStats
-from palimpzest.elements import DataRecord, DataRecordSet
-from palimpzest.execution import ExecutionEngine, SequentialSingleThreadPlanExecutor
-from palimpzest.operators import *
-from palimpzest.optimizer import SentinelPlan
-from palimpzest.utils import create_sample_mask, getChampionModel
-
 from concurrent.futures import ThreadPoolExecutor, wait
-from itertools import product
 from functools import partial
-from typing import List, Tuple, Union
+from typing import Callable
 
 import numpy as np
 
-import time
-
-def create_mab_initial_sample_mask(records: list, physical_ops: list, num_sample_rows: int, seed: int):
-    """
-    Compute the initial observation matrix which will determine which optimizations (cols)
-    are applied to which records (rows).
-    """
-    # create mappings from (record_id --> matrix row) and (physical_op_id --> matrix col)
-    record_to_row_map = {}
-    for row_idx, record in enumerate(records):
-        # NOTE: for scan records only, we need to use record._source_id instead of record._id
-        # because the DataSource.get_item method will swap out the input record with a newly
-        # constructed record. Thus, one way to ensure that the first operator after the scan
-        # will lookup the correct parent record is to simply use the source
-        record_id = record._id if record.schema != SourceRecord else record._source_id
-        record_to_row_map[record_id] = row_idx
-
-    phys_op_to_col_map = {}
-    for col_idx, physical_op in enumerate(physical_ops):
-        phys_op_to_col_map[physical_op.op_id] = col_idx
-
-    # compute the number of rows and columns
-    num_rows = len(records)
-    num_cols = len(physical_ops)
-
-    # construct an observation matrix which samples num_rows at random
-    rng = np.random.default_rng(seed=seed)
-    sample_row_indices = np.sort(rng.choice(np.arange(num_rows), size=num_sample_rows, replace=False))
-    sample_matrix = np.zeros((num_rows, num_cols))
-    sample_matrix[sample_row_indices, :] = 1
-
-    return sample_matrix, record_to_row_map, phys_op_to_col_map
-
-# NOTE: I would like for this to be a util, but its reliance on operator specifics
-#       makes it impossible to put in utils (which multiple operator files import from)
-def getChampionConvertOperator(operators):
-    """
-    NOTE: this function is one place where inductive bias (in the form of our prior belief
-    about the best operator(s)) is inserted into the PZ optimizer.
-
-    If we want to support a fully non-inductive bias optimizer, which also works w/out
-    the presence of validation data, then we would need to have the user specify their
-    preferred champion operator (or give a ranking of operators).
-
-    Thus, we can think of this as being a quick and dirty way for us to provide that
-    preference / ranking information (rather than passing it all the way through the executor).
-    """
-    convert_operator_class_ranking = {
-        LLMConvertConventional: 4,
-        LLMConvertBonded: 3,
-        # setting both token reduced converts to same ranking
-        TokenReducedConvertConventional: 2,
-        TokenReducedConvertBonded: 2,
-        # setting all code synthesis converts to same ranking
-        CodeSynthesisConvertNone: 1,
-        CodeSynthesisConvertSingle: 1,
-        CodeSynthesisConvertExampleEnsemble: 1,
-        CodeSynthesisConvertAdviceEnsemble: 1,
-        CodeSynthesisConvertAdviceEnsembleValidation: 1,
-    }
-    filter_operator_class_ranking = {
-        LLMFilter: 1,
-    }
-    model_ranking = {
-        Model.GPT_4o: 4,
-        Model.GPT_4o_V: 4,
-        Model.GPT_4o_MINI: 3,
-        Model.GPT_4o_MINI_V: 3,
-        Model.MIXTRAL: 2,
-        Model.LLAMA3: 1,
-        Model.LLAMA3_V: 1,
-    }
-
-    # compute product of operator and model ranking
-    champion_convert_operator, champion_product = None, 0
-    for operator in operators:
-        operator_ranking = (
-            convert_operator_class_ranking[operator.__class__]
-            if isinstance(operator, ConvertOp)
-            else filter_operator_class_ranking[operator.__class__]
-        )
-        product = (
-            operator_ranking * model_ranking[operator.model]
-            if not isinstance(operator, CodeSynthesisConvert)
-            else operator_ranking * 1.0
-        )
-        if product > champion_product:
-            champion_convert_operator = operator
-
-    return champion_convert_operator
+from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, OptimizationStrategy
+from palimpzest.corelib.schemas import SourceRecord
+from palimpzest.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.execution.execution_engine import ExecutionEngine
+from palimpzest.execution.plan_executors.single_threaded_plan_execution import SequentialSingleThreadPlanExecutor
+from palimpzest.operators.convert import ConvertOp, LLMConvert
+from palimpzest.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
+from palimpzest.operators.filter import FilterOp, LLMFilter
+from palimpzest.operators.logical import FilteredScan
+from palimpzest.operators.physical import PhysicalOperator
+from palimpzest.operators.retrieve import RetrieveOp
+from palimpzest.optimizer.cost_model import CostModel, SampleBasedCostModel
+from palimpzest.optimizer.optimizer import Optimizer
+from palimpzest.optimizer.plan import SentinelPlan
+from palimpzest.policy import Policy
+from palimpzest.sets import Set
 
 
 class MABSentinelExecutionEngine(ExecutionEngine):
@@ -188,7 +83,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                         op_to_num_inputs[op_id] += 1
                         op_to_num_outputs[op_id] += num_outputs
 
-            op_to_mean_selectivity = {op_id: op_to_num_outputs[op_id] / op_to_num_inputs[op_id] for op_id in op_to_num_inputs.keys()}
+            op_to_mean_selectivity = {op_id: op_to_num_outputs[op_id] / op_to_num_inputs[op_id] for op_id in op_to_num_inputs}
 
             # compute average cost, time, and quality
             op_to_costs, op_to_times, op_to_qualities = {}, {}, {}
@@ -221,7 +116,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
             selectivity_alpha = 0.5 * np.mean([mean_selectivity for mean_selectivity in op_to_mean_selectivity.values()])
  
             op_metrics = {}
-            for op_id in op_to_costs.keys():
+            for op_id in op_to_costs:
                 sample_ratio = np.sqrt(np.log(op_set_id_to_num_samples[op_set_id]) / op_id_to_num_samples[op_id])
                 exploration_terms = np.array([cost_alpha * sample_ratio, time_alpha * sample_ratio, quality_alpha * sample_ratio, selectivity_alpha * sample_ratio])
                 mean_terms = (op_to_mean_cost[op_id], op_to_mean_time[op_id], op_to_mean_quality[op_id], op_to_mean_selectivity[op_id])
@@ -268,8 +163,8 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                     pareto_op_sets[op_set_id].add(op_id)
 
         # iterate over frontier ops and replace any which do not overlap with pareto frontier
-        new_frontier_ops = {op_set_id: [] for op_set_id in frontier_ops.keys()}
-        new_reservoir_ops = {op_set_id: [] for op_set_id in reservoir_ops.keys()}
+        new_frontier_ops = {op_set_id: [] for op_set_id in frontier_ops}
+        new_reservoir_ops = {op_set_id: [] for op_set_id in reservoir_ops}
         for op_set_id, pareto_op_set in pareto_op_sets.items():
             num_dropped_from_frontier = 0
             for op, next_shuffled_sample_idx, new_operator, fully_sampled in frontier_ops[op_set_id]:
@@ -327,11 +222,11 @@ class MABSentinelExecutionEngine(ExecutionEngine):
     def compute_quality(
             self,
             record_set: DataRecordSet,
-            expected_record_set: DataRecordSet=None,
-            champion_record_set: DataRecordSet=None,
-            is_filter_op: bool=False,
-            is_convert_op: bool=False,
-            field_to_metric_fn: Optional[Dict[str, Union[str, Callable]]] = None,
+            expected_record_set: DataRecordSet | None = None,
+            champion_record_set: DataRecordSet | None = None,
+            is_filter_op: bool = False,
+            is_convert_op: bool = False,
+            field_to_metric_fn: dict[str, str | Callable] | None = None,
         ) -> DataRecordSet:
         """
         Compute the quality for the given `record_set` by comparing it to the `expected_record_set`.
@@ -451,13 +346,13 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
     def score_quality(
             self,
-            op_set: List[PhysicalOperator],
+            op_set: list[PhysicalOperator],
             op_set_id: str,
-            execution_data: Dict[str, Dict[str, List[DataRecordSet]]],
-            champion_outputs: Dict[str, Dict[str, DataRecordSet]],
-            expected_outputs: Optional[Dict[str, DataRecordSet]] = None,
-            field_to_metric_fn: Optional[Dict[str, Union[str, Callable]]] = None,
-        ) -> List[RecordOpStats]:
+            execution_data: dict[str, dict[str, list[DataRecordSet]]],
+            champion_outputs: dict[str, dict[str, DataRecordSet]],
+            expected_outputs: dict[str, DataRecordSet] | None = None,
+            field_to_metric_fn: dict[str, str | Callable] | None = None,
+        ) -> list[RecordOpStats]:
         """
         NOTE: This approach to cost modeling does not work directly for aggregation queries;
               for these queries, we would ask the user to provide validation data for the step immediately
@@ -526,7 +421,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         return execution_data
 
 
-    def pick_ensemble_output(self, op_set_record_sets: List[Tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
+    def pick_ensemble_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
         if len(op_set_record_sets) == 1:
             record_set, _ = op_set_record_sets[0]
@@ -556,7 +451,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         return DataRecordSet(out_records, [])
 
 
-    def pick_highest_quality_output(self, op_set_record_sets: List[Tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
+    def pick_highest_quality_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
         if len(op_set_record_sets) == 1:
             record_set, _ = op_set_record_sets[0]
@@ -589,7 +484,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
 
     @staticmethod
-    def execute_op_wrapper(operator: PhysicalOperator, op_input: Union[DataRecord, List[DataRecord]]) -> Tuple[DataRecordSet, PhysicalOperator]:
+    def execute_op_wrapper(operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
         """
         Wrapper function around operator execution which also and returns the operator.
         This is useful in the parallel setting(s) where operators are executed by a worker pool,
@@ -644,7 +539,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                         # get the source_id associated with this input record
                         source_id = (
                             candidate._source_id
-                            if not (isinstance(op, MarshalAndScanDataOp) or isinstance(op, CacheScanDataOp))
+                            if not (isinstance(op, (MarshalAndScanDataOp, CacheScanDataOp)))
                             else record_set[0]._source_id
                         )
 
@@ -743,7 +638,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                     j = min(self.j, len(shuffled_sample_indices)) if new_operator else 1
                     for j_idx in range(j):
                         candidates = []
-                        if isinstance(op, MarshalAndScanDataOp) or isinstance(op, CacheScanDataOp):
+                        if isinstance(op, (MarshalAndScanDataOp, CacheScanDataOp)):
                             sample_idx = shuffled_sample_indices[(next_shuffled_sample_idx + j_idx) % len(shuffled_sample_indices)]
                             candidate = DataRecord(schema=SourceRecord, source_id=sample_idx)
                             candidate.idx = sample_idx
@@ -863,7 +758,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         expected_outputs = {}
         for idx in range(self.datasource.get_val_length()):
             data_records = self.datasource.get_item(idx, val=True, include_label=True)
-            if type(data_records) != type([]):
+            if not isinstance(data_records, list):
                 data_records = [data_records]
             record_set = DataRecordSet(data_records, None)
             expected_outputs[record_set.source_id] = record_set

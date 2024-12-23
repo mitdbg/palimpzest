@@ -4,7 +4,7 @@ from palimpzest.constants import Model
 from palimpzest.corelib.schemas import TextFile
 from palimpzest.dataclasses import PlanCost
 from palimpzest.datamanager import DataDirectory
-from palimpzest.elements import Filter
+from palimpzest.elements.filters import Filter
 from palimpzest.operators.convert import LLMConvertBonded
 from palimpzest.operators.datasource import MarshalAndScanDataOp
 from palimpzest.operators.filter import LLMFilter

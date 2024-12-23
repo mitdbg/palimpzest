@@ -1,43 +1,26 @@
-from palimpzest.constants import OptimizationStrategy
-from palimpzest.dataclasses import ExecutionStats
-from palimpzest.elements import DataRecordSet
-from palimpzest.execution import (
-    ExecutionEngine,
-    SequentialSingleThreadSentinelPlanExecutor,
-    SequentialParallelSentinelPlanExecutor,
-)
-from palimpzest.optimizer import (
-    CostModel,
-    Optimizer,
-    SampleBasedCostModel,
-    SentinelPlan,
-)
-from palimpzest.policy import Policy
-from palimpzest.sets import Set
-
-from concurrent.futures import ThreadPoolExecutor
-
 import time
-import warnings
-
-
-from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, PickOutputStrategy
-from palimpzest.corelib.schemas import SourceRecord
-from palimpzest.dataclasses import OperatorStats, PlanStats
-from palimpzest.elements import DataRecord, DataRecordSet
-from palimpzest.execution import ExecutionEngine, SequentialSingleThreadPlanExecutor
-from palimpzest.operators import *
-from palimpzest.optimizer import SentinelPlan
-from palimpzest.utils import create_sample_mask, getChampionModel
-
 from concurrent.futures import ThreadPoolExecutor, wait
-from itertools import product
 from functools import partial
-from typing import List, Tuple, Union
+from typing import Callable
 
 import numpy as np
 
-import time
+from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, OptimizationStrategy
+from palimpzest.corelib.schemas import SourceRecord
+from palimpzest.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.execution.execution_engine import ExecutionEngine
+from palimpzest.execution.plan_executors.single_threaded_plan_execution import SequentialSingleThreadPlanExecutor
+from palimpzest.operators.convert import ConvertOp, LLMConvert
+from palimpzest.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
+from palimpzest.operators.filter import FilterOp, LLMFilter
+from palimpzest.operators.physical import PhysicalOperator
+from palimpzest.operators.retrieve import RetrieveOp
+from palimpzest.optimizer.cost_model import CostModel, SampleBasedCostModel
+from palimpzest.optimizer.optimizer import Optimizer
+from palimpzest.optimizer.plan import SentinelPlan
+from palimpzest.policy import Policy
+from palimpzest.sets import Set
 
 
 class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
@@ -80,11 +63,11 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
     def compute_quality(
             self,
             record_set: DataRecordSet,
-            expected_record_set: DataRecordSet=None,
-            champion_record_set: DataRecordSet=None,
-            is_filter_op: bool=False,
-            is_convert_op: bool=False,
-            field_to_metric_fn: Optional[Dict[str, Union[str, Callable]]] = None,
+            expected_record_set: DataRecordSet | None = None,
+            champion_record_set: DataRecordSet | None = None,
+            is_filter_op: bool = False,
+            is_convert_op: bool = False,
+            field_to_metric_fn: dict[str, str | Callable] | None = None,
         ) -> DataRecordSet:
         """
         Compute the quality for the given `record_set` by comparing it to the `expected_record_set`.
@@ -204,12 +187,12 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
 
     def score_quality(
             self,
-            operator_sets: List[List[PhysicalOperator]],
-            execution_data: Dict[str, Dict[str, List[DataRecordSet]]],
-            champion_outputs: Dict[str, Dict[str, DataRecordSet]],
-            expected_outputs: Optional[Dict[str, DataRecordSet]] = None,
-            field_to_metric_fn: Optional[Dict[str, Union[str, Callable]]] = None,
-        ) -> List[RecordOpStats]:
+            operator_sets: list[list[PhysicalOperator]],
+            execution_data: dict[str, dict[str, list[DataRecordSet]]],
+            champion_outputs: dict[str, dict[str, DataRecordSet]],
+            expected_outputs: dict[str, DataRecordSet] | None = None,
+            field_to_metric_fn: dict[str, str | Callable] | None = None,
+        ) -> list[RecordOpStats]:
         """
         NOTE: This approach to cost modeling does not work directly for aggregation queries;
               for these queries, we would ask the user to provide validation data for the step immediately
@@ -237,7 +220,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         op_set = operator_sets[-1]
         op_set_id = SentinelPlan.compute_op_set_id(op_set)
         physical_op = op_set[0]
-        is_source_op = isinstance(physical_op, MarshalAndScanDataOp) or isinstance(physical_op, CacheScanDataOp)
+        is_source_op = isinstance(physical_op, (MarshalAndScanDataOp, CacheScanDataOp))
         is_filter_op = isinstance(physical_op, FilterOp)
         is_convert_op = isinstance(physical_op, ConvertOp)
         is_perfect_quality_op = (
@@ -292,7 +275,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         return execution_data
 
 
-    def pick_ensemble_output(self, op_set_record_sets: List[Tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
+    def pick_ensemble_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
         if len(op_set_record_sets) == 1:
             record_set, _ = op_set_record_sets[0]
@@ -323,7 +306,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
 
 
     @staticmethod
-    def execute_op_wrapper(operator: PhysicalOperator, op_input: Union[DataRecord, List[DataRecord]]) -> Tuple[DataRecordSet, PhysicalOperator]:
+    def execute_op_wrapper(operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
         """
         Wrapper function around operator execution which also and returns the operator.
         This is useful in the parallel setting(s) where operators are executed by a worker pool,
@@ -502,9 +485,8 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             if next_op_set_id is not None:
                 for _, record_set in source_id_to_champion_record_set.items():
                     for record in record_set:
-                        if isinstance(op_set[0], FilterOp):
-                            if not record._passed_operator:
-                                continue
+                        if isinstance(op_set[0], FilterOp) and not record._passed_operator:
+                            continue
                         candidates.append(record)
 
             # if we've filtered out all records, terminate early
@@ -543,7 +525,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         expected_outputs = {}
         for idx in range(self.datasource.get_val_length()):
             data_records = self.datasource.get_item(idx, val=True, include_label=True)
-            if type(data_records) != type([]):
+            if not isinstance(data_records, list):
                 data_records = [data_records]
             record_set = DataRecordSet(data_records, None)
             expected_outputs[record_set.source_id] = record_set
@@ -598,7 +580,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         all_execution_data, plan_stats = self.generate_sample_observations(sentinel_plan, policy)
 
         # if self.exp_name is not None:
-        #     # execution_data: Dict[op_set_id, Dict[source_id, List[DataRecordSet]]]
+        #     # execution_data: dict[op_set_id, dict[source_id, list[DataRecordSet]]]
         #     all_execution_data_copy = {}
         #     for op_set_id, source_id_to_record_sets in all_execution_data.items():
         #         all_execution_data_copy[op_set_id] = {}

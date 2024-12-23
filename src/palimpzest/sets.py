@@ -38,8 +38,8 @@ class Set:
 
     def __init__(
         self,
-        schema: Schema,
         source: Set | DataSource,
+        schema: Schema,
         desc: str | None = None,
         filter: Filter | None = None,
         udf: Callable | None = None,
@@ -154,8 +154,8 @@ class Dataset(Set):
             desc=self._desc,
             filter=self._filter,
             udf=self._udf,
-            aggFunc=self._aggFunc,
-            groupBy=self._groupBy,
+            agg_func=self._agg_func,
+            group_by=self._group_by,
             index=self._index,
             search_attr=self._search_attr,
             output_attr=self._output_attr,

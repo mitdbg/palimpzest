@@ -1,10 +1,12 @@
-from palimpzest.constants import Model
-from palimpzest.corelib import TextFile
-from palimpzest.elements import DataRecord, DataRecordSet
-from palimpzest.dataclasses import RecordOpStats
-from palimpzest.optimizer import SentinelPlan
-import pytest
 import re
+
+import pytest
+
+from palimpzest.constants import Model
+from palimpzest.corelib.schemas import TextFile
+from palimpzest.dataclasses import RecordOpStats
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.optimizer.plan import SentinelPlan
 
 
 # NOTE: technically the filter should process 10 outputs 3x times

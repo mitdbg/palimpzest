@@ -74,7 +74,7 @@ class TestCostModel:
         # construct cost model
         cost_model = CostModel(
             sample_execution_data=simple_plan_sample_execution_data,
-            available_models=getModels(),
+            available_models=get_models(),
         )
 
         # estimate cost of plan operators

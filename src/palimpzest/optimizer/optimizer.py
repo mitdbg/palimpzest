@@ -80,7 +80,7 @@ class Optimizer:
         allow_token_reduction: bool = True,
         allow_mixtures: bool = True,
         optimization_strategy: OptimizationStrategy = OptimizationStrategy.PARETO,
-        use_final_op_quality: bool = True, # TODO: make this func(plan) -> final_quality
+        use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
     ):
         # store the policy
         if available_models is None:
