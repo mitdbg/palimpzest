@@ -1,41 +1,12 @@
 import dspy
 import requests
+import tiktoken
 from dsp.modules.hf import HFModel
-from tenacity import retry, stop_after_attempt, wait_exponential
 
-from palimpzest.constants import RETRY_MAX_ATTEMPTS, RETRY_MAX_SECS, RETRY_MULTIPLIER, log_attempt_number
+# from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 ### DSPy Signatures ###
-# Given a questionn, we'll feed it with the paper context for answer generation.
-class FilterOverPaper(dspy.Signature):
-    """Answer condition questions about a scientific paper."""
-
-    context = dspy.InputField(desc="contains full text of the paper, including author, institution, title, and body")
-    question = dspy.InputField(desc="one or more conditions about the paper")
-    answer = dspy.OutputField(desc="often a TRUE/FALSE answer to the condition question(s) about the paper")
-
-
-class QuestionOverPaper(dspy.Signature):
-    """Answer question(s) about a scientific paper."""
-
-    context = dspy.InputField(desc="contains full text of the paper, including author, institution, title, and body")
-    question = dspy.InputField(desc="one or more question about the paper")
-    answer = dspy.OutputField(desc="print the answer only, separated by a newline character")
-
-
-class SingleQuestionOverSample(dspy.Signature):
-    """Answer question(s) about a scientific paper."""
-
-    context = dspy.InputField(
-        desc="contains a snippet of the paper, including the most possible answer to the question."
-    )
-    question = dspy.InputField(desc="one question about the paper")
-    answer = dspy.OutputField(
-        desc="print the answer close to the original text as you can, and print 'None' if an answer cannot be found. Please do not helucinate the answer"
-    )
-
-
 # functions which generate signatures
 def gen_signature_class(instruction, context_desc, question_desc, answer_desc):
     class QuestionOverDoc(dspy.Signature):
@@ -43,7 +14,6 @@ def gen_signature_class(instruction, context_desc, question_desc, answer_desc):
         context = dspy.InputField(desc=context_desc)
         question = dspy.InputField(desc=question_desc)
         answer = dspy.OutputField(desc=answer_desc)
-
     return QuestionOverDoc
 
 
@@ -54,6 +24,13 @@ def gen_filter_signature_class(doc_schema, doc_type):
     answer_desc = f"often a TRUE/FALSE answer to the condition question(s) about the {doc_type}"
     return gen_signature_class(instruction, context_desc, question_desc, answer_desc)
 
+def gen_moa_agg_qa_signature_class(doc_type):
+    class AggregateResponses(dspy.Signature):
+        """You are given a Question and the outputs produced by a set of models which answered this Question. Your task is to synthesize these responses into a single, high-quality response. It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect. Your response should not simply replicate the given answers but should offer a refined, accurate, and comprehensive reply to the Question."""
+        question = dspy.InputField(desc=f"a question about the {doc_type}.")
+        responses = dspy.InputField(desc="a set of responses to the question produced by different models.")
+        answer = dspy.OutputField(desc="your synthesized response to the question.")
+    return AggregateResponses
 
 def gen_qa_signature_class(doc_schema, doc_type):
     instruction = f"Answer question(s) about a {doc_schema}."
@@ -68,14 +45,17 @@ class DSPyCOT(dspy.Module):
     """
     Invoke dspy in chain of thought mode
     """
-
-    def __init__(self, f_signature: type[dspy.Signature] = FilterOverPaper):
+    def __init__(self, f_signature: type[dspy.Signature]):
         super().__init__()
         self.generate_answer = dspy.ChainOfThought(f_signature)
 
-    def forward(self, question, context):
-        context = context
-        answer = self.generate_answer(context=context, question=question)
+    def forward(self, question, context: str | None=None, responses: str | None=None):
+        answer = None
+        if context is not None:
+            answer = self.generate_answer(context=context, question=question)
+        elif responses is not None:
+            answer = self.generate_answer(responses=responses, question=question)
+
         return answer
 
 
@@ -86,38 +66,43 @@ class TogetherHFAdaptor(HFModel):
         self.api_base = "https://api.together.xyz/inference"
         self.token = api_key
         self.model = model
+        # using tiktoken as a rough approximation for both Llama3 and Mixtral (which are based on tiktoken tokenizers)
+        self.tokenizer = tiktoken.get_encoding('cl100k_base')
 
         self.use_inst_template = False
         if any(keyword in self.model.lower() for keyword in ["inst", "instruct"]):
             self.use_inst_template = True
 
-        # stop_default = "\n\n---"
+        stop_default = "\n\n---"
         # print("Stop procedure", stop_default)
+
         self.kwargs = {
-            "temperature": 0.0,
-            "max_tokens": 512,  # 8192
+            "max_tokens": 4096, # 8192
             "top_p": 1,
             "top_k": 20,
             "repetition_penalty": 1,
+            "frequency_penalty": 1,
             "n": 1,
-            # "stop": stop_default if "stop" not in kwargs else kwargs["stop"],
-            **kwargs,
+            "stop": kwargs.get("stop", stop_default),
+            **kwargs
         }
 
-    @retry(
-        wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
-        stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
-        after=log_attempt_number,
-    )
+    # TODO undo after paper submission
+    # @retry(
+    #     wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=RETRY_MAX_SECS),
+    #     stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
+    #     after=log_attempt_number,
+    # )
     def _generate(self, prompt, use_chat_api=False, **kwargs):
         url = f"{self.api_base}"
 
         kwargs = {**self.kwargs, **kwargs}
         stop = kwargs.get("stop")
         temperature = kwargs.get("temperature")
-        max_tokens = kwargs.get("max_tokens", 150)
-        top_p = kwargs.get("top_p", 0.7)
-        top_k = kwargs.get("top_k", 50)
+        prompt_tokens = len(self.tokenizer.encode(prompt)) + 150 # buffer for differences between tiktoken and actual tokenizers
+        max_tokens = kwargs.get("max_tokens") if prompt_tokens + kwargs.get("max_tokens") < 8192 else 8192 - prompt_tokens
+        # top_p = kwargs.get("top_p", 0.7)
+        # top_k = kwargs.get("top_k", 50)
         repetition_penalty = kwargs.get("repetition_penalty", 1)
         logprobs = kwargs.get("logprobs", 0)
         prompt = f"[INST]{prompt}[/INST]" if self.use_inst_template else prompt
@@ -135,8 +120,8 @@ class TogetherHFAdaptor(HFModel):
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
-                "top_p": top_p,
-                "top_k": top_k,
+                # "top_p": top_p,
+                # "top_k": top_k,
                 "repetition_penalty": repetition_penalty,
                 "stop": stop,
                 "logprobs": logprobs,
@@ -147,8 +132,8 @@ class TogetherHFAdaptor(HFModel):
                 "prompt": prompt,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
-                "top_p": top_p,
-                "top_k": top_k,
+                # "top_p": top_p,
+                # "top_k": top_k,
                 "repetition_penalty": repetition_penalty,
                 "stop": stop,
                 "logprobs": logprobs,

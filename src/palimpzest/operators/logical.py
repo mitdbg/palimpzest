@@ -8,6 +8,7 @@ from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
 from palimpzest.corelib.schemas import ImageFile, Schema
 from palimpzest.elements.filters import Filter
 from palimpzest.elements.groupbysig import GroupBySig
+from palimpzest.utils.index_helpers import get_index_str
 
 
 class LogicalOperator:
@@ -22,6 +23,7 @@ class LogicalOperator:
     - LimitScan (scans up to N records from a Set)
     - GroupByAggregate (applies a group by on the Set)
     - Aggregate (applies an aggregation on the Set)
+    - RetrieveScan (fetches documents from a provided input for a given query)
 
     Every logical operator must declare the get_op_params() method, which returns
     a dictionary of parameters that are used to implement its physical operator.
@@ -29,8 +31,8 @@ class LogicalOperator:
 
     def __init__(
         self,
-        output_schema: type[Schema],
-        input_schema: type[Schema] | None = None,
+        output_schema: Schema,
+        input_schema: Schema | None = None,
     ):
         self.output_schema = output_schema
         self.input_schema = input_schema
@@ -75,7 +77,7 @@ class LogicalOperator:
         # compute, set, and return the op_id
         op_name = self.op_name()
         op_params = self.get_op_params()
-        op_params = {k: str(v) for k, v in op_params.items()}
+        op_params = {k: str(v) if k != "index" else get_index_str(v) for k, v in op_params.items()}
         hash_str = json.dumps({"op_name": op_name, **op_params}, sort_keys=True)
         self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
@@ -85,7 +87,6 @@ class LogicalOperator:
         if not self.op_id:
             raise ValueError("op_id not set, unable to hash")
         return int(self.op_id, 16)
-
 
 class Aggregate(LogicalOperator):
     """
@@ -199,15 +200,11 @@ class CacheScan(LogicalOperator):
         )
 
     def get_op_params(self):
-        return {
-            "output_schema": self.output_schema,
-            "dataset_id": self.dataset_id,
-        }
+        return {"output_schema": self.output_schema, "dataset_id": self.dataset_id}
 
 
 class ConvertScan(LogicalOperator):
-    """A ConvertScan is a logical operator that represents a scan of a particular data source,
-    with conversion applied."""
+    """A ConvertScan is a logical operator that represents a scan of a particular data source, with conversion applied."""
 
     def __init__(
         self,
@@ -224,7 +221,7 @@ class ConvertScan(LogicalOperator):
         self.cardinality = cardinality
         self.udf = udf
         self.image_conversion = image_conversion or (self.input_schema == ImageFile)
-        self.depends_on = [] if depends_on is None else depends_on
+        self.depends_on = [] if depends_on is None else sorted(depends_on)
         self.desc = desc
         self.target_cache_id = target_cache_id
 
@@ -261,6 +258,7 @@ class ConvertScan(LogicalOperator):
             "cardinality": self.cardinality,
             "udf": self.udf,
             "image_conversion": self.image_conversion,
+            "depends_on": self.depends_on,
             "desc": self.desc,
             "target_cache_id": self.target_cache_id,
         }
@@ -281,7 +279,7 @@ class FilteredScan(LogicalOperator):
         super().__init__(*args, **kwargs)
         self.filter = filter
         self.image_filter = image_filter or (self.input_schema == ImageFile)
-        self.depends_on = [] if depends_on is None else depends_on
+        self.depends_on = [] if depends_on is None else sorted(depends_on)
         self.target_cache_id = target_cache_id
 
     def __str__(self):
@@ -312,6 +310,7 @@ class FilteredScan(LogicalOperator):
             "output_schema": self.output_schema,
             "filter": self.filter,
             "image_filter": self.image_filter,
+            "depends_on": self.depends_on,
             "target_cache_id": self.target_cache_id,
         }
 
@@ -391,5 +390,62 @@ class LimitScan(LogicalOperator):
             "input_schema": self.input_schema,
             "output_schema": self.output_schema,
             "limit": self.limit,
+            "target_cache_id": self.target_cache_id,
+        }
+
+# TODO(Siva): Currently, retrieve is pretty much a convert!
+class RetrieveScan(LogicalOperator):
+    """A RetrieveScan is a logical operator that represents a scan of a particular data source, with a convert-like retrieve applied."""
+
+    def __init__(
+        self,
+        index,
+        search_attr,
+        output_attr,
+        k,
+        target_cache_id: str = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.index = index
+        self.search_attr = search_attr
+        self.output_attr = output_attr  
+        self.k = k
+        self.target_cache_id = target_cache_id
+
+    def __str__(self):
+        return f"RetrieveScan({self.input_schema} -> {str(self.output_schema)},{str(self.desc)})"
+
+    def __eq__(self, other: LogicalOperator) -> bool:
+        return (
+            isinstance(other, RetrieveScan)
+            and self.input_schema == other.input_schema
+            and self.output_schema == other.output_schema
+            and self.index == other.index
+            and self.search_attr == other.search_attr
+            and self.output_attr == other.output_attr
+            and self.k == other.k
+        )
+
+    def copy(self):
+        return RetrieveScan(
+            input_schema=self.input_schema,
+            output_schema=self.output_schema,
+            index=self.index,
+            search_attr=self.search_attr,
+            output_attr=self.output_attr,
+            k=self.k,
+            target_cache_id=self.target_cache_id,
+        )
+
+    def get_op_params(self):
+        return {
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
+            "index": self.index,
+            "search_attr": self.search_attr,
+            "output_attr": self.output_attr,
+            "k": self.k,
             "target_cache_id": self.target_cache_id,
         }

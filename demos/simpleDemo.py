@@ -70,7 +70,7 @@ def vldb_text_file_to_url(candidate: DataRecord):
     url_records = []
     with open(candidate.filename) as f:
         for line in f:
-            dr = DataRecord(pz.URL, parent_id=candidate._id)
+            dr = DataRecord.from_parent(pz.URL, parent_record=candidate, project_cols=[])
             dr.url = line.strip()
             url_records.append(dr)
 
@@ -105,8 +105,7 @@ def get_page_text(url):
 
 def download_html(candidate: DataRecord):
     textcontent = get_page_text(candidate.url)
-    dr = DataRecord(pz.WebPage, parent_id=candidate._id)
-    dr.url = candidate.url
+    dr = DataRecord.from_parent(pz.WebPage, parent_record=candidate, project_cols=['url'])
 
     html = textcontent
     tokens = html.split()[:5000]
@@ -124,7 +123,7 @@ def download_html(candidate: DataRecord):
 def download_pdf(candidate: DataRecord):
     print(f"DOWNLOADING: {candidate.pdfLink}")
     content = requests.get(candidate.pdfLink).content
-    dr = DataRecord(pz.File, parent_id=candidate._id)
+    dr = DataRecord.from_parent(pz.File, parent_record=candidate, project_cols=[])
     dr.url = candidate.pdfLink
     dr.content = content
     dr.timestamp = datetime.datetime.now().isoformat()
@@ -377,10 +376,8 @@ if __name__ == "__main__":
     if engine == "sentinel":
         if executor == "sequential":
             execution_engine = pz.SequentialSingleThreadSentinelExecution
-        elif executor == "pipelined":
-            execution_engine = pz.PipelinedSingleThreadSentinelExecution
         elif executor == "parallel":
-            execution_engine = pz.PipelinedParallelSentinelExecution
+            execution_engine = pz.SequentialParallelSentinelExecution
         else:
             print("Unknown executor")
             exit(1)
@@ -481,7 +478,7 @@ if __name__ == "__main__":
                 # NOTE: we can make this a streaming demo again by modifying this get_item function
                 commit = self.commits[idx]
                 commit_str = json.dumps(commit)
-                dr = pz.DataRecord(self.schema)
+                dr = pz.DataRecord(self.schema, source_id=idx)
                 dr.json = commit_str
 
                 return dr

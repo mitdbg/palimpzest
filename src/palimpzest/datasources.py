@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import abc
 import json
 import os
 import sys
 from io import BytesIO
-from typing import Any, Dict, List, Type, Union
+from typing import Any, Callable
 
 import modal
 import pandas as pd
@@ -11,7 +13,6 @@ from bs4 import BeautifulSoup
 from papermage import Document
 
 from palimpzest import constants
-from palimpzest.constants import Cardinality
 from palimpzest.corelib.schemas import File, ImageFile, Number, PDFFile, Schema, TextFile, WebPage, XLSFile
 from palimpzest.elements.records import DataRecord
 from palimpzest.tools.pdfparser import get_text_from_pdf
@@ -30,7 +31,7 @@ class AbstractDataSource(abc.ABC):
     In the future, programmers can implement their own DataSources using custom Schemas.
     """
 
-    def __init__(self, schema: Type[Schema]) -> None:
+    def __init__(self, schema: Schema) -> None:
         self._schema = schema
 
     def __str__(self) -> str:
@@ -49,20 +50,20 @@ class AbstractDataSource(abc.ABC):
     def get_size(self) -> int: ...
 
     @property
-    def schema(self) -> Type[Schema]:
+    def schema(self) -> Schema:
         return self._schema
 
-    def serialize(self) -> Dict[str, Any]:
+    def copy(self) -> AbstractDataSource:
+        raise NotImplementedError("You are calling this method from an abstract class.")
+
+    def serialize(self) -> dict[str, Any]:
         return {"schema": self._schema.json_schema()}
 
 
 class DataSource(AbstractDataSource):
-    def __init__(
-        self, schema: Type[Schema], dataset_id: str, cardinality: Cardinality = Cardinality.ONE_TO_ONE
-    ) -> None:
+    def __init__(self, schema: Schema, dataset_id: str) -> None:
         super().__init__(schema)
         self.dataset_id = dataset_id
-        self.cardinality = cardinality
 
     def universal_identifier(self):
         """Return a unique identifier for this Set."""
@@ -76,7 +77,7 @@ class DataSource(AbstractDataSource):
 class DirectorySource(DataSource):
     """DirectorySource returns multiple File objects from a real-world source (a directory on disk)"""
 
-    def __init__(self, path: str, dataset_id: str, schema: Type[Schema]) -> None:
+    def __init__(self, path: str, dataset_id: str, schema: Schema) -> None:
         self.filepaths = [
             os.path.join(path, filename)
             for filename in sorted(os.listdir(path))
@@ -85,7 +86,7 @@ class DirectorySource(DataSource):
         self.path = path
         super().__init__(schema, dataset_id)
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         return {
             "schema": self.schema.json_schema(),
             "path": self.path,
@@ -103,28 +104,6 @@ class DirectorySource(DataSource):
         raise NotImplementedError("You are calling this method from an abstract class.")
 
 
-class MemorySource(DataSource):
-    """MemorySource returns multiple objects that reflect contents of an in-memory Python list"""
-
-    def __init__(self, vals: List[Union[int, float]], dataset_id: str):
-        # For the moment we assume that we are given a list of floats or ints, but someday it could be strings or something else
-        super().__init__(Number, dataset_id)
-        self.vals = vals
-
-    def __len__(self):
-        return len(self.vals)
-
-    def get_size(self):
-        return sum([sys.getsizeof(self.get_item(idx)) for idx in range(len(self))])
-
-    def get_item(self, idx: int):
-        value = self.vals[idx]
-        dr = DataRecord(self.schema, scan_idx=idx)
-        dr.value = value
-
-        return dr
-
-
 class FileSource(DataSource):
     """FileSource returns a single File object from a single real-world local file"""
 
@@ -132,7 +111,10 @@ class FileSource(DataSource):
         super().__init__(File, dataset_id)
         self.filepath = path
 
-    def serialize(self) -> Dict[str, Any]:
+    def copy(self):
+        return FileSource(self.filepath, self.dataset_id)
+
+    def serialize(self) -> dict[str, Any]:
         return {
             "schema": self.schema.json_schema(),
             "path": self.filepath,
@@ -146,8 +128,8 @@ class FileSource(DataSource):
         # Get the memory size of the filepath
         return os.path.getsize(self.filepath)
 
-    def get_item(self, idx: int):
-        dr = DataRecord(self.schema, scan_idx=idx)
+    def get_item(self, idx: int) -> DataRecord:
+        dr = DataRecord(self.schema, source_id=self.filepath)
         dr.filename = self.filepath
         with open(self.filepath, "rb") as f:
             dr.contents = f.read()
@@ -155,28 +137,29 @@ class FileSource(DataSource):
         return dr
 
 
-class UserSource(DataSource):
-    """UserSource is a DataSource that is created by the user and not loaded from a file"""
+class MemorySource(DataSource):
+    """MemorySource returns multiple objects that reflect contents of an in-memory Python list"""
 
-    def __init__(
-        self, schema: Type[Schema], dataset_id: str, cardinality: Cardinality = Cardinality.ONE_TO_ONE
-    ) -> None:
-        super().__init__(schema, dataset_id, cardinality)
+    def __init__(self, vals: list[int | float], dataset_id: str):
+        # For the moment we assume that we are given a list of floats or ints, but someday it could be strings or something else
+        super().__init__(Number, dataset_id)
+        self.vals = vals
 
-    def serialize(self) -> Dict[str, Any]:
-        return {
-            "schema": self.schema.json_schema(),
-            "source_type": "user-defined:" + self.__class__.__name__,
-        }
+    def copy(self):
+        return MemorySource(self.vals, self.dataset_id)
 
     def __len__(self):
-        raise NotImplementedError("User needs to implement this method")
+        return len(self.vals)
 
     def get_size(self):
-        raise NotImplementedError("User may optionally implement this method.")
+        return sum([sys.getsizeof(self.get_item(idx)) for idx in range(len(self))])
 
-    def get_item(self, idx: int):
-        raise NotImplementedError("User needs to implement this method.")
+    def get_item(self, idx: int) -> DataRecord:
+        value = self.vals[idx]
+        dr = DataRecord(self.schema, source_id=idx)
+        dr.value = value
+
+        return dr
 
 
 # Third level of abstraction
@@ -184,6 +167,9 @@ class HTMLFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=WebPage)
         assert all([filename.endswith(tuple(constants.HTML_EXTENSIONS)) for filename in self.filepaths])
+
+    def copy(self):
+        return HTMLFileDirectorySource(self.path, self.dataset_id)
 
     def html_to_text_with_links(self, html):
         # Parse the HTML content
@@ -200,18 +186,18 @@ class HTMLFileDirectorySource(DirectorySource):
         text = soup.get_text(separator="\n", strip=True)
         return text
 
-    def get_item(self, idx: int):
+    def get_item(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
-        dr = DataRecord(self.schema, scan_idx=idx)
+        dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath) as f:
-            textcontent = f.read()
+            text_content = f.read()
 
-        html = textcontent
+        html = text_content
         tokens = html.split()[: constants.MAX_HTML_ROWS]
         dr.html = " ".join(tokens)
 
-        stripped_html = self.html_to_text_with_links(textcontent)
+        stripped_html = self.html_to_text_with_links(text_content)
         tokens = stripped_html.split()[: constants.MAX_HTML_ROWS]
         dr.text = " ".join(tokens)
 
@@ -223,9 +209,12 @@ class ImageFileDirectorySource(DirectorySource):
         super().__init__(path=path, dataset_id=dataset_id, schema=ImageFile)
         assert all([filename.endswith(tuple(constants.IMAGE_EXTENSIONS)) for filename in self.filepaths])
 
-    def get_item(self, idx: int):
+    def copy(self):
+        return ImageFileDirectorySource(self.path, self.dataset_id)
+
+    def get_item(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
-        dr = DataRecord(self.schema, scan_idx=idx)
+        dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
             dr.contents = f.read()
@@ -246,7 +235,10 @@ class PDFFileDirectorySource(DirectorySource):
         self.pdfprocessor = pdfprocessor
         self.file_cache_dir = file_cache_dir
 
-    def get_item(self, idx: int):
+    def copy(self):
+        return PDFFileDirectorySource(self.path, self.dataset_id)
+
+    def get_item(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
         pdf_filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
@@ -267,12 +259,10 @@ class PDFFileDirectorySource(DirectorySource):
             for p in doc.pages:
                 text_content += p.text
         else:
-            text_content = get_text_from_pdf(pdf_filename, pdf_bytes,
-            pdfprocessor=self.pdfprocessor,
-            file_cache_dir=self.file_cache_dir)
+            text_content = get_text_from_pdf(pdf_filename, pdf_bytes, pdfprocessor=self.pdfprocessor, file_cache_dir=self.file_cache_dir)
 
         # construct data record
-        dr = DataRecord(self.schema, scan_idx=idx)
+        dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = pdf_filename
         dr.contents = pdf_bytes
         dr.text_contents = text_content[:15000]  # TODO Very hacky
@@ -284,9 +274,12 @@ class TextFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=TextFile)
 
-    def get_item(self, idx: int):
+    def copy(self):
+        return TextFileDirectorySource(self.path, self.dataset_id)
+
+    def get_item(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
-        dr = DataRecord(self.schema, scan_idx=idx)
+        dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath) as f:
             dr.contents = f.read()
@@ -298,9 +291,12 @@ class XLSFileDirectorySource(DirectorySource):
         super().__init__(path=path, dataset_id=dataset_id, schema=XLSFile)
         assert all([filename.endswith(tuple(constants.XLS_EXTENSIONS)) for filename in self.filepaths])
 
-    def get_item(self, idx: int):
+    def copy(self):
+        return XLSFileDirectorySource(self.path, self.dataset_id)
+
+    def get_item(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
-        dr = DataRecord(self.schema, scan_idx=idx)
+        dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
             dr.contents = f.read()
@@ -309,3 +305,41 @@ class XLSFileDirectorySource(DirectorySource):
         dr.number_sheets = len(xls.sheet_names)
         dr.sheet_names = xls.sheet_names
         return dr
+
+
+# User-defined datasources
+class UserSource(DataSource):
+    """UserSource is a DataSource that is created by the user and not loaded from a file"""
+
+    def __init__(self, schema: Schema, dataset_id: str) -> None:
+        super().__init__(schema, dataset_id)
+
+    def serialize(self) -> dict[str, Any]:
+        return {
+            "schema": self.schema.json_schema(),
+            "source_type": "user-defined:" + self.__class__.__name__,
+        }
+
+    def __len__(self):
+        raise NotImplementedError("User needs to implement this method")
+
+    def get_size(self):
+        raise NotImplementedError("User may optionally implement this method.")
+
+    def get_item(self, idx: int) -> DataRecord:
+        raise NotImplementedError("User needs to implement this method.")
+
+
+class ValidationDataSource(UserSource):
+    """
+    TODO: update this class interface (and comment)
+    """
+
+    def get_val_length(self) -> int:
+        raise NotImplementedError("User needs to implement this method.")
+
+    def get_field_to_metric_fn(self) -> Callable:
+        raise NotImplementedError("User needs to implement this method.")
+
+    def get_item(self, idx: int, val: bool = False, include_label: bool = False) -> DataRecord:
+        raise NotImplementedError("User needs to implement this method.")

@@ -10,7 +10,6 @@ from palimpzest.constants import (
     PromptStrategy,
 )
 from palimpzest.dataclasses import OperatorCostEstimates
-from palimpzest.generators.generators import DSPyGenerator
 from palimpzest.operators.convert import LLMConvert, LLMConvertBonded, LLMConvertConventional
 from palimpzest.utils.token_reduction_helpers import best_substring_match, find_best_range
 
@@ -25,9 +24,10 @@ class TokenReducedConvert(LLMConvert):
     def __init__(self, token_budget: float, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.token_budget = token_budget
-        self.heatmap_dict = {}
         self.resolution = self.TOKEN_REDUCTION_GRANULARITY
         self.first_execution = True
+        self.count = 0
+        self.heatmap = [0] * int(1.0 / self.resolution)
 
     def __str__(self):
         op = super().__str__()
@@ -77,14 +77,18 @@ class TokenReducedConvert(LLMConvert):
         # set refined estimate of cost per record and, for now,
         # assume quality multiplier is proportional to sqrt(sqrt(token_budget))
         naive_op_cost_estimates.cost_per_record = model_conversion_usd_per_record
+        naive_op_cost_estimates.cost_per_record_lower_bound = naive_op_cost_estimates.cost_per_record
+        naive_op_cost_estimates.cost_per_record_upper_bound = naive_op_cost_estimates.cost_per_record
         naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * math.sqrt(math.sqrt(self.token_budget))
+        naive_op_cost_estimates.quality_lower_bound = naive_op_cost_estimates.quality
+        naive_op_cost_estimates.quality_upper_bound = naive_op_cost_estimates.quality
 
         return naive_op_cost_estimates
 
-    def reduce_context(self, heatmap: list[int], full_context: str | list[str]) -> str:
+    def reduce_context(self, full_context: str) -> str:
         if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-            range = find_best_range(
-                heatmap,
+            si, ei = find_best_range(
+                self.heatmap,
                 int(self.token_budget / self.TOKEN_REDUCTION_GRANULARITY),
                 trim_zeros=False,
             )
@@ -108,39 +112,27 @@ class TokenReducedConvert(LLMConvert):
         else:
             raise NotImplementedError("Token reduction is only supported for DSPY_COT_QA prompts")
 
-    def _dspy_generate_fields(
-        self, prompt: str, content: str | list[str], verbose: bool = False
-    ) -> tuple[list[dict[str, list]] | Any]:
+    def _dspy_generate_fields(self, prompt: str, content: str | list[str]) -> tuple[list[dict[str, list]] | Any]:
         answer, query_stats = None, None
         if self.first_execution or self.heatmap_dict["count"] < self.MAX_HEATMAP_UPDATES:
-            print("Warming up heatmap")
-            answer, query_stats = super()._dspy_generate_fields(prompt, content, verbose)
+            if self.verbose:
+                print("Warming up heatmap")
+            answer, query_stats = super()._dspy_generate_fields(prompt, content)
             self.first_execution = False
-            # create the heatmap structure with default resolution of 0.001 and count of 0
-            self.heatmap_dict = {
-                "count": 0,
-                "heatmap": [0] * int(1.0 / self.resolution),
-            }
+
         else:
-            doc_schema = str(self.output_schema)
-            doc_type = self.output_schema.class_name()
+            if self.verbose:
+                print("Using heatmap")
 
-            if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-                generator = DSPyGenerator(self.model.value, self.prompt_strategy, doc_schema, doc_type, verbose)
-            else:
-                raise Exception(f"Token reduction not implemented for {self.prompt_strategy}")
-
-            heatmap = self.heatmap_dict["heatmap"]
-            count = self.heatmap_dict["count"]
             # only refer to the heatmap if the count is greater than a enough sample size
             # TODO: only trim the context if the attention is clustered in a small region
-            if count >= self.TOKEN_REDUCTION_SAMPLE:
-                context = self.reduce_context(heatmap, content)
+            if self.count >= self.TOKEN_REDUCTION_SAMPLE:
+                context = self.reduce_context(content)
                 try:
-                    answer, query_stats = generator.generate(context=context, prompt=prompt)
+                    answer, _, query_stats = self.generator.generate(context=context, prompt=prompt)
                 except Exception as e:
                     print(f"DSPy generation error: {e}, falling back to unreduced generation")
-                    answer, query_stats = super()._dspy_generate_fields(prompt, content, verbose)
+                    answer, query_stats = super()._dspy_generate_fields(prompt, content)
 
         # TODO: answer and query stats may be unbound if we hit the else block
         # and count < TOKEN_REDUCTION_SAMPLE, which makes the below pretty clunky
@@ -159,13 +151,11 @@ class TokenReducedConvert(LLMConvert):
         context_len = len(content)
         gsr, ger = gsi / context_len, gei / context_len
         norm_si, norm_ei = int(gsr / self.resolution), int(ger / self.resolution)
-        if verbose:
+        if self.verbose:
             print(f"best_start: {gsi} -- best_end: {gei}")
 
-        self.heatmap_dict["count"] += 1
-        self.heatmap_dict["heatmap"][norm_si:norm_ei] = map(
-            lambda x: x + 1, self.heatmap_dict["heatmap"][norm_si:norm_ei]
-        )
+        self.count += 1
+        self.heatmap[norm_si:norm_ei] = map(lambda x: x + 1, self.heatmap[norm_si:norm_ei])
 
         return answer, query_stats
 

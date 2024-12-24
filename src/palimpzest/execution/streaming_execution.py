@@ -1,7 +1,6 @@
 import time
 
 from palimpzest.corelib.schemas import SourceRecord
-from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import OperatorStats, PlanStats
 from palimpzest.elements.records import DataRecord
 from palimpzest.execution.execution_engine import ExecutionEngine
@@ -9,6 +8,7 @@ from palimpzest.operators.aggregate import AggregateOp
 from palimpzest.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp
 from palimpzest.operators.limit import LimitScanOp
+from palimpzest.optimizer.cost_model import CostModel
 from palimpzest.optimizer.optimizer import Optimizer
 from palimpzest.optimizer.plan import PhysicalPlan
 from palimpzest.policy import Policy
@@ -50,12 +50,9 @@ class StreamingSequentialExecution(ExecutionEngine):
 
     def generate_plan(self, dataset: Dataset, policy: Policy):
         self.clear_cached_responses_and_examples()
-
-        self.set_source_dataset_id(dataset)
         start_time = time.time()
 
-        cost_model = CostModel(source_dataset_id=self.source_dataset_id)
-
+        cost_model = CostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
@@ -70,14 +67,16 @@ class StreamingSequentialExecution(ExecutionEngine):
         )
 
         # Effectively always use the optimal strategy
-        plans = optimizer.optimize(dataset)
+        plans = optimizer.optimize(dataset, policy)
         self.plan = plans[0]
         self.plan_stats = PlanStats(plan_id=self.plan.plan_id)
         for op in self.plan.operators:
             if isinstance(op, AggregateOp):
                 raise Exception("You cannot have a Streaming Execution if there is an Aggregation Operator")
             op_id = op.get_op_id()
-            self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op.op_name())
+            op_name = op.op_name()
+            op_details = {k: str(v) for k, v in op.get_op_params().items()}
+            self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details) 
         print("Time for planning: ", time.time() - start_time)
         self.plan_generated = True
         return self.plan
@@ -105,9 +104,9 @@ class StreamingSequentialExecution(ExecutionEngine):
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
         datasource = (
-            self.datadir.get_registered_dataset(self.source_dataset_id)
+            self.datadir.get_registered_dataset(scan_operator.dataset_id)
             if isinstance(scan_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(scan_operator.cachedDataIdentifier)
+            else self.datadir.get_cached_result(scan_operator.dataset_id)
         )
         if not datasource:
             raise Exception("Data source not found")
@@ -116,10 +115,11 @@ class StreamingSequentialExecution(ExecutionEngine):
         input_records = []
         record_op_stats = []
         for idx in range(datasource_len):
-            candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=idx)
+            # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
+            #       it is simply a vessel to inform the scan_operator which record to fetch
+            candidate = DataRecord(schema=SourceRecord, source_id=idx)
             candidate.idx = idx
             candidate.get_item_fn = datasource.get_item
-            candidate.cardinality = datasource.cardinality
             records, record_op_stats_lst = scan_operator(candidate)
             input_records += records
             record_op_stats += record_op_stats_lst
@@ -163,7 +163,7 @@ class StreamingSequentialExecution(ExecutionEngine):
 
                 if isinstance(operator, FilterOp):
                     # delete all records that did not pass the filter
-                    output_records = [r for r in output_records if r._passed_filter]
+                    output_records = [r for r in output_records if r._passed_operator]
                     if not output_records:
                         break
 

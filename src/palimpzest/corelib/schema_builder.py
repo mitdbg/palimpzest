@@ -13,8 +13,8 @@ import yaml
 from pyld import jsonld
 
 import palimpzest as pz
-from .fields import Field
-from .schemas import Schema
+from palimpzest.corelib.fields import Field
+from palimpzest.corelib.schemas import Schema
 
 
 class SchemaBuilder:

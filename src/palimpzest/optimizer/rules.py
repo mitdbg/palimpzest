@@ -1,4 +1,5 @@
 from copy import deepcopy
+from itertools import combinations
 from typing import Dict, Set, Tuple
 
 from palimpzest.constants import AggFunc, Cardinality, PromptStrategy
@@ -16,10 +17,13 @@ from palimpzest.operators.logical import (
     FilteredScan,
     GroupByAggregate,
     LimitScan,
+    RetrieveScan,
 )
+from palimpzest.operators.mixture_of_agents_convert import MixtureOfAgentsConvert
+from palimpzest.operators.retrieve import RetrieveOp
 from palimpzest.operators.token_reduction_convert import TokenReducedConvertBonded, TokenReducedConvertConventional
 from palimpzest.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
-from palimpzest.utils.model_helpers import get_vision_models
+from palimpzest.utils.model_helpers import get_models, get_vision_models
 
 
 class Rule:
@@ -255,16 +259,22 @@ class LLMConvertRule(ImplementationRule):
             }
         )
 
+        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
+        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
+        #
+        # identify models which can be used strictly for text or strictly for images
+        vision_models = set(get_vision_models())
+        text_models = set(get_models())
+        pure_text_models = {model for model in text_models if model not in vision_models}
+        pure_vision_models = {model for model in vision_models if model not in text_models}
+
         physical_expressions = []
         for model in physical_op_params["available_models"]:
             # skip this model if:
-            # 1. this is an image model and we're not doing an image conversion, or
-            # 2. this is not an image model and we're doing an image conversion
-            # TODO: make sure this logic can handle models like GPT-4o which are both vision and not-vision
-            is_vision_model = model in get_vision_models()
-            is_image_conversion = op_kwargs["image_conversion"]
-            image_model_xor = is_vision_model != is_image_conversion
-            if image_model_xor:
+            # 1. this is a pure image model and we're not doing an image conversion, or
+            # 2. this is a pure text model and we're doing an image conversion
+            is_image_conversion = op_kwargs['image_conversion']
+            if (model in pure_text_models and is_image_conversion) or (model in pure_vision_models and not is_image_conversion):
                 continue
 
             # construct multi-expression
@@ -316,7 +326,7 @@ class TokenReducedConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        return isinstance(logical_op, ConvertScan) and not logical_op.image_conversion
+        return isinstance(logical_op, ConvertScan) and not logical_op.image_conversion and logical_op.udf is None
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
@@ -331,11 +341,19 @@ class TokenReducedConvertRule(ImplementationRule):
             }
         )
 
+        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
+        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
+        #
+        # identify models which can be used strictly for text or strictly for images
+        vision_models = set(get_vision_models())
+        text_models = set(get_models())
+        pure_vision_models = {model for model in vision_models if model not in text_models}
+
         physical_expressions = []
         for model in physical_op_params["available_models"]:
             for token_budget in cls.token_budgets:
-                # skip this model if this is an image model
-                if model in get_vision_models():
+                # skip this model if this is a pure image model
+                if model in pure_vision_models:
                     continue
 
                 # construct multi-expression
@@ -391,6 +409,7 @@ class CodeSynthesisConvertRule(ImplementationRule):
             isinstance(logical_op, ConvertScan)
             and not logical_op.image_conversion
             and logical_op.cardinality != Cardinality.ONE_TO_MANY
+            and logical_op.udf is None
         )
 
     @classmethod
@@ -431,6 +450,139 @@ class CodeSynthesisConvertSingleRule(CodeSynthesisConvertRule):
     """
 
     physical_convert_class = CodeSynthesisConvertSingle
+
+
+class MixtureOfAgentsConvertRule(ImplementationRule):
+    """
+    Implementation rule for the MixtureOfAgentsConvert operator.
+    """
+    num_proposer_models = [1, 2, 3]
+    temperatures = [0.0, 0.4, 0.8]
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        logical_op = logical_expression.operator
+        return isinstance(logical_op, ConvertScan) and logical_op.udf is None
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+        logical_op = logical_expression.operator
+
+        # get initial set of parameters for physical op
+        op_kwargs: dict = logical_op.get_op_params()
+        op_kwargs.update({
+            "verbose": physical_op_params['verbose'],
+            "logical_op_id": logical_op.get_op_id(),
+        })
+
+        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
+        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
+        #
+        # identify models which can be used strictly for text or strictly for images
+        vision_models = set(get_vision_models())
+        text_models = set(get_models())
+
+        # construct set of proposer models and set of aggregator models
+        is_image_conversion = op_kwargs['image_conversion']
+        proposer_model_set = vision_models if is_image_conversion else text_models
+        aggregator_model_set = text_models
+
+        # filter un-available models out of sets
+        proposer_model_set = {model for model in proposer_model_set if model in physical_op_params['available_models']}
+        aggregator_model_set = {model for model in aggregator_model_set if model in physical_op_params['available_models']}
+
+        # construct MixtureOfAgentsConvert operations for various numbers of proposer models
+        # and for every combination of proposer models and aggregator model
+        physical_expressions = []
+        for k in cls.num_proposer_models:
+            for temp in cls.temperatures:
+                for proposer_models in combinations(proposer_model_set, k):
+                    for aggregator_model in aggregator_model_set:
+                        # construct multi-expression
+                        op = MixtureOfAgentsConvert(
+                            proposer_models=list(proposer_models),
+                            temperatures=[temp] * len(proposer_models),
+                            aggregator_model=aggregator_model,
+                            proposer_prompt=op_kwargs.get("prompt"),
+                            **op_kwargs,
+                        )
+                        expression = PhysicalExpression(
+                            operator=op,
+                            input_group_ids=logical_expression.input_group_ids,
+                            input_fields=logical_expression.input_fields,
+                            generated_fields=logical_expression.generated_fields,
+                            group_id=logical_expression.group_id,
+                        )
+                        physical_expressions.append(expression)
+
+        return set(physical_expressions)
+
+
+class RetrieveRule(ImplementationRule):
+    """
+    Substitute a logical expression for a RetrieveScan with a Retrieve physical implementation.
+    """
+    k_budgets = [1, 3, 5, 10]
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        return (
+            isinstance(logical_expression.operator, RetrieveScan)
+        )
+
+    @classmethod
+    def substitute(
+        cls, logical_expression: LogicalExpression, **physical_op_params
+    ) -> Set[PhysicalExpression]:
+        logical_op = logical_expression.operator
+
+        physical_expressions = []
+        ks = cls.k_budgets if logical_op.k == -1 else [logical_op.k]
+        for k in ks:
+            # get initial set of parameters for physical op
+            op_kwargs = logical_op.get_op_params()
+            op_kwargs.update(
+                {
+                    "verbose": physical_op_params["verbose"],
+                    "logical_op_id": logical_op.get_op_id(),
+                    "k": k,
+                }
+            )
+
+            # construct multi-expression
+            op = RetrieveOp(**op_kwargs)
+            expression = PhysicalExpression(
+                operator=op,
+                input_group_ids=logical_expression.input_group_ids,
+                input_fields=logical_expression.input_fields,
+                generated_fields=logical_expression.generated_fields,
+                group_id=logical_expression.group_id,
+            )
+
+            physical_expressions.append(expression)
+
+        return set(physical_expressions)
+
+        # # get initial set of parameters for physical op
+        # op_kwargs = logical_op.get_op_params()
+        # op_kwargs.update(
+        #     {
+        #         "verbose": physical_op_params["verbose"],
+        #         "logical_op_id": logical_op.get_op_id(),
+        #     }
+        # )
+
+        # # construct multi-expression
+        # op = RetrieveOp(**op_kwargs)
+        # expression = PhysicalExpression(
+        #     operator=op,
+        #     input_group_ids=logical_expression.input_group_ids,
+        #     input_fields=logical_expression.input_fields,
+        #     generated_fields=logical_expression.generated_fields,
+        #     group_id=logical_expression.group_id,
+        # )
+
+        # return set([expression])
 
 
 class NonLLMFilterRule(ImplementationRule):
@@ -483,22 +635,27 @@ class LLMFilterRule(ImplementationRule):
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_op_id(),
-            }
-        )
+        op_kwargs.update({
+            "verbose": physical_op_params["verbose"],
+            "logical_op_id": logical_op.get_op_id(),
+        })
+
+        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
+        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
+        #
+        # identify models which can be used strictly for text or strictly for images
+        vision_models = set(get_vision_models())
+        text_models = set(get_models())
+        pure_text_models = {model for model in text_models if model not in vision_models}
+        pure_vision_models = {model for model in vision_models if model not in text_models}
+
         physical_expressions = []
         for model in physical_op_params["available_models"]:
             # skip this model if:
-            # 1. this is an image model and we're not doing an image filter, or
-            # 2. this is not an image model and we're doing an image filter
-            # TODO: make sure this logic can handle models like GPT-4o which are both vision and not-vision
-            is_vision_model = model in get_vision_models()
-            is_image_filter = op_kwargs["image_filter"]
-            image_model_xor = is_vision_model != is_image_filter
-            if image_model_xor:
+            # 1. this is a pure image model and we're not doing an image conversion, or
+            # 2. this is a pure text model and we're doing an image conversion
+            is_image_filter = op_kwargs['image_filter']
+            if (model in pure_text_models and is_image_filter) or (model in pure_vision_models and not is_image_filter):
                 continue
 
             # construct multi-expression

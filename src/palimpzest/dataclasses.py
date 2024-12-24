@@ -124,11 +124,17 @@ class RecordOpStats:
     # identifier for the parent of this record
     record_parent_id: str
 
+    # idenifier for the source of this record
+    record_source_id: str
+
     # a dictionary with the record state after being processed by the operator
     record_state: dict[str, Any]
 
-    # operation id; an identifier for this operation
+    # operation id; an identifier for this operation's physical op id
     op_id: str
+
+    # logical operation id; the logical op id for this physical op
+    logical_op_id: str
 
     # operation name
     op_name: str
@@ -145,6 +151,9 @@ class RecordOpStats:
 
     # the ID of the physical plan which produced this record at this operation
     plan_id: str = ""
+
+    ##### OPTIONAL, BUT FILLED BY COST MODEL AFTER SAMPLE DATA EXECUTION #####
+    quality: float | None = None
 
     ##### OPTIONAL FIELDS (I.E. ONLY MANDATORY FOR CERTAIN OPERATORS) #####
     # (if applicable) the name of the model used to generate the output for this record
@@ -179,8 +188,9 @@ class RecordOpStats:
     # (if applicable) the filter text (or a string representation of the filter function) applied to this record
     filter_str: str | None = None
 
-    # (if applicable) the True/False result of whether this record passed the filter or not
-    passed_filter: bool | None = None
+    # the True/False result of whether this record was output by the operator or not
+    # (can only be False if the operator is as Filter)
+    passed_operator: bool = True
 
     # (if applicable) the time (in seconds) spent executing a call to an LLM
     llm_call_duration_secs: float = 0.0
@@ -190,6 +200,12 @@ class RecordOpStats:
 
     # (if applicable) a boolean indicating whether this is the statistics captured from a failed convert operation
     failed_convert: bool | None = None
+
+    # (if applicable) a boolean indicating whether this is an image convert/filter operation
+    image_operation: bool | None = None
+
+    # an OPTIONAL dictionary with more detailed information about this operation;
+    op_details: dict[str, Any] = field(default_factory=dict)
 
     def to_json(self):
         return {field.name: getattr(self, field.name) for field in fields(self)}
@@ -325,6 +341,9 @@ class ExecutionStats:
     # dictionary of PlanStats objects (one for each plan run during execution)
     plan_stats: dict[str, PlanStats] = field(default_factory=dict)
 
+    # total time spent optimizing
+    total_optimization_time: float = 0.0
+
     # total runtime for a call to pz.Execute
     total_execution_time: float = 0.0
 
@@ -338,6 +357,7 @@ class ExecutionStats:
         return {
             "execution_id": self.execution_id,
             "plan_stats": {plan_id: plan_stats.to_json() for plan_id, plan_stats in self.plan_stats.items()},
+            "total_optimization_time": self.total_optimization_time,
             "total_execution_time": self.total_execution_time,
             "total_execution_cost": self.total_execution_cost,
             "plan_strs": self.plan_strs,
@@ -439,6 +459,9 @@ class PlanCost:
 
     # upper bound on the expression quality
     quality_upper_bound: float | None = None
+
+    def __hash__(self):
+        return hash(f"{self.cost}-{self.time}-{self.quality}")
 
     def __post_init__(self):
         if self.time_lower_bound is None and self.time_upper_bound is None:

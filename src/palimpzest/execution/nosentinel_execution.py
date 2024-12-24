@@ -1,16 +1,16 @@
 import time
 
 from palimpzest.constants import OptimizationStrategy
-from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import ExecutionStats
 from palimpzest.execution.execution_engine import ExecutionEngine
-from palimpzest.execution.plan_executors.parallel_execution_engine import (
+from palimpzest.execution.plan_executors.parallel_plan_execution import (
     PipelinedParallelPlanExecutor,
 )
-from palimpzest.execution.plan_executors.single_threaded_execution_engine import (
+from palimpzest.execution.plan_executors.single_threaded_plan_execution import (
     PipelinedSingleThreadPlanExecutor,
     SequentialSingleThreadPlanExecutor,
 )
+from palimpzest.optimizer.cost_model import CostModel
 from palimpzest.optimizer.optimizer import Optimizer
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
@@ -30,11 +30,8 @@ class NoSentinelExecutionEngine(ExecutionEngine):
         if self.nocache:
             self.clear_cached_responses_and_examples()
 
-        # set the source dataset id
-        self.set_source_dataset_id(dataset)
-
         # construct the CostModel
-        cost_model = CostModel(source_dataset_id=self.source_dataset_id)
+        cost_model = CostModel()
 
         # initialize the optimizer
         optimizer = Optimizer(
@@ -52,11 +49,11 @@ class NoSentinelExecutionEngine(ExecutionEngine):
 
         # execute plan(s) according to the optimization strategy
         records, plan_stats = [], []
-        if self.optimization_strategy == OptimizationStrategy.OPTIMAL:
-            records, plan_stats = self.execute_optimal_strategy(dataset, optimizer)
-
-        elif self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
-            records, plan_stats = self.execute_confidence_interval_strategy(dataset, optimizer)
+        if self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
+            records, plan_stats = self.execute_confidence_interval_strategy(dataset, policy, optimizer)
+        
+        else:
+            records, plan_stats = self.execute_strategy(dataset, policy, optimizer)
 
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)
@@ -79,21 +76,24 @@ class SequentialSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, Seque
     """
     This class performs non-sample based execution while executing plans in a sequential, single-threaded fashion.
     """
-
-    pass
+    def __init__(self, *args, **kwargs):
+        NoSentinelExecutionEngine.__init__(self, *args, **kwargs)
+        SequentialSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
 
 
 class PipelinedSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, PipelinedSingleThreadPlanExecutor):
     """
     This class performs non-sample based execution while executing plans in a pipelined, single-threaded fashion.
     """
-
-    pass
+    def __init__(self, *args, **kwargs):
+        NoSentinelExecutionEngine.__init__(self, *args, **kwargs)
+        PipelinedSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
 
 
 class PipelinedParallelNoSentinelExecution(NoSentinelExecutionEngine, PipelinedParallelPlanExecutor):
     """
     This class performs non-sample based execution while executing plans in a pipelined, parallel fashion.
     """
-
-    pass
+    def __init__(self, *args, **kwargs):
+        NoSentinelExecutionEngine.__init__(self, *args, **kwargs)
+        PipelinedParallelPlanExecutor.__init__(self, *args, **kwargs)

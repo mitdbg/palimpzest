@@ -1,13 +1,25 @@
-from typing import List, Optional
-
 from palimpzest.constants import Model, OptimizationStrategy
+from palimpzest.datamanager import DataDirectory
+from palimpzest.datasources import DataSource
 from palimpzest.execution.execution_engine import ExecutionEngine
-from palimpzest.execution.sentinel_execution import PipelinedSingleThreadSentinelExecution
+from palimpzest.execution.nosentinel_execution import SequentialSingleThreadNoSentinelExecution
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
 
 class Execute:
+    @classmethod
+    def get_datasource(cls, dataset: Set | DataSource) -> str:
+        """
+        Gets the DataSource for the given dataset.
+        """
+        # iterate until we reach DataSource
+        while isinstance(dataset, Set):
+            dataset = dataset._source
+
+        # this will throw an exception if datasource is not registered with PZ
+        return DataDirectory().get_registered_dataset(dataset.dataset_id)
+
     def __new__(
         cls,
         dataset: Set,
@@ -15,17 +27,17 @@ class Execute:
         num_samples: int = 20,
         nocache: bool = False,
         include_baselines: bool = False,
-        min_plans: Optional[int] = None,
+        min_plans: int | None = None,
         max_workers: int = 1,
         verbose: bool = False,
-        available_models: Optional[List[Model]] = None,
-        allow_bonded_query: Optional[bool] = True,
-        allow_conventional_query: Optional[bool] = False,
-        allow_model_selection: Optional[bool] = True,
-        allow_code_synth: Optional[bool] = True,
-        allow_token_reduction: Optional[bool] = True,
-        optimization_strategy: OptimizationStrategy = OptimizationStrategy.OPTIMAL,
-        execution_engine: ExecutionEngine = PipelinedSingleThreadSentinelExecution,
+        available_models: list[Model] | None = None,
+        allow_bonded_query: bool = True,
+        allow_conventional_query: bool = False,
+        allow_model_selection: bool = True,
+        allow_code_synth: bool = True,
+        allow_token_reduction: bool = True,
+        optimization_strategy: OptimizationStrategy = OptimizationStrategy.PARETO,
+        execution_engine: ExecutionEngine = SequentialSingleThreadNoSentinelExecution,
         *args,
         **kwargs,
     ):
@@ -34,6 +46,7 @@ class Execute:
         return execution_engine(
             *args,
             **kwargs,
+            datasource=cls.get_datasource(dataset),
             num_samples=num_samples,
             nocache=nocache,
             include_baselines=include_baselines,

@@ -23,7 +23,7 @@ if not os.environ.get("OPENAI_API_KEY"):
 #     params = {
 #         "output_schema": email_schema,
 #         "input_schema": File,
-#         "model": pz.Model.GPT_3_5,
+#         "model": pz.Model.GPT_4o_MINI,
 #         "cardinality": "oneToOne",
 #     }
 

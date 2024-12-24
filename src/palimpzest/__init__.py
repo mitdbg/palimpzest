@@ -8,6 +8,7 @@ from palimpzest.corelib.fields import (
     NumericField,
     StringField,
 )
+from palimpzest.corelib.schema_builder import SchemaBuilder
 from palimpzest.corelib.schemas import (
     URL,
     Any,
@@ -27,7 +28,6 @@ from palimpzest.corelib.schemas import (
     WebPage,
     XLSFile,
 )
-from palimpzest.corelib.schema_builder import SchemaBuilder
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import (
     DataSource,
@@ -49,8 +49,7 @@ from palimpzest.execution.nosentinel_execution import (
     SequentialSingleThreadNoSentinelExecution,
 )
 from palimpzest.execution.sentinel_execution import (
-    PipelinedParallelSentinelExecution,
-    PipelinedSingleThreadSentinelExecution,
+    SequentialParallelSentinelExecution,
     SequentialSingleThreadSentinelExecution,
 )
 from palimpzest.execution.streaming_execution import StreamingSequentialExecution
@@ -119,7 +118,7 @@ __all__ = [
     "PipelinedSingleThreadNoSentinelExecution",
     "SequentialSingleThreadNoSentinelExecution",
     "PipelinedParallelSentinelExecution",
-    "PipelinedSingleThreadSentinelExecution",
+    "SequentialParallelSentinelExecution",
     "SequentialSingleThreadSentinelExecution",
     # operators
     "AggregateOp",

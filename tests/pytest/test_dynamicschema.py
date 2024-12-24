@@ -31,7 +31,7 @@ def test_dynamicschema_json():
     records, stats = pz.Execute(
         emails,
         policy=pz.MinCost(),
-        available_models=[Model.GPT_3_5],
+        available_models=[Model.GPT_4o_MINI],
         num_samples=3,
         nocache=True,
         allow_bonded_query=True,
@@ -61,7 +61,7 @@ def test_dynamicschema_yml():
     records, stats = pz.Execute(
         emails,
         policy=pz.MinCost(),
-        available_models=[Model.GPT_3_5],
+        available_models=[Model.GPT_4o_MINI],
         num_samples=3,
         nocache=True,
         allow_bonded_query=True,

@@ -22,9 +22,9 @@ def real_estate_listing_files_schema():
 
         listing = pz.StringField(desc="The name of the listing", required=True)
         text_content = pz.StringField(desc="The content of the listing's text description", required=True)
-        image_contents = pz.ListField(
-            element_type=pz.BytesField,
-            desc="A list of the contents of each image of the listing",
+        image_filepaths = pz.ListField(
+            element_type=pz.StringField,
+            desc="A list of the filepaths for each image of the listing",
             required=True,
         )
 
@@ -104,3 +104,18 @@ def case_data_schema():
         )
 
     return CaseData
+
+@pytest.fixture
+def foobar_schema():
+    class FooBar(pz.Schema):
+        foo = pz.Field("foo")
+        bar = pz.Field("bar")
+
+    return FooBar
+
+@pytest.fixture
+def baz_schema():
+    class Baz(pz.Schema):
+        baz = pz.Field("baz")
+
+    return Baz
