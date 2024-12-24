@@ -325,12 +325,6 @@ if __name__ == "__main__":
     parser.add_argument("--datasetid", type=str, help="The dataset id")
     parser.add_argument("--task", type=str, help="The task to run")
     parser.add_argument(
-        "--engine",
-        type=str,
-        help="The engine to use. One of sentinel, nosentinel",
-        default="nosentinel",
-    )
-    parser.add_argument(
         "--executor",
         type=str,
         help="The plan executor to use. One of sequential, pipelined, parallel",
@@ -372,27 +366,15 @@ if __name__ == "__main__":
         exit(1)
 
     execution_engine = None
-    engine, executor = args.engine, args.executor
-    if engine == "sentinel":
-        if executor == "sequential":
-            execution_engine = pz.SequentialSingleThreadSentinelExecution
-        elif executor == "parallel":
-            execution_engine = pz.SequentialParallelSentinelExecution
-        else:
-            print("Unknown executor")
-            exit(1)
-    elif engine == "nosentinel":
-        if executor == "sequential":
-            execution_engine = pz.SequentialSingleThreadNoSentinelExecution
-        elif executor == "pipelined":
-            execution_engine = pz.PipelinedSingleThreadNoSentinelExecution
-        elif executor == "parallel":
-            execution_engine = pz.PipelinedParallelNoSentinelExecution
-        else:
-            print("Unknown executor")
-            exit(1)
+    executor = args.executor
+    if executor == "sequential":
+        execution_engine = pz.SequentialSingleThreadNoSentinelExecution
+    elif executor == "pipelined":
+        execution_engine = pz.PipelinedSingleThreadNoSentinelExecution
+    elif executor == "parallel":
+        execution_engine = pz.PipelinedParallelNoSentinelExecution
     else:
-        print("Unknown engine")
+        print("Unknown executor")
         exit(1)
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:

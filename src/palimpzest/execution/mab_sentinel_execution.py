@@ -10,6 +10,7 @@ from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
 from palimpzest.elements.records import DataRecord, DataRecordSet
 from palimpzest.execution.execution_engine import ExecutionEngine
+from palimpzest.execution.plan_executors.parallel_plan_execution import PipelinedParallelPlanExecutor
 from palimpzest.execution.plan_executors.single_threaded_plan_execution import SequentialSingleThreadPlanExecutor
 from palimpzest.operators.convert import ConvertOp, LLMConvert
 from palimpzest.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
@@ -877,5 +878,4 @@ class MABSequentialParallelSentinelExecution(MABSentinelExecutionEngine, Sequent
     """
     def __init__(self, *args, **kwargs):
         MABSentinelExecutionEngine.__init__(self, *args, **kwargs)
-        # TODO: post-submission, change to parallel plan executor
-        SequentialSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
+        PipelinedParallelPlanExecutor.__init__(self, *args, **kwargs)

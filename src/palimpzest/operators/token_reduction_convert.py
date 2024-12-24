@@ -87,7 +87,7 @@ class TokenReducedConvert(LLMConvert):
 
     def reduce_context(self, full_context: str) -> str:
         if self.prompt_strategy == PromptStrategy.DSPY_COT_QA:
-            si, ei = find_best_range(
+            range = find_best_range(
                 self.heatmap,
                 int(self.token_budget / self.TOKEN_REDUCTION_GRANULARITY),
                 trim_zeros=False,
@@ -114,7 +114,7 @@ class TokenReducedConvert(LLMConvert):
 
     def _dspy_generate_fields(self, prompt: str, content: str | list[str]) -> tuple[list[dict[str, list]] | Any]:
         answer, query_stats = None, None
-        if self.first_execution or self.heatmap_dict["count"] < self.MAX_HEATMAP_UPDATES:
+        if self.first_execution or self.count < self.MAX_HEATMAP_UPDATES:
             if self.verbose:
                 print("Warming up heatmap")
             answer, query_stats = super()._dspy_generate_fields(prompt, content)

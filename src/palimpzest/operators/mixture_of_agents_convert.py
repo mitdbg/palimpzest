@@ -139,7 +139,7 @@ class MixtureOfAgentsConvert(LLMConvert):
         query_stats:GenerationStats
 
         try:
-            answer, rationale, query_stats = generator.generate(context=content, question=prompt, temperature=temperature)
+            answer, rationale, query_stats = generator.generate(context=content, prompt=prompt, temperature=temperature)
         except Exception as e:
             print(f"DSPy generation error: {e}")
             return "", "", GenerationStats()

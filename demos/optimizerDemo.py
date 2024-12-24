@@ -6,10 +6,12 @@ import time
 from pathlib import Path
 
 import datasets
+import pandas as pd
 from ragatouille import RAGPretrainedModel
 
 import palimpzest as pz
 from palimpzest.constants import Model
+from palimpzest.corelib.schemas import TextFile
 from palimpzest.utils.model_helpers import get_models
 
 # Addresses far from MIT; we use a simple lookup like this to make the
@@ -53,6 +55,114 @@ class Email(pz.TextFile):
 
     sender = pz.Field(desc="The email address of the sender", required=True)
     subject = pz.Field(desc="The subject of the email", required=True)
+
+
+class EnronValidationSource(pz.ValidationDataSource):
+    def __init__(
+        self,
+        file_dir,
+        dataset_id,
+        num_samples: int = 3,
+        shuffle: bool = False,
+        seed: int = 42,
+    ):
+        super().__init__(TextFile, dataset_id)
+        self.file_dir = file_dir
+        self.num_samples = num_samples
+        self.shuffle = shuffle
+        self.seed = seed
+
+        # get list of filepaths
+        self.test_filepaths = [
+            os.path.join(file_dir, filename)
+            for filename in sorted(os.listdir(file_dir))
+            if os.path.isfile(os.path.join(file_dir, filename))
+        ]
+
+        # NOTE: this assumes the script is run from the root of the repository
+        self.val_filepaths = [
+            os.path.join("testdata/enron-eval-tiny", filename)
+            for filename in sorted(os.listdir("testdata/enron-eval-tiny"))
+            if os.path.isfile(os.path.join("testdata/enron-eval-tiny", filename))
+        ]
+
+        # use six labelled examples
+        self.label_fields_to_values = {
+            "buy-r-inbox-628.txt": {
+                "sender": "sherron.watkins@enron.com",
+                "subject": "RE: portrac",
+                "_passed_operator": True,
+            },
+            "buy-r-inbox-749.txt": {
+                "sender": "david.port@enron.com",
+                "subject": "RE: NewPower",
+                "_passed_operator": True,
+            },
+            "kaminski-v-deleted-items-1902.txt": {
+                "sender": "vkaminski@aol.com",
+                "subject": "Fwd: FYI",
+                "_passed_operator": False,
+            },
+            "martin-t-inbox-96-short.txt": {
+                "sender": "sarah.palmer@enron.com",
+                "subject": "Enron Mentions -- 01/18/02",
+                "_passed_operator": False,
+            },
+            "skilling-j-inbox-1109.txt": {
+                "sender": "gary@cioclub.com",
+                "subject": "Information Security Executive",
+                "_passed_operator": False,
+            },
+            "zipper-a-espeed-28.txt": {
+                "sender": "travis.mccullough@enron.com",
+                "subject": "Redraft of the Exclusivity Agreement",
+                "_passed_operator": True,
+            },
+        }
+
+        if shuffle:
+            random.Random(seed).shuffle(self.val_filepaths)
+
+        # num samples cannot exceed the number of records
+        assert self.num_samples <= len(self.label_fields_to_values), "cannot have more samples than labelled data records"
+
+        # trim to number of samples
+        self.val_filepaths = self.val_filepaths[:num_samples]
+
+    def copy(self):
+        return EnronValidationSource(self.file_dir, self.dataset_id, self.num_samples, self.shuffle, self.seed)
+
+    def __len__(self):
+        return len(self.test_filepaths)
+
+    def get_val_length(self):
+        return len(self.val_filepaths)
+
+    def get_size(self):
+        return 0
+
+    def get_field_to_metric_fn(self):
+        return {"sender": "exact", "subject": "exact"}
+
+    def get_item(self, idx: int, val: bool = False, include_label: bool = False):
+        # get filepath and filename
+        filepath = self.val_filepaths[idx] if val else self.test_filepaths[idx]
+
+        # create data record
+        dr = pz.DataRecord(self.schema, source_id=filepath)
+        dr.filename = os.path.basename(filepath)
+        with open(filepath) as f:
+            dr.contents = f.read()
+
+        # if requested, also return the label information
+        if include_label:
+            # augment data record with label info
+            labels_dict = self.label_fields_to_values[dr["filename"]]
+
+            for field, value in labels_dict.items():
+                setattr(dr, field, value)
+
+        return dr
 
 
 class RealEstateListingFiles(pz.Schema):
@@ -803,8 +913,15 @@ if __name__ == "__main__":
     # create pz plan
     plan, use_final_op_quality = None, False
     if workload == "enron":
-        # datasetid="enron-eval" for paper evaluation
-        plan = pz.Dataset(datasetid, schema=Email)
+        # datasetid="real-estate-eval-100" for paper evaluation
+        data_filepath = f"testdata/{datasetid}"
+        user_dataset_id = f"{datasetid}-user"
+
+        # create and register validation data source
+        datasource = EnronValidationSource(file_dir=data_filepath, dataset_id=user_dataset_id)
+        pz.DataDirectory().register_user_source(src=datasource, dataset_id=user_dataset_id)
+
+        plan = pz.Dataset(user_dataset_id, schema=Email)
         plan = plan.filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
@@ -819,7 +936,7 @@ if __name__ == "__main__":
 
         # create and register validation data source
         datasource = RealEstateValidationSource(
-            datasetId=f"{user_dataset_id}",
+            dataset_id=f"{user_dataset_id}",
             listings_dir=data_filepath,
             num_samples=val_examples,
             shuffle=False,
@@ -849,7 +966,7 @@ if __name__ == "__main__":
 
         # create and register validation data source
         datasource = BiodexValidationSource(
-            datasetId=f"{user_dataset_id}",
+            dataset_id=f"{user_dataset_id}",
             num_samples=val_examples,
             shuffle=False,
             seed=seed,
@@ -881,7 +998,7 @@ if __name__ == "__main__":
 
         # create and register validation data source
         datasource = BiodexValidationSource(
-            datasetId=f"{user_dataset_id}",
+            dataset_id=f"{user_dataset_id}",
             reactions_only=False,
             num_samples=val_examples,
             shuffle=False,

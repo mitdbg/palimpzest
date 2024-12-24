@@ -39,14 +39,23 @@ from palimpzest.datasources import (
     PDFFileDirectorySource,
     TextFileDirectorySource,
     UserSource,
+    ValidationDataSource,
     XLSFileDirectorySource,
 )
 from palimpzest.elements.records import DataRecord
 from palimpzest.execution.execute import Execute
+from palimpzest.execution.mab_sentinel_execution import (
+    MABSequentialParallelSentinelExecution,
+    MABSequentialSingleThreadSentinelExecution,
+)
 from palimpzest.execution.nosentinel_execution import (
     PipelinedParallelNoSentinelExecution,
     PipelinedSingleThreadNoSentinelExecution,
     SequentialSingleThreadNoSentinelExecution,
+)
+from palimpzest.execution.random_sampling_sentinel_execution import (
+    RandomSamplingSequentialParallelSentinelExecution,
+    RandomSamplingSequentialSingleThreadSentinelExecution,
 )
 from palimpzest.execution.sentinel_execution import (
     SequentialParallelSentinelExecution,
@@ -99,6 +108,7 @@ __all__ = [
     "PDFFileDirectorySource",
     "TextFileDirectorySource",
     "UserSource",
+    "ValidationDataSource",
     "XLSFileDirectorySource",
     # elements
     "DataRecord",
@@ -114,12 +124,17 @@ __all__ = [
     "DataDirectory",
     # execution
     "Execute",
+    "MABSequentialParallelSentinelExecution",
+    "MABSequentialSingleThreadSentinelExecution",
     "PipelinedParallelNoSentinelExecution",
     "PipelinedSingleThreadNoSentinelExecution",
-    "SequentialSingleThreadNoSentinelExecution",
     "PipelinedParallelSentinelExecution",
+    "RandomSamplingSequentialParallelSentinelExecution",
+    "RandomSamplingSequentialSingleThreadSentinelExecution",
     "SequentialParallelSentinelExecution",
+    "SequentialSingleThreadNoSentinelExecution",
     "SequentialSingleThreadSentinelExecution",
+    "StreamingSequentialExecution",
     # operators
     "AggregateOp",
     "ApplyGroupByOp",
@@ -164,8 +179,6 @@ __all__ = [
     "TextFile",
     "WebPage",
     "XLSFile",
-    # execution
-    "StreamingSequentialExecution",
     # policy
     "MaxQuality",
     "MinCost",

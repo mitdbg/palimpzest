@@ -64,36 +64,36 @@ ANSWER: """
 MOA_ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR = "an output that describes an object of type {doc_type}."
 MOA_ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR = "an output that describes one or more objects of type {doc_type}."
 
-MOA_STRUCTURED_CONVERT_PROMPT = """I would like you to create {targetOutputDescriptor}
+MOA_STRUCTURED_CONVERT_PROMPT = """I would like you to create {target_output_descriptor}
 You will use the information in an input JSON object that I will provide. The input object has type {input_type}.
-All of the fields in {outputSingleOrPlural} can be derived using information from the input object.
-{optionalInputDesc}
-{optionalOutputDesc}
+All of the fields in {output_single_or_plural} can be derived using information from the input object.
+{optional_input_desc}
+{optional_output_desc}
 Here is every input field name and a description: 
-{multilineInputFieldDescription}
+{multiline_input_field_description}
 Here is the field name and a description of every field which should be present in your output:
-{multilineOutputFieldDescription}
+{multiline_output_field_description}
 Your output should be a paragraph or two describing what you believe should be the keys and values of the output object of type {doc_type}. Be sure to cite information from the Context as evidence of why your output is correct. Do not hallucinate evidence, and if you are uncertain about any parts of the output -- say so."""
 
-MOA_IMAGE_CONVERT_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and create {targetOutputDescriptor}.
+MOA_IMAGE_CONVERT_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and create {target_output_descriptor}.
 You will use the information in the image that I will provide. The input image(s) has type {input_type}.
-All of the fields in {outputSingleOrPlural} can be derived using information from the input image(s).
-{optionalInputDesc}
-{optionalOutputDesc}
+All of the fields in {output_single_or_plural} can be derived using information from the input image(s).
+{optional_input_desc}
+{optional_output_desc}
 Here is the field name and a description of every field which should be present in your output:
-{multilineOutputFieldDescription}.
+{multiline_output_field_description}.
 Your output should be a paragraph or two describing what you believe should be the keys and values of the output object of type {doc_type}.
 **Include text snippets from the Context as evidence of why your output is correct.**
 Do not hallucinate evidence, and if you are uncertain about any parts of the output -- say so.
 {model_instruction}"""
 
-MOA_AGGREGATOR_CONVERT_PROMPT = """I would like you to create {targetOutputDescriptor}
+MOA_AGGREGATOR_CONVERT_PROMPT = """I would like you to create {target_output_descriptor}
 You will use the information in the provided model responses to synthesize your response.
-All of the fields in {outputSingleOrPlural} can be derived using information from the responses.
-{optionalOutputDesc}
+All of the fields in {output_single_or_plural} can be derived using information from the responses.
+{optional_output_desc}
 Here is the field name and a description of every field which should be present in your output:
-{multilineOutputFieldDescription}
-{appendixInstruction}
+{multiline_output_field_description}
+{appendix_instruction}
 {optional_desc}
 {model_instruction}
 """
