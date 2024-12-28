@@ -34,7 +34,6 @@ class ConvertOp(PhysicalOperator):
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         udf: Callable | None = None,
         desc: str | None = None,
-        depends_on: list[str] | None = None,
         *args,
         **kwargs,
     ):
@@ -42,7 +41,6 @@ class ConvertOp(PhysicalOperator):
         self.cardinality = cardinality
         self.udf = udf
         self.desc = desc
-        self.depends_on = depends_on if depends_on is None else sorted(depends_on)
 
     def get_id_params(self):
         id_params = super().get_id_params()
@@ -60,7 +58,6 @@ class ConvertOp(PhysicalOperator):
             "cardinality": self.cardinality,
             "udf": self.udf,
             "desc": self.desc,
-            "depends_on": self.depends_on,
             **op_params
         }
 
