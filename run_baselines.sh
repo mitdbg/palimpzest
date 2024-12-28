@@ -26,38 +26,9 @@
 #     done
 # done
 
-# # compute fully materialized sample matrices
-# export LOG_MATRICES="TRUE"
-# for num_samples in 100
-# do
-#     rank=$((num_samples - 1))
-#     echo "RANK: ${rank} -- NUM_SAMPLES: ${num_samples}"
-#     python demos/matrixCompletion.py --verbose \
-#                 --workload real-estate \
-#                 --datasetid real-estate-eval-100 \
-#                 --num-samples $num_samples \
-#                 --rank $rank
-# done
-# export LOG_MATRICES="FALSE"
-
 
 ### BIODEX
 # for model in "gpt-4o" "gpt-4o-mini" "llama" "mixtral"
 # do
 #     python demos/optimizerDemo.py --verbose --workload biodex --datasetid biodex --engine nosentinel --executor sequential --policy maxquality --model $model
 # done
-
-
-# compute fully materialized sample matrices
-export LOG_MATRICES="TRUE"
-for num_samples in 100
-do
-    rank=$((num_samples - 1))
-    echo "RANK: ${rank} -- NUM_SAMPLES: ${num_samples}"
-    python demos/matrixCompletion.py --verbose \
-                --workload biodex \
-                --datasetid biodex \
-                --num-samples $num_samples \
-                --rank $rank
-done
-export LOG_MATRICES="FALSE"

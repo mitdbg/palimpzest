@@ -9,21 +9,21 @@ from palimpzest.constants import Model
 @pytest.fixture
 def scan_convert_filter_qualities(scan_convert_filter_execution_data):
     expected_qualities = {
-        op_set_id: {
+        logical_op_id: {
             source_id: [[1.0] for _ in record_sets]
             for source_id, record_sets in source_id_to_record_sets.items()
         }
-        for op_set_id, source_id_to_record_sets in scan_convert_filter_execution_data.items()
+        for logical_op_id, source_id_to_record_sets in scan_convert_filter_execution_data.items()
     }
     return expected_qualities
 
 @pytest.fixture
 def scan_convert_filter_empty_qualities(scan_convert_filter_execution_data):
     expected_qualities = {}
-    for op_set_id, source_id_to_record_sets in scan_convert_filter_execution_data.items():
-        expected_qualities[op_set_id] = {}
+    for logical_op_id, source_id_to_record_sets in scan_convert_filter_execution_data.items():
+        expected_qualities[logical_op_id] = {}
         for source_id, record_sets in source_id_to_record_sets.items():
-            expected_qualities[op_set_id][source_id] = []
+            expected_qualities[logical_op_id][source_id] = []
             for record_set in record_sets:
                 record_set_expected_qualities = []
                 for record_op_stats in record_set.record_op_stats:
@@ -40,17 +40,17 @@ def scan_convert_filter_empty_qualities(scan_convert_filter_execution_data):
                         quality = int(not bool(source_idx % 2))
 
                     record_set_expected_qualities.append(quality)
-                expected_qualities[op_set_id][source_id].append(record_set_expected_qualities)
+                expected_qualities[logical_op_id][source_id].append(record_set_expected_qualities)
 
     return expected_qualities
 
 @pytest.fixture
 def scan_convert_filter_varied_qualities(scan_convert_filter_varied_execution_data):
     expected_qualities = {}
-    for op_set_id, source_id_to_record_sets in scan_convert_filter_varied_execution_data.items():
-        expected_qualities[op_set_id] = {}
+    for logical_op_id, source_id_to_record_sets in scan_convert_filter_varied_execution_data.items():
+        expected_qualities[logical_op_id] = {}
         for source_id, record_sets in source_id_to_record_sets.items():
-            expected_qualities[op_set_id][source_id] = []
+            expected_qualities[logical_op_id][source_id] = []
             for record_set in record_sets:
                 record_set_expected_qualities = []
                 for record_op_stats in record_set.record_op_stats:
@@ -74,7 +74,7 @@ def scan_convert_filter_varied_qualities(scan_convert_filter_varied_execution_da
                             quality = int(bool(source_idx % 2))
 
                     record_set_expected_qualities.append(quality)
-                expected_qualities[op_set_id][source_id].append(record_set_expected_qualities)
+                expected_qualities[logical_op_id][source_id].append(record_set_expected_qualities)
 
     return expected_qualities
 
@@ -88,10 +88,10 @@ def scan_convert_filter_varied_override_qualities(scan_convert_filter_varied_exe
     champion model is used. Qualities here are computed accordingly.
     """
     expected_qualities = {}
-    for op_set_id, source_id_to_record_sets in scan_convert_filter_varied_execution_data.items():
-        expected_qualities[op_set_id] = {}
+    for logical_op_id, source_id_to_record_sets in scan_convert_filter_varied_execution_data.items():
+        expected_qualities[logical_op_id] = {}
         for source_id, record_sets in source_id_to_record_sets.items():
-            expected_qualities[op_set_id][source_id] = []
+            expected_qualities[logical_op_id][source_id] = []
             for record_set in record_sets:
                 record_set_expected_qualities = []
                 for record_op_stats in record_set.record_op_stats:
@@ -136,7 +136,7 @@ def scan_convert_filter_varied_override_qualities(scan_convert_filter_varied_exe
                             quality = int(not record_op_stats.passed_operator)
 
                     record_set_expected_qualities.append(quality)
-                expected_qualities[op_set_id][source_id].append(record_set_expected_qualities)
+                expected_qualities[logical_op_id][source_id].append(record_set_expected_qualities)
 
     return expected_qualities
 
@@ -144,10 +144,10 @@ def scan_convert_filter_varied_override_qualities(scan_convert_filter_varied_exe
 @pytest.fixture
 def scan_multi_convert_multi_filter_qualities(scan_multi_convert_multi_filter_execution_data):
     expected_qualities = {}
-    for op_set_id, source_id_to_record_sets in scan_multi_convert_multi_filter_execution_data.items():
-        expected_qualities[op_set_id] = {}
+    for logical_op_id, source_id_to_record_sets in scan_multi_convert_multi_filter_execution_data.items():
+        expected_qualities[logical_op_id] = {}
         for source_id, record_sets in source_id_to_record_sets.items():
-            expected_qualities[op_set_id][source_id] = []
+            expected_qualities[logical_op_id][source_id] = []
             for record_set in record_sets:
                 record_set_expected_qualities = []
                 for one_to_many_idx, record_op_stats in enumerate(record_set.record_op_stats):
@@ -215,6 +215,6 @@ def scan_multi_convert_multi_filter_qualities(scan_multi_convert_multi_filter_ex
                             quality = 1.0 if str(Model.GPT_4o_MINI) in record_op_stats.op_id else 0.0
 
                     record_set_expected_qualities.append(quality)
-                expected_qualities[op_set_id][source_id].append(record_set_expected_qualities)
+                expected_qualities[logical_op_id][source_id].append(record_set_expected_qualities)
 
     return expected_qualities

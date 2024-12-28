@@ -6,9 +6,9 @@ from sklearn.metrics import precision_recall_fscore_support
 
 from palimpzest.execution.execute import Execute
 from palimpzest.execution.nosentinel_execution import (
-    PipelinedParallelNoSentinelExecution,
-    PipelinedSingleThreadNoSentinelExecution,
-    SequentialSingleThreadNoSentinelExecution,
+    NoSentinelPipelinedParallelExecution,
+    NoSentinelPipelinedSingleThreadExecution,
+    NoSentinelSequentialSingleThreadExecution,
 )
 from palimpzest.policy import MinCost
 from palimpzest.utils.model_helpers import get_models
@@ -161,9 +161,9 @@ def score_plan(dataset, records, policy_str=None, reopt=False) -> float:
 @pytest.mark.parametrize(
     argnames=("execution_engine"),
     argvalues=[
-        pytest.param(SequentialSingleThreadNoSentinelExecution, id="seq-single-thread"),
-        pytest.param(PipelinedSingleThreadNoSentinelExecution, id="pipe-single-thread"),
-        pytest.param(PipelinedParallelNoSentinelExecution, id="pipe-parallel"),
+        pytest.param(NoSentinelSequentialSingleThreadExecution, id="seq-single-thread"),
+        pytest.param(NoSentinelPipelinedSingleThreadExecution, id="pipe-single-thread"),
+        pytest.param(NoSentinelPipelinedParallelExecution, id="pipe-parallel"),
     ],
 )
 @pytest.mark.parametrize(

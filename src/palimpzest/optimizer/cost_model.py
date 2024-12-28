@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import math
-import os
 
 # NOTE: the answer.mode() call(s) inside of _est_quality() throw a UserWarning when there are multiple
 #       answers to a convert with the same mode. This is because pandas tries to sort the answers
@@ -11,13 +9,10 @@ import os
 #       multiple w/the same count, but in the future we may want to cast the 'dict' --> 'str' or compute
 #       the mode on a per-field basis.
 import warnings
-from typing import Any, Callable
+from typing import Any
 
-import numpy as np
 import pandas as pd
 import scipy.stats as stats
-import torch
-from tqdm import tqdm
 
 from palimpzest.constants import MODEL_CARDS, GPT_4o_MODEL_CARD, Model
 from palimpzest.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
@@ -25,12 +20,11 @@ from palimpzest.datamanager import DataDirectory
 from palimpzest.elements.records import DataRecordSet
 from palimpzest.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
-from palimpzest.operators.convert import ConvertOp, LLMConvert
+from palimpzest.operators.convert import LLMConvert
 from palimpzest.operators.datasource import CacheScanDataOp, DataSourcePhysicalOp, MarshalAndScanDataOp
-from palimpzest.operators.filter import FilterOp, LLMFilter, NonLLMFilter
+from palimpzest.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.operators.limit import LimitScanOp
 from palimpzest.operators.physical import PhysicalOperator
-from palimpzest.operators.retrieve import RetrieveOp
 from palimpzest.operators.token_reduction_convert import TokenReducedConvert
 from palimpzest.optimizer.plan import SentinelPlan
 from palimpzest.utils.model_helpers import get_champion_model_name, get_models
@@ -75,7 +69,7 @@ class SampleBasedCostModel:
         verbose: bool = False,
         exp_name: str | None = None,
     ):
-        # TODO: remove this
+        # store sentinel plan
         self.sentinel_plan = sentinel_plan
 
         # store verbose argument
@@ -85,7 +79,7 @@ class SampleBasedCostModel:
         self.exp_name = exp_name
 
         # construct cost, time, quality, and selectivity matrices for each operator set;
-        self.operator_to_stats = self.compute_operator_stats(execution_data, sentinel_plan.operator_sets)
+        self.operator_to_stats = self.compute_operator_stats(execution_data)
 
         # compute set of costed physical op ids from operator_to_stats
         self.costed_phys_op_ids = set([
@@ -106,18 +100,15 @@ class SampleBasedCostModel:
     def compute_operator_stats(
             self,
             execution_data: dict[str, dict[str, list[DataRecordSet]]],
-            operator_sets: list[list[PhysicalOperator]],
         ):
         # flatten the nested dictionary of execution data and pull out fields relevant to cost estimation
         execution_record_op_stats = []
-        for idx, op_set in enumerate(operator_sets):
+        for idx, (logical_op_id, _, _) in enumerate(self.sentinel_plan):
             # initialize variables
-            logical_op_id = op_set[0].logical_op_id
-            upstream_op_set_id = SentinelPlan.compute_op_set_id(operator_sets[idx - 1]) if idx > 0 else None
-            op_set_id = SentinelPlan.compute_op_set_id(op_set)
+            upstream_logical_op_id = self.sentinel_plan.logical_op_ids[idx - 1] if idx > 0 else None
 
             # filter for the execution data from this operator set
-            op_set_execution_data = execution_data[op_set_id]
+            op_set_execution_data = execution_data[logical_op_id]
 
             # flatten the execution data into a list of RecordOpStats
             op_set_execution_data = [
@@ -131,9 +122,8 @@ class SampleBasedCostModel:
             for record_op_stats in op_set_execution_data:
                 record_op_stats_dict = {
                     "logical_op_id": logical_op_id,
-                    "op_set_id": op_set_id,
                     "physical_op_id": record_op_stats.op_id,
-                    "upstream_op_set_id": upstream_op_set_id,
+                    "upstream_logical_op_id": upstream_logical_op_id,
                     "record_id": record_op_stats.record_id,
                     "record_parent_id": record_op_stats.record_parent_id,
                     "cost_per_record": record_op_stats.cost_per_record,
@@ -154,10 +144,10 @@ class SampleBasedCostModel:
         for logical_op_id, logical_op_df in operator_stats_df.groupby("logical_op_id"):
             operator_to_stats[logical_op_id] = {}
 
-            # get the op_set_id of the upstream operator
-            upstream_op_set_ids = logical_op_df.upstream_op_set_id.unique()
-            assert len(upstream_op_set_ids) == 1, "More than one upstream op id"
-            upstream_op_set_id = upstream_op_set_ids[0]
+            # get the logical_op_id of the upstream operator
+            upstream_logical_op_ids = logical_op_df.upstream_logical_op_id.unique()
+            assert len(upstream_logical_op_ids) == 1, "More than one upstream logical_op_id"
+            upstream_logical_op_id = upstream_logical_op_ids[0]
 
             for physical_op_id, physical_op_df in logical_op_df.groupby("physical_op_id"):
                 # find set of parent records for this operator
@@ -165,7 +155,7 @@ class SampleBasedCostModel:
 
                 # compute selectivity 
                 selectivity = (
-                    1.0 if upstream_op_set_id is None else physical_op_df.passed_operator.sum() / num_upstream_records
+                    1.0 if upstream_logical_op_id is None else physical_op_df.passed_operator.sum() / num_upstream_records
                 )
 
                 operator_to_stats[logical_op_id][physical_op_id] = {
@@ -178,8 +168,6 @@ class SampleBasedCostModel:
         # if this is an experiment, log the dataframe and operator_to_stats dictionary
         if self.exp_name is not None:
             operator_stats_df.to_csv(f"opt-profiling-data/{self.exp_name}-operator-stats.csv", index=False)
-            with open(f"opt-profiling-data/{self.exp_name}-operator-stats.json", "w") as f:
-                json.dump(operator_to_stats, f)
 
         return operator_to_stats
 
@@ -189,7 +177,7 @@ class SampleBasedCostModel:
         #       these physical operators are filtered out of the Optimizer, thus we can assume that
         #       we will have execution data for each operator passed into __call__; nevertheless, we
         #       still perform a sanity check
-        # look up logical op id and matrix column associated with this physical operator
+        # look up physical and logical op ids associated with this physical operator
         phys_op_id = operator.get_op_id()
         logical_op_id = operator.logical_op_id
         assert self.operator_to_stats.get(logical_op_id).get(phys_op_id) is not None, f"No execution data for {str(operator)}"
@@ -216,557 +204,6 @@ class SampleBasedCostModel:
         # generate new set of OperatorCostEstimates
         op_estimates = OperatorCostEstimates(
             cardinality=est_selectivity * source_op_estimates.cardinality,
-            time_per_record=est_time_per_record,
-            cost_per_record=est_cost_per_record,
-            quality=est_quality,
-        )
-
-        # compute estimates for this operator
-        op_time = op_estimates.time_per_record * source_op_estimates.cardinality
-        op_cost = op_estimates.cost_per_record * source_op_estimates.cardinality
-        op_quality = op_estimates.quality
-
-        # construct and return op estimates
-        return PlanCost(cost=op_cost, time=op_time, quality=op_quality, op_estimates=op_estimates)
-
-
-class MatrixCompletionCostModel:
-    """
-    TODO: evaluate on some common benchmark datasets, e.g.:
-    - Fever dataset
-    - Wiki-QA might also be good choices in the future
-    """
-    def __init__(
-            self,
-            sentinel_plan: SentinelPlan,
-            rank: int,
-            execution_data: dict[str, dict[str, list[DataRecordSet]]],
-            champion_outputs: dict[str, dict[str, DataRecordSet]],
-            expected_outputs: dict[str, DataRecordSet] | None = None,
-            field_to_metric_fn: dict[str, str | Callable] | None = None,
-            num_epochs: int = 5000,
-            verbose: bool = False,
-        ):
-        """
-        TODO: update to match changes
-        execution_data:
-            List of RecordOpStats containing execution data from every execution of an operator
-            on a record during sentinel execution
-
-        champion_outputs:
-            A mapping from op_set_id --> list of DataRecords for every operator set in our sentinel_plan.
-            The list of DataRecords is the set of champion / ensemble model outputs for that operator.
-
-        expected_outputs:
-            An optional list of DataRecords which contains the user-provided validation data.
-            Is None if no validation data is provided. If present, it will be a list of DataRecords
-            representing the exact output of the (end-to-end) PZ program expected by the user.
-
-        sentinel_plan:
-            The sentinel plan which was used to generate the sample execution data.
-        """
-        # TODO: remove this
-        self.sentinel_plan = sentinel_plan
-
-        # set the rank for the low-rank completion
-        self.rank = rank
-
-        # set the number of iterations for matrix completion algorithm
-        self.num_epochs = num_epochs
-
-        # store verbose argument
-        self.verbose = verbose
-
-        # compute the quality of each record as judged by the validation exemplars (or champion model)
-        execution_data = self.score_quality(sentinel_plan.operator_sets, execution_data, champion_outputs, expected_outputs, field_to_metric_fn)
-
-        # compute mapping from op_set_id --> logical_op_id
-        op_set_id_to_logical_id = {
-            SentinelPlan.compute_op_set_id(op_set): op_set[0].logical_op_id
-            for op_set in sentinel_plan.operator_sets
-        }
-
-        # compute mapping from logical_op_id --> sample mask
-        self.logical_op_id_to_sample_masks = {
-            op_set_id_to_logical_id[op_set_id]: (sample_matrix, record_to_row_map, phys_op_to_col_map)
-            for op_set_id, (sample_matrix, record_to_row_map, phys_op_to_col_map) in sentinel_plan.sample_matrices.items()
-        }
-
-        # construct cost, time, quality, and selectivity matrices for each operator set;
-        self.logical_op_id_to_raw_matrices = self.construct_matrices(
-            execution_data,
-            sentinel_plan.operator_sets,
-            self.logical_op_id_to_sample_masks,
-        )
-
-        # TODO: remove after SIGMOD
-        if os.environ['LOG_MATRICES'].lower() == "true":
-            with open(f"opt-profiling-data/sentinel-plan-n-{self.rank + 1}-{sentinel_plan.plan_id}.json", "w") as f:
-                json.dump({"plan_str": str(sentinel_plan)}, f)
-
-            with open(f"opt-profiling-data/sample-masks-n-{self.rank + 1}-{sentinel_plan.plan_id}.json", "w") as f:
-                logical_op_id_to_list_sample_masks = {}
-                for logical_op_id, (sample_matrix, _, _) in self.logical_op_id_to_sample_masks.items():
-                    logical_op_id_to_list_sample_masks[logical_op_id] = sample_matrix.tolist()
-                json.dump(logical_op_id_to_list_sample_masks, f)
-
-            with open(f"opt-profiling-data/raw-matrices-n-{self.rank + 1}-{sentinel_plan.plan_id}.json", "w") as f:
-                logical_op_id_to_list_raw_matrices = {}
-                for logical_op_id, raw_matrix_dict in self.logical_op_id_to_raw_matrices.items():
-                    logical_op_id_to_list_raw_matrices[logical_op_id] = {
-                        "cost": raw_matrix_dict["cost"].tolist(),
-                        "time": raw_matrix_dict["time"].tolist(),
-                        "selectivity": raw_matrix_dict["selectivity"].tolist(),
-                        "quality": raw_matrix_dict["quality"].tolist(),
-                    }
-                json.dump(logical_op_id_to_list_raw_matrices, f)
-
-        # complete the observation matrices
-        self.logical_op_id_to_matrices = self.complete_matrices(
-            self.logical_op_id_to_raw_matrices,
-            self.logical_op_id_to_sample_masks,
-        )
-
-        # construct mapping from each logical operator id to its previous logical operator id
-        self.logical_op_id_to_prev_logical_op_id = {}
-        for idx, op_set in enumerate(sentinel_plan.operator_sets):
-            logical_op_id = op_set[0].logical_op_id
-            if idx == 0:
-                self.logical_op_id_to_prev_logical_op_id[logical_op_id] = None
-            else:
-                prev_op_set = sentinel_plan.operator_sets[idx - 1]
-                prev_logical_op_id = prev_op_set[0].logical_op_id
-                self.logical_op_id_to_prev_logical_op_id[logical_op_id] = prev_logical_op_id
-
-        # compute a dictionary mapping from physical operator id --> (logical_op_id, col)
-        self.physical_op_id_to_matrix_col = {}
-        for logical_op_id, (_, _, phys_op_to_col_map) in self.logical_op_id_to_sample_masks.items():
-            for phys_op_id, col in phys_op_to_col_map.items():
-                self.physical_op_id_to_matrix_col[phys_op_id] = (logical_op_id, col)
-
-        # compute set of costed physical op ids from operator_to_stats
-        self.costed_phys_op_ids = set(self.physical_op_id_to_matrix_col.keys())
-
-        # reference to data directory
-        self.datadir = DataDirectory()
-
-        # import pdb; pdb.set_trace()
-
-    def get_costed_phys_op_ids(self):
-        return self.costed_phys_op_ids
-
-    def compute_quality(
-            self,
-            record_set: DataRecordSet,
-            expected_record_set: DataRecordSet | None = None,
-            champion_record_set: DataRecordSet | None = None,
-            is_filter_op: bool = False,
-            is_convert_op: bool = False,
-            field_to_metric_fn: dict[str, str | Callable] | None = None,
-        ) -> DataRecordSet:
-        """
-        Compute the quality for the given `record_set` by comparing it to the `expected_record_set`.
-
-        Update the record_set by assigning the quality to each entry in its record_op_stats and
-        returning the updated record_set.
-        """
-        # compute whether we can only use the champion
-        only_using_champion = expected_record_set is None
-
-        # if this operation is a failed convert
-        if is_convert_op and len(record_set) == 0:
-            record_set.record_op_stats[0].quality = 0.0
-
-        # if this operation is a filter:
-        # - we assign a quality of 1.0 if the record is in the expected outputs and it passes this filter
-        # - we assign a quality of 0.0 if the record is in the expected outputs and it does NOT pass this filter
-        # - we assign a quality relative to the champion / ensemble output if the record is not in the expected outputs
-        # we cannot know for certain what the correct behavior is a given filter on a record which is not in the output
-        # (unless it is the only filter in the plan), thus we only evaluate the filter based on its performance on
-        # records which are in the output
-        elif is_filter_op:
-            # NOTE:
-            # - we know that record_set.record_op_stats will contain a single entry for a filter op
-            # - if we are using the champion, then champion_record_set will also contain a single entry for a filter op
-            record_op_stats = record_set.record_op_stats[0]
-            if only_using_champion:
-                champion_record = champion_record_set[0]
-                record_op_stats.quality = int(record_op_stats.passed_operator == champion_record._passed_operator)
-
-            # - if we are using validation data, we may have multiple expected records in the expected_record_set for this source_id,
-            #   thus, if we can identify an exact match, we can use that to evaluate the filter's quality
-            # - if we are using validation data but we *cannot* find an exact match, then we will once again use the champion record set
-            else:
-                # compute number of matches between this record's computed fields and this expected record's outputs
-                found_match_in_output = False
-                for expected_record in expected_record_set:
-                    all_correct = True
-                    for field, value in record_op_stats.record_state.items():
-                        if value != getattr(expected_record, field):
-                            all_correct = False
-                            break
-
-                    if all_correct:
-                        found_match_in_output = True
-                        break
-
-                if found_match_in_output:
-                    record_op_stats.quality = int(record_op_stats.passed_operator == expected_record._passed_operator)
-                else:
-                    champion_record = champion_record_set[0]
-                    record_op_stats.quality = int(record_op_stats.passed_operator == champion_record._passed_operator)
-
-        # if this is a succesful convert operation
-        else:
-            # NOTE: the following computation assumes we do not project out computed values
-            #       (and that the validation examples provide all computed fields); even if
-            #       a user program does add projection, we can ignore the projection on the
-            #       validation dataset and use the champion model (as opposed to the validation
-            #       output) for scoring fields which have their values projected out
-
-            # set the expected_record_set to be the champion_record_set if we do not have validation data
-            expected_record_set = champion_record_set if only_using_champion else expected_record_set
-
-            # GREEDY ALGORITHM
-            # for each record in the expected output, we look for the computed record which maximizes the quality metric;
-            # once we've identified that computed record we remove it from consideration for the next expected output
-            for expected_record in expected_record_set:
-                best_quality, best_record_op_stats = 0.0, None
-                for record_op_stats in record_set.record_op_stats:
-                    # if we already assigned this record a quality, skip it
-                    if record_op_stats.quality is not None:
-                        continue
-
-                    # compute number of matches between this record's computed fields and this expected record's outputs
-                    total_quality = 0
-                    for field in record_op_stats.generated_fields:
-                        computed_value = record_op_stats.record_state.get(field, None)
-                        expected_value = getattr(expected_record, field)
-
-                        # get the metric function for this field
-                        metric_fn = (
-                            field_to_metric_fn[field]
-                            if field_to_metric_fn is not None and field in field_to_metric_fn
-                            else "exact"
-                        )
-
-                        # compute exact match
-                        if metric_fn == "exact":
-                            total_quality += int(computed_value == expected_value)
-
-                        # compute UDF metric
-                        elif callable(metric_fn):
-                            total_quality += metric_fn(computed_value, expected_value)
-
-                        # otherwise, throw an exception
-                        else:
-                            raise Exception(f"Unrecognized metric_fn: {metric_fn}")
-
-                    # compute recall and update best seen so far
-                    quality = total_quality / len(record_op_stats.generated_fields)
-                    if quality > best_quality:
-                        best_quality = quality
-                        best_record_op_stats = record_op_stats
-
-                # set best_quality as quality for the best_record_op_stats
-                if best_record_op_stats is not None:
-                    best_record_op_stats.quality = best_quality
-
-        # for any records which did not receive a quality, set it to 0.0 as these are unexpected extras
-        for record_op_stats in record_set.record_op_stats:
-            if record_op_stats.quality is None:
-                record_op_stats.quality = 0.0
-
-        return record_set
-
-
-    def score_quality(
-            self,
-            operator_sets: list[list[PhysicalOperator]],
-            execution_data: dict[str, dict[str, list[DataRecordSet]]],
-            champion_outputs: dict[str, dict[str, DataRecordSet]],
-            expected_outputs: dict[str, DataRecordSet] = None,
-            field_to_metric_fn: dict[str, str | Callable] = None,
-        ) -> list[RecordOpStats]:
-        """
-        NOTE: This approach to cost modeling does not work directly for aggregation queries;
-              for these queries, we would ask the user to provide validation data for the step immediately
-              before a final aggregation
-
-        NOTE: This function currently assumes that one-to-many converts do NOT create duplicate outputs.
-        This assumption would break if, for example, we extracted the breed of every dog in an image.
-        If there were two golden retrievers and a bernoodle in an image and we extracted:
-
-            {"image": "file1.png", "breed": "Golden Retriever"}
-            {"image": "file1.png", "breed": "Golden Retriever"}
-            {"image": "file1.png", "breed": "Bernedoodle"}
-        
-        This function would currently give perfect accuracy to the following output:
-
-            {"image": "file1.png", "breed": "Golden Retriever"}
-            {"image": "file1.png", "breed": "Bernedoodle"}
-
-        Even though it is missing one of the golden retrievers.
-        """
-        # extract information about the logical operation performed at this stage of the sentinel plan;
-        # NOTE: we can infer these fields from context clues, but in the long-term we should have a more
-        #       principled way of getting these directly from attributes either stored in the sentinel_plan
-        #       or in the PhysicalOperator
-        op_set = operator_sets[-1]
-        op_set_id = SentinelPlan.compute_op_set_id(op_set)
-        physical_op = op_set[0]
-        is_source_op = isinstance(physical_op, (MarshalAndScanDataOp, CacheScanDataOp))
-        is_filter_op = isinstance(physical_op, FilterOp)
-        is_convert_op = isinstance(physical_op, ConvertOp)
-        is_perfect_quality_op = (
-            not isinstance(physical_op, LLMConvert)
-            and not isinstance(physical_op, LLMFilter)
-            and not isinstance(physical_op, RetrieveOp)
-        )
-
-        # pull out the execution data from this operator; place the upstream execution data in a new list
-        this_op_execution_data = execution_data[op_set_id]
-
-        # compute quality of each output computed by this operator
-        for source_id, record_sets in this_op_execution_data.items():
-            # NOTE
-            # source_id is a particular input, for which we may have computed multiple output record_sets;
-            # each of these record_sets may contain more than one record (b/c one-to-many) and we have one
-            # record_set per operator in the op_set
-
-            # if this operation does not involve an LLM, every record_op_stats object gets perfect quality
-            if is_perfect_quality_op:
-                for record_set in record_sets:
-                    for record_op_stats in record_set.record_op_stats:
-                        record_op_stats.quality = 1.0
-                continue
-
-            # get the expected output for this source_id if we have one
-            expected_record_set = (
-                expected_outputs[source_id]
-                if expected_outputs is not None and source_id in expected_outputs
-                else None
-            )
-
-            # extract champion output for this record set
-            champion_record_set = champion_outputs[op_set_id][source_id]
-
-            # for each record_set produced by an operation, compute its quality
-            for record_set in record_sets:
-                record_set = self.compute_quality(record_set, expected_record_set, champion_record_set, is_filter_op, is_convert_op, field_to_metric_fn)
-
-        # if this operator is a source op (i.e. has no input logical operator), return the execution data
-        if is_source_op:
-            return execution_data
-
-        # recursively call the function on the next logical operator until you reach a scan
-        execution_data = self.score_quality(operator_sets[:-1], execution_data, champion_outputs, expected_outputs, field_to_metric_fn)
-
-        # return the quality annotated record op stats
-        return execution_data
-
-
-    def construct_matrices(
-            self,
-            execution_data: dict[str, dict[str, list[DataRecordSet]]],
-            operator_sets: list[list[PhysicalOperator]],
-            logical_op_id_to_sample_masks: dict[str, tuple[np.array, dict[str, int], dict[str, int]]],
-        ):
-        # given a set of execution data, construct the mappings
-        # from logical_op_id --> cost, runtime, selectivity, and quality matrices
-        logical_op_id_to_matrices = {}
-        for op_set in operator_sets:
-            # filter for the execution data from this operator set
-            logical_op_id = op_set[0].logical_op_id
-            op_set_id = SentinelPlan.compute_op_set_id(op_set)
-            op_set_execution_data = execution_data[op_set_id]
-
-            # flatten the execution data into a list of RecordOpStats
-            op_set_execution_data = [
-                record_op_stats
-                for _, record_sets in op_set_execution_data.items()
-                for record_set in record_sets
-                for record_op_stats in record_set.record_op_stats
-            ]
-
-            # fetch the mappings from records and physical operators to their location(s) in the sample mask
-            sample_mask, record_to_row_map, phys_op_to_col_map = logical_op_id_to_sample_masks[logical_op_id]
-
-            # initialize matrices
-            cost_arr = np.zeros(sample_mask.shape)
-            time_arr = np.zeros(sample_mask.shape)
-            sel_arr = np.zeros(sample_mask.shape)
-            quality_arr = np.zeros(sample_mask.shape)
-
-            # add entries from execution data into matrices
-            for record_op_stats in op_set_execution_data:
-                # NOTE: record_op_stats contains info from the *output record(s)* that result from
-                # applying this operator (set) to an input record; thus, the corresponding sample_matrix
-                # row is determined by the record_op_stats' parent_record_id
-                parent_record_id = (
-                    record_op_stats.record_parent_id
-                    if record_op_stats.record_parent_id is not None
-                    else record_op_stats.record_source_id
-                )
-
-                # NOTE: we sum the cost_per_record and time_per_record, because for one-to-many outputs we
-                # will have multiple record_op_stats objects for a given input record
-                row = record_to_row_map[parent_record_id]
-                col = phys_op_to_col_map[record_op_stats.op_id]
-                cost_arr[row, col] += record_op_stats.cost_per_record
-                time_arr[row, col] += record_op_stats.time_per_record
-
-                # NOTE: for filter operations the selectivity of this operator on the input record is determined
-                # by whether or not it passed the filter; for convert operations, we increment by 1 for every output
-                # which had this input record as its parent
-                if record_op_stats.passed_operator is not None:
-                    sel_arr[row, col] = int(record_op_stats.passed_operator)
-                else:
-                    sel_arr[row, col] += 1
-
-                # NOTE: for quality, we will sum the quality of each output record for the given input record;
-                # we will then divide by sel_arr[row, col] outside of the for loop to compute the average output quality
-                quality_arr[row, col] += record_op_stats.quality
-
-            # if this operation was a convert operation, compute the average quality for each sample
-            # by dividing by the number of outputs which were generated for this sample (i.e. sel_arr[row, col])
-            quality_arr = np.where(sel_arr == 0, quality_arr, quality_arr / sel_arr)
-
-            # set matrices
-            logical_op_id_to_matrices[logical_op_id] = {
-                "cost": cost_arr,
-                "time": time_arr,
-                "selectivity": sel_arr,
-                "quality": quality_arr,
-            }
-
-        return logical_op_id_to_matrices
-
-    def _learn_factor_matrices(self, true_mat, mat_mask):
-        device = "cpu"
-        num_rows, num_cols = true_mat.shape
-        mat_mask = mat_mask.astype(bool)
-
-        x = torch.empty((num_rows, self.rank), requires_grad=True)
-        torch.nn.init.normal_(x)
-        y = torch.empty((self.rank, num_cols), requires_grad=True)
-        torch.nn.init.normal_(y)
-
-        mse_loss = torch.nn.MSELoss()
-        opt_x = torch.optim.Adam([x], lr=1e-3, weight_decay=1e-5)
-        opt_y = torch.optim.Adam([y], lr=1e-3, weight_decay=1e-5)
-
-        true_matrix = torch.as_tensor(true_mat, dtype=torch.float32, device=device)
-
-        for _ in range(self.num_epochs):
-            opt_x.zero_grad()
-            opt_y.zero_grad()
-
-            loss = mse_loss(torch.matmul(x, y)[mat_mask], true_matrix[mat_mask])
-
-            loss.backward()
-
-            opt_x.step()
-            opt_y.step()
-
-            with torch.no_grad():
-                x[:] = x.clamp_(min=0)
-                y[:] = y.clamp_(min=0)
-
-        return [x, y]
-
-    def _complete_matrix(self, matrix: np.array, sample_mask: np.array) -> np.array:
-        x, y = self._learn_factor_matrices(matrix, sample_mask)
-        return torch.matmul(x, y).detach().numpy()
-
-    def complete_matrices(
-            self,
-            logical_op_id_to_matrices: dict[str, dict[str, np.array]],
-            logical_op_id_to_sample_masks: dict[str, np.array],
-        ):
-
-        # for each logical operator (or op_set)...
-        print("Completing Matrices for Logical Ops")
-        logical_op_id_to_completed_matrices = {}
-        for logical_op_id, matrices_dict in tqdm(logical_op_id_to_matrices.items()):
-            # and for each metric of interest...
-            logical_op_id_to_completed_matrices[logical_op_id] = {}
-            sample_mask, _, _ = logical_op_id_to_sample_masks[logical_op_id]
-
-            # if sample_mask is all 1's, no need to complete the matrix (it already is complete)
-            if (sample_mask == 1.0).all():
-                logical_op_id_to_completed_matrices[logical_op_id] = matrices_dict
-                continue
-
-            # otherwise, complete the matrix for each metric of interest
-            for metric, matrix in tqdm(matrices_dict.items(), leave=False):
-                # ensure that matrix has float dtype (not int)
-                matrix = matrix.astype(float)
-
-                # complete the matrix
-                completed_matrix = self._complete_matrix(matrix, sample_mask)
-
-                # only update matrix entries for which we did not have samples
-                matrix[~sample_mask.astype(bool)] = completed_matrix[~sample_mask.astype(bool)]
-
-                # clamp all matrices to be non-negative
-                matrix = np.clip(matrix, 0.0, None)
-
-                # clamp quality matrix to be less than 1.0
-                if metric == "quality":
-                    matrix = np.clip(matrix, 0.0, 1.0)
-
-                # set the matrix to be the completed matrix
-                logical_op_id_to_completed_matrices[logical_op_id][metric] = matrix
-
-        return logical_op_id_to_completed_matrices
-
-    def __call__(self, operator: PhysicalOperator, source_op_estimates: OperatorCostEstimates | None = None) -> PlanCost:
-        # look up logical op id and matrix column associated with this physical operator
-        phys_op_id = operator.get_op_id()
-        logical_op_id, col = self.physical_op_id_to_matrix_col[phys_op_id]
-
-        # look up column data for this operation
-        cost_col_data = self.logical_op_id_to_matrices[logical_op_id]["cost"][:, col]
-        time_col_data = self.logical_op_id_to_matrices[logical_op_id]["time"][:, col]
-        selectivity_col_data = self.logical_op_id_to_matrices[logical_op_id]["selectivity"][:, col]
-        quality_col_data = self.logical_op_id_to_matrices[logical_op_id]["quality"][:, col]
-
-        # if this is a filter operation, estimate selectivity using the column mean;
-        # otherwise, estimate fan-out using ratio between the number of rows between this matrix and its input
-        est_selectivity = None
-        if isinstance(operator, FilterOp):
-            est_selectivity = np.mean(selectivity_col_data)
-        else:
-            prev_logical_op_id = self.logical_op_id_to_prev_logical_op_id[logical_op_id]
-            if prev_logical_op_id is not None:
-                prev_selectivity_col_data = self.logical_op_id_to_matrices[logical_op_id]["selectivity"]
-                est_selectivity = len(selectivity_col_data)/len(prev_selectivity_col_data)
-            else:
-                est_selectivity = 1.0
-
-        # create source_op_estimates for datasources if they are not provided
-        if isinstance(operator, DataSourcePhysicalOp):
-            # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.get_registered_dataset(operator.dataset_id)
-            datasource_len = len(datasource)
-
-            source_op_estimates = OperatorCostEstimates(
-                cardinality=datasource_len,
-                time_per_record=0.0,
-                cost_per_record=0.0,
-                quality=1.0,
-            )
-
-        # estimate cost, time, and quality using column means
-        est_cost_per_record = np.mean(cost_col_data)
-        est_time_per_record = np.mean(time_col_data)
-        est_quality = np.mean(quality_col_data)
-        est_cardinality = est_selectivity * source_op_estimates.cardinality
-
-        # generate new set of OperatorCostEstimates
-        op_estimates = OperatorCostEstimates(
-            cardinality=est_cardinality,
             time_per_record=est_time_per_record,
             cost_per_record=est_cost_per_record,
             quality=est_quality,

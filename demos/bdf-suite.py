@@ -10,7 +10,7 @@ import time
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
-import streamlit as st
+import streamlit as st  # type: ignore
 
 import palimpzest as pz
 from palimpzest.utils import udfs
@@ -33,7 +33,7 @@ class ScientificPaper(pz.PDFFile):
     paper_author = pz.Field(desc="The name of the first author of the paper", required=True)
     paper_journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
     paper_subject = pz.Field(desc="A summary of the paper contribution in one sentence", required=False)
-    paper_doiURL = pz.Field(desc="The DOI URL for the paper", required=True)
+    paper_doi_url = pz.Field(desc="The DOI URL for the paper", required=True)
 
 
 class Reference(pz.Schema):
@@ -99,18 +99,18 @@ class CaseData(pz.Schema):
 @st.cache_resource()
 def extract_supplemental(engine, policy):
     papers = pz.Dataset("biofabric-pdf", schema=ScientificPaper)
-    paperURLs = papers.convert(pz.URL, desc="The DOI url of the paper")
-    htmlDOI = paperURLs.convert(pz.File, udf=udfs.url_to_file)
-    tableURLS = htmlDOI.convert(
+    paper_urls = papers.convert(pz.URL, desc="The DOI url of the paper")
+    html_doi = paper_urls.convert(pz.File, udf=udfs.url_to_file)
+    table_urls = html_doi.convert(
         pz.URL, desc="The URLs of the XLS tables from the page", cardinality=pz.Cardinality.ONE_TO_MANY
     )
-    # urlFile = pz.Dataset("biofabric-urls", schema=pz.TextFile)
-    # tableURLS = urlFile.convert(pz.URL, desc="The URLs of the tables")
-    tables = tableURLS.convert(pz.File, udf=udfs.url_to_file)
+    # url_file = pz.Dataset("biofabric-urls", schema=pz.TextFile)
+    # table_urls = url_file.convert(pz.URL, desc="The URLs of the tables")
+    tables = table_urls.convert(pz.File, udf=udfs.url_to_file)
     xls = tables.convert(pz.XLSFile, udf=udfs.file_to_xls)
     patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
 
-    output = patient_tables
+    # output = patient_tables
     iterable = pz.Execute(
         patient_tables,
         policy=policy,
@@ -122,8 +122,8 @@ def extract_supplemental(engine, policy):
 
     tables = []
     statistics = []
-    for table, plan, stats in iterable:
-        record_time = time.time()
+    for table, plan, stats in iterable:  # noqa: B007
+        # record_time = time.time()
         tables += table
         statistics.append(stats)
 
@@ -150,8 +150,8 @@ def integrate_tables(engine, policy):
 
     tables = []
     statistics = []
-    for table, plan, stats in iterable:
-        record_time = time.time()
+    for table, plan, stats in iterable:  # noqa: B007
+        # record_time = time.time()
         tables += table
         statistics.append(stats)
 
@@ -178,8 +178,8 @@ def extract_references(engine, policy):
 
     tables = []
     statistics = []
-    for table, plan, stats in iterable:
-        record_time = time.time()
+    for table, plan, stats in iterable:  # noqa: B007
+        # record_time = time.time()
         tables += table
         statistics.append(stats)
 
@@ -283,11 +283,11 @@ except Exception:
     breakpoint()
 try:
     G.add_nodes_from(references_df["source"].unique())
-    for idx, row in references_df.iterrows():
+    for _, row in references_df.iterrows():
         G.add_edge(row["source"], row["key"])
 except Exception:
     G.add_nodes_from(references_df["filename"].unique())
-    for idx, row in references_df.iterrows():
+    for _, row in references_df.iterrows():
         G.add_edge(row["filename"], row["key"])
 
 # prune all nodes with no edges or one edge

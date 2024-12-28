@@ -22,52 +22,33 @@ from palimpzest.prompts import IMAGE_FILTER_PROMPT
 
 
 class FilterOp(PhysicalOperator):
-    def __init__(self, filter: Filter, depends_on: list[str] | None = None, *args, **kwargs):
+    def __init__(self, filter: Filter, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert self.input_schema == self.output_schema, "Input and output schemas must match for FilterOp"
         self.filter = filter
-        self.depends_on = depends_on if depends_on is None else sorted(depends_on)
 
     def __str__(self):
         op = super().__str__()
         op += f"    Filter: {str(self.filter)}\n"
         return op
 
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {"filter": self.filter, "depends_on": self.depends_on, **copy_kwargs}
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        return {"filter": str(self.filter), **id_params}
 
     def get_op_params(self):
-        return {
-            "output_schema": self.output_schema,
-            "filter": str(self.filter),
-            "depends_on": self.depends_on,
-        }
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.filter == other.filter
-            and self.input_schema == other.input_schema
-            and self.output_schema == other.output_schema
-        )
+        op_params = super().get_op_params()
+        return {"filter": self.filter, **op_params}
 
 
 class NonLLMFilter(FilterOp):
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.filter == other.filter
-            and self.output_schema == other.output_schema
-        )
-
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate output cardinality using a constant assumption of the filter selectivity
         selectivity = NAIVE_EST_FILTER_SELECTIVITY
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate 1 ms single-threaded execution for filter function
-        time_per_record = 0.001 / self.max_workers
+        time_per_record = 0.001
 
         # assume filter fn has perfect quality
         return OperatorCostEstimates(
@@ -107,7 +88,7 @@ class NonLLMFilter(FilterOp):
             passed_operator=result,
             fn_call_duration_secs=fn_call_duration_secs,
             answer=result,
-            op_details={k: str(v) for k, v in self.get_op_params().items()},
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 
         if self.verbose:
@@ -148,30 +129,27 @@ class LLMFilter(FilterOp):
         else:
             raise Exception(f"Prompt strategy {self.prompt_strategy} not implemented yet")
 
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {
-            "model": self.model,
-            "prompt_strategy": self.prompt_strategy,
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        id_params = {
+            "model": self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
             "image_filter": self.image_filter,
-            **copy_kwargs,
+            **id_params,
         }
+
+        return id_params
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        op_params = {"model": self.model, **op_params}
+        op_params = {
+            "model": self.model,
+            "prompt_strategy": self.prompt_strategy,
+            "image_filter": self.image_filter,
+            **op_params,
+        }
 
         return op_params
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.model == other.model
-            and self.filter == other.filter
-            and self.prompt_strategy == other.prompt_strategy
-            and self.image_filter == other.image_filter
-            and self.output_schema == other.output_schema
-        )
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
@@ -188,7 +166,7 @@ class LLMFilter(FilterOp):
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
             MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
-        ) / self.max_workers
+        )
 
         # get est. of conversion cost (in USD) per record from model card
         model_conversion_usd_per_record = (
@@ -300,7 +278,7 @@ class LLMFilter(FilterOp):
             answer=response,
             passed_operator=passed_operator,
             image_operation=self.image_filter,
-            op_details={k: str(v) for k, v in self.get_op_params().items()},
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 
         return DataRecordSet([dr], [record_op_stats])

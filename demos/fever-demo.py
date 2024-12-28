@@ -261,19 +261,19 @@ else:
 
 if engine == "sentinel":
     if executor == "sequential":
-        execution_engine = pz.SequentialSingleThreadSentinelExecution
+        execution_engine = pz.MABSequentialSingleThreadSentinelExecution
     elif executor == "parallel":
-        execution_engine = pz.SequentialParallelSentinelExecution
+        execution_engine = pz.MABSequentialParallelSentinelExecution
     else:
         print("Unknown executor")
         exit(1)
 elif engine == "nosentinel":
     if executor == "sequential":
-        execution_engine = pz.SequentialSingleThreadNoSentinelExecution
+        execution_engine = pz.NoSentinelSequentialSingleThreadExecution
     elif executor == "pipelined":
-        execution_engine = pz.PipelinedSingleThreadNoSentinelExecution
+        execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
     elif executor == "parallel":
-        execution_engine = pz.PipelinedParallelNoSentinelExecution
+        execution_engine = pz.NoSentinelPipelinedParallelExecution
     else:
         print("Unknown executor")
         exit(1)

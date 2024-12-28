@@ -8,7 +8,6 @@ from palimpzest.corelib.schemas import Schema
 from palimpzest.dataclasses import OperatorCostEstimates
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements.records import DataRecord, DataRecordSet
-from palimpzest.utils.index_helpers import get_index_str
 
 
 class PhysicalOperator:
@@ -22,8 +21,9 @@ class PhysicalOperator:
         self,
         output_schema: Schema,
         input_schema: Schema | None = None,
+        depends_on: list[str] | None = None,
         logical_op_id: str | None = None,
-        max_workers: int = 1,
+        logical_op_name: str | None = None,
         target_cache_id: str | None = None,
         verbose: bool = False,
         *args,
@@ -31,12 +31,13 @@ class PhysicalOperator:
     ) -> None:
         self.output_schema = output_schema
         self.input_schema = input_schema
-        self.datadir = DataDirectory()
-        self.max_workers = max_workers
+        self.depends_on = depends_on if depends_on is None else sorted(depends_on)
+        self.logical_op_id = logical_op_id
+        self.logical_op_name = logical_op_name
         self.target_cache_id = target_cache_id
         self.verbose = verbose
-        self.logical_op_id = logical_op_id
         self.op_id = None
+        self.datadir = DataDirectory()
 
         # sets __hash__() for each child Operator to be the base class' __hash__() method;
         # by default, if a subclass defines __eq__() but not __hash__() Python will set that
@@ -51,59 +52,71 @@ class PhysicalOperator:
             op += f"    Model: {self.model}\n"
         return op
 
-    def get_copy_kwargs(self):
-        """Return kwargs to assist sub-classes w/copy() calls."""
-        return {
-            "output_schema": self.output_schema,
-            "input_schema": self.input_schema,
-            "logical_op_id": self.logical_op_id,
-            "max_workers": self.max_workers,
-            "target_cache_id": self.target_cache_id,
-            "verbose": self.verbose,
-        }
+    def __eq__(self, other) -> bool:
+        all_id_params_match = all(value == getattr(other, key) for key, value in self.get_id_params().items())
+        return isinstance(other, self.__class__) and all_id_params_match
+
+    def copy(self) -> PhysicalOperator:
+        return self.__class__(**self.get_op_params())
 
     def op_name(self) -> str:
         """Name of the physical operator."""
         return str(self.__class__.__name__)
 
-    def get_op_params(self):
+    def get_id_params(self) -> dict:
         """
-        You should implement get_op_params with op-specific parameters.
+        Returns a dictionary mapping of physical operator parameters which are relevant
+        for computing the physical operator id.
+
+        NOTE: Should be overriden by subclasses to include class-specific parameters.
+        NOTE: input_schema is not included in the id params because it depends on how the Optimizer orders operations.
         """
-        raise NotImplementedError("Calling get_op_params on abstract method")
+        return {"output_schema": self.output_schema}
+
+    def get_op_params(self) -> dict:
+        """
+        Returns a dictionary mapping of physical operator parameters which may be used to
+        create a copy of this physical operation.
+
+        NOTE: Should be overriden by subclasses to include class-specific parameters.
+        """
+        return {
+            "output_schema": self.output_schema,
+            "input_schema": self.input_schema,
+            "depends_on": self.depends_on,
+            "logical_op_id": self.logical_op_id,
+            "logical_op_name": self.logical_op_name,
+            "target_cache_id": self.target_cache_id,
+            "verbose": self.verbose,
+        }
 
     def get_op_id(self):
         """
         NOTE: We do not call this in the __init__() method as subclasses may set parameters
-              returned by self.get_op_params() after they call to super().__init__().
+              returned by self.get_id_params() after they call to super().__init__().
 
         NOTE: This is NOT a universal ID.
 
         Two different PhysicalOperator instances with the identical returned values
-        from the call to self.get_op_params() will have equivalent op_ids.
+        from the call to self.get_id_params() will have equivalent op_ids.
         """
         # return self.op_id if we've computed it before
         if self.op_id is not None:
             return self.op_id
 
-        # compute, set, and return the op_id
+        # get op name and op parameters which are relevant for computing the id
         op_name = self.op_name()
-        op_params = self.get_op_params()
-        op_params = {k: str(v) if k != "index" else get_index_str(v) for k, v in op_params.items()}
-        hash_str = json.dumps({"op_name": op_name, **op_params}, sort_keys=True)
+        id_params = self.get_id_params()
+        id_params = {k: str(v) for k, v in id_params.items()}
+
+        # compute, set, and return the op_id
+        hash_str = json.dumps({"op_name": op_name, **id_params}, sort_keys=True)
         self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
         return self.op_id
 
-    def __eq__(self, other) -> bool:
-        raise NotImplementedError("Calling __eq__ on abstract method")
-
     def __hash__(self):
         return int(self.op_id, 16)
-
-    def copy(self):
-        copy_kwargs = self.get_copy_kwargs()
-        return self.__class__(**copy_kwargs)
 
     def _generate_field_names(self, candidate: DataRecord, input_schema: Schema, output_schema: Schema) -> list[str]:
         """

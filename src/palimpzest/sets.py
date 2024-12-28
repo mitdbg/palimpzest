@@ -172,7 +172,6 @@ class Dataset(Set):
         self,
         _filter: str | Callable,
         depends_on: str | list[str] | None = None,
-        desc: str = "Apply filter(s)",
     ) -> Dataset:
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
         f = None
@@ -186,7 +185,6 @@ class Dataset(Set):
         return Dataset(
             source=self,
             schema=self.schema,
-            desc=desc,
             filter=f,
             depends_on=depends_on,
             nocache=self._nocache,

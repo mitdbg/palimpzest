@@ -368,13 +368,13 @@ if __name__ == "__main__":
     execution_engine = None
     executor = args.executor
     if executor == "sequential":
-        execution_engine = pz.SequentialSingleThreadNoSentinelExecution
+        execution_engine = pz.NoSentinelSequentialSingleThreadExecution
     elif executor == "pipelined":
-        execution_engine = pz.PipelinedSingleThreadNoSentinelExecution
+        execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
     elif executor == "parallel":
-        execution_engine = pz.PipelinedParallelNoSentinelExecution
+        execution_engine = pz.NoSentinelPipelinedParallelExecution
     else:
-        print("Unknown executor")
+        print("Executor not supported for this demo")
         exit(1)
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:

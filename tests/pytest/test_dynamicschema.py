@@ -37,7 +37,7 @@ def test_dynamicschema_json():
         allow_bonded_query=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=pz.SequentialSingleThreadNoSentinelExecution,
+        execution_engine=pz.NoSentinelSequentialSingleThreadExecution,
     )
 
     for rec in records:
@@ -67,7 +67,7 @@ def test_dynamicschema_yml():
         allow_bonded_query=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=pz.SequentialSingleThreadNoSentinelExecution,
+        execution_engine=pz.NoSentinelSequentialSingleThreadExecution,
     )
 
     for rec in records:

@@ -100,18 +100,20 @@ class DataRecord:
 
         # get the set of fields to copy from the parent record
         copy_fields = project_cols if project_cols is not None else self.get_fields()
+        copy_fields = [field.split(".")[-1] for field in copy_fields]
 
         # copy fields from the parent
         for field in copy_fields:
+            field_value = getattr(self, field)
             if (
                 not include_bytes
-                and isinstance(self.__dict__[field], bytes)
-                or (isinstance(self.__dict__[field], list) and len(self.__dict__[field]) > 0 and isinstance(self.__dict__[field][0], bytes))
+                and isinstance(field_value, bytes)
+                or (isinstance(field_value, list) and len(field_value) > 0 and isinstance(field_value[0], bytes))
             ):
                 continue
 
             # set attribute
-            setattr(new_dr, field, getattr(self, field))
+            setattr(new_dr, field, field_value)
 
         return new_dr
 

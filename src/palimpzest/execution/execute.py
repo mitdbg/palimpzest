@@ -2,7 +2,7 @@ from palimpzest.constants import Model, OptimizationStrategy
 from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import DataSource
 from palimpzest.execution.execution_engine import ExecutionEngine
-from palimpzest.execution.nosentinel_execution import SequentialSingleThreadNoSentinelExecution
+from palimpzest.execution.nosentinel_execution import NoSentinelSequentialSingleThreadExecution
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
@@ -37,7 +37,7 @@ class Execute:
         allow_code_synth: bool = True,
         allow_token_reduction: bool = True,
         optimization_strategy: OptimizationStrategy = OptimizationStrategy.PARETO,
-        execution_engine: ExecutionEngine = SequentialSingleThreadNoSentinelExecution,
+        execution_engine: ExecutionEngine = NoSentinelSequentialSingleThreadExecution,
         *args,
         **kwargs,
     ):

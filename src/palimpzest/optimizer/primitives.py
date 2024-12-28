@@ -42,7 +42,8 @@ class Expression:
         return self.operator == other.operator and self.input_group_ids == other.input_group_ids
 
     def __hash__(self):
-        hash_str = str(tuple(sorted(self.input_group_ids)) + (self.operator.get_op_id(), str(self.__class__.__name__)))
+        op_id = self.operator.get_logical_op_id() if isinstance(self.operator, LogicalOperator) else self.operator.get_op_id()
+        hash_str = str(tuple(sorted(self.input_group_ids)) + (op_id, str(self.__class__.__name__)))
         hash_id = int(hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS], 16)
         return hash_id
 

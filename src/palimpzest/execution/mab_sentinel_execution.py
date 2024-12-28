@@ -15,7 +15,6 @@ from palimpzest.execution.plan_executors.single_threaded_plan_execution import S
 from palimpzest.operators.convert import ConvertOp, LLMConvert
 from palimpzest.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.operators.filter import FilterOp, LLMFilter
-from palimpzest.operators.logical import FilteredScan
 from palimpzest.operators.physical import PhysicalOperator
 from palimpzest.operators.retrieve import RetrieveOp
 from palimpzest.optimizer.cost_model import CostModel, SampleBasedCostModel
@@ -54,13 +53,16 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         self.pick_output_fn = self.pick_ensemble_output
         self.rng = np.random.default_rng(seed=seed)
 
-        # state variables
-        self.op_set_id_to_clusterings = {}
-        self.op_set_id_to_cluster_ucbs = {}
-        self.op_id_to_col_idx = {}
-
-
-    def update_frontier_ops(self, frontier_ops, reservoir_ops, policy, all_outputs, op_set_id_to_num_samples, op_id_to_num_samples, is_filter_op_set):
+    def update_frontier_ops(
+        self,
+        frontier_ops,
+        reservoir_ops,
+        policy,
+        all_outputs,
+        logical_op_id_to_num_samples,
+        phys_op_id_to_num_samples,
+        is_filter_op_dict,
+    ):
         """
         Update the set of frontier operators, pulling in new ones from the reservoir as needed.
         This function will (for each op_set):
@@ -69,25 +71,28 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         3. Update the frontier and reservoir sets of operators based on their LCB/UCB overlap with the pareto frontier
         """
         # compute metrics for each operator in all_outputs
-        op_set_id_to_op_metrics = {}
-        for op_set_id, source_id_to_record_sets in all_outputs.items():
-            # compute selectivity
-            op_to_num_inputs, op_to_num_outputs = {}, {}
+        logical_op_id_to_op_metrics = {}
+        for logical_op_id, source_id_to_record_sets in all_outputs.items():
+            # compute selectivity for each physical operator
+            phys_op_to_num_inputs, phys_op_to_num_outputs = {}, {}
             for _, record_sets in source_id_to_record_sets.items():
                 for record_set in record_sets:
                     op_id = record_set.record_op_stats[0].op_id
                     num_outputs = sum([record_op_stats.passed_operator for record_op_stats in record_set.record_op_stats])
-                    if op_id not in op_to_num_inputs:
-                        op_to_num_inputs[op_id] = 1
-                        op_to_num_outputs[op_id] = num_outputs
+                    if op_id not in phys_op_to_num_inputs:
+                        phys_op_to_num_inputs[op_id] = 1
+                        phys_op_to_num_outputs[op_id] = num_outputs
                     else:
-                        op_to_num_inputs[op_id] += 1
-                        op_to_num_outputs[op_id] += num_outputs
+                        phys_op_to_num_inputs[op_id] += 1
+                        phys_op_to_num_outputs[op_id] += num_outputs
 
-            op_to_mean_selectivity = {op_id: op_to_num_outputs[op_id] / op_to_num_inputs[op_id] for op_id in op_to_num_inputs}
+            phys_op_to_mean_selectivity = {
+                op_id: phys_op_to_num_outputs[op_id] / phys_op_to_num_inputs[op_id]
+                for op_id in phys_op_to_num_inputs
+            }
 
             # compute average cost, time, and quality
-            op_to_costs, op_to_times, op_to_qualities = {}, {}, {}
+            phys_op_to_costs, phys_op_to_times, phys_op_to_qualities = {}, {}, {}
             for _, record_sets in source_id_to_record_sets.items():
                 for record_set in record_sets:
                     for record_op_stats in record_set.record_op_stats:
@@ -95,32 +100,32 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                         cost = record_op_stats.cost_per_record
                         time = record_op_stats.time_per_record
                         quality = record_op_stats.quality
-                        if op_id not in op_to_costs:
-                            op_to_costs[op_id] = [cost]
-                            op_to_times[op_id] = [time]
-                            op_to_qualities[op_id] = [quality]
+                        if op_id not in phys_op_to_costs:
+                            phys_op_to_costs[op_id] = [cost]
+                            phys_op_to_times[op_id] = [time]
+                            phys_op_to_qualities[op_id] = [quality]
                         else:
-                            op_to_costs[op_id].append(cost)
-                            op_to_times[op_id].append(time)
-                            op_to_qualities[op_id].append(quality)
+                            phys_op_to_costs[op_id].append(cost)
+                            phys_op_to_times[op_id].append(time)
+                            phys_op_to_qualities[op_id].append(quality)
 
-            op_to_mean_cost = {op: np.mean(costs) for op, costs in op_to_costs.items()}
-            op_to_mean_time = {op: np.mean(times) for op, times in op_to_times.items()}
-            op_to_mean_quality = {op: np.mean(qualities) for op, qualities in op_to_qualities.items()}
+            phys_op_to_mean_cost = {op: np.mean(costs) for op, costs in phys_op_to_costs.items()}
+            phys_op_to_mean_time = {op: np.mean(times) for op, times in phys_op_to_times.items()}
+            phys_op_to_mean_quality = {op: np.mean(qualities) for op, qualities in phys_op_to_qualities.items()}
 
             # compute average, LCB, and UCB of each operator; the confidence bounds depend upon
             # the computation of the alpha parameter, which we scale to be 0.5 * the mean (of means)
             # of the metric across all operators in this operator set
-            cost_alpha = 0.5 * np.mean([mean_cost for mean_cost in op_to_mean_cost.values()])
-            time_alpha = 0.5 * np.mean([mean_time for mean_time in op_to_mean_time.values()])
-            quality_alpha = 0.5 * np.mean([mean_quality for mean_quality in op_to_mean_quality.values()])
-            selectivity_alpha = 0.5 * np.mean([mean_selectivity for mean_selectivity in op_to_mean_selectivity.values()])
+            cost_alpha = 0.5 * np.mean([mean_cost for mean_cost in phys_op_to_mean_cost.values()])
+            time_alpha = 0.5 * np.mean([mean_time for mean_time in phys_op_to_mean_time.values()])
+            quality_alpha = 0.5 * np.mean([mean_quality for mean_quality in phys_op_to_mean_quality.values()])
+            selectivity_alpha = 0.5 * np.mean([mean_selectivity for mean_selectivity in phys_op_to_mean_selectivity.values()])
  
             op_metrics = {}
-            for op_id in op_to_costs:
-                sample_ratio = np.sqrt(np.log(op_set_id_to_num_samples[op_set_id]) / op_id_to_num_samples[op_id])
+            for op_id in phys_op_to_costs:
+                sample_ratio = np.sqrt(np.log(logical_op_id_to_num_samples[logical_op_id]) / phys_op_id_to_num_samples[op_id])
                 exploration_terms = np.array([cost_alpha * sample_ratio, time_alpha * sample_ratio, quality_alpha * sample_ratio, selectivity_alpha * sample_ratio])
-                mean_terms = (op_to_mean_cost[op_id], op_to_mean_time[op_id], op_to_mean_quality[op_id], op_to_mean_selectivity[op_id])
+                mean_terms = (phys_op_to_mean_cost[op_id], phys_op_to_mean_time[op_id], phys_op_to_mean_quality[op_id], phys_op_to_mean_selectivity[op_id])
 
                 # NOTE: we could clip these; however I will not do so for now to allow for arbitrary quality metric(s)
                 lcb_terms = mean_terms - exploration_terms
@@ -128,15 +133,15 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                 op_metrics[op_id] = {"mean": mean_terms, "lcb": lcb_terms, "ucb": ucb_terms}
 
             # store average metrics for each operator in the op_set
-            op_set_id_to_op_metrics[op_set_id] = op_metrics
+            logical_op_id_to_op_metrics[logical_op_id] = op_metrics
 
         # get the tuple representation of this policy
         policy_dict = policy.get_dict()
 
-        # compute the pareto optimal set of operators for each op_set_id
+        # compute the pareto optimal set of operators for each logical_op_id
         pareto_op_sets = {}
-        for op_set_id, op_metrics in op_set_id_to_op_metrics.items():
-            pareto_op_sets[op_set_id] = set()
+        for logical_op_id, op_metrics in logical_op_id_to_op_metrics.items():
+            pareto_op_sets[logical_op_id] = set()
             for op_id, metrics in op_metrics.items():
                 cost, time, quality, selectivity = metrics["mean"]
                 pareto_frontier = True
@@ -154,21 +159,21 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                     cost_dominated = True if policy_dict["cost"] == 0.0 else other_cost < cost
                     time_dominated = True if policy_dict["time"] == 0.0 else other_time < time
                     quality_dominated = True if policy_dict["quality"] == 0.0 else other_quality > quality
-                    selectivity_dominated = True if not is_filter_op_set[op_set_id] else other_selectivity < selectivity
+                    selectivity_dominated = True if not is_filter_op_dict[logical_op_id] else other_selectivity < selectivity
                     if cost_dominated and time_dominated and quality_dominated and selectivity_dominated:
                         pareto_frontier = False
                         break
 
                 # add op_id to pareto frontier if it's not dominated
                 if pareto_frontier:
-                    pareto_op_sets[op_set_id].add(op_id)
+                    pareto_op_sets[logical_op_id].add(op_id)
 
         # iterate over frontier ops and replace any which do not overlap with pareto frontier
-        new_frontier_ops = {op_set_id: [] for op_set_id in frontier_ops}
-        new_reservoir_ops = {op_set_id: [] for op_set_id in reservoir_ops}
-        for op_set_id, pareto_op_set in pareto_op_sets.items():
+        new_frontier_ops = {logical_op_id: [] for logical_op_id in frontier_ops}
+        new_reservoir_ops = {logical_op_id: [] for logical_op_id in reservoir_ops}
+        for logical_op_id, pareto_op_set in pareto_op_sets.items():
             num_dropped_from_frontier = 0
-            for op, next_shuffled_sample_idx, new_operator, fully_sampled in frontier_ops[op_set_id]:
+            for op, next_shuffled_sample_idx, new_operator, fully_sampled in frontier_ops[logical_op_id]:
                 op_id = op.get_op_id()
 
                 # if this op is fully sampled, remove it from the frontier
@@ -178,44 +183,44 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
                 # if this op is pareto optimal keep it in our frontier ops
                 if op_id in pareto_op_set:
-                    new_frontier_ops[op_set_id].append((op, next_shuffled_sample_idx, new_operator, fully_sampled))
+                    new_frontier_ops[logical_op_id].append((op, next_shuffled_sample_idx, new_operator, fully_sampled))
                     continue
 
                 # otherwise, if this op overlaps with an op on the pareto frontier, keep it in our frontier ops
                 # NOTE: for now, we perform an optimistic comparison with the ucb/lcb
                 pareto_frontier = True
-                op_cost = op_set_id_to_op_metrics[op_set_id][op_id]["lcb"][0]
-                op_time = op_set_id_to_op_metrics[op_set_id][op_id]["lcb"][1]
-                op_quality = op_set_id_to_op_metrics[op_set_id][op_id]["ucb"][2]
-                op_selectivity = op_set_id_to_op_metrics[op_set_id][op_id]["lcb"][3]
+                op_cost = logical_op_id_to_op_metrics[logical_op_id][op_id]["lcb"][0]
+                op_time = logical_op_id_to_op_metrics[logical_op_id][op_id]["lcb"][1]
+                op_quality = logical_op_id_to_op_metrics[logical_op_id][op_id]["ucb"][2]
+                op_selectivity = logical_op_id_to_op_metrics[logical_op_id][op_id]["lcb"][3]
                 for pareto_op_id in pareto_op_set:
-                    pareto_cost = op_set_id_to_op_metrics[op_set_id][pareto_op_id]["ucb"][0]
-                    pareto_time = op_set_id_to_op_metrics[op_set_id][pareto_op_id]["ucb"][1]
-                    pareto_quality = op_set_id_to_op_metrics[op_set_id][pareto_op_id]["lcb"][2]
-                    pareto_selectivity = op_set_id_to_op_metrics[op_set_id][pareto_op_id]["ucb"][3]
+                    pareto_cost = logical_op_id_to_op_metrics[logical_op_id][pareto_op_id]["ucb"][0]
+                    pareto_time = logical_op_id_to_op_metrics[logical_op_id][pareto_op_id]["ucb"][1]
+                    pareto_quality = logical_op_id_to_op_metrics[logical_op_id][pareto_op_id]["lcb"][2]
+                    pareto_selectivity = logical_op_id_to_op_metrics[logical_op_id][pareto_op_id]["ucb"][3]
 
                     # if op_id is dominated by pareto_op_id, set pareto_frontier = False and break
                     cost_dominated = True if policy_dict["cost"] == 0.0 else pareto_cost <= op_cost
                     time_dominated = True if policy_dict["time"] == 0.0 else pareto_time <= op_time
                     quality_dominated = True if policy_dict["quality"] == 0.0 else pareto_quality >= op_quality
-                    selectivity_dominated = True if not is_filter_op_set[op_set_id] else pareto_selectivity <= op_selectivity
+                    selectivity_dominated = True if not is_filter_op_dict[logical_op_id] else pareto_selectivity <= op_selectivity
                     if cost_dominated and time_dominated and quality_dominated and selectivity_dominated:
                         pareto_frontier = False
                         break
                 
                 # add op_id to pareto frontier if it's not dominated
                 if pareto_frontier:
-                    new_frontier_ops[op_set_id].append((op, next_shuffled_sample_idx, new_operator, fully_sampled))
+                    new_frontier_ops[logical_op_id].append((op, next_shuffled_sample_idx, new_operator, fully_sampled))
                 else:
                     num_dropped_from_frontier += 1
 
             # replace the ops dropped from the frontier with new ops from the reservoir
-            num_dropped_from_frontier = min(num_dropped_from_frontier, len(reservoir_ops[op_set_id]))
+            num_dropped_from_frontier = min(num_dropped_from_frontier, len(reservoir_ops[logical_op_id]))
             for idx in range(num_dropped_from_frontier):
-                new_frontier_ops[op_set_id].append((reservoir_ops[op_set_id][idx], 0, True, False))
+                new_frontier_ops[logical_op_id].append((reservoir_ops[logical_op_id][idx], 0, True, False))
 
-            # update reservoir ops for this op_set_id
-            new_reservoir_ops[op_set_id] = reservoir_ops[op_set_id][num_dropped_from_frontier:]
+            # update reservoir ops for this logical_op_id
+            new_reservoir_ops[logical_op_id] = reservoir_ops[logical_op_id][num_dropped_from_frontier:]
 
         return new_frontier_ops, new_reservoir_ops
 
@@ -348,7 +353,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
     def score_quality(
             self,
             op_set: list[PhysicalOperator],
-            op_set_id: str,
+            logical_op_id: str,
             execution_data: dict[str, dict[str, list[DataRecordSet]]],
             champion_outputs: dict[str, dict[str, DataRecordSet]],
             expected_outputs: dict[str, DataRecordSet] | None = None,
@@ -388,7 +393,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         )
 
         # pull out the execution data from this operator; place the upstream execution data in a new list
-        this_op_execution_data = execution_data[op_set_id]
+        this_op_execution_data = execution_data[logical_op_id]
 
         # compute quality of each output computed by this operator
         for source_id, record_sets in this_op_execution_data.items():
@@ -412,7 +417,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
             )
 
             # extract champion output for this record set
-            champion_record_set = champion_outputs[op_set_id][source_id]
+            champion_record_set = champion_outputs[logical_op_id][source_id]
 
             # for each record_set produced by an operation, compute its quality
             for record_set in record_sets:
@@ -502,7 +507,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         # - handle limits
         # create thread pool w/max workers and run futures over worker pool
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # for non-zero entries in sample matrix: create future task
+            # create futures
             futures = []
             for operator, candidate in op_candidate_pairs:
                 future = executor.submit(MABSentinelExecutionEngine.execute_op_wrapper, operator, candidate)
@@ -569,27 +574,16 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
         # initialize plan stats and operator stats
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
-        full_op_sets, full_op_set_ids = [], []
-        for op_set in plan.operator_sets:
-            op_set_id = SentinelPlan.compute_op_set_id(op_set)
-            full_op_sets.append(op_set)
-            full_op_set_ids.append(op_set_id)
-
-            op_set_str = ",".join([op.op_name() for op in op_set])
-            op_set_name = f"OpSet({op_set_str})"
+        for logical_op_id, logical_op_name, op_set in plan:
             op_set_details = {
-                op.op_name(): {k: str(v) for k, v in op.get_op_params().items()}
+                op.op_name(): {k: str(v) for k, v in op.get_id_params().items()}
                 for op in op_set
             }
-            plan_stats.operator_stats[op_set_id] = OperatorStats(op_id=op_set_id, op_name=op_set_name, op_details=op_set_details)
-
-        # get handle to DataSource (# making the assumption that first operator_set can only be a scan
-        source_operator = plan.operator_sets[0][0]
-        datasource = (
-            self.datadir.get_registered_dataset(source_operator.dataset_id)
-            if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
+            plan_stats.operator_stats[logical_op_id] = OperatorStats(
+                op_id=logical_op_id,
+                op_name=logical_op_name,
+                op_details=op_set_details,
+            )
 
         # shuffle the indices of records to sample
         total_num_samples = self.datasource.get_val_length()
@@ -600,41 +594,42 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         # (operator, next_shuffled_sample_idx, new_operator); new_operator is True when an operator
         # is added to the frontier
         frontier_ops, reservoir_ops = {}, {}
-        for op_set, op_set_id in zip(full_op_sets, full_op_set_ids):
+        for logical_op_id, _, op_set in plan:
             op_set_copy = [op for op in op_set]
             self.rng.shuffle(op_set_copy)
             k = min(self.k, len(op_set_copy))
-            frontier_ops[op_set_id] = [(op, 0, True, False) for op in op_set_copy[:k]]
-            reservoir_ops[op_set_id] = [op for op in op_set_copy[k:]]
+            frontier_ops[logical_op_id] = [(op, 0, True, False) for op in op_set_copy[:k]]
+            reservoir_ops[logical_op_id] = [op for op in op_set_copy[k:]]
 
-        # create mapping from op_set_id and op_ids to the number of samples drawn
-        op_set_id_to_num_samples = {op_set_id: 0 for op_set_id in full_op_set_ids}
-        op_id_to_num_samples = {op.get_op_id(): 0 for op_set in full_op_sets for op in op_set}
-        is_filter_op_set = {
-            full_op_set_id: isinstance(full_op_set[0], FilterOp)
-            for full_op_set_id, full_op_set in zip(full_op_set_ids, full_op_sets)
+        # create mapping from logical and physical op ids to the number of samples drawn
+        logical_op_id_to_num_samples = {logical_op_id: 0 for logical_op_id, _, _ in plan}
+        phys_op_id_to_num_samples = {op.get_op_id(): 0 for _, _, op_set in plan for op in op_set}
+        is_filter_op_dict = {
+            logical_op_id: isinstance(op_set[0], FilterOp)
+            for logical_op_id, _, op_set in plan
         }
 
         # TODO: long-term, we should do something which does not rely on scanning validation source to build this mapping
         sample_idx_to_source_id = {
-            sample_idx: datasource.get_item(sample_idx, val=True)._source_id
+            sample_idx: self.datasource.get_item(sample_idx, val=True)._source_id
             for sample_idx in range(total_num_samples)
         }
 
         # NOTE: to maintain parity with our count of samples drawn in the random sampling execution,
-        # for each op_set_id, we count the number of (record, op) executions as the number of samples within that op_set;
+        # for each logical_op_id, we count the number of (record, op) executions as the number of samples within that op_set;
         # the samples drawn is equal to the max of that number across all operator sets
         samples_drawn = 0
         all_outputs, champion_outputs = {}, {}
         while samples_drawn < self.sample_budget:
             # execute operator sets in sequence
-            for op_set_idx, (op_set, op_set_id) in enumerate(zip(full_op_sets, full_op_set_ids)):
-                prev_op_set_id = full_op_set_ids[op_set_idx - 1] if op_set_idx > 0 else None
+            for op_idx, (logical_op_id, _, op_set) in enumerate(plan):
+                prev_logical_op_id = plan.logical_op_ids[op_idx - 1] if op_idx > 0 else None
+                prev_logical_op_is_filter =  prev_logical_op_id is not None and is_filter_op_dict[prev_logical_op_id]
 
                 # create list of tuples for (op, candidate) which we should execute
                 op_candidate_pairs = []
                 updated_frontier_ops_lst = []
-                for op, next_shuffled_sample_idx, new_operator, fully_sampled in frontier_ops[op_set_id]:
+                for op, next_shuffled_sample_idx, new_operator, fully_sampled in frontier_ops[logical_op_id]:
                     # execute new operators on first j candidates, and previously sampled operators on one additional candidate
                     j = min(self.j, len(shuffled_sample_indices)) if new_operator else 1
                     for j_idx in range(j):
@@ -643,34 +638,34 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                             sample_idx = shuffled_sample_indices[(next_shuffled_sample_idx + j_idx) % len(shuffled_sample_indices)]
                             candidate = DataRecord(schema=SourceRecord, source_id=sample_idx)
                             candidate.idx = sample_idx
-                            candidate.get_item_fn = partial(datasource.get_item, val=True)
+                            candidate.get_item_fn = partial(self.datasource.get_item, val=True)
                             candidates = [candidate]
-                            op_set_id_to_num_samples[op_set_id] += 1
-                            op_id_to_num_samples[op.get_op_id()] += 1
+                            logical_op_id_to_num_samples[logical_op_id] += 1
+                            phys_op_id_to_num_samples[op.get_op_id()] += 1
                         else:
                             if next_shuffled_sample_idx + j_idx == len(shuffled_sample_indices):
                                 fully_sampled = True
                                 break
 
-                            # pick best output from all_outputs for prev_set_id
+                            # pick best output from all_outputs from previous logical operator
                             sample_idx = shuffled_sample_indices[next_shuffled_sample_idx + j_idx]
                             source_id = sample_idx_to_source_id[sample_idx]
-                            record_sets = all_outputs[prev_op_set_id][source_id]
+                            record_sets = all_outputs[prev_logical_op_id][source_id]
                             all_source_record_sets = [(record_set, None) for record_set in record_sets]
                             max_quality_record_set = self.pick_highest_quality_output(all_source_record_sets)
                             if (
-                                not isinstance(plan.operator_sets[op_set_idx - 1], FilteredScan)
+                                not prev_logical_op_is_filter
                                 or (
-                                    isinstance(plan.operator_sets[op_set_idx - 1], FilteredScan)
+                                    prev_logical_op_is_filter
                                     and max_quality_record_set.record_op_stats[0].passed_operator
                                 )
                             ):
                                 candidates = [record for record in max_quality_record_set]
 
-                            # increment number of samples drawn for this op_set_id and op_id; even if we get multiple
+                            # increment number of samples drawn for this logical and physical op id; even if we get multiple
                             # candidates from the previous stage in the pipeline, we only count this as one sample
-                            op_set_id_to_num_samples[op_set_id] += 1
-                            op_id_to_num_samples[op.get_op_id()] += 1
+                            logical_op_id_to_num_samples[logical_op_id] += 1
+                            phys_op_id_to_num_samples[op.get_op_id()] += 1
 
                         if len(candidates) > 0:
                             op_candidate_pairs.extend([(op, candidate) for candidate in candidates])
@@ -678,7 +673,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                     # set new_operator = False and update next_shuffled_sample_idx
                     updated_frontier_ops_lst.append((op, next_shuffled_sample_idx + j, False, fully_sampled))
 
-                frontier_ops[op_set_id] = updated_frontier_ops_lst
+                frontier_ops[logical_op_id] = updated_frontier_ops_lst
 
                 # continue if op_candidate_pairs is an empty list, as this means all records have been filtered out
                 if len(op_candidate_pairs) == 0:
@@ -688,19 +683,19 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                 source_id_to_record_sets, source_id_to_champion_record_set = self.execute_op_set(op_candidate_pairs)
 
                 # update all_outputs and champion_outputs dictionary
-                if op_set_id not in all_outputs:
-                    all_outputs[op_set_id] = source_id_to_record_sets
-                    champion_outputs[op_set_id] = source_id_to_champion_record_set
+                if logical_op_id not in all_outputs:
+                    all_outputs[logical_op_id] = source_id_to_record_sets
+                    champion_outputs[logical_op_id] = source_id_to_champion_record_set
                 else:
                     for source_id, record_sets in source_id_to_record_sets.items():
-                        if source_id not in all_outputs[op_set_id]:
-                            all_outputs[op_set_id][source_id] = record_sets
-                            champion_outputs[op_set_id][source_id] = source_id_to_champion_record_set[source_id]
+                        if source_id not in all_outputs[logical_op_id]:
+                            all_outputs[logical_op_id][source_id] = record_sets
+                            champion_outputs[logical_op_id][source_id] = source_id_to_champion_record_set[source_id]
                         else:
-                            all_outputs[op_set_id][source_id].extend(record_sets)
+                            all_outputs[logical_op_id][source_id].extend(record_sets)
                             # NOTE: short-term solution; in practice we can get multiple champion records from different
                             # sets of operators, so we should try to find a way to only take one
-                            champion_outputs[op_set_id][source_id] = source_id_to_champion_record_set[source_id]
+                            champion_outputs[logical_op_id][source_id] = source_id_to_champion_record_set[source_id]
 
                 # flatten lists of records and record_op_stats
                 all_records, all_record_op_stats = [], []
@@ -710,9 +705,9 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                         all_record_op_stats.extend(record_set.record_op_stats)
 
                 # update plan stats
-                plan_stats.operator_stats[op_set_id].add_record_op_stats(
+                plan_stats.operator_stats[logical_op_id].add_record_op_stats(
                     all_record_op_stats,
-                    source_op_id=prev_op_set_id,
+                    source_op_id=prev_logical_op_id,
                     plan_id=plan.plan_id,
                 )
 
@@ -720,22 +715,37 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                 if not self.nocache:
                     for record in all_records:
                         if getattr(record, "_passed_operator", True):
-                            self.datadir.append_cache(op_set_id, record)
+                            self.datadir.append_cache(logical_op_id, record)
 
-                # compute quality for each operator (and time and cost) and put them into matrix
+                # compute quality for each operator
                 field_to_metric_fn = self.datasource.get_field_to_metric_fn()
-                all_outputs = self.score_quality(op_set, op_set_id, all_outputs, champion_outputs, expected_outputs, field_to_metric_fn)
+                all_outputs = self.score_quality(
+                    op_set,
+                    logical_op_id,
+                    all_outputs,
+                    champion_outputs,
+                    expected_outputs,
+                    field_to_metric_fn,
+                )
 
             # update the (pareto) frontier for each set of operators
-            frontier_ops, reservoir_ops = self.update_frontier_ops(frontier_ops, reservoir_ops, policy, all_outputs, op_set_id_to_num_samples, op_id_to_num_samples, is_filter_op_set)
+            frontier_ops, reservoir_ops = self.update_frontier_ops(
+                frontier_ops,
+                reservoir_ops,
+                policy,
+                all_outputs,
+                logical_op_id_to_num_samples,
+                phys_op_id_to_num_samples,
+                is_filter_op_dict,
+            )
 
-            # update the number of samples drawn to be the max across all op_sets of the op_set_id_to_num_samples
-            samples_drawn = max(op_set_id_to_num_samples.values())
+            # update the number of samples drawn to be the max across all logical operators
+            samples_drawn = max(logical_op_id_to_num_samples.values())
 
         # if caching was allowed, close the cache
         if not self.nocache:
-            for op_set_id in full_op_set_ids:
-                self.datadir.close_cache(op_set_id)
+            for logical_op_id, _, _ in plan:
+                self.datadir.close_cache(logical_op_id)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
@@ -747,9 +757,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
     def generate_sample_observations(self, sentinel_plan: SentinelPlan, policy: Policy):
         """
         This function is responsible for generating sample observation data which can be
-        consumed by the CostModel. For each physical optimization and each operator, our
-        goal is to capture `rank + 1` samples per optimization, where `rank` is the presumed
-        low-rank of the observation matrix.
+        consumed by the CostModel.
 
         To accomplish this, we construct a special sentinel plan using the Optimizer which is
         capable of executing any valid physical implementation of a Filter or Convert operator
