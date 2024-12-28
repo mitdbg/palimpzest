@@ -543,7 +543,7 @@ class BiodexReactionLabels(BiodexReactions):
     )
 
 
-class BiodexRankedReactions(BiodexEntry):
+class BiodexRankedReactions(BiodexReactionLabels):
     """
     You will be presented with the text of a medical article which is partially or entirely about
     an adverse event experienced by a patient in response to taking one or more drugs. You will also
@@ -758,7 +758,7 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--datasetid", type=str, help="The dataset id")
     parser.add_argument(
-        "--workload", type=str, help="The workload to run. One of enron, real-estate, medical-schema-matching."
+        "--workload", type=str, help="The workload to run. One of enron, real-estate, biodex, biodex-reactions."
     )
     parser.add_argument(
         "--engine",
@@ -887,7 +887,7 @@ if __name__ == "__main__":
             execution_engine = pz.MABSequentialParallelSentinelExecution
         elif executor == "sequential-random":
             execution_engine = pz.RandomSamplingSequentialSingleThreadSentinelExecution
-        elif executor == "parallel-mab":
+        elif executor == "parallel-random":
             execution_engine = pz.RandomSamplingSequentialParallelSentinelExecution
         else:
             print("Unknown executor")
