@@ -75,7 +75,7 @@ class StreamingSequentialExecution(ExecutionEngine):
                 raise Exception("You cannot have a Streaming Execution if there is an Aggregation Operator")
             op_id = op.get_op_id()
             op_name = op.op_name()
-            op_details = {k: str(v) for k, v in op.get_op_params().items()}
+            op_details = {k: str(v) for k, v in op.get_id_params().items()}
             self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details) 
         print("Time for planning: ", time.time() - start_time)
         self.plan_generated = True

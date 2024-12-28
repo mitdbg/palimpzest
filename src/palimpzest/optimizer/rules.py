@@ -209,11 +209,12 @@ class NonLLMConvertRule(ImplementationRule):
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
-        op_kwargs = logical_op.get_op_params()
+        op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
             {
                 "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_op_id(),
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
             }
         )
 
@@ -251,11 +252,12 @@ class LLMConvertRule(ImplementationRule):
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
-        op_kwargs = logical_op.get_op_params()
+        op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
             {
                 "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_op_id(),
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
             }
         )
 
@@ -333,11 +335,12 @@ class TokenReducedConvertRule(ImplementationRule):
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
-        op_kwargs = logical_op.get_op_params()
+        op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
             {
                 "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_op_id(),
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
             }
         )
 
@@ -417,11 +420,12 @@ class CodeSynthesisConvertRule(ImplementationRule):
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
-        op_kwargs = logical_op.get_op_params()
+        op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
             {
                 "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_op_id(),
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
             }
         )
 
@@ -469,10 +473,11 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
-        op_kwargs: dict = logical_op.get_op_params()
+        op_kwargs: dict = logical_op.get_logical_op_params()
         op_kwargs.update({
             "verbose": physical_op_params['verbose'],
-            "logical_op_id": logical_op.get_op_id(),
+            "logical_op_id": logical_op.get_logical_op_id(),
+            "logical_op_name": logical_op.logical_op_name(),
         })
 
         # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
@@ -540,11 +545,12 @@ class RetrieveRule(ImplementationRule):
         ks = cls.k_budgets if logical_op.k == -1 else [logical_op.k]
         for k in ks:
             # get initial set of parameters for physical op
-            op_kwargs = logical_op.get_op_params()
+            op_kwargs = logical_op.get_logical_op_params()
             op_kwargs.update(
                 {
                     "verbose": physical_op_params["verbose"],
-                    "logical_op_id": logical_op.get_op_id(),
+                    "logical_op_id": logical_op.get_logical_op_id(),
+                    "logical_op_name": logical_op.logical_op_name(),
                     "k": k,
                 }
             )
@@ -563,27 +569,6 @@ class RetrieveRule(ImplementationRule):
 
         return set(physical_expressions)
 
-        # # get initial set of parameters for physical op
-        # op_kwargs = logical_op.get_op_params()
-        # op_kwargs.update(
-        #     {
-        #         "verbose": physical_op_params["verbose"],
-        #         "logical_op_id": logical_op.get_op_id(),
-        #     }
-        # )
-
-        # # construct multi-expression
-        # op = RetrieveOp(**op_kwargs)
-        # expression = PhysicalExpression(
-        #     operator=op,
-        #     input_group_ids=logical_expression.input_group_ids,
-        #     input_fields=logical_expression.input_fields,
-        #     generated_fields=logical_expression.generated_fields,
-        #     group_id=logical_expression.group_id,
-        # )
-
-        # return set([expression])
-
 
 class NonLLMFilterRule(ImplementationRule):
     """
@@ -600,11 +585,12 @@ class NonLLMFilterRule(ImplementationRule):
     @staticmethod
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
         logical_op = logical_expression.operator
-        op_kwargs = logical_op.get_op_params()
+        op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
             {
                 "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_op_id(),
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
             }
         )
         op = NonLLMFilter(**op_kwargs)
@@ -634,10 +620,11 @@ class LLMFilterRule(ImplementationRule):
     @staticmethod
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
         logical_op = logical_expression.operator
-        op_kwargs = logical_op.get_op_params()
+        op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update({
             "verbose": physical_op_params["verbose"],
-            "logical_op_id": logical_op.get_op_id(),
+            "logical_op_id": logical_op.get_logical_op_id(),
+            "logical_op_name": logical_op.logical_op_name(),
         })
 
         # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
@@ -688,11 +675,12 @@ class AggregateRule(ImplementationRule):
     @staticmethod
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
         logical_op = logical_expression.operator
-        op_kwargs = logical_op.get_op_params()
+        op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
             {
                 "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_op_id(),
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
             }
         )
 
@@ -735,11 +723,12 @@ class BasicSubstitutionRule(ImplementationRule):
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
         logical_op = logical_expression.operator
-        op_kwargs = logical_op.get_op_params()
+        op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
             {
                 "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_op_id(),
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
             }
         )
         physical_op_class = cls.LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP[logical_op.__class__]

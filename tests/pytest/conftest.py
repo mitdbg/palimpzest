@@ -14,7 +14,6 @@ pytest_plugins = [
     "fixtures.datasets",
     "fixtures.execution_data",
     "fixtures.expected_cost_est_results",
-    "fixtures.expected_matrices",
     "fixtures.expected_physical_plans",
     "fixtures.expected_qualities",
     "fixtures.expected_records",
@@ -221,18 +220,6 @@ def expected_qualities(
         "scffc": scan_multi_convert_multi_filter_qualities,
     }
     return expected_qualities_id_to_expected_qualities[expected_qualities_id]
-
-
-@pytest.fixture
-def expected_matrices(
-    request,
-    scan_convert_filter_matrices,
-):
-    expected_matrix_id = request.param
-    expected_matrix_id_to_expected_matrices = {
-        "scf": scan_convert_filter_matrices,
-    }
-    return expected_matrix_id_to_expected_matrices[expected_matrix_id]
 
 
 @pytest.fixture

@@ -15,23 +15,13 @@ class LimitScanOp(PhysicalOperator):
         op += f"    Limit: {self.limit}\n"
         return op
 
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {"limit": self.limit, **copy_kwargs}
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        return {"limit": self.limit, **id_params}
 
     def get_op_params(self):
-        return {
-            "output_schema": self.output_schema,
-            "limit": self.limit,
-        }
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.limit == other.limit
-            and self.output_schema == other.output_schema
-            and self.input_schema == other.input_schema
-        )
+        op_params = super().get_op_params()
+        return {"limit": self.limit, **op_params}
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the limit takes negligible additional time (and no cost in USD)
@@ -59,7 +49,7 @@ class LimitScanOp(PhysicalOperator):
             op_name=self.op_name(),
             time_per_record=0.0,
             cost_per_record=0.0,
-            op_details={k: str(v) for k, v in self.get_op_params().items()},
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 
         return DataRecordSet([dr], [record_op_stats])

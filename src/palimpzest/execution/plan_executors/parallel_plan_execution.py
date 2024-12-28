@@ -54,7 +54,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         for op in plan.operators:
             op_id = op.get_op_id()
             op_name = op.op_name()
-            op_details = {k: str(v) for k, v in op.get_op_params().items()}
+            op_details = {k: str(v) for k, v in op.get_id_params().items()}
             plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details)
 
         # initialize list of output records and intermediate variables

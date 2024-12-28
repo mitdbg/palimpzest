@@ -4,8 +4,8 @@ import pytest
 
 from palimpzest.datamanager import DataDirectory
 from palimpzest.execution.nosentinel_execution import (
-    PipelinedParallelNoSentinelExecution,
-    SequentialSingleThreadNoSentinelExecution,
+    NoSentinelPipelinedParallelExecution,
+    NoSentinelSequentialSingleThreadExecution,
 )
 from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.operators.convert import LLMConvert
@@ -15,8 +15,8 @@ from palimpzest.operators.filter import LLMFilter
 @pytest.mark.parametrize(
     argnames=("execution_engine",),
     argvalues=[
-        pytest.param(SequentialSingleThreadNoSentinelExecution, id="seq-single-thread"),
-        pytest.param(PipelinedParallelNoSentinelExecution, id="parallel"),
+        pytest.param(NoSentinelSequentialSingleThreadExecution, id="seq-single-thread"),
+        pytest.param(NoSentinelPipelinedParallelExecution, id="parallel"),
     ]
 )
 class TestParallelExecutionNoCache:

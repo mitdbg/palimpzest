@@ -18,7 +18,6 @@ from palimpzest.constants import (
     Model,
     PromptStrategy,
 )
-from palimpzest.corelib.schemas import Schema
 from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.elements.records import DataRecord, DataRecordSet
 from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
@@ -44,26 +43,28 @@ class ConvertOp(PhysicalOperator):
         self.udf = udf
         self.desc = desc
         self.depends_on = depends_on if depends_on is None else sorted(depends_on)
-        self.heatmap_json_obj = None
 
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        id_params = {
+            "cardinality": self.cardinality.value,
+            "udf": self.udf,
+            **id_params,
+        }
+
+        return id_params
+
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        op_params = {
             "cardinality": self.cardinality,
             "udf": self.udf,
             "desc": self.desc,
             "depends_on": self.depends_on,
-            **copy_kwargs
+            **op_params
         }
 
-    def get_op_params(self):
-        return {
-            "input_schema": self.input_schema,
-            "output_schema": self.output_schema,
-            "cardinality": self.cardinality.value,
-            "udf": self.udf,
-            "depends_on": self.depends_on,
-        }
+        return op_params
 
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         raise NotImplementedError("This is an abstract class. Use a subclass instead.")
@@ -77,7 +78,6 @@ class NonLLMConvert(ConvertOp):
             and self.input_schema == other.input_schema
             and self.cardinality == other.cardinality
             and self.udf == other.udf
-            and self.max_workers == other.max_workers
         )
 
     def __str__(self):
@@ -95,7 +95,7 @@ class NonLLMConvert(ConvertOp):
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate 1 ms single-threaded execution for udf function
-        time_per_record = 0.001 / self.max_workers
+        time_per_record = 0.001
 
         # assume filter fn has perfect quality
         return OperatorCostEstimates(
@@ -162,7 +162,7 @@ class NonLLMConvert(ConvertOp):
                 generated_fields=self.output_schema.field_names(),
                 fn_call_duration_secs=fn_call_duration_secs / len(drs),
                 failed_convert=(not successful_convert),
-                op_details={k: str(v) for k, v in self.get_op_params().items()},
+                op_details={k: str(v) for k, v in self.get_id_params().items()},
             )
             record_op_stats_lst.append(record_op_stats)
 
@@ -197,31 +197,21 @@ class LLMConvert(ConvertOp):
                     self.model, self.prompt_strategy, doc_schema, doc_type, self.verbose
                 )
 
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.model == other.model
-            and self.cardinality == other.cardinality
-            and self.image_conversion == other.image_conversion
-            and self.prompt_strategy == other.prompt_strategy
-            and self.output_schema == other.output_schema
-            and self.input_schema == other.input_schema
-            and self.max_workers == other.max_workers
-        )
-
     def __str__(self):
         op = super().__str__()
         op += f"    Prompt Strategy: {self.prompt_strategy}\n"
         return op
 
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {
-            "model": self.model,
-            "prompt_strategy": self.prompt_strategy,
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        id_params = {
+            "model": None if self.model is None else self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
             "image_conversion": self.image_conversion,
-            **copy_kwargs,
+            **id_params,
         }
+
+        return id_params
 
     def get_op_params(self):
         op_params = super().get_op_params()
@@ -253,7 +243,7 @@ class LLMConvert(ConvertOp):
         model_name = self.model.value if getattr(self, "model", None) is not None else Model.GPT_4o_MINI.value
         model_conversion_time_per_record = (
             MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
-        ) / self.max_workers
+        )
 
         # get est. of conversion cost (in USD) per record from model card
         model_conversion_usd_per_record = (
@@ -432,7 +422,7 @@ class LLMConvert(ConvertOp):
                 fn_call_duration_secs=per_record_stats.fn_call_duration_secs,
                 failed_convert=(not successful_convert),
                 image_operation=self.image_conversion,
-                op_details={k: str(v) for k, v in self.get_op_params().items()},
+                op_details={k: str(v) for k, v in self.get_id_params().items()},
             )
             record_op_stats_lst.append(record_op_stats)
 
@@ -677,7 +667,7 @@ class LLMConvertConventional(LLMConvert):
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
             MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
-        ) / self.max_workers
+        )
 
         # get est. of conversion cost (in USD) per record from model card
         model_conversion_usd_per_record = (
@@ -723,7 +713,7 @@ class LLMConvertBonded(LLMConvert):
         # if there was an error for any field, execute a conventional query on that field
         for field, values in json_answers.items():
             if values == []:
-                conventional_op = LLMConvertConventional(**self.get_copy_kwargs())
+                conventional_op = LLMConvertConventional(**self.get_op_params())
 
                 field_answer, field_stats = conventional_op.convert(candidate, [field])
                 json_answers[field] = field_answer[field]

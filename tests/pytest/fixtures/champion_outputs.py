@@ -9,12 +9,11 @@ from palimpzest.optimizer.plan import SentinelPlan
 # NOTE: this relies on knowledge of the fixtures in fixtures/execution_data.py
 @pytest.fixture
 def scan_convert_filter_champion_outputs(scan_convert_filter_sentinel_plan, foobar_schema):
-    op_sets = scan_convert_filter_sentinel_plan.operator_sets
-    op_set_ids = [SentinelPlan.compute_op_set_id(op_set) for op_set in op_sets]
-    scan_op_set_id = op_set_ids[0]
-    convert_op_set_id = op_set_ids[1]
-    filter_op_set_id = op_set_ids[2]
-    champion_outputs = {op_set_id: {} for op_set_id in op_set_ids}
+    logical_op_ids = scan_convert_filter_sentinel_plan.logical_op_ids
+    scan_logical_op_id = logical_op_ids[0]
+    convert_logical_op_id = logical_op_ids[1]
+    filter_logical_op_id = logical_op_ids[2]
+    champion_outputs = {logical_op_id: {} for logical_op_id in logical_op_ids}
 
     # compute scan champion_outputs
     for idx in range(10):
@@ -22,7 +21,7 @@ def scan_convert_filter_champion_outputs(scan_convert_filter_sentinel_plan, foob
         scan_dr = DataRecord(TextFile, source_id, parent_id=None)
         scan_dr.filename = f"file{idx}"
         scan_dr.contents = None
-        champion_outputs[scan_op_set_id][source_id] = DataRecordSet([scan_dr], None)
+        champion_outputs[scan_logical_op_id][source_id] = DataRecordSet([scan_dr], None)
 
     # add convert champion outputs
     for idx in range(10):
@@ -32,7 +31,7 @@ def scan_convert_filter_champion_outputs(scan_convert_filter_sentinel_plan, foob
         convert_dr.contents = None
         convert_dr.foo = f"foo{idx}"
         convert_dr.bar = f"bar{idx}"
-        champion_outputs[convert_op_set_id][source_id] = DataRecordSet([convert_dr], None)
+        champion_outputs[convert_logical_op_id][source_id] = DataRecordSet([convert_dr], None)
 
     # add filter champion outputs
     for idx in range(10):
@@ -43,19 +42,18 @@ def scan_convert_filter_champion_outputs(scan_convert_filter_sentinel_plan, foob
         filter_dr.foo = f"foo{idx}"
         filter_dr.bar = f"bar{idx}"
         filter_dr._passed_operator = bool(idx % 2)
-        champion_outputs[filter_op_set_id][source_id] = DataRecordSet([filter_dr], None)
+        champion_outputs[filter_logical_op_id][source_id] = DataRecordSet([filter_dr], None)
 
     return champion_outputs
 
 
 @pytest.fixture
 def scan_convert_filter_empty_champion_outputs(scan_convert_filter_sentinel_plan, foobar_schema):
-    op_sets = scan_convert_filter_sentinel_plan.operator_sets
-    op_set_ids = [SentinelPlan.compute_op_set_id(op_set) for op_set in op_sets]
-    scan_op_set_id = op_set_ids[0]
-    convert_op_set_id = op_set_ids[1]
-    filter_op_set_id = op_set_ids[2]
-    champion_outputs = {op_set_id: {} for op_set_id in op_set_ids}
+    logical_op_ids = scan_convert_filter_sentinel_plan.logical_op_ids
+    scan_logical_op_id = logical_op_ids[0]
+    convert_logical_op_id = logical_op_ids[1]
+    filter_logical_op_id = logical_op_ids[2]
+    champion_outputs = {logical_op_id: {} for logical_op_id in logical_op_ids}
 
     # compute scan champion_outputs
     for idx in range(10):
@@ -63,7 +61,7 @@ def scan_convert_filter_empty_champion_outputs(scan_convert_filter_sentinel_plan
         scan_dr = DataRecord(TextFile, source_id, parent_id=None)
         scan_dr.filename = f"file{idx}"
         scan_dr.contents = None
-        champion_outputs[scan_op_set_id][source_id] = DataRecordSet([scan_dr], None)
+        champion_outputs[scan_logical_op_id][source_id] = DataRecordSet([scan_dr], None)
 
     # add convert champion outputs
     for idx in range(10):
@@ -73,7 +71,7 @@ def scan_convert_filter_empty_champion_outputs(scan_convert_filter_sentinel_plan
         convert_dr.contents = None
         convert_dr.foo = f"foo{idx}"
         convert_dr.bar = f"bar{idx}"
-        champion_outputs[convert_op_set_id][source_id] = DataRecordSet([convert_dr], None)
+        champion_outputs[convert_logical_op_id][source_id] = DataRecordSet([convert_dr], None)
 
     # add filter champion outputs
     for idx in range(10):
@@ -84,19 +82,18 @@ def scan_convert_filter_empty_champion_outputs(scan_convert_filter_sentinel_plan
         filter_dr.foo = f"foo{idx}"
         filter_dr.bar = f"bar{idx}"
         filter_dr._passed_operator = False
-        champion_outputs[filter_op_set_id][source_id] = DataRecordSet([filter_dr], None)
+        champion_outputs[filter_logical_op_id][source_id] = DataRecordSet([filter_dr], None)
 
     return champion_outputs
 
 
 @pytest.fixture
 def scan_convert_filter_varied_champion_outputs(scan_convert_filter_sentinel_plan, foobar_schema):
-    op_sets = scan_convert_filter_sentinel_plan.operator_sets
-    op_set_ids = [SentinelPlan.compute_op_set_id(op_set) for op_set in op_sets]
-    scan_op_set_id = op_set_ids[0]
-    convert_op_set_id = op_set_ids[1]
-    filter_op_set_id = op_set_ids[2]
-    champion_outputs = {op_set_id: {} for op_set_id in op_set_ids}
+    logical_op_ids = scan_convert_filter_sentinel_plan.logical_op_ids
+    scan_logical_op_id = logical_op_ids[0]
+    convert_logical_op_id = logical_op_ids[1]
+    filter_logical_op_id = logical_op_ids[2]
+    champion_outputs = {logical_op_id: {} for logical_op_id in logical_op_ids}
 
     # compute scan champion_outputs
     for idx in range(10):
@@ -104,7 +101,7 @@ def scan_convert_filter_varied_champion_outputs(scan_convert_filter_sentinel_pla
         scan_dr = DataRecord(TextFile, source_id, parent_id=None)
         scan_dr.filename = f"file{idx}"
         scan_dr.contents = None
-        champion_outputs[scan_op_set_id][source_id] = DataRecordSet([scan_dr], None)
+        champion_outputs[scan_logical_op_id][source_id] = DataRecordSet([scan_dr], None)
 
     # add convert champion outputs
     for idx in range(10):
@@ -114,7 +111,7 @@ def scan_convert_filter_varied_champion_outputs(scan_convert_filter_sentinel_pla
         convert_dr.contents = None
         convert_dr.foo = f"foo{idx}"
         convert_dr.bar = f"bar{idx}-{str(Model.GPT_4o)}"
-        champion_outputs[convert_op_set_id][source_id] = DataRecordSet([convert_dr], None)
+        champion_outputs[convert_logical_op_id][source_id] = DataRecordSet([convert_dr], None)
 
     # add filter champion outputs
     for idx in range(10):
@@ -125,7 +122,7 @@ def scan_convert_filter_varied_champion_outputs(scan_convert_filter_sentinel_pla
         filter_dr.foo = f"foo{idx}"
         filter_dr.bar = f"bar{idx}-{str(Model.GPT_4o)}"
         filter_dr._passed_operator = bool(idx % 2)
-        champion_outputs[filter_op_set_id][source_id] = DataRecordSet([filter_dr], None)
+        champion_outputs[filter_logical_op_id][source_id] = DataRecordSet([filter_dr], None)
 
     return champion_outputs
 
@@ -135,14 +132,13 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
     """
     Champion outputs agree with GPT-4.
     """
-    op_sets = scan_multi_convert_multi_filter_sentinel_plan.operator_sets
-    op_set_ids = [SentinelPlan.compute_op_set_id(op_set) for op_set in op_sets]
-    scan_op_set_id = op_set_ids[0]
-    convert1_op_set_id = op_set_ids[1]
-    filter1_op_set_id = op_set_ids[2]
-    filter2_op_set_id = op_set_ids[3]
-    convert2_op_set_id = op_set_ids[4]
-    champion_outputs = {op_set_id: {} for op_set_id in op_set_ids}
+    logical_op_ids = scan_multi_convert_multi_filter_sentinel_plan.logical_op_ids
+    scan_logical_op_id = logical_op_ids[0]
+    convert1_logical_op_id = logical_op_ids[1]
+    filter1_logical_op_id = logical_op_ids[2]
+    filter2_logical_op_id = logical_op_ids[3]
+    convert2_logical_op_id = logical_op_ids[4]
+    champion_outputs = {logical_op_id: {} for logical_op_id in logical_op_ids}
 
     # compute scan champion_outputs
     for idx in range(10):
@@ -150,7 +146,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
         scan_dr = DataRecord(TextFile, source_id, parent_id=None)
         scan_dr.filename = f"file{idx}"
         scan_dr.contents = None
-        champion_outputs[scan_op_set_id][source_id] = DataRecordSet([scan_dr], None)
+        champion_outputs[scan_logical_op_id][source_id] = DataRecordSet([scan_dr], None)
 
     # add first convert champion outputs
     for source_idx in range(10):
@@ -164,7 +160,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
             convert_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
             drs.append(convert_dr)
 
-        champion_outputs[convert1_op_set_id][source_id] = DataRecordSet(drs, None)
+        champion_outputs[convert1_logical_op_id][source_id] = DataRecordSet(drs, None)
 
     # add first filter champion outputs
     for source_idx in range(10):
@@ -176,7 +172,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
             filter_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
             filter_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
             filter_dr._passed_operator = bool(source_idx < 7)
-            champion_outputs[filter1_op_set_id][source_id] = DataRecordSet([filter_dr], None)
+            champion_outputs[filter1_logical_op_id][source_id] = DataRecordSet([filter_dr], None)
 
     # add second filter champion outputs
     for source_idx in range(7):
@@ -188,7 +184,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
             filter_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
             filter_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
             filter_dr._passed_operator = bool(source_idx < 5)
-            champion_outputs[filter2_op_set_id][source_id] = DataRecordSet([filter_dr], None)
+            champion_outputs[filter2_logical_op_id][source_id] = DataRecordSet([filter_dr], None)
 
     # add first convert champion outputs
     for source_idx in range(5):
@@ -200,6 +196,6 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
             convert_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
             convert_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
             convert_dr.baz = f"baz{str(Model.GPT_4o)}"
-            champion_outputs[convert2_op_set_id][source_id] = DataRecordSet([convert_dr], None)
+            champion_outputs[convert2_logical_op_id][source_id] = DataRecordSet([convert_dr], None)
 
     return champion_outputs

@@ -71,8 +71,7 @@ class NoSentinelExecutionEngine(ExecutionEngine):
 
         return records, execution_stats
 
-
-class SequentialSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, SequentialSingleThreadPlanExecutor):
+class NoSentinelSequentialSingleThreadExecution(NoSentinelExecutionEngine, SequentialSingleThreadPlanExecutor):
     """
     This class performs non-sample based execution while executing plans in a sequential, single-threaded fashion.
     """
@@ -81,7 +80,7 @@ class SequentialSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, Seque
         SequentialSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
 
 
-class PipelinedSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, PipelinedSingleThreadPlanExecutor):
+class NoSentinelPipelinedSingleThreadExecution(NoSentinelExecutionEngine, PipelinedSingleThreadPlanExecutor):
     """
     This class performs non-sample based execution while executing plans in a pipelined, single-threaded fashion.
     """
@@ -90,7 +89,7 @@ class PipelinedSingleThreadNoSentinelExecution(NoSentinelExecutionEngine, Pipeli
         PipelinedSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
 
 
-class PipelinedParallelNoSentinelExecution(NoSentinelExecutionEngine, PipelinedParallelPlanExecutor):
+class NoSentinelPipelinedParallelExecution(NoSentinelExecutionEngine, PipelinedParallelPlanExecutor):
     """
     This class performs non-sample based execution while executing plans in a pipelined, parallel fashion.
     """

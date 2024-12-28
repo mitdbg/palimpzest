@@ -6,7 +6,6 @@ import time
 from pathlib import Path
 
 import datasets
-import pandas as pd
 from ragatouille import RAGPretrainedModel
 
 import palimpzest as pz
@@ -895,11 +894,11 @@ if __name__ == "__main__":
             exit(1)
     elif engine == "nosentinel":
         if executor == "sequential":
-            execution_engine = pz.SequentialSingleThreadNoSentinelExecution
+            execution_engine = pz.NoSentinelSequentialSingleThreadExecution
         elif executor == "pipelined":
-            execution_engine = pz.PipelinedSingleThreadNoSentinelExecution
+            execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
         elif executor == "parallel":
-            execution_engine = pz.PipelinedParallelNoSentinelExecution
+            execution_engine = pz.NoSentinelPipelinedParallelExecution
         else:
             print("Unknown executor")
             exit(1)

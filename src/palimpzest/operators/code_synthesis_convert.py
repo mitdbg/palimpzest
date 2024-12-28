@@ -56,44 +56,29 @@ class CodeSynthesisConvert(LLMConvert):
                 self.exemplars = exemplars
         self.field_to_code_ensemble = {}
 
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.exemplar_generation_model == other.exemplar_generation_model
-            and self.code_synth_model == other.code_synth_model
-            and self.conventional_fallback_model == other.conventional_fallback_model
-            and self.cardinality == other.cardinality
-            and self.prompt_strategy == other.prompt_strategy
-            and self.output_schema == other.output_schema
-            and self.max_workers == other.max_workers
-            and self.cache_across_plans == other.cache_across_plans
-        )
-
     def __str__(self):
         op = super().__str__()
         op += f"    Code Synth Strategy: {self.__class__.__name__}\n"
         return op
 
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {
-            "exemplar_generation_model": self.exemplar_generation_model,
-            "code_synth_model": self.code_synth_model,
-            "conventional_fallback_model": self.conventional_fallback_model,
-            "cache_across_plans": self.cache_across_plans,
-            **copy_kwargs,
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        id_params = {
+            "exemplar_generation_model": self.exemplar_generation_model.value,
+            "code_synth_model": self.code_synth_model.value,
+            "conventional_fallback_model": self.conventional_fallback_model.value,
+            **id_params,
         }
 
+        return id_params
+
     def get_op_params(self):
-        """
-        NOTE: we do not include self.cache_across_plans because (for now) get_op_params()
-        is only supposed to return hyperparameters which affect operator performance.
-        """
         op_params = super().get_op_params()
         op_params = {
             "exemplar_generation_model": self.exemplar_generation_model,
             "code_synth_model": self.code_synth_model,
             "conventional_fallback_model": self.conventional_fallback_model,
+            "cache_across_plans": self.cache_across_plans,
             **op_params,
         }
 

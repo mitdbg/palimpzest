@@ -49,17 +49,13 @@ from palimpzest.execution.mab_sentinel_execution import (
     MABSequentialSingleThreadSentinelExecution,
 )
 from palimpzest.execution.nosentinel_execution import (
-    PipelinedParallelNoSentinelExecution,
-    PipelinedSingleThreadNoSentinelExecution,
-    SequentialSingleThreadNoSentinelExecution,
+    NoSentinelPipelinedParallelExecution,
+    NoSentinelPipelinedSingleThreadExecution,
+    NoSentinelSequentialSingleThreadExecution,
 )
 from palimpzest.execution.random_sampling_sentinel_execution import (
     RandomSamplingSequentialParallelSentinelExecution,
     RandomSamplingSequentialSingleThreadSentinelExecution,
-)
-from palimpzest.execution.sentinel_execution import (
-    SequentialParallelSentinelExecution,
-    SequentialSingleThreadSentinelExecution,
 )
 from palimpzest.execution.streaming_execution import StreamingSequentialExecution
 from palimpzest.operators.aggregate import AggregateOp, ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
@@ -126,14 +122,11 @@ __all__ = [
     "Execute",
     "MABSequentialParallelSentinelExecution",
     "MABSequentialSingleThreadSentinelExecution",
-    "PipelinedParallelNoSentinelExecution",
-    "PipelinedSingleThreadNoSentinelExecution",
-    "PipelinedParallelSentinelExecution",
+    "NoSentinelPipelinedParallelExecution",
+    "NoSentinelPipelinedSingleThreadExecution",
+    "NoSentinelSequentialSingleThreadExecution",
     "RandomSamplingSequentialParallelSentinelExecution",
     "RandomSamplingSequentialSingleThreadSentinelExecution",
-    "SequentialParallelSentinelExecution",
-    "SequentialSingleThreadNoSentinelExecution",
-    "SequentialSingleThreadSentinelExecution",
     "StreamingSequentialExecution",
     # operators
     "AggregateOp",

@@ -8,6 +8,7 @@ import numpy as np
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, OptimizationStrategy
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
+from palimpzest.datasources import ValidationDataSource
 from palimpzest.elements.records import DataRecord, DataRecordSet
 from palimpzest.execution.execution_engine import ExecutionEngine
 from palimpzest.execution.plan_executors.single_threaded_plan_execution import SequentialSingleThreadPlanExecutor
@@ -47,6 +48,8 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         # self.max_workers = self.get_parallel_max_workers()
         # TODO: undo
         # self.max_workers = 1
+        assert isinstance(self.datasource, ValidationDataSource), "DataSource must be ValidationDataSource for sentinel execution"
+
         self.k = k
         self.sample_budget = sample_budget
         self.j = int(sample_budget / k)
@@ -218,7 +221,6 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         #       principled way of getting these directly from attributes either stored in the sentinel_plan
         #       or in the PhysicalOperator
         op_set = operator_sets[-1]
-        op_set_id = SentinelPlan.compute_op_set_id(op_set)
         physical_op = op_set[0]
         is_source_op = isinstance(physical_op, (MarshalAndScanDataOp, CacheScanDataOp))
         is_filter_op = isinstance(physical_op, FilterOp)
@@ -228,13 +230,14 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             and not isinstance(physical_op, LLMFilter)
             and not isinstance(physical_op, RetrieveOp)
         )
+        logical_op_id = physical_op.logical_op_id
 
-        # if this op_set_id is not in the execution_data (because all upstream records were filtered), return
-        if op_set_id not in execution_data:
+        # if this logical_op_id is not in the execution_data (because all upstream records were filtered), return
+        if logical_op_id not in execution_data:
             return execution_data
 
         # pull out the execution data from this operator; place the upstream execution data in a new list
-        this_op_execution_data = execution_data[op_set_id]
+        this_op_execution_data = execution_data[logical_op_id]
 
         # compute quality of each output computed by this operator
         for source_id, record_sets in this_op_execution_data.items():
@@ -258,7 +261,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             )
 
             # extract champion output for this record set
-            champion_record_set = champion_outputs[op_set_id][source_id]
+            champion_record_set = champion_outputs[logical_op_id][source_id]
 
             # for each record_set produced by an operation, compute its quality
             for record_set in record_sets:
@@ -323,7 +326,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         # - handle limits
         # create thread pool w/max workers and run futures over worker pool
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # for non-zero entries in sample matrix: create future task
+            # create futures
             futures = []
             for candidate in candidates:
                 for operator in op_set:
@@ -384,23 +387,16 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
 
         # initialize plan stats and operator stats
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
-        for op_set in plan.operator_sets:
-            op_set_id = SentinelPlan.compute_op_set_id(op_set)
-            op_set_str = ",".join([op.op_name() for op in op_set])
-            op_set_name = f"OpSet({op_set_str})"
+        for logical_op_id, logical_op_name, op_set in plan:
             op_set_details = {
-                op.op_name(): {k: str(v) for k, v in op.get_op_params().items()}
+                op.op_name(): {k: str(v) for k, v in op.get_id_params().items()}
                 for op in op_set
             }
-            plan_stats.operator_stats[op_set_id] = OperatorStats(op_id=op_set_id, op_name=op_set_name, op_details=op_set_details)
-
-        # get handle to DataSource (# making the assumption that first operator_set can only be a scan
-        source_operator = plan.operator_sets[0][0]
-        datasource = (
-            self.datadir.get_registered_dataset(source_operator.dataset_id)
-            if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
+            plan_stats.operator_stats[logical_op_id] = OperatorStats(
+                op_id=logical_op_id,
+                op_name=logical_op_name,
+                op_details=op_set_details,
+            )
 
         # sample validation records
         total_num_samples = self.datasource.get_val_length()
@@ -421,24 +417,15 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         for sample_idx in sample_indices:
             candidate = DataRecord(schema=SourceRecord, source_id=sample_idx)
             candidate.idx = sample_idx
-            candidate.get_item_fn = partial(datasource.get_item, val=True)
+            candidate.get_item_fn = partial(self.datasource.get_item, val=True)
             candidates.append(candidate)
 
         # NOTE: because we need to dynamically create sample matrices for each operator,
         #       sentinel execution must be executed one operator at a time (i.e. sequentially)
         # execute operator sets in sequence
-        for op_set_idx, op_set in enumerate(plan.operator_sets):
-            op_set_id = SentinelPlan.compute_op_set_id(op_set)
-            prev_op_set_id = (
-                SentinelPlan.compute_op_set_id(plan.operator_sets[op_set_idx - 1])
-                if op_set_idx > 0
-                else None
-            )
-            next_op_set_id = (
-                SentinelPlan.compute_op_set_id(plan.operator_sets[op_set_idx + 1])
-                if op_set_idx + 1 < len(plan.operator_sets)
-                else None
-            )
+        for op_idx, (logical_op_id, _, op_set) in enumerate(plan):
+            prev_logical_op_id = plan.logical_op_ids[op_idx - 1] if op_idx > 0 else None
+            next_logical_op_id = plan.logical_op_ids[op_idx + 1] if op_idx + 1 < len(plan) else None
 
             # sample k optimizations
             k = min(self.k, len(op_set)) if not self.sample_all_ops else len(op_set)
@@ -448,17 +435,17 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             source_id_to_record_sets, source_id_to_champion_record_set = self.execute_op_set(candidates, sampled_ops)
 
             # update all_outputs and champion_outputs dictionary
-            if op_set_id not in all_outputs:
-                all_outputs[op_set_id] = source_id_to_record_sets
-                champion_outputs[op_set_id] = source_id_to_champion_record_set
+            if logical_op_id not in all_outputs:
+                all_outputs[logical_op_id] = source_id_to_record_sets
+                champion_outputs[logical_op_id] = source_id_to_champion_record_set
             else:
                 for source_id, record_sets in source_id_to_record_sets.items():
-                    if source_id not in all_outputs[op_set_id]:
-                        all_outputs[op_set_id][source_id] = record_sets
-                        champion_outputs[op_set_id][source_id] = source_id_to_champion_record_set[source_id]
+                    if source_id not in all_outputs[logical_op_id]:
+                        all_outputs[logical_op_id][source_id] = record_sets
+                        champion_outputs[logical_op_id][source_id] = source_id_to_champion_record_set[source_id]
                     else:
-                        all_outputs[op_set_id][source_id].extend(record_sets)
-                        champion_outputs[op_set_id][source_id].extend(source_id_to_champion_record_set[source_id])
+                        all_outputs[logical_op_id][source_id].extend(record_sets)
+                        champion_outputs[logical_op_id][source_id].extend(source_id_to_champion_record_set[source_id])
 
             # flatten lists of records and record_op_stats
             all_records, all_record_op_stats = [], []
@@ -468,9 +455,9 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
                     all_record_op_stats.extend(record_set.record_op_stats)
 
             # update plan stats
-            plan_stats.operator_stats[op_set_id].add_record_op_stats(
+            plan_stats.operator_stats[logical_op_id].add_record_op_stats(
                 all_record_op_stats,
-                source_op_id=prev_op_set_id,
+                source_op_id=prev_logical_op_id,
                 plan_id=plan.plan_id,
             )
 
@@ -478,11 +465,11 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             if not self.nocache:
                 for record in all_records:
                     if getattr(record, "_passed_operator", True):
-                        self.datadir.append_cache(op_set_id, record)
+                        self.datadir.append_cache(logical_op_id, record)
 
             # update candidates for next operator; we use champion outputs as input
             candidates = []
-            if next_op_set_id is not None:
+            if next_logical_op_id is not None:
                 for _, record_set in source_id_to_champion_record_set.items():
                     for record in record_set:
                         if isinstance(op_set[0], FilterOp) and not record._passed_operator:
@@ -490,18 +477,17 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
                         candidates.append(record)
 
             # if we've filtered out all records, terminate early
-            if next_op_set_id is not None and candidates == []:
+            if next_logical_op_id is not None and candidates == []:
                 break
 
-        # compute quality for each operator (and time and cost) and put them into matrix
+        # compute quality for each operator
         field_to_metric_fn = self.datasource.get_field_to_metric_fn()
         all_outputs = self.score_quality(plan.operator_sets, all_outputs, champion_outputs, expected_outputs, field_to_metric_fn)
 
         # if caching was allowed, close the cache
         if not self.nocache:
-            for op_set in plan.operator_sets:
-                op_set_id = SentinelPlan.compute_op_set_id(op_set)
-                self.datadir.close_cache(op_set_id)
+            for logical_op_id, _, _ in plan:
+                self.datadir.close_cache(logical_op_id)
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
@@ -513,9 +499,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
     def generate_sample_observations(self, sentinel_plan: SentinelPlan, policy: Policy):
         """
         This function is responsible for generating sample observation data which can be
-        consumed by the CostModel. For each physical optimization and each operator, our
-        goal is to capture `rank + 1` samples per optimization, where `rank` is the presumed
-        low-rank of the observation matrix.
+        consumed by the CostModel.
 
         To accomplish this, we construct a special sentinel plan using the Optimizer which is
         capable of executing any valid physical implementation of a Filter or Convert operator
@@ -578,22 +562,6 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
 
         # generate sample execution data
         all_execution_data, plan_stats = self.generate_sample_observations(sentinel_plan, policy)
-
-        # if self.exp_name is not None:
-        #     # execution_data: dict[op_set_id, dict[source_id, list[DataRecordSet]]]
-        #     all_execution_data_copy = {}
-        #     for op_set_id, source_id_to_record_sets in all_execution_data.items():
-        #         all_execution_data_copy[op_set_id] = {}
-        #         for source_id, record_sets in source_id_to_record_sets.items():
-        #             all_execution_data_copy[op_set_id][source_id] = []
-        #             for record_set in record_sets:
-        #                 assert len(record_set.record_op_stats) == 1, "more than one record op stats"
-        #                 record_op_stats = record_set.record_op_stats[0]
-        #                 record_dict = record_op_stats.to_json()
-        #                 all_execution_data_copy[op_set_id][source_id].append(record_dict)
-
-        #     with open(f"opt-profiling-data/{self.exp_name}-execution-data.json", "w") as f:
-        #         json.dump(all_execution_data_copy, f)
 
         # put sentinel plan execution stats into list and prepare list of output records
         all_plan_stats = [plan_stats]

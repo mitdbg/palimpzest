@@ -34,27 +34,15 @@ class TokenReducedConvert(LLMConvert):
         op += f"    Token Budget: {str(self.token_budget)}\n"
         return op
 
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {"token_budget": self.token_budget, **copy_kwargs}
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        id_params = {"token_budget": self.token_budget, **id_params}
+
+        return id_params
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        op_params = {"token_budget": self.token_budget, **op_params}
-
-        return op_params
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.token_budget == other.token_budget
-            and self.model == other.model
-            and self.cardinality == other.cardinality
-            and self.prompt_strategy == other.prompt_strategy
-            and self.output_schema == other.output_schema
-            and self.input_schema == other.input_schema
-            and self.max_workers == other.max_workers
-        )
+        return {"token_budget": self.token_budget, **op_params}
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """

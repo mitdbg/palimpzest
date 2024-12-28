@@ -18,19 +18,6 @@ if not os.environ.get("OPENAI_API_KEY"):
     load_env()
 
 
-class ScientificPaper(pz.PDFFile):
-    """Represents a scientific research paper, which in practice is usually from a PDF file"""
-
-    title = pz.Field(
-        desc="The title of the paper. This is a natural language title, not a number or letter.", required=True
-    )
-    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
-    author = pz.Field(desc="The name of the first author of the paper", required=True)
-    journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
-    subject = pz.Field(desc="A summary of the paper contribution in one sentence", required=False)
-    doiURL = pz.Field(desc="The DOI URL for the paper", required=True)
-
-
 class CaseData(pz.Schema):
     """An individual row extracted from a table containing medical study data."""
 
@@ -70,14 +57,14 @@ def print_table(output):
 
 
 if __name__ == "__main__":
-    startTime = time.time()
+    start_time = time.time()
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument("--no-cache", action="store_true", help="Do not use cached results")
     parser.add_argument("--verbose", action="store_true", help="Do not use cached results", default=True)
     parser.add_argument("--from_xls", action="store_true", help="Start from pre-downloaded excel files", default=False)
     parser.add_argument("--experiment", type=str, help="The experiment to run", default="matching")
     parser.add_argument("--policy", type=str, help="The policy to use", default="cost")
-    parser.add_argument("--engine", type=str, help="The engine to use", default="parallel")
+    parser.add_argument("--executor", type=str, help="The plan executor to use", default="parallel")
 
     args = parser.parse_args()
     no_cache = args.no_cache
@@ -85,13 +72,17 @@ if __name__ == "__main__":
     from_xls = args.from_xls
     policy = args.policy
     experiment = args.experiment
-    engine = args.engine
-    if engine == "sequential":
-        engine = pz.SequentialSingleThreadSentinelExecution
-    elif engine == "parallel":
-        engine = pz.PipelinedParallelSentinelExecution
-    elif engine == "nosentinel":
-        engine = pz.SequentialSingleThreadNoSentinelExecution
+    executor = args.executor
+    execution_engine = None
+    if executor == "sequential":
+        execution_engine = pz.NoSentinelSequentialSingleThreadExecution
+    elif executor == "pipelined":
+        execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
+    elif executor == "parallel":
+        execution_engine = pz.NoSentinelPipelinedParallelExecution
+    else:
+        print("Executor not supported for this demo")
+        exit(1)
 
     if no_cache:
         pz.DataDirectory().clear_cache(keep_registry=True)
@@ -102,18 +93,14 @@ if __name__ == "__main__":
         policy = pz.MaxQuality()
 
     if experiment == "collection":
-        # papers = pz.Dataset("biofabric-pdf", schema=ScientificPaper)
-        # paperURLs = papers.convert(pz.URL, desc="The DOI url of the paper")
-        # TODO this fetch should be refined to work for all papers
-        # htmlDOI = paperURLs.map(pz.DownloadHTMLFunction())
         papers_html = pz.Dataset("biofabric-html", schema=pz.WebPage)
-        tableURLS = papers_html.convert(
+        table_urls = papers_html.convert(
             pz.URL, desc="The URLs of the XLS tables from the page", cardinality=pz.Cardinality.ONE_TO_MANY
         )
-        output = tableURLS
+        output = table_urls
         # urlFile = pz.Dataset("biofabric-urls", schema=pz.TextFile)
-        # tableURLS = tableURLS.convert(pz.URL, desc="The URLs of the tables")
-        # tables = tableURLS.convert(pz.File, udf=udfs.url_to_file)
+        # table_urls = table_urls.convert(pz.URL, desc="The URLs of the tables")
+        # tables = table_urls.convert(pz.File, udf=udfs.url_to_file)
         # xls = tables.convert(pz.XLSFile, udf = udfs.file_to_xls)
         # patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         # output = patient_tables
@@ -151,12 +138,12 @@ if __name__ == "__main__":
         nocache=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=engine,
+        execution_engine=execution_engine,
     )
 
     print_table(tables)
     print(plan)
     print(stats)
 
-    endTime = time.time()
-    print("Elapsed time:", endTime - startTime)
+    end_time = time.time()
+    print("Elapsed time:", end_time - start_time)

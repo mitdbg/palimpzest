@@ -19,7 +19,7 @@ from palimpzest.operators.convert import LLMConvert
 # TYPE DEFINITIONS
 FieldName = str
 
-# TODO: Create ImplementationRule for this
+
 class MixtureOfAgentsConvert(LLMConvert):
 
     def __init__(
@@ -53,18 +53,6 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         self.aggregator_generator = DSPyGenerator(aggregator_model, self.prompt_strategy, doc_schema, doc_type, self.verbose)
 
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.proposer_models == other.proposer_models
-            and self.temperatures == other.temperatures
-            and self.aggregator_model == other.aggregator_model
-            and self.cardinality == other.cardinality
-            and self.prompt_strategy == other.prompt_strategy
-            and self.output_schema == other.output_schema
-            and self.max_workers == other.max_workers
-        )
-
     def __str__(self):
         op = super().__str__()
         op += f"    Proposer Models: {self.proposer_models}\n"
@@ -72,26 +60,24 @@ class MixtureOfAgentsConvert(LLMConvert):
         op += f"    Aggregator Model: {self.aggregator_model}\n"
         return op
 
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {
-            "proposer_models": self.proposer_models,
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        id_params = {
+            "proposer_models": [model.value for model in self.proposer_models],
             "temperatures": self.temperatures,
-            "aggregator_model": self.aggregator_model,
-            **copy_kwargs
+            "aggregator_model": self.aggregator_model.value,
+            **id_params,
         }
 
+        return id_params
+
     def get_op_params(self):
-        """
-        NOTE: we do not include self.cache_across_plans because (for now) get_op_params()
-        is only supposed to return hyperparameters which affect operator performance.
-        """
         op_params = super().get_op_params()
         op_params = {
             "proposer_models": self.proposer_models,
             "temperatures": self.temperatures,
             "aggregator_model": self.aggregator_model,
-            **op_params,
+            **op_params
         }
 
         return op_params
@@ -214,7 +200,6 @@ class MixtureOfAgentsConvert(LLMConvert):
         return prompt_question
 
     def _construct_aggregator_prompt(self, fields_to_generate: list[str]) -> str:
-        # TODO: self.aggregator_model to add instruction for Llama
         # set defaults
         doc_type = self.output_schema.class_name()
 

@@ -300,7 +300,7 @@ class MockSampleBasedCostModel:
         #       these physical operators are filtered out of the Optimizer, thus we can assume that
         #       we will have execution data for each operator passed into __call__; nevertheless, we
         #       still perform a sanity check
-        # look up logical op id and matrix column associated with this physical operator
+        # look up physical and logical op ids associated with this physical operator
         phys_op_id = operator.get_op_id()
         logical_op_id = operator.logical_op_id
         assert self.operator_to_stats.get(logical_op_id).get(phys_op_id) is not None, f"No execution data for {str(operator)}"

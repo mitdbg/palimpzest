@@ -8,7 +8,6 @@ from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
 from palimpzest.corelib.schemas import ImageFile, Schema
 from palimpzest.elements.filters import Filter
 from palimpzest.elements.groupbysig import GroupBySig
-from palimpzest.utils.index_helpers import get_index_str
 
 
 class LogicalOperator:
@@ -25,8 +24,9 @@ class LogicalOperator:
     - Aggregate (applies an aggregation on the Set)
     - RetrieveScan (fetches documents from a provided input for a given query)
 
-    Every logical operator must declare the get_op_params() method, which returns
-    a dictionary of parameters that are used to implement its physical operator.
+    Every logical operator must declare the get_logical_id_params() and get_logical_op_params() methods,
+    which return dictionaries of parameters that are used to compute the logical op id and to implement
+    the logical operator (respectively).
     """
 
     def __init__(
@@ -36,57 +36,66 @@ class LogicalOperator:
     ):
         self.output_schema = output_schema
         self.input_schema = input_schema
-        self.op_id: str | None = None
+        self.logical_op_id: str | None = None
 
     def __str__(self) -> str:
         raise NotImplementedError("Abstract method")
 
     def __eq__(self, other) -> bool:
-        raise NotImplementedError("Calling __eq__ on abstract method")
+        all_id_params_match = all(value == getattr(other, key) for key, value in self.get_logical_id_params().items())
+        return isinstance(other, self.__class__) and all_id_params_match
 
     def copy(self) -> LogicalOperator:
-        raise NotImplementedError("Abstract method")
+        return self.__class__(**self.get_logical_op_params())
 
-    def op_name(self) -> str:
-        """Name of the physical operator."""
+    def logical_op_name(self) -> str:
+        """Name of the logical operator."""
         return str(self.__class__.__name__)
 
-    def get_op_params(self):
+    def get_logical_id_params(self) -> dict:
         """
-        Returns a dictionary mapping logical operator parameters which may be used to
+        Returns a dictionary mapping of logical operator parameters which are relevant
+        for computing the logical operator id.
+
+        NOTE: Should be overriden by subclasses to include class-specific parameters.
+        NOTE: input_schema is not included in the id params because it depends on how the Optimizer orders operations.
+        """
+        return {"output_schema": self.output_schema}
+
+    def get_logical_op_params(self) -> dict:
+        """
+        Returns a dictionary mapping of logical operator parameters which may be used to
         implement a physical operator associated with this logical operation.
-
-        This method is also used to obtain the op_id for the logical operator.
+        
+        NOTE: Should be overriden by subclasses to include class-specific parameters.
         """
-        raise NotImplementedError("Calling get_op_params on abstract method")
+        return {"input_schema": self.input_schema, "output_schema": self.output_schema}
 
-    def get_op_id(self):
+    def get_logical_op_id(self):
         """
         NOTE: We do not call this in the __init__() method as subclasses may set parameters
-              returned by self.get_op_params() after they call to super().__init__().
-
-        NOTE: This is NOT a universal ID.
-
-        Two different PhysicalOperator instances with the identical returned values
-        from the call to self.get_op_params() will have equivalent op_ids.
+              returned by self.get_logical_op_params() after they call to super().__init__().
         """
-        # return self.op_id if we've computed it before
-        if self.op_id is not None:
-            return self.op_id
+        # return self.logical_op_id if we've computed it before
+        if self.logical_op_id is not None:
+            return self.logical_op_id
+
+        # get op name and op parameters which are relevant for computing the id
+        logical_op_name = self.logical_op_name()
+        logical_id_params = self.get_logical_id_params()
+        logical_id_params = {k: str(v) for k, v in logical_id_params.items()}
 
         # compute, set, and return the op_id
-        op_name = self.op_name()
-        op_params = self.get_op_params()
-        op_params = {k: str(v) if k != "index" else get_index_str(v) for k, v in op_params.items()}
-        hash_str = json.dumps({"op_name": op_name, **op_params}, sort_keys=True)
-        self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+        hash_str = json.dumps({"logical_op_name": logical_op_name, **logical_id_params}, sort_keys=True)
+        self.logical_op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
 
-        return self.op_id
+        return self.logical_op_id
 
     def __hash__(self):
-        if not self.op_id:
-            raise ValueError("op_id not set, unable to hash")
-        return int(self.op_id, 16)
+        if not self.logical_op_id:
+            raise ValueError("logical_op_id not set, unable to hash")
+        return int(self.logical_op_id, 16)
+
 
 class Aggregate(LogicalOperator):
     """
@@ -108,29 +117,21 @@ class Aggregate(LogicalOperator):
     def __str__(self):
         return f"{self.__class__.__name__}(function: {str(self.agg_func.value)})"
 
-    def __eq__(self, other) -> bool:
-        return (
-            isinstance(other, Aggregate)
-            and self.input_schema == other.input_schema
-            and self.output_schema == other.output_schema
-            and self.agg_func == other.agg_func
-        )
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {"agg_func": self.agg_func, **logical_id_params}
 
-    def copy(self):
-        return self.__class__(
-            input_schema=self.input_schema,
-            output_schema=self.output_schema,
-            agg_func=self.agg_func,
-            target_cache_id=self.target_cache_id,
-        )
+        return logical_id_params
 
-    def get_op_params(self) -> dict:
-        return {
-            "input_schema": self.input_schema,
-            "output_schema": self.output_schema,
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
             "agg_func": self.agg_func,
             "target_cache_id": self.target_cache_id,
+            **logical_op_params,
         }
+
+        return logical_op_params
 
 
 class BaseScan(LogicalOperator):
@@ -157,15 +158,17 @@ class BaseScan(LogicalOperator):
             and self.dataset_id == other.dataset_id
         )
 
-    def copy(self):
-        return BaseScan(
-            input_schema=self.input_schema,
-            output_schema=self.output_schema,
-            dataset_id=self.dataset_id,
-        )
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {"dataset_id": self.dataset_id, **logical_id_params}
 
-    def get_op_params(self) -> dict:
-        return {"output_schema": self.output_schema, "dataset_id": self.dataset_id}
+        return logical_id_params
+
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {"dataset_id": self.dataset_id, **logical_op_params}
+
+        return logical_op_params
 
 
 class CacheScan(LogicalOperator):
@@ -184,23 +187,17 @@ class CacheScan(LogicalOperator):
     def __str__(self):
         return f"CacheScan({str(self.output_schema)},{str(self.dataset_id)})"
 
-    def __eq__(self, other) -> bool:
-        return (
-            isinstance(other, CacheScan)
-            and self.input_schema == other.input_schema
-            and self.output_schema == other.output_schema
-            and self.dataset_id == other.dataset_id
-        )
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {"dataset_id": self.dataset_id, **logical_id_params}
 
-    def copy(self):
-        return CacheScan(
-            input_schema=self.input_schema,
-            output_schema=self.output_schema,
-            dataset_id=self.dataset_id,
-        )
+        return logical_id_params
 
-    def get_op_params(self):
-        return {"output_schema": self.output_schema, "dataset_id": self.dataset_id}
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {"dataset_id": self.dataset_id, **logical_op_params}
+
+        return logical_op_params
 
 
 class ConvertScan(LogicalOperator):
@@ -228,40 +225,30 @@ class ConvertScan(LogicalOperator):
     def __str__(self):
         return f"ConvertScan({self.input_schema} -> {str(self.output_schema)},{str(self.desc)})"
 
-    def __eq__(self, other) -> bool:
-        return (
-            isinstance(other, ConvertScan)
-            and self.input_schema == other.input_schema
-            and self.output_schema == other.output_schema
-            and self.cardinality == other.cardinality
-            and self.udf == other.udf
-            and self.image_conversion == other.image_conversion
-            and self.depends_on == other.depends_on
-        )
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {
+            "cardinality": self.cardinality,
+            "udf": self.udf,
+            "image_conversion": self.image_conversion,
+            **logical_id_params,
+        }
 
-    def copy(self):
-        return ConvertScan(
-            input_schema=self.input_schema,
-            output_schema=self.output_schema,
-            cardinality=self.cardinality,
-            image_conversion=self.image_conversion,
-            udf=self.udf,
-            depends_on=self.depends_on,
-            desc=self.desc,
-            target_cache_id=self.target_cache_id,
-        )
+        return logical_id_params
 
-    def get_op_params(self):
-        return {
-            "input_schema": self.input_schema,
-            "output_schema": self.output_schema,
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
             "cardinality": self.cardinality,
             "udf": self.udf,
             "image_conversion": self.image_conversion,
             "depends_on": self.depends_on,
             "desc": self.desc,
             "target_cache_id": self.target_cache_id,
+            **logical_op_params,
         }
+
+        return logical_op_params
 
 
 class FilteredScan(LogicalOperator):
@@ -285,35 +272,27 @@ class FilteredScan(LogicalOperator):
     def __str__(self):
         return f"FilteredScan({str(self.output_schema)}, {str(self.filter)})"
 
-    def __eq__(self, other) -> bool:
-        return (
-            isinstance(other, FilteredScan)
-            and self.input_schema == other.input_schema
-            and self.output_schema == other.output_schema
-            and self.filter == other.filter
-            and self.image_filter == other.image_filter
-        )
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {
+            "filter": self.filter,
+            "image_filter": self.image_filter,
+            **logical_id_params,
+        }
 
-    def copy(self):
-        return FilteredScan(
-            input_schema=self.input_schema,
-            output_schema=self.output_schema,
-            filter=self.filter,
-            image_filter=self.image_filter,
-            depends_on=self.depends_on,
-            target_cache_id=self.target_cache_id,
-        )
+        return logical_id_params
 
-    def get_op_params(self) -> dict:
-        return {
-            "input_schema": self.input_schema,
-            "output_schema": self.output_schema,
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
             "filter": self.filter,
             "image_filter": self.image_filter,
             "depends_on": self.depends_on,
             "target_cache_id": self.target_cache_id,
+            **logical_op_params,
         }
 
+        return logical_op_params
 
 class GroupByAggregate(LogicalOperator):
     def __init__(
@@ -335,30 +314,21 @@ class GroupByAggregate(LogicalOperator):
     def __str__(self):
         return f"GroupBy({self.group_by_sig.serialize()})"
 
-    def __eq__(self, other) -> bool:
-        return (
-            isinstance(other, GroupByAggregate)
-            and self.input_schema == other.input_schema
-            and self.output_schema == other.output_schema
-            and self.group_by_sig == other.group_by_sig
-        )
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {"group_by_sig": self.group_by_sig, **logical_id_params}
 
-    def copy(self):
-        return GroupByAggregate(
-            input_schema=self.input_schema,
-            output_schema=self.output_schema,
-            group_by_sig=self.group_by_sig,
-            target_cache_id=self.target_cache_id,
-        )
+        return logical_id_params
 
-    def get_op_params(self) -> dict:
-        return {
-            "input_schema": self.input_schema,
-            "output_schema": self.output_schema,
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
             "group_by_sig": self.group_by_sig,
             "target_cache_id": self.target_cache_id,
+            **logical_op_params,
         }
 
+        return logical_op_params
 
 class LimitScan(LogicalOperator):
     def __init__(self, limit: int, target_cache_id: str | None = None, *args, **kwargs):
@@ -369,31 +339,23 @@ class LimitScan(LogicalOperator):
     def __str__(self):
         return f"LimitScan({str(self.input_schema)}, {str(self.output_schema)})"
 
-    def copy(self):
-        return LimitScan(
-            input_schema=self.input_schema,
-            output_schema=self.output_schema,
-            limit=self.limit,
-            target_cache_id=self.target_cache_id,
-        )
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {"limit": self.limit, **logical_id_params}
 
-    def __eq__(self, other) -> bool:
-        return (
-            isinstance(other, LimitScan)
-            and self.input_schema == other.input_schema
-            and self.output_schema == other.output_schema
-            and self.limit == other.limit
-        )
+        return logical_id_params
 
-    def get_op_params(self) -> dict:
-        return {
-            "input_schema": self.input_schema,
-            "output_schema": self.output_schema,
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
             "limit": self.limit,
             "target_cache_id": self.target_cache_id,
+            **logical_op_params,
         }
 
-# TODO(Siva): Currently, retrieve is pretty much a convert!
+        return logical_op_params
+
+
 class RetrieveScan(LogicalOperator):
     """A RetrieveScan is a logical operator that represents a scan of a particular data source, with a convert-like retrieve applied."""
 
@@ -417,35 +379,29 @@ class RetrieveScan(LogicalOperator):
     def __str__(self):
         return f"RetrieveScan({self.input_schema} -> {str(self.output_schema)},{str(self.desc)})"
 
-    def __eq__(self, other: LogicalOperator) -> bool:
-        return (
-            isinstance(other, RetrieveScan)
-            and self.input_schema == other.input_schema
-            and self.output_schema == other.output_schema
-            and self.index == other.index
-            and self.search_attr == other.search_attr
-            and self.output_attr == other.output_attr
-            and self.k == other.k
-        )
+    def get_logical_id_params(self) -> dict:
+        # NOTE: if we allow optimization over index, then we will need to include it in the id params
+        # NOTE: ^if we do this, we should probably make a wrapper around the index object to ensure that
+        #       it can be serialized as a string properly
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {
+            "search_attr": self.search_attr,
+            "output_attr": self.output_attr,
+            "k": self.k,
+            **logical_id_params,
+        }
 
-    def copy(self):
-        return RetrieveScan(
-            input_schema=self.input_schema,
-            output_schema=self.output_schema,
-            index=self.index,
-            search_attr=self.search_attr,
-            output_attr=self.output_attr,
-            k=self.k,
-            target_cache_id=self.target_cache_id,
-        )
+        return logical_id_params
 
-    def get_op_params(self):
-        return {
-            "input_schema": self.input_schema,
-            "output_schema": self.output_schema,
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
             "index": self.index,
             "search_attr": self.search_attr,
             "output_attr": self.output_attr,
             "k": self.k,
             "target_cache_id": self.target_cache_id,
+            **logical_op_params,
         }
+
+        return logical_op_params
