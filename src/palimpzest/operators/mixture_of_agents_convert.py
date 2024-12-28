@@ -77,7 +77,7 @@ class MixtureOfAgentsConvert(LLMConvert):
             "proposer_models": self.proposer_models,
             "temperatures": self.temperatures,
             "aggregator_model": self.aggregator_model,
-            **op_params
+            **op_params,
         }
 
         return op_params

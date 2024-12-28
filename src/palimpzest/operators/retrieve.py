@@ -27,6 +27,7 @@ class RetrieveOp(PhysicalOperator):
             "search_attr": self.search_attr,
             "output_attr": self.output_attr,
             "k": self.k,
+            **id_params,
         }
 
         return id_params
