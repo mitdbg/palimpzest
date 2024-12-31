@@ -303,30 +303,35 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         return answer, generation_stats
 
+
+    # TODO: how does this fit in with BondedConvert and ConventionalConvert?
     def convert(self, candidate, fields) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         # call proposers asynchronously in parallel
-        proposer_model_answers, proposer_model_stats = [], []
-        with ThreadPoolExecutor(max_workers=len(self.proposer_generators)) as executor:
-            futures = []
-            for proposer_generator, temperature in zip(self.proposer_generators, self.temperatures):
-                generate_answer = partial(self._call_proposer, proposer_generator, temperature, fields, candidate)
-                futures.append(executor.submit(generate_answer))
+        # proposer_model_final_answers, proposer_model_generation_stats = [], []
+        # with ThreadPoolExecutor(max_workers=len(self.proposer_generators)) as executor:
+        #     futures = []
+        #     for proposer_generator, temperature in zip(self.proposer_generators, self.temperatures):
+        #         generate_answer = partial(self._call_proposer, proposer_generator, temperature, fields, candidate)
+        #         futures.append(executor.submit(generate_answer))
 
-            # block until all futures have finished
-            done_futures, not_done_futures = [], futures
-            while len(not_done_futures) > 0:
-                done_futures, not_done_futures = wait(futures, timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
-
-            # get outputs
-            proposer_model_answers, proposer_model_stats = zip(*[future.result() for future in done_futures])
+        #     # block until all futures have finished
+        #     done_futures, not_done_futures = [], futures
+        #     while len(not_done_futures) > 0:
+        #         done_futures, not_done_futures = wait(futures, timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
+        # TODO: 
+        proposer_model_final_answers, proposer_model_generation_stats = [], []
+        for proposer_generator, temperature in zip(self.proposer_generators, self.temperatures):
+            field_answers, generation_stats = proposer_generator.generate(candidate, fields, prompt=self.proposer_prompt, temperature=temperature)
+            proposer_model_final_answers.append(field_answers)
+            proposer_model_generation_stats.append(generation_stats)
 
         # call the aggregator
-        final_answer, aggregator_gen_stats = self._call_aggregator(proposer_model_answers, fields)
+        field_answers, aggregator_gen_stats = self._call_aggregator(proposer_model_final_answers, fields)
 
         # compute the total generation stats
-        generation_stats = sum(proposer_model_stats) + aggregator_gen_stats
+        generation_stats = sum(proposer_model_generation_stats) + aggregator_gen_stats
 
-        # parse the final answer
-        json_answers = self.parse_answer(final_answer, fields, self.aggregator_model)
+        # # parse the final answer
+        # json_answers = self.parse_answer(final_answer, fields, self.aggregator_model)
 
-        return json_answers, generation_stats
+        return field_answers, generation_stats

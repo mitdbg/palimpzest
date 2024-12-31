@@ -335,6 +335,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
 
             # compute output record_set for each (operator, candidate) pair
             output_record_sets = []
+            iter = 0
             while len(futures) > 0:
                 # get the set of futures that have (and have not) finished in the last PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
                 done_futures, not_done_futures = wait(futures, timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
@@ -350,6 +351,10 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
 
                 # update list of futures
                 futures = not_done_futures
+                iter += 1
+
+                if iter > 2000:
+                    import pdb; pdb.set_trace()
 
             # compute mapping from source_id to record sets for all operators and for champion operator
             all_record_sets, champion_record_sets = {}, {}

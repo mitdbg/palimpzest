@@ -181,10 +181,11 @@ class CodeSynthesisConvert(LLMConvert):
         return field_to_code_ensemble, generation_stats
 
     def _bonded_query_fallback(self, candidate, start_time):
-        fields_to_generate = self._generate_field_names(candidate, self.input_schema, self.output_schema)
+        fields_to_generate = self._get_fields_to_generate(candidate, self.input_schema, self.output_schema)
         candidate_dict = candidate.as_dict(include_bytes=False, project_cols=self.depends_on)
         candidate = candidate._copy(include_bytes=False, project_cols=self.depends_on)
 
+        # execute the bonded convert
         bonded_op = LLMConvertBonded(
             input_schema=self.input_schema,
             output_schema=self.output_schema,
@@ -192,32 +193,13 @@ class CodeSynthesisConvert(LLMConvert):
             prompt_strategy=self.prompt_strategy,
         )
         field_answers, generation_stats = bonded_op.convert(candidate, fields_to_generate)
+        assert all([field in field_answers for field in fields_to_generate]), "Not all fields were generated!"
 
-        # construct list of dictionaries where each dict. has the (field, value) pairs for each generated field
-        # list is indexed per record
-        try:
-            n_records = max([len(lst) for lst in field_answers.values()])
-        except Exception:
-            print(f"Error in field answers: {field_answers}. Returning empty records.")
-            n_records = 0
-            field_answers = {}
+        # for the vanilla LLMConvert, we simply replace any None values with an empty list
+        field_answers = {field: [] if answers is None else answers for field, answers in field_answers.items()}
 
-        drs = []
-        if n_records > 0:
-            # build up list of final record dictionaries
-            records_json = [{field: None for field in fields_to_generate} for _ in range(n_records)]
-            for field_name, answer_list in field_answers.items():
-                for idx, output in enumerate(answer_list):
-                    records_json[idx][field_name] = output
-
-            # construct list of data records
-            drs = [
-                self._create_data_record_from_json(json_obj=js, candidate=candidate, cardinality_idx=idx)
-                for idx, js in enumerate(records_json)
-            ]
-        else:
-            null_js = {field: None for field in fields_to_generate}
-            drs = [self._create_data_record_from_json(json_obj=null_js, candidate=candidate, cardinality_idx=0)]
+        # transform the mapping from fields to answers into a (list of) DataRecord(s)
+        drs, successful_convert = self._create_data_records_from_field_answers(field_answers, candidate)
 
         # construct DataRecordSet object
         record_set = self._create_record_set(
@@ -225,7 +207,7 @@ class CodeSynthesisConvert(LLMConvert):
             fields=fields_to_generate,
             generation_stats=generation_stats,
             total_time=time.time() - start_time,
-            successful_convert=(n_records > 0),
+            successful_convert=successful_convert,
         )
 
         # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
@@ -246,7 +228,7 @@ class CodeSynthesisConvert(LLMConvert):
         "This code is used for codegen with a fallback to default"
         start_time = time.time()
 
-        fields_to_generate = self._generate_field_names(candidate, self.input_schema, self.output_schema)
+        fields_to_generate = self._get_fields_to_generate(candidate, self.input_schema, self.output_schema)
         # NOTE: the following is how we used to compute the candidate_dict; now that I am disallowing
         # code synthesis for one-to-many queries, I don't think we need to invoke the as_json_str() method,
         # which helped format the tabular data in the "rows" column for Medical Schema Matching.
@@ -276,7 +258,7 @@ class CodeSynthesisConvert(LLMConvert):
             return self._bonded_query_fallback(candidate, start_time)
 
         # if we have synthesized code run it on each field
-        field_outputs = {}
+        field_answers = {}
         for field_name in fields_to_generate:
             # create api instance for executing python code
             api = API.from_input_output_schemas(
@@ -286,47 +268,60 @@ class CodeSynthesisConvert(LLMConvert):
                 input_fields=candidate_dict.keys(),
             )
             code_ensemble = self.field_to_code_ensemble[field_name]
-            answer, exec_stats = code_ensemble_execution(api, code_ensemble, candidate_dict)
 
+            # execute the code ensemble to get the answer
+            answer, _, exec_stats = code_ensemble_execution(api, code_ensemble, candidate_dict)
+
+            # if the answer is not None, update the field_answers
+            # NOTE: the answer will not be a list because code synth. is disallowed for one-to-many converts
             if answer is not None:
                 generation_stats += exec_stats
-                field_outputs[field_name] = answer
+                field_answers[field_name] = [answer]
+
             else:
                 # if there is a failure, run a conventional query
                 if self.verbose:
                     print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
                 # candidate_content = json.dumps(candidate_dict)
+
+                # execute the conventional convert
                 conventional_op = LLMConvertConventional(
                     input_schema=self.input_schema,
                     output_schema=self.output_schema,
                     model=self.conventional_fallback_model,
                     prompt_strategy=self.prompt_strategy,
                 )
+                single_field_answers, single_field_stats = conventional_op.convert(candidate, [field_name])
 
-                json_answers, field_stats = conventional_op.convert(candidate, [field_name])
-
-                # include code execution time in field_stats
-                field_stats.fn_call_duration_secs += exec_stats.fn_call_duration_secs
+                # include code execution time in single_field_stats
+                single_field_stats.fn_call_duration_secs += exec_stats.fn_call_duration_secs
 
                 # update generation_stats
-                generation_stats += field_stats
+                generation_stats += single_field_stats
 
-                # NOTE: we disallow code synth for one-to-many queries, so there will only be
-                #       one element in final_json_objects
-                # update field_outputs
-                field_outputs[field_name] = json_answers[field_name][0]
+                # update field answers
+                # NOTE: because code synth. is disallowed for one-to-many queries, we make the first answer a singleton
+                field_answers[field_name] = (
+                    [single_field_answers[field_name][0]]
+                    if single_field_answers[field_name] is not None and len(single_field_answers[field_name]) > 0
+                    else []
+                )
 
-        # TODO: there needs to be a check that field_outputs is non-empty
-        # create set of data records
-        records = [self._create_data_record_from_json(json_obj=field_outputs, candidate=candidate, cardinality_idx=0)]
+        assert all([field in field_answers for field in fields_to_generate]), "Not all fields were generated!"
 
-        # create and return DataRecordSet
+        # for the vanilla LLMConvert, we simply replace any None values with an empty list
+        field_answers = {field: [] if answers is None else answers for field, answers in field_answers.items()}
+
+        # transform the mapping from fields to answers into a (list of) DataRecord(s)
+        drs, successful_convert = self._create_data_records_from_field_answers(field_answers, candidate)
+
+        # construct DataRecordSet object
         record_set = self._create_record_set(
-            records=records,
+            records=drs,
             fields=fields_to_generate,
             generation_stats=generation_stats,
             total_time=time.time() - start_time,
-            successful_convert=len(records) > 0,
+            successful_convert=successful_convert,
         )
 
         return record_set

@@ -27,14 +27,15 @@ class PromptStrategy(str, Enum):
     PromptStrategy describes the prompting technique to be used by a Generator when
     performing some task with a specified Model.
     """
-
-    ZERO_SHOT = "zero-shot"
-    FEW_SHOT = "few-shot"
-    IMAGE_TO_TEXT = "image-to-text"
-    DSPY_COT_BOOL = "dspy-chain-of-thought-bool"
-    DSPY_COT_QA = "dspy-chain-of-thought-question"
-    DSPY_COT_MOA_AGG = "dspy-chain-of-thought-mixture-of-agents-aggregation"
-    CODE_GEN_BOOL = "code-gen-bool"
+    COT_BOOL = "chain-of-thought-bool"
+    COT_BOOL_IMAGE = "chain-of-thought-bool-image"
+    COT_QA = "chain-of-thought-question"
+    COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
+    COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
+    COT_QA_IMAGE = "chain-of-thought-question-image"
+    # DSPY_COT_BOOL = "dspy-chain-of-thought-bool"
+    # DSPY_COT_QA = "dspy-chain-of-thought-question"
+    # DSPY_COT_MOA_AGG = "dspy-chain-of-thought-mixture-of-agents-aggregation"
 
 
 class OptimizationStrategy(str, Enum):

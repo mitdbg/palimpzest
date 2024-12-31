@@ -5,28 +5,34 @@ See llm_wrapper.py for a proposed refactoring of generators.py using the class f
 import base64
 import os
 import time
+import warnings
 from abc import ABC, abstractmethod
 from collections import Counter
+from string import Formatter
 from typing import Any, Dict, Generic, List, Tuple, TypeVar, Union
 
 import dsp
 import dspy
 import google.generativeai as genai
 from openai import OpenAI
+from openai.types.chat.chat_completion import ChatCompletion
 
 # from tenacity import retry, stop_after_attempt, wait_exponential
 from together import Together
 
+import palimpzest.prompts as prompts
 from palimpzest.constants import (
     MODEL_CARDS,
     # RETRY_MAX_ATTEMPTS,
     # RETRY_MAX_SECS,
     # RETRY_MULTIPLIER,
+    Cardinality,
     Model,
     PromptStrategy,
     # log_attempt_number,
 )
 from palimpzest.dataclasses import GenerationStats
+from palimpzest.elements.records import DataRecord
 from palimpzest.generators.dspy_utils import (
     DSPyCOT,
     TogetherHFAdaptor,
@@ -38,8 +44,8 @@ from palimpzest.utils.sandbox import API
 
 # DEFINITIONS
 GenerationOutput = Tuple[str, str | None, GenerationStats]
-InputType = TypeVar("InputType")
 ContextType = TypeVar("ContextType")
+InputType = TypeVar("InputType")
 
 
 def get_api_key(key: str) -> str:
@@ -52,16 +58,332 @@ def get_api_key(key: str) -> str:
     return os.environ[key]
 
 
-class BaseGenerator(Generic[InputType, ContextType], ABC):
+class BaseGenerator(Generic[ContextType, InputType], ABC):
     """
     Abstract base class for Generators.
     """
+    def __init__(self, model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality = Cardinality.ONE_TO_ONE, verbose: bool = False):
+        self.model = model
+        self.model_name = model.value
+        self.cardinality = cardinality
+        self.prompt_strategy = prompt_strategy
+        self.verbose = verbose
 
     @abstractmethod
-    def generate(self, context: InputType, prompt: ContextType, **kwargs) -> GenerationOutput: ...
+    def _get_client_or_model(self, **kwargs) -> Any:
+        """Returns a client (or local model) which can be invoked to perform the generation."""
+        pass
+
+    @abstractmethod
+    def _generate_payload(self, context: ContextType, prompt: InputType, **kwargs) -> Any:
+        """Generates the payload which will be fed into the client (or local model)."""
+        pass
+
+    @abstractmethod
+    def _generate_completion(self, client_or_model: Any, **kwargs) -> Any:
+        """Generates a completion object using the client (or local model)."""
+        pass
+
+    @abstractmethod
+    def _get_reasoning(self, completion: Any, **kwargs) -> Any:
+        """Extract the reasoning for the generated output from the completion object."""
+        pass
+
+    @abstractmethod
+    def _get_answer(self, completion: Any, **kwargs) -> Any:
+        """Extract the answer from the completion object."""
+        pass
+
+    @abstractmethod
+    def _get_usage(self, completion: Any, **kwargs) -> Any:
+        """Extract the usage statistics from the completion object."""
+        pass
+
+    @abstractmethod
+    def _get_finish_reason(self, completion: Any, **kwargs) -> Any:
+        """Extract the finish reason from the completion object."""
+        pass
+
+    @abstractmethod
+    def _get_answer_log_probs(self, completion: Any, **kwargs) -> Any:
+        """Extract the log probabilities from the completion object."""
+        pass
+
+    @abstractmethod
+    def generate(self, context: ContextType, prompt: InputType, **kwargs) -> GenerationOutput:
+        """asdf"""
+        pass
 
 
-class CustomGenerator(BaseGenerator[None, str]):
+class OpenAIGenerator(BaseGenerator[str | List[str], str]):
+    """
+    Class for generating text using the OpenAI chat API.
+    """
+    def __init__(self, model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality = Cardinality.ONE_TO_ONE, verbose: bool = False):
+        # assert that model is an OpenAI model
+        assert model in [Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4o_V, Model.GPT_4o_MINI_V]
+        assert prompt_strategy in [
+            PromptStrategy.COT_BOOL,
+            PromptStrategy.COT_BOOL_IMAGE,
+            PromptStrategy.COT_QA,
+            PromptStrategy.COT_MOA_PROPOSER,
+            PromptStrategy.COT_MOA_AGG,
+            PromptStrategy.COT_QA_IMAGE,
+        ]
+        super().__init__(model, prompt_strategy, cardinality, verbose)
+
+    def _get_client_or_model(self, **kwargs) -> Any:
+        """Returns a client (or local model) which can be invoked to perform the generation."""
+        return OpenAI(api_key=get_api_key("OPENAI_API_KEY"))
+
+    def _generate_developer_prompt(self) -> str:
+        """Returns a prompt based on the prompt strategy with high-level instructions for the generation."""
+        if self.prompt_strategy == PromptStrategy.COT_BOOL:
+            prompt = prompts.COT_BOOL_SYSTEM_PROMPT
+        elif self.prompt_strategy == PromptStrategy.COT_BOOL_IMAGE:
+            prompt = prompts.COT_BOOL_IMAGE_SYSTEM_PROMPT
+        elif self.prompt_strategy == PromptStrategy.COT_QA:
+            prompt = prompts.COT_QA_BASE_SYSTEM_PROMPT
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER:
+            prompt = prompts.COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_AGG:
+            prompt = prompts.COT_MOA_AGG_BASE_SYSTEM_PROMPT
+        elif self.prompt_strategy == PromptStrategy.COT_QA_IMAGE:
+            prompt = prompts.COT_QA_IMAGE_BASE_SYSTEM_PROMPT
+
+        if self.prompt_strategy not in [PromptStrategy.COT_BOOL, PromptStrategy.COT_BOOL_IMAGE]:
+            output_format_instruction = (
+                prompts.ONE_TO_ONE_OUTPUT_FORMAT_INSTRUCTION
+                if self.cardinality == Cardinality.ONE_TO_ONE
+                else prompts.ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION
+            )
+            prompt = prompt.format(output_format_instruction=output_format_instruction)
+
+        return prompt
+
+    def _generate_user_prompt(self, candidate: DataRecord, fields: List[str], **kwargs) -> str:
+        """Returns a prompt based on the prompt strategy with instance-specific instructions."""
+        # get context from input record (project_cols will be None if not provided in kwargs)
+        context = candidate.as_json_str(include_bytes=False, project_cols=kwargs.get("project_cols"), include_data_cols=False)
+
+        # get filter condition for filter operations
+        filter_condition = (
+            kwargs.get("filter_condition")
+            if self.prompt_strategy in [PromptStrategy.COT_BOOL, PromptStrategy.COT_BOOL_IMAGE]
+            else None
+        )
+
+        # get model responses for mixture-of-agents aggregation
+        model_responses = None
+        if self.prompt_strategy == PromptStrategy.COT_MOA_AGG:
+            model_responses = ""
+            for idx, model_response in enumerate(kwargs.get("model_responses")):
+                model_responses += f"MODEL RESPONSE {idx + 1}: {model_response}\n"
+
+        # generate input and output fields descriptions
+        input_fields_desc = ""
+        for field in kwargs.get("project_cols", candidate.get_fields()):
+            input_fields_desc += f"- {field}: {candidate.get_field_desc(field)}\n" # TODO: add field descriptions to kwargs?
+
+        output_fields_desc = ""
+        for field in fields:
+            output_fields_desc += f"- {field}: {candidate.get_field_desc(field)}\n" # TODO: add field descriptions to kwargs?
+
+        # strip the last newline characters from the field descriptions
+        input_fields_desc = input_fields_desc[:-1]
+        output_fields_desc = output_fields_desc[:-1]
+
+        # set formatting instruction for non-filter prompts
+        output_format_instruction = (
+            prompts.ONE_TO_ONE_OUTPUT_FORMAT_INSTRUCTION
+            if self.cardinality == Cardinality.ONE_TO_ONE
+            else prompts.ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION
+        )
+
+        # initialize format_kwargs
+        format_kwargs = {
+            "context": context,
+            "input_fields_desc": input_fields_desc,
+        }
+
+        # select prompt based on prompt strategy and update format_kwargs as needed
+        if self.prompt_strategy == PromptStrategy.COT_BOOL:
+            prompt = prompts.COT_BOOL_USER_PROMPT
+            format_kwargs.update({"filter_condition": filter_condition})
+
+        elif self.prompt_strategy == PromptStrategy.COT_BOOL_IMAGE:
+            prompt = prompts.COT_BOOL_IMAGE_USER_PROMPT
+            format_kwargs.update({"filter_condition": filter_condition})
+
+        elif self.prompt_strategy == PromptStrategy.COT_QA:
+            prompt = prompts.COT_QA_BASE_USER_PROMPT
+            format_kwargs.update({
+                "output_format_instruction": output_format_instruction,
+                "output_fields_desc": output_fields_desc,
+            })
+
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER:
+            prompt = prompts.COT_MOA_PROPOSER_BASE_USER_PROMPT
+            format_kwargs.update({
+                "output_format_instruction": output_format_instruction,
+                "output_fields_desc": output_fields_desc,
+            })
+
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_AGG:
+            prompt = prompts.COT_MOA_AGG_BASE_USER_PROMPT
+            format_kwargs.update({
+                "output_format_instruction": output_format_instruction,
+                "output_fields_desc": output_fields_desc,
+                "model_responses": model_responses,
+            })
+
+        elif self.prompt_strategy == PromptStrategy.COT_QA_IMAGE:
+            prompt = prompts.COT_QA_IMAGE_BASE_USER_PROMPT
+            format_kwargs.update({
+                "output_format_instruction": output_format_instruction,
+                "output_fields_desc": output_fields_desc,
+            })
+
+        return prompt.format(**format_kwargs)
+
+    def _generate_payload(self, candidate: DataRecord, user_prompt: str, developer_prompt: str | None, **kwargs) -> Any:
+        """Generates the payload which will be fed into the client (or local model)."""
+        # get basic parameters
+        model = self.model_name
+        temperature = kwargs.get("temperature", 0.0)
+        max_tokens = kwargs.get("max_tokens", 4096)
+
+        # construct messages
+        messages = []
+        if developer_prompt is not None:
+            messages.append({"role": "developer", "content": developer_prompt})
+        
+        image_conversion = kwargs.get("image_conversion", False) # TODO
+        if image_conversion:
+            messages.append({
+                "role": "user", "content": [
+                    {"type": "text", "text": user_prompt},
+                    {"type": "image_url", "image_url": kwargs.get("image_url")}, # TODO: handle image url vs. image bytes
+                ]
+            })
+            # TODO: iterate over fields in candidate and add image content to messages; you may also need to iterate over a list[bytes] within the candidate
+        else:
+            messages.append({"role": "user", "content": user_prompt})
+
+        # construct and return payload
+        payload = {
+            "model": model,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "messages": messages,
+        }
+
+        return payload
+
+    def _generate_completion(self, client: OpenAI, payload: dict, **kwargs) -> ChatCompletion:
+        """Generates a completion object using the client (or local model)."""
+        return client.chat.completions.create(**payload)
+
+    def _get_reasoning(self, completion: ChatCompletion, **kwargs) -> Any:
+        """Extract the reasoning for the generated output from the completion object."""
+        pass
+
+    def _get_answer(self, completion: ChatCompletion, **kwargs) -> Any:
+        """Extract the answer from the completion object."""
+        pass
+
+    def _get_usage(self, completion: ChatCompletion, **kwargs) -> Any:
+        """Extract the usage statistics from the completion object."""
+        return 
+
+    def _get_finish_reason(self, completion: ChatCompletion, **kwargs) -> Any:
+        """Extract the finish reason from the completion object."""
+        return completion.choices[0].finish_reason
+
+    def _get_log_probs(self, completion: ChatCompletion, **kwargs) -> Any:
+        """Extract the log probabilities from the completion object."""
+        return completion.choices[0].logprobs
+
+    def generate(self, candidate: DataRecord, fields: List[str], **kwargs) -> GenerationOutput:
+        """Process the given context and prompt using the specified model and return the generated output."""
+        client = self._get_client_or_model()
+
+        # if the user (or operator) provides a developer prompt instead of a prompt, treat this as
+        # the prompt and print a warning
+        if "developer_prompt" in kwargs and "prompt" not in kwargs:
+            kwargs["prompt"] = kwargs["developer_prompt"]
+            kwargs.pop("developer_prompt")
+            warnings.warn("Provided `developer_prompt` without providing `prompt`; setting `prompt` = `developer_prompt`.")  # noqa: B028
+
+        # if the user provides a prompt, use it; otherwise, generate a prompt based on the prompt strategy
+        prompt = None
+        if "prompt" in kwargs:
+            prompt: str = kwargs["prompt"]
+            prompt_field_names = [fname for _, fname, _, _ in Formatter().parse(prompt) if fname]
+            assert all([field in candidate.get_fields() for field in prompt_field_names]), f"Prompt string has fields which are not in candidate record.\nPrompt fields: {prompt_field_names}\nRecord fields: {candidate.get_fields()}"
+            prompt = prompt.format({field: getattr(candidate, field) for field in prompt_field_names})
+        
+        else:
+            prompt = self._generate_user_prompt(candidate, fields, **kwargs) # TODO: add field descriptions to kwargs? (and filter_condition)
+
+        # if the user (or operator) provides a user prompt and no developer prompt, then we just
+        # use the user prompt because our default developer prompt may have conflicting instructions;
+        # otherwise, we take the provided developer prompt or generate a default developer prompt
+        developer_prompt = (
+            None
+            if "prompt" in kwargs and "developer_prompt" not in kwargs
+            else kwargs.get("developer_prompt", self._generate_developer_prompt())
+        )
+
+        # generate payload and completion
+        chat_payload = self._generate_payload(candidate, prompt, developer_prompt, **kwargs)
+
+        # TODO: catch exception(s) with generation?
+        start_time = time.time()
+        completion = self._generate_completion(client, chat_payload, **kwargs)
+        end_time = time.time()
+
+        # parse answer, reasoning, and other features of generation
+        answer = self._get_answer(completion, **kwargs)
+        reasoning = self._get_reasoning(completion, **kwargs)
+        usage = self._get_usage(completion, **kwargs)
+        finish_reason = self._get_finish_reason(completion, **kwargs)
+        answer_log_probs = self._get_log_probs(completion, **kwargs)
+
+        # get cost per input/output token for the model and parse number of input and output tokens
+        usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
+        usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
+        input_tokens = usage["prompt_tokens"]
+        output_tokens = usage["completion_tokens"]
+
+        # create GenerationStats
+        stats = GenerationStats(
+            **{
+                "model_name": self.model_name,
+                "llm_call_duration_secs": end_time - start_time,
+                "fn_call_duration_secs": 0.0,
+                "total_input_tokens": input_tokens,
+                "total_output_tokens": output_tokens,
+                "total_input_cost": input_tokens * usd_per_input_token,
+                "total_output_cost": output_tokens * usd_per_output_token,
+                "cost_per_record": input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+                # "developer_prompt": developer_prompt,
+                # "prompt": prompt,
+                # "usage": usage,
+                # "finish_reason": finish_reason,
+                # "answer_log_probs": answer_log_probs,
+                # "answer": answer,
+            }
+        )
+
+        # TODO: pretty print prompt + full completion output for debugging
+        if self.verbose:
+            dspy_lm.inspect_history(n=1)
+
+        return answer, reasoning, stats
+
+
+class CustomGenerator(BaseGenerator[str | None, str]):
     """
     Class for generating outputs with a given model using a custom prompt.
     """
@@ -171,7 +493,7 @@ class CustomGenerator(BaseGenerator[None, str]):
     #     after=log_attempt_number,
     #     reraise=True,
     # )
-    def generate(self, context, prompt, **kwargs) -> GenerationOutput:
+    def generate(self, context: str | None, prompt: str, **kwargs) -> GenerationOutput:
         # fetch model
         dspy_lm = self._get_model(temperature=kwargs.get("temperature", 0.0))
 
@@ -350,7 +672,7 @@ class DSPyGenerator(BaseGenerator[str, str]):
     #     after=log_attempt_number,
     #     reraise=True,
     # )
-    def generate(self, context, prompt, **kwargs) -> GenerationOutput:
+    def generate(self, context: str, prompt: str, **kwargs) -> GenerationOutput:
         dspy_lm = self._get_model(temperature=kwargs.get("temperature", 0.0))
         dspy.settings.configure(lm=dspy_lm)
         cot = DSPyCOT(self.promptSignature)
@@ -425,7 +747,7 @@ class DSPyGenerator(BaseGenerator[str, str]):
         return pred.answer, pred.rationale, stats
 
 
-class ImageTextGenerator(BaseGenerator[List[str], str]):
+class ImageTextGenerator(BaseGenerator[List[str | bytes], str]):
     """
     Class for generating field descriptions for an image with a given image model.
     """
@@ -611,7 +933,7 @@ class ImageTextGenerator(BaseGenerator[List[str], str]):
     #     stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
     #     after=log_attempt_number,
     # )
-    def generate(self, context, prompt, **kwargs) -> GenerationOutput:
+    def generate(self, context: List[str | bytes], prompt: str, **kwargs) -> GenerationOutput:
         # NOTE: context is list of base64 images and question is prompt
         # fetch model client
         client = self._get_model_client()
@@ -683,15 +1005,15 @@ def code_ensemble_execution(
         if len(preds) == 1:
             majority_response = preds[0]
             exec_stats = GenerationStats(fn_call_duration_secs=time.time() - start_time)
-            return majority_response, exec_stats
+            return majority_response, None, exec_stats
 
         if len(preds) > 0:
             majority_response = Counter(preds).most_common(1)[0][0]
             exec_stats = GenerationStats(fn_call_duration_secs=time.time() - start_time)
             # return majority_response+(" (codegen)" if verbose else ""), ensemble_stats
-            return majority_response, exec_stats
+            return majority_response, None, exec_stats
 
     except Exception:
         pass
 
-    return None, GenerationStats(fn_call_duration_secs=time.time() - start_time)
+    return None, None, GenerationStats(fn_call_duration_secs=time.time() - start_time)

@@ -118,9 +118,10 @@ class PhysicalOperator:
     def __hash__(self):
         return int(self.op_id, 16)
 
-    def _generate_field_names(self, candidate: DataRecord, input_schema: Schema, output_schema: Schema) -> list[str]:
+    def _get_fields_to_generate(self, candidate: DataRecord, input_schema: Schema, output_schema: Schema) -> list[str]:
         """
-        Creates the list of field names that the convert operation needs to generate.
+        Creates the list of field names that an operation needs to generate. Right now this is only used
+        by convert and retrieve operators.
         """
         # construct the list of fields in output_schema which will need to be generated;
         # specifically, this is the set of fields which are:
