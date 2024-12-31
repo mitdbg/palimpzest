@@ -8,7 +8,7 @@ from palimpzest.operators.convert import LLMConvertBonded
 from palimpzest.operators.datasource import MarshalAndScanDataOp
 from palimpzest.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.operators.token_reduction_convert import TokenReducedConvertBonded
-from palimpzest.optimizer.plan import PhysicalPlan
+from palimpzest.optimizer.plan import PhysicalPlan, SentinelPlan
 
 
 ### PHYSICAL PLANS ###
@@ -41,7 +41,7 @@ def llm_filter_plan():
         input_schema=File,
         output_schema=File,
         filter=filter,
-        model=Model.GPT_3_5,
+        model=Model.GPT_4o_MINI,
         target_cache_id="abc123",
     )
     plan = PhysicalPlan(operators=[scan_op, filter_op])
@@ -54,7 +54,7 @@ def bonded_llm_convert_plan(email_schema):
     convert_op_llm = LLMConvertBonded(
         input_schema=TextFile,
         output_schema=email_schema,
-        model=Model.GPT_3_5,
+        model=Model.GPT_4o_MINI,
         target_cache_id="abc123",
     )
     plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
@@ -67,9 +67,9 @@ def code_synth_convert_plan(email_schema):
     convert_op_llm = CodeSynthesisConvertSingle(
         input_schema=TextFile,
         output_schema=email_schema,
-        exemplar_generation_model=Model.GPT_4,
-        code_synth_model=Model.GPT_4,
-        conventional_fallback_model=Model.GPT_3_5,
+        exemplar_generation_model=Model.GPT_4o,
+        code_synth_model=Model.GPT_4o,
+        conventional_fallback_model=Model.GPT_4o_MINI,
         target_cache_id="abc123",
         cache_across_plans=False,
     )
@@ -83,7 +83,7 @@ def token_reduction_convert_plan(email_schema):
     convert_op_llm = TokenReducedConvertBonded(
         input_schema=TextFile,
         output_schema=email_schema,
-        model=Model.GPT_3_5,
+        model=Model.GPT_4o_MINI,
         token_budget=0.1,
         target_cache_id="abc123",
     )
@@ -97,7 +97,7 @@ def image_convert_plan(real_estate_listing_files_schema, image_real_estate_listi
     convert_op_llm = LLMConvertBonded(
         input_schema=real_estate_listing_files_schema,
         output_schema=image_real_estate_listing_schema,
-        model=Model.GPT_3_5,
+        model=Model.GPT_4o_MINI,
         target_cache_id="abc123",
         image_conversion=True,
     )
@@ -111,7 +111,7 @@ def one_to_many_convert_plan(real_estate_listing_files_schema, room_real_estate_
     convert_op_llm = LLMConvertBonded(
         input_schema=real_estate_listing_files_schema,
         output_schema=room_real_estate_listing_schema,
-        model=Model.GPT_3_5,
+        model=Model.GPT_4o_MINI,
         cardinality=Cardinality.ONE_TO_MANY,
         target_cache_id="abc123",
         image_conversion=True,
@@ -145,3 +145,80 @@ def simple_plan_factory():
         return plan
 
     return simple_plan_generator
+
+
+@pytest.fixture
+def scan_convert_filter_sentinel_plan(foobar_schema):
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, logical_op_id="scan1", dataset_id="foo")
+    convert_ops = [
+        LLMConvertBonded(
+            input_schema=TextFile,
+            output_schema=foobar_schema,
+            model=model,
+            logical_op_id="convert1",
+            target_cache_id=f"convert-foobar-{model.value}",
+        )
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+    ]
+    filter_ops = [
+        LLMFilter(
+            input_schema=foobar_schema,
+            output_schema=foobar_schema,
+            filter=Filter("hello"),
+            model=model,
+            logical_op_id="filter1",
+            target_cache_id=f"filter-hello-{model.value}",
+        )
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+    ]
+    plan = SentinelPlan(operator_sets=[[scan_op], convert_ops, filter_ops])
+    return plan
+
+
+@pytest.fixture
+def scan_multi_convert_multi_filter_sentinel_plan(foobar_schema, baz_schema):
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, logical_op_id="scan1", dataset_id="foo")
+    convert_ops1 = [
+        LLMConvertBonded(
+            input_schema=TextFile,
+            output_schema=foobar_schema,
+            model=model,
+            logical_op_id="convert1",
+            target_cache_id=f"convert-foobar-{model.value}",
+        )
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+    ]
+    filter_ops1 = [
+        LLMFilter(
+            input_schema=foobar_schema,
+            output_schema=foobar_schema,
+            filter=Filter("hello"),
+            model=model,
+            logical_op_id="filter1",
+            target_cache_id=f"filter-hello-{model.value}",
+        )
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+    ]
+    filter_ops2 = [
+        LLMFilter(
+            input_schema=foobar_schema,
+            output_schema=foobar_schema,
+            filter=Filter("world"),
+            model=model,
+            logical_op_id="filter2",
+            target_cache_id=f"filter-world-{model.value}",
+        )
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+    ]
+    convert_ops2 = [
+        LLMConvertBonded(
+            input_schema=foobar_schema,
+            output_schema=baz_schema,
+            model=model,
+            logical_op_id="convert2",
+            target_cache_id=f"convert-baz-{model.value}",
+        )
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+    ]
+    plan = SentinelPlan(operator_sets=[[scan_op], convert_ops1, filter_ops1, filter_ops2, convert_ops2])
+    return plan

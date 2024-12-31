@@ -26,6 +26,9 @@ from palimpzest.optimizer.rules import (
     LLMFilterRule as _LLMFilterRule,
 )
 from palimpzest.optimizer.rules import (
+    MixtureOfAgentsConvertRule as _MixtureOfAgentsConvertRule,
+)
+from palimpzest.optimizer.rules import (
     NonLLMConvertRule as _NonLLMConvertRule,
 )
 from palimpzest.optimizer.rules import (
@@ -33,6 +36,9 @@ from palimpzest.optimizer.rules import (
 )
 from palimpzest.optimizer.rules import (
     PushDownFilter as _PushDownFilter,
+)
+from palimpzest.optimizer.rules import (
+    RetrieveRule as _RetrieveRule,
 )
 from palimpzest.optimizer.rules import (
     Rule as _Rule,
@@ -60,9 +66,11 @@ ALL_RULES = [
     _LLMConvertConventionalRule,
     _LLMConvertRule,
     _LLMFilterRule,
+    _MixtureOfAgentsConvertRule,
     _NonLLMConvertRule,
     _NonLLMFilterRule,
     _PushDownFilter,
+    _RetrieveRule,
     _Rule,
     _TokenReducedConvertBondedRule,
     _TokenReducedConvertConventionalRule,

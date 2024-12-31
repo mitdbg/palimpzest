@@ -3,13 +3,13 @@ import multiprocessing
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional, Tuple, Union
 
 from palimpzest.constants import MAX_ID_CHARS, Model, OptimizationStrategy
-from palimpzest.cost_model import CostModel
 from palimpzest.dataclasses import PlanStats, RecordOpStats
 from palimpzest.datamanager import DataDirectory
+from palimpzest.datasources import DataSource, ValidationDataSource
 from palimpzest.elements.records import DataRecord
+from palimpzest.optimizer.cost_model import CostModel
 from palimpzest.optimizer.optimizer import Optimizer
 from palimpzest.optimizer.plan import PhysicalPlan
 from palimpzest.policy import Policy
@@ -20,22 +20,22 @@ from palimpzest.utils.model_helpers import get_models
 class ExecutionEngine:
     def __init__(
         self,
+        datasource: DataSource,
         num_samples: int = float("inf"),
         scan_start_idx: int = 0,
         nocache: bool = True,  # NOTE: until we properly implement caching, let's set the default to True
         include_baselines: bool = False,
-        min_plans: Optional[int] = None,
+        min_plans: int | None = None,
         verbose: bool = False,
-        available_models: List[Model] | None = None,
+        available_models: list[Model] | None = None,
         allow_bonded_query: bool = True,
         allow_conventional_query: bool = False,
         allow_model_selection: bool = True,
         allow_code_synth: bool = True,
         allow_token_reduction: bool = True,
-        optimization_strategy: OptimizationStrategy = OptimizationStrategy.OPTIMAL,
-        max_workers: int = 1,
-        num_workers_per_thread: int = 1,
-        inter_plan_parallelism: bool = True,
+        optimization_strategy: OptimizationStrategy = OptimizationStrategy.PARETO,
+        max_workers: int | None = None,
+        num_workers_per_plan: int = 1,
         *args,
         **kwargs,
     ) -> None:
@@ -57,10 +57,14 @@ class ExecutionEngine:
         self.allow_token_reduction = allow_token_reduction
         self.optimization_strategy = optimization_strategy
         self.max_workers = max_workers
-        self.num_workers_per_thread = num_workers_per_thread
-        self.inter_plan_parallelism = inter_plan_parallelism
+        self.num_workers_per_plan = num_workers_per_plan
 
         self.datadir = DataDirectory()
+
+        # datasource; should be set by execute() with call to get_datasource()
+        self.datasource = datasource
+        self.using_validation_data = isinstance(self.datasource, ValidationDataSource)
+
 
     def execution_id(self) -> str:
         """
@@ -83,20 +87,6 @@ class ExecutionEngine:
         cache = self.datadir.get_cache_service()
         cache.rm_cache()
 
-    def set_source_dataset_id(self, dataset: Set) -> str:
-        """
-        Sets the dataset_id of the DataSource for the given dataset.
-        """
-        # iterate until we reach DataSource
-        while isinstance(dataset, Set):
-            dataset = dataset._source
-
-        # throw an exception if datasource is not registered with PZ
-        _ = self.datadir.get_registered_dataset(dataset.dataset_id)
-
-        # set the source dataset id
-        self.source_dataset_id = dataset.dataset_id
-
     def get_parallel_max_workers(self):
         # for now, return the number of system CPUs;
         # in the future, we may want to consider the models the user has access to
@@ -107,7 +97,7 @@ class ExecutionEngine:
         # changing the max_workers in response to 429 errors.
         return max(int(0.8 * multiprocessing.cpu_count()), 1)
 
-    def get_max_quality_plan_id(self, plans: List[PhysicalPlan]) -> str:
+    def get_max_quality_plan_id(self, plans: list[PhysicalPlan]) -> str:
         """
         Return the plan_id for the plan with the highest quality in the list of plans.
         """
@@ -119,7 +109,7 @@ class ExecutionEngine:
 
         return max_quality_plan_id
 
-    def aggregate_plan_stats(self, plan_stats: List[PlanStats]) -> Dict[str, PlanStats]:
+    def aggregate_plan_stats(self, plan_stats: list[PlanStats]) -> dict[str, PlanStats]:
         """
         Aggregate a list of plan stats into a dictionary mapping plan_id --> cumulative plan stats.
 
@@ -137,35 +127,42 @@ class ExecutionEngine:
         return agg_plan_stats
 
     def execute_plans(
-        self, plans: List[PhysicalPlan], max_quality_plan_id: str, num_samples: Union[int, float] = float("inf")
+        self, plans: list[PhysicalPlan], max_quality_plan_id: str, num_samples: int | float = float("inf")
     ):
         """
-        Execute a given list of plans for num_samples records each, using whatever parallelism is available.
+        Execute a given list of plans for num_samples records each. Plans are executed in parallel.
+        If any workers are unused, then additional workers are distributed evenly among plans.
         """
         # compute number of plans
         num_plans = len(plans)
 
-        # execute plans using any parallelism provided by the user or system
-        max_workers = (
-            self.max_workers
-            if not self.inter_plan_parallelism
-            else max(self.max_workers, self.get_parallel_max_workers())
-        )
-        max_workers = min(max_workers, num_plans)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            results = list(
-                executor.map(
-                    lambda x: self.execute_plan(**x),
-                    [
-                        {"plan": plan, "num_samples": num_samples, "max_workers": self.num_workers_per_thread}
-                        for plan in plans
-                    ],
+        # set plan_parallel_workers and workers_per_plan;
+        # - plan_parallel_workers controls how many plans are executed in parallel
+        # - workers_per_plan controls how many threads are assigned to executing each plan
+        plan_parallel_workers, workers_per_plan = None, None
+        if self.max_workers <= num_plans:
+            plan_parallel_workers = self.max_workers
+            workers_per_plan = [1 for _ in range(num_plans)]
+        else:
+            plan_parallel_workers = num_plans
+            workers_per_plan = [(self.max_workers // num_plans) for _ in range(num_plans)]
+            idx = 0
+            while sum(workers_per_plan) < self.max_workers:
+                workers_per_plan[idx] += 1
+                idx += 1
+
+        with ThreadPoolExecutor(max_workers=plan_parallel_workers) as executor:
+            results = list(executor.map(lambda x: self.execute_plan(**x),
+                    [{"plan": plan,
+                      "num_samples": num_samples,
+                      "plan_workers": plan_workers}
+                      for plan, plan_workers in zip(plans, workers_per_plan)],
                 )
             )
         # results = list(map(lambda x: self.execute_plan(**x),
         #         [{"plan": plan,
         #             "num_samples": num_samples,
-        #             "max_workers": 1}
+        #             "plan_workers": 1}
         #             for plan in plans],
         #     )
         # )
@@ -183,24 +180,27 @@ class ExecutionEngine:
             if plan.plan_id == max_quality_plan_id:
                 return_records = records
 
-        return all_sample_execution_data, return_records, plan_stats
+        return all_sample_execution_data, return_records, all_plan_stats
 
-    def execute_optimal_strategy(
+    def execute_strategy(
         self,
         dataset: Set,
+        policy: Policy,
         optimizer: Optimizer,
-        execution_data: List[RecordOpStats] | None = None,
-    ) -> Tuple[List[DataRecord], List[PlanStats]]:
-        # get the optimal plan according to the optimizer
+        execution_data: list[RecordOpStats] | None = None,
+    ) -> tuple[list[DataRecord], list[PlanStats]]:
         if execution_data is None:
             execution_data = []
-        plans = optimizer.optimize(dataset)
+
+        # get the optimal plan according to the optimizer
+        plans = optimizer.optimize(dataset, policy)
         final_plan = plans[0]
 
         # execute the plan
+        # TODO: for some reason this is not picking up change to self.max_workers from PipelinedParallelPlanExecutor.__init__()
         records, plan_stats = self.execute_plan(
             plan=final_plan,
-            max_workers=self.max_workers,
+            plan_workers=self.max_workers,
         )
 
         # return the output records and plan stats
@@ -209,21 +209,18 @@ class ExecutionEngine:
     def execute_confidence_interval_strategy(
         self,
         dataset: Set,
+        policy: Policy,
         optimizer: Optimizer,
-        execution_data: List[RecordOpStats] | None = None,
-    ) -> Tuple[List[DataRecord], List[PlanStats]]:
+        execution_data: list[RecordOpStats] | None = None,
+    ) -> tuple[list[DataRecord], list[PlanStats]]:
         # initialize output records and plan stats
         if execution_data is None:
             execution_data = []
         records, plan_stats = [], []
 
-        # get total number of input records in the datasource
-        datasource = self.datadir.get_registered_dataset(self.source_dataset_id)
-        datasource_len = len(datasource)
-
         # get the initial set of optimal plans according to the optimizer
-        plans = optimizer.optimize(dataset)
-        while len(plans) > 1 and self.scan_start_idx < datasource_len:
+        plans = optimizer.optimize(dataset, policy)
+        while len(plans) > 1 and self.scan_start_idx < len(self.datasource):
             # identify the plan with the highest quality in the set
             max_quality_plan_id = self.get_max_quality_plan_id(plans)
 
@@ -234,27 +231,24 @@ class ExecutionEngine:
             records.extend(new_records)
             plan_stats.extend(new_plan_stats)
 
-            if self.scan_start_idx + self.num_samples < datasource_len:
+            if self.scan_start_idx + self.num_samples < len(self.datasource):
                 # update cost model and optimizer
                 execution_data.extend(new_execution_data)
-                cost_model = CostModel(
-                    source_dataset_id=self.source_dataset_id,
-                    sample_execution_data=execution_data,
-                )
+                cost_model = CostModel(sample_execution_data=execution_data)
                 optimizer.update_cost_model(cost_model)
 
                 # get new set of plans
-                plans = optimizer.optimize(dataset)
+                plans = optimizer.optimize(dataset, policy)
 
                 # update scan start idx
                 self.scan_start_idx += self.num_samples
 
-        if self.scan_start_idx < datasource_len:
+        if self.scan_start_idx < len(self.datasource):
             # execute final plan until end
             final_plan = plans[0]
             new_records, new_plan_stats = self.execute_plan(
                 plan=final_plan,
-                max_workers=self.max_workers,
+                plan_workers=self.max_workers,
             )
             records.extend(new_records)
             plan_stats.append(new_plan_stats)
@@ -262,11 +256,11 @@ class ExecutionEngine:
         # return the final set of records and plan stats
         return records, plan_stats
 
-    def execute_plan(
-        self, plan: PhysicalPlan, num_samples: Union[int, float] = float("inf"), max_workers: Optional[int] = None
-    ):
+
+    def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
         """Execute the given plan and return the output records and plan stats."""
         raise NotImplementedError("Abstract method to be overwritten by sub-classes")
+
 
     def execute(self, dataset: Dataset, policy: Policy):
         """

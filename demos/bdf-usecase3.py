@@ -10,7 +10,7 @@ import time
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
-import streamlit as st
+import streamlit as st  # type: ignore
 
 import palimpzest as pz
 
@@ -68,8 +68,8 @@ def run_workload():
 
     tables = []
     statistics = []
-    for table, plan, stats in iterable:
-        record_time = time.time()
+    for table, plan, stats in iterable:  # noqa: B007
+        # record_time = time.time()
         tables += table
         statistics.append(stats)
 
@@ -173,11 +173,11 @@ except Exception:
     breakpoint()
 try:
     G.add_nodes_from(references_df["source"].unique())
-    for idx, row in references_df.iterrows():
+    for _, row in references_df.iterrows():
         G.add_edge(row["source"], row["key"])
 except Exception:
     G.add_nodes_from(references_df["filename"].unique())
-    for idx, row in references_df.iterrows():
+    for _, row in references_df.iterrows():
         G.add_edge(row["filename"], row["key"])
 
 # prune all nodes with no edges or one edge
@@ -195,5 +195,5 @@ nx.write_gexf(G, "demos/bdf-usecase3.gexf")
 
 print("References:", references_df)
 # st.write(table.title, table.author, table.abstract)
-# endTime = time.time()
-# print("Elapsed time:", endTime - startTime)
+# end_time = time.time()
+# print("Elapsed time:", end_time - start_time)

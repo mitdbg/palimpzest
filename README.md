@@ -15,6 +15,37 @@ $ cd palimpzest
 $ pip install .
 ```
 
+## Downloading test data
+To run the provided demos, you will need to download the test data. Due to the size of the data, we are unable to include it in the repository. You can download the test data by running the following command from a unix terminal (requires `wget` and `tar`):
+```
+chmod +x testdata/download_testdata.sh
+./testdata/download_testdata.sh
+```
+For convenience, we have also provided a script to register all test data with Palimpzest:
+```
+chmod +x testdata/register-sources.sh
+./testdata/register-sources.sh
+```
+
+
+## Python Demos
+#### NOTE: we are in the process of refactoring our demos; please reach out to us or create an issue if you'd like support getting started
+Below are simple instructions to run pz on a test data set of enron emails that is included with the system:
+
+- Initialize the configuration by running `pz init`.
+
+- Palimpzest defaults to using OpenAI. You’ll need to export an environment variable `OPENAI_API_KEY`
+
+- (Skip this step if you ran the `register-sources.sh` script successfully) Add the enron data set with:
+`pz reg --path testdata/enron-tiny --name enron-tiny`
+
+- Finally, run the simple test program with:
+      `python demos/simpleDemo.py --task enron --datasetid enron-eval-tiny --verbose`
+
+- If you would like to try running our in our execution mode which first optimizes on a subset of the data, you can run:
+      `python demos/optimizerDemo.py --verbose --workload enron --datasetid enron-eval-tiny --executor sequential-mab --sample-budget 15 --exp-name demo` 
+
+
 
 ## Palimpzest CLI
 Installing Palimpzest also installs its CLI tool `pz` which provides users with basic utilities for creating and managing their own Palimpzest system. Running `pz --help` diplays an overview of the CLI's commands:
@@ -166,38 +197,4 @@ If you want to use parallel LLM execution on together.ai, you have to modify the
 If you want to use parallel PDF processing at modal.com, you have to:
 1. Set `pdfprocessor: modal` in the config.yaml file.
 2. Run `modal deploy src/palimpzest/tools/allenpdf.py`.  This will remotely install the modal function so you can run it. (Actually, it's probably already installed there, but do this just in case.  Also do it if there's been a change to the server-side function inside that file.)
-
-
-## Downloading test data
-To run the provided demos, you will need to download the test data. Due to the size of the data, we are unable to include it in the repository. You can download the test data by running the following command from a unix terminal (requires `wget` and `tar`):
-```
-chmod +x testdata/download_testdata.sh
-./testdata/download_testdata.sh
-```
-For convenience, we have also provided a script to register all test data with Palimpzest:
-```
-chmod +x testdata/register-sources.sh
-./testdata/register-sources.sh
-```
-
-
-## Python Demo
-#### NOTE: we are in the process of refactoring our demos; please check back in a day or two
-Below are simple instructions to run pz on a test data set of enron emails that is included with the system:
-
-- Initialize the configuration by running `pz init`.
-
-- Add the enron data set with:
-`pz reg --path testdata/enron-tiny --name enron-tiny`
-then run it through the test program with:
-      `python demos/simpleDemo.py --task enron --datasetid enron-tiny`
-
-- Add the test paper set with:
-    `pz reg --path testdata/pdfs-tiny --name pdfs-tiny`
-then run it through the test program with:
-`python demos/simpleDemo.py --task paper --datasetid pdfs-tiny`
-
-
-- Palimpzest defaults to using OpenAI. You’ll need to export an environment variable `OPENAI_API_KEY`
-
 

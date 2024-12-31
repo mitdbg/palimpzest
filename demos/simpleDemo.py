@@ -70,7 +70,7 @@ def vldb_text_file_to_url(candidate: DataRecord):
     url_records = []
     with open(candidate.filename) as f:
         for line in f:
-            dr = DataRecord(pz.URL, parent_id=candidate._id)
+            dr = DataRecord.from_parent(pz.URL, parent_record=candidate, project_cols=[])
             dr.url = line.strip()
             url_records.append(dr)
 
@@ -105,8 +105,7 @@ def get_page_text(url):
 
 def download_html(candidate: DataRecord):
     textcontent = get_page_text(candidate.url)
-    dr = DataRecord(pz.WebPage, parent_id=candidate._id)
-    dr.url = candidate.url
+    dr = DataRecord.from_parent(pz.WebPage, parent_record=candidate, project_cols=['url'])
 
     html = textcontent
     tokens = html.split()[:5000]
@@ -124,7 +123,7 @@ def download_html(candidate: DataRecord):
 def download_pdf(candidate: DataRecord):
     print(f"DOWNLOADING: {candidate.pdfLink}")
     content = requests.get(candidate.pdfLink).content
-    dr = DataRecord(pz.File, parent_id=candidate._id)
+    dr = DataRecord.from_parent(pz.File, parent_record=candidate, project_cols=[])
     dr.url = candidate.pdfLink
     dr.content = content
     dr.timestamp = datetime.datetime.now().isoformat()
@@ -299,7 +298,7 @@ def build_image_agg_plan(dataset_id):
 
 
 def print_table(records, cols=None, gradio=False, plan_str=None):
-    records = [{key: record.__dict__[key] for key in record.__dict__ if not key.startswith("_")} for record in records]
+    records = [{key: record[key] for key in record.get_fields()} for record in records]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
     final_df = records_df[print_cols] if not records_df.empty else pd.DataFrame(columns=print_cols)
@@ -325,12 +324,6 @@ if __name__ == "__main__":
     parser.add_argument("--profile", default=False, action="store_true", help="Profile execution")
     parser.add_argument("--datasetid", type=str, help="The dataset id")
     parser.add_argument("--task", type=str, help="The task to run")
-    parser.add_argument(
-        "--engine",
-        type=str,
-        help="The engine to use. One of sentinel, nosentinel",
-        default="nosentinel",
-    )
     parser.add_argument(
         "--executor",
         type=str,
@@ -373,29 +366,15 @@ if __name__ == "__main__":
         exit(1)
 
     execution_engine = None
-    engine, executor = args.engine, args.executor
-    if engine == "sentinel":
-        if executor == "sequential":
-            execution_engine = pz.SequentialSingleThreadSentinelExecution
-        elif executor == "pipelined":
-            execution_engine = pz.PipelinedSingleThreadSentinelExecution
-        elif executor == "parallel":
-            execution_engine = pz.PipelinedParallelSentinelExecution
-        else:
-            print("Unknown executor")
-            exit(1)
-    elif engine == "nosentinel":
-        if executor == "sequential":
-            execution_engine = pz.SequentialSingleThreadNoSentinelExecution
-        elif executor == "pipelined":
-            execution_engine = pz.PipelinedSingleThreadNoSentinelExecution
-        elif executor == "parallel":
-            execution_engine = pz.PipelinedParallelNoSentinelExecution
-        else:
-            print("Unknown executor")
-            exit(1)
+    executor = args.executor
+    if executor == "sequential":
+        execution_engine = pz.NoSentinelSequentialSingleThreadExecution
+    elif executor == "pipelined":
+        execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
+    elif executor == "parallel":
+        execution_engine = pz.NoSentinelPipelinedParallelExecution
     else:
-        print("Unknown engine")
+        print("Executor not supported for this demo")
         exit(1)
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
@@ -481,7 +460,7 @@ if __name__ == "__main__":
                 # NOTE: we can make this a streaming demo again by modifying this get_item function
                 commit = self.commits[idx]
                 commit_str = json.dumps(commit)
-                dr = pz.DataRecord(self.schema)
+                dr = pz.DataRecord(self.schema, source_id=idx)
                 dr.json = commit_str
 
                 return dr

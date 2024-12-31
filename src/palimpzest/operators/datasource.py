@@ -5,12 +5,11 @@ import time
 from palimpzest.constants import (
     LOCAL_SCAN_TIME_PER_KB,
     MEMORY_SCAN_TIME_PER_KB,
-    NAIVE_EST_ONE_TO_MANY_SELECTIVITY,
     Cardinality,
 )
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.elements.records import DataRecord
-from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.operators.physical import PhysicalOperator
 
 
 class DataSourcePhysicalOp(PhysicalOperator):
@@ -29,19 +28,13 @@ class DataSourcePhysicalOp(PhysicalOperator):
         op += f"    ({', '.join(self.output_schema.field_names())[:30]})\n"
         return op
 
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {"dataset_id": self.dataset_id, **copy_kwargs}
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        return {"dataset_id": self.dataset_id, **id_params}
 
     def get_op_params(self):
-        return {"output_schema": self.output_schema, "dataset_id": self.dataset_id}
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.output_schema == other.output_schema
-            and self.dataset_id == other.dataset_id
-        )
+        op_params = super().get_op_params()
+        return {"dataset_id": self.dataset_id, **op_params}
 
     def naive_cost_estimates(
         self,
@@ -70,7 +63,6 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
     def naive_cost_estimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
-        input_cardinality: Cardinality,
         input_record_size_in_bytes: int | float,
         dataset_type: str,
     ) -> OperatorCostEstimates:
@@ -86,11 +78,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         )
 
         # estimate output cardinality
-        cardinality = (
-            source_op_cost_estimates.cardinality
-            if input_cardinality == Cardinality.ONE_TO_ONE
-            else source_op_cost_estimates.cardinality * NAIVE_EST_ONE_TO_MANY_SELECTIVITY
-        )
+        cardinality = source_op_cost_estimates.cardinality
 
         # for now, assume no cost per record for reading data
         return OperatorCostEstimates(
@@ -100,15 +88,22 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
             quality=1.0,
         )
 
-    def __call__(self, candidate: DataRecord) -> list[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
         """
         This function takes the candidate -- which is a DataRecord with a SourceRecord schema --
         and invokes its get_item_fn on the given idx to return the next DataRecord from the DataSource.
         """
         start_time = time.time()
-        output = candidate.get_item_fn(candidate.idx)
-        records = [output] if candidate.cardinality == Cardinality.ONE_TO_ONE else output
+        records = candidate.get_item_fn(candidate.idx)
         end_time = time.time()
+
+        # if records is a DataRecord (instead of a list) wrap it in a list
+        if isinstance(records, DataRecord):
+            records = [records]
+
+        # assert that every element of records is a DataRecord and has a source_id
+        for dr in records:
+            assert isinstance(dr, DataRecord), "Output from DataSource.get_item() must be a DataRecord or List[DataRecord]"
 
         # create RecordOpStats objects
         record_op_stats_lst = []
@@ -116,22 +111,27 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
             record_op_stats = RecordOpStats(
                 record_id=record._id,
                 record_parent_id=record._parent_id,
+                record_source_id=record._source_id,
                 record_state=record.as_dict(include_bytes=False),
                 op_id=self.get_op_id(),
+                logical_op_id=self.logical_op_id,
                 op_name=self.op_name(),
                 time_per_record=(end_time - start_time) / len(records),
                 cost_per_record=0.0,
+                op_details={k: str(v) for k, v in self.get_id_params().items()},
             )
             record_op_stats_lst.append(record_op_stats)
 
-        return records, record_op_stats_lst
+        # construct and return DataRecordSet object
+        record_set = DataRecordSet(records, record_op_stats_lst)
+
+        return record_set
 
 
 class CacheScanDataOp(DataSourcePhysicalOp):
     def naive_cost_estimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
-        input_cardinality: Cardinality,
         input_record_size_in_bytes: int | float,
     ):
         # get inputs needed for naive cost estimation
@@ -142,11 +142,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
         time_per_record = LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
 
         # estimate output cardinality
-        cardinality = (
-            source_op_cost_estimates.cardinality
-            if input_cardinality == Cardinality.ONE_TO_ONE
-            else source_op_cost_estimates.cardinality * NAIVE_EST_ONE_TO_MANY_SELECTIVITY
-        )
+        cardinality = source_op_cost_estimates.cardinality
 
         # for now, assume no cost per record for reading from cache
         return OperatorCostEstimates(
@@ -156,11 +152,18 @@ class CacheScanDataOp(DataSourcePhysicalOp):
             quality=1.0,
         )
 
-    def __call__(self, candidate: DataRecord) -> list[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
         start_time = time.time()
-        output = candidate.get_item_fn(candidate.idx)
-        records = [output] if candidate.cardinality == Cardinality.ONE_TO_ONE else output
+        records = candidate.get_item_fn(candidate.idx)
         end_time = time.time()
+
+        # if records is a DataRecord (instead of a list) wrap it in a list
+        if isinstance(records, DataRecord):
+            records = [records]
+
+        # assert that every element of records is a DataRecord and has a source_id
+        for dr in records:
+            assert isinstance(dr, DataRecord), "Output from DataSource.get_item() must be a DataRecord or List[DataRecord]"
 
         # create RecordOpStats objects
         record_op_stats_lst = []
@@ -168,12 +171,18 @@ class CacheScanDataOp(DataSourcePhysicalOp):
             record_op_stats = RecordOpStats(
                 record_id=record._id,
                 record_parent_id=record._parent_id,
+                record_source_id=record._source_id,
                 record_state=record.as_dict(include_bytes=False),
                 op_id=self.get_op_id(),
+                logical_op_id=self.logical_op_id,
                 op_name=self.op_name(),
                 time_per_record=(end_time - start_time) / len(records),
                 cost_per_record=0.0,
+                op_details={k: str(v) for k, v in self.get_id_params().items()},
             )
             record_op_stats_lst.append(record_op_stats)
 
-        return records, record_op_stats_lst
+        # construct and eturn DataRecordSet object
+        record_set = DataRecordSet(records, record_op_stats_lst)
+
+        return record_set

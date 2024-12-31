@@ -1,7 +1,8 @@
 import pytest
 
+import palimpzest as pz
 from palimpzest.constants import Cardinality
-from palimpzest.corelib.schemas import Table, XLSFile
+from palimpzest.corelib.schemas import Table, TextFile, XLSFile
 from palimpzest.sets import Dataset
 from palimpzest.utils import udfs
 
@@ -61,7 +62,7 @@ def real_estate_workload(
 ):
     listings = Dataset(real_estate_eval_tiny, schema=real_estate_listing_files_schema)
     listings = listings.convert(text_real_estate_listing_schema, depends_on="text_content")
-    listings = listings.convert(image_real_estate_listing_schema, image_conversion=True, depends_on="image_contents")
+    listings = listings.convert(image_real_estate_listing_schema, image_conversion=True, depends_on="image_filepaths")
     listings = listings.filter(
         "The interior is modern and attractive, and has lots of natural sunlight",
         depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
@@ -82,3 +83,31 @@ def biofabric_workload(biofabric_tiny, case_data_schema):
         case_data_schema, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
     )
     return case_data
+
+@pytest.fixture
+def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_schema):
+    # construct plan with three converts
+    dataset = pz.Dataset(enron_eval_tiny, schema=email_schema)
+    dataset = dataset.convert(foobar_schema)
+    dataset = dataset.convert(baz_schema)
+
+    return dataset
+
+@pytest.fixture
+def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
+    # construct plan with two converts and two filters
+    dataset = pz.Dataset(enron_eval_tiny, schema=TextFile)
+    dataset = dataset.filter("filter1")
+    dataset = dataset.convert(email_schema)
+
+    return dataset
+
+@pytest.fixture
+def two_converts_two_filters_workload(enron_eval_tiny, email_schema, foobar_schema):
+    # construct plan with two converts and two filters
+    dataset = pz.Dataset(enron_eval_tiny, schema=email_schema)
+    dataset = dataset.convert(foobar_schema)
+    dataset = dataset.filter("filter1", depends_on=["sender"])
+    dataset = dataset.filter("filter2", depends_on=["subject"])
+
+    return dataset

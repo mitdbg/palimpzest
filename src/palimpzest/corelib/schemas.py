@@ -200,7 +200,6 @@ class SourceRecord(Schema):
 
     idx = NumericField(desc="The scan index of the record", required=True)
     get_item_fn = CallableField(desc="The get_item() function from the DataSource", required=True)
-    cardinality = StringField(desc="The cardinality of the datasource", required=True)
 
 
 class Table(Schema):

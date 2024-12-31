@@ -1,7 +1,8 @@
 import pytest
 
-from palimpzest.cost_model import CostModel
 from palimpzest.datamanager import DataDirectory
+from palimpzest.optimizer.cost_model import CostModel
+from palimpzest.utils.model_helpers import get_models
 
 
 class TestCostModel:
@@ -9,7 +10,10 @@ class TestCostModel:
         self, simple_plan_sample_execution_data, simple_plan_expected_operator_estimates
     ):
         # construct estimator
-        estimator = CostModel(source_dataset_id=None, sample_execution_data=simple_plan_sample_execution_data)
+        estimator = CostModel(
+            sample_execution_data=simple_plan_sample_execution_data,
+            available_models=get_models(),
+        )
 
         # get computed operator estimates
         operator_estimates = estimator.operator_estimates
@@ -35,20 +39,14 @@ class TestCostModel:
         argnames=("physical_plan", "expected_cost_est_results"),
         argvalues=[
             pytest.param("cost-est-simple-plan-gpt4-gpt4", "cost-est-simple-plan-gpt4-gpt4", id="gpt4-gpt4"),
-            pytest.param("cost-est-simple-plan-gpt4-gpt35", "cost-est-simple-plan-gpt4-gpt35", id="gpt4-gpt35"),
+            pytest.param("cost-est-simple-plan-gpt4-gpt4m", "cost-est-simple-plan-gpt4-gpt4m", id="gpt4-gpt4m"),
             pytest.param("cost-est-simple-plan-gpt4-mixtral", "cost-est-simple-plan-gpt4-mixtral", id="gpt4-mixtral"),
-            pytest.param("cost-est-simple-plan-gpt35-gpt4", "cost-est-simple-plan-gpt35-gpt4", id="gpt35-gpt4"),
-            pytest.param("cost-est-simple-plan-gpt35-gpt35", "cost-est-simple-plan-gpt35-gpt35", id="gpt35-gpt35"),
-            pytest.param(
-                "cost-est-simple-plan-gpt35-mixtral", "cost-est-simple-plan-gpt35-mixtral", id="gpt35-mixtral"
-            ),
+            pytest.param("cost-est-simple-plan-gpt4m-gpt4", "cost-est-simple-plan-gpt4m-gpt4", id="gpt4m-gpt4"),
+            pytest.param("cost-est-simple-plan-gpt4m-gpt4m", "cost-est-simple-plan-gpt4m-gpt4m", id="gpt4m-gpt4m"),
+            pytest.param("cost-est-simple-plan-gpt4m-mixtral", "cost-est-simple-plan-gpt4m-mixtral", id="gpt4m-mixtral"),
             pytest.param("cost-est-simple-plan-mixtral-gpt4", "cost-est-simple-plan-mixtral-gpt4", id="mixtral-gpt4"),
-            pytest.param(
-                "cost-est-simple-plan-mixtral-gpt35", "cost-est-simple-plan-mixtral-gpt35", id="mixtral-gpt35"
-            ),
-            pytest.param(
-                "cost-est-simple-plan-mixtral-mixtral", "cost-est-simple-plan-mixtral-mixtral", id="mixtral-mixtral"
-            ),
+            pytest.param("cost-est-simple-plan-mixtral-gpt4m", "cost-est-simple-plan-mixtral-gpt4m", id="mixtral-gpt4m"),
+            pytest.param("cost-est-simple-plan-mixtral-mixtral", "cost-est-simple-plan-mixtral-mixtral", id="mixtral-mixtral"),
         ],
         indirect=True,
     )
@@ -74,7 +72,10 @@ class TestCostModel:
                 record_op_stats.source_op_id = test_op_id_to_new_op_id[record_op_stats.source_op_id]
 
         # construct cost model
-        cost_model = CostModel(source_dataset_id=dataset_id, sample_execution_data=simple_plan_sample_execution_data)
+        cost_model = CostModel(
+            sample_execution_data=simple_plan_sample_execution_data,
+            available_models=get_models(),
+        )
 
         # estimate cost of plan operators
         source_op_estimates = None

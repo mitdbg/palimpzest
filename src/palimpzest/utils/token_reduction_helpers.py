@@ -92,7 +92,7 @@ def get_range_from_hist(file_path, range_budget, resolution=0.001, trim_zeros=Tr
 def best_substring_match(query: str, context: str | List[str]):
     # This will extract all substrings of length equal to the query from the string
     candidates = [context[i : i + len(query)] for i in range(len(context) - len(query) + 1)]
-    print("grd:", query)
+
     # Find the best match among the candidates
     ret = process.extractOne(query, candidates, scorer=fuzz.ratio)
     if ret is None:

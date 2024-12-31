@@ -21,16 +21,16 @@ class DogImage(pz.ImageFile):
     breed = pz.Field(desc="The breed of the dog", required=True)
 
 
-def buildImagePlan(datasetId):
-    images = pz.Dataset(datasetId, schema=pz.ImageFile)
-    filteredImages = images.filter("The image contains one or more dogs")
-    dogImages = filteredImages.convert(DogImage, desc="Images of dogs")
-    return dogImages
+def build_image_plan(dataset_id):
+    images = pz.Dataset(dataset_id, schema=pz.ImageFile)
+    filtered_images = images.filter("The image contains one or more dogs")
+    dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
+    return dog_images
 
 
 if __name__ == "__main__":
     # parse arguments
-    startTime = time.time()
+    start_time = time.time()
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument("--no-cache", action="store_true", help="Do not use cached results")
 
@@ -45,8 +45,8 @@ if __name__ == "__main__":
 
     print("Starting image task")
     policy = pz.MaxQuality()
-    plan = buildImagePlan(datasetid)
-    engine = pz.PipelinedParallelNoSentinelExecution
+    plan = build_image_plan(datasetid)
+    engine = pz.NoSentinelPipelinedParallelExecution
     records, execution_stats = pz.Execute(plan, policy=policy, nocache=no_cache, execution_engine=engine, verbose=True)
 
     print("Obtained records", records)
@@ -71,6 +71,6 @@ if __name__ == "__main__":
         plan_str = list(execution_stats.plan_strs.values())[0]
         gr.Textbox(value=plan_str, info="Query Plan")
 
-    endTime = time.time()
-    print("Elapsed time:", endTime - startTime)
+    end_time = time.time()
+    print("Elapsed time:", end_time - start_time)
     demo.launch()

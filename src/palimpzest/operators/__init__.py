@@ -38,7 +38,9 @@ from palimpzest.operators.logical import (
 from palimpzest.operators.logical import (
     LogicalOperator as _LogicalOperator,
 )
+from palimpzest.operators.mixture_of_agents_convert import MixtureOfAgentsConvert as _MixtureOfAgentsConvert
 from palimpzest.operators.physical import PhysicalOperator as _PhysicalOperator
+from palimpzest.operators.retrieve import RetrieveOp as _RetrieveOp
 
 LOGICAL_OPERATORS = [
     _LogicalOperator,
@@ -62,8 +64,12 @@ PHYSICAL_OPERATORS = (
     + [_FilterOp, _NonLLMFilter, _LLMFilter]
     # limit
     + [_LimitScanOp]
+    # mixture-of-agents
+    + [_MixtureOfAgentsConvert]
     # physical
     + [_PhysicalOperator]
+    # retrieve
+    + [_RetrieveOp]
 )
 
 __all__ = [

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.elements.records import DataRecord
-from palimpzest.operators.physical import DataRecordsWithStats, PhysicalOperator
+from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.operators.physical import PhysicalOperator
 
 
 class LimitScanOp(PhysicalOperator):
@@ -15,23 +15,13 @@ class LimitScanOp(PhysicalOperator):
         op += f"    Limit: {self.limit}\n"
         return op
 
-    def get_copy_kwargs(self):
-        copy_kwargs = super().get_copy_kwargs()
-        return {"limit": self.limit, **copy_kwargs}
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        return {"limit": self.limit, **id_params}
 
     def get_op_params(self):
-        return {
-            "output_schema": self.output_schema,
-            "limit": self.limit,
-        }
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.limit == other.limit
-            and self.output_schema == other.output_schema
-            and self.input_schema == other.input_schema
-        )
+        op_params = super().get_op_params()
+        return {"limit": self.limit, **op_params}
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the limit takes negligible additional time (and no cost in USD)
@@ -42,18 +32,24 @@ class LimitScanOp(PhysicalOperator):
             quality=1.0,
         )
 
-    def __call__(self, candidate: DataRecord) -> list[DataRecordsWithStats]:
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
         # NOTE: execution layer ensures that no more than self.limit
         #       records are returned to the user by this operator.
+        # create new DataRecord
+        dr = DataRecord.from_parent(schema=candidate.schema, parent_record=candidate)
+
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=candidate._id,
-            record_parent_id=candidate._parent_id,
-            record_state=candidate.as_dict(include_bytes=False),
+            record_id=dr._id,
+            record_parent_id=dr._parent_id,
+            record_source_id=dr._source_id,
+            record_state=dr.as_dict(include_bytes=False),
             op_id=self.get_op_id(),
+            logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=0.0,
             cost_per_record=0.0,
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 
-        return [candidate], [record_op_stats]
+        return DataRecordSet([dr], [record_op_stats])

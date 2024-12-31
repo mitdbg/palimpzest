@@ -10,6 +10,7 @@ from palimpzest.datamanager import DataDirectory
 from palimpzest.datasources import DataSource
 from palimpzest.elements.filters import Filter
 from palimpzest.elements.groupbysig import GroupBySig
+from palimpzest.utils.index_helpers import get_index_str
 
 
 #####################################################
@@ -38,14 +39,17 @@ class Set:
     def __init__(
         self,
         source: Set | DataSource,
-        schema: type[Schema],
+        schema: Schema,
         desc: str | None = None,
         filter: Filter | None = None,
         udf: Callable | None = None,
         agg_func: AggFunc | None = None,
         group_by: GroupBySig | None = None,
+        index = None, # TODO(Siva): Abstract Index and add a type here and elsewhere
+        search_attr: str | None = None,
+        output_attr: str | None = None,
+        k: int | None = None, # TODO: disambiguate `k` to be something like `retrieve_k`
         limit: int | None = None,
-        fnid: str | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool | None = None,
         depends_on: list[str] | None = None,
@@ -58,8 +62,11 @@ class Set:
         self._udf = udf
         self._agg_func = agg_func
         self._group_by = group_by
+        self._index = index
+        self._search_attr = search_attr
+        self._output_attr = output_attr
+        self._k = k
         self._limit = limit
-        self._fnid = fnid
         self._cardinality = cardinality
         self._image_conversion = image_conversion
         self._depends_on = depends_on
@@ -73,7 +80,7 @@ class Set:
         )
 
     @property
-    def schema(self) -> type[Schema]:
+    def schema(self) -> Schema:
         return self._schema
 
     def serialize(self):
@@ -89,11 +96,14 @@ class Set:
             "filter": None if self._filter is None else self._filter.serialize(),
             "udf": None if self._udf is None else str(self._udf),
             "agg_func": None if self._agg_func is None else self._agg_func.serialize(),
-            "fnid": self._fnid,
             "cardinality": self._cardinality,
             "image_conversion": self._image_conversion,
             "limit": self._limit,
             "group_by": (None if self._group_by is None else self._group_by.serialize()),
+            "index": None if self._index is None else get_index_str(self._index),
+            "search_attr": self._search_attr,
+            "output_attr": self._output_attr,
+            "k": self._k,
         }
 
         return d
@@ -136,11 +146,32 @@ class Dataset(Set):
         elif type(self._depends_on) is str:
             self._depends_on = [self._depends_on]
 
+    def copy(self) -> Dataset:
+        source_copy = self._source.copy()
+        dataset_copy = Dataset(
+            schema=self.schema,
+            source=source_copy,
+            desc=self._desc,
+            filter=self._filter,
+            udf=self._udf,
+            agg_func=self._agg_func,
+            group_by=self._group_by,
+            index=self._index,
+            search_attr=self._search_attr,
+            output_attr=self._output_attr,
+            k=self._k,
+            limit=self._limit,
+            cardinality=self._cardinality,
+            image_conversion=self._image_conversion,
+            depends_on=self._depends_on,
+            nocache=self._nocache,
+        )
+        return dataset_copy
+
     def filter(
         self,
         _filter: str | Callable,
         depends_on: str | list[str] | None = None,
-        desc: str = "Apply filter(s)",
     ) -> Dataset:
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
         f = None
@@ -154,7 +185,6 @@ class Dataset(Set):
         return Dataset(
             source=self,
             schema=self.schema,
-            desc=desc,
             filter=f,
             depends_on=depends_on,
             nocache=self._nocache,
@@ -162,7 +192,7 @@ class Dataset(Set):
 
     def convert(
         self,
-        output_schema: type[Schema],
+        output_schema: Schema,
         udf: Callable | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         image_conversion: bool = False,
@@ -207,6 +237,18 @@ class Dataset(Set):
             schema=groupby.output_schema(),
             desc="Group By",
             group_by=groupby,
+            nocache=self._nocache,
+        )
+
+    def retrieve(self, output_schema, index, search_attr, output_attr, k=-1) -> Dataset:
+        return Dataset(
+            source=self,
+            schema=output_schema,
+            desc="Retrieve",
+            index=index,
+            search_attr=search_attr,
+            output_attr=output_attr,
+            k=k,
             nocache=self._nocache,
         )
 

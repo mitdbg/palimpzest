@@ -49,8 +49,8 @@ def in_price_range(record):
 class Email(pz.TextFile):
     """Represents an email, which in practice is usually from a text file"""
 
-    sender = pz.Field(desc="The email address of the sender", required=True)
-    subject = pz.Field(desc="The subject of the email", required=True)
+    sender = pz.StringField(desc="The email address of the sender", required=True)
+    subject = pz.StringField(desc="The subject of the email", required=True)
 
 
 class CaseData(pz.Schema):
@@ -90,9 +90,9 @@ class RealEstateListingFiles(pz.Schema):
 
     listing = pz.StringField(desc="The name of the listing", required=True)
     text_content = pz.StringField(desc="The content of the listing's text description", required=True)
-    image_contents = pz.ListField(
-        element_type=pz.BytesField,
-        desc="A list of the contents of each image of the listing",
+    image_filepaths = pz.ListField(
+        element_type=pz.StringField,
+        desc="A list of the filepaths for each image of the listing",
         required=True,
     )
 
@@ -132,18 +132,16 @@ class RealEstateListingSource(pz.UserSource):
         listing = self.listings[idx]
 
         # create data record
-        dr = pz.DataRecord(self.schema, scan_idx=idx)
+        dr = pz.DataRecord(self.schema, source_id=listing)
         dr.listing = listing
-        dr.image_contents = []
+        dr.image_filepaths = []
         listing_dir = os.path.join(self.listings_dir, listing)
         for file in os.listdir(listing_dir):
-            bytes_data = None
-            with open(os.path.join(listing_dir, file), "rb") as f:
-                bytes_data = f.read()
             if file.endswith(".txt"):
-                dr.text_content = bytes_data.decode("utf-8")
+                with open(os.path.join(listing_dir, file), "rb") as f:
+                    dr.text_content = f.read().decode("utf-8")
             elif file.endswith(".png"):
-                dr.image_contents.append(bytes_data)
+                dr.image_filepaths.append(os.path.join(listing_dir, file))
 
         return dr
 
@@ -157,12 +155,6 @@ if __name__ == "__main__":
     parser.add_argument("--datasetid", type=str, help="The dataset id")
     parser.add_argument(
         "--workload", type=str, help="The workload to run. One of enron, real-estate, medical-schema-matching."
-    )
-    parser.add_argument(
-        "--engine",
-        type=str,
-        help="The engine to use. One of sentinel, nosentinel",
-        default="sentinel",
     )
     parser.add_argument(
         "--executor",
@@ -208,29 +200,15 @@ if __name__ == "__main__":
         exit(1)
 
     execution_engine = None
-    engine, executor = args.engine, args.executor
-    if engine == "sentinel":
-        if executor == "sequential":
-            execution_engine = pz.SequentialSingleThreadSentinelExecution
-        elif executor == "pipelined":
-            execution_engine = pz.PipelinedSingleThreadSentinelExecution
-        elif executor == "parallel":
-            execution_engine = pz.PipelinedParallelSentinelExecution
-        else:
-            print("Unknown executor")
-            exit(1)
-    elif engine == "nosentinel":
-        if executor == "sequential":
-            execution_engine = pz.SequentialSingleThreadNoSentinelExecution
-        elif executor == "pipelined":
-            execution_engine = pz.PipelinedSingleThreadNoSentinelExecution
-        elif executor == "parallel":
-            execution_engine = pz.PipelinedParallelNoSentinelExecution
-        else:
-            print("Unknown executor")
-            exit(1)
+    executor = args.executor
+    if executor == "sequential":
+        execution_engine = pz.NoSentinelSequentialSingleThreadExecution
+    elif executor == "pipelined":
+        execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
+    elif executor == "parallel":
+        execution_engine = pz.NoSentinelPipelinedParallelExecution
     else:
-        print("Unknown engine")
+        print("Executor not supported for this demo")
         exit(1)
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
@@ -257,7 +235,7 @@ if __name__ == "__main__":
         )
         plan = pz.Dataset(user_dataset_id, schema=RealEstateListingFiles)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
-        plan = plan.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_contents")
+        plan = plan.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_filepaths")
         plan = plan.filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
@@ -277,7 +255,7 @@ if __name__ == "__main__":
         plan,
         policy,
         nocache=True,
-        optimization_strategy=pz.OptimizationStrategy.OPTIMAL,
+        optimization_strategy=pz.OptimizationStrategy.PARETO,
         execution_engine=execution_engine,
         verbose=verbose,
     )

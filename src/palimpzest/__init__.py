@@ -8,6 +8,7 @@ from palimpzest.corelib.fields import (
     NumericField,
     StringField,
 )
+from palimpzest.corelib.schema_builder import SchemaBuilder
 from palimpzest.corelib.schemas import (
     URL,
     Any,
@@ -38,19 +39,23 @@ from palimpzest.datasources import (
     PDFFileDirectorySource,
     TextFileDirectorySource,
     UserSource,
+    ValidationDataSource,
     XLSFileDirectorySource,
 )
 from palimpzest.elements.records import DataRecord
 from palimpzest.execution.execute import Execute
-from palimpzest.execution.nosentinel_execution import (
-    PipelinedParallelNoSentinelExecution,
-    PipelinedSingleThreadNoSentinelExecution,
-    SequentialSingleThreadNoSentinelExecution,
+from palimpzest.execution.mab_sentinel_execution import (
+    MABSequentialParallelSentinelExecution,
+    MABSequentialSingleThreadSentinelExecution,
 )
-from palimpzest.execution.sentinel_execution import (
-    PipelinedParallelSentinelExecution,
-    PipelinedSingleThreadSentinelExecution,
-    SequentialSingleThreadSentinelExecution,
+from palimpzest.execution.nosentinel_execution import (
+    NoSentinelPipelinedParallelExecution,
+    NoSentinelPipelinedSingleThreadExecution,
+    NoSentinelSequentialSingleThreadExecution,
+)
+from palimpzest.execution.random_sampling_sentinel_execution import (
+    RandomSamplingSequentialParallelSentinelExecution,
+    RandomSamplingSequentialSingleThreadSentinelExecution,
 )
 from palimpzest.execution.streaming_execution import StreamingSequentialExecution
 from palimpzest.operators.aggregate import AggregateOp, ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
@@ -83,6 +88,8 @@ from palimpzest.policy import (
 from palimpzest.sets import Dataset
 
 __all__ = [
+    #corelib
+    "SchemaBuilder",
     # constants
     "Cardinality",
     "MAX_ROWS",
@@ -97,6 +104,7 @@ __all__ = [
     "PDFFileDirectorySource",
     "TextFileDirectorySource",
     "UserSource",
+    "ValidationDataSource",
     "XLSFileDirectorySource",
     # elements
     "DataRecord",
@@ -112,12 +120,14 @@ __all__ = [
     "DataDirectory",
     # execution
     "Execute",
-    "PipelinedParallelNoSentinelExecution",
-    "PipelinedSingleThreadNoSentinelExecution",
-    "SequentialSingleThreadNoSentinelExecution",
-    "PipelinedParallelSentinelExecution",
-    "PipelinedSingleThreadSentinelExecution",
-    "SequentialSingleThreadSentinelExecution",
+    "MABSequentialParallelSentinelExecution",
+    "MABSequentialSingleThreadSentinelExecution",
+    "NoSentinelPipelinedParallelExecution",
+    "NoSentinelPipelinedSingleThreadExecution",
+    "NoSentinelSequentialSingleThreadExecution",
+    "RandomSamplingSequentialParallelSentinelExecution",
+    "RandomSamplingSequentialSingleThreadSentinelExecution",
+    "StreamingSequentialExecution",
     # operators
     "AggregateOp",
     "ApplyGroupByOp",
@@ -162,8 +172,6 @@ __all__ = [
     "TextFile",
     "WebPage",
     "XLSFile",
-    # execution
-    "StreamingSequentialExecution",
     # policy
     "MaxQuality",
     "MinCost",

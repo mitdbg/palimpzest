@@ -1,11 +1,10 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
-from typing import List, Optional, Union
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.corelib.schemas import SourceRecord
 from palimpzest.dataclasses import OperatorStats, PlanStats
-from palimpzest.elements.records import DataRecord
+from palimpzest.elements.records import DataRecord, DataRecordSet
 from palimpzest.execution.execution_engine import ExecutionEngine
 from palimpzest.operators.aggregate import AggregateOp
 from palimpzest.operators.datasource import MarshalAndScanDataOp
@@ -23,22 +22,24 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.max_workers = self.get_parallel_max_workers()
+        self.max_workers = (
+            self.get_parallel_max_workers()
+            if self.max_workers is None
+            else self.max_workers
+        )
 
     @staticmethod
-    def execute_op_wrapper(operator: PhysicalOperator, op_input: Union[DataRecord, List[DataRecord]]):
+    def execute_op_wrapper(operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
         """
         Wrapper function around operator execution which also and returns the operator.
         This is useful in the parallel setting(s) where operators are executed by a worker pool,
         and it is convenient to return the op_id along with the computation result.
         """
-        records, record_op_stats_lst = operator(op_input)
+        record_set = operator(op_input)
 
-        return records, record_op_stats_lst, operator
+        return record_set, operator
 
-    def execute_plan(
-        self, plan: PhysicalPlan, num_samples: Union[int, float] = float("inf"), max_workers: Optional[int] = None
-    ):
+    def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
         """Initialize the stats and the execute the plan."""
         if self.verbose:
             print("----------------------")
@@ -48,13 +49,13 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
         plan_start_time = time.time()
 
-        # initialize plan and operator stats
+        # initialize plan stats and operator stats
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
         for op in plan.operators:
             op_id = op.get_op_id()
-            plan_stats.operator_stats[op_id] = OperatorStats(
-                op_id=op_id, op_name=op.op_name()
-            )  # TODO: also add op_details here
+            op_name = op.op_name()
+            op_details = {k: str(v) for k, v in op.get_id_params().items()}
+            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details)
 
         # initialize list of output records and intermediate variables
         output_records = []
@@ -77,7 +78,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         source_operator = plan.operators[0]
         source_op_id = source_operator.get_op_id()
         datasource = (
-            self.datadir.get_registered_dataset(self.source_dataset_id)
+            self.datadir.get_registered_dataset(source_operator.dataset_id)
             if isinstance(source_operator, MarshalAndScanDataOp)
             else self.datadir.get_cached_result(source_operator.dataset_id)
         )
@@ -89,16 +90,15 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         # create thread pool w/max workers
         futures = []
         current_scan_idx = self.scan_start_idx
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=plan_workers) as executor:
             # create initial (set of) future(s) to read first source record;
             # construct input DataRecord for DataSourcePhysicalOp
-            candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)
+            # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
+            #       it is simply a vessel to inform the scan_operator which record to fetch
+            candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
             candidate.idx = current_scan_idx
             candidate.get_item_fn = datasource.get_item
-            candidate.cardinality = datasource.cardinality
-            futures.append(
-                executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate)
-            )
+            futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
             op_id_to_futures_in_flight[source_op_id] += 1
             current_scan_idx += 1
 
@@ -114,7 +114,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                 new_futures = []
                 for future in done_futures:
                     # get the result
-                    records, record_op_stats_lst, operator = future.result()
+                    record_set, operator = future.result()
                     op_id = operator.get_op_id()
 
                     # decrement future from mapping of futures in-flight
@@ -123,15 +123,15 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                     # update plan stats
                     prev_operator = op_id_to_prev_operator[op_id]
                     plan_stats.operator_stats[op_id].add_record_op_stats(
-                        record_op_stats_lst,
+                        record_set.record_op_stats,
                         source_op_id=prev_operator.get_op_id() if prev_operator is not None else None,
                         plan_id=plan.plan_id,
                     )
 
                     # process each record output by the future's operator
-                    for record in records:
+                    for record in record_set:
                         # skip records which are filtered out
-                        if not getattr(record, "_passed_filter", True):
+                        if not getattr(record, "_passed_operator", True):
                             continue
 
                         # add records (which are not filtered) to the cache, if allowed
@@ -147,20 +147,17 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
                     # if this operator was a source scan, update the number of source records scanned
                     if op_id == source_op_id:
-                        source_records_scanned += len(records)
+                        source_records_scanned += len(record_set)
 
                         # scan next record if we can still draw records from source
                         if source_records_scanned < num_samples and current_scan_idx < datasource_len:
                             # construct input DataRecord for DataSourcePhysicalOp
-                            candidate = DataRecord(schema=SourceRecord, parent_id=None, scan_idx=current_scan_idx)
+                            # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
+                            #       it is simply a vessel to inform the scan_operator which record to fetch
+                            candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
                             candidate.idx = current_scan_idx
                             candidate.get_item_fn = datasource.get_item
-                            candidate.cardinality = datasource.cardinality
-                            new_futures.append(
-                                executor.submit(
-                                    PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate
-                                )
-                            )
+                            new_futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
                             op_id_to_futures_in_flight[source_op_id] += 1
                             current_scan_idx += 1
 

@@ -1,5 +1,5 @@
 """
-This scripts collects a sample of useful UDFs to convert schemata.
+This file collects a sample of useful UDFs to convert schemata.
 """
 
 import io
@@ -76,7 +76,7 @@ def xls_to_tables(candidate):
 
         # TODO extend number of rows with dynamic sizing of context length
         # construct data record
-        dr = DataRecord(Table, parent_id=candidate._id)
+        dr = DataRecord.from_parent(Table, parent_record=candidate)
         rows = []
         for row in dataframe.values[:100]:
             row_record = [str(x) for x in row]

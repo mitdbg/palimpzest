@@ -82,6 +82,16 @@ class ListField(Field, list):
         self.element_type = element_type
         self.cardinality = cardinality
 
+    def json_schema(self) -> dict[str, str]:
+        elt_type = None
+        if self.element_type == StringField:
+            elt_type = "string"
+        elif self.element_type == NumericField:
+            elt_type = "numeric"
+        elif self.element_type == BooleanField:
+            elt_type = "boolean"
+        return {"description": self._desc, "type": f"List[{elt_type}]"}
+
     def append(self, item):
         """Append item to the list after type validation."""
         if not isinstance(item, self.element_type):

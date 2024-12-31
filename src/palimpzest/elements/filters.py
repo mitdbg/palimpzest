@@ -18,11 +18,11 @@ class Filter:
     def serialize(self) -> dict[str, Any]:
         return {"filter_condition": self.filter_condition, "filter_fn": str(self.filter_fn)}
 
-    def __str__(self) -> str:
-        return "Filter(" + self.get_filter_str() + ")"
-
     def get_filter_str(self) -> str:
         return self.filter_condition if self.filter_condition is not None else str(self.filter_fn)
+
+    def __repr__(self) -> str:
+        return "Filter(" + self.get_filter_str() + ")"
 
     def __hash__(self) -> int:
         # custom hash function
@@ -35,3 +35,5 @@ class Filter:
             and self.filter_condition == other.filter_condition
             and self.filter_fn == other.filter_fn
         )
+    def __str__(self) -> str:
+        return self.get_filter_str()

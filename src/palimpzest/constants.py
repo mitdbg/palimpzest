@@ -3,7 +3,6 @@ import os
 from enum import Enum
 
 
-# TODO: add GPT-4o, GPT-4o-mini; update vision
 # ENUMS
 class Model(str, Enum):
     """
@@ -11,15 +10,13 @@ class Model(str, Enum):
     which requires invoking an LLM. It does NOT specify whether the model need be executed
     remotely or locally (if applicable).
     """
-
-    LLAMA2 = "meta-llama/Llama-2-7b-hf"  # "togethercomputer/Llama-2-7B-32K-Instruct"
     LLAMA3 = "meta-llama/Llama-3-8b-chat-hf"
+    LLAMA3_V = "meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo"
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    GPT_3_5 = "gpt-3.5-turbo-0125"
-    GPT_4 = "gpt-4o-mini"  # TODO: revert, just getting results for distribution of tokens
-    GPT_4V = "gpt-4-vision-preview"
-    GEMINI_1 = "gemini-1.0-pro-001"
-    GEMINI_1V = "gemini-1.0-pro-vision-latest"
+    GPT_4o = "gpt-4o-2024-08-06"
+    GPT_4o_V = "gpt-4o-2024-08-06"
+    GPT_4o_MINI = "gpt-4o-mini-2024-07-18"
+    GPT_4o_MINI_V = "gpt-4o-mini-2024-07-18"
 
     def __repr__(self):
         return f"{self.name}"
@@ -36,6 +33,7 @@ class PromptStrategy(str, Enum):
     IMAGE_TO_TEXT = "image-to-text"
     DSPY_COT_BOOL = "dspy-chain-of-thought-bool"
     DSPY_COT_QA = "dspy-chain-of-thought-question"
+    DSPY_COT_MOA_AGG = "dspy-chain-of-thought-mixture-of-agents-aggregation"
     CODE_GEN_BOOL = "code-gen-bool"
 
 
@@ -44,10 +42,11 @@ class OptimizationStrategy(str, Enum):
     OptimizationStrategy determines which (set of) plan(s) the Optimizer
     will return to the Execution layer.
     """
-
-    OPTIMAL = "optimal"
+    GREEDY = "greedy"
     CONFIDENCE_INTERVAL = "confidence-interval"
+    PARETO = "pareto" 
     SENTINEL = "sentinel"
+    NONE = "none"
 
 
 class AggFunc(str, Enum):
@@ -69,6 +68,9 @@ class Cardinality(str, Enum):
                     return member
         return cls.ONE_TO_ONE
 
+class PickOutputStrategy(str, Enum):
+    CHAMPION = "champion"
+    ENSEMBLE = "ensemble"
 
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
 PDF_EXTENSIONS = [".pdf"]
@@ -162,213 +164,213 @@ LOG_LLM_OUTPUT = False
 # Time is presented in seconds per output token. I grabbed some semi-recent estimates
 # from the internet for this quick POC, but we can and should do more to model these
 # values more precisely:
-# - Llama2 7B: https://blog.truefoundry.com/llama-2-benchmarks/
-# - Mixtral 7B: https://artificialanalysis.ai/models/mixtral-8x7b-instruct/hosts
-# - GPT 3.5/4: https://community.openai.com/t/gpt-3-5-and-gpt-4-api-response-time-measurements-fyi/237394/16
-# - Gemini 1: https://blog.google/technology/ai/google-gemini-ai/
-LLAMA2_7B_MODEL_CARD = {
+# - https://artificialanalysis.ai/models/llama-3-1-instruct-8b
+#
+LLAMA3_8B_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 1 / 1e10,  # for now, let's have a de minimis cost for Llama2
-    "usd_per_output_token": 1 / 1e10,
+    "usd_per_input_token": 0.18 / 1E6,
+    "usd_per_output_token": 0.18 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.005,  # Assuming an A10 (i.e. G5 on EC2); see link for A100 est.
+    "seconds_per_output_token": 0.0061,
     ##### Agg. Benchmark #####
-    "MMLU": 45.3,
-    ### "BBH": 32.6,
-    ### "AGI Eval": 29.3,
-    ##### Commonsense Reasoning #####
-    "reasoning": 73.9,
-    ### "HellaSwag": 77.2,^
-    ### "WinoGrande": 69.2,^
-    ### "PIQA": 78.8,
-    ### "SIQA": 48.3,
-    ### "Arc-e": 75.2,^
-    ### "Arc-c": 45.9,
-    ##### World Knowledge #####
-    ### "NaturalQuestions": 25.7, # 5-shot
-    ### "TriviaQA": 72.1,         # 5-shot
-    ##### Reading Comprehension #####
-    ### "SQuAD": 62.8, # 5-shot
-    ### "QuAC": 39.7,  # 1-shot
-    ### "BoolQ": 77.4,
+    "overall": 71.0,
     ##### Code #####
-    "code": 12.8,
-    ### "HumanEval": 12.8,^ # pass@1
-    ### "MBPP": 20.8,       # pass@1
-    ##### Math #####
-    "math": 14.6,
-    ### "MATH": 2.5,
-    ### "GSM8K": 14.6,^
+    "code": 64.0,
+}
+LLAMA3_11B_V_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.18 / 1E6,
+    "usd_per_output_token": 0.18 / 1E6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0061,
+    ##### Agg. Benchmark #####
+    "overall": 71.0,
 }
 MIXTRAL_8X_7B_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.6 / 1e6,
     "usd_per_output_token": 0.6 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.005,
+    "seconds_per_output_token": 0.0112,
     ##### Agg. Benchmark #####
-    "MMLU": 70.6,
-    ##### Commonsense Reasoning #####
-    "reasoning": 81.6,
-    ### "HellaSwag": 84.4,^  # 10-shot
-    ### "WinoGrande": 77.2,^ # 5-shot
-    ### "PIQA": 83.6,
-    ### "Arc-e": 83.1,^      # 25-shot
-    ### "Arc-c": 59.7,
-    ##### World Knowledge #####
-    ### "NaturalQuestions": 30.6,
-    ### "TriviaQA": 71.5,
-    ##### Reading Comprehension #####
+    "overall": 63.0,
     ##### Code #####
-    "code": 40.2,
-    ### "HumanEval": 40.2,
-    ### "MBPP": 60.7,      # pass@1
-    ##### Math #####
-    "math": 74.4,
-    ### "MATH": 28.4,
-    ### "GSM8K": 74.4, # 5-shot
+    "code": 40.0,
 }
-LLAMA3_8B_MODEL_CARD = {
+GPT_4o_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 0.2 / 1e6,
-    "usd_per_output_token": 0.2 / 1e6,
+    "usd_per_input_token": 2.5 / 1E6,
+    "usd_per_output_token": 10.0 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.00285,
+    "seconds_per_output_token": 0.0079,
     ##### Agg. Benchmark #####
-    "MMLU": 68.4,
-    ##### Commonsense Reasoning #####
-    "reasoning": 78.6,
-    ### "Arc-e": 78.6,^      # 25-shot
-    ##### Reading Comprehension #####
+    "overall": 89.0,
     ##### Code #####
-    "code": 62.2,
-    ### "HumanEval": 62.2,
-    ##### Math #####
-    "math": 79.6,
-    ### "MATH": 30.0,
-    ### "GSM8K": 79.6, # 5-shot
+    "code": 90.0,
 }
-# NOTE: seconds_per_output_token is based on `gpt-3.5-turbo-1106`
-GPT_3_5_MODEL_CARD = {
+GPT_4o_V_MODEL_CARD = {
+    # NOTE: it is unclear if the same ($ / token) costs can be applied, or if we have to calculate this ourselves
     ##### Cost in USD #####
-    "usd_per_input_token": 0.5 / 1e6,
-    "usd_per_output_token": 1.5 / 1e6,
+    "usd_per_input_token": 2.5 / 1E6,
+    "usd_per_output_token": 10.0 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.0065,
+    "seconds_per_output_token": 0.0079,
     ##### Agg. Benchmark #####
-    "MMLU": 70.0,  # 5-shot
-    ##### Commonsense Reasoning #####
-    "reasoning": 84.1,
-    ### "HellaSwag": 85.5,^  # 10-shot
-    ### "WinoGrande": 81.6,^ # 5-shot
-    ### "Arc-e": 85.2,^      # 25-shot
-    ##### World Knowledge #####
-    ##### Reading Comprehension #####
-    ### "DROP": 64.1, # 3-shot
+    "overall": 89.0,
+}
+GPT_4o_MINI_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.15 / 1E6,
+    "usd_per_output_token": 0.6 / 1E6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0098,
+    ##### Agg. Benchmark #####
+    "overall": 82.0,
     ##### Code #####
-    "code": 48.1,
-    ### "HumanEval": 48.1,^ # 0-shot
-    ##### Math #####
-    "math": 57.1,
-    ### "GSM8K": 57.1,^     # 5-shot
+    "code": 86.0,
 }
-# NOTE: the seconds_per_output_token was computed based on a slightly different model ('gpt-4-1106-preview')
-#       and the benchmark statistics were computed based on the GPT-4 Technical Report; these might be
-#       slightly innacurate compared to the real numbers for gpt-4-0125-preview, but we'll use them until
-#       we have something better. (The cost metrics are accurate).
-GPT_4_MODEL_CARD = {
+GPT_4o_MINI_V_MODEL_CARD = {
+    # NOTE: it is unclear if the same ($ / token) costs can be applied, or if we have to calculate this ourselves
     ##### Cost in USD #####
-    "usd_per_input_token": 10 / 1e6,
-    "usd_per_output_token": 30 / 1e6,
+    "usd_per_input_token": 0.15 / 1E6,
+    "usd_per_output_token": 0.6 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.018,
+    "seconds_per_output_token": 0.0098,
     ##### Agg. Benchmark #####
-    "MMLU": 86.4,  # 5-shot
-    ##### Commonsense Reasoning #####
-    "reasoning": 93.0,
-    ### "HellaSwag": 95.3,^  # 10-shot
-    ### "WinoGrande": 87.5,^ # 5-shot
-    ### "Arc-e": 96.3,^      # 25-shot
-    ##### World Knowledge #####
-    ##### Reading Comprehension #####
-    ### "DROP": 80.9, # 3-shot
-    ##### Code #####
-    "code": 67.0,
-    ### "HumanEval": 67.0,^ # 0-shot
-    ##### Math #####
-    "math": 92.0,
-    ### "GSM8K": 92.0,^     # 5-shot
-}
-
-# TODO: rename MMLU to "overall" for all cards
-# TODO: use cost info in here: https://platform.openai.com/docs/guides/vision/calculating-costs
-GPT_4V_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 10 / 1e6,
-    "usd_per_output_token": 30 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.042
-    / 10.0,  # TODO: / 10.0 is a hack; need to figure out why time estimates are so off
-    ##### Agg. Benchmark #####
-    "MMLU": 86.4,
-}
-
-GEMINI_1_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 125 / 1e8,  # Gemini is free but rate limited for now. Pricing will be updated
-    "usd_per_output_token": 375 / 1e9,
-    ##### Time #####
-    "seconds_per_output_token": 0.042 / 10.0,  # TODO:
-    ##### Agg. Benchmark #####
-    "MMLU": 65.0,  # 90.0 TODO: we are using the free version of Gemini which is substantially worse than its paid version; I'm manually revising it's quality below that of Mixtral
-    ##### Commonsense Reasoning #####
-    "reasoning": 80.0,  # 87.8, TODO: see note above on MMLU
-    # "HellaSwag": 87.8,  # 10-shot
-    ##### World Knowledge #####
-    ##### Reading Comprehension #####
-    # "DROP": 82.4, # Variable shots ?
-    ##### Code #####
-    "code": 74.4,
-    # "HumanEval": 74.4, # 0-shot (IT)*
-    # "Natural2Code": 74.9, # 0-shot
-    ##### Math #####
-    "math": 94.4,
-    # "GSM8K": 94.4,     # maj1@32
-    # "MATH": 53.2,      # 4-shot
-}
-
-GEMINI_1V_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 25 / 1e6,  # Gemini is free but rate limited for now. Pricing will be updated
-    "usd_per_output_token": 375 / 1e9,
-    ##### Time #####
-    "seconds_per_output_token": 0.042,  # / 10.0, # TODO:
-    ##### Agg. Benchmark #####
-    "MMLU": 65.0,  # 90.0, TODO: see note above in Gemini_1 model card
-    ##### Commonsense Reasoning #####
-    "reasoning": 80.0,  # 87.8, TODO: see note above in Gemini_1 model card
-    # "HellaSwag": 87.8,  # 10-shot
-    ##### World Knowledge #####
-    ##### Reading Comprehension #####
-    # "DROP": 82.4, # Variable shots ?
-    ##### Code #####
-    "code": 74.4,
-    # "HumanEval": 74.4, # 0-shot (IT)*
-    # "Natural2Code": 74.9, # 0-shot
-    ##### Math #####
-    "math": 94.4,
-    # "GSM8K": 94.4,     # maj1@32
-    # "MATH": 53.2,      # 4-shot
+    "overall": 82.0,
 }
 
 
 MODEL_CARDS = {
-    Model.LLAMA2.value: LLAMA2_7B_MODEL_CARD,
     Model.LLAMA3.value: LLAMA3_8B_MODEL_CARD,
+    Model.LLAMA3_V.value: LLAMA3_11B_V_MODEL_CARD,
     Model.MIXTRAL.value: MIXTRAL_8X_7B_MODEL_CARD,
-    Model.GPT_3_5.value: GPT_3_5_MODEL_CARD,
-    Model.GPT_4.value: GPT_4_MODEL_CARD,
-    Model.GPT_4V.value: GPT_4V_MODEL_CARD,
-    Model.GEMINI_1.value: GEMINI_1_MODEL_CARD,
-    Model.GEMINI_1V.value: GEMINI_1V_MODEL_CARD,
+    Model.GPT_4o.value: GPT_4o_MODEL_CARD,
+    Model.GPT_4o_V.value: GPT_4o_V_MODEL_CARD,
+    Model.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
+    Model.GPT_4o_MINI_V.value: GPT_4o_MINI_V_MODEL_CARD,
+
+    ###
+    # Model.GPT_3_5.value: GPT_3_5_MODEL_CARD,
+    # Model.GPT_4.value: GPT_4_MODEL_CARD,
+    # Model.GPT_4V.value: GPT_4V_MODEL_CARD,
+    # Model.GEMINI_1.value: GEMINI_1_MODEL_CARD,
+    # Model.GEMINI_1V.value: GEMINI_1V_MODEL_CARD,
 }
+
+
+
+
+
+###### DEPRECATED ######
+# # NOTE: seconds_per_output_token is based on `gpt-3.5-turbo-1106`
+# GPT_3_5_MODEL_CARD = {
+#     ##### Cost in USD #####
+#     "usd_per_input_token": 0.5 / 1E6,
+#     "usd_per_output_token": 1.5 / 1E6,
+#     ##### Time #####
+#     "seconds_per_output_token": 0.0065,
+#     ##### Agg. Benchmark #####
+#     "overall": 70.0, # 5-shot
+#     ##### Commonsense Reasoning #####
+#     "reasoning": 84.1,
+#     ### "HellaSwag": 85.5,^  # 10-shot
+#     ### "WinoGrande": 81.6,^ # 5-shot
+#     ### "Arc-e": 85.2,^      # 25-shot
+#     ##### World Knowledge #####
+#     ##### Reading Comprehension #####
+#     ### "DROP": 64.1, # 3-shot
+#     ##### Code #####
+#     "code": 48.1,
+#     ### "HumanEval": 48.1,^ # 0-shot    
+#     ##### Math #####
+#     "math": 57.1,
+#     ### "GSM8K": 57.1,^     # 5-shot
+# }
+# # NOTE: the seconds_per_output_token was computed based on a slightly different model ('gpt-4-1106-preview')
+# #       and the benchmark statistics were computed based on the GPT-4 Technical Report; these might be
+# #       slightly innacurate compared to the real numbers for gpt-4-0125-preview, but we'll use them until
+# #       we have something better. (The cost metrics are accurate).
+# GPT_4_MODEL_CARD = {
+#     ##### Cost in USD #####
+#     "usd_per_input_token": 10 / 1E6,
+#     "usd_per_output_token": 30 / 1E6,
+#     ##### Time #####
+#     "seconds_per_output_token": 0.018,
+#     ##### Agg. Benchmark #####
+#     "overall": 86.4, # 5-shot
+#     ##### Commonsense Reasoning #####
+#     "reasoning": 93.0,
+#     ### "HellaSwag": 95.3,^  # 10-shot
+#     ### "WinoGrande": 87.5,^ # 5-shot
+#     ### "Arc-e": 96.3,^      # 25-shot
+#     ##### World Knowledge #####
+#     ##### Reading Comprehension #####
+#     ### "DROP": 80.9, # 3-shot
+#     ##### Code #####
+#     "code": 67.0,
+#     ### "HumanEval": 67.0,^ # 0-shot
+#     ##### Math #####
+#     "math": 92.0,
+#     ### "GSM8K": 92.0,^     # 5-shot
+# }
+
+# # TODO: use cost info in here: https://platform.openai.com/docs/guides/vision/calculating-costs
+# GPT_4V_MODEL_CARD = {
+#     ##### Cost in USD #####
+#     "usd_per_input_token": 10 / 1E6,
+#     "usd_per_output_token": 30 / 1E6,
+#     ##### Time #####
+#     "seconds_per_output_token": 0.042 / 10.0, # TODO: / 10.0 is a hack; need to figure out why time estimates are so off
+#     ##### Agg. Benchmark #####
+#     "overall": 86.4,
+# }
+
+
+# GEMINI_1_MODEL_CARD = {
+#     ##### Cost in USD #####
+#     "usd_per_input_token": 125 / 1E8, # Gemini is free but rate limited for now. Pricing will be updated 
+#     "usd_per_output_token": 375 / 1E9,
+#     ##### Time #####
+#     "seconds_per_output_token": 0.042 / 10.0, # TODO: 
+#     ##### Agg. Benchmark #####
+#     "overall": 65.0, # 90.0 TODO: we are using the free version of Gemini which is substantially worse than its paid version; I'm manually revising it's quality below that of Mixtral
+#     ##### Commonsense Reasoning #####
+#     "reasoning": 80.0, # 87.8, TODO: see note above on overall
+#     # "HellaSwag": 87.8,  # 10-shot
+#     ##### World Knowledge #####
+#     ##### Reading Comprehension #####
+#     # "DROP": 82.4, # Variable shots ?
+#     ##### Code #####
+#     "code": 74.4,
+#     # "HumanEval": 74.4, # 0-shot (IT)*
+#     # "Natural2Code": 74.9, # 0-shot 
+#     ##### Math #####
+#     "math": 94.4,
+#     # "GSM8K": 94.4,     # maj1@32
+#     # "MATH": 53.2,      # 4-shot
+# }
+
+# GEMINI_1V_MODEL_CARD = {
+#     ##### Cost in USD #####
+#     "usd_per_input_token": 25 / 1E6,  # Gemini is free but rate limited for now. Pricing will be updated 
+#     "usd_per_output_token": 375 / 1E9,
+#     ##### Time #####
+#     "seconds_per_output_token": 0.042, # / 10.0, # TODO: 
+#     ##### Agg. Benchmark #####
+#     "overall": 65.0, # 90.0, TODO: see note above in Gemini_1 model card
+#     ##### Commonsense Reasoning #####
+#     "reasoning": 80.0, # 87.8, TODO: see note above in Gemini_1 model card
+#     # "HellaSwag": 87.8,  # 10-shot
+#     ##### World Knowledge #####
+#     ##### Reading Comprehension #####
+#     # "DROP": 82.4, # Variable shots ?
+#     ##### Code #####
+#     "code": 74.4,
+#     # "HumanEval": 74.4, # 0-shot (IT)*
+#     # "Natural2Code": 74.9, # 0-shot 
+#     ##### Math #####
+#     "math": 94.4,
+#     # "GSM8K": 94.4,     # maj1@32
+#     # "MATH": 53.2,      # 4-shot
+# }
