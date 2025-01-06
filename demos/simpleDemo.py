@@ -22,18 +22,18 @@ from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.elements.records import DataRecord
 
 
-class ScientificPaper(pz.PDFFile):
+class ScientificPaper(pz.core.PDFFile):
     """Represents a scientific research paper, which in practice is usually from a PDF file"""
 
-    title = pz.Field(
+    title = pz.core.Field(
         desc="The title of the paper. This is a natural language title, not a number or letter.",
         required=True,
     )
-    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False) # noqa
-    author = pz.Field(desc="The name of the first author of the paper", required=True)
-    institution = pz.Field(desc="The institution of the first author of the paper", required=True)
-    journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
-    fundingAgency = pz.Field( # noqa
+    publicationYear = pz.core.Field(desc="The year the paper was published. This is a number.", required=False) # noqa
+    author = pz.core.Field(desc="The name of the first author of the paper", required=True)
+    institution = pz.core.Field(desc="The institution of the first author of the paper", required=True)
+    journal = pz.core.Field(desc="The name of the journal the paper was published in", required=True)
+    fundingAgency = pz.core.Field( # noqa
         desc="The name of the funding agency that supported the research",
         required=False,
     )
@@ -58,12 +58,12 @@ def build_mit_battery_paper_plan(dataset_id):
     return mit_papers
 
 
-class VLDBPaperListing(pz.Schema):
+class VLDBPaperListing(pz.core.Schema):
     """VLDBPaperListing represents a single paper from the VLDB conference"""
 
-    title = pz.Field(desc="The title of the paper", required=True)
-    authors = pz.Field(desc="The authors of the paper", required=True)
-    pdfLink = pz.Field(desc="The link to the PDF of the paper", required=True) # noqa
+    title = pz.core.Field(desc="The title of the paper", required=True)
+    authors = pz.core.Field(desc="The authors of the paper", required=True)
+    pdfLink = pz.core.Field(desc="The link to the PDF of the paper", required=True) # noqa
 
 
 def vldb_text_file_to_url(candidate: DataRecord):
@@ -199,41 +199,44 @@ def download_vldb_papers(vldb_listing_page_urls_id, output_dir, execution_engine
             json.dump(download_execution_stats.to_json(), f)
 
 
-class GitHubUpdate(pz.Schema):
+class GitHubUpdate(pz.core.Schema):
     """GitHubUpdate represents a single commit message from a GitHub repo"""
 
-    commitId = pz.Field(desc="The unique identifier for the commit", required=True) # noqa
-    reponame = pz.Field(desc="The name of the repository", required=True)
-    commit_message = pz.Field(desc="The message associated with the commit", required=True)
-    commit_date = pz.Field(desc="The date the commit was made", required=True)
-    committer_name = pz.Field(desc="The name of the person who made the commit", required=True)
-    file_names = pz.Field(desc="The list of files changed in the commit", required=False)
+    commitId = pz.core.Field(desc="The unique identifier for the commit", required=True) # noqa
+    reponame = pz.core.Field(desc="The name of the repository", required=True)
+    commit_message = pz.core.Field(desc="The message associated with the commit", required=True)
+    commit_date = pz.core.Field(desc="The date the commit was made", required=True)
+    committer_name = pz.core.Field(desc="The name of the person who made the commit", required=True)
+    file_names = pz.core.Field(desc="The list of files changed in the commit", required=False)
 
 
 def test_user_source(dataset_id: str):
     return pz.Dataset(dataset_id, schema=GitHubUpdate)
 
 
-class Email(pz.TextFile):
+class Email(pz.core.TextFile):
     """Represents an email, which in practice is usually from a text file"""
 
-    sender = pz.Field(desc="The email address of the sender", required=True)
-    subject = pz.Field(desc="The subject of the email", required=True)
+    sender = pz.core.Field(desc="The email address of the sender", required=True)
+    subject = pz.core.Field(desc="The subject of the email", required=True)
 
 
 def build_enron_plan(dataset_id):
-    emails = pz.Dataset(dataset_id, schema=Email)
+    from palimpzest.sets import Dataset
+    emails = Dataset(dataset_id, schema=Email)
     return emails
 
 
 def compute_enron_stats(dataset_id):
-    emails = pz.Dataset(dataset_id, schema=Email)
+    from palimpzest.sets import Dataset
+    emails = Dataset(dataset_id, schema=Email)
     subject_line_lengths = emails.convert(pz.Number, desc="The number of words in the subject field")
     return subject_line_lengths
 
 
 def enron_gby_plan(dataset_id):
-    emails = pz.Dataset(dataset_id, schema=Email)
+    from palimpzest.sets import Dataset
+    emails = Dataset(dataset_id, schema=Email)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -243,7 +246,8 @@ def enron_gby_plan(dataset_id):
 
 
 def enron_count_plan(dataset_id):
-    emails = pz.Dataset(dataset_id, schema=Email)
+    from palimpzest.sets import Dataset
+    emails = Dataset(dataset_id, schema=Email)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = []
@@ -253,7 +257,8 @@ def enron_count_plan(dataset_id):
 
 
 def enron_average_count_plan(dataset_id):
-    emails = pz.Dataset(dataset_id, schema=Email)
+    from palimpzest.sets import Dataset
+    emails = Dataset(dataset_id, schema=Email)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -269,24 +274,27 @@ def enron_average_count_plan(dataset_id):
 
 
 def enron_limit_plan(dataset_id, limit=5):
-    data = pz.Dataset(dataset_id, schema=Email)
+    from palimpzest.sets import Dataset
+    data = Dataset(dataset_id, schema=Email)
     limit_data = data.limit(limit)
     return limit_data
 
 
-class DogImage(pz.ImageFile):
-    breed = pz.Field(desc="The breed of the dog", required=True)
+class DogImage(pz.core.ImageFile):
+    breed = pz.core.Field(desc="The breed of the dog", required=True)
 
 
 def build_image_plan(dataset_id):
-    images = pz.Dataset(dataset_id, schema=pz.ImageFile)
+    from palimpzest.sets import Dataset
+    images = Dataset(dataset_id, schema=pz.ImageFile)
     filtered_images = images.filter("The image contains one or more dogs")
     dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
     return dog_images
 
 
 def build_image_agg_plan(dataset_id):
-    images = pz.Dataset(dataset_id, schema=pz.ImageFile)
+    from palimpzest.sets import Dataset
+    images = Dataset(dataset_id, schema=pz.ImageFile)
     filtered_images = images.filter("The image contains one or more dogs")
     dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
     ops = ["count"]
@@ -367,12 +375,13 @@ if __name__ == "__main__":
 
     execution_engine = None
     executor = args.executor
+    import palimpzest.query
     if executor == "sequential":
-        execution_engine = pz.NoSentinelSequentialSingleThreadExecution
+        execution_engine = pz.query.NoSentinelSequentialSingleThreadExecution
     elif executor == "pipelined":
-        execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
+        execution_engine = pz.query.NoSentinelPipelinedSingleThreadExecution
     elif executor == "parallel":
-        execution_engine = pz.NoSentinelPipelinedParallelExecution
+        execution_engine = pz.query.NoSentinelPipelinedParallelExecution
     else:
         print("Executor not supported for this demo")
         exit(1)
@@ -493,7 +502,8 @@ if __name__ == "__main__":
         print("Unknown task")
         exit(1)
 
-    records, execution_stats = pz.Execute(
+    from palimpzest.query import Execute
+    records, execution_stats = Execute(
         root_set,
         policy=policy,
         nocache=True,

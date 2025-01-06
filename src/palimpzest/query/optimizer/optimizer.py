@@ -16,7 +16,7 @@ from palimpzest.query.operators.logical import (
     LogicalOperator,
     RetrieveScan,
 )
-from palimpzest.query.optimizer import (
+from ..optimizer import (
     IMPLEMENTATION_RULES,
     TRANSFORMATION_RULES,
 )
