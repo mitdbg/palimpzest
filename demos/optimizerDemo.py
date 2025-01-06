@@ -10,7 +10,7 @@ from ragatouille import RAGPretrainedModel
 
 import palimpzest as pz
 from palimpzest.constants import Model
-from palimpzest.corelib.schemas import TextFile
+from palimpzest.core.lib.schemas import TextFile
 from palimpzest.utils.model_helpers import get_models
 
 # Addresses far from MIT; we use a simple lookup like this to make the

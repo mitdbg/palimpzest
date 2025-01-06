@@ -1,14 +1,14 @@
 import pytest
 
 from palimpzest.constants import Cardinality, Model
-from palimpzest.corelib.schemas import File, Schema, StringField, TextFile
-from palimpzest.elements.filters import Filter
-from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvertSingle
-from palimpzest.operators.convert import LLMConvertBonded
-from palimpzest.operators.datasource import MarshalAndScanDataOp
-from palimpzest.operators.filter import LLMFilter, NonLLMFilter
-from palimpzest.operators.token_reduction_convert import TokenReducedConvertBonded
-from palimpzest.optimizer.plan import PhysicalPlan, SentinelPlan
+from palimpzest.core.lib.schemas import File, Schema, StringField, TextFile
+from palimpzest.core.elements.filters import Filter
+from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
+from palimpzest.query.operators.convert import LLMConvertBonded
+from palimpzest.query.operators.datasource import MarshalAndScanDataOp
+from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
+from palimpzest.query.operators.token_reduction_convert import TokenReducedConvertBonded
+from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 
 
 ### PHYSICAL PLANS ###

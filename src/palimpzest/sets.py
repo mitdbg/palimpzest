@@ -5,11 +5,11 @@ import json
 from typing import Callable
 
 from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
-from palimpzest.corelib.schemas import Number, Schema
-from palimpzest.datamanager import DataDirectory
-from palimpzest.datasources import DataSource
-from palimpzest.elements.filters import Filter
-from palimpzest.elements.groupbysig import GroupBySig
+from palimpzest.core.lib.schemas import Number, Schema
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.elements.filters import Filter
+from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.utils.index_helpers import get_index_str
 
 

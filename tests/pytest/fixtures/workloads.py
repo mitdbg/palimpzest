@@ -2,7 +2,7 @@ import pytest
 
 import palimpzest as pz
 from palimpzest.constants import Cardinality
-from palimpzest.corelib.schemas import Table, TextFile, XLSFile
+from palimpzest.core.lib.schemas import Table, TextFile, XLSFile
 from palimpzest.sets import Dataset
 from palimpzest.utils import udfs
 

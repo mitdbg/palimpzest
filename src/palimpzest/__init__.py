@@ -1,5 +1,5 @@
 from palimpzest.constants import MAX_ROWS, Cardinality, OptimizationStrategy
-from palimpzest.corelib.fields import (
+from palimpzest.core.lib.fields import (
     BooleanField,
     BytesField,
     CallableField,
@@ -8,8 +8,8 @@ from palimpzest.corelib.fields import (
     NumericField,
     StringField,
 )
-from palimpzest.corelib.schema_builder import SchemaBuilder
-from palimpzest.corelib.schemas import (
+#from palimpzest.core.lib.schema_builder import SchemaBuilder
+from palimpzest.core.lib.schemas import (
     URL,
     Any,
     Download,
@@ -28,8 +28,8 @@ from palimpzest.corelib.schemas import (
     WebPage,
     XLSFile,
 )
-from palimpzest.datamanager import DataDirectory
-from palimpzest.datasources import (
+#from palimpzest.datamanager import DataDirectory
+from palimpzest.core.data.datasources import (
     DataSource,
     DirectorySource,
     FileSource,
@@ -42,28 +42,29 @@ from palimpzest.datasources import (
     ValidationDataSource,
     XLSFileDirectorySource,
 )
-from palimpzest.elements.records import DataRecord
-from palimpzest.execution.execute import Execute
-from palimpzest.execution.mab_sentinel_execution import (
+from palimpzest.core.elements.records import DataRecord
+
+from palimpzest.query.execution.execute import Execute
+from palimpzest.query.execution.mab_sentinel_execution import (
     MABSequentialParallelSentinelExecution,
     MABSequentialSingleThreadSentinelExecution,
 )
-from palimpzest.execution.nosentinel_execution import (
+from palimpzest.query.execution.nosentinel_execution import (
     NoSentinelPipelinedParallelExecution,
     NoSentinelPipelinedSingleThreadExecution,
     NoSentinelSequentialSingleThreadExecution,
 )
-from palimpzest.execution.random_sampling_sentinel_execution import (
+from palimpzest.query.execution.random_sampling_sentinel_execution import (
     RandomSamplingSequentialParallelSentinelExecution,
     RandomSamplingSequentialSingleThreadSentinelExecution,
 )
-from palimpzest.execution.streaming_execution import StreamingSequentialExecution
-from palimpzest.operators.aggregate import AggregateOp, ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
-from palimpzest.operators.convert import ConvertOp, LLMConvert, LLMConvertBonded, LLMConvertConventional, NonLLMConvert
-from palimpzest.operators.datasource import CacheScanDataOp, DataSourcePhysicalOp, MarshalAndScanDataOp
-from palimpzest.operators.filter import FilterOp, LLMFilter, NonLLMFilter
-from palimpzest.operators.limit import LimitScanOp
-from palimpzest.operators.logical import (
+from palimpzest.query.execution.streaming_execution import StreamingSequentialExecution
+from palimpzest.query.operators.aggregate import AggregateOp, ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
+from palimpzest.query.operators.convert import ConvertOp, LLMConvert, LLMConvertBonded, LLMConvertConventional, NonLLMConvert
+from palimpzest.query.operators.datasource import CacheScanDataOp, DataSourcePhysicalOp, MarshalAndScanDataOp
+from palimpzest.query.operators.filter import FilterOp, LLMFilter, NonLLMFilter
+from palimpzest.query.operators.limit import LimitScanOp
+from palimpzest.query.operators.logical import (
     Aggregate,
     BaseScan,
     CacheScan,
@@ -73,7 +74,7 @@ from palimpzest.operators.logical import (
     LimitScan,
     LogicalOperator,
 )
-from palimpzest.operators.physical import PhysicalOperator
+from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.policy import (
     MaxQuality,
     MaxQualityAtFixedCost,
@@ -89,7 +90,7 @@ from palimpzest.sets import Dataset
 
 __all__ = [
     #corelib
-    "SchemaBuilder",
+    #"SchemaBuilder",
     # constants
     "Cardinality",
     "MAX_ROWS",
@@ -117,7 +118,7 @@ __all__ = [
     "NumericField",
     "StringField",
     # datamanager
-    "DataDirectory",
+#    "DataDirectory",
     # execution
     "Execute",
     "MABSequentialParallelSentinelExecution",

@@ -102,9 +102,16 @@ def ls_data() -> None:
     Print a table listing the datasets registered with PZ.
     """
     # fetch list of registered datasets
+    # Time the loading of the library
+    import time
+    start = time.time()
     import palimpzest as pz
+    end = time.time()
+    print(f"Time taken for PZ import: {end - start} seconds")
+    import palimpzest.datamanager.datamanager as pzdm
 
-    ds = pz.DataDirectory().list_registered_datasets()
+
+    ds = pzdm.DataDirectory().list_registered_datasets()
 
     # construct table for printing
     table = [["Name", "Type", "Path"]]

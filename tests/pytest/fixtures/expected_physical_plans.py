@@ -1,15 +1,15 @@
 import pytest
 
 from palimpzest.constants import Model
-from palimpzest.corelib.schemas import TextFile
+from palimpzest.core.lib.schemas import TextFile
 from palimpzest.dataclasses import PlanCost
 from palimpzest.datamanager import DataDirectory
-from palimpzest.elements.filters import Filter
-from palimpzest.operators.convert import LLMConvertBonded
-from palimpzest.operators.datasource import MarshalAndScanDataOp
-from palimpzest.operators.filter import LLMFilter
-from palimpzest.operators.logical import BaseScan, ConvertScan, FilteredScan
-from palimpzest.optimizer.plan import PhysicalPlan
+from palimpzest.core.elements.filters import Filter
+from palimpzest.query.operators.convert import LLMConvertBonded
+from palimpzest.query.operators.datasource import MarshalAndScanDataOp
+from palimpzest.query.operators.filter import LLMFilter
+from palimpzest.query.operators.logical import BaseScan, ConvertScan, FilteredScan
+from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.sets import Dataset
 
 

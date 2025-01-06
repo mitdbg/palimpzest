@@ -1,9 +1,9 @@
 import pytest
 
 from palimpzest.constants import Model
-from palimpzest.corelib.schemas import TextFile
-from palimpzest.elements.records import DataRecord, DataRecordSet
-from palimpzest.optimizer.plan import SentinelPlan
+from palimpzest.core.lib.schemas import TextFile
+from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.query.optimizer.plan import SentinelPlan
 
 
 # NOTE: this relies on knowledge of the fixtures in fixtures/execution_data.py

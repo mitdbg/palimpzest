@@ -1,19 +1,19 @@
 import pytest
 
 from palimpzest.constants import Cardinality, Model, OptimizationStrategy
-from palimpzest.corelib.schemas import TextFile
+from palimpzest.core.lib.schemas import TextFile
 from palimpzest.dataclasses import OperatorCostEstimates, PlanCost
 from palimpzest.datamanager import DataDirectory
-from palimpzest.elements.filters import Filter
-from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
-from palimpzest.operators.convert import LLMConvert, LLMConvertBonded
-from palimpzest.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
-from palimpzest.operators.filter import LLMFilter, NonLLMFilter
-from palimpzest.operators.logical import ConvertScan, FilteredScan
-from palimpzest.operators.physical import PhysicalOperator
-from palimpzest.optimizer.cost_model import CostModel
-from palimpzest.optimizer.optimizer import Optimizer
-from palimpzest.optimizer.primitives import Group, LogicalExpression
+from palimpzest.core.elements.filters import Filter
+from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
+from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded
+from palimpzest.query.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
+from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
+from palimpzest.query.operators.logical import ConvertScan, FilteredScan
+from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.query.optimizer.cost_model import CostModel
+from palimpzest.query.optimizer.optimizer import Optimizer
+from palimpzest.query.optimizer.primitives import Group, LogicalExpression
 from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.sets import Dataset
 
