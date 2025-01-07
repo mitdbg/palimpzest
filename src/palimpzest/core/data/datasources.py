@@ -329,6 +329,8 @@ class UserSource(DataSource):
     def get_item(self, idx: int) -> DataRecord:
         raise NotImplementedError("User needs to implement this method.")
 
+    def copy(self):
+        raise NotImplementedError("User needs to implement this method.")
 
 class ValidationDataSource(UserSource):
     """
