@@ -1,42 +1,36 @@
 from __future__ import annotations
 
-from palimpzest.corelib.schemas import Schema, Field
-from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
-from .physical import PhysicalOperator, DataRecordsWithStats
-
-from palimpzest.constants import *
-from palimpzest.dataclasses import GenerationStats, RecordOpStats
-from palimpzest.dataclasses import RecordOpStats, OperatorCostEstimates
-from palimpzest.elements import DataRecord
-
-from typing import List
-
 import base64
 import time
+from typing import List
+
+from palimpzest.constants import *
+from palimpzest.corelib.schemas import Field, Schema
+from palimpzest.dataclasses import OperatorCostEstimates, RecordOpStats
+from palimpzest.elements.records import DataRecord, DataRecordSet
+
+from .physical import PhysicalOperator
 
 
 class JoinOp(PhysicalOperator):
-    def __init__(self, left: Schema, right:Schema, on: Field, *args, **kwargs):
+    def __init__(self, left: Schema, right: Schema, on: Field, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        assert on in left.fieldNames(), "Left schema does not contain the field to join on"
-        assert on in right.fieldNames(), "Right schema does not contain the field to join on"
+        assert on in left.field_names(), "Left schema does not contain the field to join on"
+        assert on in right.field_names(), "Right schema does not contain the field to join on"
         self.left = left
         self.right = right
         self.on = on
-        self.inputSchema = left
-        self.outputSchema = left + right
+        self.input_schema = left
+        self.output_schema = left + right
 
     def __str__(self):
         op = super().__str__()
-        op += f"    Join: {self.left.className}-{self.right.className} on {self.on}\n"
+        op += f"    Join: {self.left.class_name}-{self.right.class_name} on {self.on}\n"
         return op
 
     def get_copy_kwargs(self):
         copy_kwargs = super().get_copy_kwargs()
-        return {"left": self.left,
-                "right":self.right,
-                "on":self.on,
-                **copy_kwargs}
+        return {"left": self.left, "right": self.right, "on": self.on, **copy_kwargs}
 
     def get_op_params(self):
         return {
@@ -56,9 +50,9 @@ class JoinOp(PhysicalOperator):
 
 class NonLLMJoin(JoinOp):
 
-    def naiveCostEstimates(self, source_op_cost_estimates: OperatorCostEstimates):
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate output cardinality using a constant assumption of the filter selectivity
-        selectivity = 0.1 #NAIVE_EST_JOIN_SELECTIVITY
+        selectivity = 0.1  # NAIVE_EST_JOIN_SELECTIVITY
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate 1 ms single-threaded execution for filter function
@@ -72,22 +66,21 @@ class NonLLMJoin(JoinOp):
             quality=1.0,
         )
 
-    def __call__(self, candidates: DataRecord) -> List[DataRecordsWithStats]:
+
+    def __call__(self, candidates: DataRecord) -> List[DataRecordSet]:
         start_time = time.time()
 
         breakpoint()
         # build group array
-        aggState = {}
+        agg_state = {}
         for candidate in candidates:
             group = ()
             for f in self.gbySig.gbyFields:
                 if not hasattr(candidate, f):
-                    raise TypeError(
-                        f"ApplyGroupByOp record missing expected field {f}"
-                    )
+                    raise TypeError(f"ApplyGroupByOp record missing expected field {f}")
                 group = group + (getattr(candidate, f),)
-            if group in aggState:
-                state = aggState[group]
+            if group in agg_state:
+                state = agg_state[group]
             else:
                 state = []
                 for fun in self.gbySig.aggFuncs:
@@ -95,9 +88,7 @@ class NonLLMJoin(JoinOp):
             for i in range(0, len(self.gbySig.aggFuncs)):
                 fun = self.gbySig.aggFuncs[i]
                 if not hasattr(candidate, self.gbySig.aggFields[i]):
-                    raise TypeError(
-                        f"ApplyGroupByOp record missing expected field {self.gbySig.aggFields[i]}"
-                    )
+                    raise TypeError(f"ApplyGroupByOp record missing expected field {self.gbySig.aggFields[i]}")
                 field = getattr(candidate, self.gbySig.aggFields[i])
                 state[i] = ApplyGroupByOp.agg_merge(fun, state[i], field)
             aggState[group] = state

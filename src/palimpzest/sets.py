@@ -261,7 +261,7 @@ class Dataset(Set):
 
     def retrieve(self, output_schema, index, search_attr, output_attr, k=-1) -> Dataset:
         return Dataset(
-            source=self,
+            source=[self],
             schema=output_schema,
             desc="Retrieve",
             index=index,

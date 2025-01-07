@@ -103,33 +103,35 @@ class StreamingSequentialExecution(ExecutionEngine):
 
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
-        datasource = (
+        datasources = (
             self.datadir.get_registered_dataset(scan_operator.dataset_id)
             if isinstance(scan_operator, MarshalAndScanDataOp)
             else self.datadir.get_cached_result(scan_operator.dataset_id)
         )
-        if not datasource:
+        if not datasources:
             raise Exception("Data source not found")
-        datasource_len = len(datasource)
 
-        input_records = []
-        record_op_stats = []
-        for idx in range(datasource_len):
-            # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
-            #       it is simply a vessel to inform the scan_operator which record to fetch
-            candidate = DataRecord(schema=SourceRecord, source_id=idx)
-            candidate.idx = idx
-            candidate.get_item_fn = datasource.get_item
-            records, record_op_stats_lst = scan_operator(candidate)
-            input_records += records
-            record_op_stats += record_op_stats_lst
+        for datasource in datasources:
+            datasource_len = len(datasource)
 
-        op_id = scan_operator.get_op_id()
-        self.plan_stats.operator_stats[op_id].add_record_op_stats(
-            record_op_stats,
-            source_op_id=None,
-            plan_id=self.plan.plan_id,
-        )
+            input_records = []
+            record_op_stats = []
+            for idx in range(datasource_len):
+                # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
+                #       it is simply a vessel to inform the scan_operator which record to fetch
+                candidate = DataRecord(schema=SourceRecord, source_id=idx)
+                candidate.idx = idx
+                candidate.get_item_fn = datasource.get_item
+                record_set = scan_operator(candidate)
+                input_records.extend(record_set.data_records)
+                record_op_stats.extend(record_set.record_op_stats)
+
+            op_id = scan_operator.get_op_id()
+            self.plan_stats.operator_stats[op_id].add_record_op_stats(
+                record_op_stats,
+                source_op_id=None,
+                plan_id=self.plan.plan_id,
+            )
 
         return input_records
 
@@ -157,9 +159,9 @@ class StreamingSequentialExecution(ExecutionEngine):
                     break
             else:
                 for r in input_records:
-                    record_out, stats = operator(r)
-                    output_records += record_out
-                    record_op_stats_lst += stats
+                    record_set = operator(r)
+                    output_records.extend(record_set.data_records)
+                    record_op_stats_lst.extend(record_set.record_op_stats)
 
                 if isinstance(operator, FilterOp):
                     # delete all records that did not pass the filter

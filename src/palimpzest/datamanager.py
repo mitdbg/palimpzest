@@ -147,9 +147,10 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
 
         entry, rock = self._registry[dataset_id]
+        src = None
         if entry == "dir":
             if all([f.endswith(tuple(constants.IMAGE_EXTENSIONS)) for f in os.listdir(rock)]):
-                return ImageFileDirectorySource(rock, dataset_id)
+                src = ImageFileDirectorySource(rock, dataset_id)
             elif all([f.endswith(tuple(constants.PDF_EXTENSIONS)) for f in os.listdir(rock)]):
                 pdfprocessor = self.current_config.get("pdfprocessor")
                 if not pdfprocessor:
@@ -157,27 +158,27 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
                 file_cache_dir = self.get_file_cache_dir()
                 if not file_cache_dir:
                     raise Exception("No file cache directory found.")
-                return PDFFileDirectorySource(
+                src = PDFFileDirectorySource(
                     path=rock, dataset_id=dataset_id, pdfprocessor=pdfprocessor, file_cache_dir=file_cache_dir
                 )
             elif all([f.endswith(tuple(constants.XLS_EXTENSIONS)) for f in os.listdir(rock)]):
-                return XLSFileDirectorySource(rock, dataset_id)
-            elif all([ f.endswith(tuple(constants.CSV_EXTENSIONS))
-                        for f in os.listdir(rock)]):
-                return CSVFileDirectorySource(rock, dataset_id)
-                return HTMLFileDirectorySource(rock, dataset_id)
+                src = XLSFileDirectorySource(rock, dataset_id)
+            # elif all([ f.endswith(tuple(constants.CSV_EXTENSIONS)) for f in os.listdir(rock)]):
+                # src = CSVFileDirectorySource(rock, dataset_id)
+            elif all([f.endswith(tuple(constants.HTML_EXTENSIONS)) for f in os.listdir(rock)]):
+                src = HTMLFileDirectorySource(rock, dataset_id)
             else:
-                return TextFileDirectorySource(rock, dataset_id)
+                src = TextFileDirectorySource(rock, dataset_id)
 
         elif entry == "file":
-            return FileSource(rock, dataset_id)
+            src = FileSource(rock, dataset_id)
         elif entry == "memory":
-            return MemorySource(rock, dataset_id)
+            src = MemorySource(rock, dataset_id)
         elif entry == "user":
             src = rock
-            return src
         else:
             raise Exception("Unknown entry type")
+        return [src]
 
     def get_registered_dataset_type(self, dataset_id):
         """Return the type of the given dataset in the registry."""

@@ -270,11 +270,12 @@ class PDFFileDirectorySource(DirectorySource):
         return dr
 
 class CSVFileDirectorySource(DirectorySource):
+
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=Table)
         assert all([filename.endswith(tuple(constants.CSV_EXTENSIONS)) for filename in self.filepaths])
 
-    def getItem(self, idx: int):
+    def get_item(self, idx: int):
         filepath = self.filepaths[idx]
         dr = DataRecord(Table, scan_idx=idx)
         dr.filename = os.path.basename(filepath)

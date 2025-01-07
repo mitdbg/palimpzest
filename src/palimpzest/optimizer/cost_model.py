@@ -612,8 +612,8 @@ class CostModel(BaseCostModel):
             # get handle to DataSource and pre-compute its size (number of records)
             datasource = self.datadir.get_registered_dataset(operator.dataset_id)
             dataset_type = self.datadir.get_registered_dataset_type(operator.dataset_id)
-            datasource_len = len(datasource)
-            datasource_memsize = datasource.get_size()
+            datasource_len = sum([len(ds) for ds in datasource])
+            datasource_memsize = sum([ds.get_size() for ds in datasource])
 
             source_op_estimates = OperatorCostEstimates(
                 cardinality=datasource_len,
@@ -628,8 +628,8 @@ class CostModel(BaseCostModel):
 
         elif isinstance(operator, CacheScanDataOp):
             datasource = self.datadir.get_cached_result(operator.dataset_id)
-            datasource_len = len(datasource)
-            datasource_memsize = datasource.get_size()
+            datasource_len = sum([len(ds) for ds in datasource])
+            datasource_memsize = sum([ds.get_size() for ds in datasource])
 
             source_op_estimates = OperatorCostEstimates(
                 cardinality=datasource_len,

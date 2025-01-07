@@ -416,7 +416,7 @@ class Join(LogicalOperator):
         left: Schema,
         right: Schema,
         on: Field,
-        targetCacheId: str = None,
+        target_cache_id: str = None,
         *args,
         **kwargs,
     ):
@@ -425,7 +425,7 @@ class Join(LogicalOperator):
         self.right = right
         self.on = on
         self.outputSchema = left+right
-        self.targetCacheId = targetCacheId
+        self.target_cache_id = target_cache_id
 
     def __str__(self):
         return f"{self.__class__.__name__}(function: {str(self.aggFunc.value)})"

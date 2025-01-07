@@ -181,13 +181,14 @@ class Optimizer:
         node = dataset_nodes[-1]
         output_schema = node.schema
         
-        if len(node._source) == 1:
-            input_schema = node._source[0].schema
-        elif len(node._source) == 2:
-            input_schema = node._source[0].schema + node._source[1].schema # TODO implement __radd__ for sum(schemata)
-        elif len(dataset_nodes) > 1:
+        if len(dataset_nodes) > 1:
+            if len(node._source) == 1:
+                input_schema = node._source[0].schema
+            elif len(node._source) == 2:
+                input_schema = node._source[0].schema + node._source[1].schema # TODO implement __radd__ for sum(schemata)
+            else:        
             # NOTE: is this catching different cases than the above?
-            input_schema = dataset_nodes[-2].schema 
+                input_schema = dataset_nodes[-2].schema 
         else:
             input_schema = None
 
@@ -341,13 +342,13 @@ class Optimizer:
         # TODO this won't work for joins
         # remove unnecessary convert if output schema from data source scan matches
         # input schema for the next operator
-        # try:
-            # if len(dataset_nodes) > 1 and dataset_nodes[0].schema == dataset_nodes[1].schema:
-                # dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
-                # if len(dataset_nodes) > 1:
-                    # dataset_nodes[1]._source = [dataset_nodes[0]]
-        # except AttributeError:
-            # breakpoint()
+        try:
+            if len(dataset_nodes) > 1 and dataset_nodes[0].schema == dataset_nodes[1].schema:
+                dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
+                if len(dataset_nodes) > 1:
+                    dataset_nodes[1]._source = [dataset_nodes[0]]
+        except AttributeError:
+            breakpoint()
 
         # compute depends_on field for every node
         short_to_full_field_name = {}
