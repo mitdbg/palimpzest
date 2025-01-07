@@ -103,10 +103,8 @@ def ls_data() -> None:
     """
     # fetch list of registered datasets
     # Time the loading of the library
-    import time
     import palimpzest as pz
     import palimpzest.datamanager.datamanager as pzdm
-
 
     ds = pzdm.DataDirectory().list_registered_datasets()
 
