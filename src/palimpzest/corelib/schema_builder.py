@@ -25,6 +25,7 @@ class SchemaBuilder:
         schema_name: str = "",
         schema_description: str = "",
         include_attributes: list = None,
+        exclude_attributes: list = None,
         schema_type: Schema = None,
         ):
         """
@@ -32,7 +33,8 @@ class SchemaBuilder:
             schema_file: str - the path to the file
             description (optional): str - the description of the schema
             name (optional): str - the name of the schema
-            target_attributes (optional): list - a list of attribute names to include in the schema. If None, all attributes are included.
+            include_attributes (optional): list - a list of attribute names to include in the schema. If None, all attributes are included.
+            exclude_attributes (optional): list - a list of attribute names to exclude from the schema. If None, no attributes are excluded.
             schema_type (optional): Schema - the parent type of the schema to generate, e.g. ScientificPapers have a schema_type of PDFFile. If None, a generic Schema type is used.
         Outputs:
             A class object - the dynamically generated class
@@ -69,6 +71,8 @@ class SchemaBuilder:
 
         if include_attributes is None:
            include_attributes = []
+        if exclude_attributes is None:
+           exclude_attributes = []
 
         if schema_type is None:
             if schema_data.get('type', None):
@@ -80,8 +84,13 @@ class SchemaBuilder:
            
         # Generate the schema class dynamically
         attributes = {"__doc__": schema_description}
+        include_attributes_lower = set([a.lower() for a in include_attributes])
+        exclude_attributes_lower = set([a.lower() for a in exclude_attributes])
         for field in schema_data['fields']:
-            if len(include_attributes) and field['name'] not in include_attributes:
+            norm_name = field['name'].lower()
+            if len(include_attributes) and norm_name not in include_attributes_lower:
+                continue
+            if norm_name in exclude_attributes_lower:
                 continue
             name = field['name']
             description = field.get('description', '')
