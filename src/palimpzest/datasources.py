@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 from papermage import Document
 
 from palimpzest import constants
-from palimpzest.corelib.schemas import File, ImageFile, Number, PDFFile, Schema, TextFile, WebPage, XLSFile, Table
+from palimpzest.corelib.schemas import File, ImageFile, Number, PDFFile, Schema, Table, TextFile, WebPage, XLSFile
 from palimpzest.elements.records import DataRecord
 from palimpzest.tools.pdfparser import get_text_from_pdf
 
@@ -259,7 +259,9 @@ class PDFFileDirectorySource(DirectorySource):
             for p in doc.pages:
                 text_content += p.text
         else:
-            text_content = get_text_from_pdf(pdf_filename, pdf_bytes, pdfprocessor=self.pdfprocessor, file_cache_dir=self.file_cache_dir)
+            text_content = get_text_from_pdf(
+                pdf_filename, pdf_bytes, pdfprocessor=self.pdfprocessor, file_cache_dir=self.file_cache_dir
+            )
 
         # construct data record
         dr = DataRecord(self.schema, source_id=filepath)
@@ -269,8 +271,8 @@ class PDFFileDirectorySource(DirectorySource):
 
         return dr
 
-class CSVFileDirectorySource(DirectorySource):
 
+class CSVFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=Table)
         assert all([filename.endswith(tuple(constants.CSV_EXTENSIONS)) for filename in self.filepaths])
@@ -350,6 +352,7 @@ class UserSource(DataSource):
 
     def copy(self):
         raise NotImplementedError("User needs to implement this method.")
+
 
 class ValidationDataSource(UserSource):
     """
