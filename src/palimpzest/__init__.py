@@ -17,5 +17,5 @@ from palimpzest.policy import (
 #from palimpzest.sets import Dataset
 
 # Data management
-#from palimpzest.datamanager import DataDirectory
+from palimpzest.datamanager.datamanager import DataDirectory
 
