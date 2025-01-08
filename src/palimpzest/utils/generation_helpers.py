@@ -11,12 +11,13 @@ def get_json_from_answer(answer: str, model: Model) -> dict[str, Any]:
     This function parses an LLM response which is supposed to output a JSON object
     and optimistically searches for the substring containing the JSON object.
     """
+    answer = answer.strip()
     # model-specific trimming for LLAMA3 responses
     if model in [Model.LLAMA3, Model.LLAMA3_V]:
         answer = answer.split("---")[0]
         answer = answer.replace("True", "true")
         answer = answer.replace("False", "false")
-
+        answer = answer.strip()
     # split off context / excess, which models sometimes output after answer
     answer = answer.split("Context:")[0]
     answer = answer.split("# this is the answer")[0]

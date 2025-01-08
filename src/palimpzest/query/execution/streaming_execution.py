@@ -120,9 +120,9 @@ class StreamingSequentialExecution(ExecutionEngine):
             candidate = DataRecord(schema=SourceRecord, source_id=idx)
             candidate.idx = idx
             candidate.get_item_fn = datasource.get_item
-            records, record_op_stats_lst = scan_operator(candidate)
-            input_records += records
-            record_op_stats += record_op_stats_lst
+            data_record_set = scan_operator(candidate)
+            input_records += data_record_set.data_records
+            record_op_stats += data_record_set.record_op_stats
 
         op_id = scan_operator.get_op_id()
         self.plan_stats.operator_stats[op_id].add_record_op_stats(
@@ -139,6 +139,8 @@ class StreamingSequentialExecution(ExecutionEngine):
         record_op_stats_lst = []
 
         for op_idx, operator in enumerate(plan.operators):
+            if self.verbose:
+                print("__________________________Operator:", op_idx, operator)
             # TODO: this being defined in the for loop potentially makes the return
             # unbounded if plan.operators is empty. This should be defined outside the loop
             # and the loop refactored to account for not redeclaring this for each operator
@@ -157,10 +159,11 @@ class StreamingSequentialExecution(ExecutionEngine):
                     break
             else:
                 for r in input_records:
-                    record_out, stats = operator(r)
-                    output_records += record_out
-                    record_op_stats_lst += stats
-
+                    if self.verbose:    
+                        print("__________________________", r, "__________________________")
+                    data_record_set = operator(r)
+                    output_records += data_record_set.data_records
+                    record_op_stats_lst += data_record_set.record_op_stats
                 if isinstance(operator, FilterOp):
                     # delete all records that did not pass the filter
                     output_records = [r for r in output_records if r._passed_operator]
