@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 from typing import Callable
-import os
 
 from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
 from palimpzest.core.lib.schemas import Number, Schema
