@@ -6,7 +6,8 @@ from typing import Any
 from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.core.data.dataclasses import RecordOpStats
-
+import pandas as pd
+from palimpzest.core.lib.fields import Field
 
 class DataRecord:
     """A DataRecord is a single record of data matching some Schema."""
@@ -186,6 +187,20 @@ class DataRecord:
                 if isinstance(v, bytes) or (isinstance(v, list) and len(v) > 0 and isinstance(v[0], bytes)):
                     dct[k] = "<bytes>"
         return dct
+    
+    def as_df(self, include_bytes: bool = True, project_cols: list[str] | None = None):
+        """Return a pandas DataFrame representation of this DataRecord
+        
+        Args:
+            include_bytes (bool): Whether to include byte fields in the output
+            project_cols (list[str]): Optional list of columns to include
+            
+        Returns:
+            pd.DataFrame: A single-row DataFrame containing the record data
+        """
+        import pandas as pd
+        dct = self.as_dict(include_bytes=include_bytes, project_cols=project_cols)
+        return pd.DataFrame([dct])
 
 
     def get_fields(self):
@@ -194,15 +209,11 @@ class DataRecord:
 
 class DataRecordSet:
     """
-    A DataRecordSet contains a list of DataRecords and a reference to the parent_id
-    and source_id that these records were derived from. It also contains the RecordOpStats
-    associated with generating these DataRecords.
+    A DataRecordSet contains a list of DataRecords that share the same schema, same parent_id, and same source_id.
 
-    Thus, there is an assumption that a DataRecordSet consists of the output from
-    executing a single operator on a single input record.
+    We explicitly check that this is True.
 
-    We explicitly check that this is True, by making sure that the records passed into
-    the DataRecordSet all share the same parent_id.
+    The record_op_stats could be empty if the DataRecordSet is not from executing an operator.
     """
     def __init__(self, data_records: list[DataRecord], record_op_stats: list[RecordOpStats]):
         # check that all data_records are derived from the same parent record
@@ -231,3 +242,60 @@ class DataRecordSet:
 
     def __iter__(self):
         yield from self.data_records
+
+    @staticmethod
+    def from_df(df: pd.DataFrame, schema: Schema = None, source_id: int | None = None) -> DataRecordSet:
+        """Create a list of DataRecords from a pandas DataFrame
+        
+        Args:
+            df (pd.DataFrame): Input DataFrame
+            schema (Schema, optional): Schema for the DataRecords. If None, will be derived from DataFrame
+            source_id (int, optional): Source ID for the records. Defaults to None.
+            
+        Returns:
+            list[DataRecord]: List of DataRecord instances
+        """        
+        # Derive schema from DataFrame if not provided
+        if schema is None:
+            class DerivedSchema(Schema):
+                pass
+            
+            # Add fields dynamically to the schema class
+            for col in df.columns:
+                setattr(DerivedSchema, col, Field(
+                    desc=f"{col}",
+                    required=True
+                ))
+            
+            schema = DerivedSchema
+        
+        records = []
+        for idx, row in df.iterrows():
+            data = row.to_dict()
+            
+            # Create DataRecord instance
+            record = DataRecord(schema=schema, source_id=source_id)
+            record._data = data
+            record._id = str(idx)  # Use DataFrame index as record ID
+            record._parent_id = None
+            record._source_id = source_id
+            records.append(record)
+        
+        return DataRecordSet(records, [])
+
+
+
+df = pd.DataFrame({
+    'name': ['a', 'b', '𝜆'],
+    'description': ['rate of infection', 'recovery rate', 'growth factor'],
+    'value': [0.5, 0.3, 1.2]
+})
+
+records = DataRecordSet.from_df(df)
+
+class MySchema(Schema):
+    name = Field(desc="Variable name", required=True)
+    description = Field(desc="Variable description", required=False)
+    value = Field(desc="Variable value", required=False)
+
+records = DataRecord.from_df(df, schema=MySchema)
