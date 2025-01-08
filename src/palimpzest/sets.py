@@ -137,18 +137,11 @@ class Dataset(Set):
     def __init__(self, source: str | DataSource, *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
         if isinstance(source, str):
-            if DataDirectory().exists(source):
-                source = DataDirectory().get_registered_dataset(source)
-            else:
-                if os.path.isfile(source):
-                    DataDirectory().register_local_file(os.path.abspath(source), source)
-                elif os.path.isdir(source):
-                    DataDirectory().register_local_directory(os.path.abspath(source), source)
-                else:
-                    raise Exception(f"Path {source} is invalid. Does not point to a file or directory.")
-        elif isinstance(source, (DataSource, Set)):
-            pass
-        else:
+            try:
+                source = DataDirectory().get_or_register_source(source)
+            except Exception as e:
+                raise Exception(f"Invalid source path: {source}") from e
+        elif not isinstance(source, (DataSource, Set)):
             raise Exception(f"Invalid source type: {type(source)}")
 
         # intialize class
