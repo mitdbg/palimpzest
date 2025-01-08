@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from typing import Callable
+import os
 
 from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
 from palimpzest.core.lib.schemas import Number, Schema
@@ -135,7 +136,20 @@ class Dataset(Set):
 
     def __init__(self, source: str | DataSource, *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
-        source = DataDirectory().get_registered_dataset(source) if isinstance(source, str) else source
+        if isinstance(source, str):
+            if DataDirectory().exists(source):
+                source = DataDirectory().get_registered_dataset(source)
+            else:
+                if os.path.isfile(source):
+                    DataDirectory().register_local_file(os.path.abspath(source), source)
+                elif os.path.isdir(source):
+                    DataDirectory().register_local_directory(os.path.abspath(source), source)
+                else:
+                    raise Exception(f"Path {source} is invalid. Does not point to a file or directory.")
+        elif isinstance(source, (DataSource, Set)):
+            pass
+        else:
+            raise Exception(f"Invalid source type: {type(source)}")
 
         # intialize class
         super().__init__(source, *args, **kwargs)

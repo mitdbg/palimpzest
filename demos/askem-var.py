@@ -36,10 +36,11 @@ class Variable(Schema):
 if __name__ == "__main__":
     run_pz = True
     dataset = "askem"
+    file_path = "testdata/askem-tiny"
 
     if run_pz:
         # reference, plan, stats = run_workload()
-        excerpts = Dataset(dataset, schema=TextFile)
+        excerpts = Dataset(file_path, schema=TextFile)
         output = excerpts.convert(
             Variable, desc="A variable used or introduced in the paper snippet", cardinality=pz.Cardinality.ONE_TO_MANY
         )
