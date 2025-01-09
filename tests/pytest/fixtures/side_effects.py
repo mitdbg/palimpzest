@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from palimpzest.dataclasses import RecordOpStats
+from palimpzest.core.data.dataclasses import RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 
 
