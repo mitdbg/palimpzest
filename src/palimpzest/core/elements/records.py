@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import hashlib
 from typing import Any
 
-from palimpzest.constants import MAX_ID_CHARS
+from palimpzest.constants import DERIVED_SCHEMA_PREFIX, FROM_DF_PREFIX
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.core.data.dataclasses import RecordOpStats
 import pandas as pd
 from palimpzest.core.lib.fields import Field
+from palimpzest.utils.hash_helpers import hash_for_id, hash_for_temp_schema
+
 
 class DataRecord:
     """A DataRecord is a single record of data matching some Schema."""
@@ -54,7 +55,7 @@ class DataRecord:
             if cardinality_idx is None
             else str(schema) + str(cardinality_idx) + (parent_id if parent_id is not None else self._source_id)
         )
-        self._id = hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+        self._id = hash_for_id(id_str)
 
 
     def __setattr__(self, name: str, value: Any, /) -> None:
@@ -77,8 +78,11 @@ class DataRecord:
         return self.__getattr__(key)
 
 
-    def __str__(self):
-        items = (f"{k}={str(v)[:15]!r}..." for k, v in sorted(self._data.items()))
+    def __str__(self, truncate: int | None = 15) -> str:
+        if truncate is not None:
+            items = (f"{k}={str(v)[:truncate]!r}{'...' if len(str(v)) > truncate else ''}" for k, v in sorted(self._data.items()))
+        else:
+            items = (f"{k}={v!r}" for k, v in sorted(self._data.items()))
         return "{}({})".format(type(self).__name__, ", ".join(items))
 
 
@@ -167,6 +171,69 @@ class DataRecord:
         # TODO: we can implement this method if/when we add joins
         pass
 
+    @staticmethod
+    def _build_source_id_from_df(source_id: int | str | None = None) -> int | str:
+        updated_source_id = source_id
+        if source_id is None:
+            updated_source_id = "None"
+        elif isinstance(source_id, int):
+            updated_source_id = str(source_id)
+        return f"{FROM_DF_PREFIX}_{updated_source_id}"
+    
+    @staticmethod
+    def _build_schema_from_df(df: pd.DataFrame) -> Schema:
+        # Create a unique schema name based on columns
+        schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
+        
+        if schema_name in globals():
+            return globals()[schema_name]
+            
+        # Create new schema only if it doesn't exist
+        new_schema = type(schema_name, (Schema,), {
+            '_desc': "Derived schema from DataFrame",
+            '__module__': Schema.__module__
+        })
+        
+        for col in df.columns:
+            setattr(new_schema, col, Field(
+                desc=f"{col}",
+                required=True
+            ))
+        
+        # Store the schema class globally
+        globals()[schema_name] = new_schema
+        return new_schema
+    
+    @staticmethod
+    def from_df(df: pd.DataFrame, schema: Schema = None, source_id: int | str | None = None) -> list[DataRecord]:
+        """Create a list of DataRecords from a pandas DataFrame
+        
+        Args:
+            df (pd.DataFrame): Input DataFrame
+            schema (Schema, optional): Schema for the DataRecords. If None, will be derived from DataFrame  
+            source_id (int | str | None, optional)
+        
+        Returns:
+            list[DataRecord]: List of DataRecord instances
+        """
+        if df is None:
+            raise ValueError("DataFrame is None!")
+        
+        records = []
+        if schema is None:
+            schema = DataRecord._build_schema_from_df(df)
+        source_id = DataRecord._build_source_id_from_df(source_id)
+        for _, row in df.iterrows():
+            record = DataRecord(schema=schema, source_id=source_id)
+            record._data = row.to_dict()
+            records.append(record)
+            
+        return records
+    
+    @staticmethod
+    def as_df(records: list[DataRecord]) -> pd.DataFrame:
+        return pd.DataFrame([record.as_dict() for record in records])
+
 
     def as_json_str(self, include_bytes: bool = True, project_cols: list[str] | None = None, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
@@ -187,21 +254,6 @@ class DataRecord:
                 if isinstance(v, bytes) or (isinstance(v, list) and len(v) > 0 and isinstance(v[0], bytes)):
                     dct[k] = "<bytes>"
         return dct
-    
-    def as_df(self, include_bytes: bool = True, project_cols: list[str] | None = None):
-        """Return a pandas DataFrame representation of this DataRecord
-        
-        Args:
-            include_bytes (bool): Whether to include byte fields in the output
-            project_cols (list[str]): Optional list of columns to include
-            
-        Returns:
-            pd.DataFrame: A single-row DataFrame containing the record data
-        """
-        import pandas as pd
-        dct = self.as_dict(include_bytes=include_bytes, project_cols=project_cols)
-        return pd.DataFrame([dct])
-
 
     def get_fields(self):
         return list(self._data.keys())
@@ -242,60 +294,3 @@ class DataRecordSet:
 
     def __iter__(self):
         yield from self.data_records
-
-    @staticmethod
-    def from_df(df: pd.DataFrame, schema: Schema = None, source_id: int | None = None) -> DataRecordSet:
-        """Create a list of DataRecords from a pandas DataFrame
-        
-        Args:
-            df (pd.DataFrame): Input DataFrame
-            schema (Schema, optional): Schema for the DataRecords. If None, will be derived from DataFrame
-            source_id (int, optional): Source ID for the records. Defaults to None.
-            
-        Returns:
-            list[DataRecord]: List of DataRecord instances
-        """        
-        # Derive schema from DataFrame if not provided
-        if schema is None:
-            class DerivedSchema(Schema):
-                pass
-            
-            # Add fields dynamically to the schema class
-            for col in df.columns:
-                setattr(DerivedSchema, col, Field(
-                    desc=f"{col}",
-                    required=True
-                ))
-            
-            schema = DerivedSchema
-        
-        records = []
-        for idx, row in df.iterrows():
-            data = row.to_dict()
-            
-            # Create DataRecord instance
-            record = DataRecord(schema=schema, source_id=source_id)
-            record._data = data
-            record._id = str(idx)  # Use DataFrame index as record ID
-            record._parent_id = None
-            record._source_id = source_id
-            records.append(record)
-        
-        return DataRecordSet(records, [])
-
-
-
-df = pd.DataFrame({
-    'name': ['a', 'b', '𝜆'],
-    'description': ['rate of infection', 'recovery rate', 'growth factor'],
-    'value': [0.5, 0.3, 1.2]
-})
-
-records = DataRecordSet.from_df(df)
-
-class MySchema(Schema):
-    name = Field(desc="Variable name", required=True)
-    description = Field(desc="Variable description", required=False)
-    value = Field(desc="Variable value", required=False)
-
-records = DataRecord.from_df(df, schema=MySchema)

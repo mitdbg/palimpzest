@@ -17,6 +17,7 @@ from palimpzest.core.lib.schemas import TextFile
 from palimpzest.sets import Dataset
 from palimpzest.query import StreamingSequentialExecution
 from palimpzest.policy import MaxQuality
+from palimpzest.core.elements.records import DataRecord
 
 class Papersnippet(TextFile):
     """Represents an excerpt from a scientific research paper, which potentially contains variables"""
@@ -90,7 +91,9 @@ if __name__ == "__main__":
                 st.write(strop)
 
         input_records = engine.get_input_records()
-
+        input_df = DataRecord.as_df(input_records)
+        print(input_df)
+        
         variables = []
         statistics = []
         start_time = time.time()
