@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import hashlib
+
 import json
 from typing import Callable
 
-from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
+from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.lib.schemas import ImageFile, Schema
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class LogicalOperator:
@@ -87,7 +88,7 @@ class LogicalOperator:
 
         # compute, set, and return the op_id
         hash_str = json.dumps({"logical_op_name": logical_op_name, **logical_id_params}, sort_keys=True)
-        self.logical_op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+        self.logical_op_id = hash_for_id(hash_str)
 
         return self.logical_op_id
 

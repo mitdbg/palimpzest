@@ -1,10 +1,9 @@
-import hashlib
 import multiprocessing
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 
-from palimpzest.constants import MAX_ID_CHARS, Model, OptimizationStrategy
+from palimpzest.constants import Model, OptimizationStrategy
 from palimpzest.core.data.dataclasses import PlanStats, RecordOpStats
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.core.data.datasources import DataSource, ValidationDataSource
@@ -15,6 +14,7 @@ from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.policy import Policy
 from palimpzest.sets import Dataset, Set
 from palimpzest.utils.model_helpers import get_models
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class ExecutionEngine:
@@ -75,7 +75,7 @@ class ExecutionEngine:
             if not attr.startswith("_"):
                 id_str += f"{attr}={value},"
 
-        return hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+        return hash_for_id(id_str)
 
     def clear_cached_responses_and_examples(self):
         """

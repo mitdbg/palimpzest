@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import hashlib
 from abc import ABC, abstractmethod
 
-from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.core.data.dataclasses import PlanCost
 from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class Plan(ABC):
@@ -55,7 +54,7 @@ class PhysicalPlan(Plan):
         Two different PhysicalPlan instances with the identical lists of operators will have equivalent plan_ids.
         """
         hash_str = str(tuple(op.get_op_id() for op in self.operators))
-        return hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+        return hash_for_id(hash_str)
 
     def __eq__(self, other):
         return isinstance(other, PhysicalPlan) and self.plan_id == other.plan_id
@@ -120,7 +119,7 @@ class SentinelPlan(Plan):
         hash_str = ""
         for logical_op_id, op_set in zip(self.logical_op_ids, self.operator_sets):
             hash_str += f"{logical_op_id} {tuple(op.get_op_id() for op in op_set)} "
-        return hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+        return hash_for_id(hash_str)
 
     def __eq__(self, other):
         return isinstance(other, SentinelPlan) and self.plan_id == other.plan_id
