@@ -1,9 +1,8 @@
 import os
 from pathlib import Path
 
-import pytest
-
 import palimpzest as pz
+import pytest
 
 
 ### DATA SOURCES ###
@@ -13,12 +12,11 @@ import palimpzest as pz
 class RealEstateListingFiles(pz.Schema):
     """The source text and image data for a real estate listing."""
 
-    listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.StringField(desc="The content of the listing's text description", required=True)
+    listing = pz.StringField(desc="The name of the listing")
+    text_content = pz.StringField(desc="The content of the listing's text description")
     image_filepaths = pz.ListField(
         element_type=pz.StringField,
         desc="A list of the filepaths for each image of the listing",
-        required=True,
     )
 
 

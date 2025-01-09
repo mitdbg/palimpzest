@@ -12,67 +12,80 @@ import numpy as np
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from palimpzest.constants import Cardinality
+from palimpzest.corelib.fields import Field
+from palimpzest.corelib.schemas import (
+    URL,
+    Download,
+    ImageFile,
+    Number,
+    PDFFile,
+    RawJSONObject,
+    Schema,
+    TextFile,
+    WebPage,
+)
+from palimpzest.datamanager import DataDirectory
+from palimpzest.datasources import UserSource
+from palimpzest.elements.groupbysig import GroupBySig
+from palimpzest.elements.records import DataRecord
+from palimpzest.execution.execute import Execute
+from palimpzest.execution.nosentinel_execution import (
+    NoSentinelPipelinedParallelExecution,
+    NoSentinelPipelinedSingleThreadExecution,
+    NoSentinelSequentialSingleThreadExecution,
+)
+from palimpzest.policy import MaxQuality, MinCost, MinTime
+from palimpzest.sets import Dataset
 from PIL import Image
 from requests_html import HTMLSession  # for downloading JavaScript content
 from tabulate import tabulate
 
-import palimpzest as pz
-from palimpzest.constants import Cardinality
-from palimpzest.elements.groupbysig import GroupBySig
-from palimpzest.elements.records import DataRecord
 
-
-class ScientificPaper(pz.PDFFile):
+class ScientificPaper(PDFFile):
     """Represents a scientific research paper, which in practice is usually from a PDF file"""
-
-    title = pz.Field(
-        desc="The title of the paper. This is a natural language title, not a number or letter.",
-        required=True,
-    )
-    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False) # noqa
-    author = pz.Field(desc="The name of the first author of the paper", required=True)
-    institution = pz.Field(desc="The institution of the first author of the paper", required=True)
-    journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
-    fundingAgency = pz.Field( # noqa
+    title = Field(desc="The title of the paper. This is a natural language title, not a number or letter.")
+    publicationYear = Field(desc="The year the paper was published. This is a number.") # noqa
+    author = Field(desc="The name of the first author of the paper")
+    institution = Field(desc="The institution of the first author of the paper")
+    journal = Field(desc="The name of the journal the paper was published in")
+    fundingAgency = Field( # noqa
         desc="The name of the funding agency that supported the research",
-        required=False,
     )
 
 
 def build_sci_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""
-    return pz.Dataset(dataset_id, schema=ScientificPaper)
+    return Dataset(dataset_id, schema=ScientificPaper)
 
 
 def build_test_pdf_plan(dataset_id):
     """This tests whether we can process a PDF file"""
-    return pz.Dataset(dataset_id, schema=pz.PDFFile)
+    return Dataset(dataset_id, schema=PDFFile)
 
 
 def build_mit_battery_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""
-    sci_papers = pz.Dataset(dataset_id, schema=ScientificPaper)
+    sci_papers = Dataset(dataset_id, schema=ScientificPaper)
     battery_papers = sci_papers.filter("The paper is about batteries")
     mit_papers = battery_papers.filter("The paper is from MIT")
 
     return mit_papers
 
 
-class VLDBPaperListing(pz.Schema):
+class VLDBPaperListing(Schema):
     """VLDBPaperListing represents a single paper from the VLDB conference"""
+    title = Field(desc="The title of the paper")
+    authors = Field(desc="The authors of the paper")
+    pdfLink = Field(desc="The link to the PDF of the paper") # noqa
 
-    title = pz.Field(desc="The title of the paper", required=True)
-    authors = pz.Field(desc="The authors of the paper", required=True)
-    pdfLink = pz.Field(desc="The link to the PDF of the paper", required=True) # noqa
 
-
-def vldb_text_file_to_url(candidate: DataRecord):
+def vldb_text_file_to_url(candidate: dict):
     url_records = []
-    with open(candidate.filename) as f:
+    with open(candidate["filename"]) as f:
         for line in f:
-            dr = DataRecord.from_parent(pz.URL, parent_record=candidate, project_cols=[])
-            dr.url = line.strip()
-            url_records.append(dr)
+            record = {"url": line.strip()}
+            url_records.append(record)
 
     return url_records
 
@@ -103,58 +116,57 @@ def get_page_text(url):
     return response.text
 
 
-def download_html(candidate: DataRecord):
-    textcontent = get_page_text(candidate.url)
-    dr = DataRecord.from_parent(pz.WebPage, parent_record=candidate, project_cols=['url'])
+def download_html(candidate: dict):
+    textcontent = get_page_text(candidate["url"])
 
+    record = {}
     html = textcontent
     tokens = html.split()[:5000]
-    dr.html = " ".join(tokens)
+    record["html"] = " ".join(tokens)
 
     stripped_html = html_to_text_with_links(textcontent)
     tokens = stripped_html.split()[:5000]
-    dr.text = " ".join(tokens)
+    record["text"] = " ".join(tokens)
 
     # get current timestamp, in nice ISO format
-    dr.timestamp = datetime.datetime.now().isoformat()
-    return dr
+    record["timestamp"] = datetime.datetime.now().isoformat()
+    return record
 
 
-def download_pdf(candidate: DataRecord):
-    print(f"DOWNLOADING: {candidate.pdfLink}")
-    content = requests.get(candidate.pdfLink).content
-    dr = DataRecord.from_parent(pz.File, parent_record=candidate, project_cols=[])
-    dr.url = candidate.pdfLink
-    dr.content = content
-    dr.timestamp = datetime.datetime.now().isoformat()
+def download_pdf(candidate: dict):
+    print(f"DOWNLOADING: {candidate['pdfLink']}")
+    content = requests.get(candidate["pdfLink"]).content
+    record["url"] = candidate["pdfLink"]
+    record["content"] = content
+    record["timestamp"] = datetime.datetime.now().isoformat()
     time.sleep(1)
-    return dr
+    return record
 
 
 def download_vldb_papers(vldb_listing_page_urls_id, output_dir, execution_engine, profile=False):
     """This function downloads a bunch of VLDB papers from an online listing and saves them to disk.  It also saves a CSV file of the paper listings."""
     # 1. Grab the input VLDB listing page(s) and scrape them for paper metadata
-    tfs = pz.Dataset(
+    tfs = Dataset(
         vldb_listing_page_urls_id,
-        schema=pz.TextFile,
+        schema=TextFile,
         desc="A file full of URLs of VLDB journal pages",
     )
     urls = tfs.convert(
-        output_schema=pz.URL,
+        output_schema=URL,
         udf=vldb_text_file_to_url,
         desc="The actual URLs of the VLDB pages",
-        cardinality=Cardinality.ONE_TO_MANY,  # one_to_many=True
-    )
-    html_content = urls.convert(output_schema=pz.WebPage, udf=download_html)
+        cardinality=Cardinality.ONE_TO_MANY,
+    ).project(["url"])
+    html_content = urls.convert(output_schema=WebPage, udf=download_html)
     vldb_paper_listings = html_content.convert(
         output_schema=VLDBPaperListing,
         desc="The actual listings for each VLDB paper",
         cardinality=Cardinality.ONE_TO_MANY,
     )
 
-    listing_records, listing_execution_stats = pz.Execute(
+    listing_records, listing_execution_stats = Execute(
         vldb_paper_listings,
-        policy=pz.MaxQuality(),
+        policy=MaxQuality(),
         nocache=True,
         allow_token_reduction=False,
         allow_code_synth=False,
@@ -177,12 +189,15 @@ def download_vldb_papers(vldb_listing_page_urls_id, output_dir, execution_engine
             json.dump(listing_execution_stats.to_json(), f)
 
     # 2. Get the PDF URL for each paper that's listed and download it
-    pdf_content = vldb_paper_listings.convert(output_schema=pz.Download, udf=download_pdf)
+    pdf_content = vldb_paper_listings.convert(
+        output_schema=Download,
+        udf=download_pdf,
+    ).project(["url", "content", "timestamp"])
 
     # 3. Save the paper listings to a CSV file and the PDFs to disk
-    pdf_records, download_execution_stats = pz.Execute(
+    pdf_records, download_execution_stats = Execute(
         pdf_content,
-        policy=pz.MaxQuality(),
+        policy=MaxQuality(),
         nocache=True,
         allow_token_reduction=False,
         allow_code_synth=False,
@@ -199,41 +214,41 @@ def download_vldb_papers(vldb_listing_page_urls_id, output_dir, execution_engine
             json.dump(download_execution_stats.to_json(), f)
 
 
-class GitHubUpdate(pz.Schema):
+class GitHubUpdate(Schema):
     """GitHubUpdate represents a single commit message from a GitHub repo"""
 
-    commitId = pz.Field(desc="The unique identifier for the commit", required=True) # noqa
-    reponame = pz.Field(desc="The name of the repository", required=True)
-    commit_message = pz.Field(desc="The message associated with the commit", required=True)
-    commit_date = pz.Field(desc="The date the commit was made", required=True)
-    committer_name = pz.Field(desc="The name of the person who made the commit", required=True)
-    file_names = pz.Field(desc="The list of files changed in the commit", required=False)
+    commitId = Field(desc="The unique identifier for the commit") # noqa
+    reponame = Field(desc="The name of the repository")
+    commit_message = Field(desc="The message associated with the commit")
+    commit_date = Field(desc="The date the commit was made")
+    committer_name = Field(desc="The name of the person who made the commit")
+    file_names = Field(desc="The list of files changed in the commit")
 
 
 def test_user_source(dataset_id: str):
-    return pz.Dataset(dataset_id, schema=GitHubUpdate)
+    return Dataset(dataset_id, schema=GitHubUpdate)
 
 
-class Email(pz.TextFile):
+class Email(TextFile):
     """Represents an email, which in practice is usually from a text file"""
 
-    sender = pz.Field(desc="The email address of the sender", required=True)
-    subject = pz.Field(desc="The subject of the email", required=True)
+    sender = Field(desc="The email address of the sender")
+    subject = Field(desc="The subject of the email")
 
 
 def build_enron_plan(dataset_id):
-    emails = pz.Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id, schema=Email)
     return emails
 
 
 def compute_enron_stats(dataset_id):
-    emails = pz.Dataset(dataset_id, schema=Email)
-    subject_line_lengths = emails.convert(pz.Number, desc="The number of words in the subject field")
+    emails = Dataset(dataset_id, schema=Email)
+    subject_line_lengths = emails.convert(Number, desc="The number of words in the subject field")
     return subject_line_lengths
 
 
 def enron_gby_plan(dataset_id):
-    emails = pz.Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id, schema=Email)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -243,7 +258,7 @@ def enron_gby_plan(dataset_id):
 
 
 def enron_count_plan(dataset_id):
-    emails = pz.Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id, schema=Email)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = []
@@ -253,7 +268,7 @@ def enron_count_plan(dataset_id):
 
 
 def enron_average_count_plan(dataset_id):
-    emails = pz.Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id, schema=Email)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -269,24 +284,24 @@ def enron_average_count_plan(dataset_id):
 
 
 def enron_limit_plan(dataset_id, limit=5):
-    data = pz.Dataset(dataset_id, schema=Email)
+    data = Dataset(dataset_id, schema=Email)
     limit_data = data.limit(limit)
     return limit_data
 
 
-class DogImage(pz.ImageFile):
-    breed = pz.Field(desc="The breed of the dog", required=True)
+class DogImage(ImageFile):
+    breed = Field(desc="The breed of the dog")
 
 
 def build_image_plan(dataset_id):
-    images = pz.Dataset(dataset_id, schema=pz.ImageFile)
+    images = Dataset(dataset_id, schema=ImageFile)
     filtered_images = images.filter("The image contains one or more dogs")
     dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
     return dog_images
 
 
 def build_image_agg_plan(dataset_id):
-    images = pz.Dataset(dataset_id, schema=pz.ImageFile)
+    images = Dataset(dataset_id, schema=ImageFile)
     filtered_images = images.filter("The image contains one or more dogs")
     dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
     ops = ["count"]
@@ -298,7 +313,7 @@ def build_image_agg_plan(dataset_id):
 
 
 def print_table(records, cols=None, gradio=False, plan_str=None):
-    records = [{key: record[key] for key in record.get_fields()} for record in records]
+    records = [{key: record[key] for key in record.get_field_names()} for record in records]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
     final_df = records_df[print_cols] if not records_df.empty else pd.DataFrame(columns=print_cols)
@@ -354,13 +369,13 @@ if __name__ == "__main__":
     datasetid = args.datasetid
     task = args.task
     verbose = args.verbose
-    policy = pz.MaxQuality()
+    policy = MaxQuality()
     if args.policy == "mincost":
-        policy = pz.MinCost()
+        policy = MinCost()
     elif args.policy == "mintime":
-        policy = pz.MinTime()
+        policy = MinTime()
     elif args.policy == "maxquality":
-        policy = pz.MaxQuality()
+        policy = MaxQuality()
     else:
         print("Policy not supported for this demo")
         exit(1)
@@ -368,11 +383,11 @@ if __name__ == "__main__":
     execution_engine = None
     executor = args.executor
     if executor == "sequential":
-        execution_engine = pz.NoSentinelSequentialSingleThreadExecution
+        execution_engine = NoSentinelSequentialSingleThreadExecution
     elif executor == "pipelined":
-        execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
+        execution_engine = NoSentinelPipelinedSingleThreadExecution
     elif executor == "parallel":
-        execution_engine = pz.NoSentinelPipelinedParallelExecution
+        execution_engine = NoSentinelPipelinedParallelExecution
     else:
         print("Executor not supported for this demo")
         exit(1)
@@ -427,9 +442,9 @@ if __name__ == "__main__":
         repo = "palimpzest"
         url = f"https://api.github.com/repos/{owner}/{repo}/commits"
 
-        class GitHubCommitSource(pz.UserSource):
+        class GitHubCommitSource(UserSource):
             def __init__(self, dataset_id):
-                super().__init__(pz.RawJSONObject, dataset_id)
+                super().__init__(RawJSONObject, dataset_id)
                 per_page = 100
                 params = {"per_page": per_page, "page": 1}
                 self.commits = []
@@ -460,12 +475,12 @@ if __name__ == "__main__":
                 # NOTE: we can make this a streaming demo again by modifying this get_item function
                 commit = self.commits[idx]
                 commit_str = json.dumps(commit)
-                dr = pz.DataRecord(self.schema, source_id=idx)
+                dr = DataRecord(self.schema, source_id=idx)
                 dr.json = commit_str
 
                 return dr
 
-        pz.DataDirectory().register_user_source(GitHubCommitSource(datasetid), datasetid)
+        DataDirectory().register_user_source(GitHubCommitSource(datasetid), datasetid)
 
         root_set = test_user_source(datasetid)
         cols = ["commitId", "reponame", "commit_message"]
@@ -493,7 +508,7 @@ if __name__ == "__main__":
         print("Unknown task")
         exit(1)
 
-    records, execution_stats = pz.Execute(
+    records, execution_stats = Execute(
         root_set,
         policy=policy,
         nocache=True,

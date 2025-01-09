@@ -1,7 +1,6 @@
 import json
 
 import pytest
-
 from palimpzest.dataclasses import RecordOpStats
 from palimpzest.elements.records import DataRecord, DataRecordSet
 
@@ -15,9 +14,9 @@ def enron_filter():
         
         # create RecordOpStats object with positive time and cost per record
         record_op_stats = RecordOpStats(
-            record_id=candidate._id,
-            record_parent_id=candidate._parent_id,
-            record_source_id=candidate._source_id,
+            record_id=candidate.id,
+            record_parent_id=candidate.parent_id,
+            record_source_id=candidate.source_id,
             record_state=candidate.as_dict(include_bytes=False),
             op_id="MockFilterFoo",
             logical_op_id="LogicalMockFilterFoo",
@@ -28,8 +27,8 @@ def enron_filter():
             passed_operator=passed_operator,
         )
 
-        # set _passed_operator attribute and return
-        candidate._passed_operator = passed_operator
+        # set passed_operator attribute and return
+        candidate.passed_operator = passed_operator
 
         return DataRecordSet([candidate], [record_op_stats])
 
@@ -65,9 +64,9 @@ def enron_convert(email_schema):
 
         # compute fake record_op_stats
         record_op_stats = RecordOpStats(
-            record_id=candidate._id,
-            record_parent_id=candidate._parent_id,
-            record_source_id=candidate._source_id,
+            record_id=candidate.id,
+            record_parent_id=candidate.parent_id,
+            record_source_id=candidate.source_id,
             record_state=dr.as_dict(include_bytes=False),
             op_id="MockConvertFoo",
             logical_op_id="LogicalMockConvertFoo",
@@ -98,9 +97,9 @@ def real_estate_convert(image_real_estate_listing_schema):
 
         # compute fake record_op_stats
         record_op_stats = RecordOpStats(
-            record_id=candidate._id,
-            record_parent_id=candidate._parent_id,
-            record_source_id=candidate._source_id,
+            record_id=candidate.id,
+            record_parent_id=candidate.parent_id,
+            record_source_id=candidate.source_id,
             record_state=dr.as_dict(include_bytes=False),
             op_id="MockConvertFoo",
             logical_op_id="LogicalMockConvertFoo",
@@ -142,9 +141,9 @@ def real_estate_one_to_many_convert(room_real_estate_listing_schema):
 
             # create fake record_op_stats
             record_op_stats = RecordOpStats(
-                record_id=candidate._id,
-                record_parent_id=candidate._parent_id,
-                record_source_id=candidate._source_id,
+                record_id=candidate.id,
+                record_parent_id=candidate.parent_id,
+                record_source_id=candidate.source_id,
                 record_state=dr.as_dict(include_bytes=False),
                 op_id="MockConvertFoo",
                 logical_op_id="LogicalMockConvertFoo",

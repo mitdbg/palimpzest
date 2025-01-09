@@ -45,13 +45,13 @@ class Set:
         udf: Callable | None = None,
         agg_func: AggFunc | None = None,
         group_by: GroupBySig | None = None,
+        project_cols: list[str] | None = None,
         index = None, # TODO(Siva): Abstract Index and add a type here and elsewhere
         search_attr: str | None = None,
         output_attr: str | None = None,
         k: int | None = None, # TODO: disambiguate `k` to be something like `retrieve_k`
         limit: int | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-        image_conversion: bool | None = None,
         depends_on: list[str] | None = None,
         nocache: bool = False,
     ):
@@ -62,21 +62,21 @@ class Set:
         self._udf = udf
         self._agg_func = agg_func
         self._group_by = group_by
+        self._project_cols = None if project_cols is None else sorted(project_cols)
         self._index = index
         self._search_attr = search_attr
         self._output_attr = output_attr
         self._k = k
         self._limit = limit
         self._cardinality = cardinality
-        self._image_conversion = image_conversion
-        self._depends_on = depends_on
+        self._depends_on = None if depends_on is None else sorted(depends_on)
         self._nocache = nocache
 
     def __str__(self):
         return (
             f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, "
             f"filter={str(self._filter)}, udf={str(self._udf)}, agg_func={str(self._agg_func)}, limit={str(self._limit)}, "
-            f"uid={self.universal_identifier()})"
+            f"project_cols={str(self._project_cols)}, uid={self.universal_identifier()})"
         )
 
     @property
@@ -95,11 +95,11 @@ class Set:
             "desc": repr(self._desc),
             "filter": None if self._filter is None else self._filter.serialize(),
             "udf": None if self._udf is None else str(self._udf),
-            "agg_func": None if self._agg_func is None else self._agg_func.serialize(),
+            "agg_func": None if self._agg_func is None else self._agg_func.value,
             "cardinality": self._cardinality,
-            "image_conversion": self._image_conversion,
             "limit": self._limit,
             "group_by": (None if self._group_by is None else self._group_by.serialize()),
+            "project_cols": (None if self._project_cols is None else self._project_cols),
             "index": None if self._index is None else get_index_str(self._index),
             "search_attr": self._search_attr,
             "output_attr": self._output_attr,
@@ -143,7 +143,7 @@ class Dataset(Set):
         if self._depends_on is None:
             self._depends_on = []
 
-        elif type(self._depends_on) is str:
+        elif isinstance(self._depends_on, str):
             self._depends_on = [self._depends_on]
 
     def copy(self) -> Dataset:
@@ -162,7 +162,6 @@ class Dataset(Set):
             k=self._k,
             limit=self._limit,
             cardinality=self._cardinality,
-            image_conversion=self._image_conversion,
             depends_on=self._depends_on,
             nocache=self._nocache,
         )
@@ -175,7 +174,7 @@ class Dataset(Set):
     ) -> Dataset:
         """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
         f = None
-        if type(_filter) is str:
+        if isinstance(_filter, str):
             f = Filter(_filter)
         elif callable(_filter):
             f = Filter(filter_fn=_filter)
@@ -195,7 +194,6 @@ class Dataset(Set):
         output_schema: Schema,
         udf: Callable | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-        image_conversion: bool = False,
         depends_on: str | list[str] | None = None,
         desc: str = "Convert to new schema",
     ) -> Dataset:
@@ -205,7 +203,6 @@ class Dataset(Set):
             schema=output_schema,
             udf=udf,
             cardinality=cardinality,
-            image_conversion=image_conversion,
             depends_on=depends_on,
             desc=desc,
             nocache=self._nocache,
@@ -259,5 +256,14 @@ class Dataset(Set):
             schema=self.schema,
             desc="LIMIT " + str(n),
             limit=n,
+            nocache=self._nocache,
+        )
+
+    def project(self, project_cols: list[str] | str) -> Dataset:
+        """Project the Set to only include the specified columns."""
+        return Dataset(
+            source=self,
+            schema=self.schema.project(project_cols),
+            project_cols=project_cols if isinstance(project_cols, list) else [project_cols],
             nocache=self._nocache,
         )

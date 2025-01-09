@@ -11,7 +11,7 @@ ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION = "Remember, your answer must be a valid J
 COT_BOOL_SYSTEM_PROMPT = """You are a helpful assistant whose job is to answer a TRUE / FALSE question.
 You will be presented with a context and a filter condition. Output TRUE if the context satisfies the filter condition, and FALSE otherwise.
 
-Remember, your answer must be TRUE or FALSE.
+Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 
 An example is shown below:
 ---
@@ -30,24 +30,25 @@ Let's think step by step in order to answer the question.
 REASONING: the text mentions the words "fox" and "dog" which are animals, therefore the answer is TRUE.
 
 ANSWER: TRUE
+---
 """
 
 COT_BOOL_IMAGE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to analyze input image(s) and/or text in order to answer a TRUE / FALSE question.
 You will be presented with the image(s) and a filter condition. You may also have some textual inputs. Output TRUE if the input(s) satisfy the filter condition, and FALSE otherwise.
 
-Remember, your answer must be TRUE or FALSE.
+Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 
 An example is shown below (the image will be provided in a subsequent message, suppose it is an image of a dog playing with a cat):
 ---
 CONTEXT:
 {
   "image": <bytes>,
-  "filename": "img001.jpg"
+  "photographer": "CameraEnthusiast1"
 }
 
 INPUT FIELDS:
 - image: an image of a scene
-- filename: the filename of the image
+- photographer: the photographer of the image
 
 FILTER CONDITION: there's an animal in this image
 
@@ -56,6 +57,7 @@ Let's think step by step in order to answer the question.
 REASONING: the image shows a dog and a cat playing, both of which are animals, therefore the answer is TRUE.
 
 ANSWER: TRUE
+---
 """
 
 COT_QA_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to generate a JSON object.
@@ -176,12 +178,12 @@ An example is shown below (the image will be provided in a subsequent message, s
 CONTEXT:
 {
   "image": <bytes>,
-  "filename": "img001.jpg"
+  "photographer": "CameraEnthusiast1"
 }
 
 INPUT FIELDS:
 - image: an image of a scene
-- filename: the filename of the image
+- photographer: the photographer of the image
 
 OUTPUT FIELDS:
 - dog_in_image: true if a dog is in the image and false otherwise
@@ -204,7 +206,7 @@ ANSWER:
 COT_BOOL_USER_PROMPT = """You are a helpful assistant whose job is to answer a TRUE / FALSE question.
 You will be presented with a context and a filter condition. Output TRUE if the context satisfies the filter condition, and FALSE otherwise.
 
-Remember, your answer must be TRUE or FALSE.
+Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 ---
 CONTEXT:
 {context}
@@ -221,7 +223,7 @@ REASONING: """
 COT_BOOL_IMAGE_USER_PROMPT = """You are a helpful assistant whose job is to analyze input image(s) and/or text in order to answer a TRUE / FALSE question.
 You will be presented with the image(s) and a filter condition. You may also have some textual inputs. Output TRUE if the input(s) satisfy the filter condition, and FALSE otherwise.
 
-Remember, your answer must be TRUE or FALSE.
+Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 ---
 CONTEXT:
 {context}
@@ -317,100 +319,6 @@ Let's think step by step in order to answer the question.
 
 REASONING: """
 
-### CONVERT PROMPTS ###
-INPUT_FIELD = "{field_name}: {field_desc}\n"
-OUTPUT_FIELD = "{field_name}: {field_desc}\n"
-
-OPTIONAL_INPUT_DESC = "Here is a description of the input object: {desc}."
-OPTIONAL_OUTPUT_DESC = "Here is a description of the output object: {desc}."
-
-OPTIONAL_DESC = "Keep in mind that this process is described by this text: {desc}."
-LLAMA_INSTRUCTION = "Keep your answer brief and to the point. Do not repeat yourself endlessly."
-
-### ONE TO ONE ###
-ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR = "an output JSON object that describes an object of type {doc_type}."
-ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL = "the output object"
-ONE_TO_ONE_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The dictionary should only have the output fields: {fields}.\n\nFor example:\n{fields_example_dict}"
-
-# TODO: add JSON dict example to ONE_TO_MANY_APPENDIX_INSTRUCTION
-### ONE_TO_MANY ###
-ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR = (
-    "an output array of zero or more JSON objects that describe objects of type {doc_type}."
-)
-ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL = "the output objects"
-ONE_TO_MANY_APPENDIX_INSTRUCTION = "Be sure to emit a JSON object only. The root-level JSON object should have a single field, called 'items' that is a list of the output objects. Every output object in this list should be a dictionary with the output fields {fields}. You must decide the correct number of output objects."
-
-STRUCTURED_CONVERT_PROMPT = """I would like you to create {target_output_descriptor}
-You will use the information in an input JSON object that I will provide. The input object has type {input_type}.
-All of the fields in {output_single_or_plural} can be derived using information from the input object.
-{optional_input_desc}
-{optional_output_desc}
-Here is every input field name and a description: 
-{multiline_input_field_description}
-Here is every output field name and a description:
-{multiline_output_field_description}
-{appendix_instruction}
-{optional_desc}
-{model_instruction}"""
-
-IMAGE_CONVERT_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and create {target_output_descriptor}.
-You will use the information in the image that I will provide. The input image(s) has type {input_type}.
-All of the fields in {output_single_or_plural} can be derived using information from the input image(s).
-{optional_input_desc}
-{optional_output_desc}
-Here is every output field name and a description:
-{multiline_output_field_description}
-{appendix_instruction}
-{optional_desc}
-{model_instruction}"""
-
-IMAGE_FILTER_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and:
-- Output TRUE if the given image satisfies the filter condition
-- Output FALSE if the given image does not satisfy the condition
-
-Your answer must be TRUE or FALSE.
-
-FILTER CONDITION: {filter_condition}
-
-ANSWER: """
-
-### MIXTURE-OF-AGENTS PROMPTS ###
-MOA_ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR = "an output that describes an object of type {doc_type}."
-MOA_ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR = "an output that describes one or more objects of type {doc_type}."
-
-MOA_STRUCTURED_CONVERT_PROMPT = """I would like you to create {target_output_descriptor}
-You will use the information in an input JSON object that I will provide. The input object has type {input_type}.
-All of the fields in {output_single_or_plural} can be derived using information from the input object.
-{optional_input_desc}
-{optional_output_desc}
-Here is every input field name and a description: 
-{multiline_input_field_description}
-Here is the field name and a description of every field which should be present in your output:
-{multiline_output_field_description}
-Your output should be a paragraph or two describing what you believe should be the keys and values of the output object of type {doc_type}. Be sure to cite information from the Context as evidence of why your output is correct. Do not hallucinate evidence, and if you are uncertain about any parts of the output -- say so."""
-
-MOA_IMAGE_CONVERT_PROMPT = """You are an image analysis bot. Analyze the supplied image(s) and create {target_output_descriptor}.
-You will use the information in the image that I will provide. The input image(s) has type {input_type}.
-All of the fields in {output_single_or_plural} can be derived using information from the input image(s).
-{optional_input_desc}
-{optional_output_desc}
-Here is the field name and a description of every field which should be present in your output:
-{multiline_output_field_description}.
-Your output should be a paragraph or two describing what you believe should be the keys and values of the output object of type {doc_type}.
-**Include text snippets from the Context as evidence of why your output is correct.**
-Do not hallucinate evidence, and if you are uncertain about any parts of the output -- say so.
-{model_instruction}"""
-
-MOA_AGGREGATOR_CONVERT_PROMPT = """I would like you to create {target_output_descriptor}
-You will use the information in the provided model responses to synthesize your response.
-All of the fields in {output_single_or_plural} can be derived using information from the responses.
-{optional_output_desc}
-Here is the field name and a description of every field which should be present in your output:
-{multiline_output_field_description}
-{appendix_instruction}
-{optional_desc}
-{model_instruction}
-"""
 
 ### CODE SYNTHESIS PROMPTS ###
 EXAMPLE_PROMPT = """Example{idx}:

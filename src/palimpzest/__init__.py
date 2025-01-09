@@ -11,7 +11,6 @@ from palimpzest.corelib.fields import (
 from palimpzest.corelib.schema_builder import SchemaBuilder
 from palimpzest.corelib.schemas import (
     URL,
-    Any,
     Download,
     EquationImage,
     File,
@@ -156,7 +155,6 @@ __all__ = [
     "PhysicalOperator",
     # schemas
     "URL",
-    "Any",
     "Download",
     "EquationImage",
     "File",

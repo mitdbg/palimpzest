@@ -32,7 +32,7 @@ def test_convert(convert_op, email_schema, enron_eval_tiny):
         input_schema=File,
         output_schema=email_schema,
         model=model,
-        prompt_strategy=PromptStrategy.DSPY_COT_QA,
+        prompt_strategy=PromptStrategy.COT_QA,
     )
  
     datasource = DataDirectory().get_registered_dataset(enron_eval_tiny)

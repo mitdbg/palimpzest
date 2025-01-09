@@ -63,11 +63,18 @@ class TestParallelExecutionNoCache:
             ),
             pytest.param(
                 "enron-eval-tiny",
-                "token-reduction-convert",
+                "rag-convert",
                 "enron-all-records",
                 "enron-convert",
-                id="token-reduction-convert",
+                id="rag-convert",
             ),
+            # pytest.param(
+            #     "enron-eval-tiny",
+            #     "token-reduction-convert",
+            #     "enron-all-records",
+            #     "enron-convert",
+            #     id="token-reduction-convert",
+            # ),
             pytest.param(
                 "real-estate-eval-tiny",
                 "image-convert",

@@ -38,6 +38,9 @@ from palimpzest.optimizer.rules import (
     PushDownFilter as _PushDownFilter,
 )
 from palimpzest.optimizer.rules import (
+    RAGConvertRule as _RAGConvertRule,
+)
+from palimpzest.optimizer.rules import (
     RetrieveRule as _RetrieveRule,
 )
 from palimpzest.optimizer.rules import (
@@ -70,6 +73,7 @@ ALL_RULES = [
     _NonLLMConvertRule,
     _NonLLMFilterRule,
     _PushDownFilter,
+    _RAGConvertRule,
     _RetrieveRule,
     _Rule,
     _TokenReducedConvertBondedRule,
@@ -82,7 +86,7 @@ IMPLEMENTATION_RULES = [
     rule
     for rule in ALL_RULES
     if issubclass(rule, _ImplementationRule)
-    and rule not in [_ImplementationRule, _LLMConvertRule, _TokenReducedConvertRule, _CodeSynthesisConvertRule]
+    and rule not in [_CodeSynthesisConvertRule, _ImplementationRule, _LLMConvertRule, _RAGConvertRule, _TokenReducedConvertRule]
 ]
 
 TRANSFORMATION_RULES = [

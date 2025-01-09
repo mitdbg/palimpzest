@@ -49,7 +49,7 @@ class StreamingSequentialExecution(ExecutionEngine):
         self._plan_stats = plan_stats
 
     def generate_plan(self, dataset: Dataset, policy: Policy):
-        self.clear_cached_responses_and_examples()
+        self.clear_cached_examples()
         start_time = time.time()
 
         cost_model = CostModel()
@@ -63,6 +63,8 @@ class StreamingSequentialExecution(ExecutionEngine):
             allow_conventional_query=self.allow_conventional_query,
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
+            allow_rag_reduction=self.allow_rag_reduction,
+            allow_mixtures=self.allow_mixtures,
             optimization_strategy=self.optimization_strategy,
         )
 
@@ -163,7 +165,7 @@ class StreamingSequentialExecution(ExecutionEngine):
 
                 if isinstance(operator, FilterOp):
                     # delete all records that did not pass the filter
-                    output_records = [r for r in output_records if r._passed_operator]
+                    output_records = [r for r in output_records if r.passed_operator]
                     if not output_records:
                         break
 

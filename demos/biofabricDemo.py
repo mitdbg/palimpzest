@@ -21,27 +21,27 @@ if not os.environ.get("OPENAI_API_KEY"):
 class CaseData(pz.Schema):
     """An individual row extracted from a table containing medical study data."""
 
-    case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-    age_at_diagnosis = pz.Field(desc="The age of the patient at the time of diagnosis", required=False)
+    case_submitter_id = pz.Field(desc="The ID of the case")
+    age_at_diagnosis = pz.Field(desc="The age of the patient at the time of diagnosis")
     race = pz.Field(
-        desc="An arbitrary classification of a taxonomic group that is a division of a species.", required=False
+        desc="An arbitrary classification of a taxonomic group that is a division of a species."
     )
     ethnicity = pz.Field(
-        desc="Whether an individual describes themselves as Hispanic or Latino or not.", required=False
+        desc="Whether an individual describes themselves as Hispanic or Latino or not."
     )
-    gender = pz.Field(desc="Text designations that identify gender.", required=False)
-    vital_status = pz.Field(desc="The vital status of the patient", required=False)
-    ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
-    ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
-    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
-    tumor_grade = pz.Field(desc="The tumor grade", required=False)
-    tumor_focality = pz.Field(desc="The tumor focality", required=False)
-    tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter", required=False)
-    primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
-    morphology = pz.Field(desc="The morphology", required=False)
-    tissue_or_organ_of_origin = pz.Field(desc="The tissue or organ of origin", required=False)
-    # tumor_code = pz.Field(desc="The tumor code", required=False)
-    study = pz.Field(desc="The last name of the author of the study, from the table name", required=False)
+    gender = pz.Field(desc="Text designations that identify gender.")
+    vital_status = pz.Field(desc="The vital status of the patient")
+    ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T")
+    ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N")
+    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage")
+    tumor_grade = pz.Field(desc="The tumor grade")
+    tumor_focality = pz.Field(desc="The tumor focality")
+    tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter")
+    primary_diagnosis = pz.Field(desc="The primary diagnosis")
+    morphology = pz.Field(desc="The morphology")
+    tissue_or_organ_of_origin = pz.Field(desc="The tissue or organ of origin")
+    # tumor_code = pz.Field(desc="The tumor code")
+    study = pz.Field(desc="The last name of the author of the study, from the table name")
 
 
 def print_table(output):

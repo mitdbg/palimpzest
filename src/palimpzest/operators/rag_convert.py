@@ -110,8 +110,9 @@ class RAGConvert(LLMConvert):
         """
         # compute embedding for output fields
         output_fields_desc = ""
+        field_desc_map = self.output_schema.field_desc_map()
         for field_name in output_fields:
-            output_fields_desc += f"- {field_name}: {self.output_schema.field_desc_map[field_name]}\n"
+            output_fields_desc += f"- {field_name}: {field_desc_map[field_name]}\n"
         query_embedding = self.compute_embedding(output_fields_desc)
 
         for field_name in input_fields:
@@ -153,7 +154,7 @@ class RAGConvert(LLMConvert):
 
     def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         # get the set of input fields to use for the convert operation
-        input_fields = self._get_input_fields()
+        input_fields = self.get_input_fields()
 
         # lookup most relevant chunks for each field using embedding search
         candidate_copy = candidate.copy()

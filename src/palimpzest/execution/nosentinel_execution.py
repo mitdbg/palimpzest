@@ -26,9 +26,9 @@ class NoSentinelExecutionEngine(ExecutionEngine):
     def execute(self, dataset: Set, policy: Policy):
         execution_start_time = time.time()
 
-        # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
+        # if nocache is True, make sure we do not re-use codegen examples
         if self.nocache:
-            self.clear_cached_responses_and_examples()
+            self.clear_cached_examples()
 
         # construct the CostModel
         cost_model = CostModel()
@@ -44,6 +44,8 @@ class NoSentinelExecutionEngine(ExecutionEngine):
             allow_conventional_query=self.allow_conventional_query,
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
+            allow_rag_reduction=self.allow_rag_reduction,
+            allow_mixtures=self.allow_mixtures,
             optimization_strategy=self.optimization_strategy,
         )
 

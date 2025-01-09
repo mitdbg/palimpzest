@@ -1,5 +1,4 @@
 import pytest
-
 from palimpzest.constants import Cardinality, Model, OptimizationStrategy
 from palimpzest.corelib.schemas import TextFile
 from palimpzest.dataclasses import OperatorCostEstimates, PlanCost
@@ -52,7 +51,6 @@ class TestPrimitives:
             input_schema=TextFile,
             output_schema=email_schema,
             cardinality=Cardinality.ONE_TO_ONE,
-            image_conversion=False,
             depends_on=[],
             target_cache_id="convert1",
         )
@@ -124,6 +122,7 @@ class TestOptimizer:
             allow_code_synth=False,
             allow_conventional_query=False,
             allow_token_reduction=False,
+            allow_rag_reduction=False,
             allow_mixtures=False,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -226,6 +225,8 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
             allow_token_reduction=False,
+            allow_rag_reduction=False,
+            allow_mixtures=False,
             allow_code_synth=False,
             optimization_strategy=opt_strategy,
         )
@@ -374,6 +375,7 @@ class TestParetoOptimizer:
             allow_code_synth=False,
             allow_conventional_query=False,
             allow_token_reduction=False,
+            allow_rag_reduction=False,
             allow_mixtures=False,
         )
 

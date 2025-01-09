@@ -7,9 +7,14 @@ import time
 
 import gradio as gr
 import numpy as np
+from palimpzest.corelib.fields import Field
+from palimpzest.corelib.schemas import ImageFile
+from palimpzest.datamanager import DataDirectory
+from palimpzest.execution.execute import Execute
+from palimpzest.execution.nosentinel_execution import NoSentinelPipelinedParallelExecution
+from palimpzest.policy import MaxQuality
+from palimpzest.sets import Dataset
 from PIL import Image
-
-import palimpzest as pz
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env
@@ -17,12 +22,12 @@ if not os.environ.get("OPENAI_API_KEY"):
     load_env()
 
 
-class DogImage(pz.ImageFile):
-    breed = pz.Field(desc="The breed of the dog", required=True)
+class DogImage(ImageFile):
+    breed = Field(desc="The breed of the dog")
 
 
 def build_image_plan(dataset_id):
-    images = pz.Dataset(dataset_id, schema=pz.ImageFile)
+    images = Dataset(dataset_id, schema=ImageFile)
     filtered_images = images.filter("The image contains one or more dogs")
     dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
     return dog_images
@@ -37,17 +42,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
     no_cache = args.no_cache
     datasetid = "images-tiny"
-    if datasetid not in pz.DataDirectory().list_registered_datasets():
-        pz.DataDirectory().register_local_directory(path="testdata/images-tiny", dataset_id="images-tiny")
+    if datasetid not in DataDirectory().list_registered_datasets():
+        DataDirectory().register_local_directory(path="testdata/images-tiny", dataset_id="images-tiny")
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     print("Starting image task")
-    policy = pz.MaxQuality()
+    policy = MaxQuality()
     plan = build_image_plan(datasetid)
-    engine = pz.NoSentinelPipelinedParallelExecution
-    records, execution_stats = pz.Execute(plan, policy=policy, nocache=no_cache, execution_engine=engine, verbose=True)
+    engine = NoSentinelPipelinedParallelExecution
+    records, execution_stats = Execute(plan, policy=policy, nocache=no_cache, execution_engine=engine, verbose=True)
 
     print("Obtained records", records)
     imgs, breeds = [], []

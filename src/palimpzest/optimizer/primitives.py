@@ -3,9 +3,11 @@ from __future__ import annotations
 import hashlib
 
 from palimpzest.constants import MAX_ID_CHARS
+from palimpzest.corelib.fields import Field
 from palimpzest.operators.logical import LogicalOperator
 from palimpzest.operators.physical import PhysicalOperator
 from palimpzest.optimizer.plan import PlanCost
+from palimpzest.optimizer.rules import Rule
 
 
 class Expression:
@@ -19,13 +21,15 @@ class Expression:
         self,
         operator: LogicalOperator | PhysicalOperator,
         input_group_ids: list[int],
-        input_fields: set[str],
-        generated_fields: set[str],
+        input_fields: dict[str, Field],
+        depends_on_field_names: set[str],
+        generated_fields: dict[str, Field],
         group_id: int | None = None,
     ):
         self.operator = operator
         self.input_group_ids = input_group_ids
         self.input_fields = input_fields
+        self.depends_on_field_names = depends_on_field_names
         self.generated_fields = generated_fields
         self.group_id = group_id
         self.rules_applied = set()
@@ -47,7 +51,7 @@ class Expression:
         hash_id = int(hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS], 16)
         return hash_id
 
-    def add_applied_rule(self, rule):
+    def add_applied_rule(self, rule: Rule):
         self.rules_applied.add(rule.get_rule_id())
 
     def set_group_id(self, group_id: int) -> None:
@@ -72,7 +76,7 @@ class Group:
     Maintains a set of logical multi-expressions and physical multi-expressions.
     """
 
-    def __init__(self, logical_expressions: list[Expression], fields: set[str], properties: dict[str, set[str]]):
+    def __init__(self, logical_expressions: list[Expression], fields: dict[str, Field], properties: dict[str, set[str]]):
         self.logical_expressions = set(logical_expressions)
         self.physical_expressions = set()
         self.fields = fields
@@ -93,8 +97,8 @@ class Group:
         self.explored = True
 
     def compute_group_id(self) -> int:
-        # sort fields
-        sorted_fields = sorted(self.fields)
+        # sort field names
+        sorted_fields = sorted(self.fields.keys())
 
         # sort properties
         sorted_properties = []

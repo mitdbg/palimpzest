@@ -1,15 +1,9 @@
 from __future__ import annotations
 
-import base64
-import json
 import time
 from abc import ABC, abstractmethod
-from io import BytesIO
 from typing import Any, Callable
 
-from PIL import Image
-
-from palimpzest import prompts
 from palimpzest.constants import (
     MODEL_CARDS,
     NAIVE_EST_NUM_INPUT_TOKENS,
@@ -21,9 +15,9 @@ from palimpzest.constants import (
 )
 from palimpzest.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.elements.records import DataRecord, DataRecordSet
-from palimpzest.generators.generators import DSPyGenerator, ImageTextGenerator
+from palimpzest.generators.generators import generator_factory
 from palimpzest.operators.physical import PhysicalOperator
-from palimpzest.utils.generation_helpers import get_json_from_answer
+from palimpzest.utils.model_helpers import get_vision_models
 
 # TYPE DEFINITIONS
 FieldName = str
@@ -64,14 +58,154 @@ class ConvertOp(PhysicalOperator, ABC):
 
         return op_params
 
-    @abstractmethod
-    def __call__(self, candidate: DataRecord) -> DataRecordSet:
+    def _create_data_records_from_field_answers(
+        self,
+        field_answers: dict[FieldName, list[Any]],
+        candidate: DataRecord,
+    ) -> list[DataRecord]:
         """
-        Each convert operator implements this method to convert an input DataRecord into an output DataRecordSet.
-        The output DataRecordSet contains the DataRecord(s) output by the operator and their corresponding RecordOpStats
-        objects. Some subclasses may further abstract parts of this __call__ method to be implemented by sub-subclasses.
+        Given a mapping from each field to its (list of) generated value(s), we construct the corresponding
+        list of output DataRecords.
+        """
+        # get the number of records generated; for some convert operations it is possible for fields to
+        # have different lengths of generated values, so we take the maximum length of any field's values
+        # to be the number of records generated
+        n_records = max([len(lst) for lst in field_answers.values()])
+        successful_convert = n_records > 0
+
+        drs = []
+        for idx in range(max(n_records, 1)):
+            # initialize record with the correct output schema, parent record, and cardinality idx
+            dr = DataRecord.from_parent(self.output_schema, parent_record=candidate, cardinality_idx=idx)
+
+            # copy all fields from the input record
+            # NOTE: this means that records processed by PZ converts will inherit all pre-computed fields
+            #       in an incremental fashion; this is a design choice which may be revisited in the future
+            for field in candidate.get_field_names():
+                setattr(dr, field, getattr(candidate, field))
+
+            # get input field names and output field names
+            input_fields = self.input_schema.field_names()
+            output_fields = self.output_schema.field_names()
+
+            # parse newly generated fields from the field_answers dictionary for this field; if the list
+            # of generated values is shorter than the number of records, we fill in with None
+            for field in output_fields:
+                if field not in input_fields:
+                    value = field_answers[field][idx] if idx < len(field_answers[field]) else None
+                    setattr(dr, field, value)
+            
+            # append data record to list of output data records
+            drs.append(dr)
+
+        return drs, successful_convert
+
+    def _create_record_set(
+        self,
+        records: list[DataRecord],
+        fields: list[str],
+        generation_stats: GenerationStats,
+        total_time: float,
+        successful_convert: bool,
+    ) -> DataRecordSet:
+        """
+        Construct list of RecordOpStats objects (one for each DataRecord).
+        """
+        # amortize the generation stats across all generated records
+        per_record_stats = generation_stats / len(records)
+        time_per_record = total_time / len(records)
+
+        # create the RecordOpStats objects for each output record
+        record_op_stats_lst = [
+            RecordOpStats(
+                record_id=dr.id,
+                record_parent_id=dr.parent_id,
+                record_source_id=dr.source_id,
+                record_state=dr.as_dict(include_bytes=False),
+                op_id=self.get_op_id(),
+                logical_op_id=self.logical_op_id,
+                op_name=self.op_name(),
+                time_per_record=time_per_record,
+                cost_per_record=per_record_stats.cost_per_record,
+                model_name=self.get_model_name(),
+                answer={field_name: getattr(dr, field_name) for field_name in fields},
+                input_fields=self.input_schema.field_names(),
+                generated_fields=fields,
+                total_input_tokens=per_record_stats.total_input_tokens,
+                total_output_tokens=per_record_stats.total_output_tokens,
+                total_input_cost=per_record_stats.total_input_cost,
+                total_output_cost=per_record_stats.total_output_cost,
+                llm_call_duration_secs=per_record_stats.llm_call_duration_secs,
+                fn_call_duration_secs=per_record_stats.fn_call_duration_secs,
+                failed_convert=(not successful_convert),
+                image_operation=self.is_image_conversion(),
+                op_details={k: str(v) for k, v in self.get_id_params().items()},
+            )
+            for dr in records
+        ]
+
+        # create and return the DataRecordSet
+        return DataRecordSet(records, record_op_stats_lst)
+
+    @abstractmethod
+    def is_image_conversion(self) -> bool:
+        """Return True if the convert operation processes an image, False otherwise."""
+        pass
+
+    @abstractmethod
+    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
+        """
+        This abstract method will be implemented by subclasses of ConvertOp to process the input DataRecord
+        and generate the value(s) for each of the specified fields. If the convert operator is a one-to-many
+        convert, then each field will have a corresponding list of output values. The dictionary mapping each
+        generated field to its (list of) value(s) is returned along with the GenerationStats object.
+
+        For example, if the input DataRecord (i.e. `candidate`) contains the contents of a scientific paper,
+        and the convert operation is supposed to extract the name and affiliation of each author into its own
+        DataRecord, then the output could be:
+
+        ({"author": ["Jane Smith", "John Doe"], "affiliation": ["MIT", "Stanford University"]}, GenerationStats(...))
+
+        Even if the convert operation is a one-to-one convert (i.e. it always generates one output DataRecord
+        for each input DataRecord), the output should still map each field to a singleton list containing its value.
+
+        A post-condition of this method is that every field in `fields` must be present in the output dictionary.
+        If there is an error in generating a field, then the value for that field must be None.
         """
         pass
+
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
+        """
+        This method converts an input DataRecord into an output DataRecordSet. The output DataRecordSet contains the
+        DataRecord(s) output by the operator's convert() method and their corresponding RecordOpStats objects.
+        Some subclasses may override this __call__method to implement their own custom logic.
+        """
+        start_time = time.time()
+
+        # get fields to generate with this convert
+        fields_to_generate = self.get_fields_to_generate(candidate, self.input_schema, self.output_schema)
+
+        # execute the convert
+        field_answers: dict[str, list]
+        field_answers, generation_stats = self.convert(candidate=candidate, fields=fields_to_generate)
+        assert all([field in field_answers for field in fields_to_generate]), "Not all fields were generated!"
+
+        # replace any None values with an empty list; subclasses may override __call__ to change this behavior
+        field_answers = {field: [] if answers is None else answers for field, answers in field_answers.items()}
+
+        # transform the mapping from fields to answers into a (list of) DataRecord(s)
+        drs, successful_convert = self._create_data_records_from_field_answers(field_answers, candidate)
+
+        # construct and return DataRecordSet
+        record_set = self._create_record_set(
+            records=drs,
+            fields=fields_to_generate,
+            generation_stats=generation_stats,
+            total_time=time.time() - start_time,
+            successful_convert=successful_convert,
+        )
+
+        return record_set
 
 
 class NonLLMConvert(ConvertOp):
@@ -79,6 +213,11 @@ class NonLLMConvert(ConvertOp):
         op = super().__str__()
         op += f"    UDF: {str(self.udf)}\n"
         return op
+
+    def is_image_conversion(self) -> bool:
+        # NOTE: even if the UDF is processing an image, we do not consider this an image conversion
+        # (the output of this function will be used by the CostModel in a way which does not apply to UDFs)
+        return False
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
@@ -100,97 +239,54 @@ class NonLLMConvert(ConvertOp):
             quality=1.0,
         )
 
-    def __call__(self, candidate: DataRecord) -> DataRecordSet:
-        """
-        NOTE: if the UDF throws an exception we immediately raise it to the user. This way computation
-              (and money) are not wasted on a workload which will fail to execute correctly.
-
-              If the UDF outputs None or an empty list, then we will treat this as a failed convert.
-        """
+    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         # apply UDF to input record
         start_time = time.time()
+        field_answers = {}
         try:
-            drs = self.udf(candidate)
+            # execute the UDF function
+            answer = self.udf(candidate.as_dict())
+
+            if self.cardinality == Cardinality.ONE_TO_ONE:
+                # answer should be a dictionary
+                assert isinstance(answer, dict), "UDF must return a dictionary mapping each generated field to its value for one-to-one converts"
+
+                # wrap each answer in a list
+                field_answers = {field_name: [answer[field_name]] for field_name in fields}
+
+            else:
+                assert isinstance(answer, list), "UDF must return a list of dictionaries for one-to-many converts"
+                field_answers = {field_name: [] for field_name in fields}
+                for answer_dict in answer:
+                    assert isinstance(answer_dict, dict), "Each element of list returned by UDF must be a dictionary"
+                    for field_name in fields:
+                        field_answers[field_name].append(answer_dict.get(field_name, None))
+
+            if self.verbose:
+                print(f"{str(self.udf)}:\n{answer}")
+
         except Exception as e:
             print(f"Error invoking user-defined function for convert: {e}")
             raise e
 
-        # time spent executing the UDF function
-        fn_call_duration_secs = time.time() - start_time
+        # create generation stats object containing the time spent executing the UDF function
+        generation_stats = GenerationStats(fn_call_duration_secs=time.time() - start_time)
 
-        # determine whether or not the convert was successful
-        successful_convert = drs is not None and (isinstance(drs, DataRecord) or len(drs) > 0)
-
-        # if drs is a single record output, wrap it in a list
-        if successful_convert and isinstance(drs, DataRecord):
-            drs = [drs]
-
-        # compute the total number of records we need to create RecordOpStats for;
-        # we still create an object even if the convert fails
-        num_records = len(drs) if successful_convert else 1
-
-        # construct RecordOpStats
-        record_op_stats_lst = []
-        for idx in range(num_records):
-            # compute variables which depend on data record
-            record_id, record_parent_id, record_source_id, record_state, answer = None, candidate._id, candidate._source_id, None, None
-            if successful_convert:
-                dr = drs[idx]
-                record_id = dr._id
-                record_parent_id = dr._parent_id
-                record_source_id = dr._source_id
-                record_state = dr.as_dict(include_bytes=False)
-                answer = {field_name: getattr(dr, field_name) for field_name in self.output_schema.field_names()},
-
-            record_op_stats = RecordOpStats(
-                record_id=record_id,
-                record_parent_id=record_parent_id,
-                record_source_id=record_source_id,
-                record_state=record_state,
-                op_id=self.get_op_id(),
-                logical_op_id=self.logical_op_id,
-                op_name=self.op_name(),
-                time_per_record=fn_call_duration_secs / len(drs),
-                cost_per_record=0.0,
-                answer=answer,
-                input_fields=self.input_schema.field_names(),
-                generated_fields=self.output_schema.field_names(),
-                fn_call_duration_secs=fn_call_duration_secs / len(drs),
-                failed_convert=(not successful_convert),
-                op_details={k: str(v) for k, v in self.get_id_params().items()},
-            )
-            record_op_stats_lst.append(record_op_stats)
-
-        # construct record set
-        record_set = DataRecordSet(drs, record_op_stats_lst)
-
-        return record_set
+        return field_answers, generation_stats
 
 
 class LLMConvert(ConvertOp):
     def __init__(
         self,
         model: Model,
-        prompt_strategy: PromptStrategy = PromptStrategy.DSPY_COT_QA,
-        image_conversion: bool = False,
+        prompt_strategy: PromptStrategy = PromptStrategy.COT_QA,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.model = model
         self.prompt_strategy = prompt_strategy
-        self.image_conversion = image_conversion
-
-        # create DSPy generator
-        if self.model is not None:
-            doc_schema = str(self.output_schema)
-            doc_type = self.output_schema.class_name()
-            if self.image_conversion:
-                self.generator = ImageTextGenerator(self.model, self.verbose)
-            else:
-                self.generator = DSPyGenerator(
-                    self.model, self.prompt_strategy, doc_schema, doc_type, self.verbose
-                )
+        self.generator = generator_factory(model, prompt_strategy, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()
@@ -202,7 +298,6 @@ class LLMConvert(ConvertOp):
         id_params = {
             "model": None if self.model is None else self.model.value,
             "prompt_strategy": self.prompt_strategy.value,
-            "image_conversion": self.image_conversion,
             **id_params,
         }
 
@@ -213,11 +308,16 @@ class LLMConvert(ConvertOp):
         op_params = {
             "model": self.model,
             "prompt_strategy": self.prompt_strategy,
-            "image_conversion": self.image_conversion,
             **op_params,
         }
 
         return op_params
+
+    def get_model_name(self):
+        return None if self.model is None else self.model.value
+
+    def is_image_conversion(self) -> bool:
+        return self.model in get_vision_models()
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
@@ -229,9 +329,6 @@ class LLMConvert(ConvertOp):
         # estimate number of input and output tokens from source
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
-
-        if self.image_conversion:
-            est_num_input_tokens = 765 / 10  # 1024x1024 image is 765 tokens
 
         # get est. of conversion time per record from model card;
         # NOTE: model will only be None for code synthesis, which uses GPT-3.5 as fallback
@@ -260,369 +357,6 @@ class LLMConvert(ConvertOp):
             quality=quality,
         )
 
-    def _construct_query_prompt(self, fields_to_generate: list[str], model: Model) -> str:
-        """
-        This function constructs the prompt for a bonded query.
-        """
-        # set defaults
-        doc_type = self.output_schema.class_name()
-
-        # build string of input fields and their descriptions
-        multiline_input_field_description = ""
-        depends_on_fields = (
-            [field.split(".")[-1] for field in self.depends_on]
-            if self.depends_on is not None and len(self.depends_on) > 0
-            else None
-        )
-        input_fields = (
-            self.input_schema.field_names()
-            if depends_on_fields is None
-            else [field for field in self.input_schema.field_names() if field in depends_on_fields]
-        )
-        for field_name in input_fields:
-            field_desc = getattr(self.input_schema, field_name).desc
-            multiline_input_field_description += prompts.INPUT_FIELD.format(
-                field_name=field_name, field_desc=field_desc
-            )
-
-        # build string of output fields and their descriptions
-        multiline_output_field_description = ""
-        for field_name in fields_to_generate:
-            field_desc = getattr(self.output_schema, field_name).desc
-            multiline_output_field_description += prompts.OUTPUT_FIELD.format(
-                field_name=field_name, field_desc=field_desc
-            )
-
-        # add input/output schema descriptions (if they have a docstring)
-        optional_input_desc = (
-            ""
-            if self.input_schema.__doc__ is None
-            else prompts.OPTIONAL_INPUT_DESC.format(desc=self.input_schema.__doc__)
-        )
-        optional_output_desc = (
-            ""
-            if self.output_schema.__doc__ is None
-            else prompts.OPTIONAL_OUTPUT_DESC.format(desc=self.output_schema.__doc__)
-        )
-
-        # add optional model instruction
-        model_instruction = prompts.LLAMA_INSTRUCTION if model in [Model.LLAMA3, Model.LLAMA3_V] else ""
-
-        # construct sentence fragments which depend on cardinality of conversion (pz.Cardinality.ONE_TO_ONE or pz.Cardinality.ONE_TO_MANY)
-        if self.cardinality == Cardinality.ONE_TO_MANY:
-            target_output_descriptor = prompts.ONE_TO_MANY_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
-            output_single_or_plural = prompts.ONE_TO_MANY_OUTPUT_SINGLE_OR_PLURAL
-            appendix_instruction = prompts.ONE_TO_MANY_APPENDIX_INSTRUCTION.format(fields=fields_to_generate)
-        else:
-            target_output_descriptor = prompts.ONE_TO_ONE_TARGET_OUTPUT_DESCRIPTOR.format(doc_type=doc_type)
-            output_single_or_plural = prompts.ONE_TO_ONE_OUTPUT_SINGLE_OR_PLURAL
-
-            fields_example_dict = {}
-            for field in fields_to_generate:
-                type_str = self.output_schema.json_schema()['properties'][field]['type']
-                if type_str == "string":
-                    fields_example_dict[field] = "abc"
-                elif type_str == "numeric":
-                    fields_example_dict[field] = 123
-                elif type_str == "boolean":
-                    fields_example_dict[field] = True
-                elif type_str == "List[string]":
-                    fields_example_dict[field] = ["<str>", "<str>", "..."]
-                elif type_str == "List[numeric]":
-                    fields_example_dict[field] = ["<int | float>", "<int | float>", "..."]
-                elif type_str == "List[boolean]":
-                    fields_example_dict[field] = ["<bool>", "<bool>", "..."]
-
-            fields_example_dict_str = json.dumps(fields_example_dict, indent=2)
-            appendix_instruction = prompts.ONE_TO_ONE_APPENDIX_INSTRUCTION.format(fields=fields_to_generate, fields_example_dict=fields_example_dict_str)
-
-        # construct promptQuestion
-        optional_desc = "" if self.desc is None else prompts.OPTIONAL_DESC.format(desc=self.desc)
-        if not self.image_conversion:
-            prompt_question = prompts.STRUCTURED_CONVERT_PROMPT
-        else:
-            prompt_question = prompts.IMAGE_CONVERT_PROMPT
-
-        prompt_question = prompt_question.format(
-            target_output_descriptor=target_output_descriptor,
-            input_type=self.input_schema.class_name(),
-            output_single_or_plural=output_single_or_plural,
-            optional_input_desc=optional_input_desc,
-            optional_output_desc=optional_output_desc,
-            multiline_input_field_description=multiline_input_field_description,
-            multiline_output_field_description=multiline_output_field_description,
-            appendix_instruction=appendix_instruction,
-            optional_desc=optional_desc,
-            model_instruction = model_instruction,
-        )
-        # TODO: add this for boolean questions?
-        # if prompt_strategy == PromptStrategy.DSPY_COT_BOOL:
-        #     promptQuestion += "\nRemember, your output MUST be one of TRUE or FALSE."
-
-        return prompt_question
-
-    def _create_record_set(
-        self,
-        records: list[DataRecord],
-        fields: list[str],
-        generation_stats: GenerationStats,
-        total_time: float,
-        successful_convert: bool,
-    ) -> DataRecordSet:
-        """
-        Construct list of RecordOpStats objects (one for each DataRecord).
-        """
-        # amortize the generation stats across all generated records
-        per_record_stats = generation_stats / len(records)
-        time_per_record = total_time / len(records)
-
-        # create the RecordOpStats objects for each output record
-        record_op_stats_lst = [
-            RecordOpStats(
-                record_id=dr._id,
-                record_parent_id=dr._parent_id,
-                record_source_id=dr._source_id,
-                record_state=dr.as_dict(include_bytes=False),
-                op_id=self.get_op_id(),
-                logical_op_id=self.logical_op_id,
-                op_name=self.op_name(),
-                time_per_record=time_per_record,
-                cost_per_record=per_record_stats.cost_per_record,
-                model_name=None if self.model is None else self.model.value,
-                answer={field_name: getattr(dr, field_name) for field_name in fields},
-                input_fields=self.input_schema.field_names(),
-                generated_fields=fields,
-                total_input_tokens=per_record_stats.total_input_tokens,
-                total_output_tokens=per_record_stats.total_output_tokens,
-                total_input_cost=per_record_stats.total_input_cost,
-                total_output_cost=per_record_stats.total_output_cost,
-                llm_call_duration_secs=per_record_stats.llm_call_duration_secs,
-                fn_call_duration_secs=per_record_stats.fn_call_duration_secs,
-                failed_convert=(not successful_convert),
-                image_operation=self.image_conversion,
-                op_details={k: str(v) for k, v in self.get_id_params().items()},
-            )
-            for dr in records
-        ]
-
-        # create and return the DataRecordSet
-        return DataRecordSet(records, record_op_stats_lst)
-
-    # TODO: apply to code_synthesis_convert.py as well
-    def _create_data_records_from_field_answers(
-        self,
-        field_answers: dict[FieldName, list[Any]],
-        candidate: DataRecord,
-    ) -> list[DataRecord]:
-        """
-        Given a mapping from each field to its (list of) generated value(s), we construct the corresponding
-        list of output DataRecords.
-        """
-        # get the number of records generated; for some convert operations it is possible for fields to
-        # have different lengths of generated values, so we take the maximum length of any field's values
-        # to be the number of records generated
-        n_records = max([len(lst) for lst in field_answers.values()])
-        successful_convert = n_records > 0
-
-        drs = []
-        for idx in range(max(n_records, 1)):
-            # initialize record with the correct output schema, parent record, and cardinality idx
-            dr = DataRecord.from_parent(self.output_schema, parent_record=candidate, cardinality_idx=idx)
-
-            # copy all fields from the input record
-            # NOTE: this means that records processed by PZ converts will inherit all pre-computed fields
-            #       in an incremental fashion; this is a design choice which may be revisited in the future
-            for field in candidate.get_fields():
-                setattr(dr, field, getattr(candidate, field))
-
-            # get input field names and output field names
-            input_fields = self.input_schema.field_names()
-            output_fields = self.output_schema.field_names()
-
-            # parse newly generated fields from the field_answers dictionary for this field; if the list
-            # of generated values is shorter than the number of records, we fill in with None
-            for field in output_fields:
-                if field not in input_fields:
-                    value = field_answers[field][idx] if idx < len(field_answers[field]) else None
-                    setattr(dr, field, value)
-            
-            # append data record to list of output data records
-            drs.append(dr)
-
-        return drs, successful_convert
-
-    # TODO: move into Generator class
-    def parse_answer(self, answer: str, fields_to_generate: list[str], model: Model) -> dict[FieldName, list[Any]]:
-        """ 
-        This functions gets a string answer and parses it into an iterable format of [{"field1": value1, "field2": value2}, {...}, ...]
-        """
-        try:
-            # parse json from answer string
-            json_answer = get_json_from_answer(answer, model)
-
-            # sanity check validity of parsed json
-            assert json_answer != {}, "No output was found!"
-            if self.cardinality == Cardinality.ONE_TO_MANY:
-                assert "items" in json_answer, '"items" key missing from one-to-many JSON'
-                assert (
-                    isinstance(json_answer["items"], list) and len(json_answer["items"]) > 0
-                ), "No output objects were generated for one-to-many query"
-            else:
-                assert all([field in json_answer for field in fields_to_generate]), "Not all fields were generated!"
-
-        except Exception as e:
-            print(f"Error parsing LLM answer: {e}")
-            print(f"\tAnswer: {answer}")
-            # msg = str(e)
-            # if "line" in msg:
-            #     line = int(str(msg).split("line ")[1].split(" ")[0])
-            #     print(f"\tAnswer snippet: {answer.splitlines()[line]}")
-            return {field_name: [] for field_name in fields_to_generate}
-
-        field_answers = {}
-        if self.cardinality == Cardinality.ONE_TO_MANY:
-            # json_answer["items"] is a list of dictionaries, each of which contains the generated fields
-            for field in fields_to_generate:
-                field_answers[field] = []
-                for item in json_answer["items"]:
-                    try:
-                        field_answers[field].append(item[field])
-                    except Exception:
-                        print(f"Error parsing field {field} in one-to-many answer: {item}")
-
-        else:
-            field_answers = {field: [json_answer[field]] for field in fields_to_generate}
-
-        return field_answers
-
-    # TODO: move into Generator class (?)
-    def _get_candidate_content(self, model: Model, candidate: DataRecord):
-        # get text or image content depending on prompt strategy
-        if self.image_conversion:
-            base64_images = []
-            if hasattr(candidate, "contents"):
-                # TODO: should address this now; we need a way to infer (or have the programmer declare) what fields contain image content
-                base64_images = [
-                    base64.b64encode(candidate.contents).decode("utf-8")  
-                ]
-            elif model in [Model.GPT_4o_V, Model.GPT_4o_MINI_V]:
-                for image_file in candidate.image_filepaths:  # TODO: (see note above)
-                    image = Image.open(image_file)
-                    buffered = BytesIO()
-                    image.save(buffered, format=image.format)
-                    base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                    base64_images.append(base64_image)
-
-            # for LLAMA vision model, we must concatenate images into a single image
-            elif model in [Model.LLAMA3_V]:
-                # TODO: revert after paper submission
-                # # load images, get their dimensions, and create new image to fit them horizontally
-                # images = [Image.open(image_file) for image_file in candidate.image_filepaths]
-                # widths, heights = zip(*(img.size for img in images))
-                # total_width, max_height = sum(widths), max(heights)
-                # new_image = Image.new(images[0].mode, (total_width, max_height))
-
-                # # construct new image by pasting images side-by-side
-                # x_offset = 0
-                # for img in images:
-                #     new_image.paste(img, (x_offset,0))
-                #     x_offset += img.size[0]
-
-                # # crop new image to adhere to max size processed by LLAMA; I'm not sure
-                # # what the exact max size allowed by Together is, but 900x900 seems to work
-                # crop_height = 900
-                # crop_width = 900
-                # new_image = new_image.crop((0, 0, crop_width, crop_height))
-
-                # # encode new image in base64
-                # buffered = BytesIO()
-                # new_image.save(buffered, format=images[0].format)
-                # base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                # base64_images.append(base64_image)
-                
-                # NOTE: Together stopped accepting uploaded images, so we now point them to public s3 urls
-                listing_idx = int(candidate.listing.split("listing")[-1])
-                url = f"https://palimpzest-workloads.s3.amazonaws.com/real-estate-eval-concat-images/img{listing_idx}.png"
-                base64_images.append(url)
-
-            content = base64_images
-        else:
-            content = candidate.as_json_str(include_bytes=False, project_cols=self.depends_on)
-
-        return content
-
-    # TODO: move into Generator class (?)
-    def _dspy_generate_fields(
-        self,
-        prompt: str,
-        content: str | list[bytes] | None = None,  # either text or image
-    ) -> tuple[str, GenerationStats]:
-        """
-        This functions wraps the call to the generator method to actually perform the field generation.
-        Returns an answer which is a string and a query_stats which is a GenerationStats object.
-        """
-        # generate LLM response and capture statistics
-        answer:str
-        query_stats:GenerationStats
-        try:
-            answer, _, query_stats = self.generator.generate(context=content, prompt=prompt)
-
-        except Exception as e:
-            print(f"DSPy generation error: {e}")
-            return "", GenerationStats()
-
-        return answer, query_stats
-
-    @abstractmethod
-    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
-        """
-        This abstract method will be implemented by subclasses of LLMConvert to process the input DataRecord
-        and generate the value(s) for each of the specified fields. If the convert operator is a one-to-many
-        convert, then each field will have a corresponding list of output values. The dictionary mapping each
-        generated field to its (list of) value(s) is returned along with the GenerationStats object.
-
-        For example, if the input DataRecord (i.e. `candidate`) contains the contents of a scientific paper,
-        and the convert operation is supposed to extract the name and affiliation of each author into its own
-        DataRecord, then the output could be:
-
-        ({"author": ["Jane Smith", "John Doe"], "affiliation": ["MIT", "Stanford University"]}, GenerationStats(...))
-
-        Even if the convert operation is a one-to-one convert (i.e. it always generates one output DataRecord
-        for each input DataRecord), the output should still map each field to a singleton list containing its value.
-
-        A post-condition of this method is that every field in `fields` must be present in the output dictionary.
-        If there is an error in generating a field, then the value for that field must be None.
-        """
-        pass
-
-    def __call__(self, candidate: DataRecord) -> DataRecordSet:
-        start_time = time.time()
-
-        # get fields to generate with this convert
-        fields_to_generate = self._get_fields_to_generate(candidate, self.input_schema, self.output_schema)
-
-        # execute the convert
-        field_answers: dict[str, list]
-        field_answers, generation_stats = self.convert(candidate=candidate, fields=fields_to_generate)
-        assert all([field in field_answers for field in fields_to_generate]), "Not all fields were generated!"
-
-        # for the vanilla LLMConvert, we simply replace any None values with an empty list
-        field_answers = {field: [] if answers is None else answers for field, answers in field_answers.items()}
-
-        # transform the mapping from fields to answers into a (list of) DataRecord(s)
-        drs, successful_convert = self._create_data_records_from_field_answers(field_answers, candidate)
-
-        # construct and return DataRecordSet
-        record_set = self._create_record_set(
-            records=drs,
-            fields=fields_to_generate,
-            generation_stats=generation_stats,
-            total_time=time.time() - start_time,
-            successful_convert=successful_convert,
-        )
-
-        return record_set
-
 
 class LLMConvertConventional(LLMConvert):
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
@@ -648,9 +382,6 @@ class LLMConvertConventional(LLMConvert):
         est_num_input_tokens *= num_fields_to_generate
         est_num_output_tokens *= num_fields_to_generate
 
-        if self.image_conversion:
-            est_num_input_tokens = 765 / 10  # 1024x1024 image is 765 tokens
-
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
             MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
@@ -673,40 +404,42 @@ class LLMConvertConventional(LLMConvert):
         return naive_op_cost_estimates
 
     def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
-        fields_answers = {}
-        fields_stats = {}
-        candidate_content = self._get_candidate_content(self.model, candidate)
-        for field_name in fields:
-            prompt = self._construct_query_prompt(fields_to_generate=[field_name], model=self.model)
-            answer, stats = self._dspy_generate_fields(content=candidate_content, prompt=prompt)
-            json_answer = self.parse_answer(answer, [field_name], self.model)
-            fields_answers.update(json_answer)
-            fields_stats[field_name] = stats
+        # get the set of input fields to use for the convert operation
+        input_fields = self.get_input_fields()
 
-        generation_stats = sum(fields_stats.values())
-        return fields_answers, generation_stats
+        # construct kwargs for generation
+        gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema}
+
+        # generate outputs one field at a time
+        field_answers, generation_stats_lst = {}, []
+        for field in fields:
+            single_field_answers, _, single_field_stats = self.generator(candidate, [field], **gen_kwargs)
+            field_answers.update(single_field_answers)
+            generation_stats_lst.append(single_field_stats)
+
+        # aggregate generation stats into single object
+        generation_stats = sum(generation_stats_lst)
+
+        return field_answers, generation_stats
 
 
 class LLMConvertBonded(LLMConvert):
 
     def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
-        # prompt = self._construct_query_prompt(fields_to_generate=fields, model=self.model)
-        # candidate_content = self._get_candidate_content(self.model, candidate)
+        # get the set of input fields to use for the convert operation
+        input_fields = self.get_input_fields()
 
-        # # generate all fields in a single query
-        # answer, generation_stats = self._dspy_generate_fields(content=candidate_content, prompt=prompt)
-        # json_answers = self.parse_answer(answer, fields, self.model)
+        # construct kwargs for generation
+        gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema}
 
         # generate outputs for all fields in a single query
-        field_answers, generation_stats = self.generator(candidate, fields)
+        field_answers, _, generation_stats = self.generator(candidate, fields, **gen_kwargs) # TODO: guarantee negative output from generator is None
 
         # if there was an error for any field, execute a conventional query on that field
         for field, answers in field_answers.items():
-            if answers == []:
-                conventional_op = LLMConvertConventional(**self.get_op_params())
-
-                single_field_answers, single_field_stats = conventional_op.convert(candidate, [field])
-                field_answers[field] = single_field_answers[field]
+            if answers is None:
+                single_field_answers, _, single_field_stats = self.generator(candidate, [field], **gen_kwargs)
+                field_answers.update(single_field_answers)
                 generation_stats += single_field_stats
 
         return field_answers, generation_stats

@@ -112,12 +112,12 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
             # add records (which are not filtered) to the cache, if allowed
             if not self.nocache:
                 for record in records:
-                    if getattr(record, "_passed_operator", True):
+                    if getattr(record, "passed_operator", True):
                         self.datadir.append_cache(operator.target_cache_id, record)
 
             # update processing_queues or output_records
             for record in records:
-                if isinstance(operator, FilterOp) and not record._passed_operator:
+                if isinstance(operator, FilterOp) and not record.passed_operator:
                     continue
                 if next_op_id is not None:
                     processing_queues[next_op_id].append(record)
@@ -260,12 +260,12 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
                     # add records (which are not filtered) to the cache, if allowed
                     if not self.nocache:
                         for record in records:
-                            if getattr(record, "_passed_operator", True):
+                            if getattr(record, "passed_operator", True):
                                 self.datadir.append_cache(operator.target_cache_id, record)
 
                     # update processing_queues or output_records
                     for record in records:
-                        if isinstance(operator, FilterOp) and not record._passed_operator:
+                        if isinstance(operator, FilterOp) and not record.passed_operator:
                             continue
                         if next_op_id is not None:
                             processing_queues[next_op_id].append(record)

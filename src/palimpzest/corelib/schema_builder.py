@@ -77,7 +77,7 @@ class SchemaBuilder:
                 schema_type = parsed_type if issubclass(parsed_type, Schema) else Schema
             else:
                 schema_type = Schema
-           
+
         # Generate the schema class dynamically
         attributes = {"__doc__": schema_description}
         for field in schema_data['fields']:
@@ -85,13 +85,12 @@ class SchemaBuilder:
                 continue
             name = field['name']
             description = field.get('description', '')
-            required = field.get('required', False)
             field_type = field.get('type', 'Field')
             field_type = getattr(pz, field_type, Field)
             if not issubclass(field_type, Field):
                 field_type = Field
                   
-            attributes[name] = field_type(desc=description, required=required)
+            attributes[name] = field_type(desc=description)
 
         # Create the class dynamically
         return type(schema_name, (schema_type,), attributes)
@@ -114,8 +113,6 @@ class SchemaBuilder:
         # Generate the schema class dynamically
         fields = []
         for col in columns:
-            required = not df[col].isnull().values.any()
-
             field_type = df[col].dtype
             if field_type == float or field_type == int:  # noqa
                 field_type = "NumericField"
@@ -124,8 +121,7 @@ class SchemaBuilder:
 
             fields.append({"name":col,
                            "description":"",
-                           "type":field_type,
-                           "required":required})
+                           "type":field_type})
         
         return {
             "name": '',
@@ -169,8 +165,7 @@ class SchemaBuilder:
             fields.append({
                 "name": name,
                 "description": description, 
-                "values": values,
-                "required": True})
+                "values": values})
 
         return {
             "name": '',
@@ -193,7 +188,6 @@ class SchemaBuilder:
         {
             "attribute1": {
                 "description": "description",
-                "required": True
             },
             ...
         }
@@ -221,7 +215,6 @@ class SchemaBuilder:
           fields:
             - name: attribute_name
               description: description
-              required: True
         ...
         """
 

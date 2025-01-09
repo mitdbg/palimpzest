@@ -54,10 +54,10 @@ class GroupBySig:
         schema = type("CustomGroupBy", (OperatorDerivedSchema,), {})
 
         for g in self.group_by_fields:
-            f = Field(desc=g, required=True)
+            f = Field(desc=g)
             setattr(schema, g, f)
         ops = self.get_agg_field_names()
         for op in ops:
-            f = Field(desc=op, required=True)
+            f = Field(desc=op)
             setattr(schema, op, f)
         return schema

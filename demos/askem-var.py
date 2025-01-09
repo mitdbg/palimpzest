@@ -9,23 +9,27 @@ import time
 
 import pandas as pd
 import streamlit as st
+from palimpzest.constants import Cardinality
+from palimpzest.corelib.fields import Field
+from palimpzest.corelib.schemas import Schema, TextFile
+from palimpzest.execution.streaming_execution import StreamingSequentialExecution
+from palimpzest.policy import MaxQuality
+from palimpzest.sets import Dataset
 
-import palimpzest as pz
 
-
-class Papersnippet(pz.TextFile):
+class Papersnippet(TextFile):
     """Represents an excerpt from a scientific research paper, which potentially contains variables"""
 
-    excerptid = pz.Field(desc="The unique identifier for the excerpt", required=True)
-    excerpt = pz.Field(desc="The text of the excerpt", required=True)
+    excerptid = Field(desc="The unique identifier for the excerpt")
+    excerpt = Field(desc="The text of the excerpt")
 
 
-class Variable(pz.Schema):
+class Variable(Schema):
     """Represents a variable of scientific model in a scientific paper"""
 
-    name = pz.Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
-    description = pz.Field(desc="A description of the variable, optional, set 'null' if not found", required=False)
-    value = pz.Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
+    name = Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None")
+    description = Field(desc="A description of the variable, optional, set 'null' if not found")
+    value = Field(desc="The value of the variable, optional, set 'null' if not found")
 
 
 if __name__ == "__main__":
@@ -34,15 +38,15 @@ if __name__ == "__main__":
 
     if run_pz:
         # reference, plan, stats = run_workload()
-        excerpts = pz.Dataset(dataset, schema=pz.TextFile)
+        excerpts = Dataset(dataset, schema=TextFile)
         output = excerpts.convert(
-            Variable, desc="A variable used or introduced in the paper snippet", cardinality=pz.Cardinality.ONE_TO_MANY
+            Variable, desc="A variable used or introduced in the paper snippet", cardinality=Cardinality.ONE_TO_MANY
         )
 
-        engine = pz.StreamingSequentialExecution
-        # policy = pz.MinCost()
-        policy = pz.MaxQuality()
-        # iterable  =  pz.Execute(output,
+        engine = StreamingSequentialExecution
+        # policy = MinCost()
+        policy = MaxQuality()
+        # iterable  =  Execute(output,
         #                         policy = policy,
         #                         nocache=True,
         #                         verbose=True,
@@ -51,7 +55,7 @@ if __name__ == "__main__":
         #                         allow_bonded_query=True,
         #                         execution_engine=engine)
 
-        engine = pz.StreamingSequentialExecution(
+        engine = StreamingSequentialExecution(
             policy=policy,
             nocache=True,
             verbose=True,
@@ -61,20 +65,6 @@ if __name__ == "__main__":
         )
         engine.generate_plan(output, policy)
 
-        # physical_op_type = type('LLMBondedQueryConvert',
-        #                 (LLMBondedQueryConvert,),
-        #                 {'model': engine.plan.operators[1].model,
-        #                  'prompt_strategy': pz.PromptStrategy.DSPY_COT_QA})
-        #
-        # bonded_convert = physical_op_type(
-        #     input_schema=engine.plan.operators[1].input_schema,
-        #     output_schema=engine.plan.operators[1].output_schema,
-        #     query_strategy=pz.QueryStrategy.BONDED_WITH_FALLBACK,
-        #     shouldProfile=False,
-        #     cardinality=pz.Cardinality.ONE_TO_MANY,
-        # )
-        #
-        # engine.plan.operators[1] = bonded_convert
         print(engine.plan)
         with st.container():
             st.write("### Executed plan: \n")

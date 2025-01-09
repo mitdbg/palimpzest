@@ -6,12 +6,30 @@ import time
 from pathlib import Path
 
 import datasets
-from ragatouille import RAGPretrainedModel
-
-import palimpzest as pz
-from palimpzest.constants import Model
-from palimpzest.corelib.schemas import TextFile
+from palimpzest.constants import Model, OptimizationStrategy
+from palimpzest.corelib.fields import BooleanField, ImageFilepathField, ListField, NumericField, StringField
+from palimpzest.corelib.schemas import Schema, TextFile
+from palimpzest.datamanager import DataDirectory
+from palimpzest.datasources import ValidationDataSource
+from palimpzest.elements.records import DataRecord
+from palimpzest.execution.execute import Execute
+from palimpzest.execution.mab_sentinel_execution import (
+    MABSequentialParallelSentinelExecution,
+    MABSequentialSingleThreadSentinelExecution,
+)
+from palimpzest.execution.nosentinel_execution import (
+    NoSentinelPipelinedParallelExecution,
+    NoSentinelPipelinedSingleThreadExecution,
+    NoSentinelSequentialSingleThreadExecution,
+)
+from palimpzest.execution.random_sampling_sentinel_execution import (
+    RandomSamplingSequentialParallelSentinelExecution,
+    RandomSamplingSequentialSingleThreadSentinelExecution,
+)
+from palimpzest.policy import MaxQuality, MinCost, MinTime
+from palimpzest.sets import Dataset
 from palimpzest.utils.model_helpers import get_models
+from ragatouille import RAGPretrainedModel
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -29,18 +47,18 @@ FAR_AWAY_ADDRS = [
 ]
 
 
-def within_two_miles_of_mit(record):
+def within_two_miles_of_mit(record: dict):
     # NOTE: I'm using this hard-coded function so that folks w/out a
     #       Geocoding API key from google can still run this example
     try:
-        return not any([street.lower() in record.address.lower() for street in FAR_AWAY_ADDRS])
+        return not any([street.lower() in record["address"].lower() for street in FAR_AWAY_ADDRS])
     except Exception:
         return False
 
 
-def in_price_range(record):
+def in_price_range(record: dict):
     try:
-        price = record.price
+        price = record["price"]
         if isinstance(price, str):
             price = price.strip()
             price = int(price.replace("$", "").replace(",", ""))
@@ -49,14 +67,14 @@ def in_price_range(record):
         return False
 
 
-class Email(pz.TextFile):
+class Email(TextFile):
     """Represents an email, which in practice is usually from a text file"""
 
-    sender = pz.Field(desc="The email address of the sender", required=True)
-    subject = pz.Field(desc="The subject of the email", required=True)
+    sender = StringField(desc="The email address of the sender")
+    subject = StringField(desc="The subject of the email")
 
 
-class EnronValidationSource(pz.ValidationDataSource):
+class EnronValidationSource(ValidationDataSource):
     def __init__(
         self,
         file_dir,
@@ -90,32 +108,32 @@ class EnronValidationSource(pz.ValidationDataSource):
             "buy-r-inbox-628.txt": {
                 "sender": "sherron.watkins@enron.com",
                 "subject": "RE: portrac",
-                "_passed_operator": True,
+                "passed_operator": True,
             },
             "buy-r-inbox-749.txt": {
                 "sender": "david.port@enron.com",
                 "subject": "RE: NewPower",
-                "_passed_operator": True,
+                "passed_operator": True,
             },
             "kaminski-v-deleted-items-1902.txt": {
                 "sender": "vkaminski@aol.com",
                 "subject": "Fwd: FYI",
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "martin-t-inbox-96-short.txt": {
                 "sender": "sarah.palmer@enron.com",
                 "subject": "Enron Mentions -- 01/18/02",
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "skilling-j-inbox-1109.txt": {
                 "sender": "gary@cioclub.com",
                 "subject": "Information Security Executive",
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "zipper-a-espeed-28.txt": {
                 "sender": "travis.mccullough@enron.com",
                 "subject": "Redraft of the Exclusivity Agreement",
-                "_passed_operator": True,
+                "passed_operator": True,
             },
         }
 
@@ -148,7 +166,7 @@ class EnronValidationSource(pz.ValidationDataSource):
         filepath = self.val_filepaths[idx] if val else self.test_filepaths[idx]
 
         # create data record
-        dr = pz.DataRecord(self.schema, source_id=filepath)
+        dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath) as f:
             dr.contents = f.read()
@@ -164,37 +182,36 @@ class EnronValidationSource(pz.ValidationDataSource):
         return dr
 
 
-class RealEstateListingFiles(pz.Schema):
+class RealEstateListingFiles(Schema):
     """The source text and image data for a real estate listing."""
 
-    listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.StringField(desc="The content of the listing's text description", required=True)
-    image_filepaths = pz.ListField(
-        element_type=pz.StringField,
+    listing = StringField(desc="The name of the listing")
+    text_content = StringField(desc="The content of the listing's text description")
+    image_filepaths = ListField(
+        element_type=ImageFilepathField,
         desc="A list of the filepaths for each image of the listing",
-        required=True,
     )
 
 
 class TextRealEstateListing(RealEstateListingFiles):
     """Represents a real estate listing with specific fields extracted from its text."""
 
-    address = pz.StringField(desc="The address of the property")
-    price = pz.NumericField(desc="The listed price of the property")
+    address = StringField(desc="The address of the property")
+    price = NumericField(desc="The listed price of the property")
 
 
 class ImageRealEstateListing(RealEstateListingFiles):
     """Represents a real estate listing with specific fields extracted from its text and images."""
 
-    is_modern_and_attractive = pz.BooleanField(
+    is_modern_and_attractive = BooleanField(
         desc="True if the home interior design is modern and attractive and False otherwise"
     )
-    has_natural_sunlight = pz.BooleanField(
+    has_natural_sunlight = BooleanField(
         desc="True if the home interior has lots of natural sunlight and False otherwise"
     )
 
 
-class RealEstateValidationSource(pz.ValidationDataSource):
+class RealEstateValidationSource(ValidationDataSource):
     def __init__(
         self, dataset_id, listings_dir, split_idx: int = 25, num_samples: int = 5, shuffle: bool = False, seed: int = 42
     ):
@@ -223,175 +240,175 @@ class RealEstateValidationSource(pz.ValidationDataSource):
                 "price": 1550000,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": True,
+                "passed_operator": True,
             },
             "listing2": {
                 "address": "14 Concord Unit 712, Cambridge, MA, 02138",
                 "price": 610000,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing3": {
                 "address": "10 Dana St Unit 7, Cambridge, MA, 02138",
                 "price": 524900,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": False,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing4": {
                 "address": "27 Winter St, Cambridge, MA, 02141",
                 "price": 739000,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing5": {
                 "address": "59 Kelly Rd Unit 59, Cambridge, MA, 02139",
                 "price": 1775000,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": True,
+                "passed_operator": True,
             },
             "listing6": {
                 "address": "24 Greenough Ave, Cambridge, MA, 02139",
                 "price": 4999999,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing7": {
                 "address": "362-366 Commonwealth Ave Unit 4C, Boston, MA, 02115",
                 "price": 609900,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": False,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing8": {
                 "address": "188 Brookline Ave Unit 21H, Boston, MA, 02215",
                 "price": 1485000,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": True,
+                "passed_operator": True,
             },
             "listing9": {
                 "address": "11 Aberdeen St Unit 4, Boston, MA, 02215",
                 "price": 699000,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": False,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing10": {
                 "address": "188 Brookline Ave Unit 19A, Boston, MA, 02215",
                 "price": 3200000,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing11": {
                 "address": "49 Melcher St Unit 205, Boston, MA, 02210",
                 "price": 860000,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing12": {
                 "address": "15 Sleeper St Unit 406, Boston, MA, 02210",
                 "price": 1450000,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing13": {
                 "address": "437 D St Unit 6C, Boston, MA, 02210",
                 "price": 1025000,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing14": {
                 "address": "133 Seaport Blvd Unit 1715, Boston, MA, 02210",
                 "price": 1299999,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing15": {
                 "address": "50 Liberty Dr Unit 5E, Boston, MA, 02210",
                 "price": 2995000,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing16": {
                 "address": "133 Seaport Blvd Unit 802, Boston, MA, 02210",
                 "price": 1679000,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing17": {
                 "address": "14 Ware St Unit 44, Cambridge, MA, 02138",
                 "price": 660000,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing18": {
                 "address": "20 Mcternan Unit 203, Cambridge, MA, 02139",
                 "price": 825000,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing19": {
                 "address": "150 Hampshire St Unit 5, Cambridge, MA, 02139",
                 "price": 895000,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing20": {
                 "address": "144 Spring St, Cambridge, MA, 02141",
                 "price": 2350000,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": False,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing21": {
                 "address": "41-41A Pleasant St, Cambridge, MA, 02139",
                 "price": 4450000,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing22": {
                 "address": "1 Pine St, Cambridge, MA, 02139",
                 "price": 1875000,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing23": {
                 "address": "1055 Cambridge Unit 200, Cambridge, MA, 02139",
                 "price": 1390000,
                 "is_modern_and_attractive": True,
                 "has_natural_sunlight": True,
-                "_passed_operator": True,
+                "passed_operator": True,
             },
             "listing24": {
                 "address": "570 Franklin St Unit 1, Cambridge, MA, 02139",
                 "price": 589000,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
             "listing25": {
                 "address": "12 Kinnaird, Cambridge, MA, 02139",
                 "price": 1200000,
                 "is_modern_and_attractive": False,
                 "has_natural_sunlight": True,
-                "_passed_operator": False,
+                "passed_operator": False,
             },
         }
 
@@ -441,7 +458,7 @@ class RealEstateValidationSource(pz.ValidationDataSource):
         listing = self.listings[idx] if not val else self.val_listings[idx]
 
         # create data record
-        dr = pz.DataRecord(self.schema, source_id=listing)
+        dr = DataRecord(self.schema, source_id=listing)
         dr.listing = listing
         dr.image_filepaths = []
         listing_dir = os.path.join(self.listings_dir, listing)
@@ -463,15 +480,14 @@ class RealEstateValidationSource(pz.ValidationDataSource):
         return dr
 
 
-class BiodexEntry(pz.Schema):
+class BiodexEntry(Schema):
     """A single entry in the Biodex ICSR Dataset."""
 
-    pmid = pz.StringField(desc="The PubMed ID of the medical paper", required=True)
-    title = pz.StringField(desc="The title of the medical paper", required=True)
-    abstract = pz.StringField(desc="The abstract of the medical paper", required=True)
-    fulltext = pz.StringField(
+    pmid = StringField(desc="The PubMed ID of the medical paper")
+    title = StringField(desc="The title of the medical paper")
+    abstract = StringField(desc="The abstract of the medical paper")
+    fulltext = StringField(
         desc="The full text of the medical paper, which contains information relevant for creating a drug safety report.",
-        required=True,
     )
 
 
@@ -483,9 +499,8 @@ class BiodexSerious(BiodexEntry):
     provided below.
     """
 
-    serious = pz.NumericField(
+    serious = NumericField(
         desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.",
-        required=True,
     )
 
 
@@ -497,9 +512,8 @@ class BiodexPatientSex(BiodexEntry):
     expected output `patientsex` provided below.
     """
 
-    patientsex = pz.NumericField(
+    patientsex = NumericField(
         desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.",
-        required=True,
     )
 
 
@@ -510,10 +524,9 @@ class BiodexDrugs(BiodexEntry):
     you will be asked to extract a list of every drug mentioned in the article.
     """
 
-    drugs = pz.ListField(
+    drugs = ListField(
         desc='The **list** of all active substance names of the drugs discussed in the report.\n - For example: ["azathioprine", "infliximab", "mesalamine", "prednisolone"]',
-        element_type=pz.StringField,
-        required=True,
+        element_type=StringField,
     )
 
 
@@ -524,10 +537,9 @@ class BiodexReactions(BiodexEntry):
     you will be asked to extract a list of the primary adverse reactions which are experienced by the patient.
     """
 
-    reactions = pz.ListField(
+    reactions = ListField(
         desc='The **list** of all reaction terms discussed in the report.\n - For example: ["Epstein-Barr virus", "infection reactivation", "Idiopathic interstitial pneumonia"]',
-        element_type=pz.StringField,
-        required=True,
+        element_type=StringField,
     )
 
 
@@ -536,10 +548,9 @@ class BiodexReactionLabels(BiodexReactions):
     Retrieve the labels which are most relevant for the given set of inferred reactions.
     """
 
-    reaction_labels = pz.ListField(
+    reaction_labels = ListField(
         desc="Most relevant official terms for adverse reactions for the provided `reactions`",
-        element_type=pz.StringField,
-        required=True,
+        element_type=StringField,
     )
 
 
@@ -555,37 +566,32 @@ class BiodexRankedReactions(BiodexReactionLabels):
     - you may omit labels if you think they do not describe a reaction experienced by the patient
     """
 
-    ranked_reaction_labels = pz.ListField(
+    ranked_reaction_labels = ListField(
         desc="The ranked list of labels for adverse reactions experienced by the patient. The most likely label occurs first in the list.",
-        element_type=pz.StringField,
-        required=True,
+        element_type=StringField,
     )
 
 
 class BiodexOutput(BiodexEntry):
     """The target output fields for an entry in the Biodex ICSR Dataset."""
 
-    serious = pz.NumericField(
+    serious = NumericField(
         desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.",
-        required=True,
     )
-    patientsex = pz.NumericField(
+    patientsex = NumericField(
         desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.",
-        required=True,
     )
-    drugs = pz.ListField(
+    drugs = ListField(
         desc='The **list** of all active substance names of the drugs discussed in the report.\n - For example: ["azathioprine", "infliximab", "mesalamine", "prednisolone"]',
-        element_type=pz.StringField,
-        required=True,
+        element_type=StringField,
     )
-    reactions = pz.ListField(
+    reactions = ListField(
         desc='The **list** of all reaction terms discussed in the report.\n - For example: ["Epstein-Barr virus", "infection reactivation", "Idiopathic interstitial pneumonia"]',
-        element_type=pz.StringField,
-        required=True,
+        element_type=StringField,
     )
 
 
-class BiodexValidationSource(pz.ValidationDataSource):
+class BiodexValidationSource(ValidationDataSource):
     def __init__(
         self,
         dataset_id,
@@ -731,7 +737,7 @@ class BiodexValidationSource(pz.ValidationDataSource):
         entry = self.test_dataset[idx] if not val else self.train_dataset[idx]
 
         # create data record
-        dr = pz.DataRecord(self.schema, source_id=entry["pmid"])
+        dr = DataRecord(self.schema, source_id=entry["pmid"])
         dr.pmid = entry["pmid"]
         dr.title = entry["title"]
         dr.abstract = entry["abstract"]
@@ -749,10 +755,6 @@ class BiodexValidationSource(pz.ValidationDataSource):
 
 
 if __name__ == "__main__":
-    # NOTE: set DSP_CACHEBOOL=False before executing this script (if running an experimental/benchmarking evaluation)
-    if "DSP_CACHEBOOL" not in os.environ or os.environ["DSP_CACHEBOOL"].lower() != "false":
-        raise Exception("TURN OFF DSPy CACHE BY SETTING `export DSP_CACHEBOOL=False`")
-
     # parse arguments
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
@@ -865,13 +867,13 @@ if __name__ == "__main__":
     sample_end_idx = args.sample_end_idx
     exp_name = args.exp_name
 
-    policy = pz.MaxQuality()
+    policy = MaxQuality()
     if args.policy == "mincost":
-        policy = pz.MinCost()
+        policy = MinCost()
     elif args.policy == "mintime":
-        policy = pz.MinTime()
+        policy = MinTime()
     elif args.policy == "maxquality":
-        policy = pz.MaxQuality()
+        policy = MaxQuality()
     else:
         print("Policy not supported for this demo")
         exit(1)
@@ -880,25 +882,25 @@ if __name__ == "__main__":
     engine, executor = args.engine, args.executor
     if engine == "sentinel":
         if executor == "sequential-mab":
-            # execution_engine = pz.SequentialSingleThreadSentinelExecution
-            execution_engine = pz.MABSequentialSingleThreadSentinelExecution
+            # execution_engine = SequentialSingleThreadSentinelExecution
+            execution_engine = MABSequentialSingleThreadSentinelExecution
         elif executor == "parallel-mab":
-            # execution_engine = pz.SequentialParallelSentinelExecution
-            execution_engine = pz.MABSequentialParallelSentinelExecution
+            # execution_engine = SequentialParallelSentinelExecution
+            execution_engine = MABSequentialParallelSentinelExecution
         elif executor == "sequential-random":
-            execution_engine = pz.RandomSamplingSequentialSingleThreadSentinelExecution
+            execution_engine = RandomSamplingSequentialSingleThreadSentinelExecution
         elif executor == "parallel-random":
-            execution_engine = pz.RandomSamplingSequentialParallelSentinelExecution
+            execution_engine = RandomSamplingSequentialParallelSentinelExecution
         else:
             print("Unknown executor")
             exit(1)
     elif engine == "nosentinel":
         if executor == "sequential":
-            execution_engine = pz.NoSentinelSequentialSingleThreadExecution
+            execution_engine = NoSentinelSequentialSingleThreadExecution
         elif executor == "pipelined":
-            execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
+            execution_engine = NoSentinelPipelinedSingleThreadExecution
         elif executor == "parallel":
-            execution_engine = pz.NoSentinelPipelinedParallelExecution
+            execution_engine = NoSentinelPipelinedParallelExecution
         else:
             print("Unknown executor")
             exit(1)
@@ -918,9 +920,9 @@ if __name__ == "__main__":
 
         # create and register validation data source
         datasource = EnronValidationSource(file_dir=data_filepath, dataset_id=user_dataset_id)
-        pz.DataDirectory().register_user_source(src=datasource, dataset_id=user_dataset_id)
+        DataDirectory().register_user_source(src=datasource, dataset_id=user_dataset_id)
 
-        plan = pz.Dataset(user_dataset_id, schema=Email)
+        plan = Dataset(user_dataset_id, schema=Email)
         plan = plan.filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
@@ -941,14 +943,14 @@ if __name__ == "__main__":
             shuffle=False,
             seed=seed,
         )
-        pz.DataDirectory().register_user_source(
+        DataDirectory().register_user_source(
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
 
-        plan = pz.Dataset(user_dataset_id, schema=RealEstateListingFiles)
+        plan = Dataset(user_dataset_id, schema=RealEstateListingFiles)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
-        plan = plan.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_filepaths")
+        plan = plan.convert(ImageRealEstateListing, depends_on="image_filepaths")
         plan = plan.filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
@@ -970,11 +972,11 @@ if __name__ == "__main__":
             shuffle=False,
             seed=seed,
         )
-        pz.DataDirectory().register_user_source(
+        DataDirectory().register_user_source(
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
-        plan = pz.Dataset(user_dataset_id, schema=BiodexEntry)
+        plan = Dataset(user_dataset_id, schema=BiodexEntry)
         plan = plan.convert(BiodexReactions)  # infer
         plan = plan.retrieve(
             output_schema=BiodexReactionLabels,
@@ -1003,11 +1005,11 @@ if __name__ == "__main__":
             shuffle=False,
             seed=seed,
         )
-        pz.DataDirectory().register_user_source(
+        DataDirectory().register_user_source(
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
-        plan = pz.Dataset(user_dataset_id, schema=BiodexEntry)
+        plan = Dataset(user_dataset_id, schema=BiodexEntry)
         plan = plan.convert(BiodexSerious, depends_on=["title", "abstract", "fulltext"])
         plan = plan.convert(BiodexPatientSex, depends_on=["title", "abstract", "fulltext"])
         plan = plan.convert(BiodexDrugs, depends_on=["title", "abstract", "fulltext"])
@@ -1027,7 +1029,7 @@ if __name__ == "__main__":
     # select optimization strategy and available models based on engine
     optimization_strategy, available_models = None, None
     if engine == "sentinel":
-        optimization_strategy = pz.OptimizationStrategy.PARETO
+        optimization_strategy = OptimizationStrategy.PARETO
         available_models = get_models(include_vision=True)
     else:
         model_str_to_model = {
@@ -1042,11 +1044,11 @@ if __name__ == "__main__":
             "mixtral": Model.LLAMA3_V,
             "llama": Model.LLAMA3_V,
         }
-        optimization_strategy = pz.OptimizationStrategy.NONE
+        optimization_strategy = OptimizationStrategy.NONE
         available_models = [model_str_to_model[args.model]] + [model_str_to_vision_model[args.model]]
 
     # execute pz plan
-    records, execution_stats = pz.Execute(
+    records, execution_stats = Execute(
         plan,
         policy,
         nocache=True,

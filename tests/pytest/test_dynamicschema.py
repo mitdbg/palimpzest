@@ -37,6 +37,8 @@ def test_dynamicschema_json():
         allow_bonded_query=True,
         allow_code_synth=False,
         allow_token_reduction=False,
+        allow_rag_reduction=False,
+        allow_mixtures=False,
         execution_engine=pz.NoSentinelSequentialSingleThreadExecution,
     )
 
@@ -67,6 +69,8 @@ def test_dynamicschema_yml():
         allow_bonded_query=True,
         allow_code_synth=False,
         allow_token_reduction=False,
+        allow_rag_reduction=False,
+        allow_mixtures=False,
         execution_engine=pz.NoSentinelSequentialSingleThreadExecution,
     )
 

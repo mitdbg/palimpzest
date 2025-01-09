@@ -11,8 +11,14 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
 import streamlit as st  # type: ignore
-
-import palimpzest as pz
+from palimpzest.constants import Cardinality
+from palimpzest.corelib.fields import Field
+from palimpzest.corelib.schemas import PDFFile, Schema
+from palimpzest.datamanager import DataDirectory
+from palimpzest.execution.execute import Execute
+from palimpzest.execution.streaming_execution import StreamingSequentialExecution
+from palimpzest.policy import MaxQuality, MinCost
+from palimpzest.sets import Dataset
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env
@@ -20,44 +26,44 @@ if not os.environ.get("OPENAI_API_KEY"):
     load_env()
 
 
-class ScientificPaper(pz.PDFFile):
+class ScientificPaper(PDFFile):
     """Represents a scientific research paper, which in practice is usually from a PDF file"""
 
-    paper_title = pz.Field(
-        desc="The title of the paper. This is a natural language title, not a number or letter.", required=True
+    paper_title = Field(
+        desc="The title of the paper. This is a natural language title, not a number or letter."
     )
-    author = pz.Field(desc="The name of the first author of the paper", required=True)
-    #    publicationYear = pz.Field(desc="The year the paper was published. This is a number.", required=False)
-    #    journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
-    abstract = pz.Field(desc="A short description of the paper contributions and findings", required=False)
+    author = Field(desc="The name of the first author of the paper")
+    #    publicationYear = Field(desc="The year the paper was published. This is a number.")
+    #    journal = Field(desc="The name of the journal the paper was published in")
+    abstract = Field(desc="A short description of the paper contributions and findings")
 
 
-#    doiURL se= pz.Field(desc="The DOI URL for the paper", required=True)
+#    doiURL se= Field(desc="The DOI URL for the paper")
 
 
-class Reference(pz.Schema):
+class Reference(Schema):
     """Represents a reference to another paper, which is cited in a scientific paper"""
 
-    index = pz.Field(desc="The index of the reference in the paper", required=True)
-    title = pz.Field(desc="The title of the paper being cited", required=True)
-    first_author = pz.Field(desc="The author of the paper being cited", required=True)
-    year = pz.Field(desc="The year in which the cited paper was published", required=True)
-    # snippet = pz.Field(desc="A snippet from the source paper that references the index", required=False)
+    index = Field(desc="The index of the reference in the paper")
+    title = Field(desc="The title of the paper being cited")
+    first_author = Field(desc="The author of the paper being cited")
+    year = Field(desc="The year in which the cited paper was published")
+    # snippet = Field(desc="A snippet from the source paper that references the index")
 
 
 @st.cache_resource()
 def run_workload():
-    papers = pz.Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
+    papers = Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
     # papers = papers.filter("The paper mentions phosphorylation of Exo1")
     references = papers.convert(
-        Reference, desc="A paper cited in the reference section", cardinality=pz.Cardinality.ONE_TO_MANY
+        Reference, desc="A paper cited in the reference section", cardinality=Cardinality.ONE_TO_MANY
     )
 
     output = references
-    # engine = pz.NoSentinelExecution
-    engine = pz.StreamingSequentialExecution
-    policy = pz.MinCost()
-    iterable = pz.Execute(
+    # engine = NoSentinelExecution
+    engine = StreamingSequentialExecution
+    policy = MinCost()
+    iterable = Execute(
         output,
         policy=policy,
         nocache=True,
@@ -79,7 +85,7 @@ def run_workload():
 pdfdir = "testdata/bdf-usecase3-pdf/"
 
 with st.sidebar:
-    datasets = pz.DataDirectory().list_registered_datasets()
+    datasets = DataDirectory().list_registered_datasets()
     options = [name for name, path in datasets if path[0] == "dir"]
     options = [name for name in options if "bdf-usecase3" in name]
     dataset = st.radio("Select a dataset", options)
@@ -91,16 +97,16 @@ dataset = "bdf-usecase3-tiny"
 
 if run_pz:
     # reference, plan, stats = run_workload()
-    papers = pz.Dataset(dataset, schema=ScientificPaper)
+    papers = Dataset(dataset, schema=ScientificPaper)
     papers = papers.filter("The paper mentions phosphorylation of Exo1")
-    output = papers.convert(Reference, desc="The references cited in the paper", cardinality=pz.Cardinality.ONE_TO_MANY)
+    output = papers.convert(Reference, desc="The references cited in the paper", cardinality=Cardinality.ONE_TO_MANY)
 
     # output = references
-    # engine = pz.NoSentinelExecution
-    engine = pz.StreamingSequentialExecution
-    # policy = pz.MinCost()
-    policy = pz.MaxQuality()
-    iterable = pz.Execute(
+    # engine = NoSentinelExecution
+    engine = StreamingSequentialExecution
+    # policy = MinCost()
+    policy = MaxQuality()
+    iterable = Execute(
         output,
         policy=policy,
         nocache=True,

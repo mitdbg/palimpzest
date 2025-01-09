@@ -1,5 +1,4 @@
 import pytest
-
 from palimpzest.constants import Model
 from palimpzest.dataclasses import RecordOpStats
 
