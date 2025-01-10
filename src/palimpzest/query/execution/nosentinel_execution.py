@@ -421,6 +421,10 @@ class NoSentinelPipelinedSingleThreadExecution(NoSentinelExecutionEngine, Pipeli
                 still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
                 finished_executing = not keep_scanning_source_records and not still_processing
 
+                # update finished_executing based on limit
+                if isinstance(operator, LimitScanOp):
+                    finished_executing = len(output_records) == operator.limit
+
             # if caching was allowed, close the cache
             if not self.nocache:
                 for operator in plan.operators:
