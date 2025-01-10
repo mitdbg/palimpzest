@@ -89,10 +89,10 @@ def init() -> None:
     Initialize data directory for PZ.
     """
     # set directory and initialize it for PZ
-    import palimpzest as pz
+    import palimpzest.datamanager.datamanager as pzdm
     from palimpzest.constants import PZ_DIR
 
-    pz.DataDirectory()
+    pzdm.DataDirectory()
     _print_msg(f"Palimpzest system initialized in: {PZ_DIR}")
 
 
@@ -137,13 +137,14 @@ def synthesize_data(name: str, count: int) -> None:
         The nunber of values to synthesize
     """
     import palimpzest as pz
+    import palimpzest.datamanager.datamanager as pzdm
 
     name = name.strip()
 
     vals = []
     for i in range(0, count):
         vals.append(i)
-    pz.DataDirectory().register_dataset(vals, name)
+    pzdm.DataDirectory().register_dataset(vals, name)
 
     _print_msg(f"Registered {name}")
 
@@ -164,6 +165,7 @@ def register_data(path: str, name: str) -> None:
         Name to register the data file / directory with.
     """
     import palimpzest as pz
+    import palimpzest.datamanager.datamanager as pzdm
 
     # parse path and name
     path = path.strip()
@@ -171,10 +173,10 @@ def register_data(path: str, name: str) -> None:
 
     # register dataset
     if os.path.isfile(path):
-        pz.DataDirectory().register_local_file(os.path.abspath(path), name)
+        pzdm.DataDirectory().register_local_file(os.path.abspath(path), name)
 
     elif os.path.isdir(path):
-        pz.DataDirectory().register_local_directory(os.path.abspath(path), name)
+        pzdm.DataDirectory().register_local_directory(os.path.abspath(path), name)
 
     else:
         raise InvalidCommandError(f"Path {path} is invalid. Does not point to a file or directory.")
@@ -194,12 +196,13 @@ def rm_data(name: str) -> None:
         Name of the dataset to unregister.
     """
     import palimpzest as pz
+    import palimpzest.datamanager.datamanager as pzdm
 
     # parse name
     name = name.strip()
 
     # remove dataset from registry
-    pz.DataDirectory().rm_registered_dataset(name)
+    pzdm.DataDirectory().rm_registered_dataset(name)
 
     _print_msg(f"Deleted {name}")
 
@@ -210,8 +213,9 @@ def clear_cache() -> None:
     Clear the Palimpzest cache.
     """
     import palimpzest as pz
+    import palimpzest.datamanager.datamanager as pzdm
 
-    pz.DataDirectory().clear_cache(keep_registry=True)
+    pzdm.DataDirectory().clear_cache(keep_registry=True)
     _print_msg("Cache cleared")
 
 
@@ -221,9 +225,10 @@ def print_config() -> None:
     Print the current config that Palimpzest is using.
     """
     import palimpzest as pz
+    import palimpzest.datamanager.datamanager as pzdm
 
     # load config yaml file
-    config = pz.DataDirectory().get_config()
+    config = pzdm.DataDirectory().get_config()
 
     # print contents of config
     _print_msg(f"--- {config['name']} ---\n{yaml.dump(config)}")

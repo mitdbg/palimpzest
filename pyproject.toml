@@ -53,8 +53,6 @@ dependencies = [
     "tqdm>=4.66.2",
     "transformers>=4.11.3",
     "requests-html",
-    "backports.tarfile",
-    "aiofiles>=22.0,<24.0",
     # Add other dependencies as needed
 ]
 classifiers=[

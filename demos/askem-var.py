@@ -29,7 +29,7 @@ class Papersnippet(TextFile):
 class Variable(Schema):
     """Represents a variable of scientific model in a scientific paper"""
 
-    name = Field(desc="The label used for a scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
+    name = Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
     description = Field(desc="A description of the variable, optional, set 'null' if not found", required=False)
     value = Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
 
@@ -45,12 +45,12 @@ list_of_numbers = [1, 2, 3, 4, 5]
 if __name__ == "__main__":
     run_pz = True
     dataset = "askem"
-    file_path = "testdata/askem-tiny"
+    file_path = "testdata/"
 
     if run_pz:
         # reference, plan, stats = run_workload()
         df_input = pd.DataFrame(dict_of_excerpts)
-        excerpts = Dataset(file_path)
+        excerpts = Dataset(list_of_strings)
         output = excerpts.convert(
             Variable, desc="A variable used or introduced in the context", cardinality=pz.Cardinality.ONE_TO_MANY
         ).filter("The value name is 'a'", depends_on="name")
@@ -66,10 +66,9 @@ if __name__ == "__main__":
         #                         execution_engine=engine)
 
         engine = StreamingSequentialExecution(
-            datasource=excerpts,
             policy=policy,
             nocache=True,
-            verbose=False,
+            verbose=True,
             allow_code_synth=False,
             allow_token_reduction=False,
             allow_bonded_query=True,
@@ -106,8 +105,9 @@ if __name__ == "__main__":
         variables = []
         statistics = []
         start_time = time.time()
+        # for idx, (vars, plan, stats) in enumerate(iterable):
         for idx, record in enumerate(input_records):
-            print(f"idx: {idx}\n record: {record}")
+            print(f"idx: {idx}\n vars: {vars}")
             index = idx
             vars = engine.execute_opstream(engine.plan, record)
             if idx == len(input_records) - 1:
@@ -150,8 +150,6 @@ if __name__ == "__main__":
                     st.write(" **name:** ", var.name)
                     st.write(" **description:** ", var.description)
                     st.write(" **value:** ", var.value, "\n")
-            st.write("--------------------------------")
-            break
 
         # write variables to a json file with readable format
         with open(f"askem-variables-{dataset}.json", "w") as f:
