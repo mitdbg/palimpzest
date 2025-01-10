@@ -4,25 +4,31 @@ from pathlib import Path
 import pytest
 
 import palimpzest as pz
+from palimpzest.core.lib.schemas import Schema
+from palimpzest.core.lib.fields import Field, StringField, ListField, NumericField
+from palimpzest.core.data.datasources import UserSource
 
 
 ### DATA SOURCES ###
 # NOTE: I need to have RealEstateListingFiles and RealEstateListingSource
 #       outside of a fixture here in order for the DataDirectory to properly
 #       pickle user datasources.
-class RealEstateListingFiles(pz.Schema):
+class RealEstateListingFiles(Schema):
     """The source text and image data for a real estate listing."""
 
-    listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.StringField(desc="The content of the listing's text description", required=True)
-    image_filepaths = pz.ListField(
-        element_type=pz.StringField,
+    listing = StringField(desc="The name of the listing", required=True)
+    text_content = StringField(desc="The content of the listing's text description", required=True)
+    image_filepaths = ListField(
+        element_type=StringField,
         desc="A list of the filepaths for each image of the listing",
         required=True,
     )
 
+class Number(Schema):
+    value = NumericField(desc="The value of the number", required=True)
 
-class RealEstateListingSource(pz.UserSource):
+
+class RealEstateListingSource(UserSource):
     def __init__(self, dataset_id, listings_dir):
         super().__init__(RealEstateListingFiles, dataset_id)
         self.listings_dir = listings_dir
@@ -55,9 +61,9 @@ class RealEstateListingSource(pz.UserSource):
 
         return dr
 
-class CostModelTestSource(pz.UserSource):
+class CostModelTestSource(UserSource):
     def __init__(self, datasetId):
-        super().__init__(pz.Number, datasetId)
+        super().__init__(Number, datasetId)
         self.numbers = [1, 2, 3]
 
     def copy(self):

@@ -4,7 +4,7 @@ import pytest
 
 from palimpzest.constants import Model
 from palimpzest.core.lib.schemas import TextFile
-from palimpzest.dataclasses import RecordOpStats
+from palimpzest.core.data.dataclasses import RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.optimizer.plan import SentinelPlan
 

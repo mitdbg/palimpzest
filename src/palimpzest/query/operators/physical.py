@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import hashlib
 import json
 
-from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.core.data.dataclasses import OperatorCostEstimates
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class PhysicalOperator:
@@ -111,7 +110,7 @@ class PhysicalOperator:
 
         # compute, set, and return the op_id
         hash_str = json.dumps({"op_name": op_name, **id_params}, sort_keys=True)
-        self.op_id = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+        self.op_id = hash_for_id(hash_str)
 
         return self.op_id
 

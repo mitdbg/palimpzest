@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import hashlib
-
-from palimpzest.constants import MAX_ID_CHARS
 from palimpzest.query.operators.logical import LogicalOperator
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.plan import PlanCost
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class Expression:
@@ -44,7 +42,7 @@ class Expression:
     def __hash__(self):
         op_id = self.operator.get_logical_op_id() if isinstance(self.operator, LogicalOperator) else self.operator.get_op_id()
         hash_str = str(tuple(sorted(self.input_group_ids)) + (op_id, str(self.__class__.__name__)))
-        hash_id = int(hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS], 16)
+        hash_id = int(hash_for_id(hash_str), 16)
         return hash_id
 
     def add_applied_rule(self, rule):
@@ -102,5 +100,5 @@ class Group:
             sorted_properties.extend(sorted(self.properties[key]))
 
         hash_str = str(tuple(sorted_fields + sorted_properties))
-        hash_id = int(hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS], 16)
+        hash_id = int(hash_for_id(hash_str), 16)
         return hash_id

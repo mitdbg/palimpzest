@@ -2,8 +2,8 @@ import pytest
 
 from palimpzest.constants import Model
 from palimpzest.core.lib.schemas import TextFile
-from palimpzest.dataclasses import PlanCost
-from palimpzest.datamanager import DataDirectory
+from palimpzest.core.data.dataclasses import PlanCost
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.core.elements.filters import Filter
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.datasource import MarshalAndScanDataOp

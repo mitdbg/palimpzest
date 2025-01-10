@@ -11,21 +11,27 @@ import pandas as pd
 import streamlit as st
 
 import palimpzest as pz
+from palimpzest.core.lib.fields import Field
+from palimpzest.core.lib.schemas import Schema
+from palimpzest.core.lib.schemas import TextFile
+from palimpzest.sets import Dataset
+from palimpzest.query import StreamingSequentialExecution
+from palimpzest.policy import MaxQuality
+from palimpzest.core.elements.records import DataRecord
 
-
-class Papersnippet(pz.TextFile):
+class Papersnippet(TextFile):
     """Represents an excerpt from a scientific research paper, which potentially contains variables"""
 
-    excerptid = pz.Field(desc="The unique identifier for the excerpt", required=True)
-    excerpt = pz.Field(desc="The text of the excerpt", required=True)
+    excerptid = Field(desc="The unique identifier for the excerpt", required=True)
+    excerpt = Field(desc="The text of the excerpt", required=True)
 
 
-class Variable(pz.Schema):
+class Variable(Schema):
     """Represents a variable of scientific model in a scientific paper"""
 
-    name = pz.Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
-    description = pz.Field(desc="A description of the variable, optional, set 'null' if not found", required=False)
-    value = pz.Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
+    name = Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
+    description = Field(desc="A description of the variable, optional, set 'null' if not found", required=False)
+    value = Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
 
 
 if __name__ == "__main__":
@@ -34,14 +40,14 @@ if __name__ == "__main__":
 
     if run_pz:
         # reference, plan, stats = run_workload()
-        excerpts = pz.Dataset(dataset, schema=pz.TextFile)
+        excerpts = Dataset(dataset, schema=TextFile)
         output = excerpts.convert(
             Variable, desc="A variable used or introduced in the paper snippet", cardinality=pz.Cardinality.ONE_TO_MANY
         )
 
-        engine = pz.StreamingSequentialExecution
-        # policy = pz.MinCost()
-        policy = pz.MaxQuality()
+        engine = StreamingSequentialExecution
+        # policy = MinCost()
+        policy = MaxQuality()
         # iterable  =  pz.Execute(output,
         #                         policy = policy,
         #                         nocache=True,
@@ -51,7 +57,7 @@ if __name__ == "__main__":
         #                         allow_bonded_query=True,
         #                         execution_engine=engine)
 
-        engine = pz.StreamingSequentialExecution(
+        engine = StreamingSequentialExecution(
             policy=policy,
             nocache=True,
             verbose=True,
@@ -85,7 +91,9 @@ if __name__ == "__main__":
                 st.write(strop)
 
         input_records = engine.get_input_records()
-
+        input_df = DataRecord.as_df(input_records)
+        print(input_df)
+        
         variables = []
         statistics = []
         start_time = time.time()
