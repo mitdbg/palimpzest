@@ -44,7 +44,7 @@ list_of_numbers = [1, 2, 3, 4, 5]
 if __name__ == "__main__":
     run_pz = True
     dataset = "askem"
-    file_path = "testdata/"
+    file_path = "testdata/askem-tiny/"
 
     if run_pz:
         # reference, plan, stats = run_workload()
@@ -152,8 +152,8 @@ if __name__ == "__main__":
                     st.write(" **value:** ", var.value, "\n")
 
         # write variables to a json file with readable format
-        with open(f"askem-variables-{dataset}.json", "w") as f:
-            json.dump(variables, f, indent=4)
+        # with open(f"askem-variables-{dataset}.json", "w") as f:
+        #     json.dump(variables, f, indent=4)
         vars_df = pd.DataFrame(variables)
 
     # G = nx.DiGraph()
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     #
     # nx.write_gexf(G, "demos/bdf-usecase3.gexf")
 
-    print("References:", vars_df)
+    # print("References:", vars_df)
     # st.write(table.title, table.author, table.abstract)
     # endTime = time.time()
     # print("Elapsed time:", endTime - startTime)
