@@ -136,13 +136,7 @@ class Dataset(Set):
 
     def __init__(self, source: str | DataSource, *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
-        if isinstance(source, str):
-            try:
-                source = DataDirectory().get_or_register_source(source)
-            except Exception as e:
-                raise Exception(f"Invalid source path: {source}") from e
-        elif not isinstance(source, (DataSource, Set)):
-            raise Exception(f"Invalid source type: {type(source)}")
+        source = DataDirectory().get_registered_dataset(source) if isinstance(source, str) else source
 
         # intialize class
         super().__init__(source, *args, **kwargs)

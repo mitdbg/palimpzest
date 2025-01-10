@@ -140,19 +140,6 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         # user sources are always ephemeral
         self._registry[dataset_id] = ("user", src)
 
-    def get_or_register_source(self, dataset_id_or_path):
-        """Return a dataset from the registry."""
-        if dataset_id_or_path in self._registry:
-            return self.get_registered_dataset(dataset_id_or_path)
-        else:
-            if os.path.isfile(dataset_id_or_path):
-                self.register_local_file(dataset_id_or_path, dataset_id_or_path)
-            elif os.path.isdir(dataset_id_or_path):
-                self.register_local_directory(dataset_id_or_path, dataset_id_or_path)
-            else:
-                raise Exception(f"Path {dataset_id_or_path} is invalid. Does not point to a file or directory.")
-            return self.get_registered_dataset(dataset_id_or_path)
-
     def get_registered_dataset(self, dataset_id):
         """Return a dataset from the registry."""
         if dataset_id not in self._registry:

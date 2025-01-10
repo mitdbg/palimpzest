@@ -29,7 +29,7 @@ class Papersnippet(TextFile):
 class Variable(Schema):
     """Represents a variable of scientific model in a scientific paper"""
 
-    name = Field(desc="The label used for a scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
+    name = Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
     description = Field(desc="A description of the variable, optional, set 'null' if not found", required=False)
     value = Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
 
@@ -37,15 +37,16 @@ class Variable(Schema):
 if __name__ == "__main__":
     run_pz = True
     dataset = "askem"
-    file_path = "testdata/askem-tiny"
 
     if run_pz:
         # reference, plan, stats = run_workload()
-        excerpts = Dataset(file_path, schema=TextFile)
+        excerpts = Dataset(dataset, schema=TextFile)
         output = excerpts.convert(
             Variable, desc="A variable used or introduced in the paper snippet", cardinality=pz.Cardinality.ONE_TO_MANY
         )
-        # policy = pz.MinCost()
+
+        engine = StreamingSequentialExecution
+        # policy = MinCost()
         policy = MaxQuality()
         # iterable  =  pz.Execute(output,
         #                         policy = policy,
@@ -57,10 +58,9 @@ if __name__ == "__main__":
         #                         execution_engine=engine)
 
         engine = StreamingSequentialExecution(
-            datasource=excerpts,
             policy=policy,
             nocache=True,
-            verbose=False,
+            verbose=True,
             allow_code_synth=False,
             allow_token_reduction=False,
             allow_bonded_query=True,
@@ -81,7 +81,7 @@ if __name__ == "__main__":
         # )
         #
         # engine.plan.operators[1] = bonded_convert
-        print("Generated plan:", engine.plan)
+        print(engine.plan)
         with st.container():
             st.write("### Executed plan: \n")
             # st.write(" " + str(plan).replace("\n", "  \n "))
@@ -97,8 +97,9 @@ if __name__ == "__main__":
         variables = []
         statistics = []
         start_time = time.time()
+        # for idx, (vars, plan, stats) in enumerate(iterable):
         for idx, record in enumerate(input_records):
-            print(f"idx: {idx}\n record: {record}")
+            print(f"idx: {idx}\n vars: {vars}")
             index = idx
             vars = engine.execute_opstream(engine.plan, record)
             if idx == len(input_records) - 1:
@@ -141,8 +142,6 @@ if __name__ == "__main__":
                     st.write(" **name:** ", var.name)
                     st.write(" **description:** ", var.description)
                     st.write(" **value:** ", var.value, "\n")
-            st.write("--------------------------------")
-            break
 
         # write variables to a json file with readable format
         with open(f"askem-variables-{dataset}.json", "w") as f:
