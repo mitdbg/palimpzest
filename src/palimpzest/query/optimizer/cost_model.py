@@ -191,7 +191,7 @@ class SampleBasedCostModel:
         # create source_op_estimates for datasources if they are not provided
         if isinstance(operator, DataSourcePhysicalOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.get_registered_dataset(operator.dataset_id)
+            datasource = operator.get_datasource()
             datasource_len = len(datasource)
 
             source_op_estimates = OperatorCostEstimates(
@@ -610,8 +610,8 @@ class CostModel(BaseCostModel):
         # initialize estimates of operator metrics based on naive (but sometimes precise) logic
         if isinstance(operator, MarshalAndScanDataOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.get_registered_dataset(operator.dataset_id)
-            dataset_type = self.datadir.get_registered_dataset_type(operator.dataset_id)
+            datasource = operator.get_datasource()
+            dataset_type = operator.get_datasource_type()
             datasource_len = len(datasource)
             datasource_memsize = datasource.get_size()
 

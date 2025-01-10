@@ -1,10 +1,14 @@
 import json
+import pandas as pd
+import numpy as np
+
 from typing import Any as TypingAny
 from typing import Dict, List
 
 from palimpzest.constants import MAX_ROWS
 from palimpzest.core.lib.fields import BytesField, CallableField, Field, ListField, NumericField, StringField
-
+from palimpzest.utils.hash_helpers import hash_for_temp_schema
+from palimpzest.constants import DERIVED_SCHEMA_PREFIX, FROM_DF_PREFIX
 
 # TODO: Under the definition of __eq__ in SchemaMetaclass, I think that an equality check like
 #       Any([TextFile, PDFFile]) == TextFile will return `False`. I believe this is the behavior
@@ -122,18 +126,46 @@ class Schema(metaclass=SchemaMetaclass):
 
     def as_json_str(self, record_dict: Dict[str, TypingAny], include_data_cols: bool = True) -> str:
         """Return a JSON representation of a data record with this Schema"""
-        if include_data_cols:
-            record_dict["data type"] = str(self.__class__.__name__)
-            record_dict["data type description"] = str(self.__class__.__doc__)
+        # In case of numpy types, the json.dumps will fail. Convert to native types.
+        converted_dict = pd.Series(record_dict).to_dict()
 
-        return json.dumps(record_dict, indent=2)
+        if include_data_cols:
+            converted_dict["data type"] = str(self.__class__.__name__)
+            converted_dict["data type description"] = str(self.__class__.__doc__)
+
+        return json.dumps(converted_dict, indent=2)
 
     # TODO move logic from metaclass to here
     @classmethod
     def class_name(cls) -> str:
         """Return the name of this class"""
         return cls.__name__
+    
 
+    @staticmethod
+    def from_df(df: pd.DataFrame) -> "Schema":
+        # Create a unique schema name based on columns
+        schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
+        
+        # consider to save to temp file and load from there 
+        if schema_name in globals():
+            return globals()[schema_name]
+
+        # Create new schema only if it doesn't exist
+        new_schema = type(schema_name, (Schema,), {
+            '_desc': "Derived schema from DataFrame",
+            '__module__': Schema.__module__
+        })
+        
+        for col in df.columns:
+            setattr(new_schema, col, Field(
+                desc=f"{col}",
+                required=True
+            ))
+        
+        # Store the schema class globally
+        globals()[schema_name] = new_schema
+        return new_schema
 
 ###################################################################################
 # "Core" useful Schemas. These are Schemas that almost everyone will need.
@@ -280,3 +312,9 @@ class PlotImage(ImageFile):
     """An image that contains a plot, such as a graph or chart."""
 
     plot_description = StringField(desc="A description of the plot", required=True)
+
+
+class DefaultSchema(Schema):
+    """Store context data."""
+
+    value = Field(desc="The context data.", required=True)

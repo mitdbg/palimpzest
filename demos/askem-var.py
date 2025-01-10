@@ -34,6 +34,14 @@ class Variable(Schema):
     value = Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
 
 
+dict_of_excerpts = [
+    {"id": 0, "text": "ne of the few states producing detailed daily reports of COVID-19 confirmed cases, COVID-19 related cumulative hospitalizations, intensive care unit (ICU) admissions, and deaths per county. Likewise, Ohio is a state with marked variation of demographic and geographic attributes among counties along with substantial differences in the capacity of healthcare within the state. Our aim is to predict the spatiotemporal dynamics of the COVID-19 pandemic in relation with the distribution of the capacity of healthcare in Ohio. 2. Methods 2.1. Mathematical model We developed a spatial mathematical model to simulate the transmission dynamics of COVID-19 disease infection and spread. The spatially-explicit model incorporates geographic connectivity information at county level. The Susceptible-Infected-Hospitalized-Recovered- Dead (SIHRD) COVID-19 model classified the population into susceptibles (S), confirmed infections (I), hospitalized and ICU admitted (H), recovered (R) and dead (D). Based on a previous study that identified local air hubs and main roads as important geospatial attributes lio residing in the county. In the second scenario, we used the model to generate projections of the impact of potential easing on the non-pharmaceutical interventions in the critical care capacity of each county in Ohio. We assessed the impact of 50% reduction on the estimated impact of non-pharmaceutical interventions in reducing the hazard rate of infection. Under this scenario we calculated the proportion of ICU \n'"},
+    {"id": 1, "text": "t model incorporates geographic connectivity information at county level. The Susceptible-Infected-Hospitalized-Recovered- Dead (SIHRD) COVID-19 model classified the population into susceptibles (S), confirmed infections (I), hospitalized and ICU admitted (H), recovered (R) and dead (D). Based on a previous study that identified local air hubs and main roads as important geospatial attributes linked to differential COVID-19 related hospitalizations and mortality (Correa-Agudelo et a"}
+]
+
+list_of_strings = ["I have a variable a, the value is 1", "I have a variable b, the value is 2"]
+list_of_numbers = [1, 2, 3, 4, 5]
+
 if __name__ == "__main__":
     run_pz = True
     dataset = "askem"
@@ -41,10 +49,11 @@ if __name__ == "__main__":
 
     if run_pz:
         # reference, plan, stats = run_workload()
-        excerpts = Dataset(file_path, schema=TextFile)
+        df_input = pd.DataFrame(dict_of_excerpts)
+        excerpts = Dataset(file_path)
         output = excerpts.convert(
-            Variable, desc="A variable used or introduced in the paper snippet", cardinality=pz.Cardinality.ONE_TO_MANY
-        )
+            Variable, desc="A variable used or introduced in the context", cardinality=pz.Cardinality.ONE_TO_MANY
+        ).filter("The value name is 'a'", depends_on="name")
         # policy = pz.MinCost()
         policy = MaxQuality()
         # iterable  =  pz.Execute(output,
@@ -81,7 +90,7 @@ if __name__ == "__main__":
         # )
         #
         # engine.plan.operators[1] = bonded_convert
-        print("Generated plan:", engine.plan)
+        print("Generated plan:\n", engine.plan)
         with st.container():
             st.write("### Executed plan: \n")
             # st.write(" " + str(plan).replace("\n", "  \n "))
@@ -91,9 +100,9 @@ if __name__ == "__main__":
                 st.write(strop)
 
         input_records = engine.get_input_records()
-        input_df = DataRecord.as_df(input_records)
+        input_df = DataRecord.as_df(input_records, fields_in_schema=True)
         print(input_df)
-        
+
         variables = []
         statistics = []
         start_time = time.time()
@@ -105,9 +114,9 @@ if __name__ == "__main__":
                 total_plan_time = time.time() - start_time
                 engine.plan_stats.finalize(total_plan_time)
 
-            record_time = time.time()
             statistics.append(engine.plan_stats)
-
+            intermediate_vars = DataRecord.as_df(vars, fields_in_schema=True)
+            print(intermediate_vars)
             for var in vars:
                 # ref.key = ref.first_author.split()[0] + ref.title.split()[0] + str(ref.year)
                 try:

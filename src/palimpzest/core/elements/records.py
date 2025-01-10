@@ -181,30 +181,6 @@ class DataRecord:
         return f"{FROM_DF_PREFIX}_{updated_source_id}"
     
     @staticmethod
-    def _build_schema_from_df(df: pd.DataFrame) -> Schema:
-        # Create a unique schema name based on columns
-        schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
-        
-        if schema_name in globals():
-            return globals()[schema_name]
-            
-        # Create new schema only if it doesn't exist
-        new_schema = type(schema_name, (Schema,), {
-            '_desc': "Derived schema from DataFrame",
-            '__module__': Schema.__module__
-        })
-        
-        for col in df.columns:
-            setattr(new_schema, col, Field(
-                desc=f"{col}",
-                required=True
-            ))
-        
-        # Store the schema class globally
-        globals()[schema_name] = new_schema
-        return new_schema
-    
-    @staticmethod
     def from_df(df: pd.DataFrame, schema: Schema = None, source_id: int | str | None = None) -> list[DataRecord]:
         """Create a list of DataRecords from a pandas DataFrame
         
@@ -221,7 +197,7 @@ class DataRecord:
         
         records = []
         if schema is None:
-            schema = DataRecord._build_schema_from_df(df)
+            schema = Schema.from_df(df)
         source_id = DataRecord._build_source_id_from_df(source_id)
         for _, row in df.iterrows():
             record = DataRecord(schema=schema, source_id=source_id)
@@ -231,14 +207,23 @@ class DataRecord:
         return records
     
     @staticmethod
-    def as_df(records: list[DataRecord]) -> pd.DataFrame:
-        return pd.DataFrame([record.as_dict() for record in records])
-
+    def as_df(records: list[DataRecord], fields_in_schema: bool = False) -> pd.DataFrame:
+        if len(records) == 0:
+            return pd.DataFrame()
+        if not fields_in_schema:
+            return pd.DataFrame([record.as_dict() for record in records])
+        
+        fields = records[0].schema.field_names()
+        return pd.DataFrame([
+            {k: record.as_dict().get(k) for k in fields}
+            for record in records
+        ])
 
     def as_json_str(self, include_bytes: bool = True, project_cols: list[str] | None = None, *args, **kwargs):
         """Return a JSON representation of this DataRecord"""
         record_dict = self.as_dict(include_bytes, project_cols)
-        return self.schema().as_json_str(record_dict, *args, **kwargs)
+        include_data_cols = kwargs.pop('include_data_cols', True)
+        return self.schema().as_json_str(record_dict=record_dict, include_data_cols=include_data_cols, *args, **kwargs)
 
 
     def as_dict(self, include_bytes: bool = True, project_cols: list[str] | None = None):

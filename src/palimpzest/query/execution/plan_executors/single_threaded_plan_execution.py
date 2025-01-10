@@ -45,7 +45,7 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
         datasource = (
-            self.datadir.get_registered_dataset(source_operator.dataset_id)
+            source_operator.get_datasource()
             if isinstance(source_operator, MarshalAndScanDataOp)
             else self.datadir.get_cached_result(source_operator.dataset_id)
         )
@@ -175,7 +175,7 @@ class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
         datasource = (
-            self.datadir.get_registered_dataset(source_operator.dataset_id)
+            source_operator.get_datasource()
             if isinstance(source_operator, MarshalAndScanDataOp)
             else self.datadir.get_cached_result(source_operator.dataset_id)
         )

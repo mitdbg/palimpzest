@@ -104,7 +104,7 @@ class StreamingSequentialExecution(ExecutionEngine):
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
         datasource = (
-            self.datadir.get_registered_dataset(scan_operator.dataset_id)
+            scan_operator.get_datasource()
             if isinstance(scan_operator, MarshalAndScanDataOp)
             else self.datadir.get_cached_result(scan_operator.dataset_id)
         )

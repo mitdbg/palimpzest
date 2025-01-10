@@ -18,6 +18,9 @@ from palimpzest.core.data.datasources import (
     XLSFileDirectorySource,
 )
 
+from palimpzest.utils.hash_helpers import hash_for_id
+from palimpzest.constants import MAX_DATASET_ID_CHARS
+
 
 class DataDirectorySingletonMeta(type):
     _instances = {}
@@ -134,13 +137,22 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         self._registry[dataset_id] = ("memory", vals)
         with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
             pickle.dump(self._registry, f)
+    
+    # TODO(Jun): Consider to make dataset_id optional for all register_* methods
+    def get_or_register_memory_source(self, vals):
+        dataset_id = hash_for_id(str(vals), max_chars=MAX_DATASET_ID_CHARS)
+        if dataset_id in self._registry:
+            return self.get_registered_dataset(dataset_id)
+        else:
+            self.register_dataset(vals, dataset_id)
+        return self.get_registered_dataset(dataset_id)
 
     def register_user_source(self, src: UserSource, dataset_id: str):
         """Register a user source as a data source."""
         # user sources are always ephemeral
         self._registry[dataset_id] = ("user", src)
 
-    def get_or_register_source(self, dataset_id_or_path):
+    def get_or_register_local_source(self, dataset_id_or_path):
         """Return a dataset from the registry."""
         if dataset_id_or_path in self._registry:
             return self.get_registered_dataset(dataset_id_or_path)
@@ -281,7 +293,6 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         self._cache[cache_id] = filename
 
     def exists(self, dataset_id):
-        print("Checking if exists", dataset_id, "in", self._registry)
         return dataset_id in self._registry
 
     def get_path(self, dataset_id):

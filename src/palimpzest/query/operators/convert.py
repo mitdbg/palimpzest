@@ -477,7 +477,7 @@ class LLMConvert(ConvertOp):
 
         except Exception as e:
             print(f"Error parsing LLM answer: {e}")
-            print(f"\tAnswer: {answer}")
+            print(f"\tAnswer: {answer[:500]}")
             # msg = str(e)
             # if "line" in msg:
             #     line = int(str(msg).split("line ")[1].split(" ")[0])

@@ -2,8 +2,6 @@ import pytest
 
 from palimpzest.constants import Cardinality, Model, OptimizationStrategy
 from palimpzest.core.lib.schemas import TextFile
-from palimpzest.dataclasses import OperatorCostEstimates, PlanCost
-from palimpzest.datamanager import DataDirectory
 from palimpzest.core.elements.filters import Filter
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded
@@ -16,7 +14,8 @@ from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
 from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.sets import Dataset
-
+from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost
+from palimpzest.datamanager.datamanager import DataDirectory
 
 class TestPrimitives:
     def test_group_id_equality(self, email_schema):
@@ -314,7 +313,7 @@ class MockSampleBasedCostModel:
         # create source_op_estimates for datasources if they are not provided
         if isinstance(operator, DataSourcePhysicalOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.get_registered_dataset(operator.dataset_id)
+            datasource = operator.get_datasource()
             datasource_len = len(datasource)
 
             source_op_estimates = OperatorCostEstimates(

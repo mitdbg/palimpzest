@@ -78,7 +78,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         source_operator = plan.operators[0]
         source_op_id = source_operator.get_op_id()
         datasource = (
-            self.datadir.get_registered_dataset(source_operator.dataset_id)
+            source_operator.get_datasource()
             if isinstance(source_operator, MarshalAndScanDataOp)
             else self.datadir.get_cached_result(source_operator.dataset_id)
         )

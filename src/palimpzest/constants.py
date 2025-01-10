@@ -82,6 +82,7 @@ PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.3
 
 # character limit for various IDs
 MAX_ID_CHARS = 10
+MAX_DATASET_ID_CHARS = 16
 
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
 RETRY_MULTIPLIER = 2
