@@ -12,6 +12,7 @@ from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.utils.index_helpers import get_index_str
 from palimpzest.utils.hash_helpers import hash_for_id
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 #####################################################

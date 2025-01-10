@@ -18,17 +18,31 @@ from palimpzest.sets import Dataset
 from palimpzest.query import StreamingSequentialExecution
 from palimpzest.policy import MaxQuality
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.fields import Field
+from palimpzest.core.lib.schemas import Schema
+from palimpzest.core.lib.schemas import TextFile
+from palimpzest.sets import Dataset
+from palimpzest.query import StreamingSequentialExecution
+from palimpzest.policy import MaxQuality
+from palimpzest.core.elements.records import DataRecord
 
+class Papersnippet(TextFile):
 class Papersnippet(TextFile):
     """Represents an excerpt from a scientific research paper, which potentially contains variables"""
 
     excerptid = Field(desc="The unique identifier for the excerpt", required=True)
     excerpt = Field(desc="The text of the excerpt", required=True)
+    excerptid = Field(desc="The unique identifier for the excerpt", required=True)
+    excerpt = Field(desc="The text of the excerpt", required=True)
 
 
 class Variable(Schema):
+class Variable(Schema):
     """Represents a variable of scientific model in a scientific paper"""
 
+    name = Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
+    description = Field(desc="A description of the variable, optional, set 'null' if not found", required=False)
+    value = Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
     name = Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
     description = Field(desc="A description of the variable, optional, set 'null' if not found", required=False)
     value = Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
@@ -66,6 +80,7 @@ if __name__ == "__main__":
         #                         execution_engine=engine)
 
         engine = StreamingSequentialExecution(
+        engine = StreamingSequentialExecution(
             policy=policy,
             nocache=True,
             verbose=True,
@@ -99,7 +114,9 @@ if __name__ == "__main__":
                 st.write(strop)
 
         input_records = engine.get_input_records()
-        input_df = DataRecord.as_df(input_records, fields_in_schema=True)
+        input_df = DataRecord.as_df(input_records)
+        print(input_df)
+                input_df = DataRecord.as_df(input_records, fields_in_schema=True)
         print(input_df)
 
         variables = []
