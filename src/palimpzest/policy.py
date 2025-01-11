@@ -1,4 +1,4 @@
-from palimpzest.dataclasses import PlanCost
+from palimpzest.core.data.dataclasses import PlanCost
 
 
 class Policy:

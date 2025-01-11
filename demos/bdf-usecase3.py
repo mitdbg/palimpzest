@@ -12,12 +12,11 @@ import networkx as nx
 import pandas as pd
 import streamlit as st  # type: ignore
 from palimpzest.constants import Cardinality
-from palimpzest.corelib.fields import Field
-from palimpzest.corelib.schemas import PDFFile, Schema
-from palimpzest.datamanager import DataDirectory
-from palimpzest.execution.execute import Execute
-from palimpzest.execution.streaming_execution import StreamingSequentialExecution
+from palimpzest.core.lib.fields import Field
+from palimpzest.core.lib.schemas import PDFFile, Schema
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost
+from palimpzest.query import Execute, StreamingSequentialExecution
 from palimpzest.sets import Dataset
 
 if not os.environ.get("OPENAI_API_KEY"):

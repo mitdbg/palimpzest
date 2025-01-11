@@ -10,10 +10,11 @@ import time
 import pandas as pd
 import streamlit as st
 from palimpzest.constants import Cardinality
-from palimpzest.corelib.fields import Field
-from palimpzest.corelib.schemas import Schema, TextFile
-from palimpzest.execution.streaming_execution import StreamingSequentialExecution
+from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.fields import Field
+from palimpzest.core.lib.schemas import Schema, TextFile
 from palimpzest.policy import MaxQuality
+from palimpzest.query import StreamingSequentialExecution
 from palimpzest.sets import Dataset
 
 
@@ -44,17 +45,7 @@ if __name__ == "__main__":
         )
 
         engine = StreamingSequentialExecution
-        # policy = MinCost()
         policy = MaxQuality()
-        # iterable  =  Execute(output,
-        #                         policy = policy,
-        #                         nocache=True,
-        #                         verbose=True,
-        #                         allow_code_synth=False,
-        #                         allow_token_reduction=False,
-        #                         allow_bonded_query=True,
-        #                         execution_engine=engine)
-
         engine = StreamingSequentialExecution(
             policy=policy,
             nocache=True,
@@ -75,7 +66,9 @@ if __name__ == "__main__":
                 st.write(strop)
 
         input_records = engine.get_input_records()
-
+        input_df = DataRecord.as_df(input_records)
+        print(input_df)
+        
         variables = []
         statistics = []
         start_time = time.time()

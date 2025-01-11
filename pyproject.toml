@@ -15,7 +15,7 @@ dependencies = [
     "colorama>=0.4.6",
     "fastapi~=0.100.0",
     "fuzzywuzzy>=0.18.0",
-    "google-generativeai==0.4.1",
+    "google-generativeai>=0.8.0",
     "gradio>=4.20.1",
     "grobid-client-python==0.0.5",
     "ipython>=8.26.0",

@@ -5,22 +5,20 @@ import random
 from pathlib import Path
 
 from palimpzest.constants import Model, OptimizationStrategy
-from palimpzest.corelib.fields import BooleanField, ListField, StringField
-from palimpzest.corelib.schemas import Schema
-from palimpzest.datamanager import DataDirectory
-from palimpzest.datasources import ValidationDataSource
-from palimpzest.elements.records import DataRecord
-from palimpzest.execution.execute import Execute
-from palimpzest.execution.mab_sentinel_execution import (
+from palimpzest.core.data.datasources import ValidationDataSource
+from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.fields import BooleanField, ListField, StringField
+from palimpzest.core.lib.schemas import Schema
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.policy import MaxQuality, MinCost, MinTime
+from palimpzest.query import (
+    Execute,
     MABSequentialParallelSentinelExecution,
     MABSequentialSingleThreadSentinelExecution,
-)
-from palimpzest.execution.nosentinel_execution import (
     NoSentinelPipelinedParallelExecution,
     NoSentinelPipelinedSingleThreadExecution,
     NoSentinelSequentialSingleThreadExecution,
 )
-from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.sets import Dataset
 from palimpzest.utils.model_helpers import get_models
 from ragatouille import RAGPretrainedModel

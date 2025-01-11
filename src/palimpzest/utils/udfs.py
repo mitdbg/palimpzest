@@ -12,7 +12,7 @@ import requests
 from papermage import Document
 
 from palimpzest.constants import MAX_ROWS
-from palimpzest.datamanager import DataDirectory
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.tools.pdfparser import get_text_from_pdf
 
 

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from typing import Callable
 
-from palimpzest.constants import MAX_ID_CHARS, AggFunc, Cardinality
-from palimpzest.corelib.schemas import Number, Schema
-from palimpzest.datamanager import DataDirectory
-from palimpzest.datasources import DataSource
-from palimpzest.elements.filters import Filter
-from palimpzest.elements.groupbysig import GroupBySig
+from palimpzest.constants import AggFunc, Cardinality
+from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.elements.filters import Filter
+from palimpzest.core.elements.groupbysig import GroupBySig
+from palimpzest.core.lib.schemas import Number, Schema
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.index_helpers import get_index_str
 
 
@@ -112,8 +112,8 @@ class Set:
         """Return a unique identifier for this Set."""
         d = self.serialize()
         ordered = json.dumps(d, sort_keys=True)
-        result = hashlib.sha256(ordered.encode()).hexdigest()
-        return result[:MAX_ID_CHARS]
+        result = hash_for_id(ordered)
+        return result
 
     def json_schema(self):
         """Return the JSON schema for this Set."""

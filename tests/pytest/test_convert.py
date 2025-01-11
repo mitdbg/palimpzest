@@ -11,11 +11,11 @@ sys.path.append("./tests/")
 sys.path.append("./tests/refactor-tests/")
 
 from palimpzest.constants import Model, PromptStrategy
-from palimpzest.corelib.schemas import File, TextFile
-from palimpzest.datamanager import DataDirectory
-from palimpzest.elements.records import DataRecord
-from palimpzest.operators.convert import LLMConvertBonded, LLMConvertConventional
-from palimpzest.operators.datasource import MarshalAndScanDataOp
+from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.schemas import File, TextFile
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.query.operators.convert import LLMConvertBonded, LLMConvertConventional
+from palimpzest.query.operators.datasource import MarshalAndScanDataOp
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env

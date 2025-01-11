@@ -1,6 +1,6 @@
 import os
 
-from palimpzest.datamanager import DataDirectory
+from palimpzest.datamanager.datamanager import DataDirectory
 
 
 def remove_cache():

@@ -6,18 +6,18 @@ from pathlib import Path
 import gradio as gr
 import numpy as np
 from palimpzest.constants import Cardinality, OptimizationStrategy
-from palimpzest.corelib.fields import BooleanField, Field, ImageFilepathField, ListField, NumericField, StringField
-from palimpzest.corelib.schemas import Schema, Table, TextFile, XLSFile
-from palimpzest.datamanager import DataDirectory
-from palimpzest.datasources import UserSource
-from palimpzest.elements.records import DataRecord
-from palimpzest.execution.execute import Execute
-from palimpzest.execution.nosentinel_execution import (
+from palimpzest.core.data.datasources import UserSource
+from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.fields import BooleanField, Field, ImageFilepathField, ListField, NumericField, StringField
+from palimpzest.core.lib.schemas import Schema, Table, TextFile, XLSFile
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.policy import MaxQuality, MinCost, MinTime
+from palimpzest.query import (
+    Execute,
     NoSentinelPipelinedParallelExecution,
     NoSentinelPipelinedSingleThreadExecution,
     NoSentinelSequentialSingleThreadExecution,
 )
-from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.sets import Dataset
 from palimpzest.utils.udfs import xls_to_tables
 from PIL import Image

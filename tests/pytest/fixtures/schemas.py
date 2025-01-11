@@ -1,6 +1,6 @@
 import pytest
-from palimpzest.corelib.fields import BooleanField, Field, ImageFilepathField, ListField, NumericField, StringField
-from palimpzest.corelib.schemas import Schema, TextFile
+from palimpzest.core.lib.fields import BooleanField, Field, ImageFilepathField, ListField, NumericField, StringField
+from palimpzest.core.lib.schemas import Schema, TextFile
 
 
 ### SCHEMAS ###

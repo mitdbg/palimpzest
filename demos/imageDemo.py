@@ -7,12 +7,11 @@ import time
 
 import gradio as gr
 import numpy as np
-from palimpzest.corelib.fields import Field
-from palimpzest.corelib.schemas import ImageFile
-from palimpzest.datamanager import DataDirectory
-from palimpzest.execution.execute import Execute
-from palimpzest.execution.nosentinel_execution import NoSentinelPipelinedParallelExecution
+from palimpzest.core.lib.fields import Field
+from palimpzest.core.lib.schemas import ImageFile
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality
+from palimpzest.query import Execute, NoSentinelPipelinedParallelExecution
 from palimpzest.sets import Dataset
 from PIL import Image
 

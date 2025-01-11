@@ -18,8 +18,8 @@ $ pip install .
 ## Downloading test data
 To run the provided demos, you will need to download the test data. Due to the size of the data, we are unable to include it in the repository. You can download the test data by running the following command from a unix terminal (requires `wget` and `tar`):
 ```
-chmod +x testdata/download_testdata.sh
-./testdata/download_testdata.sh
+chmod +x testdata/download-testdata.sh
+./testdata/download-testdata.sh
 ```
 For convenience, we have also provided a script to register all test data with Palimpzest:
 ```

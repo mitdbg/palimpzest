@@ -1,15 +1,14 @@
 import time
 
 import pytest
-
-from palimpzest.datamanager import DataDirectory
-from palimpzest.execution.nosentinel_execution import (
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.query.execution.nosentinel_execution import (
     NoSentinelPipelinedParallelExecution,
     NoSentinelSequentialSingleThreadExecution,
 )
-from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvert
-from palimpzest.operators.convert import LLMConvert
-from palimpzest.operators.filter import LLMFilter
+from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
+from palimpzest.query.operators.convert import LLMConvert
+from palimpzest.query.operators.filter import LLMFilter
 
 
 @pytest.mark.parametrize(

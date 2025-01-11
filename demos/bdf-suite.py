@@ -9,14 +9,13 @@ import time
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
-import streamlit as st  # type: ignore
+import streamlit as st
 from palimpzest.constants import Cardinality
-from palimpzest.corelib.fields import Field
-from palimpzest.corelib.schemas import URL, File, PDFFile, Schema, Table, XLSFile
-from palimpzest.datamanager import DataDirectory
-from palimpzest.execution.execute import Execute
-from palimpzest.execution.streaming_execution import StreamingSequentialExecution
+from palimpzest.core.lib.fields import Field
+from palimpzest.core.lib.schemas import URL, File, PDFFile, Schema, Table, XLSFile
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality
+from palimpzest.query import Execute, StreamingSequentialExecution
 from palimpzest.sets import Dataset
 from palimpzest.utils import udfs
 
