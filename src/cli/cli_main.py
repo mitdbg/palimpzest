@@ -331,6 +331,53 @@ def set_config(name: str) -> None:
     _print_msg(f"Set config: {name}")
 
 
+@cli.command(aliases=["uc", "update"])
+@click.option("--name", type=str, default=None, required=True, help="Name of the config to update.")
+@click.option(
+    "--settings", 
+    type=str, 
+    required=True, 
+    help="Parameters to update in format 'param1=value1,param2=value2'. Example: 'llmservice=openai,parallel=true,pdfprocessor=pdfplumber'"
+)
+def update_config(name: str, settings: str) -> None:
+    """
+    Update multiple parameters in an existing Palimpzest config.
+
+    Parameters
+    ----------
+    name: str
+        Name of the config to update
+    params: str
+        Comma-separated list of parameter=value pairs to update
+    """
+    from palimpzest.config import Config
+    from palimpzest.constants import PZ_DIR
+
+    # check that config exists
+    if not os.path.exists(os.path.join(PZ_DIR, f"config_{name}.yaml")):
+        raise InvalidCommandError(f"Config with name {name} does not exist.")
+
+    # load the specified config
+    config = Config(name)
+    
+    # Parse the params string into a dictionary
+    try:
+        param_pairs = settings.split(',')
+        updates = {}
+        for pair in param_pairs:
+            if pair.strip() == "":
+                continue
+            param, value = pair.split('=')
+            updates[param.strip()] = value.strip()
+    except Exception as e:
+        raise InvalidCommandError("Invalid params format. Use: param1=value1,param2=value2") from e
+    
+    # Update each parameter
+    for param, value in updates.items():
+        config.set(param, value)
+    
+    _print_msg(f"Updated config {name} with: {updates}")
+
 def main():
     """
     Entrypoint for Palimpzest CLI tool implemented using Click.
@@ -345,4 +392,5 @@ def main():
     cli.add_command(create_config)
     cli.add_command(rm_config)
     cli.add_command(set_config)
+    cli.add_command(update_config)
     cli()
