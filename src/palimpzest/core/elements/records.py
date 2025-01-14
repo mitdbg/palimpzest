@@ -28,8 +28,8 @@ class DataRecord:
         # schema for the data record
         self.schema = schema
 
-        # mapping from field names to Field objects; effectively a mapping from a field name to its type
-        self.field_types: dict[str, Field] = {}
+        # mapping from field names to Field objects; effectively a mapping from a field name to its type        
+        self.field_types: dict[str, Field] = schema.field_map()
 
         # mapping from field names to their values
         self.field_values: dict[str, Any] = {}
@@ -67,7 +67,7 @@ class DataRecord:
 
 
     def __setattr__(self, name: str, value: Any, /) -> None:
-        if name in ["schema", "field_values"]:
+        if name in ["schema", "field_types", "field_values", "source_id", "parent_id", "cardinality_idx", "passed_operator", "id"]:
             super().__setattr__(name, value)
         else:
             self.field_values[name] = value
@@ -99,7 +99,7 @@ class DataRecord:
 
 
     def __eq__(self, other):
-        return isinstance(other, DataRecord) and self.field_values == other.field_values and self.schema == other.schema
+        return isinstance(other, DataRecord) and self.field_values == other.field_values and self.schema.get_desc() == other.schema.get_desc()
 
 
     def __hash__(self):
@@ -233,7 +233,7 @@ class DataRecord:
         
         for col in df.columns:
             # NOTE: we may need some way of inferring whether fields are images
-            setattr(new_schema, col, Field(desc=f"{col}", is_image_field=False))
+            setattr(new_schema, col, Field(desc=f"{col}"))
         
         # Store the schema class globally
         globals()[schema_name] = new_schema
@@ -261,9 +261,10 @@ class DataRecord:
         field_map = schema.field_map()
         source_id = DataRecord._build_source_id_from_df(source_id)
         for _, row in df.iterrows():
+            row_dict = row.to_dict()
             record = DataRecord(schema=schema, source_id=source_id)
-            record.field_values = row.to_dict()
-            record.field_types = {field_name: field_map[field_name] for field_name in row}
+            record.field_values = row_dict
+            record.field_types = {field_name: field_map[field_name] for field_name in row_dict}
             records.append(record)
 
         return records

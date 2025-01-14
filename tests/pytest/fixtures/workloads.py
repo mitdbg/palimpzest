@@ -1,4 +1,3 @@
-import palimpzest as pz
 import pytest
 from palimpzest.constants import Cardinality
 from palimpzest.core.lib.schemas import Table, TextFile, XLSFile
@@ -86,7 +85,7 @@ def biofabric_workload(biofabric_tiny, case_data_schema):
 @pytest.fixture
 def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_schema):
     # construct plan with three converts
-    dataset = pz.Dataset(enron_eval_tiny, schema=email_schema)
+    dataset = Dataset(enron_eval_tiny, schema=email_schema)
     dataset = dataset.convert(foobar_schema)
     dataset = dataset.convert(baz_schema)
 
@@ -95,7 +94,7 @@ def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_sc
 @pytest.fixture
 def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
     # construct plan with two converts and two filters
-    dataset = pz.Dataset(enron_eval_tiny, schema=TextFile)
+    dataset = Dataset(enron_eval_tiny, schema=TextFile)
     dataset = dataset.filter("filter1")
     dataset = dataset.convert(email_schema)
 
@@ -104,7 +103,7 @@ def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
 @pytest.fixture
 def two_converts_two_filters_workload(enron_eval_tiny, email_schema, foobar_schema):
     # construct plan with two converts and two filters
-    dataset = pz.Dataset(enron_eval_tiny, schema=email_schema)
+    dataset = Dataset(enron_eval_tiny, schema=email_schema)
     dataset = dataset.convert(foobar_schema)
     dataset = dataset.filter("filter1", depends_on=["sender"])
     dataset = dataset.filter("filter2", depends_on=["subject"])

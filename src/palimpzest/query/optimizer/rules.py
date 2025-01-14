@@ -142,7 +142,7 @@ class PushDownFilter(TransformationRule):
                 # otherwise, lookup or create expression's group and add it to the new expressions
                 else:
                     # first, compute the fields for the group
-                    all_fields = new_input_fields.update(new_generated_fields)
+                    all_fields = {**new_input_fields, **new_generated_fields}
 
                     # next, compute the properties; the properties will be identical to those of the input group
                     # EXCEPT for the filters which will change as a result of our swap
@@ -365,7 +365,7 @@ class TokenReducedConvertRule(ImplementationRule):
             for field_name, field in logical_expression.input_fields.items()
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
-        return isinstance(logical_op, ConvertScan) and is_image_conversion and logical_op.udf is None
+        return isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
@@ -515,7 +515,7 @@ class RAGConvertRule(ImplementationRule):
             for field_name, field in logical_expression.input_fields.items()
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
-        return isinstance(logical_op, ConvertScan) and is_image_conversion and logical_op.udf is None
+        return isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:

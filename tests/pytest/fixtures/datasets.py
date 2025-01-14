@@ -24,7 +24,7 @@ class RealEstateListingFiles(Schema):
     )
 
 class Number(Schema):
-    value = NumericField(desc="The value of the number", required=True)
+    value = NumericField(desc="The value of the number")
 
 
 class RealEstateListingSource(UserSource):

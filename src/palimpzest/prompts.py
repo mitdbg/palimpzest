@@ -16,9 +16,9 @@ Remember, your answer must be TRUE or FALSE. Finish your response with a newline
 An example is shown below:
 ---
 CONTEXT:
-{
+{{
   "text": "The quick brown fox jumps over the lazy dog."
-}
+}}
 
 INPUT FIELDS:
 - text: a short passage of text
@@ -41,10 +41,10 @@ Remember, your answer must be TRUE or FALSE. Finish your response with a newline
 An example is shown below (the image will be provided in a subsequent message, suppose it is an image of a dog playing with a cat):
 ---
 CONTEXT:
-{
+{{
   "image": <bytes>,
   "photographer": "CameraEnthusiast1"
-}
+}}
 
 INPUT FIELDS:
 - image: an image of a scene
@@ -69,10 +69,10 @@ You will be provided with a description of each input field and each output fiel
 An example is shown below:
 ---
 CONTEXT:
-{
+{{
   "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
   "birthday": "December 10, 1815"
-}
+}}
 
 INPUT FIELDS:
 - text: a text passage describing a scientist
@@ -87,10 +87,10 @@ Let's think step by step in order to answer the question.
 REASONING: the text passage mentions the scientist's name as "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace" and the scientist's birthday as "December 10, 1815". Therefore, the name of the scientist is "Augusta Ada King" and the birth year is 1815.
 
 ANSWER:
-{
+{{
   "name": "Augusta Ada King",
   "birth_year": 1815
-}
+}}
 ---
 
 """
@@ -106,10 +106,10 @@ You will be provided with a description of each input field and each output fiel
 An example is shown below:
 ---
 CONTEXT:
-{
+{{
   "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
   "birthday": "December 10, 1815"
-}
+}}
 
 INPUT FIELDS:
 - text: a text passage describing a scientist
@@ -137,10 +137,10 @@ You will be provided with a description of each input field and each output fiel
 An example is shown below:
 ---
 CONTEXT:
-{
+{{
   "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
   "birthday": "December 10, 1815"
-}
+}}
 
 MODEL RESPONSE 1: the text mentions the scientist's full name "Augusta Ada King, Countess of Lovelace" and states she was an English mathematician who worked on Babbage's Analytical Engine.
 
@@ -159,10 +159,10 @@ Let's think step by step in order to answer the question.
 REASONING: Looking at both model responses, they agree that the scientist's formal name is "Augusta Ada King". Model Response 2 correctly extracts the birth year from the birthday field as 1815. The responses are consistent and provide sufficient evidence for these values.
 
 ANSWER:
-{
+{{
   "name": "Augusta Ada King",
   "birth_year": 1815
-}
+}}
 ---
 
 """
@@ -176,10 +176,10 @@ You will be provided with a description of each output field. All of the fields 
 An example is shown below (the image will be provided in a subsequent message, suppose it is an image of a dog playing with a cat):
 ---
 CONTEXT:
-{
+{{
   "image": <bytes>,
   "photographer": "CameraEnthusiast1"
-}
+}}
 
 INPUT FIELDS:
 - image: an image of a scene
@@ -194,10 +194,10 @@ Let's think step by step in order to answer the question.
 REASONING: The image shows a dog playing with a cat, so there is a dog in the image. There is no person in the image.
 
 ANSWER:
-{
+{{
   "dog_in_image": true,
   "person_in_image": false
-}
+}}
 ---
 
 """

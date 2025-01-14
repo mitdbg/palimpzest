@@ -16,7 +16,6 @@ class ScientificPaper(PDFFile):
 
     title = Field(
         desc="The title of the paper. This is a natural language title, not a number or letter.",
-        required=True,
     )
     publication_year = Field(desc="The year the paper was published. This is a number.")
     author = Field(desc="The name of the first author of the paper")
@@ -27,11 +26,11 @@ class ScientificPaper(PDFFile):
 class Email(TextFile):
     """Represents an email, which in practice is usually from a text file"""
 
-    sender = Field(desc="The email address of the sender", required=True)
-    subject = Field(desc="The subject of the email", required=True)
+    sender = Field(desc="The email address of the sender")
+    subject = Field(desc="The subject of the email")
 
 class DogImage(ImageFile):
-    breed = Field(desc="The breed of the dog", required=True)
+    breed = Field(desc="The breed of the dog")
 
 def build_sci_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""

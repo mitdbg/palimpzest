@@ -8,7 +8,8 @@ This method is a simple wrapper for different methods, e.g., from_csv, from_yml,
 import json
 import os
 
-import palimpzest as pz
+import palimpzest.core.lib.fields as pz_fields
+import palimpzest.core.lib.schemas as pz_schemas
 import pandas as pd
 import yaml
 from palimpzest.core.lib.fields import Field
@@ -76,7 +77,8 @@ class SchemaBuilder:
         if schema_type is None:
             if schema_data.get('type', None):
                 # Find if the schema type is a valid class in pz
-                parsed_type = getattr(pz, schema_data['type'], Schema)
+                parsed_type = getattr(pz_schemas
+                                      , schema_data['type'], Schema)
                 schema_type = parsed_type if issubclass(parsed_type, Schema) else Schema
             else:
                 schema_type = Schema
@@ -94,7 +96,7 @@ class SchemaBuilder:
             name = field['name']
             description = field.get('description', '')
             field_type = field.get('type', 'Field')
-            field_type = getattr(pz, field_type, Field)
+            field_type = getattr(pz_fields, field_type, Field)
             if not issubclass(field_type, Field):
                 field_type = Field
                   

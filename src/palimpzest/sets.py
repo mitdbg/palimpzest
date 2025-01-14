@@ -69,7 +69,7 @@ class Set:
         self._k = k
         self._limit = limit
         self._cardinality = cardinality
-        self._depends_on = None if depends_on is None else sorted(depends_on)
+        self._depends_on = [] if depends_on is None else sorted(depends_on)
         self._nocache = nocache
 
     def __str__(self):
@@ -140,12 +140,6 @@ class Dataset(Set):
         # intialize class
         super().__init__(source, *args, **kwargs)
 
-        if self._depends_on is None:
-            self._depends_on = []
-
-        elif isinstance(self._depends_on, str):
-            self._depends_on = [self._depends_on]
-
     def copy(self) -> Dataset:
         source_copy = self._source.copy()
         dataset_copy = Dataset(
@@ -181,6 +175,9 @@ class Dataset(Set):
         else:
             raise Exception("Filter type not supported.", type(_filter))
 
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+
         return Dataset(
             source=self,
             schema=self.schema,
@@ -198,6 +195,9 @@ class Dataset(Set):
         desc: str = "Convert to new schema",
     ) -> Dataset:
         """Convert the Set to a new schema."""
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+
         return Dataset(
             source=self,
             schema=output_schema,

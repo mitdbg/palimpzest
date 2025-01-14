@@ -452,122 +452,124 @@ class NoSentinelPipelinedParallelExecution(NoSentinelExecutionEngine, PipelinedP
         PipelinedParallelPlanExecutor.__init__(self, *args, **kwargs)
         self.progress_manager = None
 
-    def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
-        """Initialize the stats and execute the plan with progress reporting."""
-        if self.verbose:
-            print("----------------------")
-            print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
-            print(plan)
-            print("---")
+    # def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
+    #     """Initialize the stats and execute the plan with progress reporting."""
+    #     if self.verbose:
+    #         print("----------------------")
+    #         print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
+    #         print(plan)
+    #         print("---")
 
-        plan_start_time = time.time()
+    #     plan_start_time = time.time()
 
-        # Initialize progress manager
-        self.progress_manager = create_progress_manager()
+    #     # Initialize progress manager
+    #     self.progress_manager = create_progress_manager()
 
-        # initialize plan stats and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
-        for op in plan.operators:
-            op_id = op.get_op_id()
-            op_name = op.op_name()
-            op_details = {k: str(v) for k, v in op.get_id_params().items()}
-            plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details)
+    #     # initialize plan stats and operator stats
+    #     plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
+    #     for op in plan.operators:
+    #         op_id = op.get_op_id()
+    #         op_name = op.op_name()
+    #         op_details = {k: str(v) for k, v in op.get_id_params().items()}
+    #         plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details)
 
-        # initialize list of output records and intermediate variables
-        output_records = []
-        source_records_scanned = 0
-        current_scan_idx = self.scan_start_idx
+    #     # initialize list of output records and intermediate variables
+    #     output_records = []
+    #     source_records_scanned = 0
+    #     current_scan_idx = self.scan_start_idx
 
-        # get handle to DataSource and pre-compute its size
-        source_operator = plan.operators[0]
-        datasource = (
-            self.datadir.get_registered_dataset(source_operator.dataset_id)
-            if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
-        datasource_len = len(datasource)
+    #     # get handle to DataSource and pre-compute its size
+    #     source_operator = plan.operators[0]
+    #     datasource = (
+    #         self.datadir.get_registered_dataset(source_operator.dataset_id)
+    #         if isinstance(source_operator, MarshalAndScanDataOp)
+    #         else self.datadir.get_cached_result(source_operator.dataset_id)
+    #     )
+    #     datasource_len = len(datasource)
 
-        # Calculate total work units - each record needs to go through each operator
-        total_ops = len(plan.operators)
-        total_items = min(num_samples, datasource_len) if num_samples != float("inf") else datasource_len
-        total_work_units = total_items * total_ops
-        self.progress_manager.start(total_work_units)
-        work_units_completed = 0
+    #     # Calculate total work units - each record needs to go through each operator
+    #     total_ops = len(plan.operators)
+    #     total_items = min(num_samples, datasource_len) if num_samples != float("inf") else datasource_len
+    #     total_work_units = total_items * total_ops
+    #     self.progress_manager.start(total_work_units)
+    #     work_units_completed = 0
 
-        try:
-            with ThreadPoolExecutor(max_workers=plan_workers) as executor:
-                # initialize processing queues and futures for each operation
-                processing_queues = {op.get_op_id(): [] for op in plan.operators}
-                futures = []
+    #     try:
+    #         with ThreadPoolExecutor(max_workers=plan_workers) as executor:
+    #             # initialize processing queues and futures for each operation
+    #             processing_queues = {op.get_op_id(): [] for op in plan.operators}
+    #             futures = []
 
-                # execute the plan until either:
-                # 1. all records have been processed, or
-                # 2. the final limit operation has completed
-                finished_executing, keep_scanning_source_records = False, True
-                last_work_units_completed = 0
-                while not finished_executing:
-                    # Process completed futures
-                    done_futures, not_done_futures = wait(futures, timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
-                    futures = list(not_done_futures)
+    #             # execute the plan until either:
+    #             # 1. all records have been processed, or
+    #             # 2. the final limit operation has completed
+    #             finished_executing, keep_scanning_source_records = False, True
+    #             last_work_units_completed = 0
+    #             while not finished_executing:
+    #                 # Process completed futures
+    #                 done_futures, not_done_futures = wait(futures, timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
+    #                 futures = list(not_done_futures)
 
-                    for future in done_futures:
-                        record_set, operator = future.result()
-                        op_id = operator.get_op_id()
-                        op_idx = next(i for i, op in enumerate(plan.operators) if op.get_op_id() == op_id)
-                        next_op_id = plan.operators[op_idx + 1].get_op_id() if op_idx + 1 < len(plan.operators) else None
+    #                 for future in done_futures:
+    #                     record_set, operator = future.result()
+    #                     op_id = operator.get_op_id()
+    #                     op_idx = next(i for i, op in enumerate(plan.operators) if op.get_op_id() == op_id)
+    #                     next_op_id = plan.operators[op_idx + 1].get_op_id() if op_idx + 1 < len(plan.operators) else None
 
-                        # Update progress for completed operation
-                        work_units_completed += len(record_set.data_records)
-                        if work_units_completed > last_work_units_completed:
-                            self.progress_manager.update(
-                                work_units_completed,
-                                f"Completed {operator.__class__.__name__} on {len(record_set.data_records)} records"
-                            )
-                            last_work_units_completed = work_units_completed
+    #                     # Update progress for completed operation
+    #                     work_units_completed += len(record_set.data_records)
+    #                     if work_units_completed > last_work_units_completed:
+    #                         self.progress_manager.update(
+    #                             work_units_completed,
+    #                             f"Completed {operator.__class__.__name__} on {len(record_set.data_records)} records"
+    #                         )
+    #                         last_work_units_completed = work_units_completed
 
-                        # Process records
-                        for record in record_set:
-                            if isinstance(operator, FilterOp) and not record.passed_operator:
-                                continue
-                            if next_op_id is not None:
-                                processing_queues[next_op_id].append(record)
-                            else:
-                                output_records.append(record)
+    #                     # Process records
+    #                     for record in record_set:
+    #                         if isinstance(operator, FilterOp) and not record.passed_operator:
+    #                             continue
+    #                         if next_op_id is not None:
+    #                             processing_queues[next_op_id].append(record)
+    #                         else:
+    #                             output_records.append(record)
 
-                    # Submit new tasks
-                    for _, operator in enumerate(plan.operators):
-                        op_id = operator.get_op_id()
+    #                 # Submit new tasks
+    #                 for _, operator in enumerate(plan.operators):
+    #                     op_id = operator.get_op_id()
                         
-                        if isinstance(operator, DataSourcePhysicalOp) and keep_scanning_source_records:
-                            # Submit source operator task
-                            candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
-                            candidate.idx = current_scan_idx
-                            candidate.get_item_fn = datasource.get_item
-                            futures.append(executor.submit(self.execute_op_wrapper, operator, candidate))
-                            current_scan_idx += 1
-                            keep_scanning_source_records = current_scan_idx < datasource_len and source_records_scanned < num_samples
+    #                     if isinstance(operator, DataSourcePhysicalOp) and keep_scanning_source_records:
+    #                         # Submit source operator task
+    #                         candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
+    #                         candidate.idx = current_scan_idx
+    #                         candidate.get_item_fn = datasource.get_item
+    #                         futures.append(executor.submit(self.execute_op_wrapper, operator, candidate))
+    #                         current_scan_idx += 1
+    #                         keep_scanning_source_records = current_scan_idx < datasource_len and source_records_scanned < num_samples
                         
-                        elif len(processing_queues[op_id]) > 0:
-                            # Submit task for next record in queue
-                            input_record = processing_queues[op_id].pop(0)
-                            futures.append(executor.submit(self.execute_op_wrapper, operator, input_record))
+    #                     elif len(processing_queues[op_id]) > 0:
+    #                         # Submit task for next record in queue
+    #                         input_record = processing_queues[op_id].pop(0)
+    #                         futures.append(executor.submit(self.execute_op_wrapper, operator, input_record))
 
-                    # Check if we're done
-                    still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
-                    finished_executing = not keep_scanning_source_records and not still_processing and len(futures) == 0
+    #                 # Check if we're done
+    #                 still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
+    #                 finished_executing = not keep_scanning_source_records and not still_processing and len(futures) == 0
 
-            # if caching was allowed, close the cache
-            if not self.nocache:
-                for operator in plan.operators:
-                    self.datadir.close_cache(operator.target_cache_id)
+    #         # if caching was allowed, close the cache
+    #         if not self.nocache:
+    #             for operator in plan.operators:
+    #                 self.datadir.close_cache(operator.target_cache_id)
 
-            # finalize plan stats
-            total_plan_time = time.time() - plan_start_time
-            plan_stats.finalize(total_plan_time)
+    #         # finalize plan stats
+    #         total_plan_time = time.time() - plan_start_time
+    #         plan_stats.finalize(total_plan_time)
 
-        finally:
-            # Always finish progress tracking
-            if self.progress_manager:
-                self.progress_manager.finish()
+    #     finally:
+    #         # Always finish progress tracking
+    #         if self.progress_manager:
+    #             self.progress_manager.finish()
 
-        return output_records, plan_stats
+    #     return output_records, plan_stats
+
+    

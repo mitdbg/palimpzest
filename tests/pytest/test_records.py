@@ -7,8 +7,8 @@ from palimpzest.core.lib.schemas import Schema
 
 # Example test schema
 class TestSchema(Schema):
-    name = Field(desc="Test name field", required=True)
-    value = Field(desc="Test value field", required=True)
+    name = Field(desc="Test name field")
+    value = Field(desc="Test value field")
 
 
 class TestDataRecord:
@@ -32,7 +32,7 @@ class TestDataRecord:
         """Test basic record creation and attribute access"""
         assert sample_record.name == "test"
         assert sample_record.value == 42
-        assert sample_record._source_id == "test_source"
+        assert sample_record.source_id == "test_source"
 
     def test_record_equality(self, sample_record):
         """Test record equality comparison"""

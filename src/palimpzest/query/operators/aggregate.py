@@ -154,7 +154,7 @@ class AverageAggregateOp(AggregateOp):
         super().__init__(*args, **kwargs)
         self.agg_func = agg_func
 
-        if not self.input_schema == Number:
+        if not self.input_schema.get_desc() == Number.get_desc():
             raise Exception("Aggregate function AVERAGE is only defined over Numbers")
 
     def __str__(self):

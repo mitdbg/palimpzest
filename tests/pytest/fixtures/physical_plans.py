@@ -24,8 +24,8 @@ def scan_only_plan():
 def non_llm_filter_plan():
     scan_op = MarshalAndScanDataOp(output_schema=File, dataset_id="enron-eval-tiny")
 
-    def filter_emails(record):
-        return record.filename in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
+    def filter_emails(record: dict):
+        return record["filename"] in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
 
     filter = Filter(filter_fn=filter_emails)
     filter_op = NonLLMFilter(input_schema=File, output_schema=File, filter=filter, target_cache_id="abc123")

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import time
 from typing import Any, Dict, Tuple
 
 from palimpzest.constants import Cardinality, GPT_4o_MODEL_CARD, Model
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
-from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.elements.records import DataRecord
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.prompts import ADVICEGEN_PROMPT, CODEGEN_PROMPT, EXAMPLE_PROMPT
 from palimpzest.query.generators.generators import code_ensemble_execution, generator_factory
@@ -184,7 +183,7 @@ class CodeSynthesisConvert(LLMConvert):
         # set field_to_code_ensemble and code_synthesized to True
         return field_to_code_ensemble, generation_stats
 
-    def _bonded_query_fallback(self, candidate: DataRecord, start_time: float):
+    def _bonded_query_fallback(self, candidate: DataRecord) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
         fields_to_generate = self.get_fields_to_generate(candidate, self.input_schema, self.output_schema)
         candidate_dict = candidate.as_dict(include_bytes=False, project_cols=self.depends_on)
         candidate = candidate.copy(include_bytes=False, project_cols=self.depends_on)
@@ -203,21 +202,12 @@ class CodeSynthesisConvert(LLMConvert):
         field_answers = {field: [] if answers is None else answers for field, answers in field_answers.items()}
 
         # transform the mapping from fields to answers into a (list of) DataRecord(s)
-        drs, successful_convert = self._create_data_records_from_field_answers(field_answers, candidate)
-
-        # construct DataRecordSet object
-        record_set = self._create_record_set(
-            records=drs,
-            fields=fields_to_generate,
-            generation_stats=generation_stats,
-            total_time=time.time() - start_time,
-            successful_convert=successful_convert,
-        )
+        drs, _ = self._create_data_records_from_field_answers(field_answers, candidate)
 
         # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
         #       keep an eye out for a regression in code synth performance and revert if necessary
         # update operator's set of exemplars
-        exemplars = [(candidate_dict, dr.as_dict(include_bytes=False)) for dr in record_set]
+        exemplars = [(candidate_dict, dr.as_dict(include_bytes=False)) for dr in drs]
         self.exemplars.extend(exemplars)
 
         # if we are allowed to cache exemplars across plan executions, add exemplars to cache
@@ -226,21 +216,14 @@ class CodeSynthesisConvert(LLMConvert):
             exemplars_cache_id = self.get_op_id()
             cache.put_cached_data("codeExemplars", exemplars_cache_id, exemplars)
 
-        return record_set
+        return field_answers, generation_stats
 
-    def __call__(self, candidate: DataRecord) -> DataRecordSet:
-        "This code is used for codegen with a fallback to default"
-        start_time = time.time()
+    def is_image_conversion(self):
+        """Code synthesis is disallowed on image conversions, so this must be False."""
+        return False
 
-        fields_to_generate = self.get_fields_to_generate(candidate, self.input_schema, self.output_schema)
-        # NOTE: the following is how we used to compute the candidate_dict; now that I am disallowing
-        # code synthesis for one-to-many queries, I don't think we need to invoke the as_json_str() method,
-        # which helped format the tabular data in the "rows" column for Medical Schema Matching.
-        # In the longer term, we should come up with a proper solution to make as_dict() properly format
-        # data which relies on the schema's as_json_str method.
-        #   candidate_dict_str = candidate.as_json_str(include_bytes=False, include_data_cols=False)
-        #   candidate_dict = json.loads(candidate_dict_str)
-        #   candidate_dict = {k: v for k, v in candidate_dict.items() if v != "<bytes>"}
+    def convert(self, candidate: DataRecord, fields_to_generate: list[str] | None = None) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
+        # get the dictionary fields for the candidate
         candidate_dict = candidate.as_dict(include_bytes=False, project_cols=self.depends_on)
 
         # Check if code was already synthesized, or if we have at least one converted sample
@@ -257,9 +240,10 @@ class CodeSynthesisConvert(LLMConvert):
                 self.field_to_code_ensemble = self._fetch_cached_code(fields_to_generate)
 
         # if we have yet to synthesize code (perhaps b/c we are waiting for more exemplars),
-        # use GPT-4 to perform the convert (and generate high-quality exemplars) using a bonded query
-        if not len(self.field_to_code_ensemble):
-            return self._bonded_query_fallback(candidate, start_time)
+        # use the exemplar generation model to perform the convert (and generate high-quality
+        # exemplars) using a bonded query
+        if not len(self.field_to_code_ensemble):            
+            return self._bonded_query_fallback(candidate)
 
         # if we have synthesized code run it on each field
         field_answers = {}
@@ -286,7 +270,6 @@ class CodeSynthesisConvert(LLMConvert):
                 # if there is a failure, run a conventional query
                 if self.verbose:
                     print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
-                # candidate_content = json.dumps(candidate_dict)
 
                 # execute the conventional convert
                 conventional_op = LLMConvertConventional(
@@ -316,19 +299,7 @@ class CodeSynthesisConvert(LLMConvert):
         # for the vanilla LLMConvert, we simply replace any None values with an empty list
         field_answers = {field: [] if answers is None else answers for field, answers in field_answers.items()}
 
-        # transform the mapping from fields to answers into a (list of) DataRecord(s)
-        drs, successful_convert = self._create_data_records_from_field_answers(field_answers, candidate)
-
-        # construct DataRecordSet object
-        record_set = self._create_record_set(
-            records=drs,
-            fields=fields_to_generate,
-            generation_stats=generation_stats,
-            total_time=time.time() - start_time,
-            successful_convert=successful_convert,
-        )
-
-        return record_set
+        return field_answers, generation_stats
 
 
 class CodeSynthesisConvertNone(CodeSynthesisConvert):

@@ -7,8 +7,9 @@ from palimpzest.query.execution.nosentinel_execution import (
     NoSentinelSequentialSingleThreadExecution,
 )
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
-from palimpzest.query.operators.convert import LLMConvert
+from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
+from palimpzest.query.operators.rag_convert import RAGConvert
 
 
 @pytest.mark.parametrize(
@@ -107,13 +108,14 @@ class TestParallelExecutionNoCache:
         execution.source_dataset_id = dataset
 
         # mock out calls to generators used by the plans which parameterize this test
-        mocker.patch.object(LLMFilter, "__call__", side_effect=side_effect)
-        mocker.patch.object(LLMConvert, "__call__", side_effect=side_effect)
-        mocker.patch.object(CodeSynthesisConvert, "__call__", side_effect=side_effect)
+        mocker.patch.object(LLMFilter, "filter", side_effect=side_effect)
+        mocker.patch.object(LLMConvertBonded, "convert", side_effect=side_effect)
+        mocker.patch.object(CodeSynthesisConvert, "convert", side_effect=side_effect)
+        mocker.patch.object(RAGConvert, "convert", side_effect=side_effect)
 
         # execute the plan
         output_records, plan_stats = execution.execute_plan(physical_plan)
-        plan_stats.finalize(time.time() - start_time)
+        plan_stats.finalize(time.time() - start_time)        
 
         # check that we get the expected set of output records
         def get_id(record):

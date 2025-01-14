@@ -15,11 +15,11 @@ class Field:
     paper_journal = Field(desc="The name of the journal that published the paper")
     ```
     """
+    is_image_field = False
 
-    def __init__(self, desc: str = "", is_image_field: bool = False) -> None:
+    def __init__(self, desc: str = "") -> None:
         self._desc = desc
         self.type = None
-        self.is_image_field = is_image_field
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
@@ -90,9 +90,12 @@ class ListField(Field, list):
     """A field representing a list of elements of specified types, with full list functionality."""
 
     def __init__(self, element_type: Field, desc: str):
-        super().__init__(desc=desc, is_image_field=element_type.is_image_field)
+        super().__init__(desc=desc)
         self.element_type = element_type
         self.type = list
+
+        if element_type.is_image_field:
+            self.__class__.is_image_field = True
 
 
 class NumericField(Field):
@@ -113,20 +116,23 @@ class StringField(Field):
 
 class ImageFilepathField(StringField):
     """An ImageFilepathField is a StringField that contains the filepath to an image."""
+    is_image_field = True
 
     def __init__(self, desc: str):
-        super().__init__(desc=desc, is_image_field=True)
+        super().__init__(desc=desc)
 
 
 class ImageURLField(StringField):
     """An ImageURLField is a StringField that contains the publicly accessible URL for an image."""
+    is_image_field = True
 
     def __init__(self, desc: str):
-        super().__init__(desc=desc, is_image_field=True)
+        super().__init__(desc=desc)
 
 
 class ImageBase64Field(BytesField):
     """An ImageBase64Field is a BytesField that contains a base64 encoded image."""
+    is_image_field = True
 
     def __init__(self, desc: str):
-        super().__init__(desc=desc, is_image_field=True)
+        super().__init__(desc=desc)

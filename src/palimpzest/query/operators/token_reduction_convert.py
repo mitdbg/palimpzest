@@ -90,6 +90,10 @@ class TokenReducedConvert(LLMConvert):
         naive_op_cost_estimates.quality_upper_bound = naive_op_cost_estimates.quality
 
         return naive_op_cost_estimates
+    
+    def is_image_conversion(self) -> bool:
+        """TokenReducedConvert is currently disallowed on image conversions, so this must be False."""
+        return False
 
     def reduce_context(self, full_context: str) -> str:
         range = find_best_range(

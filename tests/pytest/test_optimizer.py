@@ -29,8 +29,9 @@ class TestPrimitives:
         LogicalExpression(
             operator=filter1_op,
             input_group_ids=[0],
-            input_fields=set(["contents"]),
-            generated_fields=set([]),
+            input_fields={"contents": TextFile.field_map()["contents"]},
+            depends_on_field_names=set(["contents"]),
+            generated_fields={},
             group_id=None,
         )
         filter2_op = FilteredScan(
@@ -43,8 +44,9 @@ class TestPrimitives:
         filter2_expr = LogicalExpression(
             operator=filter2_op,
             input_group_ids=[1],
-            input_fields=set(["contents"]),
-            generated_fields=set([]),
+            input_fields={"contents": TextFile.field_map()["contents"]},
+            depends_on_field_names=set(["contents"]),
+            generated_fields={},
             group_id=None,
         )
         convert_op = ConvertScan(
@@ -57,8 +59,9 @@ class TestPrimitives:
         convert_expr = LogicalExpression(
             operator=convert_op,
             input_group_ids=[2],
-            input_fields=set(["contents"]),
-            generated_fields=set([]),
+            input_fields={"contents": TextFile.field_map()["contents"]},
+            depends_on_field_names=set(["contents"]),
+            generated_fields={"sender": email_schema.field_map()["sender"], "subject": email_schema.field_map()["subject"]},
             group_id=None,
         )
         g1_properties = {
@@ -66,7 +69,12 @@ class TestPrimitives:
         }
         g1 = Group(
             logical_expressions=[convert_expr],
-            fields=set(["sender", "subject", "contents", "filename"]),
+            fields = {
+                "sender": email_schema.field_map()["sender"],
+                "subject": email_schema.field_map()["subject"],
+                "contents": TextFile.field_map()["contents"],
+                "filename": TextFile.field_map()["filename"],
+            },
             properties=g1_properties,
         )
         g2_properties = {
@@ -74,7 +82,12 @@ class TestPrimitives:
         }
         g2 = Group(
             logical_expressions=[filter2_expr],
-            fields=set(["sender", "subject", "contents", "filename"]),
+            fields = {
+                "sender": email_schema.field_map()["sender"],
+                "subject": email_schema.field_map()["subject"],
+                "contents": TextFile.field_map()["contents"],
+                "filename": TextFile.field_map()["filename"],
+            },
             properties=g2_properties,
         )
         assert g1.group_id == g2.group_id

@@ -74,6 +74,10 @@ class RAGConvert(LLMConvert):
 
         return naive_op_cost_estimates
 
+    def is_image_conversion(self) -> bool:
+        """RAGConvert is currently disallowed on image conversions, so this must be False."""
+        return False
+
     def chunk_text(self, text: str, chunk_size: int) -> list[str]:
         """
         Given a text string, chunk it into substrings of length chunk_size.

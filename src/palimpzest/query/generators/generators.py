@@ -374,7 +374,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         if completion is not None:
             usage = self._get_usage(completion, **kwargs)
             # finish_reason = self._get_finish_reason(completion, **kwargs)
-            # answer_log_probs = self._get_log_probs(completion, **kwargs)
+            # answer_log_probs = self._get_answer_log_probs(completion, **kwargs)
 
             # get cost per input/output token for the model and parse number of input and output tokens
             usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
@@ -520,7 +520,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
         """Extract the finish reason from the completion object."""
         return completion.choices[0].finish_reason
 
-    def _get_log_probs(self, completion: ChatCompletion, **kwargs) -> list[float]:
+    def _get_answer_log_probs(self, completion: ChatCompletion, **kwargs) -> list[float]:
         """Extract the log probabilities from the completion object."""
         return completion.choices[0].logprobs
 
@@ -614,7 +614,7 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
         """Extract the finish reason from the completion object."""
         return completion.choices[0].finish_reason.value
 
-    def _get_log_probs(self, completion: ChatCompletionResponse, **kwargs) -> list[float]:
+    def _get_answer_log_probs(self, completion: ChatCompletionResponse, **kwargs) -> list[float]:
         """Extract the log probabilities from the completion object."""
         return completion.choices[0].logprobs
 

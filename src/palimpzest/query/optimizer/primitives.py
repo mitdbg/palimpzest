@@ -4,7 +4,6 @@ from palimpzest.core.lib.fields import Field
 from palimpzest.query.operators.logical import LogicalOperator
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.plan import PlanCost
-from palimpzest.query.optimizer.rules import Rule
 from palimpzest.utils.hash_helpers import hash_for_id
 
 
@@ -49,7 +48,7 @@ class Expression:
         hash_id = int(hash_for_id(hash_str), 16)
         return hash_id
 
-    def add_applied_rule(self, rule: Rule):
+    def add_applied_rule(self, rule):
         self.rules_applied.add(rule.get_rule_id())
 
     def set_group_id(self, group_id: int) -> None:

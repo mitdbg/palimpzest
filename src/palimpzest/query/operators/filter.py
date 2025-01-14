@@ -23,21 +23,21 @@ from palimpzest.utils.model_helpers import get_vision_models
 class FilterOp(PhysicalOperator, ABC):
     def __init__(self, filter: Filter, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        assert self.input_schema == self.output_schema, "Input and output schemas must match for FilterOp"
-        self.filter = filter
+        assert self.input_schema.get_desc() == self.output_schema.get_desc(), "Input and output schemas must match for FilterOp"
+        self.filter_obj = filter
 
     def __str__(self):
         op = super().__str__()
-        op += f"    Filter: {str(self.filter)}\n"
+        op += f"    Filter: {str(self.filter_obj)}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
-        return {"filter": str(self.filter), **id_params}
+        return {"filter": str(self.filter_obj), **id_params}
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        return {"filter": self.filter, **op_params}
+        return {"filter": self.filter_obj, **op_params}
 
     @abstractmethod
     def is_image_filter(self) -> bool:
@@ -89,7 +89,7 @@ class FilterOp(PhysicalOperator, ABC):
             time_per_record=total_time,
             cost_per_record=generation_stats.cost_per_record,
             model_name=self.get_model_name(),
-            filter_str=self.filter.get_filter_str(),
+            filter_str=self.filter_obj.get_filter_str(),
             total_input_tokens=generation_stats.total_input_tokens,
             total_output_tokens=generation_stats.total_output_tokens,
             total_input_cost=generation_stats.total_input_cost,
@@ -150,11 +150,11 @@ class NonLLMFilter(FilterOp):
         answer = {}
         try:
             # execute the UDF filter
-            passed_operator = self.filter.filter_fn(candidate.as_dict())
+            passed_operator = self.filter_obj.filter_fn(candidate.as_dict())
             answer = {"passed_operator": passed_operator}
 
             if self.verbose:
-                print(f"{self.filter.get_filter_str()}:\n{passed_operator}")
+                print(f"{self.filter_obj.get_filter_str()}:\n{passed_operator}")
 
         except Exception as e:
             print(f"Error invoking user-defined function for filter: {e}")
@@ -208,7 +208,7 @@ class LLMFilter(FilterOp):
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
-        if self.image_filter:
+        if self.is_image_filter():
             est_num_input_tokens = 765 / 10  # 1024x1024 image is 765 tokens
 
         # NOTE: the output often generates an entire reasoning sentence, thus the true value may be higher
@@ -246,16 +246,16 @@ class LLMFilter(FilterOp):
         input_fields = self.get_input_fields()
 
         # construct kwargs for generation
-        gen_kwargs = {"project_cols": input_fields, "filter_condition": self.filter.filter_condition}
+        gen_kwargs = {"project_cols": input_fields, "filter_condition": self.filter_obj.filter_condition}
 
         # generate output
         field_answers, _, generation_stats = self.generator(candidate, ["passed_operator"], **gen_kwargs)
 
         # compute whether the record passed the filter or not
-        passed_operator = (
-            "true" in field_answers["passed_operator"].lower()
-            if field_answers["passed_operator"] is not None
-            else False
-        )
+        passed_operator = False
+        if isinstance(field_answers["passed_operator"], str):
+            passed_operator = "true" in field_answers["passed_operator"].lower()
+        elif isinstance(field_answers["passed_operator"], bool):
+            passed_operator = field_answers["passed_operator"]
 
         return {"passed_operator": passed_operator}, generation_stats

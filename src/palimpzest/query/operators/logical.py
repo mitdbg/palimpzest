@@ -153,8 +153,8 @@ class BaseScan(LogicalOperator):
     def __eq__(self, other) -> bool:
         return (
             isinstance(other, BaseScan)
-            and self.input_schema == other.input_schema
-            and self.output_schema == other.output_schema
+            and self.input_schema.get_desc() == other.input_schema.get_desc()
+            and self.output_schema.get_desc() == other.output_schema.get_desc()
             and self.dataset_id == other.dataset_id
         )
 

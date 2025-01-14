@@ -133,7 +133,7 @@ def get_one_filter_one_convert_plan(one_filter_one_convert_workload, enron_eval_
 
     # remove unnecessary convert because output schema from data source scan matches
     # input schema for the next operator
-    if len(dataset_nodes) > 1 and dataset_nodes[0].schema == dataset_nodes[1].schema:
+    if len(dataset_nodes) > 1 and dataset_nodes[0].schema.get_desc() == dataset_nodes[1].schema.get_desc():
         dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
         if len(dataset_nodes) > 1:
             dataset_nodes[1]._source = dataset_nodes[0]

@@ -286,7 +286,8 @@ class LLMConvert(ConvertOp):
         super().__init__(*args, **kwargs)
         self.model = model
         self.prompt_strategy = prompt_strategy
-        self.generator = generator_factory(model, prompt_strategy, self.cardinality, self.verbose)
+        if model is not None:
+            self.generator = generator_factory(model, prompt_strategy, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()

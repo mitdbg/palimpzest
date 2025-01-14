@@ -264,20 +264,24 @@ class Optimizer:
 
         # compute the input group ids and fields for this node
         input_group_ids, input_group_fields, input_group_properties = (
-            self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], set(), {})
+            self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], {}, {})
         )
 
         # compute the fields added by this operation and all fields
         input_group_short_field_names = list(map(lambda full_field: full_field.split(".")[-1], input_group_fields.keys()))
         new_fields = {
             field_name: field
-            for field_name, field in op.output_schema.field_map(unique=True, id=uid)
+            for field_name, field in op.output_schema.field_map(unique=True, id=uid).items()
             if (field_name.split(".")[-1] not in input_group_short_field_names) or (node._udf is not None)
         }
-        all_fields = input_group_fields.update(new_fields)
+        all_fields = {**input_group_fields, **new_fields}
 
         # compute the set of (short) field names this operation depends on
-        depends_on_field_names = {field_name.split(".")[-1] for field_name in node._depends_on}
+        depends_on_field_names = (
+            {}
+            if isinstance(node, DataSource)
+            else {field_name.split(".")[-1] for field_name in node._depends_on}
+        )
 
         # compute all properties including this operations'
         all_properties = deepcopy(input_group_properties)
@@ -339,7 +343,7 @@ class Optimizer:
 
         # remove unnecessary convert if output schema from data source scan matches
         # input schema for the next operator
-        if len(dataset_nodes) > 1 and dataset_nodes[0].schema == dataset_nodes[1].schema:
+        if len(dataset_nodes) > 1 and dataset_nodes[0].schema.get_desc() == dataset_nodes[1].schema.get_desc():
             dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
             if len(dataset_nodes) > 1:
                 dataset_nodes[1]._source = dataset_nodes[0]
