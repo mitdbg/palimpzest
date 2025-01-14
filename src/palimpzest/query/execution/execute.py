@@ -1,9 +1,9 @@
 from palimpzest.constants import Model, OptimizationStrategy
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.core.data.datasources import DataSource
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_engine import ExecutionEngine
 from palimpzest.query.execution.nosentinel_execution import NoSentinelSequentialSingleThreadExecution
-from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
 
@@ -35,7 +35,9 @@ class Execute:
         allow_conventional_query: bool = False,
         allow_model_selection: bool = True,
         allow_code_synth: bool = True,
-        allow_token_reduction: bool = True,
+        allow_token_reduction: bool = False,
+        allow_rag_reduction: bool = True,
+        allow_mixtures: bool = True,
         optimization_strategy: OptimizationStrategy = OptimizationStrategy.PARETO,
         execution_engine: ExecutionEngine = NoSentinelSequentialSingleThreadExecution,
         *args,
@@ -59,5 +61,7 @@ class Execute:
             allow_code_synth=allow_code_synth,
             allow_model_selection=allow_model_selection,
             allow_token_reduction=allow_token_reduction,
+            allow_rag_reduction=allow_rag_reduction,
+            allow_mixtures=allow_mixtures,
             optimization_strategy=optimization_strategy,
         ).execute(dataset=dataset, policy=policy)

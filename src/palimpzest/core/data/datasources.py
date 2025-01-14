@@ -13,8 +13,8 @@ from bs4 import BeautifulSoup
 from papermage import Document
 
 from palimpzest import constants
-from palimpzest.core.lib.schemas import File, ImageFile, Number, PDFFile, Schema, TextFile, WebPage, XLSFile
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.schemas import File, ImageFile, Number, PDFFile, Schema, TextFile, WebPage, XLSFile
 from palimpzest.tools.pdfparser import get_text_from_pdf
 
 

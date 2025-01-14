@@ -3,8 +3,14 @@ import argparse
 import os
 import time
 
-import palimpzest as pz
 from demo_core import execute_task, format_results_table
+from palimpzest.policy import MaxQuality, MinCost, MinTime
+from palimpzest.query import (
+    NoSentinelPipelinedParallelExecution,
+    NoSentinelPipelinedSingleThreadExecution,
+    NoSentinelSequentialSingleThreadExecution,
+)
+
 
 def main():
     # parse arguments
@@ -44,13 +50,13 @@ def main():
     profile = args.profile
 
     # Set policy
-    policy = pz.MaxQuality()
+    policy = MaxQuality()
     if args.policy == "mincost":
-        policy = pz.MinCost()
+        policy = MinCost()
     elif args.policy == "mintime":
-        policy = pz.MinTime()
+        policy = MinTime()
     elif args.policy == "maxquality":
-        policy = pz.MaxQuality()
+        policy = MaxQuality()
     else:
         print("Policy not supported for this demo")
         exit(1)
@@ -58,13 +64,12 @@ def main():
     # Set execution engine
     execution_engine = None
     executor = args.executor
-    import palimpzest.query
     if executor == "sequential":
-        execution_engine = pz.query.NoSentinelSequentialSingleThreadExecution
+        execution_engine = NoSentinelSequentialSingleThreadExecution
     elif executor == "pipelined":
-        execution_engine = pz.query.NoSentinelPipelinedSingleThreadExecution
+        execution_engine = NoSentinelPipelinedSingleThreadExecution
     elif executor == "parallel":
-        execution_engine = pz.query.NoSentinelPipelinedParallelExecution
+        execution_engine = NoSentinelPipelinedParallelExecution
     else:
         print("Executor not supported for this demo")
         exit(1)

@@ -1,5 +1,4 @@
 import pytest
-
 from palimpzest.constants import Model
 from palimpzest.query.operators.convert import ConvertOp
 from palimpzest.query.operators.datasource import MarshalAndScanDataOp

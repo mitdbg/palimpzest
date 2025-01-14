@@ -1,10 +1,10 @@
 import pytest
-
 from palimpzest.constants import Cardinality, Model, OptimizationStrategy
-from palimpzest.core.lib.schemas import TextFile
-from palimpzest.dataclasses import OperatorCostEstimates, PlanCost
-from palimpzest.datamanager import DataDirectory
+from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost
 from palimpzest.core.elements.filters import Filter
+from palimpzest.core.lib.schemas import TextFile
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded
 from palimpzest.query.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
@@ -14,7 +14,6 @@ from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
-from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.sets import Dataset
 
 
@@ -30,8 +29,9 @@ class TestPrimitives:
         LogicalExpression(
             operator=filter1_op,
             input_group_ids=[0],
-            input_fields=set(["contents"]),
-            generated_fields=set([]),
+            input_fields={"contents": TextFile.field_map()["contents"]},
+            depends_on_field_names=set(["contents"]),
+            generated_fields={},
             group_id=None,
         )
         filter2_op = FilteredScan(
@@ -44,23 +44,24 @@ class TestPrimitives:
         filter2_expr = LogicalExpression(
             operator=filter2_op,
             input_group_ids=[1],
-            input_fields=set(["contents"]),
-            generated_fields=set([]),
+            input_fields={"contents": TextFile.field_map()["contents"]},
+            depends_on_field_names=set(["contents"]),
+            generated_fields={},
             group_id=None,
         )
         convert_op = ConvertScan(
             input_schema=TextFile,
             output_schema=email_schema,
             cardinality=Cardinality.ONE_TO_ONE,
-            image_conversion=False,
             depends_on=[],
             target_cache_id="convert1",
         )
         convert_expr = LogicalExpression(
             operator=convert_op,
             input_group_ids=[2],
-            input_fields=set(["contents"]),
-            generated_fields=set([]),
+            input_fields={"contents": TextFile.field_map()["contents"]},
+            depends_on_field_names=set(["contents"]),
+            generated_fields={"sender": email_schema.field_map()["sender"], "subject": email_schema.field_map()["subject"]},
             group_id=None,
         )
         g1_properties = {
@@ -68,7 +69,12 @@ class TestPrimitives:
         }
         g1 = Group(
             logical_expressions=[convert_expr],
-            fields=set(["sender", "subject", "contents", "filename"]),
+            fields = {
+                "sender": email_schema.field_map()["sender"],
+                "subject": email_schema.field_map()["subject"],
+                "contents": TextFile.field_map()["contents"],
+                "filename": TextFile.field_map()["filename"],
+            },
             properties=g1_properties,
         )
         g2_properties = {
@@ -76,7 +82,12 @@ class TestPrimitives:
         }
         g2 = Group(
             logical_expressions=[filter2_expr],
-            fields=set(["sender", "subject", "contents", "filename"]),
+            fields = {
+                "sender": email_schema.field_map()["sender"],
+                "subject": email_schema.field_map()["subject"],
+                "contents": TextFile.field_map()["contents"],
+                "filename": TextFile.field_map()["filename"],
+            },
             properties=g2_properties,
         )
         assert g1.group_id == g2.group_id
@@ -124,6 +135,7 @@ class TestOptimizer:
             allow_code_synth=False,
             allow_conventional_query=False,
             allow_token_reduction=False,
+            allow_rag_reduction=False,
             allow_mixtures=False,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -226,6 +238,8 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
             allow_token_reduction=False,
+            allow_rag_reduction=False,
+            allow_mixtures=False,
             allow_code_synth=False,
             optimization_strategy=opt_strategy,
         )
@@ -374,6 +388,7 @@ class TestParetoOptimizer:
             allow_code_synth=False,
             allow_conventional_query=False,
             allow_token_reduction=False,
+            allow_rag_reduction=False,
             allow_mixtures=False,
         )
 

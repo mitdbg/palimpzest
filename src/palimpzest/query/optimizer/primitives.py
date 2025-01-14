@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import hashlib
-
-from palimpzest.constants import MAX_ID_CHARS
+from palimpzest.core.lib.fields import Field
 from palimpzest.query.operators.logical import LogicalOperator
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.plan import PlanCost
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class Expression:
@@ -19,13 +18,15 @@ class Expression:
         self,
         operator: LogicalOperator | PhysicalOperator,
         input_group_ids: list[int],
-        input_fields: set[str],
-        generated_fields: set[str],
+        input_fields: dict[str, Field],
+        depends_on_field_names: set[str],
+        generated_fields: dict[str, Field],
         group_id: int | None = None,
     ):
         self.operator = operator
         self.input_group_ids = input_group_ids
         self.input_fields = input_fields
+        self.depends_on_field_names = depends_on_field_names
         self.generated_fields = generated_fields
         self.group_id = group_id
         self.rules_applied = set()
@@ -44,7 +45,7 @@ class Expression:
     def __hash__(self):
         op_id = self.operator.get_logical_op_id() if isinstance(self.operator, LogicalOperator) else self.operator.get_op_id()
         hash_str = str(tuple(sorted(self.input_group_ids)) + (op_id, str(self.__class__.__name__)))
-        hash_id = int(hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS], 16)
+        hash_id = int(hash_for_id(hash_str), 16)
         return hash_id
 
     def add_applied_rule(self, rule):
@@ -72,7 +73,7 @@ class Group:
     Maintains a set of logical multi-expressions and physical multi-expressions.
     """
 
-    def __init__(self, logical_expressions: list[Expression], fields: set[str], properties: dict[str, set[str]]):
+    def __init__(self, logical_expressions: list[Expression], fields: dict[str, Field], properties: dict[str, set[str]]):
         self.logical_expressions = set(logical_expressions)
         self.physical_expressions = set()
         self.fields = fields
@@ -93,8 +94,8 @@ class Group:
         self.explored = True
 
     def compute_group_id(self) -> int:
-        # sort fields
-        sorted_fields = sorted(self.fields)
+        # sort field names
+        sorted_fields = sorted(self.fields.keys())
 
         # sort properties
         sorted_properties = []
@@ -102,5 +103,5 @@ class Group:
             sorted_properties.extend(sorted(self.properties[key]))
 
         hash_str = str(tuple(sorted_fields + sorted_properties))
-        hash_id = int(hashlib.sha256(hash_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS], 16)
+        hash_id = int(hash_for_id(hash_str), 16)
         return hash_id

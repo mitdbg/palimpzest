@@ -96,12 +96,16 @@ class RetrieveOp(PhysicalOperator):
         answer = {self.output_attr: top_k_results}
         record_state = output_dr.as_dict(include_bytes=False)
         record_state["_evidence_file_ids"] = top_k_result_doc_ids
-        generated_fields = self._generate_field_names(candidate, self.input_schema, self.output_schema)
+
+        # NOTE: right now this should be equivalent to [self.output_attr], but in the future we may
+        #       want to support the RetrieveOp generating multiple fields. (Also, the function will
+        #       return the full field name (as opposed to the short field name))
+        generated_fields = self.get_fields_to_generate(candidate, self.input_schema, self.output_schema)
 
         record_op_stats = RecordOpStats(
-            record_id=output_dr._id,
-            record_parent_id=output_dr._parent_id,
-            record_source_id=output_dr._source_id,
+            record_id=output_dr.id,
+            record_parent_id=output_dr.parent_id,
+            record_source_id=output_dr.source_id,
             record_state=record_state,
             op_id=self.get_op_id(),
             logical_op_id=self.logical_op_id,
@@ -111,7 +115,7 @@ class RetrieveOp(PhysicalOperator):
             answer=answer,
             input_fields=self.input_schema.field_names(),
             generated_fields=generated_fields,
-            fn_call_duration_secs=duration_secs,  # TODO(Siva): Currently tracking retrieval time in fn_call_duration_secs
+            fn_call_duration_secs=duration_secs,
             op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 

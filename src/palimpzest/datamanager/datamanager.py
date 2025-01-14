@@ -3,7 +3,6 @@ import pickle
 from threading import Lock
 
 import yaml
-
 from palimpzest import constants
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
@@ -140,19 +139,6 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         # user sources are always ephemeral
         self._registry[dataset_id] = ("user", src)
 
-    def get_or_register_source(self, dataset_id_or_path):
-        """Return a dataset from the registry."""
-        if dataset_id_or_path in self._registry:
-            return self.get_registered_dataset(dataset_id_or_path)
-        else:
-            if os.path.isfile(dataset_id_or_path):
-                self.register_local_file(dataset_id_or_path, dataset_id_or_path)
-            elif os.path.isdir(dataset_id_or_path):
-                self.register_local_directory(dataset_id_or_path, dataset_id_or_path)
-            else:
-                raise Exception(f"Path {dataset_id_or_path} is invalid. Does not point to a file or directory.")
-            return self.get_registered_dataset(dataset_id_or_path)
-
     def get_registered_dataset(self, dataset_id):
         """Return a dataset from the registry."""
         if dataset_id not in self._registry:
@@ -197,27 +183,6 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         entry, _ = self._registry[dataset_id]
 
         return entry
-
-    def get_cardinality(self, dataset_id):
-        """Return the number of records in a dataset."""
-        if dataset_id not in self._registry:
-            raise Exception("Cannot find dataset", dataset_id, "in the registry.")
-
-        entry, rock = self._registry[dataset_id]
-        if entry == "dir":
-            # Return the number of files in the directory
-            path = rock
-            return len([name for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
-        elif entry == "file":
-            # Return 1
-            return 1
-        elif entry == "memory":
-            # Return the number of elements in the values list
-            return len(rock)
-        elif entry == "user":
-            return rock.getCardinality()
-        else:
-            raise Exception("Unknown entry type")
 
     def list_registered_datasets(self):
         """Return a list of registered datasets."""

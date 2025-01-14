@@ -6,9 +6,10 @@ from typing import Callable
 import numpy as np
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, OptimizationStrategy
-from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.lib.schemas import SourceRecord
+from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_engine import ExecutionEngine
 from palimpzest.query.execution.plan_executors.parallel_plan_execution import PipelinedParallelPlanExecutor
 from palimpzest.query.execution.plan_executors.single_threaded_plan_execution import SequentialSingleThreadPlanExecutor
@@ -20,7 +21,6 @@ from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.optimizer.cost_model import CostModel, SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.plan import SentinelPlan
-from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
 
@@ -261,7 +261,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
             record_op_stats = record_set.record_op_stats[0]
             if only_using_champion:
                 champion_record = champion_record_set[0]
-                record_op_stats.quality = int(record_op_stats.passed_operator == champion_record._passed_operator)
+                record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
 
             # - if we are using validation data, we may have multiple expected records in the expected_record_set for this source_id,
             #   thus, if we can identify an exact match, we can use that to evaluate the filter's quality
@@ -281,10 +281,10 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                         break
 
                 if found_match_in_output:
-                    record_op_stats.quality = int(record_op_stats.passed_operator == expected_record._passed_operator)
+                    record_op_stats.quality = int(record_op_stats.passed_operator == expected_record.passed_operator)
                 else:
                     champion_record = champion_record_set[0]
-                    record_op_stats.quality = int(record_op_stats.passed_operator == champion_record._passed_operator)
+                    record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
 
         # if this is a successful convert operation
         else:
@@ -544,9 +544,9 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                         #       set by the scan operator when it returns the record
                         # get the source_id associated with this input record
                         source_id = (
-                            candidate._source_id
+                            candidate.source_id
                             if not (isinstance(op, (MarshalAndScanDataOp, CacheScanDataOp)))
-                            else record_set[0]._source_id
+                            else record_set[0].source_id
                         )
 
                 # select the champion (i.e. best) record_set from all the record sets computed for this candidate
@@ -611,7 +611,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
         # TODO: long-term, we should do something which does not rely on scanning validation source to build this mapping
         sample_idx_to_source_id = {
-            sample_idx: self.datasource.get_item(sample_idx, val=True)._source_id
+            sample_idx: self.datasource.get_item(sample_idx, val=True).source_id
             for sample_idx in range(total_num_samples)
         }
 
@@ -714,7 +714,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
                 # add records (which are not filtered) to the cache, if allowed
                 if not self.nocache:
                     for record in all_records:
-                        if getattr(record, "_passed_operator", True):
+                        if getattr(record, "passed_operator", True):
                             self.datadir.append_cache(logical_op_id, record)
 
                 # compute quality for each operator
@@ -794,6 +794,8 @@ class MABSentinelExecutionEngine(ExecutionEngine):
             allow_conventional_query=self.allow_conventional_query,
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
+            allow_rag_reduction=self.allow_rag_reduction,
+            allow_mixtures=self.allow_mixtures,
             optimization_strategy=OptimizationStrategy.SENTINEL,
         )
 
@@ -811,9 +813,9 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         if not self.using_validation_data:
             raise Exception("Make sure you are using ValidationDataSource with MABSentinelExecutionEngine")
 
-        # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
+        # if nocache is True, make sure we do not re-use codegen examples
         if self.nocache:
-            self.clear_cached_responses_and_examples()
+            self.clear_cached_examples()
 
         # create sentinel plan
         sentinel_plan = self.create_sentinel_plan(dataset, policy)
@@ -839,6 +841,8 @@ class MABSentinelExecutionEngine(ExecutionEngine):
             allow_conventional_query=self.allow_conventional_query,
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
+            allow_rag_reduction=self.allow_rag_reduction,
+            allow_mixtures=self.allow_mixtures,
             optimization_strategy=self.optimization_strategy,
             use_final_op_quality=self.use_final_op_quality,
         )

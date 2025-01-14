@@ -25,7 +25,7 @@ class GroupBySig:
 
     def serialize(self) -> dict[str, Any]:
         out = {
-            "groupByFields": self.group_by_fields,
+            "group_by_fields": self.group_by_fields,
             "agg_funcs": self.agg_funcs,
             "agg_fields": self.agg_fields,
         }
@@ -54,10 +54,10 @@ class GroupBySig:
         schema = type("CustomGroupBy", (OperatorDerivedSchema,), {})
 
         for g in self.group_by_fields:
-            f = Field(desc=g, required=True)
+            f = Field(desc=g)
             setattr(schema, g, f)
         ops = self.get_agg_field_names()
         for op in ops:
-            f = Field(desc=op, required=True)
+            f = Field(desc=op)
             setattr(schema, op, f)
         return schema

@@ -12,26 +12,25 @@ import requests
 from papermage import Document
 
 from palimpzest.constants import MAX_ROWS
-from palimpzest.core.lib.schemas import Table
-from palimpzest.datamanager import DataDirectory
-from palimpzest.core.elements.records import DataRecord
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
-def url_to_file(candidate):
+def url_to_file(candidate: dict):
     """Function used to convert a DataRecord instance of URL to a File DataRecord."""
-    candidate.filename = candidate.url.split("/")[-1]
-    candidate.timestamp = datetime.now().isoformat()
+    url = candidate["url"]
+    filename = url.split("/")[-1]
+    timestamp = datetime.now().isoformat()
     try:
-        contents = requests.get(candidate.url).content
+        contents = requests.get(url).content
     except Exception as e:
-        print(f"Error fetching URL {candidate.url}: {e}")
+        print(f"Error fetching URL {url}: {e}")
         contents = b""
-    candidate.contents = contents
-    return [candidate]
+
+    return {"filename": filename, "timestamp": timestamp, "contents": contents}
 
 
-def file_to_pdf(candidate):
+def file_to_pdf(candidate: dict):
     pdfprocessor = DataDirectory().current_config.get("pdfprocessor")
     if pdfprocessor == "modal":
         print("handling PDF processing remotely")
@@ -39,7 +38,7 @@ def file_to_pdf(candidate):
     else:
         remote_func = None
 
-    pdf_bytes = candidate.contents
+    pdf_bytes = candidate["contents"]
     # generate text_content from PDF
     if remote_func is not None:
         doc_json_str = remote_func.remote([pdf_bytes])
@@ -49,26 +48,21 @@ def file_to_pdf(candidate):
         for p in doc.pages:
             text_content += p.text
     else:
-        text_content = get_text_from_pdf(candidate.filename, candidate.contents)
+        text_content = get_text_from_pdf(candidate["filename"], candidate["contents"])
 
-    # construct data record
-    candidate.text_contents = text_content[:10000]  # TODO Very hacky
-
-    return [candidate]
+    return {"text_contents": text_content[:10000]}  # TODO Very hacky
 
 
-def file_to_xls(candidate):
+def file_to_xls(candidate: dict):
     """Function used to convert a DataRecord instance of File to a XLSFile DataRecord."""
-    xls = pd.ExcelFile(io.BytesIO(candidate.contents), engine="openpyxl")
-    candidate.number_sheets = len(xls.sheet_names)
-    candidate.sheet_names = xls.sheet_names
-    return [candidate]
+    xls = pd.ExcelFile(io.BytesIO(candidate["contents"]), engine="openpyxl")
+    return {"number_sheets": len(xls.sheet_names), "sheet_names": xls.sheet_names}
 
 
-def xls_to_tables(candidate):
+def xls_to_tables(candidate: dict):
     """Function used to convert a DataRecord instance of XLSFile to a Table DataRecord."""
-    xls_bytes = candidate.contents
-    sheet_names = candidate.sheet_names
+    xls_bytes = candidate["contents"]
+    sheet_names = candidate["sheet_names"]
 
     records = []
     for sheet_name in sheet_names:
@@ -76,15 +70,15 @@ def xls_to_tables(candidate):
 
         # TODO extend number of rows with dynamic sizing of context length
         # construct data record
-        dr = DataRecord.from_parent(Table, parent_record=candidate)
+        record = {}
         rows = []
         for row in dataframe.values[:100]:
             row_record = [str(x) for x in row]
             rows += [row_record]
-        dr.rows = rows[:MAX_ROWS]
-        dr.filename = candidate.filename
-        dr.header = dataframe.columns.values.tolist()
-        dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
-        records.append(dr)
+        record["rows"] = rows[:MAX_ROWS]
+        record["filename"] = candidate["filename"]
+        record["header"] = dataframe.columns.values.tolist()
+        record["name"] = candidate["filename"].split("/")[-1] + "_" + sheet_name
+        records.append(record)
 
     return records

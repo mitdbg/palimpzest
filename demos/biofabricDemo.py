@@ -9,7 +9,18 @@ import argparse
 import os
 import time
 
-import palimpzest as pz
+from palimpzest.constants import Cardinality
+from palimpzest.core.lib.fields import Field
+from palimpzest.core.lib.schemas import URL, Schema, Table, WebPage, XLSFile
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.policy import MaxQuality, MinCost
+from palimpzest.query import (
+    Execute,
+    NoSentinelPipelinedParallelExecution,
+    NoSentinelPipelinedSingleThreadExecution,
+    NoSentinelSequentialSingleThreadExecution,
+)
+from palimpzest.sets import Dataset
 from palimpzest.utils import udfs
 
 if not os.environ.get("OPENAI_API_KEY"):
@@ -18,30 +29,30 @@ if not os.environ.get("OPENAI_API_KEY"):
     load_env()
 
 
-class CaseData(pz.Schema):
+class CaseData(Schema):
     """An individual row extracted from a table containing medical study data."""
 
-    case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-    age_at_diagnosis = pz.Field(desc="The age of the patient at the time of diagnosis", required=False)
-    race = pz.Field(
-        desc="An arbitrary classification of a taxonomic group that is a division of a species.", required=False
+    case_submitter_id = Field(desc="The ID of the case")
+    age_at_diagnosis = Field(desc="The age of the patient at the time of diagnosis")
+    race = Field(
+        desc="An arbitrary classification of a taxonomic group that is a division of a species."
     )
-    ethnicity = pz.Field(
-        desc="Whether an individual describes themselves as Hispanic or Latino or not.", required=False
+    ethnicity = Field(
+        desc="Whether an individual describes themselves as Hispanic or Latino or not."
     )
-    gender = pz.Field(desc="Text designations that identify gender.", required=False)
-    vital_status = pz.Field(desc="The vital status of the patient", required=False)
-    ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
-    ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
-    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
-    tumor_grade = pz.Field(desc="The tumor grade", required=False)
-    tumor_focality = pz.Field(desc="The tumor focality", required=False)
-    tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter", required=False)
-    primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
-    morphology = pz.Field(desc="The morphology", required=False)
-    tissue_or_organ_of_origin = pz.Field(desc="The tissue or organ of origin", required=False)
-    # tumor_code = pz.Field(desc="The tumor code", required=False)
-    study = pz.Field(desc="The last name of the author of the study, from the table name", required=False)
+    gender = Field(desc="Text designations that identify gender.")
+    vital_status = Field(desc="The vital status of the patient")
+    ajcc_pathologic_t = Field(desc="The AJCC pathologic T")
+    ajcc_pathologic_n = Field(desc="The AJCC pathologic N")
+    ajcc_pathologic_stage = Field(desc="The AJCC pathologic stage")
+    tumor_grade = Field(desc="The tumor grade")
+    tumor_focality = Field(desc="The tumor focality")
+    tumor_largest_dimension_diameter = Field(desc="The tumor largest dimension diameter")
+    primary_diagnosis = Field(desc="The primary diagnosis")
+    morphology = Field(desc="The morphology")
+    tissue_or_organ_of_origin = Field(desc="The tissue or organ of origin")
+    # tumor_code = Field(desc="The tumor code")
+    study = Field(desc="The last name of the author of the study, from the table name")
 
 
 def print_table(output):
@@ -75,39 +86,39 @@ if __name__ == "__main__":
     executor = args.executor
     execution_engine = None
     if executor == "sequential":
-        execution_engine = pz.NoSentinelSequentialSingleThreadExecution
+        execution_engine = NoSentinelSequentialSingleThreadExecution
     elif executor == "pipelined":
-        execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
+        execution_engine = NoSentinelPipelinedSingleThreadExecution
     elif executor == "parallel":
-        execution_engine = pz.NoSentinelPipelinedParallelExecution
+        execution_engine = NoSentinelPipelinedParallelExecution
     else:
         print("Executor not supported for this demo")
         exit(1)
 
     if no_cache:
-        pz.DataDirectory().clear_cache(keep_registry=True)
+        DataDirectory().clear_cache(keep_registry=True)
 
     if policy == "cost":
-        policy = pz.MinCost()
+        policy = MinCost()
     elif policy == "quality":
-        policy = pz.MaxQuality()
+        policy = MaxQuality()
 
     if experiment == "collection":
-        papers_html = pz.Dataset("biofabric-html", schema=pz.WebPage)
+        papers_html = Dataset("biofabric-html", schema=WebPage)
         table_urls = papers_html.convert(
-            pz.URL, desc="The URLs of the XLS tables from the page", cardinality=pz.Cardinality.ONE_TO_MANY
+            URL, desc="The URLs of the XLS tables from the page", cardinality=Cardinality.ONE_TO_MANY
         )
         output = table_urls
-        # urlFile = pz.Dataset("biofabric-urls", schema=pz.TextFile)
-        # table_urls = table_urls.convert(pz.URL, desc="The URLs of the tables")
-        # tables = table_urls.convert(pz.File, udf=udfs.url_to_file)
-        # xls = tables.convert(pz.XLSFile, udf = udfs.file_to_xls)
-        # patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+        # urlFile = Dataset("biofabric-urls", schema=TextFile)
+        # table_urls = table_urls.convert(URL, desc="The URLs of the tables")
+        # tables = table_urls.convert(File, udf=udfs.url_to_file)
+        # xls = tables.convert(XLSFile, udf = udfs.file_to_xls)
+        # patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
         # output = patient_tables
 
     elif experiment == "filtering":
-        xls = pz.Dataset("biofabric-tiny", schema=pz.XLSFile)
-        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+        xls = Dataset("biofabric-tiny", schema=XLSFile)
+        patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         # patient_tables = patient_tables.filter("The table explains the meaning of attributes")
         # patient_tables = patient_tables.filter("The table contains patient biometric data")
@@ -116,23 +127,23 @@ if __name__ == "__main__":
         output = patient_tables
 
     elif experiment == "matching":
-        xls = pz.Dataset("biofabric-matching", schema=pz.XLSFile)
-        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+        xls = Dataset("biofabric-matching", schema=XLSFile)
+        patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
         case_data = patient_tables.convert(
-            CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY
+            CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
         )
         output = case_data
 
     elif experiment == "endtoend":
-        xls = pz.Dataset("biofabric-tiny", schema=pz.XLSFile)
-        patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+        xls = Dataset("biofabric-tiny", schema=XLSFile)
+        patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(
-            CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY
+            CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
         )
         output = case_data
 
-    tables, plan, stats = pz.Execute(
+    tables, plan, stats = Execute(
         output,
         policy=policy,
         nocache=True,

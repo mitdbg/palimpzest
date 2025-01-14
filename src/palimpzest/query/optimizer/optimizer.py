@@ -3,8 +3,10 @@ from __future__ import annotations
 from copy import deepcopy
 
 from palimpzest.constants import Model, OptimizationStrategy
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.lib.fields import Field
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.policy import Policy
 from palimpzest.query.operators.logical import (
     Aggregate,
     BaseScan,
@@ -14,9 +16,10 @@ from palimpzest.query.operators.logical import (
     GroupByAggregate,
     LimitScan,
     LogicalOperator,
+    Project,
     RetrieveScan,
 )
-from ..optimizer import (
+from palimpzest.query.optimizer import (
     IMPLEMENTATION_RULES,
     TRANSFORMATION_RULES,
 )
@@ -28,6 +31,7 @@ from palimpzest.query.optimizer.rules import (
     LLMConvertBondedRule,
     LLMConvertConventionalRule,
     MixtureOfAgentsConvertRule,
+    RAGConvertRule,
     TokenReducedConvertBondedRule,
     TokenReducedConvertConventionalRule,
     TokenReducedConvertRule,
@@ -39,7 +43,6 @@ from palimpzest.query.optimizer.tasks import (
     OptimizeLogicalExpression,
     OptimizePhysicalExpression,
 )
-from palimpzest.policy import Policy
 from palimpzest.sets import Dataset, Set
 from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_conventional_fallback_model
 
@@ -77,7 +80,8 @@ class Optimizer:
         allow_bonded_query: bool = True,
         allow_conventional_query: bool = False,
         allow_code_synth: bool = True,
-        allow_token_reduction: bool = True,
+        allow_token_reduction: bool = False,
+        allow_rag_reduction: bool = True,
         allow_mixtures: bool = True,
         optimization_strategy: OptimizationStrategy = OptimizationStrategy.PARETO,
         use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
@@ -117,6 +121,7 @@ class Optimizer:
             self.allow_conventional_query = False
             self.allow_code_synth = False
             self.allow_token_reduction = False
+            self.allow_rag_reduction = False
             self.allow_mixtures = False
             self.available_models = [available_models[0]]
 
@@ -128,6 +133,7 @@ class Optimizer:
         self.allow_conventional_query = allow_conventional_query
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
+        self.allow_rag_reduction = allow_rag_reduction
         self.allow_mixtures = allow_mixtures
         self.optimization_strategy = optimization_strategy
         self.use_final_op_quality = use_final_op_quality
@@ -157,6 +163,11 @@ class Optimizer:
                 rule for rule in self.implementation_rules if not issubclass(rule, TokenReducedConvertRule)
             ]
 
+        if not self.allow_rag_reduction:
+            self.implementation_rules = [
+                rule for rule in self.implementation_rules if not issubclass(rule, RAGConvertRule)
+            ]
+
         if not self.allow_mixtures:
             self.implementation_rules = [
                 rule for rule in self.implementation_rules
@@ -175,7 +186,7 @@ class Optimizer:
             "conventional_fallback_model": get_conventional_fallback_model(self.available_models),
         }
 
-    def construct_group_tree(self, dataset_nodes: list[Set]) -> tuple[list[int], set[str], dict[str, set[str]]]:
+    def construct_group_tree(self, dataset_nodes: list[Set]) -> tuple[list[int], dict[str, Field], dict[str, set[str]]]:
         # get node, output_schema, and input_schema(if applicable)
         node = dataset_nodes[-1]
         output_schema = node.schema
@@ -219,7 +230,13 @@ class Optimizer:
                 limit=node._limit,
                 target_cache_id=uid,
             )
-
+        elif node._project_cols is not None:
+            op = Project(
+                input_schema=input_schema,
+                output_schema=output_schema,
+                project_cols=node._project_cols,
+                target_cache_id=uid,
+            )
         elif node._index is not None:
             op = RetrieveScan(
                 input_schema=input_schema,
@@ -230,14 +247,12 @@ class Optimizer:
                 k=node._k,
                 target_cache_id=uid
             )
-
         elif output_schema != input_schema:
             op = ConvertScan(
                 input_schema=input_schema,
                 output_schema=output_schema,
                 cardinality=node._cardinality,
                 udf=node._udf,
-                image_conversion=node._image_conversion,
                 depends_on=node._depends_on,
                 target_cache_id=uid,
             )
@@ -249,19 +264,24 @@ class Optimizer:
 
         # compute the input group ids and fields for this node
         input_group_ids, input_group_fields, input_group_properties = (
-            self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], set(), {})
+            self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], {}, {})
         )
 
         # compute the fields added by this operation and all fields
-        input_group_short_fields = list(map(lambda full_field: full_field.split(".")[-1], input_group_fields))
-        new_fields = set(
-            [
-                field
-                for field in op.output_schema.field_names(unique=True, id=uid)
-                if (field.split(".")[-1] not in input_group_short_fields) or (node._udf is not None)
-            ]
+        input_group_short_field_names = list(map(lambda full_field: full_field.split(".")[-1], input_group_fields.keys()))
+        new_fields = {
+            field_name: field
+            for field_name, field in op.output_schema.field_map(unique=True, id=uid).items()
+            if (field_name.split(".")[-1] not in input_group_short_field_names) or (node._udf is not None)
+        }
+        all_fields = {**input_group_fields, **new_fields}
+
+        # compute the set of (short) field names this operation depends on
+        depends_on_field_names = (
+            {}
+            if isinstance(node, DataSource)
+            else {field_name.split(".")[-1] for field_name in node._depends_on}
         )
-        all_fields = new_fields.union(input_group_fields)
 
         # compute all properties including this operations'
         all_properties = deepcopy(input_group_properties)
@@ -275,17 +295,25 @@ class Optimizer:
                 all_properties["filters"] = set([op_filter_str])
 
         elif isinstance(op, LimitScan):
-            op_limit_str = op.get_op_id()
+            op_limit_str = op.get_logical_op_id()
             if "limits" in all_properties:
                 all_properties["limits"].add(op_limit_str)
             else:
                 all_properties["limits"] = set([op_limit_str])
+    
+        elif isinstance(op, Project):
+            op_project_str = op.get_logical_op_id()
+            if "projects" in all_properties:
+                all_properties["projects"].add(op_project_str)
+            else:
+                all_properties["projects"] = set([op_project_str])
 
         # construct the logical expression and group
         logical_expression = LogicalExpression(
             operator=op,
             input_group_ids=input_group_ids,
             input_fields=input_group_fields,
+            depends_on_field_names=depends_on_field_names,
             generated_fields=new_fields,
             group_id=None,
         )
@@ -315,7 +343,7 @@ class Optimizer:
 
         # remove unnecessary convert if output schema from data source scan matches
         # input schema for the next operator
-        if len(dataset_nodes) > 1 and dataset_nodes[0].schema == dataset_nodes[1].schema:
+        if len(dataset_nodes) > 1 and dataset_nodes[0].schema.get_desc() == dataset_nodes[1].schema.get_desc():
             dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
             if len(dataset_nodes) > 1:
                 dataset_nodes[1]._source = dataset_nodes[0]

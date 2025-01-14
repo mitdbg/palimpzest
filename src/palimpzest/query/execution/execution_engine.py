@@ -1,19 +1,17 @@
-import hashlib
 import multiprocessing
-import os
-import shutil
 from concurrent.futures import ThreadPoolExecutor
 
-from palimpzest.constants import MAX_ID_CHARS, Model, OptimizationStrategy
+from palimpzest.constants import Model, OptimizationStrategy
 from palimpzest.core.data.dataclasses import PlanStats, RecordOpStats
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.core.data.datasources import DataSource, ValidationDataSource
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.policy import Policy
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.plan import PhysicalPlan
-from palimpzest.policy import Policy
 from palimpzest.sets import Dataset, Set
+from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.model_helpers import get_models
 
 
@@ -32,7 +30,9 @@ class ExecutionEngine:
         allow_conventional_query: bool = False,
         allow_model_selection: bool = True,
         allow_code_synth: bool = True,
-        allow_token_reduction: bool = True,
+        allow_token_reduction: bool = False,
+        allow_rag_reduction: bool = True,
+        allow_mixtures: bool = True,
         optimization_strategy: OptimizationStrategy = OptimizationStrategy.PARETO,
         max_workers: int | None = None,
         num_workers_per_plan: int = 1,
@@ -55,6 +55,8 @@ class ExecutionEngine:
         self.allow_model_selection = allow_model_selection
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
+        self.allow_rag_reduction = allow_rag_reduction
+        self.allow_mixtures = allow_mixtures
         self.optimization_strategy = optimization_strategy
         self.max_workers = max_workers
         self.num_workers_per_plan = num_workers_per_plan
@@ -75,15 +77,12 @@ class ExecutionEngine:
             if not attr.startswith("_"):
                 id_str += f"{attr}={value},"
 
-        return hashlib.sha256(id_str.encode("utf-8")).hexdigest()[:MAX_ID_CHARS]
+        return hash_for_id(id_str)
 
-    def clear_cached_responses_and_examples(self):
+    def clear_cached_examples(self):
         """
-        Clear cached LLM responses and codegen samples.
+        Clear cached codegen samples.
         """
-        dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
-        if os.path.exists(dspy_cache_dir):
-            shutil.rmtree(dspy_cache_dir)
         cache = self.datadir.get_cache_service()
         cache.rm_cache()
 

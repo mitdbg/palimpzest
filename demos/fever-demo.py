@@ -4,52 +4,36 @@ import os
 import random
 from pathlib import Path
 
+from palimpzest.constants import Model, OptimizationStrategy
+from palimpzest.core.data.datasources import ValidationDataSource
+from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.fields import BooleanField, ListField, StringField
+from palimpzest.core.lib.schemas import Schema
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.policy import MaxQuality, MinCost, MinTime
+from palimpzest.query import (
+    Execute,
+    MABSequentialParallelSentinelExecution,
+    MABSequentialSingleThreadSentinelExecution,
+    NoSentinelPipelinedParallelExecution,
+    NoSentinelPipelinedSingleThreadExecution,
+    NoSentinelSequentialSingleThreadExecution,
+)
+from palimpzest.sets import Dataset
+from palimpzest.utils.model_helpers import get_models
 from ragatouille import RAGPretrainedModel
 
-import palimpzest as pz
-from palimpzest.constants import Model
-from palimpzest.utils.model_helpers import get_models
 
-
-class FeverClaimsSchema(pz.Schema):
-    claim = pz.StringField(desc="the claim being made")
+class FeverClaimsSchema(Schema):
+    claim = StringField(desc="the claim being made")
 
 class FeverIntermediateSchema(FeverClaimsSchema):
-    relevant_wikipedia_articles = pz.ListField(desc="Most relevant wikipedia articles to the `claim`",
-                                               element_type=pz.StringField, required=True)
-
-# class FeverSummarySchema(FeverIntermediateSchema):
-#     summary = pz.StringField(desc="summary of the relevant wikipedia articles `file1`, `file2`, and `file3` to validate `claim`")
+    relevant_wikipedia_articles = ListField(desc="Most relevant wikipedia articles to the `claim`",
+                                            element_type=StringField)
 
 class FeverOutputSchema(FeverIntermediateSchema):
-    label = pz.BooleanField("Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise.")
+    label = BooleanField("Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise.")
 
-# class FeverOutputSchema(FeverSummarySchema):
-#     label = pz.BooleanField("Output TRUE if the `claim` is supported by the evidence in `file1`, `file2`, and `file3`; output FALSE otherwise.")
-
-# def get_relevant_content(index, k, record):
-#     # input: record of type FeverInputSchema
-#     # output: record of type FeverIntermediateSchema
-#     relevant_files = index.search(record.claim , k=k)
-#     most_relevant_files = [relevant_file["content"] for relevant_file in relevant_files]
-   
-#     # create output DataRecord
-#     out_record = pz.DataRecord.from_parent(FeverIntermediateSchema, parent_record=record)
-    
-#     out_record.relevant_wikipedia_articles = most_relevant_files
-#     # if len(most_relevant_files) < 3:
-#     #     most_relevant_files += [""] * (3 - len(most_relevant_files))
-        
-#     # out_record.file1 = most_relevant_files[0]
-#     # out_record.file2 = most_relevant_files[1]
-#     # out_record.file3 = most_relevant_files[2]
-#     return out_record
-
-# def set_input_schema(input: DataRecord):
-#     # , project_cols=[]
-#     output = DataRecord.from_parent(FeverClaimsSchema, parent_record=input)
-#     output.claim = input.contents
-#     return output
 
 def get_label_fields_to_values(claims, ground_truth_file):
     with open(ground_truth_file) as f:
@@ -74,16 +58,9 @@ def get_label_fields_to_values(claims, ground_truth_file):
             claim_to_label[str(entry["id"])]["_evidence_file_ids"] = evidence_file_ids
             claim_to_label[str(entry["id"])]["relevant_wikipedia_articles"] = ["IGNORED_FIELD"]
 
-    # print(claims)
-    # print(claim_to_label)
-
-    # assert(len(claim_to_label) == len(claims))
-
-    # print(claim_to_label)
-
     return claim_to_label           
 
-class FeverValidationSource(pz.ValidationDataSource):
+class FeverValidationSource(ValidationDataSource):
     def __init__(self, dataset_id, claims_dir, split_idx: int=25, num_samples: int=5, shuffle: bool=False, seed: int=42):
         super().__init__(FeverClaimsSchema, dataset_id)
         self.claims_dir = claims_dir
@@ -153,7 +130,7 @@ class FeverValidationSource(pz.ValidationDataSource):
         claim = self.claims[idx] if not val else self.val_claims[idx]
 
         # create data record
-        dr = pz.DataRecord(self.schema, source_id=claim)
+        dr = DataRecord(self.schema, source_id=claim)
 
         claim_file = os.path.join(self.claims_dir, claim)
         with open(claim_file, "rb") as f:
@@ -169,9 +146,6 @@ class FeverValidationSource(pz.ValidationDataSource):
 
         return dr
 
-
-if "DSP_CACHEBOOL" not in os.environ or os.environ["DSP_CACHEBOOL"].lower() != "false":
-        raise Exception("TURN OFF DSPy CACHE BY SETTING `export DSP_CACHEBOOL=False")
 
 if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
@@ -248,32 +222,32 @@ policy_type = "maxquality"
 verbose = True
 allow_code_synth = False
 
-policy = pz.MaxQuality()
+policy = MaxQuality()
 if policy_type == "mincost":
-    policy = pz.MinCost()
+    policy = MinCost()
 elif policy_type == "mintime":
-    policy = pz.MinTime()
+    policy = MinTime()
 elif policy_type == "maxquality":
-    policy = pz.MaxQuality()
+    policy = MaxQuality()
 else:
     print("Policy not supported for this demo")
     exit(1)
 
 if engine == "sentinel":
     if executor == "sequential":
-        execution_engine = pz.MABSequentialSingleThreadSentinelExecution
+        execution_engine = MABSequentialSingleThreadSentinelExecution
     elif executor == "parallel":
-        execution_engine = pz.MABSequentialParallelSentinelExecution
+        execution_engine = MABSequentialParallelSentinelExecution
     else:
         print("Unknown executor")
         exit(1)
 elif engine == "nosentinel":
     if executor == "sequential":
-        execution_engine = pz.NoSentinelSequentialSingleThreadExecution
+        execution_engine = NoSentinelSequentialSingleThreadExecution
     elif executor == "pipelined":
-        execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
+        execution_engine = NoSentinelPipelinedSingleThreadExecution
     elif executor == "parallel":
-        execution_engine = pz.NoSentinelPipelinedParallelExecution
+        execution_engine = NoSentinelPipelinedParallelExecution
     else:
         print("Unknown executor")
         exit(1)
@@ -284,7 +258,7 @@ else:
 # select optimization strategy and available models based on engine
 optimization_strategy, available_models = None, None
 if engine == "sentinel":
-    optimization_strategy = pz.OptimizationStrategy.PARETO
+    optimization_strategy = OptimizationStrategy.PARETO
     available_models = get_models(include_vision=True)
 else:
     model_str_to_model = {
@@ -299,7 +273,7 @@ else:
         "mixtral": Model.LLAMA3_V,
         "llama": Model.LLAMA3_V,
     }
-    optimization_strategy = pz.OptimizationStrategy.NONE
+    optimization_strategy = OptimizationStrategy.NONE
     available_models = [model_str_to_model[model]] + [model_str_to_vision_model[model]]
 
 
@@ -316,26 +290,12 @@ datasource = FeverValidationSource(
     seed=42,
 )
 
-pz.DataDirectory().register_user_source(
+DataDirectory().register_user_source(
     src=datasource,
     dataset_id=f"{user_dataset_id}",
 )
 
-claims = pz.Dataset(user_dataset_id, schema=FeverClaimsSchema)
-
-# claims = pz.Dataset(dataset_id, schema=pz.TextFile,
-# desc="Contains the claims that need to be verified.")
-# claims = claims.convert(output_schema=FeverClaimsSchema, udf=set_input_schema)
-# claims_and_relevant_files = claims.convert(output_schema=FeverIntermediateSchema,
-#                                            udf=partial(get_relevant_content, index, k))
-# claims_and_relevant_files = claims.retrieve(
-#     output_schema=FeverIntermediateSchema,
-#     index=index,
-#     search_attr="claim",
-#     output_attr="relevant_wikipedia_articles",
-#     k=10,
-# )
-
+claims = Dataset(user_dataset_id, schema=FeverClaimsSchema)
 claims_and_relevant_files = claims.retrieve(
     output_schema=FeverIntermediateSchema,
     index=index,
@@ -347,7 +307,7 @@ output = claims_and_relevant_files.convert(output_schema=FeverOutputSchema)
 
 # execute pz plan
 
-records, execution_stats = pz.Execute(
+records, execution_stats = Execute(
         output,
         policy=policy,
         nocache=True,

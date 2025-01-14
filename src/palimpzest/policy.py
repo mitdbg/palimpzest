@@ -3,11 +3,11 @@ from palimpzest.core.data.dataclasses import PlanCost
 
 class Policy:
     """
-    Base class for a policy. Each policy has two methods: satisfies_constraint() and
-    choose(). The first method determines whether the given cost, runtime, and quality
-    for a plan (or sub-plan) satisfy the policy's constraint(s). The second method takes
-    in the (cost, runtime, quality) tuples for two plans (or subplans) and returns True
-    if the first plan is better than the second one and False otherwise.
+    Base class for a policy. Each policy has two methods: constraint() and chooose().
+    The first method determines whether the given cost, runtime, and quality for a plan
+    (or sub-plan) satisfy the policy's constraint(s). The second method takes in the 
+    (cost, runtime, quality) tuples for two plans (or subplans) and returns True if the
+    first plan is better than the second one and False otherwise.
     """
 
     def __init__(self):

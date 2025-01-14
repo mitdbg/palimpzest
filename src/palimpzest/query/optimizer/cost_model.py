@@ -16,8 +16,8 @@ import scipy.stats as stats
 
 from palimpzest.constants import MODEL_CARDS, GPT_4o_MODEL_CARD, Model
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.core.elements.records import DataRecordSet
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvert
@@ -25,6 +25,7 @@ from palimpzest.query.operators.datasource import CacheScanDataOp, DataSourcePhy
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.token_reduction_convert import TokenReducedConvert
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.model_helpers import get_champion_model_name, get_models
@@ -764,6 +765,31 @@ class CostModel(BaseCostModel):
                     op_estimates.quality = op_estimates.quality * math.sqrt(math.sqrt(operator.token_budget))
                     op_estimates.quality_lower_bound = op_estimates.quality_lower_bound * math.sqrt(math.sqrt(operator.token_budget))
                     op_estimates.quality_upper_bound = op_estimates.quality_upper_bound * math.sqrt(math.sqrt(operator.token_budget))
+                
+                # rag convert adjustment
+                if isinstance(operator, RAGConvert):
+                    total_input_tokens = operator.num_chunks_per_field * operator.chunk_size
+                    total_output_tokens = sample_op_estimates[op_id][model_name]["total_output_tokens"]
+                    op_estimates.cost_per_record = (
+                        MODEL_CARDS[model_name]["usd_per_input_token"] * total_input_tokens
+                        + MODEL_CARDS[model_name]["usd_per_output_token"] * total_output_tokens
+                    )
+                    total_input_tokens_lb = operator.num_chunks_per_field * operator.chunk_size
+                    total_output_tokens_lb = sample_op_estimates[op_id][model_name]["total_output_tokens_lower_bound"]
+                    op_estimates.cost_per_record_lower_bound = (
+                        MODEL_CARDS[model_name]["usd_per_input_token"] * total_input_tokens_lb
+                        + MODEL_CARDS[model_name]["usd_per_output_token"] * total_output_tokens_lb
+                    )
+                    total_input_tokens_ub = operator.num_chunks_per_field * operator.chunk_size
+                    total_output_tokens_ub = sample_op_estimates[op_id][model_name]["total_output_tokens_upper_bound"]
+                    op_estimates.cost_per_record_upper_bound = (
+                        MODEL_CARDS[model_name]["usd_per_input_token"] * total_input_tokens_ub
+                        + MODEL_CARDS[model_name]["usd_per_output_token"] * total_output_tokens_ub
+                    )
+
+                    op_estimates.quality = op_estimates.quality * operator.naive_quality_adjustment
+                    op_estimates.quality_lower_bound = op_estimates.quality_lower_bound * operator.naive_quality_adjustment
+                    op_estimates.quality_upper_bound = op_estimates.quality_upper_bound * operator.naive_quality_adjustment
 
             else:
                 raise Exception("Unknown operator")
