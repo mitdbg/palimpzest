@@ -30,9 +30,10 @@ class PromptStrategy(str, Enum):
     COT_BOOL = "chain-of-thought-bool"
     COT_BOOL_IMAGE = "chain-of-thought-bool-image"
     COT_QA = "chain-of-thought-question"
-    COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
-    COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
     COT_QA_IMAGE = "chain-of-thought-question-image"
+    COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
+    COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
+    COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
 
 
 class OptimizationStrategy(str, Enum):

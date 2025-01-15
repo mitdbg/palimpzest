@@ -129,6 +129,9 @@ class RealEstateListingSource(UserSource):
         self.listings_dir = listings_dir
         self.listings = sorted(os.listdir(self.listings_dir))
 
+    def copy(self):
+        return RealEstateListingSource(self.dataset_id, self.listings_dir)
+
     def __len__(self):
         return len(self.listings)
 

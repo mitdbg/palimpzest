@@ -4,120 +4,30 @@ import json
 from typing import Any as TypingAny
 
 from palimpzest.constants import MAX_ROWS
-from palimpzest.core.lib.fields import BytesField, CallableField, Field, ListField, NumericField, StringField
+from palimpzest.core.lib.fields import (
+    BytesField,
+    CallableField,
+    Field,
+    ImageBase64Field,
+    ListField,
+    NumericField,
+    StringField,
+)
 
 
-# class SchemaMetaclass(type):
-#     """
-#     This is a metaclass for our Schema class.
-#     """
+class SchemaMetaclass(type):
+    """
+    This is a metaclass for our Schema class.
+    """
 
-#     # TODO: test whether we can move this into Schema
-#     def __str__(cls) -> str:
-#         """
-#         Emit a string that contains the names of all the class members that are Fields.
-#         """
-#         # get attributes that are Fields
-#         fields = SchemaMetaclass.field_names(cls)
-
-#         return f"{cls.__name__}({', '.join(fields)})"
+    def __eq__(cls, other) -> bool:
+        """
+        Equality function for the Schema which checks that the ordered fields and class names are the same.
+        """
+        return cls.get_desc() == other.get_desc()
 
 
-#     # TODO: test whether we can move this into Schema
-#     def __eq__(cls, other) -> bool:
-#         """
-#         Equality function for the Schema which checks that the ordered fields and class names are the same.
-#         """
-#         cls_schema = SchemaMetaclass.get_desc(cls)
-#         other_schema = SchemaMetaclass.get_desc(other)
-
-#         return cls_schema == other_schema
-
-
-#     # TODO: test whether we can move this into Schema
-#     def __hash__(cls) -> int:
-#         """Hash function for the Schema which is a simple hash of its ordered Fields and class name."""
-#         ordered = SchemaMetaclass.get_desc(cls)
-
-#         return hash(ordered.encode())
-
-
-#     # TODO: test whether we can move this into Schema
-#     def field_names(cls, unique=False, id="") -> list[str]:
-#         """
-#         Return a list of the fields in this Schema. The `unique` argument is used to determine if the
-#         class name should be prefixed to the field name for unique identification. The `id` argument is
-#         used to provide a unique identifier for the class name.
-#         """
-#         attributes = dir(cls)
-#         attributes = [attr for attr in attributes if not attr.startswith("__")]
-#         prefix = f"{cls.__name__}.{id}." if unique else ""
-#         fields = [prefix + attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
-#         return fields
-
-
-#     # TODO: test whether we can move this into Schema
-#     def field_desc_map(cls, unique=False, id="") -> dict[str, str]:
-#         """
-#         Return a mapping from field names to their descriptions. The `unique` argument is used to determine if the
-#         class name should be prefixed to the field name for unique identification. The `id` argument is
-#         used to provide a unique identifier for the class name.
-#         """
-#         attributes = dir(cls)
-#         attributes = [attr for attr in attributes if not attr.startswith("__")]
-#         prefix = f"{cls.__name__}.{id}." if unique else ""
-#         field_desc_map = {prefix + attr: getattr(cls, attr)._desc for attr in attributes if isinstance(getattr(cls, attr), Field)}
-#         return field_desc_map
-
-
-#     # TODO: test whether we can move this into Schema
-#     def field_map(cls, unique=False, id="") -> dict[str, Field]:
-#         """
-#         Return a mapping from field names to their field types. The `unique` argument is used to determine if the
-#         class name should be prefixed to the field name for unique identification. The `id` argument is used to
-#         provide a unique identifier for the class name.
-#         """
-#         attributes = dir(cls)
-#         attributes = [attr for attr in attributes if not attr.startswith("__")]
-#         prefix = f"{cls.__name__}.{id}." if unique else ""
-#         field_map = {prefix + attr: getattr(cls, attr) for attr in attributes if isinstance(getattr(cls, attr), Field)}
-#         return field_map
-
-
-#     # TODO: test whether we can move this into Schema
-#     def get_desc(cls) -> str:
-#         """Return a description of the schema"""
-#         fields = SchemaMetaclass.field_names(cls)
-#         d = {k: hash(getattr(cls, k)) for k in fields}
-#         d["__class__"] = cls.class_name()
-
-#         return json.dumps(d, sort_keys=True)
-
-#     # TODO: test whether we can move this into Schema
-#     def json_schema(cls) -> dict[str, TypingAny]:
-#         """The JSON representation of the Schema"""
-#         fields = SchemaMetaclass.field_names(cls)
-
-#         schema = {
-#             "fields": {},
-#             "type": "object",
-#             "description": cls.__doc__,
-#         }
-#         for k in fields:
-#             if k.startswith("_"):
-#                 continue
-#             v = getattr(cls, k)
-#             if v is None:
-#                 continue
-
-#             schema["fields"][k] = v.json_schema()
-
-#         return schema
-
-
-# TODO: should we put the SchemaMetaclass functionality into Schema and make it a @dataclass?
-# class Schema(metaclass=SchemaMetaclass):
-class Schema:
+class Schema(metaclass=SchemaMetaclass):
     """
     A Schema is defined by a set of named Fields. Much of the class is implemented in the SchemaMetaclass.
     Because Schema is a MetaClass, its fields are defined similar to how they are defined in a Python dataclass.
@@ -138,17 +48,6 @@ class Schema:
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(desc={self._desc})"
-    
-    # TODO: test whether we can move this into Schema
-    # def __str__(cls) -> str:
-    #     """
-    #     Emit a string that contains the names of all the class members that are Fields.
-    #     """
-    #     # get attributes that are Fields
-    #     fields = SchemaMetaclass.field_names(cls)
-
-    #     return f"{cls.__name__}({', '.join(fields)})"
-
 
     # TODO: after eliminating the metaclass, this does not work
     def __eq__(self, other) -> bool:
@@ -160,16 +59,21 @@ class Schema:
 
         return schema == other_schema
 
-
-    # TODO: test whether we can move this into Schema
     def __hash__(self) -> int:
         """Hash function for the Schema which is a simple hash of its ordered Fields and class name."""
         ordered = self.get_desc()
 
         return hash(ordered.encode())
 
+    @classmethod
+    def get_desc(cls) -> str:
+        """Return a description of the schema"""
+        fields = cls.field_names()
+        d = {k: hash(getattr(cls, k)) for k in fields}
+        d["__class__"] = cls.class_name()
 
-    # TODO: test whether we can move this into Schema
+        return json.dumps(d, sort_keys=True)
+
     @classmethod
     def field_names(cls, unique=False, id="") -> list[str]:
         """
@@ -183,8 +87,6 @@ class Schema:
         fields = [prefix + attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
         return fields
 
-
-    # TODO: test whether we can move this into Schema
     @classmethod
     def field_desc_map(cls, unique=False, id="") -> dict[str, str]:
         """
@@ -198,8 +100,6 @@ class Schema:
         field_desc_map = {prefix + attr: getattr(cls, attr)._desc for attr in attributes if isinstance(getattr(cls, attr), Field)}
         return field_desc_map
 
-
-    # TODO: test whether we can move this into Schema
     @classmethod
     def field_map(cls, unique=False, id="") -> dict[str, Field]:
         """
@@ -213,18 +113,6 @@ class Schema:
         field_map = {prefix + attr: getattr(cls, attr) for attr in attributes if isinstance(getattr(cls, attr), Field)}
         return field_map
 
-
-    # TODO: test whether we can move this into Schema
-    @classmethod
-    def get_desc(cls) -> str:
-        """Return a description of the schema"""
-        fields = cls.field_names()
-        d = {k: hash(getattr(cls, k)) for k in fields}
-        d["__class__"] = cls.class_name()
-
-        return json.dumps(d, sort_keys=True)
-
-    # TODO: test whether we can move this into Schema
     @classmethod
     def json_schema(cls) -> dict[str, TypingAny]:
         """The JSON representation of the Schema"""
@@ -439,8 +327,7 @@ class WebPage(Schema):
 # Second-level Schemas
 class ImageFile(File):
     """A file that contains an image."""
-
-    text_description = StringField(desc="A text description of the image")
+    contents = ImageBase64Field(desc="The contents of the image")
 
 
 class PDFFile(File):

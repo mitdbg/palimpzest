@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import base64
 import json
 import os
 import sys
@@ -217,8 +218,7 @@ class ImageFileDirectorySource(DirectorySource):
         dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
-            dr.contents = f.read()
-        dr.text_description = f"Image file {dr.filename}"
+            dr.contents = base64.b64encode(f.read())
         return dr
 
 

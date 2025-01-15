@@ -79,7 +79,7 @@ class Optimizer:
         available_models: list[Model] | None = None,
         allow_bonded_query: bool = True,
         allow_conventional_query: bool = False,
-        allow_code_synth: bool = True,
+        allow_code_synth: bool = False,
         allow_token_reduction: bool = False,
         allow_rag_reduction: bool = True,
         allow_mixtures: bool = True,

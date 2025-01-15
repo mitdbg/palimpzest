@@ -4,6 +4,7 @@ import os
 
 import pandas as pd
 from palimpzest.core.elements.groupbysig import GroupBySig
+from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import ImageFile, Number, PDFFile, TextFile
 from palimpzest.query import Execute
@@ -198,9 +199,9 @@ def execute_task(task, datasetid, execution_engine, policy, verbose=False, profi
 
     return records, execution_stats, cols
 
-def format_results_table(records, cols=None):
+def format_results_table(records: list[DataRecord], cols=None):
     """Format records as a table"""
-    records = [{key: record[key] for key in record.get_fields()} for record in records]
+    records = [{key: record[key] for key in record.get_field_names()} for record in records]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
     final_df = records_df[print_cols] if not records_df.empty else pd.DataFrame(columns=print_cols)

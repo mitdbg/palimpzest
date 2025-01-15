@@ -298,7 +298,7 @@ class LLMConvert(ConvertOp):
         id_params = super().get_id_params()
         id_params = {
             "model": None if self.model is None else self.model.value,
-            "prompt_strategy": self.prompt_strategy.value,
+            "prompt_strategy": None if self.prompt_strategy is None else self.prompt_strategy.value,
             **id_params,
         }
 
