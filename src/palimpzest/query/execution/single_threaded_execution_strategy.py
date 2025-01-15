@@ -3,19 +3,23 @@ import time
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.query.execution.execution_engine import ExecutionEngine
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 
 
-class SequentialSingleThreadPlanExecutor(ExecutionEngine):
+class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
     """
-    This class implements the abstract execute_plan() method from the ExecutionEngine.
-    This class still needs to be sub-classed by another Execution class which implements
-    the higher-level execute() method.
+    A single-threaded execution strategy that processes operators sequentially.
+    
+    This strategy processes all records through one operator completely before moving to the next operator
+    in the execution plan. For example, if we have operators A -> B -> C and records [1,2,3]:
+    1. First processes records [1,2,3] through operator A
+    2. Then takes A's output and processes all of it through operator B
+    3. Finally processes all of B's output through operator C
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -139,12 +143,20 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
         return output_records, plan_stats
 
 
-class PipelinedSingleThreadPlanExecutor(ExecutionEngine):
+class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
     """
-    This class implements the abstract execute_plan() method from the ExecutionEngine.
-    This class still needs to be sub-classed by another Execution class which implements
-    the higher-level execute() method.
+    A single-threaded execution strategy that processes records through a pipeline of operators.
+    
+    This strategy implements a pipelined execution model where each record flows through
+    the entire operator chain before the next record is processed.
+
+    Example Flow:
+    For operators A -> B -> C and records [1,2,3]:
+    1. Record 1: A -> B -> C
+    2. Record 2: A -> B -> C
+    3. Record 3: A -> B -> C
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.max_workers = 1 if self.max_workers is None else self.max_workers

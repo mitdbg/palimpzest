@@ -3,7 +3,6 @@ import time
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.query.execution.execution_engine import ExecutionEngine
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import FilterOp
@@ -14,8 +13,9 @@ from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.policy import Policy
 from palimpzest.sets import Dataset
 
+from palimpzest.query.processor.query_processor import QueryProcessor
 
-class StreamingSequentialExecution(ExecutionEngine):
+class StreamingQueryProcessor(QueryProcessor):
     """This class can be used for a streaming, record-based execution.
     Results are returned as an iterable that can be consumed by the caller."""
 
@@ -52,21 +52,9 @@ class StreamingSequentialExecution(ExecutionEngine):
         self.clear_cached_responses_and_examples()
         start_time = time.time()
 
-        cost_model = CostModel()
-        optimizer = Optimizer(
-            policy=policy,
-            cost_model=cost_model,
-            no_cache=self.nocache,
-            verbose=self.verbose,
-            available_models=self.available_models,
-            allow_bonded_query=self.allow_bonded_query,
-            allow_conventional_query=self.allow_conventional_query,
-            allow_code_synth=self.allow_code_synth,
-            allow_token_reduction=self.allow_token_reduction,
-            optimization_strategy=self.optimization_strategy,
-        )
-
-        # Effectively always use the optimal strategy
+        # TODO: Do we need to re-initialize the optimizer here? 
+        # Effectively always use the optimal strategy   
+        optimizer = self.optimizer.deepcopy_clean_optimizer()
         plans = optimizer.optimize(dataset, policy)
         self.plan = plans[0]
         self.plan_stats = PlanStats(plan_id=self.plan.plan_id)
@@ -79,17 +67,18 @@ class StreamingSequentialExecution(ExecutionEngine):
             self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details) 
         print("Time for planning: ", time.time() - start_time)
         self.plan_generated = True
+        print("Generated plan:\n", self.plan)
         return self.plan
 
-    def execute(
-        self,
-        dataset: Dataset,
-        policy: Policy,
-    ):
+    def execute(self, dry_run: bool = False):
         start_time = time.time()
         # Always delete cache
         if not self.plan_generated:
-            self.generate_plan(dataset, policy)
+            self.generate_plan(self.dataset, self.policy)
+
+        if dry_run:
+            yield [], self.plan, self.plan_stats
+            return
 
         input_records = self.get_input_records()
         for idx, record in enumerate(input_records):

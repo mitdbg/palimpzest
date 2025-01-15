@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from palimpzest.constants import OptimizationStrategy
+from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.core.data.dataclasses import PlanCost
 from palimpzest.query.optimizer.cost_model import BaseCostModel
 from palimpzest.query.optimizer.primitives import Expression, Group
@@ -464,13 +464,13 @@ class OptimizePhysicalExpression(Task):
 
         # return if we've already computed the cost of this physical expression
         if (  # noqa: SIM114
-            context['optimization_strategy'] in [OptimizationStrategy.GREEDY, OptimizationStrategy.SENTINEL, OptimizationStrategy.NONE]
+            context['optimization_strategy_type'] in [OptimizationStrategyType.GREEDY, OptimizationStrategyType.SENTINEL, OptimizationStrategyType.NONE]
             and self.physical_expression.plan_cost is not None
         ):
             return []
 
         elif (
-            context['optimization_strategy'] == OptimizationStrategy.PARETO
+            context['optimization_strategy_type'] == OptimizationStrategyType.PARETO
             and self.physical_expression.pareto_optimal_plan_costs is not None
         ):
             return []
@@ -486,21 +486,21 @@ class OptimizePhysicalExpression(Task):
             # compute the input plan cost or list of input plan costs
             new_tasks = []
             if (
-                context['optimization_strategy'] in [OptimizationStrategy.GREEDY, OptimizationStrategy.SENTINEL, OptimizationStrategy.NONE]
+                context['optimization_strategy_type'] in [OptimizationStrategyType.GREEDY, OptimizationStrategyType.SENTINEL, OptimizationStrategyType.NONE]
                 and input_group.best_physical_expression is not None
             ):
                 # TODO: apply policy constraint here
                 best_input_plan_cost = input_group.best_physical_expression.plan_cost
 
             elif (
-                context['optimization_strategy'] == OptimizationStrategy.CONFIDENCE_INTERVAL
+                context['optimization_strategy_type'] == OptimizationStrategyType.CONFIDENCE_INTERVAL
                 and input_group.ci_best_physical_expressions is not None
             ):
                 # TODO: fix this to properly compute set of potential input plan costs
                 raise Exception("NotImplementedError")
 
             elif (
-                context['optimization_strategy'] == OptimizationStrategy.PARETO
+                context['optimization_strategy_type'] == OptimizationStrategyType.PARETO
                 and input_group.pareto_optimal_physical_expressions is not None
             ):
                 # TODO: apply policy constraint here
@@ -524,12 +524,12 @@ class OptimizePhysicalExpression(Task):
                 return [self] + new_tasks
 
         group = groups[self.physical_expression.group_id]
-        if context['optimization_strategy'] == OptimizationStrategy.CONFIDENCE_INTERVAL:
+        if context['optimization_strategy_type'] == OptimizationStrategyType.CONFIDENCE_INTERVAL:
             # TODO: fix this to properly compute and update set of possible plan costs
             raise Exception("NotImplementedError")
             group = self.update_ci_best_physical_expressions(group, policy)
 
-        elif context['optimization_strategy'] == OptimizationStrategy.PARETO:
+        elif context['optimization_strategy_type'] == OptimizationStrategyType.PARETO:
             # compute all possible plan costs for this physical expression given the pareto optimal input plan costs
             all_possible_plan_costs = []
             for input_plan_cost in input_plan_costs:

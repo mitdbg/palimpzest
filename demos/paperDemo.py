@@ -9,6 +9,14 @@ from PIL import Image
 
 import palimpzest as pz
 from palimpzest.utils.udfs import xls_to_tables
+from palimpzest.core.lib.schemas import Schema, Field, StringField, NumericField, ListField, TextFile,XLSFile, Table
+from palimpzest.core.lib.fields import BooleanField
+from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.datamanager.datamanager import UserSource, DataDirectory
+from palimpzest.policy import MinCost, MinTime, MaxQuality
+from palimpzest.sets import Dataset
+from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+from palimpzest.query.processor.config import QueryProcessorConfig
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -46,52 +54,52 @@ def in_price_range(record):
         return False
 
 
-class Email(pz.TextFile):
+class Email(TextFile):
     """Represents an email, which in practice is usually from a text file"""
 
-    sender = pz.StringField(desc="The email address of the sender", required=True)
-    subject = pz.StringField(desc="The subject of the email", required=True)
+    sender = StringField(desc="The email address of the sender", required=True)
+    subject = StringField(desc="The subject of the email", required=True)
 
 
-class CaseData(pz.Schema):
+class CaseData(Schema):
     """An individual row extracted from a table containing medical study data."""
 
-    case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-    age_at_diagnosis = pz.Field(desc="The age of the patient at the time of diagnosis", required=False)
-    race = pz.Field(
+    case_submitter_id = Field(desc="The ID of the case", required=True)
+    age_at_diagnosis = Field(desc="The age of the patient at the time of diagnosis", required=False)
+    race = Field(
         desc="An arbitrary classification of a taxonomic group that is a division of a species.",
         required=False,
     )
-    ethnicity = pz.Field(
+    ethnicity = Field(
         desc="Whether an individual describes themselves as Hispanic or Latino or not.",
         required=False,
     )
-    gender = pz.Field(desc="Text designations that identify gender.", required=False)
-    vital_status = pz.Field(desc="The vital status of the patient", required=False)
-    ajcc_pathologic_t = pz.Field(desc="The AJCC pathologic T", required=False)
-    ajcc_pathologic_n = pz.Field(desc="The AJCC pathologic N", required=False)
-    ajcc_pathologic_stage = pz.Field(desc="The AJCC pathologic stage", required=False)
-    tumor_grade = pz.Field(desc="The tumor grade", required=False)
-    tumor_focality = pz.Field(desc="The tumor focality", required=False)
-    tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter", required=False)
-    primary_diagnosis = pz.Field(desc="The primary diagnosis", required=False)
-    morphology = pz.Field(desc="The morphology", required=False)
-    tissue_or_organ_of_origin = pz.Field(desc="The tissue or organ of origin", required=False)
-    # tumor_code = pz.Field(desc="The tumor code", required=False)
-    filename = pz.Field(desc="The name of the file the record was extracted from", required=False)
-    study = pz.Field(
+    gender = Field(desc="Text designations that identify gender.", required=False)
+    vital_status = Field(desc="The vital status of the patient", required=False)
+    ajcc_pathologic_t = Field(desc="The AJCC pathologic T", required=False)
+    ajcc_pathologic_n = Field(desc="The AJCC pathologic N", required=False)
+    ajcc_pathologic_stage = Field(desc="The AJCC pathologic stage", required=False)
+    tumor_grade = Field(desc="The tumor grade", required=False)
+    tumor_focality = Field(desc="The tumor focality", required=False)
+    tumor_largest_dimension_diameter = Field(desc="The tumor largest dimension diameter", required=False)
+    primary_diagnosis = Field(desc="The primary diagnosis", required=False)
+    morphology = Field(desc="The morphology", required=False)
+    tissue_or_organ_of_origin = Field(desc="The tissue or organ of origin", required=False)
+    # tumor_code = Field(desc="The tumor code", required=False)
+    filename = Field(desc="The name of the file the record was extracted from", required=False)
+    study = Field(
         desc="The last name of the author of the study, from the table name",
         required=False,
     )
 
 
-class RealEstateListingFiles(pz.Schema):
+class RealEstateListingFiles(Schema):
     """The source text and image data for a real estate listing."""
 
-    listing = pz.StringField(desc="The name of the listing", required=True)
-    text_content = pz.StringField(desc="The content of the listing's text description", required=True)
-    image_filepaths = pz.ListField(
-        element_type=pz.StringField,
+    listing = StringField(desc="The name of the listing", required=True)
+    text_content = StringField(desc="The content of the listing's text description", required=True)
+    image_filepaths = ListField(
+        element_type=StringField,
         desc="A list of the filepaths for each image of the listing",
         required=True,
     )
@@ -100,22 +108,22 @@ class RealEstateListingFiles(pz.Schema):
 class TextRealEstateListing(RealEstateListingFiles):
     """Represents a real estate listing with specific fields extracted from its text."""
 
-    address = pz.StringField(desc="The address of the property")
-    price = pz.NumericField(desc="The listed price of the property")
+    address = StringField(desc="The address of the property")
+    price = NumericField(desc="The listed price of the property")
 
 
 class ImageRealEstateListing(RealEstateListingFiles):
     """Represents a real estate listing with specific fields extracted from its text and images."""
 
-    is_modern_and_attractive = pz.BooleanField(
+    is_modern_and_attractive = BooleanField(
         desc="True if the home interior design is modern and attractive and False otherwise"
     )
-    has_natural_sunlight = pz.BooleanField(
+    has_natural_sunlight = BooleanField(
         desc="True if the home interior has lots of natural sunlight and False otherwise"
     )
 
 
-class RealEstateListingSource(pz.UserSource):
+class RealEstateListingSource(UserSource):
     def __init__(self, dataset_id, listings_dir):
         super().__init__(RealEstateListingFiles, dataset_id)
         self.listings_dir = listings_dir
@@ -132,7 +140,7 @@ class RealEstateListingSource(pz.UserSource):
         listing = self.listings[idx]
 
         # create data record
-        dr = pz.DataRecord(self.schema, source_id=listing)
+        dr = DataRecord(self.schema, source_id=listing)
         dr.listing = listing
         dr.image_filepaths = []
         listing_dir = os.path.join(self.listings_dir, listing)
@@ -188,28 +196,28 @@ if __name__ == "__main__":
     visualize = args.viz
     verbose = args.verbose
     profile = args.profile
-    policy = pz.MaxQuality()
+    policy = MaxQuality()
     if args.policy == "mincost":
-        policy = pz.MinCost()
+        policy = MinCost()
     elif args.policy == "mintime":
-        policy = pz.MinTime()
+        policy = MinTime()
     elif args.policy == "maxquality":
-        policy = pz.MaxQuality()
+        policy = MaxQuality()
     else:
         print("Policy not supported for this demo")
         exit(1)
 
-    execution_engine = None
-    executor = args.executor
-    if executor == "sequential":
-        execution_engine = pz.NoSentinelSequentialSingleThreadExecution
-    elif executor == "pipelined":
-        execution_engine = pz.NoSentinelPipelinedSingleThreadExecution
-    elif executor == "parallel":
-        execution_engine = pz.NoSentinelPipelinedParallelExecution
-    else:
-        print("Executor not supported for this demo")
-        exit(1)
+    # execution_engine = None
+    # executor = args.executor
+    # if executor == "sequential":
+    #     execution_engine = NoSentinelSequentialSingleThreadExecution
+    # elif executor == "pipelined":
+    #     execution_engine = NoSentinelPipelinedSingleThreadExecution
+    # elif executor == "parallel":
+    #     execution_engine = NoSentinelPipelinedParallelExecution
+    # else:
+    #     print("Executor not supported for this demo")
+    #     exit(1)
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
@@ -217,7 +225,7 @@ if __name__ == "__main__":
     # create pz plan
     if workload == "enron":
         # datasetid="enron-eval" for paper evaluation
-        plan = pz.Dataset(datasetid, schema=Email)
+        plan = Dataset(datasetid, schema=Email)
         plan = plan.filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
@@ -229,11 +237,11 @@ if __name__ == "__main__":
         # datasetid="real-estate-eval-100" for paper evaluation
         data_filepath = f"testdata/{datasetid}"
         user_dataset_id = f"{datasetid}-user"
-        pz.DataDirectory().register_user_source(
+        DataDirectory().register_user_source(
             src=RealEstateListingSource(user_dataset_id, data_filepath),
             dataset_id=user_dataset_id,
         )
-        plan = pz.Dataset(user_dataset_id, schema=RealEstateListingFiles)
+        plan = Dataset(user_dataset_id, schema=RealEstateListingFiles)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
         plan = plan.convert(ImageRealEstateListing, image_conversion=True, depends_on="image_filepaths")
         plan = plan.filter(
@@ -245,20 +253,29 @@ if __name__ == "__main__":
 
     elif workload == "medical-schema-matching":
         # datasetid="biofabric-medium" for paper evaluation
-        plan = pz.Dataset(datasetid, schema=pz.XLSFile)
-        plan = plan.convert(pz.Table, udf=xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+        plan = Dataset(datasetid, schema=XLSFile)
+        plan = plan.convert(Table, udf=xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         plan = plan.filter("The rows of the table contain the patient age")
         plan = plan.convert(CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY)
 
-    # execute pz plan
-    records, execution_stats = pz.Execute(
-        plan,
-        policy,
-        nocache=True,
-        optimization_strategy=pz.OptimizationStrategy.PARETO,
-        execution_engine=execution_engine,
-        verbose=verbose,
+
+    config = QueryProcessorConfig(nocache=True, policy=policy, max_workers=10)
+    # Create a basic processor
+    # We could pass this process around to different service if needed.
+    processor = QueryProcessorFactory.create_processor(
+        datasource=plan,
+        processing_strategy="no_sentinel",  # or use ProcessingStrategyType.NO_SENTINEL
+        execution_strategy="sequential",    # or use ExecutionStrategyType.SEQUENTIAL
+        optimizer_strategy="pareto",       # or use OptimizationStrategyType.PARETO
+        config=config
     )
+    records, execution_stats = processor.execute()
+    # future interface
+    # records, execution_stats = plan.run(policy, 
+    #                                     processing_strategy="no_sentinel",  # or use ProcessingStrategyType.NO_SENTINEL
+    #                                     execution_strategy="pipelined",    # or use ExecutionStrategyType.SEQUENTIAL
+    #                                     optimizer_strategy="pareto",       # or use OptimizationStrategyType.PARETO
+    #                                     config=config)
 
     # save statistics
     if profile:

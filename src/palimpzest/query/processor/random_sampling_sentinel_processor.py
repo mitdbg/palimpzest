@@ -5,13 +5,12 @@ from typing import Callable
 
 import numpy as np
 
-from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, OptimizationStrategy
+from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
+from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
 from palimpzest.core.data.datasources import ValidationDataSource
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.query.execution.execution_engine import ExecutionEngine
-from palimpzest.query.execution.plan_executors.single_threaded_plan_execution import SequentialSingleThreadPlanExecutor
 from palimpzest.query.operators.convert import ConvertOp, LLMConvert
 from palimpzest.query.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
@@ -23,12 +22,15 @@ from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.policy import Policy
 from palimpzest.sets import Set
 
+from palimpzest.query.processor.query_processor import QueryProcessor
+from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
+from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
+from palimpzest.query.optimizer.plan import PhysicalPlan
 
-class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
+
+class RandomSamplingSentinelQueryProcessor(QueryProcessor):
     """
-    This class implements the abstract execute() method from the ExecutionEngine.
-    This class still needs to be sub-classed by another Execution class which implements
-    the higher-level execute_plan() method.
+
     """
     def __init__(
             self,
@@ -308,8 +310,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         return DataRecordSet(out_records, [])
 
 
-    @staticmethod
-    def execute_op_wrapper(operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
+    def execute_op_wrapper(self, operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
         """
         Wrapper function around operator execution which also and returns the operator.
         This is useful in the parallel setting(s) where operators are executed by a worker pool,
@@ -317,7 +318,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         """
         record_set = operator(op_input)
 
-        return record_set, operator, op_input
+        return record_set, operator
 
 
     def execute_op_set(self, candidates, op_set):
@@ -330,7 +331,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             futures = []
             for candidate in candidates:
                 for operator in op_set:
-                    future = executor.submit(RandomSamplingSentinelExecutionEngine.execute_op_wrapper, operator, candidate)
+                    future = executor.submit(self.execute_op_wrapper, operator, candidate)
                     futures.append(future)
 
             # compute output record_set for each (operator, candidate) pair
@@ -526,19 +527,8 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         """
         # TODO: explicitly pull up filters; for SIGMOD we can explicitly write plans w/filters pulled up
         # initialize the optimizer
-        optimizer = Optimizer(
-            policy=policy,
-            cost_model=CostModel(),
-            no_cache=True,
-            verbose=self.verbose,
-            available_models=self.available_models,
-            allow_bonded_query=self.allow_bonded_query,
-            allow_conventional_query=self.allow_conventional_query,
-            allow_code_synth=self.allow_code_synth,
-            allow_token_reduction=self.allow_token_reduction,
-            optimization_strategy=OptimizationStrategy.SENTINEL,
-        )
-
+        # TODO: Do we need to re-initialize the optimizer here? 
+        optimizer = self.optimizer.deepcopy_clean_optimizer()
         # use optimizer to generate sentinel plans
         sentinel_plans = optimizer.optimize(dataset, policy)
         sentinel_plan = sentinel_plans[0]
@@ -546,7 +536,7 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         return sentinel_plan
 
 
-    def execute(self, dataset: Set, policy: Policy):
+    def execute(self, dry_run: bool = False):
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
@@ -558,10 +548,10 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
             self.clear_cached_responses_and_examples()
 
         # create sentinel plan
-        sentinel_plan = self.create_sentinel_plan(dataset, policy)
+        sentinel_plan = self.create_sentinel_plan(self.dataset, self.policy)
 
         # generate sample execution data
-        all_execution_data, plan_stats = self.generate_sample_observations(sentinel_plan, policy)
+        all_execution_data, plan_stats = self.generate_sample_observations(sentinel_plan, self.policy)
 
         # put sentinel plan execution stats into list and prepare list of output records
         all_plan_stats = [plan_stats]
@@ -569,33 +559,13 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
 
         # construct the CostModel with any sample execution data we've gathered
         cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose, self.exp_name)
-
-        # (re-)initialize the optimizer
-        optimizer = Optimizer(
-            policy=policy,
-            cost_model=cost_model,
-            no_cache=self.nocache,
-            verbose=self.verbose,
-            available_models=self.available_models,
-            allow_bonded_query=self.allow_bonded_query,
-            allow_conventional_query=self.allow_conventional_query,
-            allow_code_synth=self.allow_code_synth,
-            allow_token_reduction=self.allow_token_reduction,
-            optimization_strategy=self.optimization_strategy,
-            use_final_op_quality=self.use_final_op_quality,
-        )
+        optimizer = self.optimizer.deepcopy_clean_optimizer().update_cost_model(cost_model)
         total_optimization_time = time.time() - execution_start_time
 
         # execute plan(s) according to the optimization strategy
-        if self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
-            records, plan_stats = self.execute_confidence_interval_strategy(dataset, policy, optimizer)
-            all_records.extend(records)
-            all_plan_stats.extend(plan_stats)
-
-        else:
-            records, plan_stats = self.execute_strategy(dataset, policy, optimizer)
-            all_records.extend(records)
-            all_plan_stats.extend(plan_stats)
+        records, plan_stats = self._execute_with_optimizer(self.dataset, self.policy, optimizer)
+        all_records.extend(records)
+        all_plan_stats.extend(plan_stats)
 
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(all_plan_stats)
@@ -613,20 +583,29 @@ class RandomSamplingSentinelExecutionEngine(ExecutionEngine):
         return all_records, execution_stats
 
 
-class RandomSamplingSequentialSingleThreadSentinelExecution(RandomSamplingSentinelExecutionEngine, SequentialSingleThreadPlanExecutor):
+class RandomSamplingSentinelSequentialSingleThreadProcessor(RandomSamplingSentinelQueryProcessor, SequentialSingleThreadExecutionStrategy):
     """
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
     """
     def __init__(self, *args, **kwargs):
-        RandomSamplingSentinelExecutionEngine.__init__(self, *args, **kwargs)
-        SequentialSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
+        self.strategy = SequentialSingleThreadExecutionStrategy(
+            scan_start_idx=self.can_start_idx,
+            datadir=self.datadir,
+            max_workers=self.max_workers,
+            verbose=self.verbose
+        )
 
 
-class RandomSamplingSequentialParallelSentinelExecution(RandomSamplingSentinelExecutionEngine, SequentialSingleThreadPlanExecutor):
+class RandomSamplingSentinelPipelinedProcessor(RandomSamplingSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
     """
     This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
     """
     def __init__(self, *args, **kwargs):
-        RandomSamplingSentinelExecutionEngine.__init__(self, *args, **kwargs)
-        # TODO: post-submission, change to parallel plan executor
-        SequentialSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
+        self.strategy = PipelinedParallelExecutionStrategy(
+            scan_start_idx=self.can_start_idx,
+            datadir=self.datadir,
+            max_workers=self.max_workers,
+            verbose=self.verbose
+        )

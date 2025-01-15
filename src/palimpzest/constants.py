@@ -37,18 +37,6 @@ class PromptStrategy(str, Enum):
     CODE_GEN_BOOL = "code-gen-bool"
 
 
-class OptimizationStrategy(str, Enum):
-    """
-    OptimizationStrategy determines which (set of) plan(s) the Optimizer
-    will return to the Execution layer.
-    """
-    GREEDY = "greedy"
-    CONFIDENCE_INTERVAL = "confidence-interval"
-    PARETO = "pareto" 
-    SENTINEL = "sentinel"
-    NONE = "none"
-
-
 class AggFunc(str, Enum):
     COUNT = "count"
     AVERAGE = "average"

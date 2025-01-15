@@ -1,0 +1,27 @@
+from dataclasses import dataclass, field
+from palimpzest.constants import Model
+from palimpzest.policy import Policy, MaxQuality
+
+
+# TODO: Separate out the config for the Optimizer, ExecutionStrategy, and QueryProcessor
+@dataclass
+class QueryProcessorConfig:
+    """Shared context for query processors"""
+    policy: Policy = field(default_factory=MaxQuality)
+    scan_start_idx: int = field(default=0)
+    num_samples: int = field(default=float("inf"))
+    nocache: bool = field(default=True)  # NOTE: until we properly implement caching, let's set the default to True
+    include_baselines: bool = field(default=False)
+    min_plans: int | None = field(default=None)
+    verbose: bool = field(default=False)
+    available_models: list[Model] | None = field(default=None)
+    
+    max_workers: int | None = field(default=None)
+    num_workers_per_plan: int = field(default=1)
+
+    allow_bonded_query: bool = field(default=True)
+    allow_conventional_query: bool = field(default=False)
+    allow_model_selection: bool = field(default=True)
+    allow_code_synth: bool = field(default=True)
+    allow_token_reduction: bool = field(default=True)
+    use_final_op_quality: bool = field(default=False)

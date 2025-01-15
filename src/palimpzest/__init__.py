@@ -1,4 +1,4 @@
-from palimpzest.constants import MAX_ROWS, Cardinality, OptimizationStrategy
+from palimpzest.constants import MAX_ROWS, Cardinality
 
 
 from palimpzest.policy import (
