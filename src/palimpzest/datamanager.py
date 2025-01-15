@@ -151,8 +151,9 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
                 return ImageFileDirectorySource(rock, dataset_id)
             elif all([f.endswith(tuple(constants.PDF_EXTENSIONS)) for f in os.listdir(rock)]):
                 pdfprocessor = self.current_config.get("pdfprocessor")
-                if not pdfprocessor:
-                    raise Exception("No PDF processor found in the current config.")
+                # if no setup is found, then just use the default
+                # if not pdfprocessor:
+                #     raise Exception("No PDF processor found in the current config.")
                 file_cache_dir = self.get_file_cache_dir()
                 if not file_cache_dir:
                     raise Exception("No file cache directory found.")
