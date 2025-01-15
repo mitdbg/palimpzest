@@ -168,12 +168,12 @@ class RAGConvert(LLMConvert):
         gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema}
 
         # generate outputs for all fields in a single query
-        field_answers, generation_stats = self.generator(candidate_copy, fields, **gen_kwargs)
+        field_answers, _, generation_stats = self.generator(candidate_copy, fields, **gen_kwargs)
 
         # if there was an error for any field, execute a conventional query on that field
         for field, answers in field_answers.items():
             if answers is None:
-                single_field_answers, single_field_stats = self.generator(candidate_copy, [field], **gen_kwargs)
+                single_field_answers, _, single_field_stats = self.generator(candidate_copy, [field], **gen_kwargs)
                 field_answers.update(single_field_answers)
                 generation_stats += single_field_stats
 

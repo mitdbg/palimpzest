@@ -27,7 +27,6 @@ class SequentialSingleThreadPlanExecutor(ExecutionEngine):
             print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
             print(plan)
             print("---")
-            exit(0) # TODO: remove
 
         plan_start_time = time.time()
 

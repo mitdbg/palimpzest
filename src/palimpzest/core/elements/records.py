@@ -273,16 +273,14 @@ class DataRecord:
     def as_df(records: list[DataRecord]) -> pd.DataFrame:
         return pd.DataFrame([record.as_dict() for record in records])
 
-
     def as_json_str(self, include_bytes: bool = True, project_cols: list[str] | None = None):
         """Return a JSON representation of this DataRecord"""
         record_dict = self.as_dict(include_bytes, project_cols)
         record_dict = {
             field_name: self.schema.field_to_json(field_name, field_value)
-            for field_name, field_value in self.field_values.items()
+            for field_name, field_value in record_dict.items()
         }
         return json.dumps(record_dict, indent=2)
-
 
     def as_dict(self, include_bytes: bool = True, project_cols: list[str] | None = None):
         """Return a dictionary representation of this DataRecord"""
