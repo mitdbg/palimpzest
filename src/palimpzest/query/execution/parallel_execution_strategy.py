@@ -1,11 +1,11 @@
-import time
 import multiprocessing
+import time
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
-from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.datasource import MarshalAndScanDataOp
@@ -139,7 +139,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
                     # process each record output by the future's operator
                     for record in record_set:
                         # skip records which are filtered out
-                        if not getattr(record, "_passed_operator", True):
+                        if not getattr(record, "passed_operator", True):
                             continue
 
                         # add records (which are not filtered) to the cache, if allowed

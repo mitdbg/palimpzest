@@ -38,8 +38,15 @@ from palimpzest.query.operators.logical import (
 from palimpzest.query.operators.logical import (
     LogicalOperator as _LogicalOperator,
 )
+from palimpzest.query.operators.logical import (
+    Project as _Project,
+)
+from palimpzest.query.operators.logical import (
+    RetrieveScan as _RetrieveScan,
+)
 from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgentsConvert as _MixtureOfAgentsConvert
 from palimpzest.query.operators.physical import PhysicalOperator as _PhysicalOperator
+from palimpzest.query.operators.project import ProjectOp as _ProjectOp
 from palimpzest.query.operators.retrieve import RetrieveOp as _RetrieveOp
 
 LOGICAL_OPERATORS = [
@@ -51,6 +58,8 @@ LOGICAL_OPERATORS = [
     _FilteredScan,
     _GroupByAggregate,
     _LimitScan,
+    _Project,
+    _RetrieveScan,
 ]
 
 PHYSICAL_OPERATORS = (
@@ -68,6 +77,8 @@ PHYSICAL_OPERATORS = (
     + [_MixtureOfAgentsConvert]
     # physical
     + [_PhysicalOperator]
+    # project
+    + [_ProjectOp]
     # retrieve
     + [_RetrieveOp]
 )

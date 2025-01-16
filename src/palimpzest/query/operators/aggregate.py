@@ -3,10 +3,10 @@ from __future__ import annotations
 import time
 
 from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
-from palimpzest.core.lib.schemas import Number
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.lib.schemas import Number
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
@@ -129,9 +129,9 @@ class ApplyGroupByOp(AggregateOp):
         record_op_stats_lst = []
         for dr in drs:
             record_op_stats = RecordOpStats(
-                record_id=dr._id,
-                record_parent_id=dr._parent_id,
-                record_source_id=dr._source_id,
+                record_id=dr.id,
+                record_parent_id=dr.parent_id,
+                record_source_id=dr.source_id,
                 record_state=dr.as_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 logical_op_id=self.logical_op_id,
@@ -154,7 +154,7 @@ class AverageAggregateOp(AggregateOp):
         super().__init__(*args, **kwargs)
         self.agg_func = agg_func
 
-        if not self.input_schema == Number:
+        if not self.input_schema.get_desc() == Number.get_desc():
             raise Exception("Aggregate function AVERAGE is only defined over Numbers")
 
     def __str__(self):
@@ -189,9 +189,9 @@ class AverageAggregateOp(AggregateOp):
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=dr._id,
-            record_parent_id=dr._parent_id,
-            record_source_id=dr._source_id,
+            record_id=dr.id,
+            record_parent_id=dr.parent_id,
+            record_source_id=dr.source_id,
             record_state=dr.as_dict(include_bytes=False),
             op_id=self.get_op_id(),
             op_name=self.op_name(),
@@ -242,9 +242,9 @@ class CountAggregateOp(AggregateOp):
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=dr._id,
-            record_parent_id=dr._parent_id,
-            record_source_id=dr._source_id,
+            record_id=dr.id,
+            record_parent_id=dr.parent_id,
+            record_source_id=dr.source_id,
             record_state=dr.as_dict(include_bytes=False),
             op_id=self.get_op_id(),
             logical_op_id=self.logical_op_id,

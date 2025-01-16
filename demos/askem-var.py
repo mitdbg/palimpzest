@@ -9,28 +9,28 @@ import time
 
 import pandas as pd
 import streamlit as st
-
-import palimpzest as pz
-from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import Schema
-from palimpzest.core.lib.schemas import TextFile
-from palimpzest.sets import Dataset
-from palimpzest.query import StreamingSequentialExecution
-from palimpzest.policy import MaxQuality
+from palimpzest.constants import Cardinality
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.fields import Field
+from palimpzest.core.lib.schemas import Schema, TextFile
+from palimpzest.policy import MaxQuality
+from palimpzest.query import StreamingSequentialExecution
+from palimpzest.sets import Dataset
+
 
 class Papersnippet(TextFile):
     """Represents an excerpt from a scientific research paper, which potentially contains variables"""
 
-    excerptid = Field(desc="The unique identifier for the excerpt", required=True)
-    excerpt = Field(desc="The text of the excerpt", required=True)
+    excerptid = Field(desc="The unique identifier for the excerpt")
+    excerpt = Field(desc="The text of the excerpt")
 
 
 class Variable(Schema):
     """Represents a variable of scientific model in a scientific paper"""
-    name = Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None", required=True)
-    description = Field(desc="A description of the variable, optional, set 'null' if not found", required=False)
-    value = Field(desc="The value of the variable, optional, set 'null' if not found", required=False)
+
+    name = Field(desc="The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None")
+    description = Field(desc="A description of the variable, optional, set 'null' if not found")
+    value = Field(desc="The value of the variable, optional, set 'null' if not found")
 
 
 dict_of_excerpts = [
@@ -51,44 +51,18 @@ if __name__ == "__main__":
         df_input = pd.DataFrame(dict_of_excerpts)
         excerpts = Dataset(df_input)
         output = excerpts.convert(
-            Variable, desc="A variable used or introduced in the context", cardinality=pz.Cardinality.ONE_TO_MANY
+            Variable, desc="A variable used or introduced in the context", cardinality=Cardinality.ONE_TO_MANY
         ).filter("The value name is 'a'", depends_on="name")
-        # policy = pz.MinCost()
         policy = MaxQuality()
-        # iterable  =  pz.Execute(output,
-        #                         policy = policy,
-        #                         nocache=True,
-        #                         verbose=True,
-        #                         allow_code_synth=False,
-        #                         allow_token_reduction=False,
-        #                         allow_bonded_query=True,
-        #                         execution_engine=engine)
-
         engine = StreamingSequentialExecution(
-            datasource=excerpts,
             policy=policy,
             nocache=True,
-            verbose=False,
+            verbose=True,
             allow_code_synth=False,
             allow_token_reduction=False,
             allow_bonded_query=True,
         )
         engine.generate_plan(output, policy)
-
-        # physical_op_type = type('LLMBondedQueryConvert',
-        #                 (LLMBondedQueryConvert,),
-        #                 {'model': engine.plan.operators[1].model,
-        #                  'prompt_strategy': pz.PromptStrategy.DSPY_COT_QA})
-        #
-        # bonded_convert = physical_op_type(
-        #     input_schema=engine.plan.operators[1].input_schema,
-        #     output_schema=engine.plan.operators[1].output_schema,
-        #     query_strategy=pz.QueryStrategy.BONDED_WITH_FALLBACK,
-        #     shouldProfile=False,
-        #     cardinality=pz.Cardinality.ONE_TO_MANY,
-        # )
-        #
-        # engine.plan.operators[1] = bonded_convert
         print("Generated plan:\n", engine.plan)
         with st.container():
             st.write("### Executed plan: \n")

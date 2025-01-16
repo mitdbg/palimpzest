@@ -27,14 +27,13 @@ class PromptStrategy(str, Enum):
     PromptStrategy describes the prompting technique to be used by a Generator when
     performing some task with a specified Model.
     """
-
-    ZERO_SHOT = "zero-shot"
-    FEW_SHOT = "few-shot"
-    IMAGE_TO_TEXT = "image-to-text"
-    DSPY_COT_BOOL = "dspy-chain-of-thought-bool"
-    DSPY_COT_QA = "dspy-chain-of-thought-question"
-    DSPY_COT_MOA_AGG = "dspy-chain-of-thought-mixture-of-agents-aggregation"
-    CODE_GEN_BOOL = "code-gen-bool"
+    COT_BOOL = "chain-of-thought-bool"
+    COT_BOOL_IMAGE = "chain-of-thought-bool-image"
+    COT_QA = "chain-of-thought-question"
+    COT_QA_IMAGE = "chain-of-thought-question-image"
+    COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
+    COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
+    COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
 
 
 class AggFunc(str, Enum):
@@ -98,8 +97,8 @@ LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
 # Assume 30 GB/sec for sequential access of memory
 MEMORY_SCAN_TIME_PER_KB = 1 / (float(30) * 1024 * 1024)
 
-# Rough conversion from # of bytes --> # of tokens; assumes 1 token ~= 4 chars and 1 char == 1 byte
-BYTES_TO_TOKENS = 0.25
+# Rough conversion from # of characters --> # of tokens; assumes 1 token ~= 4 chars
+TOKENS_PER_CHARACTER = 0.25
 
 # a naive estimate for the input record size
 NAIVE_EST_SOURCE_RECORD_SIZE_IN_BYTES = 1_000_000

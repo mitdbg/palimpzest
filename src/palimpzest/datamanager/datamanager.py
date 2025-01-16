@@ -3,10 +3,9 @@ import pickle
 from threading import Lock
 
 import yaml
-
 from palimpzest import constants
 from palimpzest.config import Config
-from palimpzest.constants import PZ_DIR
+from palimpzest.constants import MAX_DATASET_ID_CHARS, PZ_DIR
 from palimpzest.core.data.datasources import (
     FileSource,
     HTMLFileDirectorySource,
@@ -17,9 +16,7 @@ from palimpzest.core.data.datasources import (
     UserSource,
     XLSFileDirectorySource,
 )
-
 from palimpzest.utils.hash_helpers import hash_for_id
-from palimpzest.constants import MAX_DATASET_ID_CHARS
 
 
 class DataDirectorySingletonMeta(type):
@@ -209,27 +206,6 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         entry, _ = self._registry[dataset_id]
 
         return entry
-
-    def get_cardinality(self, dataset_id):
-        """Return the number of records in a dataset."""
-        if dataset_id not in self._registry:
-            raise Exception("Cannot find dataset", dataset_id, "in the registry.")
-
-        entry, rock = self._registry[dataset_id]
-        if entry == "dir":
-            # Return the number of files in the directory
-            path = rock
-            return len([name for name in os.listdir(path) if os.path.isfile(os.path.join(path, name))])
-        elif entry == "file":
-            # Return 1
-            return 1
-        elif entry == "memory":
-            # Return the number of elements in the values list
-            return len(rock)
-        elif entry == "user":
-            return rock.getCardinality()
-        else:
-            raise Exception("Unknown entry type")
 
     def list_registered_datasets(self):
         """Return a list of registered datasets."""

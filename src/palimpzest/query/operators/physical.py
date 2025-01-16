@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 
-from palimpzest.core.lib.schemas import Schema
 from palimpzest.core.data.dataclasses import OperatorCostEstimates
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.lib.schemas import Schema
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.utils.hash_helpers import hash_for_id
 
 
@@ -117,9 +117,29 @@ class PhysicalOperator:
     def __hash__(self):
         return int(self.op_id, 16)
 
-    def _generate_field_names(self, candidate: DataRecord, input_schema: Schema, output_schema: Schema) -> list[str]:
+    def get_model_name(self) -> str | None:
+        """Returns the name of the model used by the physical operator (if it sets self.model). Otherwise, it returns None."""
+        return None
+
+    def get_input_fields(self):
+        """Returns the set of input fields needed to execute a physical operator."""
+        depends_on_fields = (
+            [field.split(".")[-1] for field in self.depends_on]
+            if self.depends_on is not None and len(self.depends_on) > 0
+            else None
+        )
+        input_fields = (
+            self.input_schema.field_names()
+            if depends_on_fields is None
+            else [field for field in self.input_schema.field_names() if field in depends_on_fields]
+        )
+
+        return input_fields
+
+    def get_fields_to_generate(self, candidate: DataRecord, input_schema: Schema, output_schema: Schema) -> list[str]:
         """
-        Creates the list of field names that the convert operation needs to generate.
+        Creates the list of field names that an operation needs to generate. Right now this is only used
+        by convert and retrieve operators.
         """
         # construct the list of fields in output_schema which will need to be generated;
         # specifically, this is the set of fields which are:
@@ -132,9 +152,6 @@ class PhysicalOperator:
                 fields_to_generate.append(field_name)
 
         return fields_to_generate
-
-    def __call__(self, candidate: DataRecord) -> DataRecordSet:
-        raise NotImplementedError("Calling __call__ from abstract method")
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
@@ -155,3 +172,6 @@ class PhysicalOperator:
         at least ballpark correct estimates of this quantity).
         """
         raise NotImplementedError("CostEstimates from abstract method")
+
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
+        raise NotImplementedError("Calling __call__ from abstract method")

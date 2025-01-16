@@ -1,19 +1,17 @@
 import time
 
-from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.schemas import SourceRecord
+from palimpzest.policy import Policy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
-from palimpzest.query.optimizer.cost_model import CostModel
-from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.plan import PhysicalPlan
-from palimpzest.policy import Policy
+from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Dataset
 
-from palimpzest.query.processor.query_processor import QueryProcessor
 
 class StreamingQueryProcessor(QueryProcessor):
     """This class can be used for a streaming, record-based execution.
@@ -49,7 +47,7 @@ class StreamingQueryProcessor(QueryProcessor):
         self._plan_stats = plan_stats
 
     def generate_plan(self, dataset: Dataset, policy: Policy):
-        self.clear_cached_responses_and_examples()
+        self.clear_cached_examples()
         start_time = time.time()
 
         # TODO: Do we need to re-initialize the optimizer here? 
@@ -152,7 +150,7 @@ class StreamingQueryProcessor(QueryProcessor):
 
                 if isinstance(operator, FilterOp):
                     # delete all records that did not pass the filter
-                    output_records = [r for r in output_records if r._passed_operator]
+                    output_records = [r for r in output_records if r.passed_operator]
                     if not output_records:
                         break
 

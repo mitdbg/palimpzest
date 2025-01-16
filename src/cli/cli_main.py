@@ -103,7 +103,6 @@ def ls_data() -> None:
     """
     # fetch list of registered datasets
     # Time the loading of the library
-    import palimpzest as pz
     import palimpzest.datamanager.datamanager as pzdm
 
     ds = pzdm.DataDirectory().list_registered_datasets()
@@ -136,7 +135,6 @@ def synthesize_data(name: str, count: int) -> None:
     count: int
         The nunber of values to synthesize
     """
-    import palimpzest as pz
     import palimpzest.datamanager.datamanager as pzdm
 
     name = name.strip()
@@ -164,7 +162,6 @@ def register_data(path: str, name: str) -> None:
     name: str
         Name to register the data file / directory with.
     """
-    import palimpzest as pz
     import palimpzest.datamanager.datamanager as pzdm
 
     # parse path and name
@@ -195,7 +192,6 @@ def rm_data(name: str) -> None:
     name: str
         Name of the dataset to unregister.
     """
-    import palimpzest as pz
     import palimpzest.datamanager.datamanager as pzdm
 
     # parse name
@@ -212,7 +208,6 @@ def clear_cache() -> None:
     """
     Clear the Palimpzest cache.
     """
-    import palimpzest as pz
     import palimpzest.datamanager.datamanager as pzdm
 
     pzdm.DataDirectory().clear_cache(keep_registry=True)
@@ -224,7 +219,6 @@ def print_config() -> None:
     """
     Print the current config that Palimpzest is using.
     """
-    import palimpzest as pz
     import palimpzest.datamanager.datamanager as pzdm
 
     # load config yaml file

@@ -8,13 +8,13 @@ This method is a simple wrapper for different methods, e.g., from_csv, from_yml,
 import json
 import os
 
+import palimpzest.core.lib.fields as pz_fields
+import palimpzest.core.lib.schemas as pz_schemas
 import pandas as pd
 import yaml
-from pyld import jsonld
-
-import palimpzest as pz
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema
+from pyld import jsonld
 
 
 class SchemaBuilder:
@@ -77,11 +77,12 @@ class SchemaBuilder:
         if schema_type is None:
             if schema_data.get('type', None):
                 # Find if the schema type is a valid class in pz
-                parsed_type = getattr(pz, schema_data['type'], Schema)
+                parsed_type = getattr(pz_schemas
+                                      , schema_data['type'], Schema)
                 schema_type = parsed_type if issubclass(parsed_type, Schema) else Schema
             else:
                 schema_type = Schema
-           
+
         # Generate the schema class dynamically
         attributes = {"__doc__": schema_description}
         include_attributes_lower = set([a.lower() for a in include_attributes])
@@ -94,13 +95,12 @@ class SchemaBuilder:
                 continue
             name = field['name']
             description = field.get('description', '')
-            required = field.get('required', False)
             field_type = field.get('type', 'Field')
-            field_type = getattr(pz, field_type, Field)
+            field_type = getattr(pz_fields, field_type, Field)
             if not issubclass(field_type, Field):
                 field_type = Field
                   
-            attributes[name] = field_type(desc=description, required=required)
+            attributes[name] = field_type(desc=description)
 
         # Create the class dynamically
         return type(schema_name, (schema_type,), attributes)
@@ -123,8 +123,6 @@ class SchemaBuilder:
         # Generate the schema class dynamically
         fields = []
         for col in columns:
-            required = not df[col].isnull().values.any()
-
             field_type = df[col].dtype
             if field_type == float or field_type == int:  # noqa
                 field_type = "NumericField"
@@ -133,8 +131,7 @@ class SchemaBuilder:
 
             fields.append({"name":col,
                            "description":"",
-                           "type":field_type,
-                           "required":required})
+                           "type":field_type})
         
         return {
             "name": '',
@@ -178,8 +175,7 @@ class SchemaBuilder:
             fields.append({
                 "name": name,
                 "description": description, 
-                "values": values,
-                "required": True})
+                "values": values})
 
         return {
             "name": '',
@@ -202,7 +198,6 @@ class SchemaBuilder:
         {
             "attribute1": {
                 "description": "description",
-                "required": True
             },
             ...
         }
@@ -230,7 +225,6 @@ class SchemaBuilder:
           fields:
             - name: attribute_name
               description: description
-              required: True
         ...
         """
 

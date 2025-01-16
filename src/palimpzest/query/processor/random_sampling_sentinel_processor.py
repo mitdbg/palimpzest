@@ -4,28 +4,23 @@ from functools import partial
 from typing import Callable
 
 import numpy as np
-
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
-from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
-from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
 from palimpzest.core.data.datasources import ValidationDataSource
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.lib.schemas import SourceRecord
+from palimpzest.policy import Policy
+from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
+from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
 from palimpzest.query.operators.convert import ConvertOp, LLMConvert
 from palimpzest.query.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
-from palimpzest.query.optimizer.cost_model import CostModel, SampleBasedCostModel
-from palimpzest.query.optimizer.optimizer import Optimizer
+from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.plan import SentinelPlan
-from palimpzest.policy import Policy
-from palimpzest.sets import Set
-
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
-from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
-from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.sets import Set
 
 
 class RandomSamplingSentinelQueryProcessor(QueryProcessor):
@@ -101,7 +96,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             record_op_stats = record_set.record_op_stats[0]
             if only_using_champion:
                 champion_record = champion_record_set[0]
-                record_op_stats.quality = int(record_op_stats.passed_operator == champion_record._passed_operator)
+                record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
 
             # - if we are using validation data, we may have multiple expected records in the expected_record_set for this source_id,
             #   thus, if we can identify an exact match, we can use that to evaluate the filter's quality
@@ -121,10 +116,10 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                         break
 
                 if found_match_in_output:
-                    record_op_stats.quality = int(record_op_stats.passed_operator == expected_record._passed_operator)
+                    record_op_stats.quality = int(record_op_stats.passed_operator == expected_record.passed_operator)
                 else:
                     champion_record = champion_record_set[0]
-                    record_op_stats.quality = int(record_op_stats.passed_operator == champion_record._passed_operator)
+                    record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
 
         # if this is a successful convert operation
         else:
@@ -364,7 +359,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                 champion_record_set = self.pick_output_fn(candidate_output_record_sets)
 
                 # get the source_id associated with this input record
-                source_id = candidate._source_id
+                source_id = candidate.source_id
 
                 # add champion record_set to mapping from source_id --> champion record_set
                 champion_record_sets[source_id] = champion_record_set
@@ -465,7 +460,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             # add records (which are not filtered) to the cache, if allowed
             if not self.nocache:
                 for record in all_records:
-                    if getattr(record, "_passed_operator", True):
+                    if getattr(record, "passed_operator", True):
                         self.datadir.append_cache(logical_op_id, record)
 
             # update candidates for next operator; we use champion outputs as input
@@ -473,7 +468,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             if next_logical_op_id is not None:
                 for _, record_set in source_id_to_champion_record_set.items():
                     for record in record_set:
-                        if isinstance(op_set[0], FilterOp) and not record._passed_operator:
+                        if isinstance(op_set[0], FilterOp) and not record.passed_operator:
                             continue
                         candidates.append(record)
 
@@ -543,9 +538,9 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         if not self.using_validation_data:
             raise Exception("Make sure you are using ValidationDataSource with MABSentinelExecutionEngine")
 
-        # if nocache is True, make sure we do not re-use DSPy examples or codegen examples
+        # if nocache is True, make sure we do not re-use codegen examples
         if self.nocache:
-            self.clear_cached_responses_and_examples()
+            self.clear_cached_examples()
 
         # create sentinel plan
         sentinel_plan = self.create_sentinel_plan(self.dataset, self.policy)

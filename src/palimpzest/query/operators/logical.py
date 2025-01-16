@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
 import json
 from typing import Callable
 
 from palimpzest.constants import AggFunc, Cardinality
-from palimpzest.core.lib.schemas import ImageFile, Schema
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
+from palimpzest.core.lib.schemas import Schema
 from palimpzest.utils.hash_helpers import hash_for_id
 
 
@@ -152,8 +151,8 @@ class BaseScan(LogicalOperator):
     def __eq__(self, other) -> bool:
         return (
             isinstance(other, BaseScan)
-            and self.input_schema == other.input_schema
-            and self.output_schema == other.output_schema
+            and self.input_schema.get_desc() == other.input_schema.get_desc()
+            and self.output_schema.get_desc() == other.output_schema.get_desc()
             and self.dataset_id == other.dataset_id
         )
 
@@ -206,7 +205,6 @@ class ConvertScan(LogicalOperator):
         self,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         udf: Callable | None = None,
-        image_conversion: bool = False,
         depends_on: list[str] | None = None,
         desc: str | None = None,
         target_cache_id: str | None = None,
@@ -216,7 +214,6 @@ class ConvertScan(LogicalOperator):
         super().__init__(*args, **kwargs)
         self.cardinality = cardinality
         self.udf = udf
-        self.image_conversion = image_conversion or (self.input_schema == ImageFile)
         self.depends_on = [] if depends_on is None else sorted(depends_on)
         self.desc = desc
         self.target_cache_id = target_cache_id
@@ -229,7 +226,6 @@ class ConvertScan(LogicalOperator):
         logical_id_params = {
             "cardinality": self.cardinality,
             "udf": self.udf,
-            "image_conversion": self.image_conversion,
             **logical_id_params,
         }
 
@@ -240,7 +236,6 @@ class ConvertScan(LogicalOperator):
         logical_op_params = {
             "cardinality": self.cardinality,
             "udf": self.udf,
-            "image_conversion": self.image_conversion,
             "depends_on": self.depends_on,
             "desc": self.desc,
             "target_cache_id": self.target_cache_id,
@@ -256,7 +251,6 @@ class FilteredScan(LogicalOperator):
     def __init__(
         self,
         filter: Filter,
-        image_filter: bool = False,
         depends_on: list[str] | None = None,
         target_cache_id: str | None = None,
         *args,
@@ -264,7 +258,6 @@ class FilteredScan(LogicalOperator):
     ):
         super().__init__(*args, **kwargs)
         self.filter = filter
-        self.image_filter = image_filter or (self.input_schema == ImageFile)
         self.depends_on = [] if depends_on is None else sorted(depends_on)
         self.target_cache_id = target_cache_id
 
@@ -275,7 +268,6 @@ class FilteredScan(LogicalOperator):
         logical_id_params = super().get_logical_id_params()
         logical_id_params = {
             "filter": self.filter,
-            "image_filter": self.image_filter,
             **logical_id_params,
         }
 
@@ -285,7 +277,6 @@ class FilteredScan(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "filter": self.filter,
-            "image_filter": self.image_filter,
             "depends_on": self.depends_on,
             "target_cache_id": self.target_cache_id,
             **logical_op_params,
@@ -348,6 +339,32 @@ class LimitScan(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "limit": self.limit,
+            "target_cache_id": self.target_cache_id,
+            **logical_op_params,
+        }
+
+        return logical_op_params
+
+
+class Project(LogicalOperator):
+    def __init__(self, project_cols: list[str], target_cache_id: str | None = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.project_cols = project_cols
+        self.target_cache_id = target_cache_id
+
+    def __str__(self):
+        return f"Project({self.input_schema}, {self.project_cols})"
+
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {"project_cols": self.project_cols, **logical_id_params}
+
+        return logical_id_params
+
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
+            "project_cols": self.project_cols,
             "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }

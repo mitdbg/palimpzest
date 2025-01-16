@@ -1,28 +1,20 @@
-from dataclasses import dataclass
-from typing import Optional
-import time
+from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-import multiprocessing
-import os
-import shutil
-from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
-from palimpzest.core.data.dataclasses import PlanStats, RecordOpStats
-from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats, RecordOpStats
 from palimpzest.core.data.datasources import DataSource, ValidationDataSource
-from palimpzest.query.optimizer.optimizer import Optimizer
-from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import Policy
-from palimpzest.sets import Dataset, Set
-from palimpzest.core.data.datasources import DataSource
-from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategy
-from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.query.optimizer.cost_model import CostModel
-from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.utils.model_helpers import get_models
+from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
+from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.sets import Dataset, Set
+from palimpzest.utils.hash_helpers import hash_for_id
+from palimpzest.utils.model_helpers import get_models
 
 
 @dataclass
@@ -94,13 +86,10 @@ class QueryProcessor:
 
         return hash_for_id(id_str)
 
-    def clear_cached_responses_and_examples(self):
+    def clear_cached_examples(self):
         """
-        Clear cached LLM responses and codegen samples.
+        Clear cached codegen samples.
         """
-        dspy_cache_dir = os.path.join(os.path.expanduser("~"), "cachedir_joblib/joblib/dsp/")
-        if os.path.exists(dspy_cache_dir):
-            shutil.rmtree(dspy_cache_dir)
         cache = self.datadir.get_cache_service()
         cache.rm_cache()
 

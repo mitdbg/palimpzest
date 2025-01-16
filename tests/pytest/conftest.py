@@ -1,5 +1,4 @@
 import pytest
-
 from palimpzest.constants import Model
 from palimpzest.policy import MaxQuality, MaxQualityAtFixedCost, MinCost, MinCostAtFixedQuality
 
@@ -84,7 +83,8 @@ def physical_plan(
     llm_filter_plan,
     bonded_llm_convert_plan,
     code_synth_convert_plan,
-    token_reduction_convert_plan,
+    rag_convert_plan,
+    # token_reduction_convert_plan,
     image_convert_plan,
     one_to_many_convert_plan,
     simple_plan_factory,
@@ -96,7 +96,8 @@ def physical_plan(
         "llm-filter": llm_filter_plan,
         "bonded-llm-convert": bonded_llm_convert_plan,
         "code-synth-convert": code_synth_convert_plan,
-        "token-reduction-convert": token_reduction_convert_plan,
+        "rag-convert": rag_convert_plan,
+        # "token-reduction-convert": token_reduction_convert_plan,
         "image-convert": image_convert_plan,
         "one-to-many-convert": one_to_many_convert_plan,
         "cost-est-simple-plan-gpt4-gpt4": simple_plan_factory(

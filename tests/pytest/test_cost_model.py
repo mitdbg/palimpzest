@@ -1,6 +1,5 @@
 import pytest
-
-from palimpzest.datamanager import DataDirectory
+from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.utils.model_helpers import get_models
 

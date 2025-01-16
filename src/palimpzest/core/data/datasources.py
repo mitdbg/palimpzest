@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import base64
 import json
 import os
 import sys
@@ -13,8 +14,17 @@ from bs4 import BeautifulSoup
 from papermage import Document
 
 from palimpzest import constants
-from palimpzest.core.lib.schemas import File, ImageFile, Number, PDFFile, Schema, TextFile, WebPage, XLSFile, DefaultSchema
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.schemas import (
+    DefaultSchema,
+    File,
+    ImageFile,
+    PDFFile,
+    Schema,
+    TextFile,
+    WebPage,
+    XLSFile,
+)
 from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
@@ -228,8 +238,7 @@ class ImageFileDirectorySource(DirectorySource):
         dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
-            dr.contents = f.read()
-        dr.text_description = f"Image file {dr.filename}"
+            dr.contents = base64.b64encode(f.read())
         return dr
 
 

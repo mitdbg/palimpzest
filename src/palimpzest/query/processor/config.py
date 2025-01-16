@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
+
 from palimpzest.constants import Model
-from palimpzest.policy import Policy, MaxQuality
+from palimpzest.policy import MaxQuality, Policy
 
 
 # TODO: Separate out the config for the Optimizer, ExecutionStrategy, and QueryProcessor
@@ -22,6 +23,8 @@ class QueryProcessorConfig:
     allow_bonded_query: bool = field(default=True)
     allow_conventional_query: bool = field(default=False)
     allow_model_selection: bool = field(default=True)
-    allow_code_synth: bool = field(default=True)
-    allow_token_reduction: bool = field(default=True)
+    allow_code_synth: bool = field(default=False)
+    allow_token_reduction: bool = field(default=False)
+    allow_rag_reduction: bool = field(default=True)
+    allow_mixtures: bool = field(default=True)
     use_final_op_quality: bool = field(default=False)

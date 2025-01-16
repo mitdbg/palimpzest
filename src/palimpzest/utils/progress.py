@@ -1,25 +1,21 @@
-from abc import ABC, abstractmethod
-import threading
 import time
-from typing import Optional, Dict, Any
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from rich.progress import Progress as RichProgress
-from rich.progress import (
-    TextColumn, 
-    BarColumn, 
-    TaskProgressColumn,
-    TimeRemainingColumn,
-    SpinnerColumn,
-    TimeElapsedColumn
-)
-from rich.live import Live
 from rich.console import Console
-from rich.layout import Layout
+from rich.progress import (
+    BarColumn,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+from rich.progress import Progress as RichProgress
 
 try:
     import ipywidgets as widgets
-    from IPython.display import display, clear_output
+    from IPython.display import display
     JUPYTER_AVAILABLE = True
 except ImportError:
     JUPYTER_AVAILABLE = False
@@ -39,7 +35,7 @@ def in_jupyter_notebook():
     try:
         from IPython import get_ipython
         return 'IPKernelApp' in get_ipython().config
-    except:
+    except Exception:
         return False
 
 def get_memory_usage() -> float:
@@ -48,7 +44,7 @@ def get_memory_usage() -> float:
         import psutil
         process = psutil.Process()
         return process.memory_info().rss / 1024 / 1024
-    except:
+    except Exception:
         return 0.0
 
 class ProgressManager(ABC):
@@ -63,7 +59,7 @@ class ProgressManager(ABC):
         pass
     
     @abstractmethod
-    def update(self, current: int, sample: Optional[str] = None, **kwargs):
+    def update(self, current: int, sample: str | None = None, **kwargs):
         """Update progress with current count and optional sample"""
         pass
     
@@ -121,7 +117,7 @@ class CLIProgressManager(ProgressManager):
         # Start progress bar
         self.progress.start()
         
-    def update(self, current: int, sample: Optional[str] = None, **kwargs):
+    def update(self, current: int, sample: str | None = None, **kwargs):
         self.update_stats(**kwargs)
         
         # Update progress bar and recent text in one update
@@ -181,7 +177,7 @@ class NotebookProgressManager(ProgressManager):
         self.progress_bar.max = total
         display(self.container)
         
-    def update(self, current: int, sample: Optional[str] = None, **kwargs):
+    def update(self, current: int, sample: str | None = None, **kwargs):
         self.update_stats(**kwargs)
         self.progress_bar.value = current
         

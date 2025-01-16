@@ -3,16 +3,20 @@
 python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usecase3-pdf
 
 """
-
 import os
 import time
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
-import streamlit as st  # type: ignore
-
-import palimpzest as pz
+import streamlit as st
+from palimpzest.constants import Cardinality
+from palimpzest.core.lib.fields import Field
+from palimpzest.core.lib.schemas import URL, File, PDFFile, Schema, Table, XLSFile
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.policy import MaxQuality
+from palimpzest.query import Execute, StreamingSequentialExecution
+from palimpzest.sets import Dataset
 from palimpzest.utils import udfs
 
 if not os.environ.get("OPENAI_API_KEY"):
@@ -20,98 +24,90 @@ if not os.environ.get("OPENAI_API_KEY"):
 
     load_env()
 
-pz.DataDirectory().clear_cache(keep_registry=True)
+DataDirectory().clear_cache(keep_registry=True)
 
 
-class ScientificPaper(pz.PDFFile):
+class ScientificPaper(PDFFile):
     """Represents a scientific research paper, which in practice is usually from a PDF file"""
 
-    paper_title = pz.Field(
-        desc="The title of the paper. This is a natural language title, not a number or letter.", required=True
+    paper_title = Field(
+        desc="The title of the paper. This is a natural language title, not a number or letter."
     )
-    paper_year = pz.Field(desc="The year the paper was published. This is a number.", required=False)
-    paper_author = pz.Field(desc="The name of the first author of the paper", required=True)
-    paper_journal = pz.Field(desc="The name of the journal the paper was published in", required=True)
-    paper_subject = pz.Field(desc="A summary of the paper contribution in one sentence", required=False)
-    paper_doi_url = pz.Field(desc="The DOI URL for the paper", required=True)
+    paper_year = Field(desc="The year the paper was published. This is a number.")
+    paper_author = Field(desc="The name of the first author of the paper")
+    paper_journal = Field(desc="The name of the journal the paper was published in")
+    paper_subject = Field(desc="A summary of the paper contribution in one sentence")
+    paper_doi_url = Field(desc="The DOI URL for the paper")
 
 
-class Reference(pz.Schema):
+class Reference(Schema):
     """Represents a reference to another paper, which is cited in a scientific paper"""
 
-    reference_index = pz.Field(desc="The index of the reference in the paper", required=True)
-    reference_title = pz.Field(desc="The title of the paper being cited", required=True)
-    reference_first_author = pz.Field(desc="The author of the paper being cited", required=True)
-    reference_year = pz.Field(desc="The year in which the cited paper was published", required=True)
-    # snippet = pz.Field(desc="A snippet from the source paper that references the index", required=False)
+    reference_index = Field(desc="The index of the reference in the paper")
+    reference_title = Field(desc="The title of the paper being cited")
+    reference_first_author = Field(desc="The author of the paper being cited")
+    reference_year = Field(desc="The year in which the cited paper was published")
+    # snippet = Field(desc="A snippet from the source paper that references the index")
 
 
-class CaseData(pz.Schema):
+class CaseData(Schema):
     """An individual row extracted from a table containing medical study data."""
 
-    case_submitter_id = pz.Field(desc="The ID of the case", required=True)
-    age_at_diagnosis = pz.Field(desc="The age of the patient at the time of diagnosis", required=False)
-    race = pz.Field(
-        desc="An arbitrary classification of a taxonomic group that is a division of a species.", required=False
+    case_submitter_id = Field(desc="The ID of the case")
+    age_at_diagnosis = Field(desc="The age of the patient at the time of diagnosis")
+    race = Field(
+        desc="An arbitrary classification of a taxonomic group that is a division of a species."
     )
-    ethnicity = pz.Field(
-        desc="Whether an individual describes themselves as Hispanic or Latino or not.", required=False
+    ethnicity = Field(
+        desc="Whether an individual describes themselves as Hispanic or Latino or not."
     )
-    gender = pz.Field(desc="Text designations that identify gender.", required=False)
-    vital_status = pz.Field(desc="The vital status of the patient", required=False)
-    ajcc_pathologic_t = pz.Field(
+    gender = Field(desc="Text designations that identify gender.")
+    vital_status = Field(desc="The vital status of the patient")
+    ajcc_pathologic_t = Field(
         desc="Code of pathological T (primary tumor) to define the size or contiguous extension of the primary tumor (T), using staging criteria from the American Joint Committee on Cancer (AJCC).",
-        required=False,
     )
-    ajcc_pathologic_n = pz.Field(
+    ajcc_pathologic_n = Field(
         desc="The codes that represent the stage of cancer based on the nodes present (N stage) according to criteria based on multiple editions of the AJCC's Cancer Staging Manual.",
-        required=False,
     )
-    ajcc_pathologic_stage = pz.Field(
+    ajcc_pathologic_stage = Field(
         desc="The extent of a cancer, especially whether the disease has spread from the original site to other parts of the body based on AJCC staging criteria.",
-        required=False,
     )
-    tumor_grade = pz.Field(
+    tumor_grade = Field(
         desc="Numeric value to express the degree of abnormality of cancer cells, a measure of differentiation and aggressiveness.",
-        required=False,
     )
-    tumor_focality = pz.Field(
+    tumor_focality = Field(
         desc="The text term used to describe whether the patient's disease originated in a single location or multiple locations.",
-        required=False,
     )
-    tumor_largest_dimension_diameter = pz.Field(desc="The tumor largest dimension diameter.", required=False)
-    primary_diagnosis = pz.Field(
+    tumor_largest_dimension_diameter = Field(desc="The tumor largest dimension diameter.")
+    primary_diagnosis = Field(
         desc="Text term used to describe the patient's histologic diagnosis, as described by the World Health Organization's (WHO) International Classification of Diseases for Oncology (ICD-O).",
-        required=False,
     )
-    morphology = pz.Field(
+    morphology = Field(
         desc="The Morphological code of the tumor, as described by the World Health Organization's (WHO) International Classification of Diseases for Oncology (ICD-O).",
-        required=False,
     )
-    tissue_or_organ_of_origin = pz.Field(
+    tissue_or_organ_of_origin = Field(
         desc="The text term used to describe the anatomic site of origin, of the patient's malignant disease, as described by the World Health Organization's (WHO) International Classification of Diseases for Oncology (ICD-O).",
-        required=False,
     )
-    # tumor_code = pz.Field(desc="The tumor code", required=False)
-    study = pz.Field(desc="The last name of the author of the study, from the table name", required=False)
+    # tumor_code = Field(desc="The tumor code")
+    study = Field(desc="The last name of the author of the study, from the table name")
 
 
 @st.cache_resource()
 def extract_supplemental(engine, policy):
-    papers = pz.Dataset("biofabric-pdf", schema=ScientificPaper)
-    paper_urls = papers.convert(pz.URL, desc="The DOI url of the paper")
-    html_doi = paper_urls.convert(pz.File, udf=udfs.url_to_file)
+    papers = Dataset("biofabric-pdf", schema=ScientificPaper)
+    paper_urls = papers.convert(URL, desc="The DOI url of the paper")
+    html_doi = paper_urls.convert(File, udf=udfs.url_to_file)
     table_urls = html_doi.convert(
-        pz.URL, desc="The URLs of the XLS tables from the page", cardinality=pz.Cardinality.ONE_TO_MANY
+        URL, desc="The URLs of the XLS tables from the page", cardinality=Cardinality.ONE_TO_MANY
     )
-    # url_file = pz.Dataset("biofabric-urls", schema=pz.TextFile)
-    # table_urls = url_file.convert(pz.URL, desc="The URLs of the tables")
-    tables = table_urls.convert(pz.File, udf=udfs.url_to_file)
-    xls = tables.convert(pz.XLSFile, udf=udfs.file_to_xls)
-    patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+    # url_file = Dataset("biofabric-urls", schema=TextFile)
+    # table_urls = url_file.convert(URL, desc="The URLs of the tables")
+    tables = table_urls.convert(File, udf=udfs.url_to_file)
+    xls = tables.convert(XLSFile, udf=udfs.file_to_xls)
+    patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
 
     # output = patient_tables
-    iterable = pz.Execute(
+    iterable = Execute(
         patient_tables,
         policy=policy,
         nocache=True,
@@ -132,14 +128,14 @@ def extract_supplemental(engine, policy):
 
 @st.cache_resource()
 def integrate_tables(engine, policy):
-    xls = pz.Dataset("biofabric-tiny", schema=pz.XLSFile)
-    patient_tables = xls.convert(pz.Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
+    xls = Dataset("biofabric-tiny", schema=XLSFile)
+    patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
     patient_tables = patient_tables.filter("The table contains biometric information about the patient")
     case_data = patient_tables.convert(
-        CaseData, desc="The patient data in the table", cardinality=pz.Cardinality.ONE_TO_MANY
+        CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
     )
 
-    iterable = pz.Execute(
+    iterable = Execute(
         case_data,
         policy=policy,
         nocache=True,
@@ -160,14 +156,14 @@ def integrate_tables(engine, policy):
 
 @st.cache_resource()
 def extract_references(engine, policy):
-    papers = pz.Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
+    papers = Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
     papers = papers.filter("The paper mentions phosphorylation of Exo1")
     references = papers.convert(
-        Reference, desc="A paper cited in the reference section", cardinality=pz.Cardinality.ONE_TO_MANY
+        Reference, desc="A paper cited in the reference section", cardinality=Cardinality.ONE_TO_MANY
     )
 
     output = references
-    iterable = pz.Execute(
+    iterable = Execute(
         output,
         policy=policy,
         nocache=True,
@@ -189,7 +185,7 @@ def extract_references(engine, policy):
 pdfdir = "testdata/bdf-usecase3-pdf/"
 
 with st.sidebar:
-    datasets = pz.DataDirectory().list_registered_datasets()
+    datasets = DataDirectory().list_registered_datasets()
     options = [name for name, path in datasets if path[0] == "dir"]
     options = [name for name in options if "bdf-usecase3" in name]
     dataset = st.radio("Select a dataset", options)
@@ -201,16 +197,16 @@ dataset = "bdf-usecase3-tiny"
 
 if run_pz:
     # reference, plan, stats = run_workload()
-    papers = pz.Dataset(dataset, schema=ScientificPaper)
+    papers = Dataset(dataset, schema=ScientificPaper)
     papers = papers.filter("The paper mentions phosphorylation of Exo1")
-    output = papers.convert(Reference, desc="The references cited in the paper", cardinality=pz.Cardinality.ONE_TO_MANY)
+    output = papers.convert(Reference, desc="The references cited in the paper", cardinality=Cardinality.ONE_TO_MANY)
 
     # output = references
-    # engine = pz.NoSentinelExecution
-    engine = pz.StreamingSequentialExecution
-    # policy = pz.MinCost()
-    policy = pz.MaxQuality()
-    iterable = pz.Execute(
+    # engine = NoSentinelExecution
+    engine = StreamingSequentialExecution
+    # policy = MinCost()
+    policy = MaxQuality()
+    iterable = Execute(
         output,
         policy=policy,
         nocache=True,

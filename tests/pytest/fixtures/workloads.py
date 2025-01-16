@@ -1,6 +1,4 @@
 import pytest
-
-import palimpzest as pz
 from palimpzest.constants import Cardinality
 from palimpzest.core.lib.schemas import Table, TextFile, XLSFile
 from palimpzest.sets import Dataset
@@ -32,7 +30,7 @@ def within_two_miles_of_mit(record):
 def in_price_range(record):
     try:
         price = record.price
-        if type(price) is str:
+        if isinstance(price, str):
             price = price.strip()
             price = int(price.replace("$", "").replace(",", ""))
         return 6e5 < price <= 2e6
@@ -62,7 +60,7 @@ def real_estate_workload(
 ):
     listings = Dataset(real_estate_eval_tiny, schema=real_estate_listing_files_schema)
     listings = listings.convert(text_real_estate_listing_schema, depends_on="text_content")
-    listings = listings.convert(image_real_estate_listing_schema, image_conversion=True, depends_on="image_filepaths")
+    listings = listings.convert(image_real_estate_listing_schema, depends_on="image_filepaths")
     listings = listings.filter(
         "The interior is modern and attractive, and has lots of natural sunlight",
         depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
@@ -87,7 +85,7 @@ def biofabric_workload(biofabric_tiny, case_data_schema):
 @pytest.fixture
 def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_schema):
     # construct plan with three converts
-    dataset = pz.Dataset(enron_eval_tiny, schema=email_schema)
+    dataset = Dataset(enron_eval_tiny, schema=email_schema)
     dataset = dataset.convert(foobar_schema)
     dataset = dataset.convert(baz_schema)
 
@@ -96,7 +94,7 @@ def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_sc
 @pytest.fixture
 def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
     # construct plan with two converts and two filters
-    dataset = pz.Dataset(enron_eval_tiny, schema=TextFile)
+    dataset = Dataset(enron_eval_tiny, schema=TextFile)
     dataset = dataset.filter("filter1")
     dataset = dataset.convert(email_schema)
 
@@ -105,7 +103,7 @@ def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
 @pytest.fixture
 def two_converts_two_filters_workload(enron_eval_tiny, email_schema, foobar_schema):
     # construct plan with two converts and two filters
-    dataset = pz.Dataset(enron_eval_tiny, schema=email_schema)
+    dataset = Dataset(enron_eval_tiny, schema=email_schema)
     dataset = dataset.convert(foobar_schema)
     dataset = dataset.filter("filter1", depends_on=["sender"])
     dataset = dataset.filter("filter2", depends_on=["subject"])

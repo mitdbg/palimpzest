@@ -1,84 +1,129 @@
+from __future__ import annotations
+
 import json
-import pandas as pd
-import numpy as np
-
 from typing import Any as TypingAny
-from typing import Dict, List
 
-from palimpzest.constants import MAX_ROWS
-from palimpzest.core.lib.fields import BytesField, CallableField, Field, ListField, NumericField, StringField
+import pandas as pd
+
+from palimpzest.constants import DERIVED_SCHEMA_PREFIX, MAX_ROWS
+from palimpzest.core.lib.fields import (
+    BytesField,
+    CallableField,
+    Field,
+    ImageBase64Field,
+    ListField,
+    NumericField,
+    StringField,
+)
 from palimpzest.utils.hash_helpers import hash_for_temp_schema
-from palimpzest.constants import DERIVED_SCHEMA_PREFIX, FROM_DF_PREFIX
 
-# TODO: Under the definition of __eq__ in SchemaMetaclass, I think that an equality check like
-#       Any([TextFile, PDFFile]) == TextFile will return `False`. I believe this is the behavior
-#       that we want (these schemas are not the same), but I need to make sure that an equality
-#       check between two instances of these schemas will not return `False` if they are both the
-#       the same object (e.g. the same file of text), but one has Schema == Any([TextFile, PDFFile])
-#       and the other has Schema = TextFile
+
 class SchemaMetaclass(type):
     """
     This is a metaclass for our Schema class.
     """
 
-    def __str__(cls) -> str:
-        """
-        Emit a string that contains the names of all the class members that are Fields.
-        """
-        # get attributes that are Fields
-        fields = SchemaMetaclass.field_names(cls)
-
-        return f"{cls.__name__}({', '.join(fields)})"
-
     def __eq__(cls, other) -> bool:
         """
         Equality function for the Schema which checks that the ordered fields and class names are the same.
         """
-        cls_schema = SchemaMetaclass.get_desc(cls)
-        other_schema = SchemaMetaclass.get_desc(other)
+        return cls.get_desc() == other.get_desc()
 
-        return cls_schema == other_schema
 
-    def __hash__(cls) -> int:
+class Schema(metaclass=SchemaMetaclass):
+    """
+    A Schema is defined by a set of named Fields. Much of the class is implemented in the SchemaMetaclass.
+    Because Schema is a MetaClass, its fields are defined similar to how they are defined in a Python dataclass.
+
+    For example, if you wanted to define a schema for research papers, you could define a schema
+    with fields representing the paper's title, publication year, and publishing journal:
+
+    ```python
+    class ResearchPaper(Schema):
+        paper_title = Field(desc="The title of a scientific paper")
+        paper_year = Field(desc="The year the paper was published")
+        paper_journal = Field(desc="The name of the journal that published the paper")
+    ```
+    """
+
+    def __init__(self, desc: str | None = None):
+        self._desc = "" if desc is None else desc
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}(desc={self._desc})"
+
+    # TODO: after eliminating the metaclass, this does not work
+    def __eq__(self, other) -> bool:
+        """
+        Equality function for the Schema which checks that the ordered fields and class names are the same.
+        """
+        schema = self.get_desc()
+        other_schema = other.get_desc()
+
+        return schema == other_schema
+
+    def __hash__(self) -> int:
         """Hash function for the Schema which is a simple hash of its ordered Fields and class name."""
-        ordered = SchemaMetaclass.get_desc(cls)
+        ordered = self.get_desc()
 
         return hash(ordered.encode())
 
-    def field_names(cls, unique=False, id="") -> List[str]:
-        """Return a list of the fields in this Schema
-        The unique argument is used to determine if the class name should be prefixed to the field name for unique identification
-        The id argument is used to provide a unique identifier for the class name"""
+    @classmethod
+    def get_desc(cls) -> str:
+        """Return a description of the schema"""
+        fields = cls.field_names()
+        d = {k: hash(getattr(cls, k)) for k in fields}
+        d["__class__"] = cls.class_name()
+
+        return json.dumps(d, sort_keys=True)
+
+    @classmethod
+    def field_names(cls, unique=False, id="") -> list[str]:
+        """
+        Return a list of the fields in this Schema. The `unique` argument is used to determine if the
+        class name should be prefixed to the field name for unique identification. The `id` argument is
+        used to provide a unique identifier for the class name.
+        """
         attributes = dir(cls)
         attributes = [attr for attr in attributes if not attr.startswith("__")]
         prefix = f"{cls.__name__}.{id}." if unique else ""
         fields = [prefix + attr for attr in attributes if isinstance(getattr(cls, attr), Field)]
         return fields
 
-    def get_desc(cls) -> str:
-        """Return a description of the schema"""
-        fields = SchemaMetaclass.field_names(cls)
-        d = {k: hash(getattr(cls, k)) for k in fields}
+    @classmethod
+    def field_desc_map(cls, unique=False, id="") -> dict[str, str]:
+        """
+        Return a mapping from field names to their descriptions. The `unique` argument is used to determine if the
+        class name should be prefixed to the field name for unique identification. The `id` argument is
+        used to provide a unique identifier for the class name.
+        """
+        attributes = dir(cls)
+        attributes = [attr for attr in attributes if not attr.startswith("__")]
+        prefix = f"{cls.__name__}.{id}." if unique else ""
+        field_desc_map = {prefix + attr: getattr(cls, attr)._desc for attr in attributes if isinstance(getattr(cls, attr), Field)}
+        return field_desc_map
 
-        # TODO: this causes an exception why trying to use Schema in a type definition
-        # e.g. TaskDescriptor = Tuple[str, Union[tuple, None], Schema, Schema]
-        # will throw the following exception:
-        #
-        # File "/Users/matthewrusso/palimpzest/src/palimpzest/elements/elements.py", line 168, in get_desc
-        #     d["__class__"] = o.__name__
-        # AttributeError: '_SpecialForm' object has no attribute '__name__'
-        #
-        d["__class__"] = cls.__class__.__name__
+    @classmethod
+    def field_map(cls, unique=False, id="") -> dict[str, Field]:
+        """
+        Return a mapping from field names to their field types. The `unique` argument is used to determine if the
+        class name should be prefixed to the field name for unique identification. The `id` argument is used to
+        provide a unique identifier for the class name.
+        """
+        attributes = dir(cls)
+        attributes = [attr for attr in attributes if not attr.startswith("__")]
+        prefix = f"{cls.__name__}.{id}." if unique else ""
+        field_map = {prefix + attr: getattr(cls, attr) for attr in attributes if isinstance(getattr(cls, attr), Field)}
+        return field_map
 
-        return json.dumps(d, sort_keys=True)
-
-    def json_schema(cls) -> Dict[str, TypingAny]:
+    @classmethod
+    def json_schema(cls) -> dict[str, TypingAny]:
         """The JSON representation of the Schema"""
-        fields = SchemaMetaclass.field_names(cls)
+        fields = cls.field_names()
 
         schema = {
-            "properties": {},
-            "required": [],
+
+            "fields": {},
             "type": "object",
             "description": cls.__doc__,
         }
@@ -89,53 +134,106 @@ class SchemaMetaclass(type):
             if v is None:
                 continue
 
-            schema["properties"][k] = v.json_schema()
+            schema["fields"][k] = v.json_schema()
 
-            if v.required:
-                schema["required"].append(k)
         return schema
 
+    @staticmethod
+    def field_to_json(field_name: str, field_value: TypingAny) -> TypingAny:
+        """Return a representation of the specified field which will be used in its conversion to JSON"""
+        return field_value
 
-# TODO: should we put the SchemaMetaclass functionality into Schema and make it a @dataclass?
-class Schema(metaclass=SchemaMetaclass):
-    """
-    A Schema is defined by a set of named Fields. Much of the class is implemented
-    in the SchemaMetaclass (which I need to ask Mike more about). Because Schema is a MetaClass,
-    its fields are defined similar to how they are defined in a Python dataclass.
+    @classmethod
+    def union(cls, other_schema: Schema, keep_duplicates: bool = False) -> Schema:
+        """Return the union of this schema with the other_schema"""
+        # construct the new schema name
+        schema_name = cls.class_name()
+        other_schema_name = other_schema.class_name()
+        new_schema_name = f"Union[{schema_name}, {other_schema_name}]"
 
-    For example, if you wanted to define a schema for research papers, you could define a schema
-    with fields representing the paper's title, publication year, and publishing journal:
+        # construct new schema description
+        new_desc = (
+            f"The union of {schema_name} and {other_schema_name}\n\n"
+            f"{schema_name}:\n{cls.__doc__}\n\n"
+            f"{other_schema_name}:\n{other_schema.__doc__}"
+        )
 
-    ```python
-    class ResearchPaper(Schema):
-        paper_title = Field(desc="The title of a scientific paper", required=True)
-        paper_year = Field(desc="The year the paper was published", required=True)
-        paper_journal = Field(desc="The name of the journal that published the paper", required=False)
-    ```
+        # construct new lists of field names, types, and descriptions
+        # NOTE: we don't need to use unique field names because they will be injected with an ID at runtime
+        new_field_names, new_field_types, new_field_descs = [], [], []
+        this_field_map = cls.field_map()
+        for field_name, field in this_field_map.items():
+            new_field_names.append(field_name)
+            new_field_types.append(field)
+            new_field_descs.append(field._desc)
 
-    Note that because not all papers are published in journals, this field might be optional (`required=False`).
-    """
+        other_field_map = other_schema.field_map()
+        for field_name, field in other_field_map.items():
+            new_field_names.append(field_name)
+            new_field_types.append(field)
+            new_field_descs.append(field._desc)
 
-    def __init__(self, desc: str | None = None):
-        self._desc = ""
-        if desc is not None:
-            self._desc = desc
+        # rename duplicate fields if we are keeping duplicates
+        if keep_duplicates:
+            dup_new_field_names = []
+            for left_idx, left_field_name in enumerate(new_field_names):
+                # see if there's a duplicate field name
+                matching_field = False
+                for right_idx in range(left_idx + 1, len(new_field_names)):
+                    right_field_name = new_field_names[right_idx]
+                    if left_field_name == right_field_name:
+                        matching_field = True
+                        break
+                
+                # if theres a matching field, add them both with their schema names
+                if matching_field:
+                    dup_new_field_names.append(schema_name + "_" + left_field_name)
+                    dup_new_field_names.append(other_schema_name + "_" + left_field_name)
+                else:
+                    dup_new_field_names.append(left_field_name)
 
-    def __str__(self) -> str:
-        return f"{self.__class__.__name__}(desc={self._desc})"
+        # Generate the schema class dynamically
+        attributes = {"__doc__": new_desc}
+        for field_name, field_type, field_desc in zip(new_field_names, new_field_types, new_field_descs):
+            attributes[field_name] = (
+                field_type.__class__(desc=field_desc, element_type=field_type.element_type)
+                if isinstance(field_type, ListField)
+                else field_type.__class__(desc=field_desc)
+            )
 
-    def as_json_str(self, record_dict: Dict[str, TypingAny], include_data_cols: bool = True) -> str:
-        """Return a JSON representation of a data record with this Schema"""
-        # In case of numpy types, the json.dumps will fail. Convert to native types.
-        converted_dict = pd.Series(record_dict).to_dict()
+        # Create the class dynamically
+        return type(new_schema_name, (Schema,), attributes)
 
-        if include_data_cols:
-            converted_dict["data type"] = str(self.__class__.__name__)
-            converted_dict["data type description"] = str(self.__class__.__doc__)
+    @classmethod
+    def project(cls, project_cols: list[str]) -> Schema:
+        """Return a projection of this schema with only the project_cols"""
+        # construct the new schema name
+        schema_name = cls.class_name()
+        new_schema_name = f"Project[{schema_name}]"
 
-        return json.dumps(converted_dict, indent=2)
+        # construct new schema description
+        new_desc = f"A projection of {schema_name} which only contains the fields {project_cols}"
 
-    # TODO move logic from metaclass to here
+        # make sure projection column names are shortened
+        project_cols = [field_name.split(".")[-1] for field_name in project_cols]
+
+        # construct new lists of field names, types, and descriptions
+        # NOTE: we don't need to use unique field names because they will be injected with an ID at runtime
+        new_field_names, new_field_types, new_field_descs = [], [], []
+        for field_name, field in cls.field_map().items():
+            if field_name in project_cols:
+                new_field_names.append(field_name)
+                new_field_types.append(field)
+                new_field_descs.append(field._desc)
+
+        # Generate the schema class dynamically
+        attributes = {"__doc__": new_desc}
+        for field_name, field_type, field_desc in zip(new_field_names, new_field_types, new_field_descs):
+            attributes[field_name] = field_type.__class__(desc=field_desc)
+
+        # Create the class dynamically
+        return type(new_schema_name, (Schema,), attributes)
+
     @classmethod
     def class_name(cls) -> str:
         """Return the name of this class"""
@@ -143,7 +241,7 @@ class Schema(metaclass=SchemaMetaclass):
     
 
     @staticmethod
-    def from_df(df: pd.DataFrame) -> "Schema":
+    def from_df(df: pd.DataFrame) -> Schema:
         # Create a unique schema name based on columns
         schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
         
@@ -172,29 +270,13 @@ class Schema(metaclass=SchemaMetaclass):
 # File, TextFile, Image, PDF, etc.
 ###################################################################################
 
-
 # First-level Schema's
-class Any(Schema):
-    """
-    This represents ANY of the specified Schemas. For example, you may not know if a document
-    is a PDF or a Word document, but you know it's one of those two.
-    """
-
-    def __init__(self, possible_schemas: list[Schema], desc: str):
-        super().__init__(desc=desc)
-        self._possible_schemas = possible_schemas
-
-    @property
-    def children(self) -> List[Schema]:
-        return self._possible_schemas
-
-
 class Download(Schema):
     """A download is a URL and the contents of the download."""
 
-    url = StringField(desc="The URL of the download", required=True)
-    content = BytesField(desc="The contents of the download", required=True)
-    timestamp = StringField(desc="The timestamp of the download", required=True)
+    url = StringField(desc="The URL of the download")
+    content = BytesField(desc="The contents of the download")
+    timestamp = StringField(desc="The timestamp of the download")
 
 
 class File(Schema):
@@ -204,14 +286,14 @@ class File(Schema):
     - the contents of the file (bytes)
     """
 
-    filename = StringField(desc="The UNIX-style name of the file", required=True)
-    contents = BytesField(desc="The contents of the file", required=True)
+    filename = StringField(desc="The UNIX-style name of the file")
+    contents = BytesField(desc="The contents of the file")
 
 
 class Number(Schema):
     """Just a number. Often used for aggregates"""
 
-    value = NumericField(desc="A single number", required=True)
+    value = NumericField(desc="A single number")
 
 
 class OperatorDerivedSchema(Schema):
@@ -221,7 +303,7 @@ class OperatorDerivedSchema(Schema):
 class RawJSONObject(Schema):
     """A JSON object, which is a dictionary of key-value pairs."""
 
-    json = StringField(desc="String representation of a JSON object", required=True)
+    json = StringField(desc="String representation of a JSON object")
 
 
 class SourceRecord(Schema):
@@ -230,60 +312,57 @@ class SourceRecord(Schema):
     which implement the BaseScan or CacheScan logical operators.
     """
 
-    idx = NumericField(desc="The scan index of the record", required=True)
-    get_item_fn = CallableField(desc="The get_item() function from the DataSource", required=True)
+    idx = NumericField(desc="The scan index of the record")
+    get_item_fn = CallableField(desc="The get_item() function from the DataSource")
 
 
 class Table(Schema):
     """A Table is an object composed of a header and rows."""
 
-    filename = StringField(desc="The name of the file the table was extracted from", required=False)
-    name = StringField(desc="The name of the table", required=False)
-    header = ListField(element_type=StringField, desc="The header of the table", required=True)
+    filename = StringField(desc="The name of the file the table was extracted from")
+    name = StringField(desc="The name of the table")
+    header = ListField(element_type=StringField, desc="The header of the table")
     # TODO currently no support for nesting data records on data records
-    rows = ListField(element_type=ListField, desc="The rows of the table", required=True)
+    rows = ListField(element_type=ListField, desc="The rows of the table")
 
-    def as_json_str(self, record_dict: Dict[str, TypingAny], *args, **kwargs) -> str:
-        """Return a JSON representation of an instantiated object of this Schema"""
-        # Take the rows in the record_dict and turn them into comma separated strings
-        rows = []
-        # only sample the first MAX_ROWS
-        for row in record_dict["rows"][:MAX_ROWS]:
-            rows += [",".join(map(str, row)) + "\n"]
-        record_dict["rows"] = rows
-        header = ",".join(record_dict["header"])
-        record_dict["header"] = header
+    def field_to_json(self, field_name: str, field_value: TypingAny) -> TypingAny:
+        """Return a truncated JSON representation for `rows` and a string representation for `header`"""
+        # take the first MAX_ROWS rows in the record_dict and turn them into comma separated strings
+        if field_name == "rows":
+            return [",".join(map(str, row)) + "\n" for row in field_value[:MAX_ROWS]]
 
-        return super().as_json_str(record_dict, *args, **kwargs)
+        elif field_name == "header":
+            return ",".join(field_value)
+
+        return field_value
 
 
 class URL(Schema):
     """A URL is a string that represents a web address."""
 
-    url = StringField(desc="A URL", required=True)
+    url = StringField(desc="A URL")
 
 
 class WebPage(Schema):
     """A web page is a URL and the contents of the page."""
 
-    # url = StringField(desc="The URL of the web page", required=True)
-    text = StringField(desc="The text contents of the web page", required=True)
-    html = StringField(desc="The html contents of the web page", required=True)
-    timestamp = StringField(desc="The timestamp of the download", required=True)
+    # url = StringField(desc="The URL of the web page")
+    text = StringField(desc="The text contents of the web page")
+    html = StringField(desc="The html contents of the web page")
+    timestamp = StringField(desc="The timestamp of the download")
 
 
 # Second-level Schemas
 class ImageFile(File):
     """A file that contains an image."""
-
-    text_description = StringField(desc="A text description of the image", required=False)
+    contents = ImageBase64Field(desc="The contents of the image")
 
 
 class PDFFile(File):
     """A PDF file is a File that is a PDF. It has specialized fields, font information, etc."""
 
     # This class is currently very impoverished. It needs a lot more fields before it can correctly represent a PDF.
-    text_contents = StringField(desc="The text-only contents of the PDF", required=True)
+    text_contents = StringField(desc="The text-only contents of the PDF")
 
 
 class TextFile(File):
@@ -293,11 +372,10 @@ class TextFile(File):
 class XLSFile(File):
     """An XLS file is a File that contains one or more Excel spreadsheets."""
 
-    number_sheets = NumericField(desc="The number of sheets in the Excel file", required=True)
+    number_sheets = NumericField(desc="The number of sheets in the Excel file")
     sheet_names = ListField(
         element_type=NumericField,
         desc="The names of the sheets in the Excel file",
-        required=True,
     )
 
 
@@ -305,13 +383,13 @@ class XLSFile(File):
 class EquationImage(ImageFile):
     """An image that contains a mathematical equation."""
 
-    equation_text = StringField(desc="The text representation of the equation in the image", required=True)
+    equation_text = StringField(desc="The text representation of the equation in the image")
 
 
 class PlotImage(ImageFile):
     """An image that contains a plot, such as a graph or chart."""
 
-    plot_description = StringField(desc="A description of the plot", required=True)
+    plot_description = StringField(desc="A description of the plot")
 
 
 class DefaultSchema(Schema):

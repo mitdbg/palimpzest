@@ -2,11 +2,11 @@ import os
 from pathlib import Path
 
 import pytest
-
-import palimpzest as pz
-from palimpzest.core.lib.schemas import Schema
-from palimpzest.core.lib.fields import Field, StringField, ListField, NumericField
 from palimpzest.core.data.datasources import UserSource
+from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.fields import ListField, NumericField, StringField
+from palimpzest.core.lib.schemas import Schema
+from palimpzest.datamanager.datamanager import DataDirectory
 
 
 ### DATA SOURCES ###
@@ -16,16 +16,15 @@ from palimpzest.core.data.datasources import UserSource
 class RealEstateListingFiles(Schema):
     """The source text and image data for a real estate listing."""
 
-    listing = StringField(desc="The name of the listing", required=True)
-    text_content = StringField(desc="The content of the listing's text description", required=True)
+    listing = StringField(desc="The name of the listing")
+    text_content = StringField(desc="The content of the listing's text description")
     image_filepaths = ListField(
         element_type=StringField,
         desc="A list of the filepaths for each image of the listing",
-        required=True,
     )
 
 class Number(Schema):
-    value = NumericField(desc="The value of the number", required=True)
+    value = NumericField(desc="The value of the number")
 
 
 class RealEstateListingSource(UserSource):
@@ -48,7 +47,7 @@ class RealEstateListingSource(UserSource):
         listing = self.listings[idx]
 
         # create data record
-        dr = pz.DataRecord(self.schema, source_id=listing)
+        dr = DataRecord(self.schema, source_id=listing)
         dr.listing = listing
         dr.image_filepaths = []
         listing_dir = os.path.join(self.listings_dir, listing)
@@ -62,8 +61,8 @@ class RealEstateListingSource(UserSource):
         return dr
 
 class CostModelTestSource(UserSource):
-    def __init__(self, datasetId):
-        super().__init__(Number, datasetId)
+    def __init__(self, dataset_id: str):
+        super().__init__(Number, dataset_id)
         self.numbers = [1, 2, 3]
 
     def copy(self):
@@ -80,7 +79,7 @@ class CostModelTestSource(UserSource):
         number = self.numbers[idx]
 
         # create data record
-        dr = pz.DataRecord(self.schema, source_id=idx)
+        dr = DataRecord(self.schema, source_id=idx)
         dr.value = number
 
         return dr
@@ -106,7 +105,7 @@ def biofabric_tiny_data():
 @pytest.fixture
 def enron_eval_tiny(enron_eval_tiny_data):
     dataset_id = "enron-eval-tiny"
-    pz.DataDirectory().register_local_directory(
+    DataDirectory().register_local_directory(
         path=enron_eval_tiny_data,
         dataset_id=dataset_id,
     )
@@ -117,7 +116,7 @@ def enron_eval_tiny(enron_eval_tiny_data):
 def real_estate_eval_tiny(real_estate_eval_tiny_data):
     dataset_id = "real-estate-eval-tiny"
 
-    pz.DataDirectory().register_user_source(
+    DataDirectory().register_user_source(
         src=RealEstateListingSource(dataset_id, real_estate_eval_tiny_data),
         dataset_id=dataset_id,
     )
@@ -127,7 +126,7 @@ def real_estate_eval_tiny(real_estate_eval_tiny_data):
 @pytest.fixture
 def biofabric_tiny(biofabric_tiny_data):
     dataset_id = "biofabric-tiny"
-    pz.DataDirectory().register_local_directory(
+    DataDirectory().register_local_directory(
         path=biofabric_tiny_data,
         dataset_id=dataset_id,
     )
@@ -138,7 +137,7 @@ def biofabric_tiny(biofabric_tiny_data):
 def cost_model_test_dataset():
     dataset_id = "cost-model-test-dataset"
 
-    pz.DataDirectory().register_user_source(
+    DataDirectory().register_user_source(
         src=CostModelTestSource(dataset_id),
         dataset_id=dataset_id,
     )

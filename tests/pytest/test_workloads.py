@@ -2,16 +2,15 @@ import os
 
 import pandas as pd
 import pytest
-from sklearn.metrics import precision_recall_fscore_support
-
+from palimpzest.policy import MinCost
 from palimpzest.query.execution.execute import Execute
 from palimpzest.query.execution.nosentinel_execution import (
     NoSentinelPipelinedParallelExecution,
     NoSentinelPipelinedSingleThreadExecution,
     NoSentinelSequentialSingleThreadExecution,
 )
-from palimpzest.policy import MinCost
 from palimpzest.utils.model_helpers import get_models
+from sklearn.metrics import precision_recall_fscore_support
 
 
 def score_biofabric_plans(dataset, records, policy_str=None, reopt=False) -> float:

@@ -1,15 +1,13 @@
-from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
-from enum import Enum
-from typing import List, Tuple, Optional
 import time
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import List, Tuple
 
 from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.query.optimizer.plan import PhysicalPlan
-from palimpzest.policy import Policy
 from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.query.optimizer.plan import PhysicalPlan
+
 
 class ExecutionStrategyType(str, Enum):
     """Available execution strategy types"""

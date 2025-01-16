@@ -1,30 +1,28 @@
 from enum import Enum
-from typing import Optional, Type
+from typing import Type
 
-from palimpzest.sets import Dataset
-from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.execution.execution_strategy import ExecutionStrategyType
-from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.query.processor.mab_sentinel_processor import MABSentinelQueryProcessor
-from palimpzest.query.processor.nosentinel_processor import NoSentinelQueryProcessor
-from palimpzest.query.processor.random_sampling_sentinel_processor import RandomSamplingSentinelQueryProcessor
-from palimpzest.query.processor.streaming_processor import StreamingQueryProcessor
-from palimpzest.query.processor.mab_sentinel_processor import MABSentinelSequentialSingleThreadProcessor, MABSentinelPipelinedParallelProcessor
-from palimpzest.query.processor.random_sampling_sentinel_processor import RandomSamplingSentinelSequentialSingleThreadProcessor, RandomSamplingSentinelPipelinedProcessor
+from palimpzest.query.optimizer.cost_model import CostModel
+from palimpzest.query.optimizer.optimizer import Optimizer
+from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
+from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.query.processor.mab_sentinel_processor import (
+    MABSentinelPipelinedParallelProcessor,
+    MABSentinelSequentialSingleThreadProcessor,
+)
 from palimpzest.query.processor.nosentinel_processor import (
-    NoSentinelSequentialSingleThreadProcessor, 
-    NoSentinelPipelinedSinglelProcessor, 
-    NoSentinelPipelinedParallelProcessor
+    NoSentinelPipelinedParallelProcessor,
+    NoSentinelPipelinedSinglelProcessor,
+    NoSentinelSequentialSingleThreadProcessor,
+)
+from palimpzest.query.processor.query_processor import QueryProcessor
+from palimpzest.query.processor.random_sampling_sentinel_processor import (
+    RandomSamplingSentinelPipelinedProcessor,
+    RandomSamplingSentinelSequentialSingleThreadProcessor,
 )
 from palimpzest.query.processor.streaming_processor import StreamingQueryProcessor
-from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.query.optimizer.optimizer import Optimizer
-from palimpzest.query.optimizer.cost_model import CostModel
-from palimpzest.policy import Policy
+from palimpzest.sets import Dataset
 from palimpzest.utils.model_helpers import get_models
-
-from enum import Enum, auto
-from typing import Optional, Type
 
 
 class ProcessingStrategyType(Enum):

@@ -1,14 +1,14 @@
 import time
 
-from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.schemas import SourceRecord
+from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
-from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 
 
 class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
@@ -115,12 +115,12 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
             # add records (which are not filtered) to the cache, if allowed
             if not self.nocache:
                 for record in records:
-                    if getattr(record, "_passed_operator", True):
+                    if getattr(record, "passed_operator", True):
                         self.datadir.append_cache(operator.target_cache_id, record)
 
             # update processing_queues or output_records
             for record in records:
-                if isinstance(operator, FilterOp) and not record._passed_operator:
+                if isinstance(operator, FilterOp) and not record.passed_operator:
                     continue
                 if next_op_id is not None:
                     processing_queues[next_op_id].append(record)
@@ -271,12 +271,12 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     # add records (which are not filtered) to the cache, if allowed
                     if not self.nocache:
                         for record in records:
-                            if getattr(record, "_passed_operator", True):
+                            if getattr(record, "passed_operator", True):
                                 self.datadir.append_cache(operator.target_cache_id, record)
 
                     # update processing_queues or output_records
                     for record in records:
-                        if isinstance(operator, FilterOp) and not record._passed_operator:
+                        if isinstance(operator, FilterOp) and not record.passed_operator:
                             continue
                         if next_op_id is not None:
                             processing_queues[next_op_id].append(record)
