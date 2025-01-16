@@ -44,6 +44,7 @@ class NoSentinelExecutionEngine(ExecutionEngine):
             allow_conventional_query=self.allow_conventional_query,
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
+            allow_mixtures=self.allow_mixtures,
             optimization_strategy=self.optimization_strategy,
         )
 

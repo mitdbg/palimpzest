@@ -33,6 +33,7 @@ class ExecutionEngine:
         allow_model_selection: bool = True,
         allow_code_synth: bool = True,
         allow_token_reduction: bool = True,
+        allow_mixtures: bool = True,
         optimization_strategy: OptimizationStrategy = OptimizationStrategy.PARETO,
         max_workers: int | None = None,
         num_workers_per_plan: int = 1,
@@ -55,6 +56,7 @@ class ExecutionEngine:
         self.allow_model_selection = allow_model_selection
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
+        self.allow_mixtures = allow_mixtures
         self.optimization_strategy = optimization_strategy
         self.max_workers = max_workers
         self.num_workers_per_plan = num_workers_per_plan

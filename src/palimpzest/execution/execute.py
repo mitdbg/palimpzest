@@ -36,6 +36,7 @@ class Execute:
         allow_model_selection: bool = True,
         allow_code_synth: bool = True,
         allow_token_reduction: bool = True,
+        allow_mixtures: bool = True,
         optimization_strategy: OptimizationStrategy = OptimizationStrategy.PARETO,
         execution_engine: ExecutionEngine = NoSentinelSequentialSingleThreadExecution,
         *args,
@@ -59,5 +60,6 @@ class Execute:
             allow_code_synth=allow_code_synth,
             allow_model_selection=allow_model_selection,
             allow_token_reduction=allow_token_reduction,
+            allow_mixtures=allow_mixtures,
             optimization_strategy=optimization_strategy,
         ).execute(dataset=dataset, policy=policy)
