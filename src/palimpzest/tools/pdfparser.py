@@ -215,6 +215,8 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10):
 # pieces which are related to setting / reading external configurations (like "pdfprocessor").
 # However, given that I can fix this in two minutes by adding this is a kwarg, I'm going to
 # do that for now and revisit the issue if/when this matters.
+
+# TODO(Jun): 1. cosmos returns 202 for me. 2. why only accept "pypdf" and "cosmos" as pdfprocessor?
 def get_text_from_pdf(filename, pdf_bytes, pdfprocessor="cosmos", enable_file_cache=True, file_cache_dir="/tmp"):
     pdf_filename = filename
     file_name = os.path.basename(pdf_filename)

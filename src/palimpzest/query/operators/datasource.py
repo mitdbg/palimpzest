@@ -57,7 +57,11 @@ class DataSourcePhysicalOp(PhysicalOperator):
         at least ballpark correct estimates of this quantity).
         """
         raise NotImplementedError("Abstract method")
-
+    
+    # TODO: we need to revisit this to make get_datasource() unified for DataScan operators
+    def get_datasource(self):
+        return self.datadir.get_registered_dataset(self.dataset_id)
+        
 
 class MarshalAndScanDataOp(DataSourcePhysicalOp):
     def naive_cost_estimates(
@@ -126,6 +130,12 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         record_set = DataRecordSet(records, record_op_stats_lst)
 
         return record_set
+
+    def get_datasource(self):
+        return self.datadir.get_registered_dataset(self.dataset_id)
+        
+    def get_datasource_type(self):
+        return self.datadir.get_registered_dataset_type(self.dataset_id)
 
 
 class CacheScanDataOp(DataSourcePhysicalOp):

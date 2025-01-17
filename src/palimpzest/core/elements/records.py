@@ -5,11 +5,11 @@ from typing import Any
 
 import pandas as pd
 
-from palimpzest.constants import DERIVED_SCHEMA_PREFIX, FROM_DF_PREFIX
+from palimpzest.constants import FROM_DF_PREFIX
 from palimpzest.core.data.dataclasses import RecordOpStats
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema
-from palimpzest.utils.hash_helpers import hash_for_id, hash_for_temp_schema
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class DataRecord:
@@ -218,28 +218,6 @@ class DataRecord:
         return f"{FROM_DF_PREFIX}_{updated_source_id}"
     
     @staticmethod
-    def _build_schema_from_df(df: pd.DataFrame) -> Schema:
-        # Create a unique schema name based on columns
-        schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
-        
-        if schema_name in globals():
-            return globals()[schema_name]
-            
-        # Create new schema only if it doesn't exist
-        new_schema = type(schema_name, (Schema,), {
-            '_desc': "Derived schema from DataFrame",
-            '__module__': Schema.__module__
-        })
-        
-        for col in df.columns:
-            # NOTE: we may need some way of inferring whether fields are images
-            setattr(new_schema, col, Field(desc=f"{col}"))
-        
-        # Store the schema class globally
-        globals()[schema_name] = new_schema
-        return new_schema
-    
-    @staticmethod
     def from_df(df: pd.DataFrame, schema: Schema = None, source_id: int | str | None = None) -> list[DataRecord]:
         """Create a list of DataRecords from a pandas DataFrame
         
@@ -256,7 +234,7 @@ class DataRecord:
 
         records = []
         if schema is None:
-            schema = DataRecord._build_schema_from_df(df)
+            schema = Schema.from_df(df)
 
         field_map = schema.field_map()
         source_id = DataRecord._build_source_id_from_df(source_id)
@@ -268,10 +246,19 @@ class DataRecord:
             records.append(record)
 
         return records
-    
+
     @staticmethod
-    def as_df(records: list[DataRecord]) -> pd.DataFrame:
-        return pd.DataFrame([record.as_dict() for record in records])
+    def as_df(records: list[DataRecord], fields_in_schema: bool = False) -> pd.DataFrame:
+        if len(records) == 0:
+            return pd.DataFrame()
+        if not fields_in_schema:
+            return pd.DataFrame([record.as_dict() for record in records])
+
+        fields = records[0].schema.field_names()
+        return pd.DataFrame([
+            {k: record.as_dict().get(k) for k in fields}
+            for record in records
+        ])
 
     def as_json_str(self, include_bytes: bool = True, project_cols: list[str] | None = None):
         """Return a JSON representation of this DataRecord"""
@@ -284,7 +271,8 @@ class DataRecord:
 
     def as_dict(self, include_bytes: bool = True, project_cols: list[str] | None = None):
         """Return a dictionary representation of this DataRecord"""
-        dct = self.field_values.copy()
+        # In case of numpy types, the json.dumps will fail. Convert to native types.
+        dct = pd.Series(self.field_values).to_dict()
 
         if project_cols is not None and len(project_cols) > 0:
             project_field_names = set(field.split(".")[-1] for field in project_cols)

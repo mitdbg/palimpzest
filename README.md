@@ -181,6 +181,23 @@ name: together-conf
 parallel: true
 ```
 
+You can update an existing config using the `pz update` command (also aliased as `pz uc`):
+```bash
+$ pz update --name default --settings parallel=true,pdfprocessor=pdfplumber
+Updated config: default
+
+$ pz config
+--- default ---
+filecachedir: /some/local/filepath
+llmservice: anthropic
+name: default
+parallel: true
+pdfprocessor: pdfplumber
+```
+
+The `--name` parameter specifies which config to update. `--settings` specifies all the parameter name and value pairs in the format `param_name=param_value`, separated by commas.
+
+
 Finally, you can delete a config with the `pz rm-config` command (also aliased as `pz rmc`):
 ```bash
 $ pz rmc --name together-conf

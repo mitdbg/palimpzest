@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from typing import Any as TypingAny
 
-from palimpzest.constants import MAX_ROWS
+import pandas as pd
+
+from palimpzest.constants import DERIVED_SCHEMA_PREFIX, MAX_ROWS
 from palimpzest.core.lib.fields import (
     BytesField,
     CallableField,
@@ -13,6 +15,7 @@ from palimpzest.core.lib.fields import (
     NumericField,
     StringField,
 )
+from palimpzest.utils.hash_helpers import hash_for_temp_schema
 
 
 class SchemaMetaclass(type):
@@ -235,7 +238,32 @@ class Schema(metaclass=SchemaMetaclass):
     def class_name(cls) -> str:
         """Return the name of this class"""
         return cls.__name__
+    
 
+    @staticmethod
+    def from_df(df: pd.DataFrame) -> Schema:
+        # Create a unique schema name based on columns
+        schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
+        
+        # consider to save to temp file and load from there 
+        if schema_name in globals():
+            return globals()[schema_name]
+
+        # Create new schema only if it doesn't exist
+        new_schema = type(schema_name, (Schema,), {
+            '_desc': "Derived schema from DataFrame",
+            '__module__': Schema.__module__
+        })
+        
+        for col in df.columns:
+            setattr(new_schema, col, Field(
+                desc=f"{col}",
+                required=True
+            ))
+        
+        # Store the schema class globally
+        globals()[schema_name] = new_schema
+        return new_schema
 
 ###################################################################################
 # "Core" useful Schemas. These are Schemas that almost everyone will need.
@@ -362,3 +390,9 @@ class PlotImage(ImageFile):
     """An image that contains a plot, such as a graph or chart."""
 
     plot_description = StringField(desc="A description of the plot")
+
+
+class DefaultSchema(Schema):
+    """Store context data."""
+
+    value = Field(desc="The context data.")
