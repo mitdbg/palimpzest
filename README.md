@@ -7,13 +7,26 @@
 - Check out our Colab Demo: [colab demo](https://colab.research.google.com/drive/1zqOxnh_G6eZ8_xax6PvDr-EjMt7hp4R5?usp=sharing)
 - Check out the video: [MIT 2024](https://youtu.be/T8VQfyBiki0?si=eiph57DSEkDNbEIu)
 
-# Getting started
-You can install the Palimpzest package and CLI on your machine by cloning this repository and running:
+## Getting started
+You can find a stable version of the Palimpzest package on PyPI [here](https://pypi.org/project/palimpzest/). To install the package, run:
+```bash
+$ pip install palimpzest
+```
+
+Alternatively, to install the latest version of the package from this repository, you can clone this repository and run the following commands:
 ```bash
 $ git clone git@github.com:mitdbg/palimpzest.git
 $ cd palimpzest
 $ pip install .
 ```
+
+## Quick Start
+The easiest way to get started with Palimpzest, is to run the `quickstart.ipynb` jupyter notebook. We provide a simple use case to showcase the workflow of working with Palimpzest, including registering a dataset, running a workload, and accessing the results.
+To run the notebook, you can use the following command:
+```bash
+$ jupyter notebook
+```
+And then access the notebook from the jupyter interface in your browser at `localhost:8888`.
 
 ## Downloading test data
 To run the provided demos, you will need to download the test data. Due to the size of the data, we are unable to include it in the repository. You can download the test data by running the following command from a unix terminal (requires `wget` and `tar`):
