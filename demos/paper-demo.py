@@ -247,22 +247,22 @@ if __name__ == "__main__":
 
 
     config = QueryProcessorConfig(nocache=True, policy=policy, max_workers=10)
-    # Create a basic processor
-    # We could pass this process around to different service if needed.
-    processor = QueryProcessorFactory.create_processor(
-        datasource=plan,
-        processing_strategy="no_sentinel",  # or use ProcessingStrategyType.NO_SENTINEL
-        execution_strategy="sequential",    # or use ExecutionStrategyType.SEQUENTIAL
-        optimizer_strategy="pareto",       # or use OptimizationStrategyType.PARETO
-        config=config
-    )
-    records, execution_stats = processor.execute()
-    # future interface
-    # records, execution_stats = plan.run(policy, 
-    #                                     processing_strategy="no_sentinel",  # or use ProcessingStrategyType.NO_SENTINEL
-    #                                     execution_strategy="pipelined",    # or use ExecutionStrategyType.SEQUENTIAL
-    #                                     optimizer_strategy="pareto",       # or use OptimizationStrategyType.PARETO
-    #                                     config=config)
+    # # Option1: Create a basic processor
+    # # We could pass this process around to different service if needed.
+    # processor = QueryProcessorFactory.create_processor(
+    #     datasource=plan,
+    #     processing_strategy="no_sentinel",
+    #     execution_strategy="sequential",
+    #     optimizer_strategy="pareto", 
+    #     config=config
+    # )
+    # records, execution_stats = processor.execute()
+
+    # Option2: Use the new interface
+    records, execution_stats = plan.run(config, 
+                                        optimizer_strategy="pareto", 
+                                        execution_strategy="sequential", 
+                                        processing_strategy="no_sentinel")
 
     # save statistics
     if profile:

@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from palimpzest.constants import Model
 from palimpzest.policy import MaxQuality, Policy
+import json
 
 
 # TODO: Separate out the config for the Optimizer, ExecutionStrategy, and QueryProcessor
@@ -28,3 +29,25 @@ class QueryProcessorConfig:
     allow_rag_reduction: bool = field(default=True)
     allow_mixtures: bool = field(default=True)
     use_final_op_quality: bool = field(default=False)
+
+    def to_jsonstr(self):
+        return json.dumps({
+            "policy": self.policy.to_jsonstr(),
+            "scan_start_idx": self.scan_start_idx,
+            "num_samples": self.num_samples,
+            "nocache": self.nocache,
+            "include_baselines": self.include_baselines,
+            "min_plans": self.min_plans,
+            "verbose": self.verbose,
+            "available_models": self.available_models,
+            "max_workers": self.max_workers,
+            "num_workers_per_plan": self.num_workers_per_plan,
+            "allow_bonded_query": self.allow_bonded_query,
+            "allow_conventional_query": self.allow_conventional_query,
+            "allow_model_selection": self.allow_model_selection,
+            "allow_code_synth": self.allow_code_synth,
+            "allow_token_reduction": self.allow_token_reduction,
+            "allow_rag_reduction": self.allow_rag_reduction,
+            "allow_mixtures": self.allow_mixtures,
+            "use_final_op_quality": self.use_final_op_quality,
+        }, indent=4)

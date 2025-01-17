@@ -395,4 +395,4 @@ class PlotImage(ImageFile):
 class DefaultSchema(Schema):
     """Store context data."""
 
-    value = Field(desc="The context data.", required=True)
+    value = Field(desc="The context data.")

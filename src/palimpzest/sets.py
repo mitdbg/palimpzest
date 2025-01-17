@@ -13,6 +13,7 @@ from palimpzest.core.lib.schemas import DefaultSchema, Number, Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.index_helpers import get_index_str
+from palimpzest.query.processor.config import QueryProcessorConfig
 
 
 #####################################################
@@ -155,6 +156,8 @@ class Dataset(Set):
         # intialize class
         super().__init__(source, schema, *args, **kwargs)
 
+        self._processor_cache = {}
+
     def copy(self) -> Dataset:
         source_copy = self._source.copy()
         dataset_copy = Dataset(
@@ -282,3 +285,29 @@ class Dataset(Set):
             project_cols=project_cols if isinstance(project_cols, list) else [project_cols],
             nocache=self._nocache,
         )
+    
+    def _processor_hashid(self, config: QueryProcessorConfig, 
+            optimizer_strategy: str = "pareto", 
+            execution_strategy: str = "sequential",
+            processing_strategy: str = "no_sentinel"):
+        return hash_for_id(config.to_jsonstr() + optimizer_strategy + execution_strategy + processing_strategy)
+    
+    def run(self, config: QueryProcessorConfig, 
+            optimizer_strategy: str = "pareto", 
+            execution_strategy: str = "sequential",
+            processing_strategy: str = "no_sentinel"):
+
+        processor_hashid = self._processor_hashid(config, optimizer_strategy, execution_strategy, processing_strategy)
+        if processor_hashid in self._processor_cache:
+            processor = self._processor_cache[processor_hashid]
+        else:
+            from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+            processor = QueryProcessorFactory.create_processor(
+                datasource=self,
+                processing_strategy=processing_strategy,
+                execution_strategy=execution_strategy,
+                optimizer_strategy=optimizer_strategy,
+                config=config
+            )
+            self._processor_cache[processor_hashid] = processor
+        return processor.execute()
