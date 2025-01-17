@@ -16,6 +16,7 @@ from palimpzest.corelib.schemas import Table
 from palimpzest.datamanager import DataDirectory
 from palimpzest.elements.records import DataRecord
 from palimpzest.tools.pdfparser import get_text_from_pdf
+from pypdf import PdfReader
 
 
 def url_to_file(candidate):
@@ -87,4 +88,20 @@ def xls_to_tables(candidate):
         dr.name = candidate.filename.split("/")[-1] + "_" + sheet_name
         records.append(dr)
 
+import palimpzest as pz
+class PDFPage(pz.File):
+    """A page of a PDF file."""
+    page_number = pz.NumericField(desc="The page number", required=True)
+    page_text = pz.StringField(desc="The text of the page", required=True)
+
+
+def pdf_to_pages(candidate):
+    pdf_bytes = candidate.contents
+    pdf = PdfReader(io.BytesIO(pdf_bytes))
+    records = []
+    for idx, page in enumerate(pdf.pages):
+        dr = DataRecord.from_parent(PDFPage, parent_record=candidate)
+        dr.page_number = idx
+        dr.page_text = page.extract_text()
+        records.append(dr)
     return records
