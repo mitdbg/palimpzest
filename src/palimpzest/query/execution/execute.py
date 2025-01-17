@@ -25,7 +25,7 @@ class Execute:
         dataset: Set,
         policy: Policy,
         num_samples: int = 20,
-        nocache: bool = False,
+        nocache: bool = True,
         include_baselines: bool = False,
         min_plans: int | None = None,
         max_workers: int = 1,
