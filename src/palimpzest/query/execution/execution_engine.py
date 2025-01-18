@@ -42,6 +42,8 @@ class ExecutionEngine:
         self.num_samples = num_samples
         self.scan_start_idx = scan_start_idx
         self.nocache = nocache
+        if not self.nocache:
+            raise NotImplementedError("Caching is not yet implemented! Please set nocache=True.")
         self.include_baselines = include_baselines
         self.min_plans = min_plans
         self.verbose = verbose

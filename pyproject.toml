@@ -19,6 +19,7 @@ dependencies = [
     "gradio>=4.20.1",
     "grobid-client-python==0.0.5",
     "ipython>=8.26.0",
+    "jupyter",
     "layoutparser>=0.3.4",
     "lxml-html-clean>=0.1.1",
     "modal>=0.62.198",
