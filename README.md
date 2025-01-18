@@ -1,4 +1,4 @@
-![pz-banner](logos/palimpzest-cropped.png)
+![pz-banner](src/static/palimpzest-cropped.png)
 
 # Palimpzest (PZ)
 - **Read our (pre-print) paper:** [**read the paper**](https://arxiv.org/pdf/2405.14696)
