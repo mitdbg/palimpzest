@@ -2,7 +2,7 @@
 
 # Palimpzest (PZ)
 [![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/pdf/2405.14696)
-[![Blog Post](https://img.shields.io/badge/Website-PZ-blue)](https://dsg.csail.mit.edu/projects/palimpzest/)
+[![Blog Post](https://img.shields.io/badge/Website-PZ-green)](https://dsg.csail.mit.edu/projects/palimpzest/)
 [![Colab Demo](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1zqOxnh_G6eZ8_xax6PvDr-EjMt7hp4R5?usp=sharing)
 [![Video](https://img.shields.io/badge/Website-Talk-purple)](https://youtu.be/T8VQfyBiki0?si=eiph57DSEkDNbEIu)
 [![PyPI](https://img.shields.io/pypi/v/palimpzest)](https://pypi.org/project/palimpzest/)
