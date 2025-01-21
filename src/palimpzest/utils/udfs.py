@@ -82,20 +82,23 @@ def xls_to_tables(candidate: dict):
         record["name"] = candidate["filename"].split("/")[-1] + "_" + sheet_name
         records.append(record)
 
-import palimpzest as pz
-class PDFPage(pz.File):
+from palimpzest.core.lib.schemas import File
+from palimpzest.core.lib.fields import NumericField, StringField
+from palimpzest.core.elements.records import DataRecord
+class PDFPage(File):
     """A page of a PDF file."""
-    page_number = pz.NumericField(desc="The page number", required=True)
-    page_text = pz.StringField(desc="The text of the page", required=True)
+    page_number = NumericField(desc="The page number")
+    page_text = StringField(desc="The text of the page")
 
 
-def pdf_to_pages(candidate):
-    pdf_bytes = candidate.contents
+def pdf_to_pages(candidate:dict):
+    pdf_bytes = candidate["contents"]
     pdf = PdfReader(io.BytesIO(pdf_bytes))
     records = []
     for idx, page in enumerate(pdf.pages):
-        dr = DataRecord.from_parent(PDFPage, parent_record=candidate)
-        dr.page_number = idx
-        dr.page_text = page.extract_text()
+        dr = {
+        "page_number": idx,
+        "page_text": page.extract_text()   
+        }
         records.append(dr)
     return records
