@@ -3,10 +3,10 @@ from typing import Any
 
 import regex as re  # Use regex instead of re to used variable length lookbehind
 
-from palimpzest.constants import Model
+from palimpzest.constants import Cardinality, Model
 
 
-def get_json_from_answer(answer: str, model: Model) -> dict[str, Any]:
+def get_json_from_answer(answer: str, model: Model, cardinality: Cardinality) -> dict[str, Any]:
     """
     This function parses an LLM response which is supposed to output a JSON object
     and optimistically searches for the substring containing the JSON object.
@@ -21,21 +21,38 @@ def get_json_from_answer(answer: str, model: Model) -> dict[str, Any]:
     answer = answer.split("Context:")[0]
     answer = answer.split("# this is the answer")[0]
 
-    if not answer.strip().startswith("{"):
-        # Find the start index of the actual JSON string
-        # assuming the prefix is followed by the JSON object/array
-        start_index = answer.find("{") if "{" in answer else answer.find("[")
-        if start_index != -1:
-            # Remove the prefix and any leading characters before the JSON starts
-            answer = answer[start_index:]
+    # trim the answer to only include the JSON dictionary
+    if cardinality == Cardinality.ONE_TO_ONE:
+        if not answer.strip().startswith("{"):
+            # Find the start index of the actual JSON string assuming the prefix is followed by the JSON dictionary
+            start_index = answer.find("{")
+            if start_index != -1:
+                # Remove the prefix and any leading characters before the JSON starts
+                answer = answer[start_index:]
 
-    if not answer.strip().endswith("}"):
-        # Find the end index of the actual JSON string
-        # assuming the suffix is preceded by the JSON object/array
-        end_index = answer.rfind("}") if "}" in answer else answer.rfind("]")
-        if end_index != -1:
-            # Remove the suffix and any trailing characters after the JSON ends
-            answer = answer[: end_index + 1]
+        if not answer.strip().endswith("}"):
+            # Find the end index of the actual JSON string assuming the suffix is preceded by the JSON dictionary
+            end_index = answer.rfind("}")
+            if end_index != -1:
+                # Remove the suffix and any trailing characters after the JSON ends
+                answer = answer[: end_index + 1]
+
+    # otherwise, trim the answer to only include the JSON array
+    else:
+        if not answer.strip().startswith("["):
+            # Find the start index of the actual JSON string assuming the prefix is followed by the JSON array
+            start_index = answer.find("[")
+            if start_index != -1:
+                # Remove the prefix and any leading characters before the JSON starts
+                answer = answer[start_index:]
+
+        if not answer.strip().endswith("]"):
+            # Find the end index of the actual JSON string
+            # assuming the suffix is preceded by the JSON object/array
+            end_index = answer.rfind("]")
+            if end_index != -1:
+                # Remove the suffix and any trailing characters after the JSON ends
+                answer = answer[: end_index + 1]
 
     # Handle weird escaped values. I am not sure why the model
     # is returning these, but the JSON parser can't take them
@@ -48,15 +65,5 @@ def get_json_from_answer(answer: str, model: Model) -> dict[str, Any]:
     # Sanitize newlines in the JSON response
     answer = answer.replace("\n", " ")
 
-    try:
-        response = json.loads(answer)
-    except Exception as e:
-        if "items" in answer:  # If we are in one to many
-            # Find the last dictionary item not closed
-            last_idx = answer.rfind("},")
-            # Close the last dictionary item
-            answer = answer[: last_idx + 1] + "]}"
-            response = json.loads(answer)
-        else:
-            raise e
-    return response
+    # finally, parse and return the JSON object; errors are handled by the caller
+    return json.loads(answer)

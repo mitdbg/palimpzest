@@ -1,44 +1,23 @@
-import json
-
 import pytest
-
-from palimpzest.dataclasses import RecordOpStats
-from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.data.dataclasses import GenerationStats
 
 
 ### Side-Effects for Mocking LLM Calls ###
 @pytest.fixture
 def enron_filter():
-    def mock_call(candidate):
+    def mock_filter(candidate):
         # determine the answer based on the record filename
-        passed_operator = candidate.filename in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
-        
-        # create RecordOpStats object with positive time and cost per record
-        record_op_stats = RecordOpStats(
-            record_id=candidate._id,
-            record_parent_id=candidate._parent_id,
-            record_source_id=candidate._source_id,
-            record_state=candidate.as_dict(include_bytes=False),
-            op_id="MockFilterFoo",
-            logical_op_id="LogicalMockFilterFoo",
-            op_name="MockFilter",
-            time_per_record=1.0,
-            cost_per_record=1.0,
-            answer=str(passed_operator),
-            passed_operator=passed_operator,
-        )
+        field_answers = {"passed_operator": candidate.filename in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]}
+        generation_stats = GenerationStats(cost_per_record=1.0)
 
-        # set _passed_operator attribute and return
-        candidate._passed_operator = passed_operator
+        return field_answers, generation_stats
 
-        return DataRecordSet([candidate], [record_op_stats])
-
-    return mock_call
+    return mock_filter
 
 
 @pytest.fixture
 def enron_convert(email_schema):
-    def mock_call(candidate):
+    def mock_convert(candidate, fields):
         filename_to_sender = {
             "buy-r-inbox-628.txt": "sherron.watkins@enron.com",
             "buy-r-inbox-749.txt": "david.port@enron.com",
@@ -56,105 +35,49 @@ def enron_convert(email_schema):
             "zipper-a-espeed-28.txt": "Redraft of the Exclusivity Agreement",
         }
 
-        # construct data record
-        dr = DataRecord.from_parent(schema=email_schema, parent_record=candidate, cardinality_idx=0)
-        dr.sender = filename_to_sender[candidate.filename]
-        dr.subject = filename_to_subject[candidate.filename]
-        dr.filename = candidate.filename
-        dr.contents = candidate.contents
+        # determine the answer based on the record filename
+        field_answers = {
+            "sender": [filename_to_sender[candidate.filename]],
+            "subject": [filename_to_subject[candidate.filename]],
+        }
+        generation_stats = GenerationStats(cost_per_record=1.0)
 
-        # compute fake record_op_stats
-        record_op_stats = RecordOpStats(
-            record_id=candidate._id,
-            record_parent_id=candidate._parent_id,
-            record_source_id=candidate._source_id,
-            record_state=dr.as_dict(include_bytes=False),
-            op_id="MockConvertFoo",
-            logical_op_id="LogicalMockConvertFoo",
-            op_name="MockConvert",
-            time_per_record=1.0,
-            cost_per_record=1.0,
-            answer=json.dumps({"sender": dr.sender, "subject": dr.subject}),
-        )
+        return field_answers, generation_stats
 
-        return DataRecordSet([dr], [record_op_stats])
-
-    return mock_call
+    return mock_convert
 
 
 @pytest.fixture
 def real_estate_convert(image_real_estate_listing_schema):
-    def mock_call(candidate):
+    def mock_convert(candidate, fields):
         listing_to_modern_and_attractive = {"listing1": True, "listing2": False, "listing3": False}
         listing_to_has_natural_sunlight = {"listing1": True, "listing2": True, "listing3": False}
 
-        # construct data record
-        dr = DataRecord.from_parent(schema=image_real_estate_listing_schema, parent_record=candidate, cardinality_idx=0)
-        dr.is_modern_and_attractive = listing_to_modern_and_attractive[candidate.listing]
-        dr.has_natural_sunlight = listing_to_has_natural_sunlight[candidate.listing]
-        dr.listing = candidate.listing
-        dr.text_content = candidate.text_content
-        dr.image_filepaths = candidate.image_filepaths
+        # determine the answer based on the record listing
+        field_answers = {
+            "is_modern_and_attractive": [listing_to_modern_and_attractive[candidate.listing]],
+            "has_natural_sunlight": [listing_to_has_natural_sunlight[candidate.listing]],
+        }
+        generation_stats = GenerationStats(cost_per_record=1.0)
 
-        # compute fake record_op_stats
-        record_op_stats = RecordOpStats(
-            record_id=candidate._id,
-            record_parent_id=candidate._parent_id,
-            record_source_id=candidate._source_id,
-            record_state=dr.as_dict(include_bytes=False),
-            op_id="MockConvertFoo",
-            logical_op_id="LogicalMockConvertFoo",
-            op_name="MockConvert",
-            time_per_record=1.0,
-            cost_per_record=1.0,
-            answer=json.dumps(
-                {
-                    "is_modern_and_attractive": dr.is_modern_and_attractive,
-                    "has_natural_sunlight": dr.has_natural_sunlight,
-                }
-            ),
-        )
+        return field_answers, generation_stats
 
-        return DataRecordSet([dr], [record_op_stats])
-
-    return mock_call
+    return mock_convert
 
 
 @pytest.fixture
 def real_estate_one_to_many_convert(room_real_estate_listing_schema):
-    def mock_call(candidate):
+    def mock_convert(candidate, fields):
         listing_to_rooms = {
             "listing1": ["other", "living_room", "kitchen"],
             "listing2": ["other", "living_room", "living_room"],
             "listing3": ["other", "living_room", "other"],
         }
 
-        # construct data records and list of RecordOpStats
-        data_records, record_op_stats_lst = [], []
-        for idx, room in enumerate(listing_to_rooms[candidate.listing]):
-            # create data record
-            dr = DataRecord.from_parent(schema=room_real_estate_listing_schema, parent_record=candidate, cardinality_idx=idx)
-            dr.room = room
-            dr.listing = candidate.listing
-            dr.text_content = candidate.text_content
-            dr.image_filepaths = candidate.image_filepaths
-            data_records.append(dr)
+        # determine the answers based on the record listing
+        field_answers = {"room": listing_to_rooms[candidate.listing]}
+        generation_stats = GenerationStats(cost_per_record=1.0)
 
-            # create fake record_op_stats
-            record_op_stats = RecordOpStats(
-                record_id=candidate._id,
-                record_parent_id=candidate._parent_id,
-                record_source_id=candidate._source_id,
-                record_state=dr.as_dict(include_bytes=False),
-                op_id="MockConvertFoo",
-                logical_op_id="LogicalMockConvertFoo",
-                op_name="MockConvert",
-                time_per_record=1.0,
-                cost_per_record=1.0,
-                answer=json.dumps({"room": listing_to_rooms[candidate.listing]}),
-            )
-            record_op_stats_lst.append(record_op_stats)
+        return field_answers, generation_stats
 
-        return DataRecordSet(data_records, record_op_stats_lst)
-
-    return mock_call
+    return mock_convert

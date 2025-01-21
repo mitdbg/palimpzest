@@ -1,10 +1,9 @@
 import os
 
 import pytest
-
 from palimpzest.constants import Model
-from palimpzest.corelib.schemas import File
-from palimpzest.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.lib.schemas import File
 
 
 ### EXPECTED RECORDS ###
@@ -13,7 +12,7 @@ def enron_all_expected_records(enron_eval_tiny_data):
     data_records = []
     for file in sorted(os.listdir(enron_eval_tiny_data)):
         # NOTE: technically source_id should be filepath to match TextFileDirectorySource,
-        #       but our unit test that consumes this fixture does not check equality on record._id
+        #       but our unit test that consumes this fixture does not check equality on record.id
         #       (which is partially derived from source_id)
         dr = DataRecord(schema=File, source_id=file)
         dr.filename = file
@@ -83,7 +82,7 @@ def scan_convert_filter_expected_outputs(foobar_schema):
             dr.contents = None
             dr.foo = f"foo{idx}"
             dr.bar = f"bar{idx}"
-            dr._passed_operator = True # bool(idx % 2)
+            dr.passed_operator = True # bool(idx % 2)
             expected_outputs[source_id] = DataRecordSet([dr], None)
 
     return expected_outputs
@@ -106,7 +105,7 @@ def scan_convert_filter_varied_expected_outputs(foobar_schema):
             dr.contents = None
             dr.foo = f"foo{idx}"
             dr.bar = f"bar{idx}-{str(Model.GPT_4o_MINI)}" if idx < 6 else f"bar{idx}-{str(Model.MIXTRAL)}"
-            dr._passed_operator = True
+            dr.passed_operator = True
             expected_outputs[source_id] = DataRecordSet([dr], None)
 
     return expected_outputs
@@ -135,7 +134,7 @@ def scan_multi_convert_multi_filter_expected_outputs(foobar_schema, baz_schema):
             dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
             dr.bar = f"bar{source_idx}-{str(Model.GPT_4o_MINI)}"
             dr.baz = f"baz{str(Model.GPT_4o_MINI)}"
-            dr._passed_operator = True
+            dr.passed_operator = True
             drs.append(dr)
 
         expected_outputs[source_id] = DataRecordSet(drs, None)

@@ -1,15 +1,15 @@
 import pytest
-
 from palimpzest.constants import Cardinality, Model
-from palimpzest.corelib.schemas import File, Schema, StringField, TextFile
-from palimpzest.elements.filters import Filter
-from palimpzest.operators.code_synthesis_convert import CodeSynthesisConvertSingle
-from palimpzest.operators.convert import LLMConvertBonded
-from palimpzest.operators.datasource import MarshalAndScanDataOp
-from palimpzest.operators.filter import LLMFilter, NonLLMFilter
-from palimpzest.operators.token_reduction_convert import TokenReducedConvertBonded
-from palimpzest.optimizer.plan import PhysicalPlan, SentinelPlan
+from palimpzest.core.elements.filters import Filter
+from palimpzest.core.lib.schemas import File, Schema, StringField, TextFile
+from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
+from palimpzest.query.operators.convert import LLMConvertBonded
+from palimpzest.query.operators.datasource import MarshalAndScanDataOp
+from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
+from palimpzest.query.operators.rag_convert import RAGConvert
+from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 
+# from palimpzest.operators.token_reduction_convert import TokenReducedConvertBonded
 
 ### PHYSICAL PLANS ###
 # TODO: provide dataset_id as argument to these fixtures
@@ -24,8 +24,8 @@ def scan_only_plan():
 def non_llm_filter_plan():
     scan_op = MarshalAndScanDataOp(output_schema=File, dataset_id="enron-eval-tiny")
 
-    def filter_emails(record):
-        return record.filename in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
+    def filter_emails(record: dict):
+        return record["filename"] in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
 
     filter = Filter(filter_fn=filter_emails)
     filter_op = NonLLMFilter(input_schema=File, output_schema=File, filter=filter, target_cache_id="abc123")
@@ -76,19 +76,33 @@ def code_synth_convert_plan(email_schema):
     plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
     return plan
 
-
 @pytest.fixture
-def token_reduction_convert_plan(email_schema):
+def rag_convert_plan(email_schema):
     scan_op = MarshalAndScanDataOp(output_schema=TextFile, dataset_id="enron-eval-tiny")
-    convert_op_llm = TokenReducedConvertBonded(
+    convert_op_llm = RAGConvert(
         input_schema=TextFile,
         output_schema=email_schema,
         model=Model.GPT_4o_MINI,
-        token_budget=0.1,
+        num_chunks_per_field=1,
+        chunk_size=1000,
         target_cache_id="abc123",
     )
     plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
     return plan
+
+# NOTE: removing until TokenReducedConvert has implementation changes
+# @pytest.fixture
+# def token_reduction_convert_plan(email_schema):
+#     scan_op = MarshalAndScanDataOp(output_schema=TextFile, dataset_id="enron-eval-tiny")
+#     convert_op_llm = TokenReducedConvertBonded(
+#         input_schema=TextFile,
+#         output_schema=email_schema,
+#         model=Model.GPT_4o_MINI,
+#         token_budget=0.1,
+#         target_cache_id="abc123",
+#     )
+#     plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
+#     return plan
 
 
 @pytest.fixture
@@ -99,7 +113,6 @@ def image_convert_plan(real_estate_listing_files_schema, image_real_estate_listi
         output_schema=image_real_estate_listing_schema,
         model=Model.GPT_4o_MINI,
         target_cache_id="abc123",
-        image_conversion=True,
     )
     plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
     return plan
@@ -114,7 +127,6 @@ def one_to_many_convert_plan(real_estate_listing_files_schema, room_real_estate_
         model=Model.GPT_4o_MINI,
         cardinality=Cardinality.ONE_TO_MANY,
         target_cache_id="abc123",
-        image_conversion=True,
     )
     plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
     return plan

@@ -5,8 +5,6 @@ schema:
   fields:
     - name: sender
       description: The email address of the sender
-      required: true
     - name: subject
       description: The subject of the email
-      required: true
 

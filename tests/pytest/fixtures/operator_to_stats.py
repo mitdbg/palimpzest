@@ -1,13 +1,12 @@
 import pytest
-
 from palimpzest.constants import Model
-from palimpzest.corelib.schemas import TextFile
-from palimpzest.datamanager import DataDirectory
-from palimpzest.elements.filters import Filter
-from palimpzest.operators.convert import LLMConvertBonded
-from palimpzest.operators.datasource import MarshalAndScanDataOp
-from palimpzest.operators.filter import LLMFilter
-from palimpzest.operators.logical import BaseScan, ConvertScan, FilteredScan
+from palimpzest.core.elements.filters import Filter
+from palimpzest.core.lib.schemas import TextFile
+from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.query.operators.convert import LLMConvertBonded
+from palimpzest.query.operators.datasource import MarshalAndScanDataOp
+from palimpzest.query.operators.filter import LLMFilter
+from palimpzest.query.operators.logical import BaseScan, ConvertScan, FilteredScan
 from palimpzest.sets import Dataset
 
 
@@ -196,7 +195,7 @@ def get_one_filter_one_convert_logical_and_physical_op_ids(one_filter_one_conver
 
     # remove unnecessary convert because output schema from data source scan matches
     # input schema for the next operator
-    if len(dataset_nodes) > 1 and dataset_nodes[0].schema == dataset_nodes[1].schema:
+    if len(dataset_nodes) > 1 and dataset_nodes[0].schema.get_desc() == dataset_nodes[1].schema.get_desc():
         dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
         if len(dataset_nodes) > 1:
             dataset_nodes[1]._source = dataset_nodes[0]

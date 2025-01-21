@@ -1,9 +1,7 @@
 import pytest
-
 from palimpzest.constants import Model
-from palimpzest.corelib.schemas import TextFile
-from palimpzest.elements.records import DataRecord, DataRecordSet
-from palimpzest.optimizer.plan import SentinelPlan
+from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.lib.schemas import TextFile
 
 
 # NOTE: this relies on knowledge of the fixtures in fixtures/execution_data.py
@@ -41,7 +39,7 @@ def scan_convert_filter_champion_outputs(scan_convert_filter_sentinel_plan, foob
         filter_dr.contents = None
         filter_dr.foo = f"foo{idx}"
         filter_dr.bar = f"bar{idx}"
-        filter_dr._passed_operator = bool(idx % 2)
+        filter_dr.passed_operator = bool(idx % 2)
         champion_outputs[filter_logical_op_id][source_id] = DataRecordSet([filter_dr], None)
 
     return champion_outputs
@@ -81,7 +79,7 @@ def scan_convert_filter_empty_champion_outputs(scan_convert_filter_sentinel_plan
         filter_dr.contents = None
         filter_dr.foo = f"foo{idx}"
         filter_dr.bar = f"bar{idx}"
-        filter_dr._passed_operator = False
+        filter_dr.passed_operator = False
         champion_outputs[filter_logical_op_id][source_id] = DataRecordSet([filter_dr], None)
 
     return champion_outputs
@@ -121,7 +119,7 @@ def scan_convert_filter_varied_champion_outputs(scan_convert_filter_sentinel_pla
         filter_dr.contents = None
         filter_dr.foo = f"foo{idx}"
         filter_dr.bar = f"bar{idx}-{str(Model.GPT_4o)}"
-        filter_dr._passed_operator = bool(idx % 2)
+        filter_dr.passed_operator = bool(idx % 2)
         champion_outputs[filter_logical_op_id][source_id] = DataRecordSet([filter_dr], None)
 
     return champion_outputs
@@ -171,7 +169,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
             filter_dr.contents = None
             filter_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
             filter_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
-            filter_dr._passed_operator = bool(source_idx < 7)
+            filter_dr.passed_operator = bool(source_idx < 7)
             champion_outputs[filter1_logical_op_id][source_id] = DataRecordSet([filter_dr], None)
 
     # add second filter champion outputs
@@ -183,7 +181,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
             filter_dr.contents = None
             filter_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
             filter_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
-            filter_dr._passed_operator = bool(source_idx < 5)
+            filter_dr.passed_operator = bool(source_idx < 5)
             champion_outputs[filter2_logical_op_id][source_id] = DataRecordSet([filter_dr], None)
 
     # add first convert champion outputs
