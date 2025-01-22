@@ -5,19 +5,15 @@ from pathlib import Path
 
 import gradio as gr
 import numpy as np
-from palimpzest.constants import Cardinality, OptimizationStrategy
+from palimpzest.constants import Cardinality
 from palimpzest.core.data.datasources import UserSource
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import BooleanField, Field, ImageFilepathField, ListField, NumericField, StringField
 from palimpzest.core.lib.schemas import Schema, Table, TextFile, XLSFile
 from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.policy import MaxQuality, MinCost, MinTime
-from palimpzest.query import (
-    Execute,
-    NoSentinelPipelinedParallelExecution,
-    NoSentinelPipelinedSingleThreadExecution,
-    NoSentinelSequentialSingleThreadExecution,
-)
 from palimpzest.sets import Dataset
 from palimpzest.utils.udfs import xls_to_tables
 from PIL import Image
@@ -170,8 +166,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--executor",
         type=str,
-        help="The plan executor to use. One of sequential, pipelined, parallel",
-        default="parallel",
+        help="The plan executor to use. One of sequential, pipelined_single_thread, pipelined_parallel",
+        default="pipelined_parallel",
     )
     parser.add_argument(
         "--policy",
@@ -208,18 +204,6 @@ if __name__ == "__main__":
         policy = MaxQuality()
     else:
         print("Policy not supported for this demo")
-        exit(1)
-
-    execution_engine = None
-    executor = args.executor
-    if executor == "sequential":
-        execution_engine = NoSentinelSequentialSingleThreadExecution
-    elif executor == "pipelined":
-        execution_engine = NoSentinelPipelinedSingleThreadExecution
-    elif executor == "parallel":
-        execution_engine = NoSentinelPipelinedParallelExecution
-    else:
-        print("Executor not supported for this demo")
         exit(1)
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
@@ -261,15 +245,23 @@ if __name__ == "__main__":
         plan = plan.filter("The rows of the table contain the patient age")
         plan = plan.convert(CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY)
 
-    # execute pz plan
-    records, execution_stats = Execute(
-        plan,
-        policy,
+    config = QueryProcessorConfig(
         nocache=True,
-        optimization_strategy=OptimizationStrategy.PARETO,
-        execution_engine=execution_engine,
         verbose=verbose,
-    )
+        policy=policy,
+        execution_strategy=args.executor)
+    # Option 1: Use QueryProcessorFactory to create a processor
+    # processor = QueryProcessorFactory.create_processor(
+    #     datasource=plan,
+    #     processing_strategy="no_sentinel",  
+    #     execution_strategy="sequential", 
+    #     optimizer_strategy="pareto",
+    #     config=config
+    # )
+    # records, execution_stats = processor.execute()
+
+    # Option 2: Use Dataset.run() to run the plan.
+    records, execution_stats = plan.run(config)
 
     # save statistics
     if profile:

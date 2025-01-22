@@ -11,7 +11,7 @@ from palimpzest.core.lib.schemas import Number, Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.index_helpers import get_index_str
-
+from palimpzest.query.processor.config import QueryProcessorConfig
 
 #####################################################
 #
@@ -267,3 +267,7 @@ class Dataset(Set):
             project_cols=project_cols if isinstance(project_cols, list) else [project_cols],
             nocache=self._nocache,
         )
+
+    def run(self, config: QueryProcessorConfig | None = None):
+        from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+        return QueryProcessorFactory.create_and_run_processor(self, config)

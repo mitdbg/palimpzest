@@ -4,31 +4,28 @@ from functools import partial
 from typing import Callable
 
 import numpy as np
-
-from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, OptimizationStrategy
+from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.policy import Policy
-from palimpzest.query.execution.execution_engine import ExecutionEngine
-from palimpzest.query.execution.plan_executors.parallel_plan_execution import PipelinedParallelPlanExecutor
-from palimpzest.query.execution.plan_executors.single_threaded_plan_execution import SequentialSingleThreadPlanExecutor
+from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
+from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy, PipelinedSingleThreadExecutionStrategy
 from palimpzest.query.operators.convert import ConvertOp, LLMConvert
 from palimpzest.query.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.optimizer.cost_model import CostModel, SampleBasedCostModel
-from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.plan import SentinelPlan
+from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
 
 
-class MABSentinelExecutionEngine(ExecutionEngine):
+class MABSentinelQueryProcessor(QueryProcessor):
     """
-    This class implements the abstract execute() method from the ExecutionEngine.
-    This class still needs to be sub-classed by another Execution class which implements
-    the higher-level execute_plan() method.
+    Specialized query processor that implements MAB sentinel strategy
+    for coordinating optimization and execution.
     """
     def __init__(
             self,
@@ -52,6 +49,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         self.use_final_op_quality = use_final_op_quality
         self.pick_output_fn = self.pick_ensemble_output
         self.rng = np.random.default_rng(seed=seed)
+
 
     def update_frontier_ops(
         self,
@@ -489,18 +487,6 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         return DataRecordSet(out_records, [])
 
 
-    @staticmethod
-    def execute_op_wrapper(operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
-        """
-        Wrapper function around operator execution which also and returns the operator.
-        This is useful in the parallel setting(s) where operators are executed by a worker pool,
-        and it is convenient to return the op_id along with the computation result.
-        """
-        record_set = operator(op_input)
-
-        return record_set, operator, op_input
-
-
     def execute_op_set(self, op_candidate_pairs):
         # TODO: post-submission we will need to modify this to:
         # - submit all candidates for aggregate operators
@@ -510,7 +496,7 @@ class MABSentinelExecutionEngine(ExecutionEngine):
             # create futures
             futures = []
             for operator, candidate in op_candidate_pairs:
-                future = executor.submit(MABSentinelExecutionEngine.execute_op_wrapper, operator, candidate)
+                future = executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate)
                 futures.append(future)
 
             # compute output record_set for each (operator, candidate) pair
@@ -784,29 +770,16 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         """
         # TODO: explicitly pull up filters; for SIGMOD we can explicitly write plans w/filters pulled up
         # initialize the optimizer
-        optimizer = Optimizer(
-            policy=policy,
-            cost_model=CostModel(),
-            no_cache=True,
-            verbose=self.verbose,
-            available_models=self.available_models,
-            allow_bonded_query=self.allow_bonded_query,
-            allow_conventional_query=self.allow_conventional_query,
-            allow_code_synth=self.allow_code_synth,
-            allow_token_reduction=self.allow_token_reduction,
-            allow_rag_reduction=self.allow_rag_reduction,
-            allow_mixtures=self.allow_mixtures,
-            optimization_strategy=OptimizationStrategy.SENTINEL,
-        )
-
         # use optimizer to generate sentinel plans
-        sentinel_plans = optimizer.optimize(dataset, policy)
+        # TODO: Do we need to re-initialize the optimizer here? 
+        self.optimizer.update_cost_model(CostModel())
+        sentinel_plans = self.optimizer.optimize(dataset, policy)
         sentinel_plan = sentinel_plans[0]
 
         return sentinel_plan
 
 
-    def execute(self, dataset: Set, policy: Policy):
+    def execute(self):
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
@@ -818,10 +791,10 @@ class MABSentinelExecutionEngine(ExecutionEngine):
             self.clear_cached_examples()
 
         # create sentinel plan
-        sentinel_plan = self.create_sentinel_plan(dataset, policy)
+        sentinel_plan = self.create_sentinel_plan(self.dataset, self.policy)
 
         # generate sample execution data
-        all_execution_data, plan_stats = self.generate_sample_observations(sentinel_plan, policy)
+        all_execution_data, plan_stats = self.generate_sample_observations(sentinel_plan, self.policy)
 
         # put sentinel plan execution stats into list and prepare list of output records
         all_plan_stats = [plan_stats]
@@ -829,35 +802,14 @@ class MABSentinelExecutionEngine(ExecutionEngine):
 
         # construct the CostModel with any sample execution data we've gathered
         cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose)
-
         # (re-)initialize the optimizer
-        optimizer = Optimizer(
-            policy=policy,
-            cost_model=cost_model,
-            no_cache=self.nocache,
-            verbose=self.verbose,
-            available_models=self.available_models,
-            allow_bonded_query=self.allow_bonded_query,
-            allow_conventional_query=self.allow_conventional_query,
-            allow_code_synth=self.allow_code_synth,
-            allow_token_reduction=self.allow_token_reduction,
-            allow_rag_reduction=self.allow_rag_reduction,
-            allow_mixtures=self.allow_mixtures,
-            optimization_strategy=self.optimization_strategy,
-            use_final_op_quality=self.use_final_op_quality,
-        )
+        optimizer = self.deepcopy_clean_optimizer().update_cost_model(cost_model)
         total_optimization_time = time.time() - execution_start_time
 
         # execute plan(s) according to the optimization strategy
-        if self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
-            records, plan_stats = self.execute_confidence_interval_strategy(dataset, policy, optimizer)
-            all_records.extend(records)
-            all_plan_stats.extend(plan_stats)
-
-        else:
-            records, plan_stats = self.execute_strategy(dataset, policy, optimizer)
-            all_records.extend(records)
-            all_plan_stats.extend(plan_stats)
+        records, plan_stats = self._execute_with_optimizer(self.dataset, self.policy, optimizer)
+        all_records.extend(records)
+        all_plan_stats.extend(plan_stats)
 
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(all_plan_stats)
@@ -873,21 +825,52 @@ class MABSentinelExecutionEngine(ExecutionEngine):
         )
 
         return all_records, execution_stats
+    
 
 
-class MABSequentialSingleThreadSentinelExecution(MABSentinelExecutionEngine, SequentialSingleThreadPlanExecutor):
+class MABSentinelSequentialSingleThreadProcessor(MABSentinelQueryProcessor, SequentialSingleThreadExecutionStrategy):
     """
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
     """
     def __init__(self, *args, **kwargs):
-        MABSentinelExecutionEngine.__init__(self, *args, **kwargs)
-        SequentialSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
+        SequentialSingleThreadExecutionStrategy(
+            scan_start_idx=self.can_start_idx,
+            datadir=self.datadir,
+            max_workers=self.max_workers,
+            nocache=self.nocache,
+            verbose=self.verbose
+        )
+        self.progress_manager = None
 
 
-class MABSequentialParallelSentinelExecution(MABSentinelExecutionEngine, SequentialSingleThreadPlanExecutor):
+class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
     """
     This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
     """
     def __init__(self, *args, **kwargs):
-        MABSentinelExecutionEngine.__init__(self, *args, **kwargs)
-        PipelinedParallelPlanExecutor.__init__(self, *args, **kwargs)
+        MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        PipelinedParallelExecutionStrategy(
+            scan_start_idx=self.can_start_idx,
+            datadir=self.datadir,
+            max_workers=self.max_workers,
+            nocache=self.nocache,
+            verbose=self.verbose
+        )
+        self.progress_manager = None
+
+
+class MABSentinelPipelinedSingleThreadProcessor(MABSentinelQueryProcessor, PipelinedSingleThreadExecutionStrategy):
+    """
+    This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
+    """
+    def __init__(self, *args, **kwargs):
+        MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        PipelinedSingleThreadExecutionStrategy(
+            scan_start_idx=self.can_start_idx,
+            datadir=self.datadir,
+            max_workers=self.max_workers,
+            nocache=self.nocache,
+            verbose=self.verbose
+        )
+        self.progress_manager = None

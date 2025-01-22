@@ -1,3 +1,4 @@
+import json
 from palimpzest.core.data.dataclasses import PlanCost
 
 
@@ -43,6 +44,13 @@ class Policy:
         Return True if plan is better than other_plan and return False otherwise.
         """
         raise NotImplementedError("Calling this method from an abstract base class.")
+    
+    def to_jsonstr(self) -> str:
+        """Convert policy configuration to a JSON-serializable dictionary."""
+        return json.dumps({
+            "type": self.__class__.__name__,
+            "config": self.get_dict()
+        }, indent=4)
 
 
 class MaxQuality(Policy):
