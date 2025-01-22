@@ -1,7 +1,6 @@
 import time
-from concurrent.futures import ThreadPoolExecutor, wait
 
-from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, OptimizationStrategy
+from palimpzest.constants import OptimizationStrategy
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import SourceRecord

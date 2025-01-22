@@ -68,7 +68,7 @@ if __name__ == "__main__":
         input_records = engine.get_input_records()
         input_df = DataRecord.as_df(input_records)
         print(input_df)
-        
+
         variables = []
         statistics = []
         start_time = time.time()
