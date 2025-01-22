@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import abc
+from abc import ABC, abstractmethod
 import base64
 import json
 import os
 import sys
 from io import BytesIO
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 import modal
 import pandas as pd
@@ -20,7 +20,7 @@ from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
 # First level of abstraction
-class AbstractDataSource(abc.ABC):
+class AbstractDataSource(ABC):
     """
     An AbstractDataSource is an Iterable which yields DataRecords adhering to a given schema.
 
@@ -41,13 +41,13 @@ class AbstractDataSource(abc.ABC):
     def __eq__(self, __value: object) -> bool:
         return self.__dict__ == __value.__dict__
 
-    @abc.abstractmethod
+    @abstractmethod
     def __len__(self) -> int: ...
 
-    @abc.abstractmethod
+    @abstractmethod
     def get_item(self, idx: int) -> DataRecord: ...
 
-    @abc.abstractmethod
+    @abstractmethod
     def get_size(self) -> int: ...
 
     @property
@@ -141,27 +141,23 @@ class FileSource(DataSource):
 class MemorySource(DataSource):
     """MemorySource returns multiple objects that reflect contents of an in-memory Python list"""
 
-    def __init__(self, vals: list[int | float], dataset_id: str):
+    def __init__(self, data: Iterable[Any], *args, **kwargs):
         # For the moment we assume that we are given a list of floats or ints, but someday it could be strings or something else
-        super().__init__(Number, dataset_id)
-        self.vals = vals
+        super().__init__(*args, **kwargs)
+        self.data = data
 
     def copy(self):
-        return MemorySource(self.vals, self.dataset_id)
+        return self.__class__(data=self.data, dataset_id=self.dataset_id, schema=self.schema)
 
     def __len__(self):
-        return len(self.vals)
+        return len(self.data)
 
     def get_size(self):
         return sum([sys.getsizeof(self.get_item(idx)) for idx in range(len(self))])
 
+    @abstractmethod
     def get_item(self, idx: int) -> DataRecord:
-        value = self.vals[idx]
-        dr = DataRecord(self.schema, source_id=idx)
-        dr.value = value
-
-        return dr
-
+        raise NotImplementedError("You are calling this method from an abstract class.")
 
 # Third level of abstraction
 class HTMLFileDirectorySource(DirectorySource):
@@ -345,3 +341,66 @@ class ValidationDataSource(UserSource):
 
     def get_item(self, idx: int, val: bool = False, include_label: bool = False) -> DataRecord:
         raise NotImplementedError("User needs to implement this method.")
+
+class MemoryNumbersSource(MemorySource):
+    """ This class is a subclass of MemorySource that returns DataRecords with a Number schema """
+    #TODO 
+
+    def __init__(self, data, *args, **kwargs):
+        super().__init__(data, schema=Number, **kwargs)
+
+    def get_item(self, idx:int) -> DataRecord:
+        value = self.data[idx]
+        dr = DataRecord(self.schema, source_id=idx)
+        dr.value = value
+        return dr    
+
+
+class MemoryDictSource(MemorySource):
+    """MemoryDictSource returns multiple objects that reflect contents of an in-memory Python list of dictionaries. It fills the values of the schema attributes with the dictionary values"""
+
+    def __len__(self):
+        return len(self.data)
+    
+    def get_size(self):
+        return sum([sys.getsizeof(self.get_item(idx)) for idx in range(len(self))])
+
+    def get_item(self, idx: int) -> DataRecord:
+        record_dict = self.data[idx]
+        record = DataRecord.from_dict(schema=self.schema, 
+                                      record_dict=record_dict, 
+                                      source_id=idx)
+        return record
+
+class MemoryDataframeSource(DataSource):
+    """Create a list of DataRecords from a pandas DataFrame
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        schema (Schema, optional): Schema for the DataRecords. If None, will be derived from DataFrame  
+        source_id (int | str | None, optional)
+    
+    Returns:
+        list[DataRecord]: List of DataRecord instances
+    """
+
+    # def __init__(self, data: pd.DataFrame, *args, **kwargs) -> list[DataRecord]:
+    #     # TODO refactor out 
+    #     if df is None:
+    #         raise ValueError("DataFrame is None!")
+
+    #     records = []
+    #     if schema is None:
+    #         schema = DataRecord._build_schema_from_df(df)
+
+    #     field_map = schema.field_map()
+    #     source_id = DataRecord._build_source_id_from_df(source_id)
+    #     for _, row in df.iterrows():
+    #         row_dict = row.to_dict()
+    #         record = DataRecord(schema=schema, source_id=source_id)
+    #         record.field_values = row_dict
+    #         record.field_types = {field_name: field_map[field_name] for field_name in row_dict}
+    #         records.append(record)
+
+    #     return records
+    

@@ -27,6 +27,7 @@ class SchemaBuilder:
         include_attributes: list = None,
         exclude_attributes: list = None,
         schema_type: Schema = None,
+        template: str = None,
         ):
         """
         Inputs:
@@ -36,6 +37,7 @@ class SchemaBuilder:
             include_attributes (optional): list - a list of attribute names to include in the schema. If None, all attributes are included.
             exclude_attributes (optional): list - a list of attribute names to exclude from the schema. If None, no attributes are excluded.
             schema_type (optional): Schema - the parent type of the schema to generate, e.g. ScientificPapers have a schema_type of PDFFile. If None, a generic Schema type is used.
+            template (optional): str - the template to use for the schema. This is relevant for generating schemas from JSON-LD files that contain a template field. In that case the name. description, and fields are extracted from the template.
         Outputs:
             A class object - the dynamically generated class
         """
@@ -49,7 +51,7 @@ class SchemaBuilder:
         elif file_extension == ".json":
             schema_data = cls.from_json(schema_file)
         elif file_extension == ".jsonld":
-            schema_data = cls.from_jsonld(schema_file)
+            schema_data = cls.from_jsonld(schema_file, template)
         elif file_extension == ".yml":
             schema_data = cls.from_yml(schema_file)
         else:
@@ -143,13 +145,16 @@ class SchemaBuilder:
     def from_jsonld(
         cls,
         schema_file: str,
+        template: str = None,
     ) -> dict:
         """JSON-LD schema builder.
         The attributes are extracted from the JSON-LD objects of type 'rdfs:Class'.
         If they contain a 'comment' field, this is used to populate a schema descripton.
         If they contain a 'rangeIncludes' field, this is used within the description to
         signal the list of valid values.
-       """
+ 
+        If the JSON-LD file contains a 'template' field, the name, description, and fields are extracted from the template specified in the template variable.
+        """
 
         # Load the schema from the JSONLD file
         with open(schema_file) as file:
@@ -158,24 +163,54 @@ class SchemaBuilder:
         compacted_data = jsonld.compact(jsonld_data, context)
         compacted_graph = compacted_data["@graph"]
 
-        fields = []
+        graph_dict = {node['@id']:node for node in compacted_graph}
 
-        for node in compacted_graph:
-            if node.get("@type") != "rdfs:Class":
-                continue
-            name = node.get("rdfs:label")
+        if template is not None:
+            template_node = graph_dict.get('bts:'+template, None)
+            if template_node is None:
+                raise ValueError(f"Template {template} not found in the JSON-LD file.")
+            fields = []
+            for field in template_node.get("sms:requiresDependency", []):
+                node = graph_dict.get(field["@id"], None)
 
-            values = []
-            if "schema:rangeIncludes" in node:
-                values = [val["@id"].split(":")[-1] for val in node["schema:rangeIncludes"]]
-            
-            description = node.get("rdfs:comment", "")
-            if values:
-                description += " The only valid values are: " + ", ".join(values)
-            fields.append({
-                "name": name,
-                "description": description, 
-                "values": values})
+                values = []
+                if "schema:rangeIncludes" in node:
+                    values = [val["@id"].split(":")[-1] for val in node["schema:rangeIncludes"]]
+                description = node.get("rdfs:comment", "")
+                if values:
+                    description += " The only valid values are: " + ", ".join(values)
+
+                fields.append({
+                    "name": node.get("rdfs:label", ""),                    
+                    "description":description,
+                    "values": values
+                    })
+
+            return {
+                "name": template_node.get("rdfs:label", ""),
+                "description": template_node.get("rdfs:comment", ""),
+                "fields": fields,
+            }
+
+        else:
+            fields = []
+
+            for node in compacted_graph:
+                if node.get("@type") != "rdfs:Class":
+                    continue
+                name = node.get("rdfs:label")
+
+                values = []
+                if "schema:rangeIncludes" in node:
+                    values = [val["@id"].split(":")[-1] for val in node["schema:rangeIncludes"]]
+                
+                description = node.get("rdfs:comment", "")
+                if values:
+                    description += " The only valid values are: " + ", ".join(values)
+                fields.append({
+                    "name": name,
+                    "description": description, 
+                    "values": values})
 
         return {
             "name": '',
@@ -239,3 +274,8 @@ class SchemaBuilder:
             "fields": schema_data.get("fields", []),
             "type": schema_data.get("type", "")
         }
+    
+    @classmethod
+    def from_df(cls, df: pd.DataFrame) -> dict:
+        #TODO
+        pass

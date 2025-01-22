@@ -240,35 +240,33 @@ class DataRecord:
         return new_schema
     
     @staticmethod
-    def from_df(df: pd.DataFrame, schema: Schema = None, source_id: int | str | None = None) -> list[DataRecord]:
-        """Create a list of DataRecords from a pandas DataFrame
+    def from_dict(record_dict: dict, schema: Schema, source_id: int | str) -> DataRecord:
+        """Create a DataRecord from a dictionary
         
         Args:
-            df (pd.DataFrame): Input DataFrame
-            schema (Schema, optional): Schema for the DataRecords. If None, will be derived from DataFrame  
+            record_dict (dict): Input dictionary
+            schema (Schema, optional): Schema for the DataRecord. If None, will be derived from DataFrame  
             source_id (int | str | None, optional)
         
         Returns:
-            list[DataRecord]: List of DataRecord instances
+            DataRecord: DataRecord instance
         """
-        if df is None:
-            raise ValueError("DataFrame is None!")
 
-        records = []
+        if record_dict is None:
+            raise ValueError("record_dict is None!")
         if schema is None:
-            schema = DataRecord._build_schema_from_df(df)
-
-        field_map = schema.field_map()
-        source_id = DataRecord._build_source_id_from_df(source_id)
-        for _, row in df.iterrows():
-            row_dict = row.to_dict()
-            record = DataRecord(schema=schema, source_id=source_id)
-            record.field_values = row_dict
-            record.field_types = {field_name: field_map[field_name] for field_name in row_dict}
-            records.append(record)
-
-        return records
+            raise ValueError("Schema is None!")
+        if source_id is None:
+            raise ValueError("source_id is None!")
     
+        record = DataRecord(schema=schema, source_id=str(source_id))
+        assert(set(record_dict.keys()) == set(schema.field_names())), "Field names in record_dict do not match schema"
+        for key, value in record_dict.items():
+            record[key] = value
+            
+        record.field_types = schema.field_map()
+        return record
+
     @staticmethod
     def as_df(records: list[DataRecord]) -> pd.DataFrame:
         return pd.DataFrame([record.as_dict() for record in records])
