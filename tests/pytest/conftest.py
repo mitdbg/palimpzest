@@ -1,4 +1,5 @@
 import pytest
+
 from palimpzest.constants import Model
 from palimpzest.policy import MaxQuality, MaxQualityAtFixedCost, MinCost, MinCostAtFixedQuality
 
@@ -46,7 +47,6 @@ def workload(
     request,
     enron_workload,
     real_estate_workload,
-    biofabric_workload,
     three_converts_workload,
     one_filter_one_convert_workload,
     two_converts_two_filters_workload,
@@ -55,7 +55,6 @@ def workload(
     workload_id_to_workload = {
         "enron-workload": enron_workload,
         "real-estate-workload": real_estate_workload,
-        "biofabric-workload": biofabric_workload,
         "three-converts": three_converts_workload,
         "one-filter-one-convert": one_filter_one_convert_workload,
         "two-converts-two-filters": two_converts_two_filters_workload,

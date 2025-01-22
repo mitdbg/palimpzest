@@ -9,6 +9,7 @@ import time
 
 import pandas as pd
 import streamlit as st
+
 from palimpzest.constants import Cardinality
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import Field
@@ -68,7 +69,7 @@ if __name__ == "__main__":
         input_records = engine.get_input_records()
         input_df = DataRecord.as_df(input_records)
         print(input_df)
-        
+
         variables = []
         statistics = []
         start_time = time.time()
