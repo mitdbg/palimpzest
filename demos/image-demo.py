@@ -7,13 +7,14 @@ import time
 
 import gradio as gr
 import numpy as np
+from PIL import Image
+
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import ImageFile
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality
 from palimpzest.query import Execute, NoSentinelSequentialSingleThreadExecution
 from palimpzest.sets import Dataset
-from PIL import Image
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env

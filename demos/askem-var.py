@@ -9,6 +9,7 @@ import time
 
 import pandas as pd
 import streamlit as st
+
 from palimpzest.constants import Cardinality
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import Field

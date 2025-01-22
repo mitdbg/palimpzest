@@ -194,6 +194,9 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor):
                 if not self.nocache:
                     for record in records:
                         if getattr(record, "passed_operator", True):
+                            if operator.target_cache_id is None:
+                                print("No cache ID for operator", operator)
+                                breakpoint()
                             self.datadir.append_cache(operator.target_cache_id, record)
 
                 # update processing_queues or output_records

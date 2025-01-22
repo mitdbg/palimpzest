@@ -97,6 +97,8 @@ class DataRecord:
             items = (f"{k}={v!r}" for k, v in sorted(self.field_values.items()))
         return "{}({})".format(type(self).__name__, ", ".join(items))
 
+    def __repr__(self) -> str:
+        return self.__str__(truncate=None)
 
     def __eq__(self, other):
         return isinstance(other, DataRecord) and self.field_values == other.field_values and self.schema.get_desc() == other.schema.get_desc()

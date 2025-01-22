@@ -3,6 +3,7 @@ import pickle
 from threading import Lock
 
 import yaml
+
 from palimpzest import constants
 from palimpzest.config import Config
 from palimpzest.constants import MAX_DATASET_ID_CHARS, PZ_DIR
