@@ -258,7 +258,7 @@ class DataRecord:
 
         fields = records[0].schema.field_names()
         return pd.DataFrame([
-            {k: record.as_dict().get(k) for k in fields}
+            {k: record[k] for k in fields}
             for record in records
         ])
 
