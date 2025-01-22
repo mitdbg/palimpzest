@@ -50,6 +50,8 @@ jobs:
         python-version: '3.x'
     - name: Install the code linting and formatting tool Ruff
       run: pipx install ruff
+    - name: check version
+      run: ruff --version
     - name: Lint code with Ruff
       run: ruff check --output-format=github --target-version=py38
     - name: Check code formatting with Ruff
