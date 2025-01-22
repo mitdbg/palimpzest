@@ -218,31 +218,9 @@ class DataRecord:
         elif isinstance(source_id, int):
             updated_source_id = str(source_id)
         return f"{FROM_DF_PREFIX}_{updated_source_id}"
-    
+
     @staticmethod
-    def _build_schema_from_df(df: pd.DataFrame) -> Schema:
-        # Create a unique schema name based on columns
-        schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
-        
-        if schema_name in globals():
-            return globals()[schema_name]
-            
-        # Create new schema only if it doesn't exist
-        new_schema = type(schema_name, (Schema,), {
-            '_desc': "Derived schema from DataFrame",
-            '__module__': Schema.__module__
-        })
-        
-        for col in df.columns:
-            # NOTE: we may need some way of inferring whether fields are images
-            setattr(new_schema, col, Field(desc=f"{col}"))
-        
-        # Store the schema class globally
-        globals()[schema_name] = new_schema
-        return new_schema
-    
-    @staticmethod
-    def from_df(df: pd.DataFrame, schema: Schema = None, source_id: int | str | None = None) -> list[DataRecord]:
+    def from_df(df: pd.DataFrame, schema: Schema | None = None, source_id: int | str | None = None) -> list[DataRecord]:
         """Create a list of DataRecords from a pandas DataFrame
         
         Args:
@@ -258,7 +236,7 @@ class DataRecord:
 
         records = []
         if schema is None:
-            schema = DataRecord._build_schema_from_df(df)
+            schema = Schema.from_df(df)
 
         field_map = schema.field_map()
         source_id = DataRecord._build_source_id_from_df(source_id)
