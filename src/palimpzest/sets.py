@@ -290,7 +290,7 @@ class Dataset(Set):
             optimizer_strategy: str = "pareto", 
             execution_strategy: str = "sequential",
             processing_strategy: str = "no_sentinel"):
-        return hash_for_id(config.to_jsonstr() + optimizer_strategy + execution_strategy + processing_strategy)
+        return hash_for_id(config.to_json_str() + optimizer_strategy + execution_strategy + processing_strategy)
     
     def run(self, config: QueryProcessorConfig, 
             optimizer_strategy: str = "pareto", 

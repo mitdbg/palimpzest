@@ -105,7 +105,7 @@ class DataRecord:
 
 
     def __hash__(self):
-        return hash(self.as_json_str())
+        return hash(self.to_json_str())
 
 
     def __iter__(self):
@@ -262,7 +262,7 @@ class DataRecord:
             for record in records
         ])
 
-    def as_json_str(self, include_bytes: bool = True, project_cols: list[str] | None = None):
+    def to_json_str(self, include_bytes: bool = True, project_cols: list[str] | None = None):
         """Return a JSON representation of this DataRecord"""
         record_dict = self.as_dict(include_bytes, project_cols)
         record_dict = {

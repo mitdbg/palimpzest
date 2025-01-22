@@ -145,7 +145,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
     def _generate_user_prompt(self, candidate: DataRecord, fields: list[str], **kwargs) -> str:
         """Returns a prompt based on the prompt strategy with instance-specific instructions."""
         # get context from input record (project_cols will be None if not provided in kwargs)
-        context = candidate.as_json_str(include_bytes=False, project_cols=kwargs.get("project_cols"))
+        context = candidate.to_json_str(include_bytes=False, project_cols=kwargs.get("project_cols"))
 
         # get filter condition for filter operations
         filter_condition = (

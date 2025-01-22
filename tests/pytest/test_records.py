@@ -73,9 +73,9 @@ class TestDataRecord:
         assert record_dict['name'] == 'test'
         assert record_dict['value'] == 42
 
-    def test_as_json_str(self, sample_record):
+    def test_to_json_str(self, sample_record):
         """Test JSON string representation"""
-        json_str = sample_record.as_json_str()
+        json_str = sample_record.to_json_str()
         assert 'test' in json_str
         assert '42' in json_str
 
