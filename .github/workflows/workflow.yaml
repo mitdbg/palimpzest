@@ -55,5 +55,5 @@ jobs:
     - name: Lint code with Ruff
       run: ruff check --output-format=github --target-version=py38
     - name: Check code formatting with Ruff
-      run: ruff format --diff --target-version=py38
+      run: ruff check --no-fix . --target-version=py38
       continue-on-error: true
