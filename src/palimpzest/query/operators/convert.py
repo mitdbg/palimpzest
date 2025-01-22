@@ -121,7 +121,7 @@ class ConvertOp(PhysicalOperator, ABC):
                 record_id=dr.id,
                 record_parent_id=dr.parent_id,
                 record_source_id=dr.source_id,
-                record_state=dr.as_dict(include_bytes=False),
+                record_state=dr.to_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 logical_op_id=self.logical_op_id,
                 op_name=self.op_name(),
@@ -245,7 +245,7 @@ class NonLLMConvert(ConvertOp):
         field_answers = {}
         try:
             # execute the UDF function
-            answer = self.udf(candidate.as_dict())
+            answer = self.udf(candidate.to_dict())
 
             if self.cardinality == Cardinality.ONE_TO_ONE:
                 # answer should be a dictionary

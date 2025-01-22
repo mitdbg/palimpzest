@@ -334,7 +334,7 @@ stats_path = (
 
 record_jsons = []
 for record in records:
-    record_dict = record.as_dict()
+    record_dict = record.to_dict()
     ### field_to_keep = ["claim", "id", "label"]
     ### record_dict = {k: v for k, v in record_dict.items() if k in fields_to_keep}
     record_jsons.append(record_dict)

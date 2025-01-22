@@ -44,7 +44,7 @@ def test_dynamicschema_json(mocker, enron_workload, enron_convert, enron_filter)
     )
 
     for rec in records:
-        print(rec.as_dict())
+        print(rec.to_dict())
 
 
 def test_dynamicschema_yml(mocker, enron_workload, enron_convert, enron_filter):
@@ -71,4 +71,4 @@ def test_dynamicschema_yml(mocker, enron_workload, enron_convert, enron_filter):
     )
 
     for rec in records:
-        print(rec.as_dict())
+        print(rec.to_dict())

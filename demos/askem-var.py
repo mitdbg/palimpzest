@@ -74,7 +74,7 @@ if __name__ == "__main__":
                 st.write(strop)
 
         input_records = engine.get_input_records()
-        input_df = DataRecord.as_df(input_records, fields_in_schema=True)
+        input_df = DataRecord.to_df(input_records, fields_in_schema=True)
         print(input_df)
 
         variables = []
@@ -90,7 +90,7 @@ if __name__ == "__main__":
                 engine.plan_stats.finalize(total_plan_time)
 
             statistics.append(engine.plan_stats)
-            intermediate_vars = DataRecord.as_df(vars, fields_in_schema=True)
+            intermediate_vars = DataRecord.to_df(vars, fields_in_schema=True)
             print(intermediate_vars)
             for var in vars:
                 # ref.key = ref.first_author.split()[0] + ref.title.split()[0] + str(ref.year)
