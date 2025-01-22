@@ -1,4 +1,5 @@
 import pytest
+
 from palimpzest.constants import Model
 from palimpzest.policy import MaxQuality, MaxQualityAtFixedCost, MinCost, MinCostAtFixedQuality
 

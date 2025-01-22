@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
 import streamlit as st  # type: ignore
+
 from palimpzest.constants import Cardinality
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import PDFFile, Schema

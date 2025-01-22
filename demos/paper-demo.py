@@ -5,6 +5,8 @@ from pathlib import Path
 
 import gradio as gr
 import numpy as np
+from PIL import Image
+
 from palimpzest.constants import Cardinality, OptimizationStrategy
 from palimpzest.core.data.datasources import UserSource
 from palimpzest.core.elements.records import DataRecord
@@ -20,7 +22,6 @@ from palimpzest.query import (
 )
 from palimpzest.sets import Dataset
 from palimpzest.utils.udfs import xls_to_tables
-from PIL import Image
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
