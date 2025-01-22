@@ -77,11 +77,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         # get handle to DataSource and pre-compute its op_id and size
         source_operator = plan.operators[0]
         source_op_id = source_operator.get_op_id()
-        datasource = (
-            self.datadir.get_registered_dataset(source_operator.dataset_id)
-            if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
+        datasource = source_operator.get_datasource()
         datasource_len = len(datasource)
 
         # get limit of final limit operator (if one exists)

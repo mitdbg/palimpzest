@@ -127,6 +127,12 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
 
         return record_set
 
+    def get_datasource(self):
+        return self.datadir.get_registered_dataset(self.dataset_id)
+
+    def get_datasource_type(self):
+        return self.datadir.get_registered_dataset_type(self.dataset_id)
+
 
 class CacheScanDataOp(DataSourcePhysicalOp):
     def naive_cost_estimates(
@@ -186,3 +192,6 @@ class CacheScanDataOp(DataSourcePhysicalOp):
         record_set = DataRecordSet(records, record_op_stats_lst)
 
         return record_set
+    
+    def get_datasource(self):
+        return self.datadir.get_cached_result(self.dataset_id)
