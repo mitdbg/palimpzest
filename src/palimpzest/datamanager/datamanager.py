@@ -61,11 +61,6 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         self._tempCache = {}
         self.cacheService = CacheService()
 
-        try:
-            pass
-        except:
-            pass
-
         # set up data directory
         self._dir = PZ_DIR
         current_config_path = os.path.join(self._dir, "current_config.yaml")
