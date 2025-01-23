@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from palimpzest.constants import Cardinality, GPT_4o_MODEL_CARD, Model
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
@@ -15,9 +15,9 @@ from palimpzest.utils.sandbox import API
 FieldName = str
 CodeName = str
 Code = str
-DataRecordDict = Dict[str, Any]
-Exemplar = Tuple[DataRecordDict, DataRecordDict]
-CodeEnsemble = Dict[CodeName, Code]
+DataRecordDict = dict[str, Any]
+Exemplar = tuple[DataRecordDict, DataRecordDict]
+CodeEnsemble = dict[CodeName, Code]
 
 
 class CodeSynthesisConvert(LLMConvert):
