@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Type
 
 from palimpzest.policy import Policy
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
@@ -21,12 +22,12 @@ class OptimizationStrategyType(str, Enum):
 
 class OptimizationStrategy(ABC):
     @abstractmethod
-    def optimize(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plan(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
         """Strategy decides how to search through the groups for optimal plan(s)"""
         pass
 
     @classmethod
-    def get_strategy(cls, strategy_type: str) -> 'OptimizationStrategy':
+    def get_strategy(cls, strategy_type: str) -> OptimizationStrategy:
         """Factory method to create strategy instances"""
         return OptimizerStrategyRegistry.get_strategy(strategy_type)
 
@@ -51,7 +52,7 @@ class GreedyStrategy(OptimizationStrategy):
         # add this operator to best physical plan and return
         return PhysicalPlan.from_ops_and_sub_plan([best_phys_expr.operator], input_best_phys_plan, best_phys_expr.plan_cost)
 
-    def optimize(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plan(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
         return [self._get_greedy_physical_plan(groups, final_group_id)]
 
 
@@ -101,7 +102,7 @@ class ParetoStrategy(OptimizationStrategy):
 
         return pareto_optimal_plans
     
-    def optimize(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plan(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
         # compute all of the pareto optimal physical plans
         plans = self._get_candidate_pareto_physical_plans(groups, final_group_id, policy)
 
@@ -150,12 +151,12 @@ class SentinelStrategy(OptimizationStrategy):
         # add this operator set to best physical plan and return
         return SentinelPlan.from_ops_and_sub_plan([phys_op_set], best_phys_subplan)
 
-    def optimize(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plan(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
         return [self._get_sentinel_plan(groups, final_group_id)]
 
 
 class NoOptimizationStrategy(OptimizationStrategy):
-    def optimize(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plan(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
         raise NotImplementedError("No optimization strategy selected")
     
 
@@ -201,20 +202,21 @@ class ConfidenceIntervalStrategy(OptimizationStrategy):
 
         return best_plans
 
-    def optimize(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plan(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
         # TODO: fix this to properly handle multiple potential plans
         raise Exception("NotImplementedError")
-        plans = self.get_confidence_interval_optimal_plans(final_group_id)
-    
+        # plans = self._get_confidence_interval_optimal_plans(final_group_id)
+
+
 class AutoOptimizationStrategy(OptimizationStrategy):
-    def optimize(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plan(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
         raise NotImplementedError("Auto optimization strategy not implemented")
-    
+
 
 class OptimizerStrategyRegistry:
     """Registry to map strategy types to their implementations"""
-    
-    _strategies: dict[str, Type[OptimizationStrategy]] = {
+
+    _strategies: dict[str, type[OptimizationStrategy]] = {
         OptimizationStrategyType.GREEDY.value: GreedyStrategy,
         OptimizationStrategyType.CONFIDENCE_INTERVAL.value: ConfidenceIntervalStrategy,
         OptimizationStrategyType.PARETO.value: ParetoStrategy,
@@ -222,7 +224,7 @@ class OptimizerStrategyRegistry:
         OptimizationStrategyType.NONE.value: NoOptimizationStrategy,
         OptimizationStrategyType.AUTO.value: AutoOptimizationStrategy,
     }
-    
+
     @classmethod
     def get_strategy(cls, strategy_type: str) -> OptimizationStrategy:
         """Get strategy instance by type"""
