@@ -26,16 +26,18 @@ class QueryProcessor:
     3. Result phase: Statistics gathering and result formatting
     """
     def __init__(
-        self,    
-        datasource: DataSource,
+        self,
+        dataset: Dataset,
         optimizer: Optimizer = None,
         config: QueryProcessorConfig = None,
+        *args,
+        **kwargs,
     ):
         """
         Initialize QueryProcessor with optional custom components.
         
         Args:
-            datasource: Data source to process
+            dataset: Dataset to process
             optimizer: Custom optimizer (optional)
             execution_engine: Custom execution engine (optional)
             config: Configuration dictionary for default components
@@ -43,7 +45,8 @@ class QueryProcessor:
         assert config is not None, "QueryProcessorConfig is required for QueryProcessor"
 
         self.config = config or QueryProcessorConfig()
-        self.datasource = datasource
+        self.dataset = dataset
+        self.datasource = self._get_datasource(self.dataset)
         self.num_samples = self.config.num_samples
         self.using_validation_data = isinstance(self.datasource, ValidationDataSource)
         self.scan_start_idx = self.config.scan_start_idx
@@ -55,7 +58,6 @@ class QueryProcessor:
         self.datadir = DataDirectory()
 
         self.policy = self.config.policy
-        self.dataset = self.datasource
 
         self.available_models = self.config.available_models
         if self.available_models is None or len(self.available_models) == 0:
@@ -70,6 +72,16 @@ class QueryProcessor:
         assert optimizer is not None, "Optimizer is required. Please use QueryProcessorFactory.create_processor() to initialize a QueryProcessor."
         self.optimizer = optimizer
 
+    def _get_datasource(self, dataset: Set | DataSource) -> str:
+        """
+        Gets the DataSource for the given dataset.
+        """
+        # iterate until we reach DataSource
+        while isinstance(dataset, Set):
+            dataset = dataset._source
+
+        # this will throw an exception if datasource is not registered with PZ
+        return DataDirectory().get_registered_dataset(dataset.dataset_id)
 
     def execution_id(self) -> str:
         """
