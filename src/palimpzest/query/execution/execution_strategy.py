@@ -46,15 +46,6 @@ class ExecutionStrategy(ABC):
         pass
 
 
-    @abstractmethod
-    def _should_stop_execution(
-        self,
-        records: list[DataRecord],
-        plan_stats: list[PlanStats]
-    ) -> bool:
-        """Override to implement early stopping logic"""
-        raise NotImplementedError("Early stopping logic not implemented")
-
     # TODO(chjun): use _create_execution_stats for execution stats setup.
     ## aggregate plan stats
     # aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)
