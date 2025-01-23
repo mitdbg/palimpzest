@@ -12,6 +12,7 @@ from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.index_helpers import get_index_str
 
+
 #####################################################
 #
 #####################################################
@@ -267,6 +268,6 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def run(self, config: "QueryProcessorConfig | None" = None, **kwargs):
+    def run(self, config: QueryProcessorConfig | None = None, **kwargs): # noqa: F821
         from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
         return QueryProcessorFactory.create_and_run_processor(self, config, **kwargs)

@@ -3,6 +3,7 @@ import pickle
 from threading import Lock
 
 import yaml
+
 from palimpzest import constants
 from palimpzest.config import Config
 from palimpzest.constants import PZ_DIR
