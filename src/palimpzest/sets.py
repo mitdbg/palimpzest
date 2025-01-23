@@ -267,6 +267,6 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def run(self, config: "QueryProcessorConfig | None" = None):
+    def run(self, config: "QueryProcessorConfig | None" = None, **kwargs):
         from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
-        return QueryProcessorFactory.create_and_run_processor(self, config)
+        return QueryProcessorFactory.create_and_run_processor(self, config, **kwargs)
