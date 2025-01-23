@@ -59,7 +59,6 @@ class DataSourcePhysicalOp(PhysicalOperator, ABC):
         """
         raise NotImplementedError("Abstract method")
     
-    # TODO: we need to revisit this to make get_datasource() unified for DataScan operators
     @abstractmethod
     def get_datasource(self):
         raise NotImplementedError("Abstract method")
@@ -135,7 +134,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
 
     def get_datasource(self):
         return self.datadir.get_registered_dataset(self.dataset_id)
-        
+
     def get_datasource_type(self):
         return self.datadir.get_registered_dataset_type(self.dataset_id)
 

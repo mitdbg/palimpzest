@@ -628,7 +628,7 @@ class CostModel(BaseCostModel):
                                                     dataset_type=dataset_type)
 
         elif isinstance(operator, CacheScanDataOp):
-            datasource = self.datadir.get_cached_result(operator.dataset_id)
+            datasource = operator.get_datasource()
             datasource_len = len(datasource)
             datasource_memsize = datasource.get_size()
 
