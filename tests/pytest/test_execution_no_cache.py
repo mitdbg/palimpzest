@@ -1,6 +1,7 @@
 import time
 
 import pytest
+
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.query.execution.nosentinel_execution import (
     NoSentinelPipelinedParallelExecution,

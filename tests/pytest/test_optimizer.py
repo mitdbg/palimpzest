@@ -1,5 +1,5 @@
 import pytest
-from palimpzest.constants import Cardinality, Model, OptimizationStrategy
+from palimpzest.constants import Cardinality, Model
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import TextFile
@@ -96,8 +96,8 @@ class TestPrimitives:
 @pytest.mark.parametrize(
     argnames=("opt_strategy",),
     argvalues=[
-        pytest.param(OptimizationStrategy.GREEDY, id="greedy"),
-        pytest.param(OptimizationStrategy.PARETO, id="pareto"),
+        pytest.param(OptimizationStrategy.GREEDY, id="greedy"),  # TODO: fix
+        pytest.param(OptimizationStrategy.PARETO, id="pareto"),  # TODO: fix
     ]
 )
 class TestOptimizer:
@@ -388,7 +388,7 @@ class TestParetoOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3],
-            optimization_strategy=OptimizationStrategy.PARETO,
+            optimization_strategy=OptimizationStrategy.PARETO,  # TODO: fix
             # TODO: remove
             allow_code_synth=False,
             allow_conventional_query=False,

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import json
+import pandas as pd
 from typing import Callable
 
+import pandas as pd
+
 from palimpzest.constants import AggFunc, Cardinality
-from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.data.datasources import DataSource, TextFile
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
-from palimpzest.core.lib.schemas import Number, Schema
+from palimpzest.core.lib.schemas import DefaultSchema, Number, Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.index_helpers import get_index_str
+from palimpzest.query.processor.config import QueryProcessorConfig
 
 
 #####################################################
@@ -120,6 +124,7 @@ class Set:
         return self.schema.json_schema()
 
 
+
 class Dataset(Set):
     """
     A Dataset is the intended abstraction for programmers to interact with when manipulating Sets.
@@ -133,12 +138,13 @@ class Dataset(Set):
     previously cached computation by providing it as a `source` to some future Dataset.
     """
 
-    def __init__(self, source: str | DataSource, *args, **kwargs):
+    def __init__(self, source: str | list | pd.DataFrame | DataSource, schema: Schema | None = None, *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
-        source = DataDirectory().get_registered_dataset(source) if isinstance(source, str) else source
-
+        source = DataDirectory().get_or_register_dataset(source) if isinstance(source, (str, list, pd.DataFrame)) else source
+        if schema is None:
+            schema = Schema.from_df(source) if isinstance(source, pd.DataFrame) else DefaultSchema
         # intialize class
-        super().__init__(source, *args, **kwargs)
+        super().__init__(source, schema, *args, **kwargs)
 
     def copy(self) -> Dataset:
         source_copy = self._source.copy()
@@ -267,3 +273,29 @@ class Dataset(Set):
             project_cols=project_cols if isinstance(project_cols, list) else [project_cols],
             nocache=self._nocache,
         )
+    
+    def _processor_hashid(self, config: QueryProcessorConfig, 
+            optimizer_strategy: str = "pareto", 
+            execution_strategy: str = "sequential",
+            processing_strategy: str = "no_sentinel"):
+        return hash_for_id(config.to_json_str() + optimizer_strategy + execution_strategy + processing_strategy)
+    
+    def run(self, config: QueryProcessorConfig, 
+            optimizer_strategy: str = "pareto", 
+            execution_strategy: str = "sequential",
+            processing_strategy: str = "no_sentinel"):
+
+        processor_hashid = self._processor_hashid(config, optimizer_strategy, execution_strategy, processing_strategy)
+        if processor_hashid in self._processor_cache:
+            processor = self._processor_cache[processor_hashid]
+        else:
+            from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+            processor = QueryProcessorFactory.create_processor(
+                datasource=self,
+                processing_strategy=processing_strategy,
+                execution_strategy=execution_strategy,
+                optimizer_strategy=optimizer_strategy,
+                config=config
+            )
+            self._processor_cache[processor_hashid] = processor
+        return processor.execute()

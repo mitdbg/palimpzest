@@ -1,3 +1,4 @@
+import multiprocessing
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 
@@ -5,18 +6,17 @@ from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import SourceRecord
-from palimpzest.query.execution.execution_engine import ExecutionEngine
+from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
+from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.plan import PhysicalPlan
 
 
-class PipelinedParallelPlanExecutor(ExecutionEngine):
+class PipelinedParallelExecutionStrategy(ExecutionStrategy):
     """
-    This class implements the abstract execute_plan() method from the ExecutionEngine.
-    This class still needs to be sub-classed by another Execution class which implements
-    the higher-level execute() method.
+    A parallel execution strategy that processes data through a pipeline of operators using thread-based parallelism.
     """
 
     def __init__(self, *args, **kwargs):
@@ -27,8 +27,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
             else self.max_workers
         )
 
-    @staticmethod
-    def execute_op_wrapper(operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
+    def execute_op_wrapper(self, operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
         """
         Wrapper function around operator execution which also and returns the operator.
         This is useful in the parallel setting(s) where operators are executed by a worker pool,
@@ -37,6 +36,16 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
         record_set = operator(op_input)
 
         return record_set, operator
+    
+    def get_parallel_max_workers(self):
+        # for now, return the number of system CPUs;
+        # in the future, we may want to consider the models the user has access to
+        # and whether or not they will encounter rate-limits. If they will, we should
+        # set the max workers in a manner that is designed to avoid hitting them.
+        # Doing this "right" may require considering their logical, physical plan,
+        # and tier status with LLM providers. It may also be worth dynamically
+        # changing the max_workers in response to 429 errors.
+        return max(int(0.8 * multiprocessing.cpu_count()), 1)
 
     def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
         """Initialize the stats and the execute the plan."""
@@ -75,6 +84,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
 
         # get handle to DataSource and pre-compute its op_id and size
         source_operator = plan.operators[0]
+        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
         source_op_id = source_operator.get_op_id()
         datasource = source_operator.get_datasource()
         datasource_len = len(datasource)
@@ -93,7 +103,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
             candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
             candidate.idx = current_scan_idx
             candidate.get_item_fn = datasource.get_item
-            futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
+            futures.append(executor.submit(self.execute_op_wrapper, source_operator, candidate))
             op_id_to_futures_in_flight[source_op_id] += 1
             current_scan_idx += 1
 
@@ -152,7 +162,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                             candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
                             candidate.idx = current_scan_idx
                             candidate.get_item_fn = datasource.get_item
-                            new_futures.append(executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, source_operator, candidate))
+                            new_futures.append(executor.submit(self.execute_op_wrapper, source_operator, candidate))
                             op_id_to_futures_in_flight[source_op_id] += 1
                             current_scan_idx += 1
 
@@ -167,7 +177,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                 for operator, candidate in processing_queue:
                     # if the candidate is not an input to an aggregate, execute it right away
                     if not isinstance(operator, AggregateOp):
-                        future = executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, operator, candidate)
+                        future = executor.submit(self.execute_op_wrapper, operator, candidate)
                         new_futures.append(future)
                         op_id_to_futures_in_flight[operator.get_op_id()] += 1
 
@@ -203,7 +213,7 @@ class PipelinedParallelPlanExecutor(ExecutionEngine):
                     if upstream_ops_are_finished:
                         operator = op_id_to_operator[agg_op_id]
                         candidates = list(map(lambda tup: tup[1], candidate_tuples))
-                        future = executor.submit(PipelinedParallelPlanExecutor.execute_op_wrapper, operator, candidates)
+                        future = executor.submit(self.execute_op_wrapper, operator, candidates)
                         new_futures.append(future)
                         op_id_to_futures_in_flight[operator.get_op_id()] += 1
 

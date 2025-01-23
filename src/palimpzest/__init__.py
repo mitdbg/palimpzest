@@ -1,4 +1,4 @@
-from palimpzest.constants import MAX_ROWS, Cardinality, OptimizationStrategy
+from palimpzest.constants import MAX_ROWS, Cardinality
 
 # Dataset functionality
 #from palimpzest.sets import Dataset
@@ -20,7 +20,6 @@ __all__ = [
     # constants
     "MAX_ROWS",
     "Cardinality",
-    "OptimizationStrategy",
     # datamanager
     "DataDirectory",
     # policy

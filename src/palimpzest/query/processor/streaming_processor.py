@@ -4,18 +4,16 @@ from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.policy import Policy
-from palimpzest.query.execution.execution_engine import ExecutionEngine
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
-from palimpzest.query.optimizer.cost_model import CostModel
-from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Dataset
 
 
-class StreamingSequentialExecution(ExecutionEngine):
+class StreamingQueryProcessor(QueryProcessor):
     """This class can be used for a streaming, record-based execution.
     Results are returned as an iterable that can be consumed by the caller."""
 
@@ -52,23 +50,9 @@ class StreamingSequentialExecution(ExecutionEngine):
         self.clear_cached_examples()
         start_time = time.time()
 
-        cost_model = CostModel()
-        optimizer = Optimizer(
-            policy=policy,
-            cost_model=cost_model,
-            no_cache=self.nocache,
-            verbose=self.verbose,
-            available_models=self.available_models,
-            allow_bonded_query=self.allow_bonded_query,
-            allow_conventional_query=self.allow_conventional_query,
-            allow_code_synth=self.allow_code_synth,
-            allow_token_reduction=self.allow_token_reduction,
-            allow_rag_reduction=self.allow_rag_reduction,
-            allow_mixtures=self.allow_mixtures,
-            optimization_strategy=self.optimization_strategy,
-        )
-
-        # Effectively always use the optimal strategy
+        # TODO: Do we need to re-initialize the optimizer here? 
+        # Effectively always use the optimal strategy   
+        optimizer = self.optimizer.deepcopy_clean_optimizer()
         plans = optimizer.optimize(dataset, policy)
         self.plan = plans[0]
         self.plan_stats = PlanStats(plan_id=self.plan.plan_id)
@@ -81,17 +65,18 @@ class StreamingSequentialExecution(ExecutionEngine):
             self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details) 
         print("Time for planning: ", time.time() - start_time)
         self.plan_generated = True
+        print("Generated plan:\n", self.plan)
         return self.plan
 
-    def execute(
-        self,
-        dataset: Dataset,
-        policy: Policy,
-    ):
+    def execute(self, dry_run: bool = False):
         start_time = time.time()
         # Always delete cache
         if not self.plan_generated:
-            self.generate_plan(dataset, policy)
+            self.generate_plan(self.dataset, self.policy)
+
+        if dry_run:
+            yield [], self.plan, self.plan_stats
+            return
 
         input_records = self.get_input_records()
         for idx, record in enumerate(input_records):
@@ -105,6 +90,7 @@ class StreamingSequentialExecution(ExecutionEngine):
 
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
+        assert isinstance(scan_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
         datasource = scan_operator.get_datasource()
         if not datasource:
             raise Exception("Data source not found")
@@ -118,9 +104,9 @@ class StreamingSequentialExecution(ExecutionEngine):
             candidate = DataRecord(schema=SourceRecord, source_id=idx)
             candidate.idx = idx
             candidate.get_item_fn = datasource.get_item
-            records, record_op_stats_lst = scan_operator(candidate)
-            input_records += records
-            record_op_stats += record_op_stats_lst
+            record_set = scan_operator(candidate)
+            input_records += record_set.data_records
+            record_op_stats += record_set.record_op_stats
 
         op_id = scan_operator.get_op_id()
         self.plan_stats.operator_stats[op_id].add_record_op_stats(
@@ -155,9 +141,9 @@ class StreamingSequentialExecution(ExecutionEngine):
                     break
             else:
                 for r in input_records:
-                    record_out, stats = operator(r)
-                    output_records += record_out
-                    record_op_stats_lst += stats
+                    record_set = operator(r)
+                    output_records += record_set.data_records
+                    record_op_stats_lst += record_set.record_op_stats
 
                 if isinstance(operator, FilterOp):
                     # delete all records that did not pass the filter

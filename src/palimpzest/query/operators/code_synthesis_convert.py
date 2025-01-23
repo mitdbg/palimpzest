@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from palimpzest.constants import Cardinality, GPT_4o_MODEL_CARD, Model
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
@@ -15,9 +15,9 @@ from palimpzest.utils.sandbox import API
 FieldName = str
 CodeName = str
 Code = str
-DataRecordDict = Dict[str, Any]
-Exemplar = Tuple[DataRecordDict, DataRecordDict]
-CodeEnsemble = Dict[CodeName, Code]
+DataRecordDict = dict[str, Any]
+Exemplar = tuple[DataRecordDict, DataRecordDict]
+CodeEnsemble = dict[CodeName, Code]
 
 
 class CodeSynthesisConvert(LLMConvert):
@@ -206,7 +206,7 @@ class CodeSynthesisConvert(LLMConvert):
         # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
         #       keep an eye out for a regression in code synth performance and revert if necessary
         # update operator's set of exemplars
-        exemplars = [(projected_candidate.as_dict(include_bytes=False), dr.as_dict(include_bytes=False)) for dr in drs]
+        exemplars = [(projected_candidate.to_dict(include_bytes=False), dr.to_dict(include_bytes=False)) for dr in drs]
         self.exemplars.extend(exemplars)
 
         # if we are allowed to cache exemplars across plan executions, add exemplars to cache
@@ -223,7 +223,7 @@ class CodeSynthesisConvert(LLMConvert):
 
     def convert(self, candidate: DataRecord, fields: list[str] | None = None) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
         # get the dictionary fields for the candidate
-        candidate_dict = candidate.as_dict(include_bytes=False, project_cols=self.depends_on)
+        candidate_dict = candidate.to_dict(include_bytes=False, project_cols=self.depends_on)
 
         # Check if code was already synthesized, or if we have at least one converted sample
         generation_stats = GenerationStats()
