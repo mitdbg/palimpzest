@@ -227,9 +227,9 @@ else:
     exit(1)
 
 # select optimization strategy and available models based on engine
-optimization_strategy, available_models = None, None
+optimizer_strategy, available_models = None, None
 if engine == "sentinel":
-    optimization_strategy = OptimizationStrategy.PARETO
+    optimizer_strategy = "pareto"
     available_models = get_models(include_vision=True)
 else:
     model_str_to_model = {
@@ -244,7 +244,7 @@ else:
         "mixtral": Model.LLAMA3_V,
         "llama": Model.LLAMA3_V,
     }
-    optimization_strategy = OptimizationStrategy.NONE
+    optimizer_strategy = "none"
     available_models = [model_str_to_model[model]] + [model_str_to_vision_model[model]]
 
 
@@ -283,7 +283,7 @@ config = QueryProcessorConfig(
     policy=policy,
     nocache=True,
     available_models=available_models,
-    optimization_strategy=optimization_strategy,
+    optimizer_strategy=optimizer_strategy,
     processing_strategy=args.processing_strategy,
     execution_strategy=args.execution_strategy,
     rank=rank,
