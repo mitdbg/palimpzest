@@ -58,6 +58,11 @@ class DataSourcePhysicalOp(PhysicalOperator):
         """
         raise NotImplementedError("Abstract method")
 
+    def get_datasource(self):
+        raise NotImplementedError("Abstract method")
+
+    def get_datasource_type(self):
+        raise NotImplementedError("Abstract method")
 
 class MarshalAndScanDataOp(DataSourcePhysicalOp):
     def naive_cost_estimates(
