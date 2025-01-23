@@ -1,7 +1,6 @@
 import time
-from concurrent.futures import ThreadPoolExecutor, wait
 
-from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, OptimizationStrategy
+from palimpzest.constants import OptimizationStrategy
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import SourceRecord
@@ -15,7 +14,7 @@ from palimpzest.query.execution.plan_executors.single_threaded_plan_execution im
     SequentialSingleThreadPlanExecutor,
 )
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
+from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.optimizer.cost_model import CostModel

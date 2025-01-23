@@ -5,7 +5,7 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.query.execution.execution_engine import ExecutionEngine
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
+from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.optimizer.plan import PhysicalPlan

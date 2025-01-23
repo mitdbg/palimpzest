@@ -7,7 +7,6 @@ from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.query.execution.execution_engine import ExecutionEngine
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.datasource import MarshalAndScanDataOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.plan import PhysicalPlan
