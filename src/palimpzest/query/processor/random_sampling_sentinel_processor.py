@@ -17,7 +17,8 @@ from palimpzest.query.operators.datasource import CacheScanDataOp, MarshalAndSca
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
-from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
+from palimpzest.query.optimizer.cost_model import CostModel,SampleBasedCostModel
+from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
@@ -512,7 +513,9 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         # TODO: explicitly pull up filters; for SIGMOD we can explicitly write plans w/filters pulled up
         # initialize the optimizer
         # TODO: Do we need to re-initialize the optimizer here? 
-        sentinel_plans = self.optimizer.optimize(dataset, policy)
+        optimizer = self.optimizer.deepcopy_clean()
+        optimizer.update_strategy(OptimizationStrategyType.SENTINEL)
+        sentinel_plans = optimizer.optimize(dataset, policy)
         sentinel_plan = sentinel_plans[0]
 
         return sentinel_plan
@@ -541,11 +544,11 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
 
         # construct the CostModel with any sample execution data we've gathered
         cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose, self.exp_name)
-        optimizer = self.optimizer.deepcopy_clean_optimizer().update_cost_model(cost_model)
+        optimizer = self.optimizer.deepcopy_clean().update_cost_model(cost_model)
         total_optimization_time = time.time() - execution_start_time
 
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_with_optimizer(self.dataset, self.policy, optimizer)
+        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, optimizer)
         all_records.extend(records)
         all_plan_stats.extend(plan_stats)
 

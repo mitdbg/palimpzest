@@ -193,8 +193,7 @@ class Optimizer:
             "conventional_fallback_model": get_conventional_fallback_model(self.available_models),
         }
 
-
-    def deepcopy_clean_optimizer(self):
+    def deepcopy_clean(self):
         optimizer = Optimizer(
             policy=self.policy,
             cost_model=CostModel(),
@@ -209,6 +208,10 @@ class Optimizer:
             use_final_op_quality=self.use_final_op_quality,
         )
         return optimizer
+    
+    def update_strategy(self, optimizer_strategy_type: OptimizationStrategyType):
+        self.optimization_strategy_type = optimizer_strategy_type
+        self.strategy = OptimizerStrategyRegistry.get_strategy(optimizer_strategy_type.value)
     
     def construct_group_tree(self, dataset_nodes: list[Set]) -> tuple[list[int], dict[str, Field], dict[str, set[str]]]:
         # get node, output_schema, and input_schema(if applicable)

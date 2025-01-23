@@ -32,7 +32,7 @@ class NoSentinelQueryProcessor(QueryProcessor):
             self.clear_cached_examples()
 
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_with_optimizer(self.dataset, self.policy, self.optimizer)
+        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, self.optimizer)
 
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)

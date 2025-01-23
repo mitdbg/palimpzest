@@ -52,7 +52,7 @@ class StreamingQueryProcessor(QueryProcessor):
 
         # TODO: Do we need to re-initialize the optimizer here? 
         # Effectively always use the optimal strategy   
-        optimizer = self.optimizer.deepcopy_clean_optimizer()
+        optimizer = self.optimizer.deepcopy_clean()
         plans = optimizer.optimize(dataset, policy)
         self.plan = plans[0]
         self.plan_stats = PlanStats(plan_id=self.plan.plan_id)
