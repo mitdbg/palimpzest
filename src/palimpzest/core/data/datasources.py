@@ -15,7 +15,16 @@ from papermage import Document
 
 from palimpzest import constants
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.schemas import File, ImageFile, Number, PDFFile, Schema, TextFile, WebPage, XLSFile
+from palimpzest.core.lib.schemas import (
+    DefaultSchema,
+    File,
+    ImageFile,
+    PDFFile,
+    Schema,
+    TextFile,
+    WebPage,
+    XLSFile,
+)
 from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
@@ -139,12 +148,21 @@ class FileSource(DataSource):
 
 
 class MemorySource(DataSource):
-    """MemorySource returns multiple objects that reflect contents of an in-memory Python list"""
+    """MemorySource returns multiple objects that reflect contents of an in-memory Python list
+    TODO(gerardo): Add support for other types of in-memory data structures (he has some code
+                   for subclassing MemorySource on his branch)
+    """
 
-    def __init__(self, vals: list[int | float], dataset_id: str):
-        # For the moment we assume that we are given a list of floats or ints, but someday it could be strings or something else
-        super().__init__(Number, dataset_id)
-        self.vals = vals
+    def __init__(self, vals: Any, dataset_id: str = "memory_input"):
+        if isinstance(vals, (str, int, float)):
+            self.vals = [vals]
+        elif isinstance(vals, tuple):
+            self.vals = list(vals)
+        else:
+            self.vals = vals
+        
+        schema = Schema.from_df(self.vals) if isinstance(self.vals, pd.DataFrame) else DefaultSchema
+        super().__init__(schema, dataset_id)
 
     def copy(self):
         return MemorySource(self.vals, self.dataset_id)
@@ -156,9 +174,14 @@ class MemorySource(DataSource):
         return sum([sys.getsizeof(self.get_item(idx)) for idx in range(len(self))])
 
     def get_item(self, idx: int) -> DataRecord:
-        value = self.vals[idx]
         dr = DataRecord(self.schema, source_id=idx)
-        dr.value = value
+        
+        if isinstance(self.vals, pd.DataFrame):
+            row = self.vals.iloc[idx]
+            for field_name in row.index:
+                setattr(dr, field_name, row[field_name])
+        else:
+            dr.value = self.vals[idx]
 
         return dr
 

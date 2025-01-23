@@ -6,7 +6,7 @@ import yaml
 
 from palimpzest import constants
 from palimpzest.config import Config
-from palimpzest.constants import PZ_DIR
+from palimpzest.constants import MAX_DATASET_ID_CHARS, PZ_DIR
 from palimpzest.core.data.datasources import (
     FileSource,
     HTMLFileDirectorySource,
@@ -17,6 +17,7 @@ from palimpzest.core.data.datasources import (
     UserSource,
     XLSFileDirectorySource,
 )
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class DataDirectorySingletonMeta(type):
@@ -134,11 +135,33 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         self._registry[dataset_id] = ("memory", vals)
         with open(self._dir + "/data/cache/registry.pkl", "wb") as f:
             pickle.dump(self._registry, f)
+    
+    # TODO(Jun): Consider to make dataset_id optional for all register_* methods
+    def get_or_register_memory_source(self, vals):
+        dataset_id = hash_for_id(str(vals), max_chars=MAX_DATASET_ID_CHARS)
+        if dataset_id in self._registry:
+            return self.get_registered_dataset(dataset_id)
+        else:
+            self.register_dataset(vals, dataset_id)
+        return self.get_registered_dataset(dataset_id)
 
     def register_user_source(self, src: UserSource, dataset_id: str):
         """Register a user source as a data source."""
         # user sources are always ephemeral
         self._registry[dataset_id] = ("user", src)
+
+    def get_or_register_local_source(self, dataset_id_or_path):
+        """Return a dataset from the registry."""
+        if dataset_id_or_path in self._registry:
+            return self.get_registered_dataset(dataset_id_or_path)
+        else:
+            if os.path.isfile(dataset_id_or_path):
+                self.register_local_file(dataset_id_or_path, dataset_id_or_path)
+            elif os.path.isdir(dataset_id_or_path):
+                self.register_local_directory(dataset_id_or_path, dataset_id_or_path)
+            else:
+                raise Exception(f"Path {dataset_id_or_path} is invalid. Does not point to a file or directory.")
+            return self.get_registered_dataset(dataset_id_or_path)
 
     def get_registered_dataset(self, dataset_id):
         """Return a dataset from the registry."""
@@ -247,7 +270,6 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
         self._cache[cache_id] = filename
 
     def exists(self, dataset_id):
-        print("Checking if exists", dataset_id, "in", self._registry)
         return dataset_id in self._registry
 
     def get_path(self, dataset_id):

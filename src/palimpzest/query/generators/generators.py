@@ -12,7 +12,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections import Counter
 from string import Formatter
-from typing import Any, Generic, Tuple, TypeVar
+from typing import Any, Generic, TypeVar
 
 from colorama import Fore, Style
 from openai import OpenAI
@@ -40,7 +40,7 @@ from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
 
 # DEFINITIONS
-GenerationOutput = Tuple[dict, str | None, GenerationStats]
+GenerationOutput = tuple[dict, str | None, GenerationStats]
 ContextType = TypeVar("ContextType")
 InputType = TypeVar("InputType")
 
@@ -145,7 +145,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
     def _generate_user_prompt(self, candidate: DataRecord, fields: list[str], **kwargs) -> str:
         """Returns a prompt based on the prompt strategy with instance-specific instructions."""
         # get context from input record (project_cols will be None if not provided in kwargs)
-        context = candidate.as_json_str(include_bytes=False, project_cols=kwargs.get("project_cols"))
+        context = candidate.to_json_str(include_bytes=False, project_cols=kwargs.get("project_cols"))
 
         # get filter condition for filter operations
         filter_condition = (

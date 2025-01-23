@@ -1082,7 +1082,7 @@ if __name__ == "__main__":
     # save record outputs
     record_jsons = []
     for record in records:
-        record_dict = record.as_dict()
+        record_dict = record.to_dict()
         if workload == "biodex":
             record_dict = {
                 k: v for k, v in record_dict.items() if k in ["pmid", "serious", "patientsex", "drugs", "reactions"]
