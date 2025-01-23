@@ -2,18 +2,19 @@ import time
 
 import pytest
 from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.policy import MaxQuality
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.rag_convert import RAGConvert
-from palimpzest.query.processor.nosentinel_processor import (
-    NoSentinelSequentialSingleThreadProcessor, 
-    NoSentinelPipelinedParallelProcessor
-)
-from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.query.optimizer.optimizer import Optimizer
-from palimpzest.policy import MaxQuality
 from palimpzest.query.optimizer.cost_model import CostModel
+from palimpzest.query.optimizer.optimizer import Optimizer
+from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.query.processor.nosentinel_processor import (
+    NoSentinelPipelinedParallelProcessor,
+    NoSentinelSequentialSingleThreadProcessor,
+)
+
 
 @pytest.mark.parametrize(
     argnames=("query_processor",),

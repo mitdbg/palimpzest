@@ -3,9 +3,9 @@
 from palimpzest.constants import Model
 from palimpzest.core.lib.schemas import TextFile
 from palimpzest.policy import MinCost
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.schemabuilder.schema_builder import SchemaBuilder
 from palimpzest.sets import Dataset
-from palimpzest.query.processor.config import QueryProcessorConfig
 
 data_path = "tests/pytest/data/"
 

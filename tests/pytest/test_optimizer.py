@@ -13,10 +13,10 @@ from palimpzest.query.operators.logical import ConvertScan, FilteredScan
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
+from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
 from palimpzest.sets import Dataset
 
-from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 
 class TestPrimitives:
     def test_group_id_equality(self, email_schema):
