@@ -18,7 +18,6 @@ from palimpzest.sets import Dataset
 from palimpzest.utils.model_helpers import get_models
 from ragatouille import RAGPretrainedModel
 
-
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
 FAR_AWAY_ADDRS = [

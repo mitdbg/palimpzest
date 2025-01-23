@@ -14,9 +14,10 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema, TextFile
 from palimpzest.policy import MaxQuality
-from palimpzest.sets import Dataset
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+from palimpzest.sets import Dataset
+
 
 class Papersnippet(TextFile):
     """Represents an excerpt from a scientific research paper, which potentially contains variables"""

@@ -11,9 +11,8 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import BooleanField, Field, ImageFilepathField, ListField, NumericField, StringField
 from palimpzest.core.lib.schemas import Schema, Table, TextFile, XLSFile
 from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
-from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.policy import MaxQuality, MinCost, MinTime
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 from palimpzest.utils.udfs import xls_to_tables
 from PIL import Image

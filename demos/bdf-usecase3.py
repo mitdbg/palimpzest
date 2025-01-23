@@ -16,8 +16,8 @@ from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import PDFFile, Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost
-from palimpzest.sets import Dataset
 from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.sets import Dataset
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env

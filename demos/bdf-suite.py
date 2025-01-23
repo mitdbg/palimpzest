@@ -15,9 +15,9 @@ from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import URL, File, PDFFile, Schema, Table, XLSFile
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 from palimpzest.utils import udfs
-from palimpzest.query.processor.config import QueryProcessorConfig
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env

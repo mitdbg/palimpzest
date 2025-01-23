@@ -7,9 +7,9 @@ from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import ImageFile, Number, PDFFile, TextFile
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 from tabulate import tabulate
-from palimpzest.query.processor.config import QueryProcessorConfig
 
 
 class ScientificPaper(PDFFile):
