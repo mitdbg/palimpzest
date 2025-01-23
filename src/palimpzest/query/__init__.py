@@ -41,20 +41,18 @@ from palimpzest.query.operators.logical import (
 from palimpzest.query.operators.physical import PhysicalOperator
 
 __all__ = [
-    # execute
-    "Execute",
-    # mab_sentinel_execution
+    # mab_sentinel_processor
     "MABSentinelPipelinedParallelProcessor",
     "MABSentinelPipelinedSingleThreadProcessor",
     "MABSentinelSequentialSingleThreadProcessor",
-    # nosentinel_execution
+    # nosentinel_processor
     "NoSentinelPipelinedParallelProcessor",
     "NoSentinelPipelinedSingleThreadProcessor",
     "NoSentinelSequentialSingleThreadProcessor",
-    # random_sampling_sentinel_execution
+    # random_sampling_sentinel_processor
     "RandomSamplingSentinelPipelinedParallelProcessor",
     "RandomSamplingSentinelSequentialSingleThreadProcessor",
-    # streaming_execution
+    # streaming_processor
     "StreamingQueryProcessor",
     # aggregate
     "AggregateOp",
