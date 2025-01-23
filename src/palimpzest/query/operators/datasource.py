@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from abc import ABC, abstractmethod
 
 from palimpzest.constants import (
     LOCAL_SCAN_TIME_PER_KB,
@@ -12,7 +13,7 @@ from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
-class DataSourcePhysicalOp(PhysicalOperator):
+class DataSourcePhysicalOp(PhysicalOperator, ABC):
     """
     Physical operators which implement DataSources require slightly more information
     in order to accurately compute naive cost estimates. Thus, we use a slightly
@@ -59,8 +60,9 @@ class DataSourcePhysicalOp(PhysicalOperator):
         raise NotImplementedError("Abstract method")
     
     # TODO: we need to revisit this to make get_datasource() unified for DataScan operators
+    @abstractmethod
     def get_datasource(self):
-        return self.datadir.get_registered_dataset(self.dataset_id)
+        raise NotImplementedError("Abstract method")
         
 
 class MarshalAndScanDataOp(DataSourcePhysicalOp):
@@ -196,3 +198,6 @@ class CacheScanDataOp(DataSourcePhysicalOp):
         record_set = DataRecordSet(records, record_op_stats_lst)
 
         return record_set
+
+    def get_datasource(self):
+        return self.datadir.get_cached_result(self.dataset_id)
