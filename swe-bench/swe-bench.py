@@ -82,68 +82,6 @@ def parse_files(input_string):
     matches = file_pattern.findall(input_string)
     files = {match[0].strip(): match[1].strip() for match in matches}
     return files
-    
-def generate_patch(candidate: DataRecord):
-    """
-    Generates a unified patch for changes between two multi-file code strings.
-
-    Args:
-        before_code (str): The "before" code string containing all files.
-        after_code (str): The "after" code string containing all files.
-
-    Returns:
-        str: A unified patch for all changes.
-    """
-
-    before_code = candidate.relevant_issue_code 
-    after_code = candidate.new_code
-
-    # Parse the before and after code into dictionaries
-    before_files = parse_files(before_code)
-    after_files = parse_files(after_code)
-
-    patch_lines = []
-
-    # Iterate through all files in the "before" code
-    for file_name, before_content in before_files.items():
-        # Get the corresponding content from the "after" code, default to the original if unchanged
-        after_content = after_files.get(file_name, before_content)
-
-        # Split the contents into lines
-        before_lines = before_content.replace('\\n', '\n').splitlines()
-        after_lines = after_content.replace('\\n', '\n').splitlines()
-
-        # Generate the diff -> becomes a generator object
-        diff = difflib.unified_diff(
-            before_lines,
-            after_lines,
-            fromfile=f"a/{file_name}",
-            tofile=f"b/{file_name}",
-            lineterm=""
-        )
-
-        # Append the diff to the patch
-        patch_lines.extend(diff)
-        patch_lines.append("")  # Add a blank line between files
-
-    # Handle any new files in the "after" code that were not in the "before" code
-    # for file_name, after_content in after_files.items():
-    #     if file_name not in before_files:
-    #         after_lines = after_content.splitlines()
-    #         diff = difflib.unified_diff(
-    #             [],
-    #             after_lines,
-    #             fromfile=f"a/{file_name}",
-    #             tofile=f"b/{file_name}",
-    #             lineterm=""
-    #         )
-    #         patch_lines.extend(diff)
-    #         patch_lines.append("")
-
-    patch_record = DataRecord(GithubCodePatch)
-    patch_record.model_patch = "\n".join(patch_lines)
-    patch_record.json = patch_record.model_patch
-    return patch_record
 
 def extract_relevant_fields(candidate: DataRecord):
     data = json.loads(candidate.contents)
@@ -216,7 +154,6 @@ if __name__ == "__main__":
 
     policy = pz.MaxQuality()
     execution_engine = pz.PipelinedParallelNoSentinelExecution
-    # execution_engine = pz.SequentialSingleThreadNoSentinelExecution 
     records, plan_stats = pz.Execute(plan, 
                                 policy=policy,
                                 nocache=True,
