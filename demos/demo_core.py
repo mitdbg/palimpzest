@@ -178,7 +178,7 @@ def get_task_config(task, datasetid):
     
     return root_set, cols, stat_path
 
-def execute_task(task, datasetid, processing_strategy, execution_strategy, optimizer_strategy, policy, verbose=False, profile=False):
+def execute_task(task, datasetid, policy, verbose=False, profile=False, processing_strategy="no_sentinel", execution_strategy="sequential", optimizer_strategy="pareto"):
     """Execute a task and return results"""
     root_set, cols, stat_path = get_task_config(task, datasetid)
     config = QueryProcessorConfig(
