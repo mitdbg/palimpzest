@@ -13,7 +13,6 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.plan import PhysicalPlan
 
-g
 
 class PipelinedParallelExecutionStrategy(ExecutionStrategy):
     """
