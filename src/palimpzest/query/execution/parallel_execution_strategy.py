@@ -113,7 +113,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
                 new_futures = []
                 for future in done_futures:
                     # get the result
-                    record_set, operator = future.result()
+                    record_set, operator, _ = future.result()
                     op_id = operator.get_op_id()
 
                     # decrement future from mapping of futures in-flight

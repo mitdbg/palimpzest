@@ -186,4 +186,5 @@ class PhysicalOperator:
         """
         record_set = operator(op_input)
 
-        return record_set, operator
+        return record_set, operator, op_input
+    
