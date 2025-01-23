@@ -3,10 +3,9 @@
 from palimpzest.constants import Model
 from palimpzest.core.lib.schemas import TextFile
 from palimpzest.policy import MinCost
-from palimpzest.query.execution.execute import Execute
-from palimpzest.query.execution.nosentinel_execution import NoSentinelSequentialSingleThreadExecution
 from palimpzest.schemabuilder.schema_builder import SchemaBuilder
 from palimpzest.sets import Dataset
+from palimpzest.query.processor.config import QueryProcessorConfig
 
 data_path = "tests/pytest/data/"
 
@@ -33,8 +32,7 @@ def test_dynamicschema_json():
         "The email is not quoting from a news article or an article written by someone outside of Enron"
     )
 
-    records, stats = Execute(
-        emails,
+    config = QueryProcessorConfig(
         policy=MinCost(),
         available_models=[Model.GPT_4o_MINI],
         num_samples=3,
@@ -44,8 +42,11 @@ def test_dynamicschema_json():
         allow_token_reduction=False,
         allow_rag_reduction=False,
         allow_mixtures=False,
-        execution_engine=NoSentinelSequentialSingleThreadExecution,
+        processing_strategy="no_sentinel",
+        execution_strategy="sequential",
+        optimizer_strategy="pareto",
     )
+    records, stats = emails.run(config=config)
 
     for rec in records:
         print(rec.as_dict())
@@ -65,8 +66,7 @@ def test_dynamicschema_yml():
         "The email is not quoting from a news article or an article written by someone outside of Enron"
     )
 
-    records, stats = Execute(
-        emails,
+    config = QueryProcessorConfig(
         policy=MinCost(),
         available_models=[Model.GPT_4o_MINI],
         num_samples=3,
@@ -76,8 +76,11 @@ def test_dynamicschema_yml():
         allow_token_reduction=False,
         allow_rag_reduction=False,
         allow_mixtures=False,
-        execution_engine=NoSentinelSequentialSingleThreadExecution,
+        processing_strategy="no_sentinel",
+        execution_strategy="sequential",
+        optimizer_strategy="pareto",
     )
+    records, stats = emails.run(config=config)
 
     for rec in records:
         print(rec.as_dict())

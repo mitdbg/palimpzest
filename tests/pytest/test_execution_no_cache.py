@@ -2,21 +2,24 @@ import time
 
 import pytest
 from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.query.execution.nosentinel_execution import (
-    NoSentinelPipelinedParallelExecution,
-    NoSentinelSequentialSingleThreadExecution,
-)
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.rag_convert import RAGConvert
-
+from palimpzest.query.processor.nosentinel_processor import (
+    NoSentinelSequentialSingleThreadProcessor, 
+    NoSentinelPipelinedParallelProcessor
+)
+from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.query.optimizer.optimizer import Optimizer
+from palimpzest.policy import MaxQuality
+from palimpzest.query.optimizer.cost_model import CostModel
 
 @pytest.mark.parametrize(
-    argnames=("execution_engine",),
+    argnames=("query_processor",),
     argvalues=[
-        pytest.param(NoSentinelSequentialSingleThreadExecution, id="seq-single-thread"),
-        pytest.param(NoSentinelPipelinedParallelExecution, id="parallel"),
+        pytest.param(NoSentinelSequentialSingleThreadProcessor, id="seq-single-thread"),
+        pytest.param(NoSentinelPipelinedParallelProcessor, id="parallel"),
     ]
 )
 class TestParallelExecutionNoCache:
@@ -92,17 +95,26 @@ class TestParallelExecutionNoCache:
         ],
         indirect=True,
     )
-    def test_execute_full_plan(self, mocker, execution_engine, dataset, physical_plan, expected_records, side_effect):
+
+    @pytest.fixture
+    def optimizer(self):
+        return Optimizer(policy=MaxQuality(), cost_model=CostModel())
+
+    @pytest.fixture
+    def config(self):
+        return QueryProcessorConfig(nocache=True)
+
+    def test_execute_full_plan(self, mocker, query_processor, dataset, optimizer, config, physical_plan, expected_records, side_effect):
         """
         This test executes the given
         """
         start_time = time.time()
 
         # fetch datasource
-        datasource = DataDirectory().get_registered_dataset(dataset)
+        dataset_source = DataDirectory().get_registered_dataset(dataset)
 
         # create execution instance
-        execution = execution_engine(datasource=datasource, nocache=True)
+        execution = query_processor(dataset=dataset_source, config=config, optimizer=optimizer)
 
         # manually set source_dataset_id
         execution.source_dataset_id = dataset

@@ -3,12 +3,7 @@ import os
 import pandas as pd
 import pytest
 from palimpzest.policy import MinCost
-from palimpzest.query.execution.execute import Execute
-from palimpzest.query.execution.nosentinel_execution import (
-    NoSentinelPipelinedParallelExecution,
-    NoSentinelPipelinedSingleThreadExecution,
-    NoSentinelSequentialSingleThreadExecution,
-)
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.utils.model_helpers import get_models
 from sklearn.metrics import precision_recall_fscore_support
 
@@ -158,13 +153,14 @@ def score_plan(dataset, records, policy_str=None, reopt=False) -> float:
 
 
 @pytest.mark.parametrize(
-    argnames=("execution_engine"),
+    argnames=("processing_strategy", "execution_strategy", "optimizer_strategy"),
     argvalues=[
-        pytest.param(NoSentinelSequentialSingleThreadExecution, id="seq-single-thread"),
-        pytest.param(NoSentinelPipelinedSingleThreadExecution, id="pipe-single-thread"),
-        pytest.param(NoSentinelPipelinedParallelExecution, id="pipe-parallel"),
+        pytest.param("no_sentinel", "sequential", "pareto", id="seq-single-thread"),
+        pytest.param("no_sentinel", "pipelined_single_thread", "pareto", id="pipe-single-thread"),
+        pytest.param("no_sentinel", "pipelined_parallel", "pareto", id="pipe-parallel"),
     ],
 )
+
 @pytest.mark.parametrize(
     argnames=("dataset", "workload"),
     argvalues=[
@@ -174,15 +170,14 @@ def score_plan(dataset, records, policy_str=None, reopt=False) -> float:
     ],
     indirect=True,
 )
-def test_workload(dataset, workload, execution_engine):
+def test_workload(dataset, workload, processing_strategy, execution_strategy, optimizer_strategy):
     # workload_to_dataset_size = {"enron": 1000, "real-estate": 100, "biofabric": 11}
     dataset_to_size = {"enron-eval-tiny": 10, "real-estate-eval-tiny": 5, "biofabric-tiny": 3}
     dataset_size = dataset_to_size[dataset]
     num_samples = int(0.05 * dataset_size) if dataset != "biofabric-tiny" else 1
 
     available_models = get_models(include_vision=True)
-    records, stats = Execute(
-        workload,
+    config = QueryProcessorConfig(
         policy=MinCost(),
         available_models=available_models,
         num_samples=num_samples,
@@ -190,8 +185,11 @@ def test_workload(dataset, workload, execution_engine):
         allow_bonded_query=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=execution_engine,
+        processing_strategy=processing_strategy,
+        execution_strategy=execution_strategy,
+        optimizer_strategy=optimizer_strategy,
     )
+    records, stats = workload.run(config=config)
 
     # NOTE: f1 score calculation will be low for biofabric b/c the
     #       evaluation function still checks against the full dataset's labels
