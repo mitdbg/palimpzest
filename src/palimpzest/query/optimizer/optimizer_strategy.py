@@ -207,7 +207,7 @@ class ConfidenceIntervalStrategy(OptimizationStrategy):
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
         # TODO: fix this to properly handle multiple potential plans
         raise Exception("NotImplementedError")
-        plans = self.get_confidence_interval_optimal_plans(final_group_id)
+        # plans = self.get_confidence_interval_optimal_plans(final_group_id)
     
 class AutoOptimizationStrategy(OptimizationStrategy):
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:

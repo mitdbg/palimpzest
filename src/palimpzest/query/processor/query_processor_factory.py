@@ -21,10 +21,8 @@ from palimpzest.query.processor.random_sampling_sentinel_processor import (
     RandomSamplingSentinelSequentialSingleThreadProcessor,
 )
 from palimpzest.query.processor.streaming_processor import StreamingQueryProcessor
-from palimpzest.sets import Set, Dataset
+from palimpzest.sets import Dataset, Set
 from palimpzest.utils.model_helpers import get_models
-from palimpzest.core.data.datasources import DataSource
-from palimpzest.datamanager.datamanager import DataDirectory
 
 
 class ProcessingStrategyType(Enum):

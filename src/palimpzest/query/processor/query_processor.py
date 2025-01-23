@@ -1,8 +1,7 @@
 from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 
-from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats, RecordOpStats
+from palimpzest.core.data.dataclasses import PlanStats, RecordOpStats
 from palimpzest.core.data.datasources import DataSource, ValidationDataSource
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.datamanager.datamanager import DataDirectory
@@ -15,7 +14,6 @@ from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset, Set
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.model_helpers import get_models
-
 
 
 class QueryProcessor:

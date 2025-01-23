@@ -1,8 +1,8 @@
+import json
 from dataclasses import dataclass, field
 
 from palimpzest.constants import Model
 from palimpzest.policy import MaxQuality, Policy
-import json
 
 
 # TODO: Separate out the config for the Optimizer, ExecutionStrategy, and QueryProcessor
