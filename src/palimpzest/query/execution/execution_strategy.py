@@ -1,7 +1,6 @@
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import list, tuple
 
 from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
