@@ -7,10 +7,13 @@ from typing import Any as TypingAny
 
 from palimpzest.constants import MAX_ROWS
 from palimpzest.core.lib.fields import (
+    BooleanField,
     BytesField,
     CallableField,
     Field,
+    FloatField,
     ImageBase64Field,
+    IntField,
     ListField,
     NumericField,
     StringField,
@@ -193,7 +196,7 @@ class Schema(metaclass=SchemaMetaclass):
                     dup_new_field_names.append(left_field_name)
 
         # Generate the schema class dynamically
-        attributes = {"__doc__": new_desc}
+        attributes = {"_desc": new_desc, "__doc__": new_desc}
         for field_name, field_type, field_desc in zip(new_field_names, new_field_types, new_field_descs):
             attributes[field_name] = (
                 field_type.__class__(desc=field_desc, element_type=field_type.element_type)
@@ -227,7 +230,7 @@ class Schema(metaclass=SchemaMetaclass):
                 new_field_descs.append(field._desc)
 
         # Generate the schema class dynamically
-        attributes = {"__doc__": new_desc}
+        attributes = {"_desc": new_desc, "__doc__": new_desc}
         for field_name, field_type, field_desc in zip(new_field_names, new_field_types, new_field_descs):
             attributes[field_name] = field_type.__class__(desc=field_desc)
 
@@ -244,16 +247,25 @@ class Schema(metaclass=SchemaMetaclass):
             return globals()[schema_name]
 
         # Create new schema only if it doesn't exist
-        new_schema = type(schema_name, (Schema,), {
-            '_desc': "Derived schema from DataFrame",
-            '__module__': Schema.__module__
-        })
+        # NOTE: we will not be able to infer more complicated types like ImageFilepathField
+        #       without some input from the user
+        # construct attributes for schema (i.e. its fields and metadata)
+        desc = "Schema derived from DataFrame"
+        attributes = {"_desc": desc, "__doc__": desc, "__module__": Schema.__module__}
+        for col, dtype in zip(df.columns, df.dtypes):
+            if dtype == "object":
+                attributes[col] = StringField(desc=col)
+            elif dtype == "bool":
+                attributes[col] = BooleanField(desc=col)
+            elif dtype == "int64":
+                attributes[col] = IntField(desc=col)
+            elif dtype == "float64":
+                attributes[col] = FloatField(desc=col)
+            else:
+                attributes[col] = Field(desc=col)
 
-        for col in df.columns:
-            setattr(new_schema, col, Field(
-                desc=f"{col}",
-                required=True
-            ))
+        # Create new schema only if it doesn't exist
+        new_schema = type(schema_name, (Schema,), attributes)
 
         # Store the schema class globally
         globals()[schema_name] = new_schema
@@ -271,6 +283,13 @@ class Schema(metaclass=SchemaMetaclass):
 ###################################################################################
 
 # First-level Schema's
+class DefaultSchema(Schema):
+    """Store context data."""
+
+    value = Field(desc="The context data.")
+
+
+
 class Download(Schema):
     """A download is a URL and the contents of the download."""
 
@@ -390,8 +409,3 @@ class PlotImage(ImageFile):
     """An image that contains a plot, such as a graph or chart."""
 
     plot_description = StringField(desc="A description of the plot")
-
-class DefaultSchema(Schema):
-    """Store context data."""
-
-    value = Field(desc="The context data.")

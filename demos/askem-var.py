@@ -66,7 +66,7 @@ if __name__ == "__main__":
                 st.write(strop)
 
         input_records = engine.get_input_records()
-        input_df = DataRecord.as_df(input_records)
+        input_df = DataRecord.to_df(input_records)
         print(input_df)
         
         variables = []

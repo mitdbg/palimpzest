@@ -139,7 +139,10 @@ class FileSource(DataSource):
 
 
 class MemorySource(DataSource):
-    """MemorySource returns multiple objects that reflect contents of an in-memory Python list"""
+    """MemorySource returns multiple objects that reflect contents of an in-memory Python list
+        TODO(gerardo): Add support for other types of in-memory data structures (he has some code
+                   for subclassing MemorySource on his branch)
+    """
 
     def __init__(self, vals: Any, dataset_id: str = "default_memory_input"):
         if isinstance(vals, (str, int, float)):

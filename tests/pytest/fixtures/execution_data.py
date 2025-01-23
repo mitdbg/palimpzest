@@ -52,7 +52,7 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
             time_per_record=1.0,
             cost_per_record=0.0,
             logical_op_id="scan1-logical",
-            record_state=scan_dr.as_dict(),
+            record_state=scan_dr.to_dict(),
             passed_operator=None,
             generated_fields=None,
         )
@@ -75,7 +75,7 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
                 time_per_record=1.0,
                 cost_per_record=1.0,
                 logical_op_id="convert1-logical",
-                record_state=convert_dr.as_dict(),
+                record_state=convert_dr.to_dict(),
                 passed_operator=None,
                 generated_fields=["foo", "bar"],
             )
@@ -103,7 +103,7 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
                 time_per_record=1.0,
                 cost_per_record=1.0,
                 logical_op_id="filter1-logical",
-                record_state=filter_dr.as_dict(),
+                record_state=filter_dr.to_dict(),
                 passed_operator=bool(source_idx % 2), # odd examples pass filter
                 generated_fields=None,
             )
@@ -161,7 +161,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             time_per_record=1.0,
             cost_per_record=0.0,
             logical_op_id="scan1-logical",
-            record_state=scan_dr.as_dict(),
+            record_state=scan_dr.to_dict(),
             passed_operator=None,
             generated_fields=None,
         )
@@ -181,7 +181,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             time_per_record=1.0,
             cost_per_record=1.0,
             logical_op_id="convert1-logical",
-            record_state=convert_dr.as_dict(),
+            record_state=convert_dr.to_dict(),
             passed_operator=None,
             generated_fields=["foo", "bar"],
         )
@@ -217,7 +217,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             time_per_record=1.0,
             cost_per_record=1.0,
             logical_op_id="filter1-logical",
-            record_state=filter_dr.as_dict(),
+            record_state=filter_dr.to_dict(),
             passed_operator=passed_operator,
             generated_fields=None,
         )
@@ -294,7 +294,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
             time_per_record=1.0,
             cost_per_record=0.0,
             logical_op_id="scan1-logical",
-            record_state=scan_dr.as_dict(),
+            record_state=scan_dr.to_dict(),
             passed_operator=None,
             generated_fields=None,
         )
@@ -318,7 +318,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     time_per_record=1.0,
                     cost_per_record=1.0,
                     logical_op_id="convert1-logical",
-                    record_state=convert_dr.as_dict(),
+                    record_state=convert_dr.to_dict(),
                     passed_operator=None,
                     generated_fields=["foo", "bar"],
                 )
@@ -360,7 +360,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     time_per_record=1.0,
                     cost_per_record=1.0,
                     logical_op_id="filter1-logical",
-                    record_state=filter_dr.as_dict(),
+                    record_state=filter_dr.to_dict(),
                     passed_operator=passed_operator,
                     generated_fields=None,
                 )
@@ -401,7 +401,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     time_per_record=1.0,
                     cost_per_record=1.0,
                     logical_op_id="filter2-logical",
-                    record_state=filter_dr.as_dict(),
+                    record_state=filter_dr.to_dict(),
                     passed_operator=passed_operator,
                     generated_fields=None,
                 )
@@ -427,7 +427,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     time_per_record=1.0,
                     cost_per_record=1.0,
                     logical_op_id="convert2-logical",
-                    record_state=convert_dr.as_dict(),
+                    record_state=convert_dr.to_dict(),
                     passed_operator=None,
                     generated_fields=["baz"],
                 )

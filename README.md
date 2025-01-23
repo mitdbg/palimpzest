@@ -65,7 +65,7 @@ policy = MinCost()
 results, execution_stats = Execute(dataset, policy)
 
 # Writing output to disk
-output_df = pd.DataFrame([r.as_dict() for r in results])[["date","sender","subject"]]
+output_df = pd.DataFrame([r.to_dict() for r in results])[["date","sender","subject"]]
 output_df.to_csv("july_holiday_emails.csv")
 ```
 

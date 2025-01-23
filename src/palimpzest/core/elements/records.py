@@ -105,7 +105,7 @@ class DataRecord:
 
 
     def __hash__(self):
-        return hash(self.as_json_str())
+        return hash(self.to_json_str())
 
 
     def __iter__(self):
@@ -248,23 +248,34 @@ class DataRecord:
             records.append(record)
 
         return records
-    
-    @staticmethod
-    def as_df(records: list[DataRecord]) -> pd.DataFrame:
-        return pd.DataFrame([record.as_dict() for record in records])
 
-    def as_json_str(self, include_bytes: bool = True, project_cols: list[str] | None = None):
+    @staticmethod
+    def to_df(records: list[DataRecord], fields_in_schema: bool = False) -> pd.DataFrame:
+        if len(records) == 0:
+            return pd.DataFrame()
+        if not fields_in_schema:
+            return pd.DataFrame([record.to_dict() for record in records])
+
+        fields = records[0].schema.field_names()
+        return pd.DataFrame([
+            {k: record[k] for k in fields}
+            for record in records
+        ])
+
+    def to_json_str(self, include_bytes: bool = True, project_cols: list[str] | None = None):
         """Return a JSON representation of this DataRecord"""
-        record_dict = self.as_dict(include_bytes, project_cols)
+        record_dict = self.to_dict(include_bytes, project_cols)
         record_dict = {
             field_name: self.schema.field_to_json(field_name, field_value)
             for field_name, field_value in record_dict.items()
         }
         return json.dumps(record_dict, indent=2)
 
-    def as_dict(self, include_bytes: bool = True, project_cols: list[str] | None = None):
+    def to_dict(self, include_bytes: bool = True, project_cols: list[str] | None = None):
         """Return a dictionary representation of this DataRecord"""
-        dct = self.field_values.copy()
+        # TODO(chjun): In case of numpy types, the json.dumps will fail. Convert to native types.
+        # Better ways to handle this.
+        dct = pd.Series(self.field_values).to_dict()
 
         if project_cols is not None and len(project_cols) > 0:
             project_field_names = set(field.split(".")[-1] for field in project_cols)

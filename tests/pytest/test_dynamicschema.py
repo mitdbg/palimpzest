@@ -48,7 +48,7 @@ def test_dynamicschema_json():
     )
 
     for rec in records:
-        print(rec.as_dict())
+        print(rec.to_dict())
 
 
 def test_dynamicschema_yml():
@@ -80,4 +80,4 @@ def test_dynamicschema_yml():
     )
 
     for rec in records:
-        print(rec.as_dict())
+        print(rec.to_dict())
