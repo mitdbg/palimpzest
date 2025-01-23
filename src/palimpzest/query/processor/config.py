@@ -35,9 +35,13 @@ class QueryProcessorConfig:
     allow_mixtures: bool = field(default=True)
     use_final_op_quality: bool = field(default=False)
 
-    def to_jsonstr(self):
+    def to_json_str(self):
         return json.dumps({
-            "policy": self.policy.to_jsonstr(),
+            "processing_strategy": self.processing_strategy,
+            "execution_strategy": self.execution_strategy,
+            "optimizer_strategy": self.optimizer_strategy,
+
+            "policy": self.policy.to_json_str(),
             "scan_start_idx": self.scan_start_idx,
             "num_samples": self.num_samples,
             "nocache": self.nocache,
