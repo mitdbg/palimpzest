@@ -21,8 +21,10 @@ from palimpzest.query.processor.random_sampling_sentinel_processor import (
     RandomSamplingSentinelSequentialSingleThreadProcessor,
 )
 from palimpzest.query.processor.streaming_processor import StreamingQueryProcessor
-from palimpzest.sets import Dataset
+from palimpzest.sets import Set, Dataset
 from palimpzest.utils.model_helpers import get_models
+from palimpzest.core.data.datasources import DataSource
+from palimpzest.datamanager.datamanager import DataDirectory
 
 
 class ProcessingStrategyType(Enum):
@@ -47,66 +49,64 @@ def convert_to_enum(enum_type: Type[Enum], value: str) -> Enum:
 class QueryProcessorFactory:
     PROCESSOR_MAPPING = {
         (ProcessingStrategyType.NO_SENTINEL, ExecutionStrategyType.SEQUENTIAL): 
-            lambda ds, opt, cfg: NoSentinelSequentialSingleThreadProcessor(datasource=ds, optimizer=opt, config=cfg),
+            NoSentinelSequentialSingleThreadProcessor,
         (ProcessingStrategyType.NO_SENTINEL, ExecutionStrategyType.PIPELINED_SINGLE_THREAD): 
-            lambda ds, opt, cfg: NoSentinelPipelinedSingleThreadProcessor(datasource=ds, optimizer=opt, config=cfg),
+            NoSentinelPipelinedSingleThreadProcessor,
         (ProcessingStrategyType.NO_SENTINEL, ExecutionStrategyType.PIPELINED_PARALLEL): 
-            lambda ds, opt, cfg: NoSentinelPipelinedParallelProcessor(datasource=ds, optimizer=opt, config=cfg),
+            NoSentinelPipelinedParallelProcessor,
         (ProcessingStrategyType.MAB_SENTINEL, ExecutionStrategyType.SEQUENTIAL):
-            lambda ds, opt, cfg: MABSentinelSequentialSingleThreadProcessor(datasource=ds, optimizer=opt, config=cfg),
+            MABSentinelSequentialSingleThreadProcessor,
         (ProcessingStrategyType.MAB_SENTINEL, ExecutionStrategyType.PIPELINED_PARALLEL):
-            lambda ds, opt, cfg: MABSentinelPipelinedParallelProcessor(datasource=ds, optimizer=opt, config=cfg),
+            MABSentinelPipelinedParallelProcessor,
         (ProcessingStrategyType.STREAMING, ExecutionStrategyType.SEQUENTIAL):
-            lambda ds, opt, cfg: StreamingQueryProcessor(datasource=ds, optimizer=opt, config=cfg),
+            StreamingQueryProcessor,
         (ProcessingStrategyType.STREAMING, ExecutionStrategyType.PIPELINED_PARALLEL):
-            lambda ds, opt, cfg: StreamingQueryProcessor(datasource=ds, optimizer=opt, config=cfg),
+            StreamingQueryProcessor,
         (ProcessingStrategyType.RANDOM_SAMPLING, ExecutionStrategyType.SEQUENTIAL):
-            lambda ds, opt, cfg: RandomSamplingSentinelSequentialSingleThreadProcessor(datasource=ds, optimizer=opt, config=cfg),
+            RandomSamplingSentinelSequentialSingleThreadProcessor,
         (ProcessingStrategyType.RANDOM_SAMPLING, ExecutionStrategyType.PIPELINED_PARALLEL):
-            lambda ds, opt, cfg: RandomSamplingSentinelPipelinedParallelProcessor(datasource=ds, optimizer=opt, config=cfg),
+            RandomSamplingSentinelPipelinedParallelProcessor,
     }
 
-    @staticmethod
+    @classmethod
     def create_processor(
-        datasource: Dataset,
+        cls,
+        dataset: Set,
         config: QueryProcessorConfig | None = None,
+        **kwargs
     ) -> QueryProcessor:
         """
         Creates a QueryProcessor with specified processing and execution strategies.
 
         Args:
-            datasource: The data source to process
-            processing_strategy: How to generate/optimize query plans and execute them
-            execution_strategy: How to execute the plans
-            optimizer_strategy: How to find the optimal plan
+            dataset: The dataset to process
             config: Additional configuration parameters:
         """
         if config is None:
             config = QueryProcessorConfig()
 
-        # intialize the config
-        config = QueryProcessorFactory.config_validation_and_normalization(config)
-        processing_strategy, execution_strategy, optimizer_strategy = QueryProcessorFactory.normalize_strategies(config)
-        optimizer = QueryProcessorFactory._create_optimizer(optimizer_strategy, config)
+        config = cls._config_validation_and_normalization(config)
+        processing_strategy, execution_strategy, optimizer_strategy = cls._normalize_strategies(config)
+        optimizer = cls._create_optimizer(optimizer_strategy, config)
 
-        # Get the appropriate processor based on strategy combination
         processor_key = (processing_strategy, execution_strategy)
-        processor_factory = QueryProcessorFactory.PROCESSOR_MAPPING.get(processor_key)
-        if processor_factory is None:
+        processor_cls = cls.PROCESSOR_MAPPING.get(processor_key)
+        
+        if processor_cls is None:
             raise ValueError(f"Unsupported combination of processing strategy {processing_strategy} "
-                           f"and execution strategy {execution_strategy}")
+                        f"and execution strategy {execution_strategy}")
 
-        return processor_factory(datasource, optimizer, config)
+        return processor_cls(dataset=dataset, optimizer=optimizer, config=config, **kwargs)
 
-    @staticmethod
-    def create_and_run_processor(datasource: Dataset, config: QueryProcessorConfig):
+    @classmethod
+    def create_and_run_processor(cls, dataset: Dataset, config: QueryProcessorConfig, **kwargs):
         # TODO(Jun): Consider to use cache here.
-        processor = QueryProcessorFactory.create_processor(datasource, config=config)
+        processor = cls.create_processor(dataset=dataset, config=config, **kwargs)
         return processor.execute()
 
     #TODO(Jun): The all avaliable plans could be generated earlier and outside Optimizer.
-    @staticmethod
-    def _create_optimizer(optimizer_strategy: OptimizationStrategyType, config: QueryProcessorConfig) -> Optimizer:
+    @classmethod
+    def _create_optimizer(cls, optimizer_strategy: OptimizationStrategyType, config: QueryProcessorConfig) -> Optimizer:
         available_models = getattr(config, 'available_models', []) or get_models(include_vision=True)
         
         if config.policy is None:
@@ -126,8 +126,8 @@ class QueryProcessorFactory:
             use_final_op_quality=config.use_final_op_quality
         )
 
-    @staticmethod
-    def normalize_strategies(config: QueryProcessorConfig):
+    @classmethod
+    def _normalize_strategies(cls, config: QueryProcessorConfig):
         processing_strategy, execution_strategy, optimizer_strategy = config.processing_strategy, config.execution_strategy, config.optimizer_strategy
         
         if isinstance(processing_strategy, str):
@@ -150,8 +150,8 @@ class QueryProcessorFactory:
                                     The supported strategies are: {OptimizationStrategyType.__members__.keys()}""") from e
         return processing_strategy, execution_strategy, optimizer_strategy
 
-    @staticmethod
-    def config_validation_and_normalization(config: QueryProcessorConfig):
+    @classmethod
+    def _config_validation_and_normalization(cls, config: QueryProcessorConfig):
         if config.policy is None:
             raise ValueError("Policy is required for optimizer")
 
@@ -164,3 +164,4 @@ class QueryProcessorFactory:
         config.available_models = available_models
 
         return config
+
