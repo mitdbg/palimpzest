@@ -12,7 +12,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections import Counter
 from string import Formatter
-from typing import Any, Generic, Tuple, TypeVar
+from typing import Any, Generic, TypeVar
 
 from colorama import Fore, Style
 from openai import OpenAI
@@ -40,7 +40,7 @@ from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
 
 # DEFINITIONS
-GenerationOutput = Tuple[dict, str | None, GenerationStats]
+GenerationOutput = tuple[dict, str | None, GenerationStats]
 ContextType = TypeVar("ContextType")
 InputType = TypeVar("InputType")
 
