@@ -92,11 +92,8 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor):
 
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
-        datasource = (
-            source_operator.get_datasource()
-            if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
+        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
+        datasource = source_operator.get_datasource()
         datasource_len = len(datasource)
 
         # Calculate total work units - each record needs to go through each operator
@@ -272,11 +269,8 @@ class NoSentinelPipelinedSinglelProcessor(NoSentinelQueryProcessor, PipelinedSin
 
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
-        datasource = (
-            source_operator.get_datasource()
-            if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
+        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
+        datasource = source_operator.get_datasource()
         datasource_len = len(datasource)
 
         # Calculate total work units - each record needs to go through each operator
@@ -468,11 +462,8 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
 
     #     # get handle to DataSource and pre-compute its size
     #     source_operator = plan.operators[0]
-    #     datasource = (
-    #         source_operator.get_datasource()
-    #         if isinstance(source_operator, MarshalAndScanDataOp)
-    #         else self.datadir.get_cached_result(source_operator.dataset_id)
-    #     )
+    #     assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
+    #     datasource = source_operator.get_datasource()
     #     datasource_len = len(datasource)
 
     #     # Calculate total work units - each record needs to go through each operator

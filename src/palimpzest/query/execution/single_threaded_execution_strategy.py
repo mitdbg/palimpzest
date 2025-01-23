@@ -5,7 +5,7 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
+from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
@@ -48,11 +48,8 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
 
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
-        datasource = (
-            source_operator.get_datasource()
-            if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
+        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
+        datasource = source_operator.get_datasource()
         datasource_len = len(datasource)
 
         # initialize processing queues for each operation
@@ -186,11 +183,8 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
-        datasource = (
-            source_operator.get_datasource()
-            if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
+        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
+        datasource = source_operator.get_datasource()
         datasource_len = len(datasource)
 
         # initialize processing queues for each operation
