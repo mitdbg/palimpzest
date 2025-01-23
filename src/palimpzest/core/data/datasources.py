@@ -151,7 +151,6 @@ class MemorySource(DataSource):
             self.vals = list(vals)
         else:
             self.vals = vals
-
         schema = Schema.from_df(self.vals) if isinstance(self.vals, pd.DataFrame) else DefaultSchema
         super().__init__(schema, dataset_id)
 
@@ -166,7 +165,6 @@ class MemorySource(DataSource):
 
     def get_item(self, idx: int) -> DataRecord:
         dr = DataRecord(self.schema, source_id=idx)
-
         if isinstance(self.vals, pd.DataFrame):
             row = self.vals.iloc[idx]
             for field_name in row.index:

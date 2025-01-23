@@ -5,11 +5,11 @@ from typing import Any
 
 import pandas as pd
 
-from palimpzest.constants import DERIVED_SCHEMA_PREFIX, FROM_DF_PREFIX
+from palimpzest.constants import FROM_DF_PREFIX
 from palimpzest.core.data.dataclasses import RecordOpStats
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema
-from palimpzest.utils.hash_helpers import hash_for_id, hash_for_temp_schema
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class DataRecord:

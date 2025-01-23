@@ -36,18 +36,6 @@ class PromptStrategy(str, Enum):
     COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
 
 
-class OptimizationStrategy(str, Enum):
-    """
-    OptimizationStrategy determines which (set of) plan(s) the Optimizer
-    will return to the Execution layer.
-    """
-    GREEDY = "greedy"
-    CONFIDENCE_INTERVAL = "confidence-interval"
-    PARETO = "pareto" 
-    SENTINEL = "sentinel"
-    NONE = "none"
-
-
 class AggFunc(str, Enum):
     COUNT = "count"
     AVERAGE = "average"

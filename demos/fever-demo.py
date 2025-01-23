@@ -4,6 +4,8 @@ import os
 import random
 from pathlib import Path
 
+from ragatouille import RAGPretrainedModel
+
 from palimpzest.constants import Model, OptimizationStrategy
 from palimpzest.core.data.datasources import ValidationDataSource
 from palimpzest.core.elements.records import DataRecord
@@ -21,7 +23,6 @@ from palimpzest.query import (
 )
 from palimpzest.sets import Dataset
 from palimpzest.utils.model_helpers import get_models
-from ragatouille import RAGPretrainedModel
 
 
 class FeverClaimsSchema(Schema):
