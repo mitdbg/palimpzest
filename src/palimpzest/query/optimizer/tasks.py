@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.core.data.dataclasses import PlanCost
 from palimpzest.policy import Policy
 from palimpzest.query.optimizer.cost_model import BaseCostModel
+from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.primitives import Expression, Group
 from palimpzest.query.optimizer.rules import ImplementationRule, Rule, TransformationRule
 

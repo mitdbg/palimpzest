@@ -1,7 +1,7 @@
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List, Tuple
+from typing import list, tuple
 
 from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
@@ -42,7 +42,7 @@ class ExecutionStrategy(ABC):
         plan: PhysicalPlan,
         num_samples: int | float = float("inf"),
         workers: int = 1
-    ) -> Tuple[List[DataRecord], PlanStats]:
+    ) -> tuple[list[DataRecord], PlanStats]:
         """Execute a single plan according to strategy"""
         pass
 
@@ -50,15 +50,29 @@ class ExecutionStrategy(ABC):
     @abstractmethod
     def _should_stop_execution(
         self,
-        records: List[DataRecord],
-        plan_stats: List[PlanStats]
+        records: list[DataRecord],
+        plan_stats: list[PlanStats]
     ) -> bool:
         """Override to implement early stopping logic"""
-        return False
+        raise NotImplementedError("Early stopping logic not implemented")
 
+    # TODO(chjun): use _create_execution_stats for execution stats setup.
+    ## aggregate plan stats
+    # aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)
+
+    # # add sentinel records and plan stats (if captured) to plan execution data
+    # execution_stats = ExecutionStats(
+    #     execution_id=self.execution_id(),
+    #     plan_stats=aggregate_plan_stats,
+    #     total_execution_time=time.time() - execution_start_time,
+    #     total_execution_cost=sum(
+    #         list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats.values()))
+    #     ),
+    #     plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
+    # )
     def _create_execution_stats(
         self,
-        plan_stats: List[PlanStats],
+        plan_stats: list[PlanStats],
         start_time: float
     ) -> ExecutionStats:
         """Create execution statistics"""
@@ -68,11 +82,4 @@ class ExecutionStrategy(ABC):
             total_execution_time=time.time() - start_time,
             total_execution_cost=sum(ps.total_cost for ps in plan_stats)
         )
-    
-    def _should_stop_execution(
-        self,
-        records: List[DataRecord],
-        plan_stats: List[PlanStats]
-    ) -> bool:
-        """Override to implement early stopping logic"""
-        return False
+
