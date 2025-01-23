@@ -174,7 +174,7 @@ class QueryProcessor:
 
         return all_sample_execution_data, return_records, all_plan_stats
     
-    def _execute_strategy(
+    def _execute_best_plan(
         self,
         dataset: Set,
         policy: Policy,
@@ -197,7 +197,7 @@ class QueryProcessor:
         # return the output records and plan stats
         return records, [plan_stats]
     
-    def _execute_with_optimizer(
+    def _execute_with_strategy(
         self,
         dataset: Dataset,
         policy: Policy,
@@ -206,9 +206,9 @@ class QueryProcessor:
     ) -> tuple[list[DataRecord], list[PlanStats]]:
         records, plan_stats = [], []
         if optimizer.optimization_strategy_type == OptimizationStrategyType.CONFIDENCE_INTERVAL:
-            records, plan_stats = self._execute_confidence_interval_strategy(dataset, policy, optimizer)
+            records, plan_stats = self._execute_confidence_interval_strategy(dataset, policy, optimizer, execution_data)
         else:
-            records, plan_stats = self._execute_strategy(dataset, policy, optimizer)
+            records, plan_stats = self._execute_best_plan(dataset, policy, optimizer, execution_data)
         return records, plan_stats
 
 
