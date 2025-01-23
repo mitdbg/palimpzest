@@ -85,7 +85,7 @@ class TogetherHFAdaptor(HFModel):
         # print("Stop procedure", stop_default)
         self.kwargs = {
             "temperature": 0.0,
-            "max_tokens": 512, # 8192
+            "max_tokens": 2048,
             "top_p": 1,
             "top_k": 20,
             "repetition_penalty": 1,

@@ -210,7 +210,7 @@ class OpenAIWrapper(DSPyInterfaceWrapper):
     ):
 
         super().__init__(model_name)
-        max_tokens = 4096
+        max_tokens = 8192 #4096
         self.model = dspy.OpenAI(
             model=self.model_name,
             api_key=api_key,
@@ -586,7 +586,7 @@ class OpenAIVisionWrapper(ImageTextGenerator):
                         "content": content,
                     }
                 ],
-                "max_tokens": 4000,
+                "max_tokens": 8192 #4000,
                 "temperature": 0.0,
                 "logprobs": True,
             }

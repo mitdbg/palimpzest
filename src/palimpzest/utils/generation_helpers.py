@@ -9,6 +9,7 @@ def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
     This function parses an LLM response which is supposed to output a JSON object
     and optimistically searches for the substring containing the JSON object.
     """
+
     if not answer.strip().startswith("{"):
         # Find the start index of the actual JSON string
         # assuming the prefix is followed by the JSON object/array
@@ -28,6 +29,11 @@ def getJsonFromAnswer(answer: str) -> Dict[str, Any]:
     # Handle weird escaped values. I am not sure why the model
     # is returning these, but the JSON parser can't take them
     answer = answer.replace(r"\_", "_")
+
+    # Remove variable quantities of escape chars for new line and double quotes
+    answer = re.sub(r"\\+n", r"\n", answer)
+    answer = re.sub(r'\\+"', r'\"', answer)
+
     answer = answer.replace("\\n", "\n")
     # Remove https and http prefixes to not conflict with comment detection
     # Handle comments in the JSON response. Use regex from // until end of line

@@ -67,7 +67,7 @@ class CustomGenerator(BaseGenerator):
         model = None
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             openai_key = get_api_key("OPENAI_API_KEY")
-            max_tokens = 4096
+            max_tokens = 16000 #4096
             model = dspy.OpenAI(
                 model=self.model_name,
                 api_key=openai_key,
@@ -249,7 +249,8 @@ class DSPyGenerator(BaseGenerator):
         if self.model_name in [Model.GPT_3_5.value, Model.GPT_4.value]:
             openai_key = get_api_key("OPENAI_API_KEY")
             max_tokens = (
-                4096 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 150
+                # 4096 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 150
+                16000 if self.prompt_strategy == PromptStrategy.DSPY_COT_QA else 150
             )
             model = dspy.OpenAI(
                 model=self.model_name,
@@ -478,7 +479,7 @@ class ImageTextGenerator(BaseGenerator):
                             "content": content,
                         }
                     ],
-                    "max_tokens": 4000,
+                    "max_tokens": 16000,
                     "temperature": 0.0,
                     "logprobs": True,
                 }
