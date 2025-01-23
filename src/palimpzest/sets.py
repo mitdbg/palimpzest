@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import pandas as pd
 from typing import Callable
 
 import pandas as pd
@@ -123,6 +124,7 @@ class Set:
         return self.schema.json_schema()
 
 
+
 class Dataset(Set):
     """
     A Dataset is the intended abstraction for programmers to interact with when manipulating Sets.
@@ -136,27 +138,13 @@ class Dataset(Set):
     previously cached computation by providing it as a `source` to some future Dataset.
     """
 
-    # TODO(Jun): Auto assign schema based on the source type    
-    def __init__(self, source: str | list | pd.DataFrame | DataSource | Dataset, schema: Schema = TextFile, *args, **kwargs):
+    def __init__(self, source: str | list | pd.DataFrame | DataSource, schema: Schema | None = None, *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
-        if isinstance(source, str):
-            try:
-                source = DataDirectory().get_or_register_local_source(source)
-            except Exception as e:
-                raise Exception(f"Invalid source path: {source}") from e
-        elif isinstance(source, pd.DataFrame):
-            schema = Schema.from_df(source)
-            source = DataDirectory().get_or_register_memory_source(source)
-        elif isinstance(source, list):
-            schema = DefaultSchema
-            source = DataDirectory().get_or_register_memory_source(source)
-        elif not isinstance(source, (DataSource, Set)):
-            raise Exception(f"Invalid source type: {type(source)}, We only support DataSource, Dataset, pd.DataFrame, list, and str")
-
+        source = DataDirectory().get_or_register_dataset(source) if isinstance(source, (str, list, pd.DataFrame)) else source
+        if schema is None:
+            schema = Schema.from_df(source) if isinstance(source, pd.DataFrame) else DefaultSchema
         # intialize class
         super().__init__(source, schema, *args, **kwargs)
-
-        self._processor_cache = {}
 
     def copy(self) -> Dataset:
         source_copy = self._source.copy()

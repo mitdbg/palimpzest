@@ -15,16 +15,7 @@ from papermage import Document
 
 from palimpzest import constants
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.schemas import (
-    DefaultSchema,
-    File,
-    ImageFile,
-    PDFFile,
-    Schema,
-    TextFile,
-    WebPage,
-    XLSFile,
-)
+from palimpzest.core.lib.schemas import File, ImageFile, Number, PDFFile, Schema, TextFile, WebPage, XLSFile, DefaultSchema
 from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
@@ -149,18 +140,17 @@ class FileSource(DataSource):
 
 class MemorySource(DataSource):
     """MemorySource returns multiple objects that reflect contents of an in-memory Python list
-    TODO(gerardo): Add support for other types of in-memory data structures (he has some code
+        TODO(gerardo): Add support for other types of in-memory data structures (he has some code
                    for subclassing MemorySource on his branch)
     """
 
-    def __init__(self, vals: Any, dataset_id: str = "memory_input"):
+    def __init__(self, vals: Any, dataset_id: str = "default_memory_input"):
         if isinstance(vals, (str, int, float)):
             self.vals = [vals]
         elif isinstance(vals, tuple):
             self.vals = list(vals)
         else:
             self.vals = vals
-        
         schema = Schema.from_df(self.vals) if isinstance(self.vals, pd.DataFrame) else DefaultSchema
         super().__init__(schema, dataset_id)
 
@@ -175,7 +165,6 @@ class MemorySource(DataSource):
 
     def get_item(self, idx: int) -> DataRecord:
         dr = DataRecord(self.schema, source_id=idx)
-        
         if isinstance(self.vals, pd.DataFrame):
             row = self.vals.iloc[idx]
             for field_name in row.index:

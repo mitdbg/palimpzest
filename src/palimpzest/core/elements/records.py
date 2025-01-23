@@ -218,9 +218,9 @@ class DataRecord:
         elif isinstance(source_id, int):
             updated_source_id = str(source_id)
         return f"{FROM_DF_PREFIX}_{updated_source_id}"
-    
+
     @staticmethod
-    def from_df(df: pd.DataFrame, schema: Schema = None, source_id: int | str | None = None) -> list[DataRecord]:
+    def from_df(df: pd.DataFrame, schema: Schema | None = None, source_id: int | str | None = None) -> list[DataRecord]:
         """Create a list of DataRecords from a pandas DataFrame
         
         Args:
@@ -273,7 +273,8 @@ class DataRecord:
 
     def to_dict(self, include_bytes: bool = True, project_cols: list[str] | None = None):
         """Return a dictionary representation of this DataRecord"""
-        # In case of numpy types, the json.dumps will fail. Convert to native types.
+        # TODO(chjun): In case of numpy types, the json.dumps will fail. Convert to native types.
+        # Better ways to handle this.
         dct = pd.Series(self.field_values).to_dict()
 
         if project_cols is not None and len(project_cols) > 0:
