@@ -838,7 +838,7 @@ class MABSentinelSequentialSingleThreadProcessor(MABSentinelQueryProcessor, Sequ
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         SequentialSingleThreadExecutionStrategy(
-            scan_start_idx=self.can_start_idx,
+            scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
             nocache=self.nocache,
@@ -854,7 +854,7 @@ class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, Pipelined
     def __init__(self, *args, **kwargs):
         MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
         PipelinedParallelExecutionStrategy(
-            scan_start_idx=self.can_start_idx,
+            scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
             nocache=self.nocache,
@@ -870,7 +870,7 @@ class MABSentinelPipelinedSingleThreadProcessor(MABSentinelQueryProcessor, Pipel
     def __init__(self, *args, **kwargs):
         MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
         PipelinedSingleThreadExecutionStrategy(
-            scan_start_idx=self.can_start_idx,
+            scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
             nocache=self.nocache,

@@ -575,7 +575,7 @@ class RandomSamplingSentinelSequentialSingleThreadProcessor(RandomSamplingSentin
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         SequentialSingleThreadExecutionStrategy(
-            scan_start_idx=self.can_start_idx,
+            scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
             verbose=self.verbose
@@ -589,7 +589,7 @@ class RandomSamplingSentinelPipelinedParallelProcessor(RandomSamplingSentinelQue
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         PipelinedParallelExecutionStrategy(
-            scan_start_idx=self.can_start_idx,
+            scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
             verbose=self.verbose
@@ -603,7 +603,7 @@ class RandomSamplingSentinelPipelinedSingleThreadProcessor(RandomSamplingSentine
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         PipelinedSingleThreadExecutionStrategy(
-            scan_start_idx=self.can_start_idx,
+            scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
             verbose=self.verbose
