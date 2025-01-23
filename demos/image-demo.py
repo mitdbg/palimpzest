@@ -11,7 +11,7 @@ from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import ImageFile
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality
-from palimpzest.query import Execute, NoSentinelSequentialSingleThreadExecution
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 from PIL import Image
 
@@ -50,8 +50,13 @@ if __name__ == "__main__":
     print("Starting image task")
     policy = MaxQuality()
     plan = build_image_plan(datasetid)
-    engine = NoSentinelSequentialSingleThreadExecution
-    records, execution_stats = Execute(plan, policy=policy, nocache=no_cache, execution_engine=engine, verbose=True)
+    config = QueryProcessorConfig(
+        policy=policy,
+        nocache=no_cache,
+        verbose=True,
+        processing_strategy="no_sentinel"
+    )
+    records, execution_stats = plan.run(config)
 
     print("Obtained records", records)
     imgs, breeds = [], []
