@@ -154,9 +154,13 @@ class SentinelStrategy(OptimizationStrategy):
 
 
 class NoOptimizationStrategy(OptimizationStrategy):
+    """
+    NoOptimizationStrategy is used to intentionally construct a PhysicalPlan without applying any
+    logical transformations or optimizations.
+    """
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
         raise NotImplementedError("No optimization strategy selected")
-    
+
 
 class ConfidenceIntervalStrategy(OptimizationStrategy):
     def _get_confidence_interval_optimal_plans(self, groups: dict, group_id: int) -> list[PhysicalPlan]:
