@@ -16,8 +16,8 @@ from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import PDFFile, Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost
-from palimpzest.query import Execute, StreamingSequentialExecution
 from palimpzest.sets import Dataset
+from palimpzest.query.processor.config import QueryProcessorConfig
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env
@@ -60,16 +60,17 @@ def run_workload():
 
     output = references
     # engine = NoSentinelExecution
-    engine = StreamingSequentialExecution
     policy = MinCost()
-    iterable = Execute(
-        output,
+    config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=engine,
+        processing_strategy="streaming",
+        execution_strategy="sequential",
+        optimizer_strategy="pareto",
     )
+    iterable = output.run(config)
 
     tables = []
     statistics = []
@@ -102,17 +103,18 @@ if run_pz:
 
     # output = references
     # engine = NoSentinelExecution
-    engine = StreamingSequentialExecution
     # policy = MinCost()
     policy = MaxQuality()
-    iterable = Execute(
-        output,
+    config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=engine,
+        processing_strategy="streaming",
+        execution_strategy="sequential",
+        optimizer_strategy="pareto",
     )
+    iterable = output.run(config)
 
     references = []
     statistics = []
