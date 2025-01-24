@@ -45,13 +45,13 @@ list_of_numbers = [1, 2, 3, 4, 5]
 
 if __name__ == "__main__":
     run_pz = True
-    dataset = "askem"
+    dataset = "askem-tiny"
     file_path = "testdata/askem-tiny/"
 
     if run_pz:
         # reference, plan, stats = run_workload()
         df_input = pd.DataFrame(dict_of_excerpts)
-        excerpts = Dataset(df_input)
+        excerpts = Dataset(dataset, schema=Papersnippet)
         output = excerpts.convert(
             Variable, desc="A variable used or introduced in the context", cardinality=Cardinality.ONE_TO_MANY
         ).filter("The value name is 'a'", depends_on="name")
@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 st.write(strop)
 
         input_records = processor.get_input_records()
-        input_df = DataRecord.as_df(input_records)
+        input_df = DataRecord.to_df(input_records)
         print(input_df)
 
         variables = []
