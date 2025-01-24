@@ -4,6 +4,7 @@ from functools import partial
 from typing import Callable
 
 import numpy as np
+
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
 from palimpzest.core.data.datasources import ValidationDataSource
@@ -11,13 +12,17 @@ from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.policy import Policy
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
-from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
+from palimpzest.query.execution.single_threaded_execution_strategy import (
+    PipelinedSingleThreadExecutionStrategy,
+    SequentialSingleThreadExecutionStrategy,
+)
 from palimpzest.query.operators.convert import ConvertOp, LLMConvert
 from palimpzest.query.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
+from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
@@ -305,17 +310,6 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         return DataRecordSet(out_records, [])
 
 
-    def execute_op_wrapper(self, operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
-        """
-        Wrapper function around operator execution which also and returns the operator.
-        This is useful in the parallel setting(s) where operators are executed by a worker pool,
-        and it is convenient to return the op_id along with the computation result.
-        """
-        record_set = operator(op_input)
-
-        return record_set, operator
-
-
     def execute_op_set(self, candidates, op_set):
         # TODO: post-submission we will need to modify this to:
         # - submit all candidates for aggregate operators
@@ -326,7 +320,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             futures = []
             for candidate in candidates:
                 for operator in op_set:
-                    future = executor.submit(self.execute_op_wrapper, operator, candidate)
+                    future = executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate)
                     futures.append(future)
 
             # compute output record_set for each (operator, candidate) pair
@@ -523,15 +517,15 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         # TODO: explicitly pull up filters; for SIGMOD we can explicitly write plans w/filters pulled up
         # initialize the optimizer
         # TODO: Do we need to re-initialize the optimizer here? 
-        optimizer = self.optimizer.deepcopy_clean_optimizer()
-        # use optimizer to generate sentinel plans
+        optimizer = self.optimizer.deepcopy_clean()
+        optimizer.update_strategy(OptimizationStrategyType.SENTINEL)
         sentinel_plans = optimizer.optimize(dataset, policy)
         sentinel_plan = sentinel_plans[0]
 
         return sentinel_plan
 
 
-    def execute(self, dry_run: bool = False):
+    def execute(self):
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
@@ -554,11 +548,12 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
 
         # construct the CostModel with any sample execution data we've gathered
         cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose, self.exp_name)
-        optimizer = self.optimizer.deepcopy_clean_optimizer().update_cost_model(cost_model)
+        optimizer = self.optimizer.deepcopy_clean()
+        optimizer.update_cost_model(cost_model)
         total_optimization_time = time.time() - execution_start_time
 
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_with_optimizer(self.dataset, self.policy, optimizer)
+        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, optimizer)
         all_records.extend(records)
         all_plan_stats.extend(plan_stats)
 
@@ -583,23 +578,40 @@ class RandomSamplingSentinelSequentialSingleThreadProcessor(RandomSamplingSentin
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.strategy = SequentialSingleThreadExecutionStrategy(
-            scan_start_idx=self.can_start_idx,
+        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        SequentialSingleThreadExecutionStrategy.__init__(
+            self,
+            scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
             verbose=self.verbose
         )
 
 
-class RandomSamplingSentinelPipelinedProcessor(RandomSamplingSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
+class RandomSamplingSentinelPipelinedParallelProcessor(RandomSamplingSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
     """
     This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.strategy = PipelinedParallelExecutionStrategy(
-            scan_start_idx=self.can_start_idx,
+        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        PipelinedParallelExecutionStrategy.__init__(
+            self,
+            scan_start_idx=self.scan_start_idx,
+            datadir=self.datadir,
+            max_workers=self.max_workers,
+            verbose=self.verbose
+        )
+
+
+class RandomSamplingSentinelPipelinedSingleThreadProcessor(RandomSamplingSentinelQueryProcessor, PipelinedSingleThreadExecutionStrategy):
+    """
+    This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
+    """
+    def __init__(self, *args, **kwargs):
+        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        PipelinedSingleThreadExecutionStrategy.__init__(
+            self,
+            scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
             verbose=self.verbose

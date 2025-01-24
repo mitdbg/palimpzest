@@ -4,6 +4,7 @@ from functools import partial
 from typing import Callable
 
 import numpy as np
+
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
@@ -16,7 +17,8 @@ from palimpzest.query.operators.datasource import CacheScanDataOp, MarshalAndSca
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
-from palimpzest.query.optimizer.cost_model import CostModel, SampleBasedCostModel
+from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
+from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
@@ -487,17 +489,6 @@ class MABSentinelQueryProcessor(QueryProcessor):
         return DataRecordSet(out_records, [])
 
 
-    def execute_op_wrapper(self, operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
-        """
-        Wrapper function around operator execution which also and returns the operator.
-        This is useful in the parallel setting(s) where operators are executed by a worker pool,
-        and it is convenient to return the op_id along with the computation result.
-        """
-        record_set = operator(op_input)
-
-        return record_set, operator, op_input
-
-
     def execute_op_set(self, op_candidate_pairs):
         # TODO: post-submission we will need to modify this to:
         # - submit all candidates for aggregate operators
@@ -507,7 +498,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
             # create futures
             futures = []
             for operator, candidate in op_candidate_pairs:
-                future = executor.submit(self.execute_op_wrapper, operator, candidate)
+                future = executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate)
                 futures.append(future)
 
             # compute output record_set for each (operator, candidate) pair
@@ -783,14 +774,15 @@ class MABSentinelQueryProcessor(QueryProcessor):
         # initialize the optimizer
         # use optimizer to generate sentinel plans
         # TODO: Do we need to re-initialize the optimizer here? 
-        self.optimizer.update_cost_model(CostModel())
-        sentinel_plans = self.optimizer.optimize(dataset, policy)
+        optimizer = self.optimizer.deepcopy_clean()
+        optimizer.update_strategy(OptimizationStrategyType.SENTINEL)
+        sentinel_plans = optimizer.optimize(dataset, policy)
         sentinel_plan = sentinel_plans[0]
 
         return sentinel_plan
 
 
-    def execute(self, dry_run: bool = False):
+    def execute(self):
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
@@ -811,14 +803,16 @@ class MABSentinelQueryProcessor(QueryProcessor):
         all_plan_stats = [plan_stats]
         all_records = []
 
+        # (re-)initialize the optimizer
+        optimizer = self.optimizer.deepcopy_clean()
+
         # construct the CostModel with any sample execution data we've gathered
         cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose)
-        # (re-)initialize the optimizer
-        optimizer = self.deepcopy_clean_optimizer().update_cost_model(cost_model)
+        optimizer.update_cost_model(cost_model)
         total_optimization_time = time.time() - execution_start_time
 
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_with_optimizer(self.dataset, self.policy, optimizer)
+        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, optimizer)
         all_records.extend(records)
         all_plan_stats.extend(plan_stats)
 
@@ -844,9 +838,10 @@ class MABSentinelSequentialSingleThreadProcessor(MABSentinelQueryProcessor, Sequ
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.strategy = SequentialSingleThreadExecutionStrategy(
-            scan_start_idx=self.can_start_idx,
+        super().__init__(self, *args, **kwargs)
+        SequentialSingleThreadExecutionStrategy.__init__(
+            self,
+            scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
             nocache=self.nocache,
@@ -861,8 +856,9 @@ class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, Pipelined
     """
     def __init__(self, *args, **kwargs):
         MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
-        self.strategy = PipelinedParallelExecutionStrategy(
-            scan_start_idx=self.can_start_idx,
+        PipelinedParallelExecutionStrategy.__init__(
+            self,
+            scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
             nocache=self.nocache,

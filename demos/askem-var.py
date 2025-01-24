@@ -15,7 +15,8 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema, TextFile
 from palimpzest.policy import MaxQuality
-from palimpzest.query import StreamingSequentialExecution
+from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 from palimpzest.sets import Dataset
 
 
@@ -55,26 +56,28 @@ if __name__ == "__main__":
             Variable, desc="A variable used or introduced in the context", cardinality=Cardinality.ONE_TO_MANY
         ).filter("The value name is 'a'", depends_on="name")
         policy = MaxQuality()
-        engine = StreamingSequentialExecution(
+        config = QueryProcessorConfig(
             policy=policy,
             nocache=True,
-            verbose=True,
-            allow_code_synth=False,
-            allow_token_reduction=False,
-            allow_bonded_query=True,
+            verbose=False,
+            processing_strategy="streaming",
+            execution_strategy="sequential",
+            optimizer_strategy="pareto",
         )
-        engine.generate_plan(output, policy)
-        print("Generated plan:\n", engine.plan)
+        processor = QueryProcessorFactory.create_processor(excerpts, config)
+        plan = processor.generate_plan(output, policy)
+        print(processor.plan)
+
         with st.container():
             st.write("### Executed plan: \n")
             # st.write(" " + str(plan).replace("\n", "  \n "))
-            for idx, op in enumerate(engine.plan.operators):
+            for idx, op in enumerate(processor.plan.operators):
                 strop = f"{idx + 1}. {str(op)}"
                 strop = strop.replace("\n", "  \n")
                 st.write(strop)
 
-        input_records = engine.get_input_records()
-        input_df = DataRecord.to_df(input_records, fields_in_schema=True)
+        input_records = processor.get_input_records()
+        input_df = DataRecord.as_df(input_records)
         print(input_df)
 
         variables = []
@@ -84,14 +87,14 @@ if __name__ == "__main__":
         for idx, record in enumerate(input_records):
             print(f"idx: {idx}\n vars: {vars}")
             index = idx
-            vars = engine.execute_opstream(engine.plan, record)
+            vars = processor.execute_opstream(processor.plan, record)
             if idx == len(input_records) - 1:
                 total_plan_time = time.time() - start_time
-                engine.plan_stats.finalize(total_plan_time)
+                processor.plan_stats.finalize(total_plan_time)
 
-            statistics.append(engine.plan_stats)
-            intermediate_vars = DataRecord.to_df(vars, fields_in_schema=True)
-            print(intermediate_vars)
+            record_time = time.time()
+            statistics.append(processor.plan_stats)
+
             for var in vars:
                 # ref.key = ref.first_author.split()[0] + ref.title.split()[0] + str(ref.year)
                 try:

@@ -16,7 +16,7 @@ from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import URL, File, PDFFile, Schema, Table, XLSFile
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality
-from palimpzest.query import Execute, StreamingSequentialExecution
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 from palimpzest.utils import udfs
 
@@ -94,7 +94,7 @@ class CaseData(Schema):
 
 
 @st.cache_resource()
-def extract_supplemental(engine, policy):
+def extract_supplemental(processing_strategy, execution_strategy, optimizer_strategy, policy):
     papers = Dataset("biofabric-pdf", schema=ScientificPaper)
     paper_urls = papers.convert(URL, desc="The DOI url of the paper")
     html_doi = paper_urls.convert(File, udf=udfs.url_to_file)
@@ -107,15 +107,17 @@ def extract_supplemental(engine, policy):
     xls = tables.convert(XLSFile, udf=udfs.file_to_xls)
     patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
 
-    # output = patient_tables
-    iterable = Execute(
-        patient_tables,
+    config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=engine,
+        processing_strategy=processing_strategy,
+        execution_strategy=execution_strategy,
+        optimizer_strategy=optimizer_strategy,
     )
+    iterable = patient_tables.run(config)
+
 
     tables = []
     statistics = []
@@ -128,7 +130,7 @@ def extract_supplemental(engine, policy):
 
 
 @st.cache_resource()
-def integrate_tables(engine, policy):
+def integrate_tables(processing_strategy, execution_strategy, optimizer_strategy, policy):
     xls = Dataset("biofabric-tiny", schema=XLSFile)
     patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
     patient_tables = patient_tables.filter("The table contains biometric information about the patient")
@@ -136,14 +138,16 @@ def integrate_tables(engine, policy):
         CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
     )
 
-    iterable = Execute(
-        case_data,
+    config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=engine,
+        processing_strategy=processing_strategy,
+        execution_strategy=execution_strategy,
+        optimizer_strategy=optimizer_strategy,
     )
+    iterable = case_data.run(config)
 
     tables = []
     statistics = []
@@ -156,22 +160,23 @@ def integrate_tables(engine, policy):
 
 
 @st.cache_resource()
-def extract_references(engine, policy):
+def extract_references(processing_strategy, execution_strategy, optimizer_strategy, policy):
     papers = Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
     papers = papers.filter("The paper mentions phosphorylation of Exo1")
     references = papers.convert(
         Reference, desc="A paper cited in the reference section", cardinality=Cardinality.ONE_TO_MANY
     )
 
-    output = references
-    iterable = Execute(
-        output,
+    config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=engine,
+        processing_strategy=processing_strategy,
+        execution_strategy=execution_strategy,
+        optimizer_strategy=optimizer_strategy,
     )
+    iterable = references.run(config)
 
     tables = []
     statistics = []
@@ -204,17 +209,18 @@ if run_pz:
 
     # output = references
     # engine = NoSentinelExecution
-    engine = StreamingSequentialExecution
     # policy = MinCost()
     policy = MaxQuality()
-    iterable = Execute(
-        output,
+    config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=engine,
+        processing_strategy="streaming",
+        execution_strategy="sequential",
+        optimizer_strategy="pareto",
     )
+    iterable = output.run(config)
 
     references = []
     statistics = []

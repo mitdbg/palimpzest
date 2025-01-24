@@ -131,10 +131,10 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         record_set = DataRecordSet(records, record_op_stats_lst)
 
         return record_set
-
+    
     def get_datasource(self):
         return self.datadir.get_registered_dataset(self.dataset_id)
-
+    
     def get_datasource_type(self):
         return self.datadir.get_registered_dataset_type(self.dataset_id)
 

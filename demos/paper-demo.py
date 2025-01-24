@@ -166,8 +166,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--executor",
         type=str,
-        help="The plan executor to use. One of sequential, pipelined, parallel",
-        default="parallel",
+        help="The plan executor to use. One of sequential, pipelined_single_thread, pipelined_parallel",
+        default="sequential",
     )
     parser.add_argument(
         "--policy",
@@ -245,25 +245,24 @@ if __name__ == "__main__":
         plan = plan.filter("The rows of the table contain the patient age")
         plan = plan.convert(CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY)
 
+    config = QueryProcessorConfig(
+        nocache=True,
+        verbose=verbose,
+        policy=policy,
+        execution_strategy=args.executor)
 
-    config = QueryProcessorConfig(nocache=True, policy=policy, max_workers=10)
-    # # Option1: Create a basic processor
-    # # We could pass this process around to different service if needed.
-    # from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+    # Option 1: Use QueryProcessorFactory to create a processor
     # processor = QueryProcessorFactory.create_processor(
     #     datasource=plan,
-    #     processing_strategy="no_sentinel",
-    #     execution_strategy="sequential",
-    #     optimizer_strategy="pareto", 
+    #     processing_strategy="no_sentinel",  
+    #     execution_strategy="sequential", 
+    #     optimizer_strategy="pareto",
     #     config=config
     # )
     # records, execution_stats = processor.execute()
 
-    # Option2: Use the new interface
-    records, execution_stats = plan.run(config, 
-                                        optimizer_strategy="pareto", 
-                                        execution_strategy="sequential", 
-                                        processing_strategy="no_sentinel")
+    # Option 2: Use Dataset.run() to run the plan.
+    records, execution_stats = plan.run(config)
 
     # save statistics
     if profile:

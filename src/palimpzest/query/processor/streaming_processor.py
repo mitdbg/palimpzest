@@ -52,7 +52,7 @@ class StreamingQueryProcessor(QueryProcessor):
 
         # TODO: Do we need to re-initialize the optimizer here? 
         # Effectively always use the optimal strategy   
-        optimizer = self.optimizer.deepcopy_clean_optimizer()
+        optimizer = self.optimizer.deepcopy_clean()
         plans = optimizer.optimize(dataset, policy)
         self.plan = plans[0]
         self.plan_stats = PlanStats(plan_id=self.plan.plan_id)
@@ -68,15 +68,15 @@ class StreamingQueryProcessor(QueryProcessor):
         print("Generated plan:\n", self.plan)
         return self.plan
 
-    def execute(self, dry_run: bool = False):
+    def execute(self):
         start_time = time.time()
         # Always delete cache
         if not self.plan_generated:
             self.generate_plan(self.dataset, self.policy)
 
-        if dry_run:
-            yield [], self.plan, self.plan_stats
-            return
+        # if dry_run:
+        #     yield [], self.plan, self.plan_stats
+        #     return
 
         input_records = self.get_input_records()
         for idx, record in enumerate(input_records):

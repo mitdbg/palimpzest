@@ -22,7 +22,7 @@ class OptimizationStrategyType(str, Enum):
 
 class OptimizationStrategy(ABC):
     @abstractmethod
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan | SentinelPlan]:
+    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan] | list[SentinelPlan]:
         """Strategy decides how to search through the groups for optimal plan(s)"""
         pass
 
@@ -33,7 +33,7 @@ class OptimizationStrategy(ABC):
 
 
 class GreedyStrategy(OptimizationStrategy):
-    def _get_greedy_physical_plan(self, groups: dict, group_id: int) -> list[PhysicalPlan]:
+    def _get_greedy_physical_plan(self, groups: dict, group_id: int) -> PhysicalPlan:
         """
         Return the best plan with respect to the user provided policy.
         """
@@ -52,7 +52,7 @@ class GreedyStrategy(OptimizationStrategy):
         # add this operator to best physical plan and return
         return PhysicalPlan.from_ops_and_sub_plan([best_phys_expr.operator], input_best_phys_plan, best_phys_expr.plan_cost)
 
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
         return [self._get_greedy_physical_plan(groups, final_group_id)]
 
 
@@ -102,15 +102,14 @@ class ParetoStrategy(OptimizationStrategy):
 
         return pareto_optimal_plans
     
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
         # compute all of the pareto optimal physical plans
         plans = self._get_candidate_pareto_physical_plans(groups, final_group_id, policy)
 
         # adjust plans' plan_cost.quality to reflect only the quality of the final operator
-        # if self.use_final_op_quality:
-        # TODO(JUN): use_final_op_quality=true by default. Think about how to make this configurable
-        for plan in plans:
-            plan.plan_cost.quality = plan.plan_cost.op_estimates.quality
+        if use_final_op_quality:
+            for plan in plans:
+                plan.plan_cost.quality = plan.plan_cost.op_estimates.quality
 
         # filter pareto optimal plans for ones which satisfy policy constraint (if at least one of them does)
         # import pdb; pdb.set_trace()
@@ -151,14 +150,15 @@ class SentinelStrategy(OptimizationStrategy):
         # add this operator set to best physical plan and return
         return SentinelPlan.from_ops_and_sub_plan([phys_op_set], best_phys_subplan)
 
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[SentinelPlan]:
+    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[SentinelPlan]:
         return [self._get_sentinel_plan(groups, final_group_id)]
 
 
 class NoOptimizationStrategy(GreedyStrategy):
     """
     NoOptimizationStrategy is used to intentionally construct a PhysicalPlan without applying any
-    logical transformations or optimizations.
+    logical transformations or optimizations. It uses the same get_optimal_plans logic as the
+    GreedyOptimizationStrategy.
     """
 
 
@@ -204,14 +204,13 @@ class ConfidenceIntervalStrategy(OptimizationStrategy):
 
         return best_plans
 
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
         # TODO: fix this to properly handle multiple potential plans
         raise Exception("NotImplementedError")
         # plans = self._get_confidence_interval_optimal_plans(final_group_id)
 
-
 class AutoOptimizationStrategy(OptimizationStrategy):
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
         raise NotImplementedError("Auto optimization strategy not implemented")
 
 

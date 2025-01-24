@@ -1,14 +1,19 @@
+import json
 from dataclasses import dataclass, field
 
 from palimpzest.constants import Model
 from palimpzest.policy import MaxQuality, Policy
-import json
 
 
 # TODO: Separate out the config for the Optimizer, ExecutionStrategy, and QueryProcessor
+# TODO: Add description for each field.
 @dataclass
 class QueryProcessorConfig:
     """Shared context for query processors"""
+    processing_strategy: str = field(default="no_sentinel")
+    execution_strategy: str = field(default="sequential")
+    optimizer_strategy: str = field(default="pareto")
+
     policy: Policy = field(default_factory=MaxQuality)
     scan_start_idx: int = field(default=0)
     num_samples: int = field(default=float("inf"))
@@ -32,6 +37,9 @@ class QueryProcessorConfig:
 
     def to_json_str(self):
         return json.dumps({
+            "processing_strategy": self.processing_strategy,
+            "execution_strategy": self.execution_strategy,
+            "optimizer_strategy": self.optimizer_strategy,
             "policy": self.policy.to_json_str(),
             "scan_start_idx": self.scan_start_idx,
             "num_samples": self.num_samples,
@@ -50,4 +58,4 @@ class QueryProcessorConfig:
             "allow_rag_reduction": self.allow_rag_reduction,
             "allow_mixtures": self.allow_mixtures,
             "use_final_op_quality": self.use_final_op_quality,
-        }, indent=4)
+        }, indent=2)

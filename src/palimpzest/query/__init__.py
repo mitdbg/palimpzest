@@ -28,11 +28,11 @@ from palimpzest.query.processor.mab_sentinel_processor import (
 )
 from palimpzest.query.processor.nosentinel_processor import (
     NoSentinelPipelinedParallelProcessor,
-    NoSentinelPipelinedSinglelProcessor,
+    NoSentinelPipelinedSingleThreadProcessor,
     NoSentinelSequentialSingleThreadProcessor,
 )
 from palimpzest.query.processor.random_sampling_sentinel_processor import (
-    RandomSamplingSentinelPipelinedProcessor,
+    RandomSamplingSentinelPipelinedParallelProcessor,
     RandomSamplingSentinelSequentialSingleThreadProcessor,
 )
 from palimpzest.query.processor.streaming_processor import StreamingQueryProcessor
@@ -43,10 +43,10 @@ __all__ = [
     "MABSentinelSequentialSingleThreadProcessor",
     # nosentinel_processor
     "NoSentinelPipelinedParallelProcessor",
-    "NoSentinelPipelinedSinglelProcessor",
+    "NoSentinelPipelinedSingleThreadProcessor",
     "NoSentinelSequentialSingleThreadProcessor",
     # random_sampling_sentinel_processor
-    "RandomSamplingSentinelPipelinedProcessor",
+    "RandomSamplingSentinelPipelinedParallelProcessor",
     "RandomSamplingSentinelSequentialSingleThreadProcessor",
     # streaming_processor
     "StreamingQueryProcessor",

@@ -23,7 +23,8 @@ class NoSentinelQueryProcessor(QueryProcessor):
     for coordinating optimization and execution.
     """
 
-    def execute(self, dry_run: bool = False):
+    # TODO: Consider to support dry_run.
+    def execute(self):
         execution_start_time = time.time()
 
         # if nocache is True, make sure we do not re-use codegen examples
@@ -31,7 +32,7 @@ class NoSentinelQueryProcessor(QueryProcessor):
             self.clear_cached_examples()
 
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_with_optimizer(self.dataset, self.policy, self.optimizer)
+        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, self.optimizer)
 
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)
@@ -50,13 +51,14 @@ class NoSentinelQueryProcessor(QueryProcessor):
         return records, execution_stats
 
 
-class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor):
+class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, SequentialSingleThreadExecutionStrategy):
     """
     This class performs non-sample based execution while executing plans in a sequential, single-threaded fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.strategy = SequentialSingleThreadExecutionStrategy(
+        NoSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        SequentialSingleThreadExecutionStrategy.__init__(
+            self,
             scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
@@ -191,9 +193,6 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor):
                 if not self.nocache:
                     for record in records:
                         if getattr(record, "passed_operator", True):
-                            if operator.target_cache_id is None:
-                                print("No cache ID for operator", operator)
-                                breakpoint()
                             self.datadir.append_cache(operator.target_cache_id, record)
 
                 # update processing_queues or output_records
@@ -226,13 +225,14 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor):
         return output_records, plan_stats
 
 
-class NoSentinelPipelinedSinglelProcessor(NoSentinelQueryProcessor, PipelinedSingleThreadExecutionStrategy):
+class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, PipelinedSingleThreadExecutionStrategy):
     """
     This class performs non-sample based execution while executing plans in a pipelined, parallel fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.strategy = PipelinedParallelExecutionStrategy(
+        NoSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        PipelinedSingleThreadExecutionStrategy.__init__(
+            self,
             scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
@@ -424,8 +424,9 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
     This class performs non-sample based execution while executing plans in a pipelined, parallel fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.strategy = PipelinedParallelExecutionStrategy(
+        NoSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        PipelinedParallelExecutionStrategy.__init__(
+            self,
             scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
@@ -490,7 +491,7 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
     #                 futures = list(not_done_futures)
 
     #                 for future in done_futures:
-    #                     record_set, operator = future.result()
+    #                     record_set, operator, _ = future.result()
     #                     op_id = operator.get_op_id()
     #                     op_idx = next(i for i, op in enumerate(plan.operators) if op.get_op_id() == op_id)
     #                     next_op_id = plan.operators[op_idx + 1].get_op_id() if op_idx + 1 < len(plan.operators) else None
@@ -522,14 +523,14 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
     #                         candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
     #                         candidate.idx = current_scan_idx
     #                         candidate.get_item_fn = datasource.get_item
-    #                         futures.append(executor.submit(self.execute_op_wrapper, operator, candidate))
+    #                         futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate))
     #                         current_scan_idx += 1
     #                         keep_scanning_source_records = current_scan_idx < datasource_len and source_records_scanned < num_samples
                         
     #                     elif len(processing_queues[op_id]) > 0:
     #                         # Submit task for next record in queue
     #                         input_record = processing_queues[op_id].pop(0)
-    #                         futures.append(executor.submit(self.execute_op_wrapper, operator, input_record))
+    #                         futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, operator, input_record))
 
     #                 # Check if we're done
     #                 still_processing = any([len(queue) > 0 for queue in processing_queues.values()])

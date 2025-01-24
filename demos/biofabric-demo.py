@@ -14,12 +14,7 @@ from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import URL, Schema, Table, WebPage, XLSFile
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost
-from palimpzest.query import (
-    Execute,
-    NoSentinelPipelinedParallelExecution,
-    NoSentinelPipelinedSingleThreadExecution,
-    NoSentinelSequentialSingleThreadExecution,
-)
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 from palimpzest.utils import udfs
 
@@ -75,7 +70,7 @@ if __name__ == "__main__":
     parser.add_argument("--from_xls", action="store_true", help="Start from pre-downloaded excel files", default=False)
     parser.add_argument("--experiment", type=str, help="The experiment to run", default="matching")
     parser.add_argument("--policy", type=str, help="The policy to use", default="cost")
-    parser.add_argument("--executor", type=str, help="The plan executor to use", default="parallel")
+    parser.add_argument("--executor", type=str, help="The plan executor to use. The avaliable executors are: sequential, pipelined_parallel, pipelined_single_thread", default="pipelined_parallel")
 
     args = parser.parse_args()
     no_cache = args.no_cache
@@ -84,16 +79,6 @@ if __name__ == "__main__":
     policy = args.policy
     experiment = args.experiment
     executor = args.executor
-    execution_engine = None
-    if executor == "sequential":
-        execution_engine = NoSentinelSequentialSingleThreadExecution
-    elif executor == "pipelined":
-        execution_engine = NoSentinelPipelinedSingleThreadExecution
-    elif executor == "parallel":
-        execution_engine = NoSentinelPipelinedParallelExecution
-    else:
-        print("Executor not supported for this demo")
-        exit(1)
 
     if no_cache:
         DataDirectory().clear_cache(keep_registry=True)
@@ -143,14 +128,15 @@ if __name__ == "__main__":
         )
         output = case_data
 
-    tables, plan, stats = Execute(
-        output,
+    config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=execution_engine,
+        processing_strategy="no_sentinel",
+        execution_strategy=executor,
     )
+    tables, plan, stats = output.run(config)
 
     print_table(tables)
     print(plan)

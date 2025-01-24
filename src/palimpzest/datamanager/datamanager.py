@@ -1,12 +1,13 @@
 import os
 import pickle
 from threading import Lock
+
 import pandas as pd
 import yaml
 
 from palimpzest import constants
 from palimpzest.config import Config
-from palimpzest.constants import PZ_DIR, DEFAULT_DATASET_ID_CHARS, MAX_DATASET_ID_CHARS
+from palimpzest.constants import DEFAULT_DATASET_ID_CHARS, MAX_DATASET_ID_CHARS, PZ_DIR
 from palimpzest.core.data.datasources import (
     DataSource,
     FileSource,

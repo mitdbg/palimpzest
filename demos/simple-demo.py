@@ -6,11 +6,6 @@ import time
 from demo_core import execute_task, format_results_table
 
 from palimpzest.policy import MaxQuality, MinCost, MinTime
-from palimpzest.query import (
-    NoSentinelPipelinedParallelExecution,
-    NoSentinelPipelinedSingleThreadExecution,
-    NoSentinelSequentialSingleThreadExecution,
-)
 
 
 def main():
@@ -22,9 +17,9 @@ def main():
     parser.add_argument("--datasetid", type=str, help="The dataset id")
     parser.add_argument("--task", type=str, help="The task to run")
     parser.add_argument(
-        "--executor",
+        "--execution_strategy",
         type=str,
-        help="The plan executor to use. One of sequential, pipelined, parallel",
+        help="The execution strategy to use. One of sequential, pipelined_parallel, pipelined_single_thread",
         default="sequential",
     )
     parser.add_argument(
@@ -62,19 +57,6 @@ def main():
         print("Policy not supported for this demo")
         exit(1)
 
-    # Set execution engine
-    execution_engine = None
-    executor = args.executor
-    if executor == "sequential":
-        execution_engine = NoSentinelSequentialSingleThreadExecution
-    elif executor == "pipelined":
-        execution_engine = NoSentinelPipelinedSingleThreadExecution
-    elif executor == "parallel":
-        execution_engine = NoSentinelPipelinedParallelExecution
-    else:
-        print("Executor not supported for this demo")
-        exit(1)
-
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
@@ -82,10 +64,10 @@ def main():
     records, execution_stats, cols = execute_task(
         task=task,
         datasetid=datasetid,
-        execution_engine=execution_engine,
         policy=policy,
         verbose=verbose,
-        profile=profile
+        profile=profile,
+        execution_strategy=args.execution_strategy
     )
 
     # Print results

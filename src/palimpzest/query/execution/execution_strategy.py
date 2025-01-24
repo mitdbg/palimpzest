@@ -46,15 +46,20 @@ class ExecutionStrategy(ABC):
         pass
 
 
-    @abstractmethod
-    def _should_stop_execution(
-        self,
-        records: list[DataRecord],
-        plan_stats: list[PlanStats]
-    ) -> bool:
-        """Override to implement early stopping logic"""
-        return False
+    # TODO(chjun): use _create_execution_stats for execution stats setup.
+    ## aggregate plan stats
+    # aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)
 
+    # # add sentinel records and plan stats (if captured) to plan execution data
+    # execution_stats = ExecutionStats(
+    #     execution_id=self.execution_id(),
+    #     plan_stats=aggregate_plan_stats,
+    #     total_execution_time=time.time() - execution_start_time,
+    #     total_execution_cost=sum(
+    #         list(map(lambda plan_stats: plan_stats.total_plan_cost, aggregate_plan_stats.values()))
+    #     ),
+    #     plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
+    # )
     def _create_execution_stats(
         self,
         plan_stats: list[PlanStats],
@@ -67,11 +72,3 @@ class ExecutionStrategy(ABC):
             total_execution_time=time.time() - start_time,
             total_execution_cost=sum(ps.total_cost for ps in plan_stats)
         )
-    
-    def _should_stop_execution(
-        self,
-        records: list[DataRecord],
-        plan_stats: list[PlanStats]
-    ) -> bool:
-        """Override to implement early stopping logic"""
-        return False

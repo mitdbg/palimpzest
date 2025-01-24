@@ -1,8 +1,7 @@
 from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 
-from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats, RecordOpStats
+from palimpzest.core.data.dataclasses import PlanStats, RecordOpStats
 from palimpzest.core.data.datasources import DataSource, ValidationDataSource
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.datamanager.datamanager import DataDirectory
@@ -17,15 +16,6 @@ from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.model_helpers import get_models
 
 
-@dataclass
-class QueryResult:
-    """Container for query processing results"""
-    records: list[DataRecord]
-    execution_stats: ExecutionStats
-    optimization_stats: dict
-    physical_plans: list[PhysicalPlan]
-
-
 class QueryProcessor:
     """
     Processes queries through the complete pipeline:
@@ -34,16 +24,18 @@ class QueryProcessor:
     3. Result phase: Statistics gathering and result formatting
     """
     def __init__(
-        self,    
-        datasource: DataSource,
+        self,
+        dataset: Dataset,
         optimizer: Optimizer = None,
         config: QueryProcessorConfig = None,
+        *args,
+        **kwargs,
     ):
         """
         Initialize QueryProcessor with optional custom components.
         
         Args:
-            datasource: Data source to process
+            dataset: Dataset to process
             optimizer: Custom optimizer (optional)
             execution_engine: Custom execution engine (optional)
             config: Configuration dictionary for default components
@@ -51,17 +43,19 @@ class QueryProcessor:
         assert config is not None, "QueryProcessorConfig is required for QueryProcessor"
 
         self.config = config or QueryProcessorConfig()
-        self.datasource = datasource
+        self.dataset = dataset
+        self.datasource = self._get_datasource(self.dataset)
+        self.num_samples = self.config.num_samples
         self.using_validation_data = isinstance(self.datasource, ValidationDataSource)
         self.scan_start_idx = self.config.scan_start_idx
         self.nocache = self.config.nocache
         self.verbose = self.config.verbose
         self.max_workers = self.config.max_workers
         self.num_workers_per_plan = self.config.num_workers_per_plan
+        self.min_plans = self.config.min_plans
         self.datadir = DataDirectory()
 
         self.policy = self.config.policy
-        self.dataset = self.datasource
 
         self.available_models = self.config.available_models
         if self.available_models is None or len(self.available_models) == 0:
@@ -71,9 +65,21 @@ class QueryProcessor:
             print("Available models: ", self.available_models)
 
         # Initialize optimizer and execution engine
+        # TODO: config currently has optimizer field which is string. 
+        # In this case, we only use the initialized optimizer. Later after we split the config to multiple configs, there won't be such confusion.
         assert optimizer is not None, "Optimizer is required. Please use QueryProcessorFactory.create_processor() to initialize a QueryProcessor."
         self.optimizer = optimizer
 
+    def _get_datasource(self, dataset: Set | DataSource) -> str:
+        """
+        Gets the DataSource for the given dataset.
+        """
+        # iterate until we reach DataSource
+        while isinstance(dataset, Set):
+            dataset = dataset._source
+
+        # this will throw an exception if datasource is not registered with PZ
+        return DataDirectory().get_registered_dataset(dataset.dataset_id)
 
     def execution_id(self) -> str:
         """
@@ -178,8 +184,27 @@ class QueryProcessor:
 
         return all_sample_execution_data, return_records, all_plan_stats
     
+    def _execute_best_plan(
+        self,
+        dataset: Dataset,
+        policy: Policy,
+        optimizer: Optimizer,
+        execution_data: list[RecordOpStats] | None = None,
+    ) -> tuple[list[DataRecord], list[PlanStats]]:
+        # get the optimal plan according to the optimizer
+        plans = optimizer.optimize(dataset, policy)
+        final_plan = plans[0]
+        # execute the plan
+        # TODO: for some reason this is not picking up change to self.max_workers from PipelinedParallelPlanExecutor.__init__()
+        records, plan_stats = self.execute_plan(
+            plan=final_plan,
+            plan_workers=self.max_workers,
+        )
+
+        # return the output records and plan stats
+        return records, [plan_stats]
     
-    def _execute_with_optimizer(
+    def _execute_with_strategy(
         self,
         dataset: Dataset,
         policy: Policy,
@@ -188,9 +213,9 @@ class QueryProcessor:
     ) -> tuple[list[DataRecord], list[PlanStats]]:
         records, plan_stats = [], []
         if optimizer.optimization_strategy_type == OptimizationStrategyType.CONFIDENCE_INTERVAL:
-            records, plan_stats = self._execute_confidence_interval_strategy(dataset, policy, optimizer)
+            records, plan_stats = self._execute_confidence_interval_strategy(dataset, policy, optimizer, execution_data)
         else:
-            records, plan_stats = self._execute_strategy(dataset, policy, optimizer)
+            records, plan_stats = self._execute_best_plan(dataset, policy, optimizer, execution_data)
         return records, plan_stats
 
 
@@ -244,34 +269,7 @@ class QueryProcessor:
         # return the final set of records and plan stats
         return records, plan_stats
 
-
-    def _execute_strategy(
-        self,
-        dataset: Set,
-        policy: Policy,
-        optimizer: Optimizer,
-        execution_data: list[RecordOpStats] | None = None,
-    ) -> tuple[list[DataRecord], list[PlanStats]]:
-        if execution_data is None:
-            execution_data = []
-
-        # get the optimal plan according to the optimizer
-        plans = optimizer.optimize(dataset, policy)
-        final_plan = plans[0]
-        # execute the plan
-        # TODO: for some reason this is not picking up change to self.max_workers from PipelinedParallelPlanExecutor.__init__()
-        records, plan_stats = self.execute_plan(
-            plan=final_plan,
-            plan_workers=self.max_workers,
-        )
-
-        # return the output records and plan stats
-        return records, [plan_stats]
-
-    # let's keep the same name as the old one
+    # TODO: consider to support dry_run.
     @abstractmethod
-    def execute(
-        self, 
-        dry_run: bool = False
-    ) -> QueryResult:
+    def execute(self):
         raise NotImplementedError("Abstract method to be overwritten by sub-classes")

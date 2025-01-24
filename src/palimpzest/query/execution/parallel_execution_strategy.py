@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
-from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
@@ -27,16 +27,6 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
             else self.max_workers
         )
 
-    def execute_op_wrapper(self, operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:
-        """
-        Wrapper function around operator execution which also and returns the operator.
-        This is useful in the parallel setting(s) where operators are executed by a worker pool,
-        and it is convenient to return the op_id along with the computation result.
-        """
-        record_set = operator(op_input)
-
-        return record_set, operator
-    
     def get_parallel_max_workers(self):
         # for now, return the number of system CPUs;
         # in the future, we may want to consider the models the user has access to
@@ -103,7 +93,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
             candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
             candidate.idx = current_scan_idx
             candidate.get_item_fn = datasource.get_item
-            futures.append(executor.submit(self.execute_op_wrapper, source_operator, candidate))
+            futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, source_operator, candidate))
             op_id_to_futures_in_flight[source_op_id] += 1
             current_scan_idx += 1
 
@@ -119,7 +109,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
                 new_futures = []
                 for future in done_futures:
                     # get the result
-                    record_set, operator = future.result()
+                    record_set, operator, _ = future.result()
                     op_id = operator.get_op_id()
 
                     # decrement future from mapping of futures in-flight
@@ -162,7 +152,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
                             candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
                             candidate.idx = current_scan_idx
                             candidate.get_item_fn = datasource.get_item
-                            new_futures.append(executor.submit(self.execute_op_wrapper, source_operator, candidate))
+                            new_futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, source_operator, candidate))
                             op_id_to_futures_in_flight[source_op_id] += 1
                             current_scan_idx += 1
 
@@ -177,7 +167,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
                 for operator, candidate in processing_queue:
                     # if the candidate is not an input to an aggregate, execute it right away
                     if not isinstance(operator, AggregateOp):
-                        future = executor.submit(self.execute_op_wrapper, operator, candidate)
+                        future = executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate)
                         new_futures.append(future)
                         op_id_to_futures_in_flight[operator.get_op_id()] += 1
 
@@ -213,7 +203,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
                     if upstream_ops_are_finished:
                         operator = op_id_to_operator[agg_op_id]
                         candidates = list(map(lambda tup: tup[1], candidate_tuples))
-                        future = executor.submit(self.execute_op_wrapper, operator, candidates)
+                        future = executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidates)
                         new_futures.append(future)
                         op_id_to_futures_in_flight[operator.get_op_id()] += 1
 
