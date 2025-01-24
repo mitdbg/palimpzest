@@ -1,69 +1,38 @@
 import time
 
-from palimpzest.constants import OptimizationStrategy
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import SourceRecord
-from palimpzest.policy import Policy
-from palimpzest.query.execution.execution_engine import ExecutionEngine
-from palimpzest.query.execution.plan_executors.parallel_plan_execution import (
-    PipelinedParallelPlanExecutor,
-)
-from palimpzest.query.execution.plan_executors.single_threaded_plan_execution import (
-    PipelinedSingleThreadPlanExecutor,
-    SequentialSingleThreadPlanExecutor,
+from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
+from palimpzest.query.execution.single_threaded_execution_strategy import (
+    PipelinedSingleThreadExecutionStrategy,
+    SequentialSingleThreadExecutionStrategy,
 )
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
+from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
-from palimpzest.query.optimizer.cost_model import CostModel
-from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.plan import PhysicalPlan
-from palimpzest.sets import Set
+from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.utils.progress import create_progress_manager
+    
 
-
-class NoSentinelExecutionEngine(ExecutionEngine):
+class NoSentinelQueryProcessor(QueryProcessor):
     """
-    This class implements the abstract execute() method from the ExecutionEngine.
-    This class still needs to be sub-classed by another Execution class which implements
-    the execute_plan() method.
+    Specialized query processor that implements no sentinel strategy
+    for coordinating optimization and execution.
     """
 
-    def execute(self, dataset: Set, policy: Policy):
+    # TODO: Consider to support dry_run.
+    def execute(self):
         execution_start_time = time.time()
 
         # if nocache is True, make sure we do not re-use codegen examples
         if self.nocache:
             self.clear_cached_examples()
 
-        # construct the CostModel
-        cost_model = CostModel()
-
-        # initialize the optimizer
-        optimizer = Optimizer(
-            policy=policy,
-            cost_model=cost_model,
-            no_cache=self.nocache,
-            verbose=self.verbose,
-            available_models=self.available_models,
-            allow_bonded_query=self.allow_bonded_query,
-            allow_conventional_query=self.allow_conventional_query,
-            allow_code_synth=self.allow_code_synth,
-            allow_token_reduction=self.allow_token_reduction,
-            allow_rag_reduction=self.allow_rag_reduction,
-            allow_mixtures=self.allow_mixtures,
-            optimization_strategy=self.optimization_strategy,
-        )
-
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = [], []
-        if self.optimization_strategy == OptimizationStrategy.CONFIDENCE_INTERVAL:
-            records, plan_stats = self.execute_confidence_interval_strategy(dataset, policy, optimizer)
-        
-        else:
-            records, plan_stats = self.execute_strategy(dataset, policy, optimizer)
+        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, self.optimizer)
 
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)
@@ -82,13 +51,20 @@ class NoSentinelExecutionEngine(ExecutionEngine):
         return records, execution_stats
 
 
-class NoSentinelSequentialSingleThreadExecution(NoSentinelExecutionEngine, SequentialSingleThreadPlanExecutor):
+class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, SequentialSingleThreadExecutionStrategy):
     """
     This class performs non-sample based execution while executing plans in a sequential, single-threaded fashion.
     """
     def __init__(self, *args, **kwargs):
-        NoSentinelExecutionEngine.__init__(self, *args, **kwargs)
-        SequentialSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
+        NoSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        SequentialSingleThreadExecutionStrategy.__init__(
+            self,
+            scan_start_idx=self.scan_start_idx,
+            datadir=self.datadir,
+            max_workers=self.max_workers,
+            nocache=self.nocache,
+            verbose=self.verbose
+        )
         self.progress_manager = None
 
     def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
@@ -118,11 +94,8 @@ class NoSentinelSequentialSingleThreadExecution(NoSentinelExecutionEngine, Seque
 
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
-        datasource = (
-            self.datadir.get_registered_dataset(source_operator.dataset_id)
-            if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
+        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
+        datasource = source_operator.get_datasource()
         datasource_len = len(datasource)
 
         # Calculate total work units - each record needs to go through each operator
@@ -220,9 +193,6 @@ class NoSentinelSequentialSingleThreadExecution(NoSentinelExecutionEngine, Seque
                 if not self.nocache:
                     for record in records:
                         if getattr(record, "passed_operator", True):
-                            if operator.target_cache_id is None:
-                                print("No cache ID for operator", operator)
-                                breakpoint()
                             self.datadir.append_cache(operator.target_cache_id, record)
 
                 # update processing_queues or output_records
@@ -255,13 +225,20 @@ class NoSentinelSequentialSingleThreadExecution(NoSentinelExecutionEngine, Seque
         return output_records, plan_stats
 
 
-class NoSentinelPipelinedSingleThreadExecution(NoSentinelExecutionEngine, PipelinedSingleThreadPlanExecutor):
+class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, PipelinedSingleThreadExecutionStrategy):
     """
-    This class performs non-sample based execution while executing plans in a pipelined, single-threaded fashion.
+    This class performs non-sample based execution while executing plans in a pipelined, parallel fashion.
     """
     def __init__(self, *args, **kwargs):
-        NoSentinelExecutionEngine.__init__(self, *args, **kwargs)
-        PipelinedSingleThreadPlanExecutor.__init__(self, *args, **kwargs)
+        NoSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        PipelinedSingleThreadExecutionStrategy.__init__(
+            self,
+            scan_start_idx=self.scan_start_idx,
+            datadir=self.datadir,
+            max_workers=self.max_workers,
+            nocache=self.nocache,
+            verbose=self.verbose
+        )
         self.progress_manager = None
 
     def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
@@ -292,11 +269,8 @@ class NoSentinelPipelinedSingleThreadExecution(NoSentinelExecutionEngine, Pipeli
 
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
-        datasource = (
-            self.datadir.get_registered_dataset(source_operator.dataset_id)
-            if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
+        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
+        datasource = source_operator.get_datasource()
         datasource_len = len(datasource)
 
         # Calculate total work units - each record needs to go through each operator
@@ -445,13 +419,20 @@ class NoSentinelPipelinedSingleThreadExecution(NoSentinelExecutionEngine, Pipeli
         return output_records, plan_stats
 
 
-class NoSentinelPipelinedParallelExecution(NoSentinelExecutionEngine, PipelinedParallelPlanExecutor):
+class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
     """
     This class performs non-sample based execution while executing plans in a pipelined, parallel fashion.
     """
     def __init__(self, *args, **kwargs):
-        NoSentinelExecutionEngine.__init__(self, *args, **kwargs)
-        PipelinedParallelPlanExecutor.__init__(self, *args, **kwargs)
+        NoSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        PipelinedParallelExecutionStrategy.__init__(
+            self,
+            scan_start_idx=self.scan_start_idx,
+            datadir=self.datadir,
+            max_workers=self.max_workers,
+            nocache=self.nocache,
+            verbose=self.verbose
+        )
         self.progress_manager = None
 
     # def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
@@ -482,11 +463,8 @@ class NoSentinelPipelinedParallelExecution(NoSentinelExecutionEngine, PipelinedP
 
     #     # get handle to DataSource and pre-compute its size
     #     source_operator = plan.operators[0]
-    #     datasource = (
-    #         self.datadir.get_registered_dataset(source_operator.dataset_id)
-    #         if isinstance(source_operator, MarshalAndScanDataOp)
-    #         else self.datadir.get_cached_result(source_operator.dataset_id)
-    #     )
+    #     assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
+    #     datasource = source_operator.get_datasource()
     #     datasource_len = len(datasource)
 
     #     # Calculate total work units - each record needs to go through each operator
@@ -513,7 +491,7 @@ class NoSentinelPipelinedParallelExecution(NoSentinelExecutionEngine, PipelinedP
     #                 futures = list(not_done_futures)
 
     #                 for future in done_futures:
-    #                     record_set, operator = future.result()
+    #                     record_set, operator, _ = future.result()
     #                     op_id = operator.get_op_id()
     #                     op_idx = next(i for i, op in enumerate(plan.operators) if op.get_op_id() == op_id)
     #                     next_op_id = plan.operators[op_idx + 1].get_op_id() if op_idx + 1 < len(plan.operators) else None
@@ -545,14 +523,14 @@ class NoSentinelPipelinedParallelExecution(NoSentinelExecutionEngine, PipelinedP
     #                         candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
     #                         candidate.idx = current_scan_idx
     #                         candidate.get_item_fn = datasource.get_item
-    #                         futures.append(executor.submit(self.execute_op_wrapper, operator, candidate))
+    #                         futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate))
     #                         current_scan_idx += 1
     #                         keep_scanning_source_records = current_scan_idx < datasource_len and source_records_scanned < num_samples
                         
     #                     elif len(processing_queues[op_id]) > 0:
     #                         # Submit task for next record in queue
     #                         input_record = processing_queues[op_id].pop(0)
-    #                         futures.append(executor.submit(self.execute_op_wrapper, operator, input_record))
+    #                         futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, operator, input_record))
 
     #                 # Check if we're done
     #                 still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
@@ -573,5 +551,3 @@ class NoSentinelPipelinedParallelExecution(NoSentinelExecutionEngine, PipelinedP
     #             self.progress_manager.finish()
 
     #     return output_records, plan_stats
-
-    

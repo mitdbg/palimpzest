@@ -1,6 +1,6 @@
 import pytest
 
-from palimpzest.constants import Cardinality, Model, OptimizationStrategy
+from palimpzest.constants import Cardinality, Model
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import TextFile
@@ -14,6 +14,7 @@ from palimpzest.query.operators.logical import ConvertScan, FilteredScan
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
+from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
 from palimpzest.sets import Dataset
 
@@ -97,8 +98,8 @@ class TestPrimitives:
 @pytest.mark.parametrize(
     argnames=("opt_strategy",),
     argvalues=[
-        pytest.param(OptimizationStrategy.GREEDY, id="greedy"),
-        pytest.param(OptimizationStrategy.PARETO, id="pareto"),
+        pytest.param(OptimizationStrategyType.GREEDY, id="greedy"),
+        pytest.param(OptimizationStrategyType.PARETO, id="pareto"),
     ]
 )
 class TestOptimizer:
@@ -113,7 +114,7 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan, policy)
         physical_plan = physical_plans[0]
@@ -131,7 +132,7 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
             # TODO: remove
             allow_code_synth=False,
             allow_conventional_query=False,
@@ -157,7 +158,7 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
             allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -177,7 +178,7 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
             allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -198,7 +199,7 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
             allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -221,7 +222,7 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
             allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -246,7 +247,7 @@ class TestOptimizer:
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_code_synth=False,
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
         )
         physical_plans = optimizer.optimize(real_estate_workload, policy)
         physical_plan = physical_plans[0]
@@ -276,7 +277,7 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
             allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -334,7 +335,7 @@ class MockSampleBasedCostModel:
         # create source_op_estimates for datasources if they are not provided
         if isinstance(operator, DataSourcePhysicalOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.get_registered_dataset(operator.dataset_id)
+            datasource = operator.get_datasource()
             datasource_len = len(datasource)
 
             source_op_estimates = OperatorCostEstimates(
@@ -360,10 +361,7 @@ class MockSampleBasedCostModel:
         # construct and return op estimates
         return PlanCost(cost=op_cost, time=op_time, quality=op_quality, op_estimates=op_estimates)
 
-
-class TestParetoOptimizer:
-
-    @pytest.mark.parametrize(
+@pytest.mark.parametrize(
         argnames=("workload", "policy", "operator_to_stats", "expected_plan"),
         argvalues=[
             pytest.param("three-converts", "mincost", "3c-mincost", "3c-mincost", id="3c-mincost"),
@@ -378,6 +376,8 @@ class TestParetoOptimizer:
         ],
         indirect=True,
     )
+
+class TestParetoOptimizer:
     def test_pareto_optimization_strategy(self, workload, policy, operator_to_stats, expected_plan):
         # initialize cost model with sample execution data
         cost_model = MockSampleBasedCostModel(operator_to_stats)
@@ -389,7 +389,7 @@ class TestParetoOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3],
-            optimization_strategy=OptimizationStrategy.PARETO,
+            optimization_strategy_type=OptimizationStrategyType.PARETO,
             # TODO: remove
             allow_code_synth=False,
             allow_conventional_query=False,
@@ -397,7 +397,6 @@ class TestParetoOptimizer:
             allow_rag_reduction=False,
             allow_mixtures=False,
         )
-
         # run optimizer to get physical plan
         physical_plans = optimizer.optimize(workload, policy)
         physical_plan = physical_plans[0]

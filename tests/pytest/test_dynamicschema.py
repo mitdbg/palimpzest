@@ -2,10 +2,9 @@
 from palimpzest.constants import Model
 from palimpzest.core.lib.schemas import TextFile
 from palimpzest.policy import MinCost
-from palimpzest.query.execution.execute import Execute
-from palimpzest.query.execution.nosentinel_execution import NoSentinelSequentialSingleThreadExecution
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.schemabuilder.schema_builder import SchemaBuilder
 
 data_path = "tests/pytest/data/"
@@ -29,8 +28,7 @@ def test_dynamicschema_json(mocker, enron_workload, enron_convert, enron_filter)
     mocker.patch.object(LLMFilter, "filter", side_effect=enron_filter)
     mocker.patch.object(LLMConvertBonded, "convert", side_effect=enron_convert)
 
-    records, _ = Execute(
-        enron_workload,
+    config = QueryProcessorConfig(
         policy=MinCost(),
         available_models=[Model.GPT_4o_MINI],
         num_samples=3,
@@ -40,11 +38,14 @@ def test_dynamicschema_json(mocker, enron_workload, enron_convert, enron_filter)
         allow_token_reduction=False,
         allow_rag_reduction=False,
         allow_mixtures=False,
-        execution_engine=NoSentinelSequentialSingleThreadExecution,
+        processing_strategy="no_sentinel",
+        execution_strategy="sequential",
+        optimizer_strategy="pareto",
     )
+    records, stats = enron_workload.run(config=config)
 
     for rec in records:
-        print(rec.as_dict())
+        print(rec.to_dict())
 
 
 def test_dynamicschema_yml(mocker, enron_workload, enron_convert, enron_filter):
@@ -56,8 +57,7 @@ def test_dynamicschema_yml(mocker, enron_workload, enron_convert, enron_filter):
     mocker.patch.object(LLMFilter, "filter", side_effect=enron_filter)
     mocker.patch.object(LLMConvertBonded, "convert", side_effect=enron_convert)
 
-    records, _ = Execute(
-        enron_workload,
+    config = QueryProcessorConfig(
         policy=MinCost(),
         available_models=[Model.GPT_4o_MINI],
         num_samples=3,
@@ -67,8 +67,11 @@ def test_dynamicschema_yml(mocker, enron_workload, enron_convert, enron_filter):
         allow_token_reduction=False,
         allow_rag_reduction=False,
         allow_mixtures=False,
-        execution_engine=NoSentinelSequentialSingleThreadExecution,
+        processing_strategy="no_sentinel",
+        execution_strategy="sequential",
+        optimizer_strategy="pareto",
     )
+    records, stats = enron_workload.run(config=config)
 
     for rec in records:
-        print(rec.as_dict())
+        print(rec.to_dict())

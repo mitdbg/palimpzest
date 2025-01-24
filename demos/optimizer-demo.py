@@ -8,23 +8,14 @@ from pathlib import Path
 import datasets
 from ragatouille import RAGPretrainedModel
 
-from palimpzest.constants import Model, OptimizationStrategy
+from palimpzest.constants import Model
 from palimpzest.core.data.datasources import ValidationDataSource
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import BooleanField, ImageFilepathField, ListField, NumericField, StringField
 from palimpzest.core.lib.schemas import Schema, TextFile
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost, MinTime
-from palimpzest.query import (
-    Execute,
-    MABSequentialParallelSentinelExecution,
-    MABSequentialSingleThreadSentinelExecution,
-    NoSentinelPipelinedParallelExecution,
-    NoSentinelPipelinedSingleThreadExecution,
-    NoSentinelSequentialSingleThreadExecution,
-    RandomSamplingSequentialParallelSentinelExecution,
-    RandomSamplingSequentialSingleThreadSentinelExecution,
-)
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 from palimpzest.utils.model_helpers import get_models
 
@@ -760,16 +751,16 @@ if __name__ == "__main__":
         "--workload", type=str, help="The workload to run. One of enron, real-estate, biodex, biodex-reactions."
     )
     parser.add_argument(
-        "--engine",
-        default="sentinel",
+        "--processing_strategy",
+        default="mab_sentinel",
         type=str,
-        help="The engine to use. One of sentinel, nosentinel",
+        help="The engine to use. One of mab_sentinel, no_sentinel, random_sampling",
     )
     parser.add_argument(
-        "--executor",
-        default="parallel-mab",
+        "--execution_strategy",
+        default="pipelined_parallel",
         type=str,
-        help="The plan executor to use.",
+        help="The plan executor to use. One of sequential, pipelined_single_thread, pipelined_parallel",
     )
     parser.add_argument(
         "--policy",
@@ -838,13 +829,13 @@ if __name__ == "__main__":
 
     # The user has to indicate the dataset id and the workload
     if args.datasetid is None:
-        print("Please provide a dataset id")
+        print("Please provide a dataset id using --datasetid")
         exit(1)
     if args.workload is None:
-        print("Please provide a workload")
+        print("Please provide a workload using --workload")
         exit(1)
     if args.exp_name is None:
-        print("Please provide an experiment name")
+        print("Please provide an experiment name using --exp-name")
         exit(1)
 
     # create directory for profiling data
@@ -873,36 +864,6 @@ if __name__ == "__main__":
         policy = MaxQuality()
     else:
         print("Policy not supported for this demo")
-        exit(1)
-
-    execution_engine = None
-    engine, executor = args.engine, args.executor
-    if engine == "sentinel":
-        if executor == "sequential-mab":
-            # execution_engine = SequentialSingleThreadSentinelExecution
-            execution_engine = MABSequentialSingleThreadSentinelExecution
-        elif executor == "parallel-mab":
-            # execution_engine = SequentialParallelSentinelExecution
-            execution_engine = MABSequentialParallelSentinelExecution
-        elif executor == "sequential-random":
-            execution_engine = RandomSamplingSequentialSingleThreadSentinelExecution
-        elif executor == "parallel-random":
-            execution_engine = RandomSamplingSequentialParallelSentinelExecution
-        else:
-            print("Unknown executor")
-            exit(1)
-    elif engine == "nosentinel":
-        if executor == "sequential":
-            execution_engine = NoSentinelSequentialSingleThreadExecution
-        elif executor == "pipelined":
-            execution_engine = NoSentinelPipelinedSingleThreadExecution
-        elif executor == "parallel":
-            execution_engine = NoSentinelPipelinedParallelExecution
-        else:
-            print("Unknown executor")
-            exit(1)
-    else:
-        print("Unknown engine")
         exit(1)
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
@@ -1024,9 +985,9 @@ if __name__ == "__main__":
         use_final_op_quality = True
 
     # select optimization strategy and available models based on engine
-    optimization_strategy, available_models = None, None
-    if engine == "sentinel":
-        optimization_strategy = OptimizationStrategy.PARETO
+    optimizer_strategy, available_models = None, None
+    if args.processing_strategy in ["mab_sentinel", "random_sampling"]:
+        optimizer_strategy = "pareto"
         available_models = get_models(include_vision=True)
     else:
         model_str_to_model = {
@@ -1041,17 +1002,25 @@ if __name__ == "__main__":
             "mixtral": Model.LLAMA3_V,
             "llama": Model.LLAMA3_V,
         }
-        optimization_strategy = OptimizationStrategy.NONE
+        optimizer_strategy = "none"
         available_models = [model_str_to_model[args.model]] + [model_str_to_vision_model[args.model]]
-
+    
     # execute pz plan
-    records, execution_stats = Execute(
-        plan,
-        policy,
+    config = QueryProcessorConfig(
+        policy=policy,
         nocache=True,
         available_models=available_models,
-        optimization_strategy=optimization_strategy,
-        execution_engine=execution_engine,
+        processing_strategy=args.processing_strategy,
+        optimizer_strategy=optimizer_strategy,
+        execution_strategy=args.execution_strategy,
+        allow_code_synth=False,  # (workload != "biodex"),
+        use_final_op_quality=use_final_op_quality,
+        max_workers=10,
+        verbose=verbose,
+    )
+
+    records, execution_stats = plan.run(
+        config=config,
         k=k,
         j=j,
         sample_budget=sample_budget,
@@ -1060,29 +1029,25 @@ if __name__ == "__main__":
         sample_start_idx=sample_start_idx,
         sample_end_idx=sample_end_idx,
         seed=seed,
-        verbose=verbose,
-        exp_name=exp_name,
-        allow_code_synth=False,  # (workload != "biodex"),
-        use_final_op_quality=use_final_op_quality,
-        max_workers=10,
+        exp_name=exp_name
     )
 
     # create filepaths for records and stats
     records_path = (
         f"opt-profiling-data/{workload}-{exp_name}-records.json"
-        if engine == "sentinel"
+        if args.processing_strategy in ["mab_sentinel", "random_sampling"]
         else f"opt-profiling-data/{workload}-baseline-{exp_name}-records.json"
     )
     stats_path = (
         f"opt-profiling-data/{workload}-{exp_name}-profiling.json"
-        if engine == "sentinel"
+        if args.processing_strategy in ["mab_sentinel", "random_sampling"]
         else f"opt-profiling-data/{workload}-baseline-{exp_name}-profiling.json"
     )
 
     # save record outputs
     record_jsons = []
     for record in records:
-        record_dict = record.as_dict()
+        record_dict = record.to_dict()
         if workload == "biodex":
             record_dict = {
                 k: v for k, v in record_dict.items() if k in ["pmid", "serious", "patientsex", "drugs", "reactions"]
