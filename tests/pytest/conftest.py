@@ -1,4 +1,5 @@
 import pytest
+
 from palimpzest.constants import Model
 from palimpzest.policy import MaxQuality, MaxQualityAtFixedCost, MinCost, MinCostAtFixedQuality
 
@@ -32,21 +33,12 @@ pytest_plugins = [
 
 @pytest.fixture
 def dataset(request, enron_eval_tiny, real_estate_eval_tiny, biofabric_tiny):
+    dataset_id = request.param
     dataset_id_to_dataset = {
         "enron-eval-tiny": enron_eval_tiny,
         "real-estate-eval-tiny": real_estate_eval_tiny,
         "biofabric-tiny": biofabric_tiny,
     }
-
-    # Get the param from the callspec if it exists
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            dataset_id = request._pyfuncitem.callspec.params.get('dataset', "enron-eval-tiny")
-        else:
-            dataset_id = "enron-eval-tiny"
-    else:
-        dataset_id = "enron-eval-tiny"
-    
     return dataset_id_to_dataset[dataset_id]
 
 
@@ -55,49 +47,30 @@ def workload(
     request,
     enron_workload,
     real_estate_workload,
-    biofabric_workload,
     three_converts_workload,
     one_filter_one_convert_workload,
     two_converts_two_filters_workload,
 ):
+    workload_id = request.param
     workload_id_to_workload = {
         "enron-workload": enron_workload,
         "real-estate-workload": real_estate_workload,
-        "biofabric-workload": biofabric_workload,
         "three-converts": three_converts_workload,
         "one-filter-one-convert": one_filter_one_convert_workload,
         "two-converts-two-filters": two_converts_two_filters_workload,
     }
-
-    # Get the param from the callspec if it exists
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            workload_id = request._pyfuncitem.callspec.params.get('workload', "enron-workload")
-        else:
-            workload_id = "enron-workload"
-    else:
-        workload_id = "enron-workload"
-
     return workload_id_to_workload[workload_id]
 
 
 @pytest.fixture
 def policy(request):
+    policy_id = request.param
     policy_id_to_policy = {
         "mincost": MinCost(),
         "maxquality": MaxQuality(),
         "mincost@quality=0.8": MinCostAtFixedQuality(0.8),
         "maxquality@cost=1.0": MaxQualityAtFixedCost(1.0),
     }
-
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            policy_id = request._pyfuncitem.callspec.params.get('policy', "mincost")
-        else:
-            policy_id = "mincost"
-    else:
-        policy_id = "mincost"
-    
     return policy_id_to_policy[policy_id]
 
 
@@ -115,6 +88,7 @@ def physical_plan(
     one_to_many_convert_plan,
     simple_plan_factory,
 ):
+    physical_plan_id = request.param
     physical_plan_id_to_physical_plan = {
         "scan-only": scan_only_plan,
         "non-llm-filter": non_llm_filter_plan,
@@ -152,18 +126,7 @@ def physical_plan(
         "cost-est-simple-plan-mixtral-mixtral": simple_plan_factory(
             convert_model=Model.MIXTRAL, filter_model=Model.MIXTRAL,
         ),
-
     }
-
-    # Get the param from the callspec if it exists
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            physical_plan_id = request._pyfuncitem.callspec.params.get('physical_plan', "scan-only")
-        else:
-            physical_plan_id = "scan-only"
-    else:
-        physical_plan_id = "scan-only"
-    
     return physical_plan_id_to_physical_plan[physical_plan_id]
 
 
@@ -173,20 +136,11 @@ def sentinel_plan(
     scan_convert_filter_sentinel_plan,
     scan_multi_convert_multi_filter_sentinel_plan
 ):
+    sentinel_plan_id = request.param
     sentinel_plan_id_to_sentinel_plan = {
         "scf": scan_convert_filter_sentinel_plan,
         "scffc": scan_multi_convert_multi_filter_sentinel_plan,
     }
-
-    # Get the param from the callspec if it exists
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            sentinel_plan_id = request._pyfuncitem.callspec.params.get('sentinel_plan', "scf")
-        else:
-            sentinel_plan_id = "scf"
-    else:
-        sentinel_plan_id = "scf"
-    
     return sentinel_plan_id_to_sentinel_plan[sentinel_plan_id]
 
 @pytest.fixture
@@ -196,20 +150,12 @@ def execution_data(
     scan_convert_filter_varied_execution_data,
     scan_multi_convert_multi_filter_execution_data,
 ):
+    execution_data_id = request.param
     execution_data_id_to_execution_data = {
         "scf": scan_convert_filter_execution_data,
         "scf-varied": scan_convert_filter_varied_execution_data,
         "scffc": scan_multi_convert_multi_filter_execution_data,
     }
-
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            execution_data_id = request._pyfuncitem.callspec.params.get('execution_data', "scf")
-        else:
-            execution_data_id = "scf"
-    else:
-        execution_data_id = "scf"
-
     return execution_data_id_to_execution_data[execution_data_id]
 
 @pytest.fixture
@@ -224,6 +170,7 @@ def expected_records(
     scan_convert_filter_varied_expected_outputs,
     scan_multi_convert_multi_filter_expected_outputs,
 ):
+    records_id = request.param
     records_id_to_expected_records = {
         "enron-all-records": enron_all_expected_records,
         "enron-filtered-records": enron_filter_expected_records,
@@ -234,17 +181,6 @@ def expected_records(
         "scf-varied": scan_convert_filter_varied_expected_outputs,
         "scffc": scan_multi_convert_multi_filter_expected_outputs,
     }
-
-    # Get the param from the callspec if it exists
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            records_id = request._pyfuncitem.callspec.params.get('expected_records', "enron-all-records")
-        else:
-            records_id = "scan-only"
-    else:
-        records_id = "scan-only"
-    
-    return records_id_to_expected_records[records_id]
     return records_id_to_expected_records[records_id]
 
 
@@ -256,21 +192,13 @@ def champion_outputs(
     scan_convert_filter_varied_champion_outputs,
     scan_multi_convert_multi_filter_champion_outputs
 ):
+    champion_outputs_id = request.param
     champion_outputs_id_to_champion_outputs = {
         "scf": scan_convert_filter_champion_outputs,
         "empty": scan_convert_filter_empty_champion_outputs,
         "scf-varied": scan_convert_filter_varied_champion_outputs,
         "scffc": scan_multi_convert_multi_filter_champion_outputs,
     }
-
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            champion_outputs_id = request._pyfuncitem.callspec.params.get('champion_outputs', "scf")
-        else:
-            champion_outputs_id = "scf"
-    else:
-        champion_outputs_id = "scf"
-
     return champion_outputs_id_to_champion_outputs[champion_outputs_id]
 
 
@@ -283,6 +211,7 @@ def expected_qualities(
     scan_convert_filter_varied_override_qualities,
     scan_multi_convert_multi_filter_qualities,
 ):
+    expected_qualities_id = request.param
     expected_qualities_id_to_expected_qualities = {
         "scf": scan_convert_filter_qualities,
         "empty": scan_convert_filter_empty_qualities,
@@ -290,14 +219,6 @@ def expected_qualities(
         "scf-varied-override": scan_convert_filter_varied_override_qualities,
         "scffc": scan_multi_convert_multi_filter_qualities,
     }
-
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            expected_qualities_id = request._pyfuncitem.callspec.params.get('expected_qualities', "scf")
-        else:
-            expected_qualities_id = "scf"
-    else:
-        expected_qualities_id = "scf"
     return expected_qualities_id_to_expected_qualities[expected_qualities_id]
 
 
@@ -309,6 +230,7 @@ def side_effect(
     real_estate_convert,
     real_estate_one_to_many_convert,
 ):
+    side_effect_id = request.param
     side_effect_id_to_side_effect = {
         None: None,
         "enron-filter": enron_filter,
@@ -316,14 +238,6 @@ def side_effect(
         "real-estate-convert": real_estate_convert,
         "real-estate-one-to-many-convert": real_estate_one_to_many_convert,
     }
-
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            side_effect_id = request._pyfuncitem.callspec.params.get('side_effect', None)
-        else:
-            side_effect_id = None
-    else:
-        side_effect_id = None
     return side_effect_id_to_side_effect[side_effect_id]
 
 
@@ -332,6 +246,7 @@ def expected_cost_est_results(
     request,
     simple_plan_expected_results_factory,
 ):
+    cost_est_results_id = request.param
     cost_est_results_id_to_cost_est_results = {
         "cost-est-simple-plan-gpt4-gpt4": simple_plan_expected_results_factory(
             convert_model=Model.GPT_4o, filter_model=Model.GPT_4o,
@@ -362,16 +277,7 @@ def expected_cost_est_results(
         ),
     }
 
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            cost_est_results_id = request._pyfuncitem.callspec.params.get('expected_cost_est_results', "cost-est-simple-plan-gpt4-gpt4")
-        else:
-            cost_est_results_id = "cost-est-simple-plan-gpt4-gpt4"
-    else:
-        cost_est_results_id = "cost-est-simple-plan-gpt4-gpt4"
-
     return cost_est_results_id_to_cost_est_results[cost_est_results_id]
-
 
 
 @pytest.fixture
@@ -387,6 +293,7 @@ def operator_to_stats(
     two_converts_two_filters_min_cost_at_fixed_quality_operator_to_stats,
     two_converts_two_filters_max_quality_at_fixed_cost_operator_to_stats,
 ):
+    operator_to_stats_id = request.param
     operator_to_stats_id_to_operator_to_stats = {
         "3c-mincost": three_converts_min_cost_operator_to_stats,
         "3c-maxquality": three_converts_max_quality_operator_to_stats,
@@ -399,13 +306,6 @@ def operator_to_stats(
         "2c-2f-maxquality@cost=1.0": two_converts_two_filters_max_quality_at_fixed_cost_operator_to_stats,
     }
 
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            operator_to_stats_id = request._pyfuncitem.callspec.params.get('operator_to_stats', "3c-mincost")
-        else:
-            operator_to_stats_id = "3c-mincost"
-    else:
-        operator_to_stats_id = "3c-mincost"
     return operator_to_stats_id_to_operator_to_stats[operator_to_stats_id]
 
 
@@ -422,6 +322,7 @@ def expected_plan(
     two_converts_two_filters_min_cost_at_fixed_quality_expected_plan,
     two_converts_two_filters_max_quality_at_fixed_cost_expected_plan,
 ):
+    expected_plan_id = request.param
     expected_plan_id_to_expected_plan = {
         "3c-mincost": three_converts_min_cost_expected_plan,
         "3c-maxquality": three_converts_max_quality_expected_plan,
@@ -434,12 +335,4 @@ def expected_plan(
         "2c-2f-maxquality@cost=1.0": two_converts_two_filters_max_quality_at_fixed_cost_expected_plan,
     }
 
-    if hasattr(request, '_pyfuncitem'):
-        if hasattr(request._pyfuncitem, 'callspec'):
-            expected_plan_id = request._pyfuncitem.callspec.params.get('expected_plan', "3c-mincost")
-        else:
-            expected_plan_id = "3c-mincost"
-    else:
-        expected_plan_id = "3c-mincost"
-    
     return expected_plan_id_to_expected_plan[expected_plan_id]
