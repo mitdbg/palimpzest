@@ -361,10 +361,7 @@ class MockSampleBasedCostModel:
         # construct and return op estimates
         return PlanCost(cost=op_cost, time=op_time, quality=op_quality, op_estimates=op_estimates)
 
-
-class TestParetoOptimizer:
-
-    @pytest.mark.parametrize(
+@pytest.mark.parametrize(
         argnames=("workload", "policy", "operator_to_stats", "expected_plan"),
         argvalues=[
             pytest.param("three-converts", "mincost", "3c-mincost", "3c-mincost", id="3c-mincost"),
@@ -379,6 +376,8 @@ class TestParetoOptimizer:
         ],
         indirect=True,
     )
+
+class TestParetoOptimizer:
     def test_pareto_optimization_strategy(self, workload, policy, operator_to_stats, expected_plan):
         # initialize cost model with sample execution data
         cost_model = MockSampleBasedCostModel(operator_to_stats)

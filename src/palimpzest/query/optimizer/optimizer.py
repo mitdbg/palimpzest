@@ -455,4 +455,5 @@ class Optimizer:
         # search the optimization space by applying logical and physical transformations to the initial group tree
         self.search_optimization_space(final_group_id)
         
-        return self.strategy.get_optimal_plans(self.groups, final_group_id, policy)
+        return self.strategy.get_optimal_plans(self.groups, final_group_id, policy, self.use_final_op_quality)
+    
