@@ -253,16 +253,20 @@ class Schema(metaclass=SchemaMetaclass):
         desc = "Schema derived from DataFrame"
         attributes = {"_desc": desc, "__doc__": desc, "__module__": Schema.__module__}
         for col, dtype in zip(df.columns, df.dtypes):
+            field_name = f"column_{col}" if isinstance(col, (int, float)) else str(col)
+            field_desc = f"The {field_name} column derived from the DataFrame"
+
             if dtype == "object":
-                attributes[col] = StringField(desc=col)
+                attributes[field_name] = StringField(desc=field_desc)
             elif dtype == "bool":
-                attributes[col] = BooleanField(desc=col)
+                attributes[field_name] = BooleanField(desc=field_desc)
             elif dtype == "int64":
-                attributes[col] = IntField(desc=col)
+                attributes[field_name] = IntField(desc=field_desc)
             elif dtype == "float64":
-                attributes[col] = FloatField(desc=col)
+                attributes[field_name] = FloatField(desc=field_desc)
             else:
-                attributes[col] = Field(desc=col)
+                attributes[field_name] = Field(desc=field_desc)
+
 
         # Create new schema only if it doesn't exist
         new_schema = type(schema_name, (Schema,), attributes)
