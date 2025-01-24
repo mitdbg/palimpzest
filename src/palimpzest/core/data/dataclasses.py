@@ -344,10 +344,10 @@ class ExecutionStats:
     # total time spent optimizing
     total_optimization_time: float = 0.0
 
-    # total runtime for a call to pz.Execute
+    # total runtime for a plan's execution
     total_execution_time: float = 0.0
 
-    # total cost for a call to pz.Execute
+    # total cost for a plan's execution
     total_execution_cost: float = 0.0
 
     # dictionary of plan strings; useful for printing executed plans in demos

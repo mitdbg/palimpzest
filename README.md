@@ -38,7 +38,6 @@ from palimpzest.sets import Dataset
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema, TextFile
 from palimpzest.policy import MinCost, MaxQuality
-from palimpzest.query import Execute
 
 # Dataset registration
 dataset_path = "testdata/enron-tiny"
