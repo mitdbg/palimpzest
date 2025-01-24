@@ -1,18 +1,20 @@
 # write tests for src/palimpzest/core/data/datasources.py
 
 import os
-import pytest
+
 import pandas as pd
+import pytest
+
 from palimpzest.core.data.datasources import (
-    FileSource, 
-    TextFileDirectorySource,
+    FileSource,
+    HTMLFileDirectorySource,
     ImageFileDirectorySource,
     MemorySource,
-    HTMLFileDirectorySource
+    TextFileDirectorySource,
 )
-from palimpzest.core.lib.fields import ListField
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.schemas import List, Schema, Number, File, TextFile, WebPage, ImageFile
+from palimpzest.core.lib.schemas import File, TextFile, WebPage
+
 
 @pytest.fixture
 def temp_text_file():

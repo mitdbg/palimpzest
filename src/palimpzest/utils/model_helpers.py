@@ -1,10 +1,9 @@
 import os
-from typing import List, Optional
 
 from palimpzest.constants import Model
 
 
-def get_vision_models() -> List[Model]:
+def get_vision_models() -> list[Model]:
     """
     Return the set of vision models which the system has access to based on the set of environment variables.
     """
@@ -18,7 +17,7 @@ def get_vision_models() -> List[Model]:
     return models
 
 
-def get_models(include_vision: Optional[bool] = False) -> List[Model]:
+def get_models(include_vision: bool = False) -> list[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
     """

@@ -17,6 +17,15 @@ from palimpzest.query.processor.nosentinel_processor import (
 )
 
 
+@pytest.fixture
+def optimizer():
+    return Optimizer(policy=MaxQuality(), cost_model=CostModel())
+
+@pytest.fixture
+def config():
+    return QueryProcessorConfig(nocache=True)
+
+
 @pytest.mark.parametrize(
     argnames=("query_processor",),
     argvalues=[
@@ -97,16 +106,7 @@ class TestParallelExecutionNoCache:
         ],
         indirect=True,
     )
-
-    @pytest.fixture
-    def optimizer(self):
-        return Optimizer(policy=MaxQuality(), cost_model=CostModel())
-
-    @pytest.fixture
-    def config(self):
-        return QueryProcessorConfig(nocache=True)
-
-    def test_execute_full_plan(self, mocker, query_processor, dataset, optimizer, config, physical_plan, expected_records, side_effect):
+    def test_execute_full_plan(self, mocker, query_processor, optimizer, config, dataset, physical_plan, expected_records, side_effect):
         """
         This test executes the given
         """

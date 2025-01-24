@@ -1,9 +1,13 @@
-import pytest
 from palimpzest.core.data.datasources import MemorySource
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.schemas import Schema, List
+from palimpzest.core.lib.fields import Field
+from palimpzest.core.lib.schemas import Schema, SourceRecord
 from palimpzest.query.operators.datasource import MarshalAndScanDataOp
-from palimpzest.core.lib.schemas import SourceRecord
+
+
+class List(Schema):
+    value = Field(desc="List item")
+
 
 def test_marshal_and_scan_memory_source():
     # Create test data
