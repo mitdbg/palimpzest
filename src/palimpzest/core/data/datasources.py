@@ -177,7 +177,8 @@ class MemorySource(DataSource):
         if isinstance(self.vals, pd.DataFrame):
             row = self.vals.iloc[idx]
             for field_name in row.index:
-                setattr(dr, field_name, row[field_name])
+                field_name_str = f"column_{field_name}" if isinstance(field_name, (int, float)) else str(field_name)
+                setattr(dr, field_name_str, row[field_name])
         else:
             dr.value = self.vals[idx]
 
