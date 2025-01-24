@@ -61,7 +61,7 @@ class DataRecord:
         id_str = (
             str(schema) + (parent_id if parent_id is not None else self.source_id)
             if cardinality_idx is None
-            else str(schema) + str(cardinality_idx) + (parent_id if parent_id is not None else self.source_id)
+            else str(schema) + str(cardinality_idx) + str(parent_id if parent_id is not None else self.source_id)
         )
         self.id = hash_for_id(id_str)
 
