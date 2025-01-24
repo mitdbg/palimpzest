@@ -1,6 +1,7 @@
 import time
 
 import pytest
+
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert

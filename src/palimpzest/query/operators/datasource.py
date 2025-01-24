@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from abc import ABC, abstractmethod
 
 from palimpzest.constants import (
     LOCAL_SCAN_TIME_PER_KB,
@@ -12,7 +13,7 @@ from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
-class DataSourcePhysicalOp(PhysicalOperator):
+class DataSourcePhysicalOp(PhysicalOperator, ABC):
     """
     Physical operators which implement DataSources require slightly more information
     in order to accurately compute naive cost estimates. Thus, we use a slightly
@@ -57,7 +58,11 @@ class DataSourcePhysicalOp(PhysicalOperator):
         at least ballpark correct estimates of this quantity).
         """
         raise NotImplementedError("Abstract method")
-
+    
+    @abstractmethod
+    def get_datasource(self):
+        raise NotImplementedError("Abstract method")
+        
 
 class MarshalAndScanDataOp(DataSourcePhysicalOp):
     def naive_cost_estimates(
@@ -112,7 +117,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
                 record_id=record.id,
                 record_parent_id=record.parent_id,
                 record_source_id=record.source_id,
-                record_state=record.as_dict(include_bytes=False),
+                record_state=record.to_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 logical_op_id=self.logical_op_id,
                 op_name=self.op_name(),
@@ -178,7 +183,7 @@ class CacheScanDataOp(DataSourcePhysicalOp):
                 record_id=record.id,
                 record_parent_id=record.parent_id,
                 record_source_id=record.source_id,
-                record_state=record.as_dict(include_bytes=False),
+                record_state=record.to_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 logical_op_id=self.logical_op_id,
                 op_name=self.op_name(),
@@ -192,6 +197,6 @@ class CacheScanDataOp(DataSourcePhysicalOp):
         record_set = DataRecordSet(records, record_op_stats_lst)
 
         return record_set
-    
+
     def get_datasource(self):
         return self.datadir.get_cached_result(self.dataset_id)

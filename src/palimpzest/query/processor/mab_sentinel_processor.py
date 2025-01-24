@@ -4,16 +4,14 @@ from functools import partial
 from typing import Callable
 
 import numpy as np
+
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.policy import Policy
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
-from palimpzest.query.execution.single_threaded_execution_strategy import (
-    PipelinedSingleThreadExecutionStrategy,
-    SequentialSingleThreadExecutionStrategy,
-)
+from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
 from palimpzest.query.operators.convert import ConvertOp, LLMConvert
 from palimpzest.query.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
@@ -807,6 +805,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
         # (re-)initialize the optimizer
         optimizer = self.optimizer.deepcopy_clean()
+
         # construct the CostModel with any sample execution data we've gathered
         cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose)
         optimizer.update_cost_model(cost_model)
@@ -839,8 +838,9 @@ class MABSentinelSequentialSingleThreadProcessor(MABSentinelQueryProcessor, Sequ
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        SequentialSingleThreadExecutionStrategy(
+        super().__init__(self, *args, **kwargs)
+        SequentialSingleThreadExecutionStrategy.__init__(
+            self,
             scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
@@ -856,23 +856,8 @@ class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, Pipelined
     """
     def __init__(self, *args, **kwargs):
         MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
-        PipelinedParallelExecutionStrategy(
-            scan_start_idx=self.scan_start_idx,
-            datadir=self.datadir,
-            max_workers=self.max_workers,
-            nocache=self.nocache,
-            verbose=self.verbose
-        )
-        self.progress_manager = None
-
-
-class MABSentinelPipelinedSingleThreadProcessor(MABSentinelQueryProcessor, PipelinedSingleThreadExecutionStrategy):
-    """
-    This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
-    """
-    def __init__(self, *args, **kwargs):
-        MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
-        PipelinedSingleThreadExecutionStrategy(
+        PipelinedParallelExecutionStrategy.__init__(
+            self,
             scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,

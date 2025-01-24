@@ -1,8 +1,7 @@
 import pytest
-from palimpzest.constants import Cardinality
-from palimpzest.core.lib.schemas import Table, TextFile, XLSFile
+
+from palimpzest.core.lib.schemas import TextFile
 from palimpzest.sets import Dataset
-from palimpzest.utils import udfs
 
 
 ### UDFs ###
@@ -69,18 +68,6 @@ def real_estate_workload(
     listings = listings.filter(in_price_range, depends_on="price")
     return listings
 
-
-@pytest.fixture
-def biofabric_workload(biofabric_tiny, case_data_schema):
-    xls = Dataset(biofabric_tiny, schema=XLSFile)
-    # patient_tables = xls.convert(
-    #     pz.Table, desc="All tables in the file", cardinality=pz.Cardinality.ONE_TO_MANY)
-    patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
-    patient_tables = patient_tables.filter("The rows of the table contain the patient age")
-    case_data = patient_tables.convert(
-        case_data_schema, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
-    )
-    return case_data
 
 @pytest.fixture
 def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_schema):

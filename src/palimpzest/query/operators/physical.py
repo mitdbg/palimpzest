@@ -175,7 +175,6 @@ class PhysicalOperator:
 
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         raise NotImplementedError("Calling __call__ from abstract method")
-    
 
     @staticmethod
     def execute_op_wrapper(operator: PhysicalOperator, op_input: DataRecord | list[DataRecord]) -> tuple[DataRecordSet, PhysicalOperator]:

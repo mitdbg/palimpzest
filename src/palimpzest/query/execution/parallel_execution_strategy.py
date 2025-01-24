@@ -8,7 +8,7 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.datasource import MarshalAndScanDataOp
+from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.plan import PhysicalPlan
@@ -26,7 +26,6 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
             if self.max_workers is None
             else self.max_workers
         )
-
 
     def get_parallel_max_workers(self):
         # for now, return the number of system CPUs;
@@ -75,12 +74,9 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
 
         # get handle to DataSource and pre-compute its op_id and size
         source_operator = plan.operators[0]
+        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
         source_op_id = source_operator.get_op_id()
-        datasource = (
-            self.datadir.get_registered_dataset(source_operator.dataset_id)
-            if isinstance(source_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(source_operator.dataset_id)
-        )
+        datasource = source_operator.get_datasource()
         datasource_len = len(datasource)
 
         # get limit of final limit operator (if one exists)

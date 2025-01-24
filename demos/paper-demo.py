@@ -5,6 +5,8 @@ from pathlib import Path
 
 import gradio as gr
 import numpy as np
+from PIL import Image
+
 from palimpzest.constants import Cardinality
 from palimpzest.core.data.datasources import UserSource
 from palimpzest.core.elements.records import DataRecord
@@ -15,7 +17,6 @@ from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 from palimpzest.utils.udfs import xls_to_tables
-from PIL import Image
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -166,7 +167,7 @@ if __name__ == "__main__":
         "--executor",
         type=str,
         help="The plan executor to use. One of sequential, pipelined_single_thread, pipelined_parallel",
-        default="pipelined_parallel",
+        default="sequential",
     )
     parser.add_argument(
         "--policy",
@@ -249,6 +250,7 @@ if __name__ == "__main__":
         verbose=verbose,
         policy=policy,
         execution_strategy=args.executor)
+
     # Option 1: Use QueryProcessorFactory to create a processor
     # processor = QueryProcessorFactory.create_processor(
     #     datasource=plan,

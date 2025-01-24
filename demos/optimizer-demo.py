@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 
 import datasets
+from ragatouille import RAGPretrainedModel
+
 from palimpzest.constants import Model
 from palimpzest.core.data.datasources import ValidationDataSource
 from palimpzest.core.elements.records import DataRecord
@@ -16,7 +18,6 @@ from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 from palimpzest.utils.model_helpers import get_models
-from ragatouille import RAGPretrainedModel
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -1046,7 +1047,7 @@ if __name__ == "__main__":
     # save record outputs
     record_jsons = []
     for record in records:
-        record_dict = record.as_dict()
+        record_dict = record.to_dict()
         if workload == "biodex":
             record_dict = {
                 k: v for k, v in record_dict.items() if k in ["pmid", "serious", "patientsex", "drugs", "reactions"]

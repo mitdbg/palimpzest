@@ -186,14 +186,11 @@ class QueryProcessor:
     
     def _execute_best_plan(
         self,
-        dataset: Set,
+        dataset: Dataset,
         policy: Policy,
         optimizer: Optimizer,
         execution_data: list[RecordOpStats] | None = None,
     ) -> tuple[list[DataRecord], list[PlanStats]]:
-        if execution_data is None:
-            execution_data = []
-
         # get the optimal plan according to the optimizer
         plans = optimizer.optimize(dataset, policy)
         final_plan = plans[0]

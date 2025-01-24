@@ -1,4 +1,5 @@
 import pytest
+
 from palimpzest.constants import Cardinality, Model
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost
 from palimpzest.core.elements.filters import Filter
@@ -334,7 +335,7 @@ class MockSampleBasedCostModel:
         # create source_op_estimates for datasources if they are not provided
         if isinstance(operator, DataSourcePhysicalOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.get_registered_dataset(operator.dataset_id)
+            datasource = operator.get_datasource()
             datasource_len = len(datasource)
 
             source_op_estimates = OperatorCostEstimates(

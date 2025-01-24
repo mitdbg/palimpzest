@@ -24,7 +24,6 @@ from palimpzest.query.operators.logical import (
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.processor.mab_sentinel_processor import (
     MABSentinelPipelinedParallelProcessor,
-    MABSentinelPipelinedSingleThreadProcessor,
     MABSentinelSequentialSingleThreadProcessor,
 )
 from palimpzest.query.processor.nosentinel_processor import (
@@ -41,7 +40,6 @@ from palimpzest.query.processor.streaming_processor import StreamingQueryProcess
 __all__ = [
     # mab_sentinel_processor
     "MABSentinelPipelinedParallelProcessor",
-    "MABSentinelPipelinedSingleThreadProcessor",
     "MABSentinelSequentialSingleThreadProcessor",
     # nosentinel_processor
     "NoSentinelPipelinedParallelProcessor",

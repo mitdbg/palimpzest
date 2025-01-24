@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from enum import Enum
 
@@ -20,12 +22,12 @@ class OptimizationStrategyType(str, Enum):
 
 class OptimizationStrategy(ABC):
     @abstractmethod
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan] | list[SentinelPlan]:
         """Strategy decides how to search through the groups for optimal plan(s)"""
         pass
 
     @classmethod
-    def get_strategy(cls, strategy_type: str) -> 'OptimizationStrategy':
+    def get_strategy(cls, strategy_type: str) -> OptimizationStrategy:
         """Factory method to create strategy instances"""
         return OptimizerStrategyRegistry.get_strategy(strategy_type)
 
@@ -149,17 +151,16 @@ class SentinelStrategy(OptimizationStrategy):
         # add this operator set to best physical plan and return
         return SentinelPlan.from_ops_and_sub_plan([phys_op_set], best_phys_subplan)
 
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
+    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[SentinelPlan]:
         return [self._get_sentinel_plan(groups, final_group_id)]
 
 
-class NoOptimizationStrategy(OptimizationStrategy):
+class NoOptimizationStrategy(GreedyStrategy):
     """
     NoOptimizationStrategy is used to intentionally construct a PhysicalPlan without applying any
-    logical transformations or optimizations.
+    logical transformations or optimizations. It uses the same get_optimal_plans logic as the
+    GreedyOptimizationStrategy.
     """
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
-        raise NotImplementedError("No optimization strategy selected")
 
 
 class ConfidenceIntervalStrategy(OptimizationStrategy):
@@ -207,16 +208,16 @@ class ConfidenceIntervalStrategy(OptimizationStrategy):
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
         # TODO: fix this to properly handle multiple potential plans
         raise Exception("NotImplementedError")
-        # plans = self.get_confidence_interval_optimal_plans(final_group_id)
-    
+        # plans = self._get_confidence_interval_optimal_plans(final_group_id)
+
 class AutoOptimizationStrategy(OptimizationStrategy):
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy) -> list[PhysicalPlan]:
         raise NotImplementedError("Auto optimization strategy not implemented")
-    
+
 
 class OptimizerStrategyRegistry:
     """Registry to map strategy types to their implementations"""
-    
+
     _strategies: dict[str, type[OptimizationStrategy]] = {
         OptimizationStrategyType.GREEDY.value: GreedyStrategy,
         OptimizationStrategyType.CONFIDENCE_INTERVAL.value: ConfidenceIntervalStrategy,

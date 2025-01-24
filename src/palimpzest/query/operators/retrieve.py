@@ -94,7 +94,7 @@ class RetrieveOp(PhysicalOperator):
 
         duration_secs = time.time() - start_time
         answer = {self.output_attr: top_k_results}
-        record_state = output_dr.as_dict(include_bytes=False)
+        record_state = output_dr.to_dict(include_bytes=False)
         record_state["_evidence_file_ids"] = top_k_result_doc_ids
 
         # NOTE: right now this should be equivalent to [self.output_attr], but in the future we may

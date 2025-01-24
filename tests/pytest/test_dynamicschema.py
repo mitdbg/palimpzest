@@ -1,11 +1,11 @@
 """This testing class tests whether we can run a workload by defining a schema dynamically."""
-
 from palimpzest.constants import Model
 from palimpzest.core.lib.schemas import TextFile
 from palimpzest.policy import MinCost
+from palimpzest.query.operators.convert import LLMConvertBonded
+from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.schemabuilder.schema_builder import SchemaBuilder
-from palimpzest.sets import Dataset
 
 data_path = "tests/pytest/data/"
 
@@ -18,19 +18,15 @@ def test_dynamicschema_csv():
     clinical_schema = SchemaBuilder.from_file(data_path + "/synapse_schema.csv", schema_type=TextFile)
     assert clinical_schema is not None
 
-def test_dynamicschema_json():
+
+def test_dynamicschema_json(mocker, enron_workload, enron_convert, enron_filter):
     email_schema = SchemaBuilder.from_file(data_path + "/email_schema.json")
     assert email_schema is not None
     assert issubclass(email_schema, TextFile)
 
-    dataset_id = "enron-eval-tiny"
-    emails = Dataset(dataset_id, schema=email_schema)
-    emails = emails.filter(
-        'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
-    )
-    emails = emails.filter(
-        "The email is not quoting from a news article or an article written by someone outside of Enron"
-    )
+    # mock out calls to generators used by the plans which parameterize this test
+    mocker.patch.object(LLMFilter, "filter", side_effect=enron_filter)
+    mocker.patch.object(LLMConvertBonded, "convert", side_effect=enron_convert)
 
     config = QueryProcessorConfig(
         policy=MinCost(),
@@ -46,25 +42,20 @@ def test_dynamicschema_json():
         execution_strategy="sequential",
         optimizer_strategy="pareto",
     )
-    records, stats = emails.run(config=config)
+    records, stats = enron_workload.run(config=config)
 
     for rec in records:
-        print(rec.as_dict())
+        print(rec.to_dict())
 
 
-def test_dynamicschema_yml():
+def test_dynamicschema_yml(mocker, enron_workload, enron_convert, enron_filter):
     email_schema = SchemaBuilder.from_file(data_path + "/email_schema.yml")
     assert email_schema is not None
     assert issubclass(email_schema, TextFile)
 
-    dataset_id = "enron-eval-tiny"
-    emails = Dataset(dataset_id, schema=email_schema)
-    emails = emails.filter(
-        'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
-    )
-    emails = emails.filter(
-        "The email is not quoting from a news article or an article written by someone outside of Enron"
-    )
+    # mock out calls to generators used by the plans which parameterize this test
+    mocker.patch.object(LLMFilter, "filter", side_effect=enron_filter)
+    mocker.patch.object(LLMConvertBonded, "convert", side_effect=enron_convert)
 
     config = QueryProcessorConfig(
         policy=MinCost(),
@@ -80,7 +71,7 @@ def test_dynamicschema_yml():
         execution_strategy="sequential",
         optimizer_strategy="pareto",
     )
-    records, stats = emails.run(config=config)
+    records, stats = enron_workload.run(config=config)
 
     for rec in records:
-        print(rec.as_dict())
+        print(rec.to_dict())

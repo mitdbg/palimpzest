@@ -91,7 +91,7 @@ class Optimizer:
         use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
     ):
         # store the policy
-        if available_models is None:
+        if available_models is None or len(available_models) == 0:
             available_models = []
         self.policy = policy
 
@@ -456,4 +456,3 @@ class Optimizer:
         self.search_optimization_space(final_group_id)
         
         return self.strategy.get_optimal_plans(self.groups, final_group_id, policy)
-    

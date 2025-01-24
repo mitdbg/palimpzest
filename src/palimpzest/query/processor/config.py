@@ -40,7 +40,6 @@ class QueryProcessorConfig:
             "processing_strategy": self.processing_strategy,
             "execution_strategy": self.execution_strategy,
             "optimizer_strategy": self.optimizer_strategy,
-
             "policy": self.policy.to_json_str(),
             "scan_start_idx": self.scan_start_idx,
             "num_samples": self.num_samples,
@@ -59,4 +58,4 @@ class QueryProcessorConfig:
             "allow_rag_reduction": self.allow_rag_reduction,
             "allow_mixtures": self.allow_mixtures,
             "use_final_op_quality": self.use_final_op_quality,
-        }, indent=4)
+        }, indent=2)

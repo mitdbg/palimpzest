@@ -9,6 +9,7 @@ import time
 
 import pandas as pd
 import streamlit as st
+
 from palimpzest.constants import Cardinality
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import Field
@@ -34,17 +35,26 @@ class Variable(Schema):
     value = Field(desc="The value of the variable, optional, set 'null' if not found")
 
 
+dict_of_excerpts = [
+    {"id": 0, "text": "ne of the few states producing detailed daily reports of COVID-19 confirmed cases, COVID-19 related cumulative hospitalizations, intensive care unit (ICU) admissions, and deaths per county. Likewise, Ohio is a state with marked variation of demographic and geographic attributes among counties along with substantial differences in the capacity of healthcare within the state. Our aim is to predict the spatiotemporal dynamics of the COVID-19 pandemic in relation with the distribution of the capacity of healthcare in Ohio. 2. Methods 2.1. Mathematical model We developed a spatial mathematical model to simulate the transmission dynamics of COVID-19 disease infection and spread. The spatially-explicit model incorporates geographic connectivity information at county level. The Susceptible-Infected-Hospitalized-Recovered- Dead (SIHRD) COVID-19 model classified the population into susceptibles (S), confirmed infections (I), hospitalized and ICU admitted (H), recovered (R) and dead (D). Based on a previous study that identified local air hubs and main roads as important geospatial attributes lio residing in the county. In the second scenario, we used the model to generate projections of the impact of potential easing on the non-pharmaceutical interventions in the critical care capacity of each county in Ohio. We assessed the impact of 50% reduction on the estimated impact of non-pharmaceutical interventions in reducing the hazard rate of infection. Under this scenario we calculated the proportion of ICU \n'"},
+    {"id": 1, "text": "t model incorporates geographic connectivity information at county level. The Susceptible-Infected-Hospitalized-Recovered- Dead (SIHRD) COVID-19 model classified the population into susceptibles (S), confirmed infections (I), hospitalized and ICU admitted (H), recovered (R) and dead (D). Based on a previous study that identified local air hubs and main roads as important geospatial attributes linked to differential COVID-19 related hospitalizations and mortality (Correa-Agudelo et a"}
+]
+
+list_of_strings = ["I have a variable a, the value is 1", "I have a variable b, the value is 2"]
+list_of_numbers = [1, 2, 3, 4, 5]
+
 if __name__ == "__main__":
     run_pz = True
     dataset = "askem"
+    file_path = "testdata/askem-tiny/"
 
     if run_pz:
         # reference, plan, stats = run_workload()
-        excerpts = Dataset(dataset, schema=TextFile)
+        df_input = pd.DataFrame(dict_of_excerpts)
+        excerpts = Dataset(df_input)
         output = excerpts.convert(
-            Variable, desc="A variable used or introduced in the paper snippet", cardinality=Cardinality.ONE_TO_MANY
-        )
-
+            Variable, desc="A variable used or introduced in the context", cardinality=Cardinality.ONE_TO_MANY
+        ).filter("The value name is 'a'", depends_on="name")
         policy = MaxQuality()
         config = QueryProcessorConfig(
             policy=policy,
@@ -69,7 +79,7 @@ if __name__ == "__main__":
         input_records = processor.get_input_records()
         input_df = DataRecord.as_df(input_records)
         print(input_df)
-        
+
         variables = []
         statistics = []
         start_time = time.time()
@@ -120,8 +130,8 @@ if __name__ == "__main__":
                     st.write(" **value:** ", var.value, "\n")
 
         # write variables to a json file with readable format
-        with open(f"askem-variables-{dataset}.json", "w") as f:
-            json.dump(variables, f, indent=4)
+        # with open(f"askem-variables-{dataset}.json", "w") as f:
+        #     json.dump(variables, f, indent=4)
         vars_df = pd.DataFrame(variables)
 
     # G = nx.DiGraph()
@@ -151,7 +161,7 @@ if __name__ == "__main__":
     #
     # nx.write_gexf(G, "demos/bdf-usecase3.gexf")
 
-    print("References:", vars_df)
+    # print("References:", vars_df)
     # st.write(table.title, table.author, table.abstract)
     # endTime = time.time()
     # print("Elapsed time:", endTime - startTime)

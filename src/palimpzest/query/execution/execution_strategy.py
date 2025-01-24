@@ -25,7 +25,7 @@ class ExecutionStrategy(ABC):
                  scan_start_idx: int = 0, 
                  datadir: DataDirectory | None = None,
                  max_workers: int | None = None,
-                 nocache: bool = False,
+                 nocache: bool = True,
                  verbose: bool = False):
         self.scan_start_idx = scan_start_idx
         self.datadir = datadir
@@ -72,4 +72,3 @@ class ExecutionStrategy(ABC):
             total_execution_time=time.time() - start_time,
             total_execution_cost=sum(ps.total_cost for ps in plan_stats)
         )
-

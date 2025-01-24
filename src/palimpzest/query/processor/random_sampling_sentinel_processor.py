@@ -4,6 +4,7 @@ from functools import partial
 from typing import Callable
 
 import numpy as np
+
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
 from palimpzest.core.data.datasources import ValidationDataSource
@@ -547,7 +548,8 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
 
         # construct the CostModel with any sample execution data we've gathered
         cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose, self.exp_name)
-        optimizer = self.optimizer.deepcopy_clean().update_cost_model(cost_model)
+        optimizer = self.optimizer.deepcopy_clean()
+        optimizer.update_cost_model(cost_model)
         total_optimization_time = time.time() - execution_start_time
 
         # execute plan(s) according to the optimization strategy
@@ -576,8 +578,9 @@ class RandomSamplingSentinelSequentialSingleThreadProcessor(RandomSamplingSentin
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        SequentialSingleThreadExecutionStrategy(
+        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        SequentialSingleThreadExecutionStrategy.__init__(
+            self,
             scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
@@ -590,8 +593,9 @@ class RandomSamplingSentinelPipelinedParallelProcessor(RandomSamplingSentinelQue
     This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        PipelinedParallelExecutionStrategy(
+        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        PipelinedParallelExecutionStrategy.__init__(
+            self,
             scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,
@@ -604,8 +608,9 @@ class RandomSamplingSentinelPipelinedSingleThreadProcessor(RandomSamplingSentine
     This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        PipelinedSingleThreadExecutionStrategy(
+        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        PipelinedSingleThreadExecutionStrategy.__init__(
+            self,
             scan_start_idx=self.scan_start_idx,
             datadir=self.datadir,
             max_workers=self.max_workers,

@@ -1,7 +1,7 @@
 import json
 
 from palimpzest.core.data.dataclasses import PlanCost
-
+import json
 
 class Policy:
     """
@@ -53,6 +53,12 @@ class Policy:
             "config": self.get_dict()
         }, indent=4)
 
+    def to_json_str(self) -> str:
+        """Convert policy configuration to a JSON-serializable dictionary."""
+        return json.dumps({
+            "type": self.__class__.__name__,
+            "config": self.get_dict()
+        }, indent=2)
 
 class MaxQuality(Policy):
     """

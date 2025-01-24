@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Type
 
 from palimpzest.query.execution.execution_strategy import ExecutionStrategyType
 from palimpzest.query.optimizer.cost_model import CostModel
@@ -33,8 +32,7 @@ class ProcessingStrategyType(Enum):
     STREAMING = "streaming"
     AUTO = "auto"
 
-
-def convert_to_enum(enum_type: Type[Enum], value: str) -> Enum:
+def convert_to_enum(enum_type: type[Enum], value: str) -> Enum:
     if value == "pipelined":
         value = "pipelined_single_thread"
     value = value.upper().replace('-', '_')
@@ -162,4 +160,3 @@ class QueryProcessorFactory:
         config.available_models = available_models
 
         return config
-

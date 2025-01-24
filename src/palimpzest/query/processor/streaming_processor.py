@@ -5,7 +5,7 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.policy import Policy
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.datasource import DataSourcePhysicalOp, MarshalAndScanDataOp
+from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
@@ -90,11 +90,8 @@ class StreamingQueryProcessor(QueryProcessor):
 
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
-        datasource = (
-            self.datadir.get_registered_dataset(scan_operator.dataset_id)
-            if isinstance(scan_operator, MarshalAndScanDataOp)
-            else self.datadir.get_cached_result(scan_operator.dataset_id)
-        )
+        assert isinstance(scan_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
+        datasource = scan_operator.get_datasource()
         if not datasource:
             raise Exception("Data source not found")
         datasource_len = len(datasource)
