@@ -205,10 +205,12 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
 
     def get_registered_dataset_type(self, dataset_id):
         """Return the type of the given dataset in the registry."""
-        if dataset_id not in self._registry:
+        if dataset_id in self._tempRegistry:
+            entry, _ = self._tempRegistry[dataset_id]
+        elif dataset_id in self._registry:
+            entry, _ = self._registry[dataset_id]
+        else:
             raise Exception("Cannot find dataset", dataset_id, "in the registry.")
-
-        entry, _ = self._registry[dataset_id]
 
         return entry
 
