@@ -52,8 +52,9 @@ class TestCostModel:
     )
     def test_estimate_plan_cost(self, simple_plan_sample_execution_data, physical_plan, expected_cost_est_results):
         # register a fake dataset
+        dataset_id = "foobar"
         vals = [1, 2, 3, 4, 5, 6]
-        DataDirectory().get_or_register_memory_source(vals=vals)
+        DataDirectory().register_memory_source(vals=vals, dataset_id=dataset_id)
         input_cardinality = len(vals)
 
         # TODO: if we test with a plan other than the simple test plan; this will break

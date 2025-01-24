@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import pandas as pd
-import numpy as np
 from typing import Any as TypingAny
 
 import pandas as pd
@@ -21,7 +19,7 @@ from palimpzest.core.lib.fields import (
     StringField,
 )
 from palimpzest.utils.hash_helpers import hash_for_temp_schema
-from palimpzest.constants import DERIVED_SCHEMA_PREFIX, FROM_DF_PREFIX
+
 
 class SchemaMetaclass(type):
     """
@@ -240,7 +238,7 @@ class Schema(metaclass=SchemaMetaclass):
         return type(new_schema_name, (Schema,), attributes)
 
     @staticmethod
-    def from_df(df: pd.DataFrame) -> "Schema":
+    def from_df(df: pd.DataFrame) -> Schema:
         # Create a unique schema name based on columns
         schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
 
@@ -277,39 +275,6 @@ class Schema(metaclass=SchemaMetaclass):
     def class_name(cls) -> str:
         """Return the name of this class"""
         return cls.__name__
-
-    @staticmethod
-    def from_df(df: pd.DataFrame) -> Schema:
-        # Create a unique schema name based on columns
-        schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
-
-        # consider to save to temp file and load from there 
-        if schema_name in globals():
-            return globals()[schema_name]
-
-        # NOTE: we will not be able to infer more complicated types like ImageFilepathField
-        #       without some input from the user
-        # construct attributes for schema (i.e. its fields and metadata)
-        desc = "Schema derived from DataFrame"
-        attributes = {"_desc": desc, "__doc__": desc, "__module__": Schema.__module__}
-        for col, dtype in zip(df.columns, df.dtypes):
-            if dtype == "object":
-                attributes[col] = StringField(desc=col)
-            elif dtype == "bool":
-                attributes[col] = BooleanField(desc=col)
-            elif dtype == "int64":
-                attributes[col] = IntField(desc=col)
-            elif dtype == "float64":
-                attributes[col] = FloatField(desc=col)
-            else:
-                attributes[col] = Field(desc=col)
-
-        # Create new schema only if it doesn't exist
-        new_schema = type(schema_name, (Schema,), attributes)
-
-        # Store the schema class globally
-        globals()[schema_name] = new_schema
-        return new_schema
 
 ###################################################################################
 # "Core" useful Schemas. These are Schemas that almost everyone will need.
