@@ -1,4 +1,4 @@
-![pz-banner](src/static/palimpzest-cropped.png)
+![pz-banner](https://palimpzest-workloads.s3.us-east-1.amazonaws.com/palimpzest-cropped.png)
 
 # Palimpzest (PZ)
 [![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/pdf/2405.14696)
