@@ -17,16 +17,15 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.x'
-
     - name: Build Package
       run: |
         pip install --upgrade pip build
         python3 -m build
-    
-    uses: actions/upload-artifact@v4
-    with:
-      name: python-package-distributions
-      path: dist/
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
 
   publish:
     runs-on: ubuntu-latest
