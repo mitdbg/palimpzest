@@ -24,7 +24,12 @@ jobs:
         python3 -m build
 
     - name: Push Package
-      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/docs' }}
       run: |
-        pip install --upgrade twine
-        twine upload dist/* -u ${{ secrets.PYPI_USERNAME }} -p ${{ secrets.PYPI_PASSWORD }}
+        echo ${{ github.event_name }}
+        echo ${{ github.ref }}
+
+    # - name: Push Package
+    #   if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/docs' }}
+    #   run: |
+    #     pip install --upgrade twine
+    #     twine upload dist/* -u ${{ secrets.PYPI_USERNAME }} -p ${{ secrets.PYPI_PASSWORD }}
