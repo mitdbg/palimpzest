@@ -1,0 +1,30 @@
+name: package
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Build Package
+      run: |
+        pip install --upgrade pip build
+        python3 -m build
+
+    - name: Push Package
+      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/docs' }}
+      run: |
+        pip install --upgrade twine
+        twine upload dist/* -u ${{ secrets.PYPI_USERNAME }} -p ${{ secrets.PYPI_PASSWORD }}

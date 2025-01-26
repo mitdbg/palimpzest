@@ -17,7 +17,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
+        pip install --upgrade pip
         pip install .
 
     - name: Download and register testdata
@@ -33,7 +33,7 @@ jobs:
         pz reg --path testdata/real-estate-eval-tiny --name real-estate-eval-tiny
 
     - name: Test with pytest
-      env: # Or as an environment variable
+      env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
       run: |
