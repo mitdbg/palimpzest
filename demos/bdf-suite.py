@@ -221,9 +221,7 @@ if run_pz:
         execution_strategy="sequential",
         optimizer_strategy="pareto",
     )
-    processor = QueryProcessorFactory.create_processor(output, config)
-    plan = processor.generate_plan(output, policy)
-    data_record_collection = processor.execute()
+    data_record_collection = output.run(config)
     
     references = []
     statistics = []
@@ -238,7 +236,7 @@ if run_pz:
             with st.container():
                 st.write("### Executed plan: \n")
                 # st.write(" " + str(plan).replace("\n", "  \n "))
-                for idx, op in enumerate(plan.operators):
+                for idx, op in enumerate(stats.plan_strs[0].operators):
                     strop = f"{idx+1}. {str(op)}"
                     strop = strop.replace("\n", "  \n")
                     st.write(strop)
