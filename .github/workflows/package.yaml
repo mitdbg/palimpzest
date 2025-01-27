@@ -70,7 +70,7 @@ jobs:
           ./dist/*.whl
     - name: testing
       run: |
-        PKG_VERSION=ls -l dist/ | head -n 1 | sed -E 's/.*palimpzest-([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/'
+        PKG_VERSION=`ls -l dist/ | head -n 1 | sed -E 's/.*palimpzest-([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/'`
         echo $PKG_VERSION
     # - name: Create GitHub Release
     #   env:
