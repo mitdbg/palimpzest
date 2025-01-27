@@ -1,6 +1,6 @@
 import pandas as pd
+
 import palimpzest as pz
-from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.core.elements.records import DataRecord
 
 df = pd.read_csv("testdata/enron-tiny.csv")
@@ -17,8 +17,6 @@ qr3 = qr2.filter("It is an email").filter("It has Vacation in the subject")
 # )
 
 records, _ = qr3.run()
-outputDf = DataRecord.to_df(records)
+output_df = DataRecord.to_df(records)
 
-
-
-print(outputDf)
+print(output_df)
