@@ -68,25 +68,18 @@ jobs:
         inputs: >-
           ./dist/*.tar.gz
           ./dist/*.whl
-    - name: testing
+    - name: Create GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
-        PKG_VERSION=`ls -l dist/ | head -n 1 | sed -E 's/.*palimpzest-([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/'`
-        echo $PKG_VERSION
-    # - name: Create GitHub Release
-    #   env:
-    #     GITHUB_TOKEN: ${{ github.token }}
-    #   run: >-
-    #     gh release create
-    #     "$GITHUB_REF_NAME"
-    #     --repo "$GITHUB_REPOSITORY"
-    #     --notes ""
-    # - name: Upload artifact signatures to GitHub Release
-    #   env:
-    #     GITHUB_TOKEN: ${{ github.token }}
-    #   # Upload to GitHub Release using the `gh` CLI.
-    #   # `dist/` contains the built packages, and the
-    #   # sigstore-produced signatures and certificates.
-    #   run: >-
-    #     gh release upload
-    #     "$GITHUB_REF_NAME" dist/**
-    #     --repo "$GITHUB_REPOSITORY"
+        PKG_VERSION=`ls dist/ | head -n 1 | sed -E 's/.*palimpzest-([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/'`
+        gh release create "$PKG_VERSION" --repo "$GITHUB_REPOSITORY" --notes ""
+    - name: Upload artifact signatures to GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      # Upload to GitHub Release using the `gh` CLI.
+      # `dist/` contains the built packages, and the
+      # sigstore-produced signatures and certificates.
+      run: |
+        PKG_VERSION=`ls dist/ | head -n 1 | sed -E 's/.*palimpzest-([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/'`
+        gh release upload "$PKG_VERSION" dist/** --repo "$GITHUB_REPOSITORY"
