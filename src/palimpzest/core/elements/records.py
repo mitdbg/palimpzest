@@ -250,13 +250,14 @@ class DataRecord:
         return records
 
     @staticmethod
-    def to_df(records: list[DataRecord], fields_in_schema: bool = False) -> pd.DataFrame:
+    def to_df(records: list[DataRecord], project_cols: list[str] | None = None) -> pd.DataFrame:
         if len(records) == 0:
             return pd.DataFrame()
-        if not fields_in_schema:
-            return pd.DataFrame([record.to_dict() for record in records])
-
+        
         fields = records[0].schema.field_names()
+        if project_cols is not None and len(project_cols) > 0:
+            fields = [field for field in fields if field in project_cols]
+
         return pd.DataFrame([
             {k: record[k] for k in fields}
             for record in records
@@ -346,15 +347,15 @@ class DataRecordCollection:
         self.data_records = data_records
         self.execution_stats = execution_stats
         self.plan_stats = plan_stats
-        self.executed_plan = self._get_executed_plan()
+        self.executed_plans = self._get_executed_plans()
 
-    def to_df(self, fields_in_schema: bool = False):
-        return DataRecord.to_df(self.data_records, fields_in_schema)
+    def to_df(self, project_cols: list[str] | None = None):
+        return DataRecord.to_df(self.data_records, project_cols)
     
-    def _get_executed_plan(self):
+    def _get_executed_plans(self):
         if self.plan_stats is not None:
-            return self.plan_stats.plan_str
+            return [self.plan_stats.plan_str]
         elif self.execution_stats is not None:
-            return self.execution_stats.plan_strs
+            return list(self.execution_stats.plan_strs.values())
         else:
             return None
