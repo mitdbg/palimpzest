@@ -9,6 +9,7 @@ from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.data.datasources import DataSource
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
+from palimpzest.core.lib.fields import ListField, StringField
 from palimpzest.core.lib.schemas import DefaultSchema, Number, Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.query.processor.config import QueryProcessorConfig
@@ -49,10 +50,11 @@ class Set:
         agg_func: AggFunc | None = None,
         group_by: GroupBySig | None = None,
         project_cols: list[str] | None = None,
-        index = None, # TODO(Siva): Abstract Index and add a type here and elsewhere
+        index=None,  # TODO(Siva): Abstract Index and add a type here and elsewhere
+        search_func: Callable | None = None,
         search_attr: str | None = None,
         output_attr: str | None = None,
-        k: int | None = None, # TODO: disambiguate `k` to be something like `retrieve_k`
+        k: int | None = None,  # TODO: disambiguate `k` to be something like `retrieve_k`
         limit: int | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         depends_on: list[str] | None = None,
@@ -67,6 +69,7 @@ class Set:
         self._group_by = group_by
         self._project_cols = None if project_cols is None else sorted(project_cols)
         self._index = index
+        self._search_func = search_func
         self._search_attr = search_attr
         self._output_attr = output_attr
         self._k = k
@@ -104,6 +107,7 @@ class Set:
             "group_by": (None if self._group_by is None else self._group_by.serialize()),
             "project_cols": (None if self._project_cols is None else self._project_cols),
             "index": None if self._index is None else get_index_str(self._index),
+            "search_func": None if self._search_func is None else str(self._search_func),
             "search_attr": self._search_attr,
             "output_attr": self._output_attr,
             "k": self._k,
@@ -121,7 +125,6 @@ class Set:
     def json_schema(self):
         """Return the JSON schema for this Set."""
         return self.schema.json_schema()
-
 
 
 class Dataset(Set):
@@ -156,6 +159,7 @@ class Dataset(Set):
             agg_func=self._agg_func,
             group_by=self._group_by,
             index=self._index,
+            search_func=self._search_func,
             search_attr=self._search_attr,
             output_attr=self._output_attr,
             k=self._k,
@@ -247,12 +251,26 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def retrieve(self, output_schema, index, search_attr, output_attr, k=-1) -> Dataset:
+    def retrieve(
+        self, index, search_func: Callable, search_attr: str, output_attr: str, output_attr_desc: str, k=-1
+    ) -> Dataset:
+        """
+        Retrieve the top k nearest neighbors of the value of the `search_attr` from the index and stores it in the `output_attr` field.
+        The output schema is a union of the current schema and the `output_attr` with type ListField(StringField).
+        `search_func` is a function of type (index, query: str, k: int) -> List[str]. It should implement the lookup logic for the index and return the top k results.
+        The value of the `search_attr` field is used as the query to lookup in the index.
+        The results are stored in the `output_attr` field.
+        `output_attr_desc` is the description of the `output_attr` field.
+        """
+        # Output schema is a union of the current schema and the output_attr
+        attributes = {output_attr: ListField(desc=output_attr_desc, element_type=StringField)}
+        output_schema = self.schema().union(type("temp_class", (Schema,), attributes))
         return Dataset(
             source=self,
             schema=output_schema,
             desc="Retrieve",
             index=index,
+            search_func=search_func,
             search_attr=search_attr,
             output_attr=output_attr,
             k=k,
@@ -278,6 +296,7 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def run(self, config: QueryProcessorConfig | None = None, **kwargs): # noqa: F821
+    def run(self, config: QueryProcessorConfig | None = None, **kwargs):  # noqa: F821
         from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+
         return QueryProcessorFactory.create_and_run_processor(self, config, **kwargs)
