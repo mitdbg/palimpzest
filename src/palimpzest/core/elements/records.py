@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 
 from palimpzest.constants import FROM_DF_PREFIX
-from palimpzest.core.data.dataclasses import RecordOpStats
+from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats, RecordOpStats
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.utils.hash_helpers import hash_for_id
@@ -324,3 +324,37 @@ class DataRecordSet:
 
     def __iter__(self):
         yield from self.data_records
+
+
+class DataRecordCollection:
+    """
+    A DataRecordCollection contains a list of DataRecords.
+
+    This is a wrapper class for list[DataRecord] to support more advanced features for output of execute().
+
+    The difference between DataRecordSet and DataRecordCollection 
+    Goal: 
+        DataRecordSet is a set of DataRecords that share the same schema, same parent_id, and same source_id.
+        DataRecordCollection is a general wrapper for list[DataRecord].
+    
+    Usage:
+        DataRecordSet is used for the output of executing an operator.
+        DataRecordCollection is used for the output of executing a query, we definitely could extend it to support more advanced features for output of execute().
+    """
+    # TODO(Jun): consider to have stats_manager class to centralize stats management.
+    def __init__(self, data_records: list[DataRecord], execution_stats: ExecutionStats | None = None, plan_stats: PlanStats | None = None):
+        self.data_records = data_records
+        self.execution_stats = execution_stats
+        self.plan_stats = plan_stats
+        self.executed_plan = self._get_executed_plan()
+
+    def to_df(self, fields_in_schema: bool = False):
+        return DataRecord.to_df(self.data_records, fields_in_schema)
+    
+    def _get_executed_plan(self):
+        if self.plan_stats is not None:
+            return self.plan_stats.plan_str
+        elif self.executed_plan is not None:
+            return self.executed_plan.plan_str
+        else:
+            return None
