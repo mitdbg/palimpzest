@@ -135,7 +135,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
 
     def get_or_register_local_source(self, dataset_id_or_path):
         """Return a dataset from the registry."""
-        if dataset_id_or_path in self._registry:
+        if dataset_id_or_path in self._tempRegistry or dataset_id_or_path in self._registry:
             return self.get_registered_dataset(dataset_id_or_path)
         else:
             if os.path.isfile(dataset_id_or_path):
@@ -162,7 +162,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
     def register_user_source(self, src: UserSource, dataset_id: str):
         """Register a user source as a data source."""
         # user sources are always ephemeral
-        self._registry[dataset_id] = ("user", src)
+        self._tempRegistry[dataset_id] = ("user", src)
 
     def get_registered_dataset(self, dataset_id):
         """Return a dataset from the registry."""

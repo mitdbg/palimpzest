@@ -38,7 +38,7 @@ from palimpzest.sets import Dataset
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema, TextFile
 from palimpzest.policy import MinCost, MaxQuality
-from palimpzest.query import Execute
+from palimpzest.query.processor.config import QueryProcessorConfig
 
 # Dataset registration
 dataset_path = "testdata/enron-tiny"
@@ -62,7 +62,14 @@ dataset = dataset.filter("The email is about holidays")
 
 # Executing the compuation
 policy = MinCost()
-results, execution_stats = Execute(dataset, policy)
+config = QueryProcessorConfig(
+    policy=policy,
+    verbose=True,
+    processing_strategy="no_sentinel",
+    execution_strategy="sequential",
+    optimizer_strategy="pareto",
+)
+results, execution_stats = dataset.run(config)
 
 # Writing output to disk
 output_df = pd.DataFrame([r.to_dict() for r in results])[["date","sender","subject"]]
