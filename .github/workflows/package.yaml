@@ -3,7 +3,7 @@ name: package
 on:
   push:
     branches:
-      - main
+      - docs
   pull_request:
     branches:
       - main
@@ -30,7 +30,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     name: Publish Package
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/docs' }}
     needs:
     - build
     environment:
@@ -68,21 +68,23 @@ jobs:
         inputs: >-
           ./dist/*.tar.gz
           ./dist/*.whl
-    - name: Create GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      run: >-
-        gh release create
-        "$GITHUB_REF_NAME"
-        --repo "$GITHUB_REPOSITORY"
-        --notes ""
-    - name: Upload artifact signatures to GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      # Upload to GitHub Release using the `gh` CLI.
-      # `dist/` contains the built packages, and the
-      # sigstore-produced signatures and certificates.
-      run: >-
-        gh release upload
-        "$GITHUB_REF_NAME" dist/**
-        --repo "$GITHUB_REPOSITORY"
+    - name: testing
+      run: ls -l dist/
+    # - name: Create GitHub Release
+    #   env:
+    #     GITHUB_TOKEN: ${{ github.token }}
+    #   run: >-
+    #     gh release create
+    #     "$GITHUB_REF_NAME"
+    #     --repo "$GITHUB_REPOSITORY"
+    #     --notes ""
+    # - name: Upload artifact signatures to GitHub Release
+    #   env:
+    #     GITHUB_TOKEN: ${{ github.token }}
+    #   # Upload to GitHub Release using the `gh` CLI.
+    #   # `dist/` contains the built packages, and the
+    #   # sigstore-produced signatures and certificates.
+    #   run: >-
+    #     gh release upload
+    #     "$GITHUB_REF_NAME" dist/**
+    #     --repo "$GITHUB_REPOSITORY"
