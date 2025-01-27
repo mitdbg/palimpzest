@@ -49,9 +49,8 @@ if __name__ == "__main__":
     file_path = "testdata/askem-tiny/"
 
     if run_pz:
-        # reference, plan, stats = run_workload()
-        df_input = pd.DataFrame(dict_of_excerpts)
-        excerpts = Dataset(dataset, schema=Papersnippet)
+        df_input = pd.DataFrame(list_of_strings)
+        excerpts = Dataset(df_input, schema=Papersnippet)
         output = excerpts.convert(
             Variable, desc="A variable used or introduced in the context", cardinality=Cardinality.ONE_TO_MANY
         ).filter("The value name is 'a'", depends_on="name")
@@ -85,7 +84,7 @@ if __name__ == "__main__":
         start_time = time.time()
         # for idx, (vars, plan, stats) in enumerate(iterable):
         for idx, record in enumerate(input_records):
-            print(f"idx: {idx}\n vars: {vars}")
+            print(f"idx: {idx}\n record: {record}")
             index = idx
             vars = processor.execute_opstream(processor.plan, record)
             if idx == len(input_records) - 1:
@@ -130,8 +129,8 @@ if __name__ == "__main__":
                     st.write(" **value:** ", var.value, "\n")
 
         # write variables to a json file with readable format
-        # with open(f"askem-variables-{dataset}.json", "w") as f:
-        #     json.dump(variables, f, indent=4)
+        with open(f"askem-variables-{dataset}.json", "w") as f:
+            json.dump(variables, f, indent=4)
         vars_df = pd.DataFrame(variables)
 
     # G = nx.DiGraph()

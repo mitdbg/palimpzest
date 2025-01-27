@@ -17,6 +17,7 @@ from palimpzest.core.lib.schemas import URL, File, PDFFile, Schema, Table, XLSFi
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality
 from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 from palimpzest.sets import Dataset
 from palimpzest.utils import udfs
 
@@ -198,7 +199,7 @@ with st.sidebar:
     run_pz = st.button("Run Palimpzest on dataset")
 
     # st.radio("Biofabric Data Integration")
-run_pz = False
+run_pz = True
 dataset = "bdf-usecase3-tiny"
 
 if run_pz:
@@ -220,13 +221,17 @@ if run_pz:
         execution_strategy="sequential",
         optimizer_strategy="pareto",
     )
-    iterable = output.run(config)
-
+    processor = QueryProcessorFactory.create_processor(output, config)
+    plan = processor.generate_plan(output, policy)
+    data_record_collection = processor.execute()
+    
     references = []
     statistics = []
 
-    for idx, (reference, plan, stats) in enumerate(iterable):
+    for idx, record_collection in enumerate(data_record_collection):
         record_time = time.time()
+        stats = record_collection.execution_stats
+        references = record_collection.data_records
         statistics.append(stats)
 
         if not idx:
@@ -237,7 +242,7 @@ if run_pz:
                     strop = f"{idx+1}. {str(op)}"
                     strop = strop.replace("\n", "  \n")
                     st.write(strop)
-        for ref in reference:
+        for ref in references:
             try:
                 index = ref.index
             except Exception:

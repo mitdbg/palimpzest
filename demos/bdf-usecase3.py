@@ -120,19 +120,21 @@ if run_pz:
     references = []
     statistics = []
 
-    for idx, (reference, plan, stats) in enumerate(iterable):
+    for idx, records_collection in enumerate(iterable):
         record_time = time.time()
+        references = records_collection.data_records
+        stats = records_collection.execution_stats
         statistics.append(stats)
 
         if not idx:
             with st.container():
                 st.write("### Executed plan: \n")
                 # st.write(" " + str(plan).replace("\n", "  \n "))
-                for idx, op in enumerate(plan.operators):
+                for idx, op in enumerate(stats.plan_strs[0].operators):
                     strop = f"{idx+1}. {str(op)}"
                     strop = strop.replace("\n", "  \n")
                     st.write(strop)
-        for ref in reference:
+        for ref in references:
             try:
                 index = ref.index
             except Exception:
