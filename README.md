@@ -1,15 +1,15 @@
-![pz-banner](src/static/palimpzest-cropped.png)
+![pz-banner](https://palimpzest-workloads.s3.us-east-1.amazonaws.com/palimpzest-cropped.png)
 
 # Palimpzest (PZ)
-[![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/pdf/2405.14696)
-[![Blog Post](https://img.shields.io/badge/Website-PZ-green)](https://dsg.csail.mit.edu/projects/palimpzest/)
+[![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv)](https://arxiv.org/pdf/2405.14696)
+[![Blog Post](https://img.shields.io/badge/Blog-PZ-green)](https://dsg.csail.mit.edu/projects/palimpzest/)
 [![Colab Demo](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1zqOxnh_G6eZ8_xax6PvDr-EjMt7hp4R5?usp=sharing)
-[![Video](https://img.shields.io/badge/Website-Talk-purple)](https://youtu.be/T8VQfyBiki0?si=eiph57DSEkDNbEIu)
+[![Video](https://img.shields.io/badge/YouTube-Talk-red?logo=youtube)](https://youtu.be/T8VQfyBiki0?si=eiph57DSEkDNbEIu)
 [![PyPI](https://img.shields.io/pypi/v/palimpzest)](https://pypi.org/project/palimpzest/)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/palimpzest)](https://pypi.org/project/palimpzest/)
+[![PyPI - Monthly Downloads](https://img.shields.io/pypi/dm/palimpzest)](https://pypi.org/project/palimpzest/)
 
 ## Getting started
-You can find a stable version of the Palimpzest package on PyPI [here](https://pypi.org/project/palimpzest/). To install the package, run:
+You can find a stable version of the PZ package on PyPI [here](https://pypi.org/project/palimpzest/). To install the package, run:
 ```bash
 $ pip install palimpzest
 ```
@@ -22,7 +22,7 @@ $ pip install .
 ```
 
 ## Quick Start
-The easiest way to get started with Palimpzest, is to run the `quickstart.ipynb` jupyter notebook. We provide a simple use case to showcase the workflow of working with Palimpzest, including registering a dataset, running a workload, and accessing the results.
+The easiest way to get started with Palimpzest is to run the `quickstart.ipynb` jupyter notebook. We demonstrate the full workflow of working with PZ, including registering a dataset, composing and executing a pipeline, and accessing the results.
 To run the notebook, you can use the following command:
 ```bash
 $ jupyter notebook
