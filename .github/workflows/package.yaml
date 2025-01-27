@@ -50,8 +50,8 @@ jobs:
   github-release:
     name: >-
       Sign distribution w/Sigstore and upload to GitHub Release
-    needs:
-    - publish
+    # needs:
+    # - publish
     runs-on: ubuntu-latest
     permissions:
       contents: write
