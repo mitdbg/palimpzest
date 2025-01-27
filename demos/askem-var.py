@@ -63,6 +63,8 @@ if __name__ == "__main__":
             execution_strategy="sequential",
             optimizer_strategy="pareto",
         )
+ 
+        # Option 1: Use QueryProcessorFactory to create a processor and generate a plan 
         processor = QueryProcessorFactory.create_processor(excerpts, config)
         plan = processor.generate_plan(output, policy)
         print(processor.plan)
@@ -70,7 +72,7 @@ if __name__ == "__main__":
         with st.container():
             st.write("### Executed plan: \n")
             # st.write(" " + str(plan).replace("\n", "  \n "))
-            for idx, op in enumerate(processor.plan.operators):
+            for idx, op in enumerate(plan.operators):
                 strop = f"{idx + 1}. {str(op)}"
                 strop = strop.replace("\n", "  \n")
                 st.write(strop)

@@ -85,7 +85,7 @@ class StreamingQueryProcessor(QueryProcessor):
             if idx == len(input_records) - 1:
                 total_plan_time = time.time() - start_time
                 self.plan_stats.finalize(total_plan_time)
-
+            self.plan_stats.plan_str = str(self.plan)
             yield DataRecordCollection(output_records, plan_stats=self.plan_stats)
 
     def get_input_records(self):
