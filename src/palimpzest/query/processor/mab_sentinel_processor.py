@@ -7,7 +7,7 @@ import numpy as np
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
-from palimpzest.core.elements.records import DataRecord, DataRecordSet, DataRecordCollection
+from palimpzest.core.elements.records import DataRecord, DataRecordCollection, DataRecordSet
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.policy import Policy
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
