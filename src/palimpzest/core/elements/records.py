@@ -355,6 +355,6 @@ class DataRecordCollection:
         if self.plan_stats is not None:
             return self.plan_stats.plan_str
         elif self.execution_stats is not None:
-            return self.executed_plan.plan_str
+            return self.execution_stats.plan_strs
         else:
             return None
