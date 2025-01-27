@@ -354,7 +354,7 @@ class DataRecordCollection:
     def _get_executed_plan(self):
         if self.plan_stats is not None:
             return self.plan_stats.plan_str
-        elif self.executed_plan is not None:
+        elif self.execution_stats is not None:
             return self.executed_plan.plan_str
         else:
             return None
