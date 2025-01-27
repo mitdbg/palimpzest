@@ -15,6 +15,9 @@ config = QueryProcessorConfig(
     execution_strategy="pipelined_parallel",
 )
 
-output_df = qr3.run(config).to_df()
+output = qr3.run(config)
+output_df = output.to_df()
+print(output_df)
 
+output_df = output.to_df(project_cols=["sender", "subject", "date"])
 print(output_df)
