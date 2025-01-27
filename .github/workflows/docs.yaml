@@ -3,7 +3,7 @@ name: docs
 on:
   push:
     branches:
-      - docs
+      - main
   pull_request:
     branches:
       - main
@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install sphinx sphinx-book-theme
+          pip install sphinx sphinx-book-theme pydata-sphinx-theme furo
           pip install .
       - name: Sphinx build
         run: |
@@ -29,7 +29,7 @@ jobs:
           echo "palimpzest.org" > build/html/CNAME
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/docs' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         with:
           publish_branch: gh-pages
           github_token: ${{ secrets.GITHUB_TOKEN }}

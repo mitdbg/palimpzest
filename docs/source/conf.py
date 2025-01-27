@@ -39,3 +39,7 @@ exclude_patterns = []
 
 html_theme = "sphinx_book_theme"
 html_static_path = ["_static"]
+html_logo = "https://palimpzest-workloads.s3.us-east-1.amazonaws.com/palimpzest-cropped.png"
+html_theme_options = {}
+html_copy_source = False
+html_show_sourcelink = False
