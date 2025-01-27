@@ -27,25 +27,25 @@ jobs:
         name: python-package-distributions
         path: dist/
 
-  publish:
-    runs-on: ubuntu-latest
-    name: Publish Package
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/docs' }}
-    needs:
-    - build
-    environment:
-      name: pypi
-      url: https://pypi.org/p/palimpzest
-    permissions:
-      id-token: write
-    steps:
-      - name: Download all the dists
-        uses: actions/download-artifact@v4
-        with:
-          name: python-package-distributions
-          path: dist/
-      - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+  # publish:
+  #   runs-on: ubuntu-latest
+  #   name: Publish Package
+  #   if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/docs' }}
+  #   needs:
+  #   - build
+  #   environment:
+  #     name: pypi
+  #     url: https://pypi.org/p/palimpzest
+  #   permissions:
+  #     id-token: write
+  #   steps:
+  #     - name: Download all the dists
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: python-package-distributions
+  #         path: dist/
+  #     - name: Publish distribution to PyPI
+  #       uses: pypa/gh-action-pypi-publish@release/v1
 
   github-release:
     name: >-
@@ -69,7 +69,9 @@ jobs:
           ./dist/*.tar.gz
           ./dist/*.whl
     - name: testing
-      run: ls -l dist/
+      run: |
+        PKG_VERSION=ls -l dist/ | head -n 1 | sed -E 's/.*palimpzest-([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/'
+        echo $PKG_VERSION
     # - name: Create GitHub Release
     #   env:
     #     GITHUB_TOKEN: ${{ github.token }}
