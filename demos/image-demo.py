@@ -36,8 +36,9 @@ def build_image_plan(dataset_id):
 if __name__ == "__main__":
     # parse arguments
     start_time = time.time()
+
     parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument("--no-cache", action="store_true", help="Do not use cached results")
+    parser.add_argument("--no-cache", action="store_true", help="Do not use cached results", default=True)
 
     args = parser.parse_args()
     no_cache = args.no_cache
@@ -57,11 +58,11 @@ if __name__ == "__main__":
         verbose=True,
         processing_strategy="no_sentinel"
     )
-    records, execution_stats = plan.run(config)
+    data_record_collection = plan.run(config)
 
-    print("Obtained records", records)
+    print("Obtained records", data_record_collection.data_records)
     imgs, breeds = [], []
-    for record in records:
+    for record in data_record_collection:
         print("Trying to open ", record.filename)
         path = os.path.join("testdata/images-tiny/", record.filename)
         img = Image.open(path).resize((128, 128))
@@ -78,7 +79,7 @@ if __name__ == "__main__":
                 with gr.Column():
                     breed_blocks.append(gr.Textbox(value=breed))
 
-        plan_str = list(execution_stats.plan_strs.values())[0]
+        plan_str = list(data_record_collection.execution_stats.plan_strs.values())[0]
         gr.Textbox(value=plan_str, info="Query Plan")
 
     end_time = time.time()

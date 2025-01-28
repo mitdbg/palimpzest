@@ -291,7 +291,7 @@ config = QueryProcessorConfig(
     verbose=verbose,
     allow_code_synth=allow_code_synth
 )
-records, execution_stats = output.run(config)
+data_record_collection = output.run(config)
 
 # create filepaths for records and stats
 records_path = (
@@ -306,7 +306,7 @@ stats_path = (
 )
 
 record_jsons = []
-for record in records:
+for record in data_record_collection:
     record_dict = record.to_dict()
     ### field_to_keep = ["claim", "id", "label"]
     ### record_dict = {k: v for k, v in record_dict.items() if k in fields_to_keep}
@@ -316,6 +316,6 @@ with open(records_path, 'w') as f:
     json.dump(record_jsons, f)
 
 # save statistics
-execution_stats_dict = execution_stats.to_json()
+execution_stats_dict = data_record_collection.execution_stats.to_json()
 with open(stats_path, "w") as f:
     json.dump(execution_stats_dict, f)

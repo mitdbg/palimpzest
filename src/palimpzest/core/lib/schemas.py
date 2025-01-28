@@ -274,6 +274,49 @@ class Schema(metaclass=SchemaMetaclass):
         # Store the schema class globally
         globals()[schema_name] = new_schema
         return new_schema
+    
+    @classmethod
+    def add_fields(cls, fields: dict[str, str]) -> Schema:
+        """Add fields to the schema
+        
+        Args:
+            fields: Dictionary mapping field names to their descriptions
+            
+        Returns:
+            A new Schema with the additional fields
+        """
+        # Construct the new schema name
+        schema_name = cls.class_name()
+        new_schema_name = f"{schema_name}Extended"
+
+        # Construct new schema description
+        new_desc = f"{cls.__doc__}\nExtended with additional fields"
+
+        # Get existing fields
+        new_field_names = list(cls.field_names())
+        new_field_types = list(cls.field_map().values())
+        new_field_descs = [field._desc for field in new_field_types]
+
+        # TODO: Users will provide explicit descriptions for the fields, 
+        # details in https://github.com/mitdbg/palimpzest/issues/84
+        for field_name, field_desc in fields.items():
+            if field_name in new_field_names:
+                continue
+            new_field_names.append(field_name)
+            new_field_types.append(StringField(desc=field_desc))  # Assuming StringField for new fields
+            new_field_descs.append(field_desc)
+
+        # Generate the schema class dynamically
+        attributes = {"_desc": new_desc, "__doc__": new_desc}
+        for field_name, field_type, field_desc in zip(new_field_names, new_field_types, new_field_descs):
+            attributes[field_name] = (
+                field_type.__class__(desc=str(field_desc), element_type=field_type.element_type)
+                if isinstance(field_type, ListField)
+                else field_type.__class__(desc=str(field_desc))
+            )
+
+        # Create the class dynamically
+        return type(new_schema_name, (Schema,), attributes)
 
     @classmethod
     def class_name(cls) -> str:

@@ -1,5 +1,6 @@
 from enum import Enum
 
+from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.execution.execution_strategy import ExecutionStrategyType
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
@@ -95,7 +96,7 @@ class QueryProcessorFactory:
         return processor_cls(dataset=dataset, optimizer=optimizer, config=config, **kwargs)
 
     @classmethod
-    def create_and_run_processor(cls, dataset: Dataset, config: QueryProcessorConfig, **kwargs):
+    def create_and_run_processor(cls, dataset: Dataset, config: QueryProcessorConfig, **kwargs) -> DataRecordCollection:
         # TODO(Jun): Consider to use cache here.
         processor = cls.create_processor(dataset=dataset, config=config, **kwargs)
         return processor.execute()

@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from palimpzest.core.data.dataclasses import PlanStats, RecordOpStats
 from palimpzest.core.data.datasources import DataSource, ValidationDataSource
-from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.elements.records import DataRecord, DataRecordCollection
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import Policy
 from palimpzest.query.optimizer.cost_model import CostModel
@@ -271,5 +271,5 @@ class QueryProcessor:
 
     # TODO: consider to support dry_run.
     @abstractmethod
-    def execute(self):
+    def execute(self) -> DataRecordCollection:
         raise NotImplementedError("Abstract method to be overwritten by sub-classes")

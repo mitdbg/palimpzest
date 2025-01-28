@@ -7,7 +7,7 @@ import numpy as np
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
-from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.elements.records import DataRecord, DataRecordCollection, DataRecordSet
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.policy import Policy
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
@@ -475,18 +475,22 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
         # compute highest quality answer at each index
         out_records = []
+        out_record_op_stats = []
         for idx in range(len(idx_to_records)):
             records_lst, record_op_stats_lst = zip(*idx_to_records[idx])
             max_quality_record, max_quality = records_lst[0], record_op_stats_lst[0].quality
+            max_quality_stats = record_op_stats_lst[0]
             for record, record_op_stats in zip(records_lst[1:], record_op_stats_lst[1:]):
                 record_quality = record_op_stats.quality
                 if record_quality > max_quality:
                     max_quality_record = record
                     max_quality = record_quality
+                    max_quality_stats = record_op_stats
             out_records.append(max_quality_record)
+            out_record_op_stats.append(max_quality_stats)
 
         # create and return final DataRecordSet
-        return DataRecordSet(out_records, [])
+        return DataRecordSet(out_records, out_record_op_stats)
 
 
     def execute_op_set(self, op_candidate_pairs):
@@ -782,7 +786,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         return sentinel_plan
 
 
-    def execute(self):
+    def execute(self) -> DataRecordCollection:
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
@@ -829,7 +833,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
             plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 
-        return all_records, execution_stats
+        return DataRecordCollection(all_records, execution_stats = execution_stats)
     
 
 

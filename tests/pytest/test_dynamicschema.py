@@ -42,9 +42,9 @@ def test_dynamicschema_json(mocker, enron_workload, enron_convert, enron_filter)
         execution_strategy="sequential",
         optimizer_strategy="pareto",
     )
-    records, stats = enron_workload.run(config=config)
+    data_record_collection = enron_workload.run(config=config)
 
-    for rec in records:
+    for rec in data_record_collection:
         print(rec.to_dict())
 
 
@@ -71,7 +71,7 @@ def test_dynamicschema_yml(mocker, enron_workload, enron_convert, enron_filter):
         execution_strategy="sequential",
         optimizer_strategy="pareto",
     )
-    records, stats = enron_workload.run(config=config)
+    data_record_collection = enron_workload.run(config=config)
 
-    for rec in records:
+    for rec in data_record_collection:
         print(rec.to_dict())
