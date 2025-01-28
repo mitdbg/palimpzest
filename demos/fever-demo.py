@@ -17,6 +17,7 @@ from palimpzest.sets import Dataset
 class FeverClaimsSchema(Schema):
     claim = StringField(desc="the claim being made")
 
+
 class FeverOutputSchema(FeverClaimsSchema):
     label = BooleanField(
         "Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise."
@@ -73,11 +74,11 @@ def parse_arguments():
 
 def build_fever_query(index, dataset_id, k):
     claims = Dataset(dataset_id, schema=FeverClaimsSchema)
-    
+
     def search_func(index, query, k):
         results = index.search(query, k=k)
         return [result["content"] for result in results]
-    
+
     claims_and_relevant_files = claims.retrieve(
         index=index,
         search_func=search_func,
@@ -113,10 +114,8 @@ def main():
 
     # Build and run the FEVER query
     query = build_fever_query(index, dataset_id, k=args.k)
-    results, execution_stats = query.run(QueryProcessorConfig())
-
-    output_df = pd.DataFrame([r.to_dict() for r in results])[["claim", "relevant_wikipedia_articles", "label"]]
-    print(output_df)
+    data_record_collection = query.run(QueryProcessorConfig())
+    print(data_record_collection.to_df())
 
 
 if __name__ == "__main__":
