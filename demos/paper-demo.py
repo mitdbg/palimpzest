@@ -282,7 +282,7 @@ if __name__ == "__main__":
 
         elif workload == "real-estate":
             fst_imgs, snd_imgs, thrd_imgs, addrs, prices = [], [], [], [], []
-            for record in data_record_collection.data_records:
+            for record in data_record_collection:
                 addrs.append(record.address)
                 prices.append(record.price)
                 for idx, img_name in enumerate(["img1.png", "img2.png", "img3.png"]):

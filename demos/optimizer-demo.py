@@ -1049,7 +1049,7 @@ if __name__ == "__main__":
 
     # save record outputs
     record_jsons = []
-    for record in data_record_collection.data_records:
+    for record in data_record_collection:
         record_dict = record.to_dict()
         if workload == "biodex":
             record_dict = {

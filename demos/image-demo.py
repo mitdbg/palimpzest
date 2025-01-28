@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
     print("Obtained records", data_record_collection.data_records)
     imgs, breeds = [], []
-    for record in data_record_collection.data_records:
+    for record in data_record_collection:
         print("Trying to open ", record.filename)
         path = os.path.join("testdata/images-tiny/", record.filename)
         img = Image.open(path).resize((128, 128))

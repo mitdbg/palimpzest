@@ -306,7 +306,7 @@ stats_path = (
 )
 
 record_jsons = []
-for record in data_record_collection.data_records:
+for record in data_record_collection:
     record_dict = record.to_dict()
     ### field_to_keep = ["claim", "id", "label"]
     ### record_dict = {k: v for k, v in record_dict.items() if k in fields_to_keep}
