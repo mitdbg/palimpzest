@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Generator
 from typing import Any
 
 import pandas as pd
@@ -349,7 +350,7 @@ class DataRecordCollection:
         self.plan_stats = plan_stats
         self.executed_plans = self._get_executed_plans()
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[DataRecord]:
         """Allow iterating directly over the data records"""
         yield from self.data_records
 

@@ -117,6 +117,5 @@ def main():
     data_record_collection = query.run(QueryProcessorConfig())
     print(data_record_collection.to_df())
 
-
 if __name__ == "__main__":
     main()
