@@ -8,7 +8,7 @@ import numpy as np
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
 from palimpzest.core.data.datasources import ValidationDataSource
-from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.elements.records import DataRecord, DataRecordCollection, DataRecordSet
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.policy import Policy
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
@@ -525,7 +525,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         return sentinel_plan
 
 
-    def execute(self):
+    def execute(self) -> DataRecordCollection:
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
@@ -570,7 +570,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 
-        return all_records, execution_stats
+        return DataRecordCollection(all_records, execution_stats=execution_stats)
 
 
 class RandomSamplingSentinelSequentialSingleThreadProcessor(RandomSamplingSentinelQueryProcessor, SequentialSingleThreadExecutionStrategy):

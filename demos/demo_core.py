@@ -192,14 +192,14 @@ def execute_task(task, datasetid, policy, verbose=False, profile=False, processi
         execution_strategy=execution_strategy,
         optimizer_strategy=optimizer_strategy,
     )
-    records, execution_stats = root_set.run(config)
+    data_record_collection = root_set.run(config)
 
     if profile:
         os.makedirs("profiling-data", exist_ok=True)
         with open(stat_path, "w") as f:
-            json.dump(execution_stats.to_json(), f)
+            json.dump(data_record_collection.execution_stats.to_json(), f)
 
-    return records, execution_stats, cols
+    return data_record_collection.data_records, data_record_collection.execution_stats, cols
 
 def format_results_table(records: list[DataRecord], cols=None):
     """Format records as a table"""

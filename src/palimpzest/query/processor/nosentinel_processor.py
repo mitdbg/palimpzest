@@ -1,7 +1,7 @@
 import time
 
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats
-from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.elements.records import DataRecord, DataRecordCollection
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import (
@@ -15,7 +15,7 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.utils.progress import create_progress_manager
-    
+
 
 class NoSentinelQueryProcessor(QueryProcessor):
     """
@@ -24,7 +24,7 @@ class NoSentinelQueryProcessor(QueryProcessor):
     """
 
     # TODO: Consider to support dry_run.
-    def execute(self):
+    def execute(self) -> DataRecordCollection:
         execution_start_time = time.time()
 
         # if nocache is True, make sure we do not re-use codegen examples
@@ -48,7 +48,7 @@ class NoSentinelQueryProcessor(QueryProcessor):
             plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 
-        return records, execution_stats
+        return DataRecordCollection(records, execution_stats=execution_stats)
 
 
 class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, SequentialSingleThreadExecutionStrategy):

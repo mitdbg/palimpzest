@@ -18,6 +18,7 @@ from palimpzest.core.lib.schemas import PDFFile, Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost
 from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 from palimpzest.sets import Dataset
 
 if not os.environ.get("OPENAI_API_KEY"):
@@ -75,11 +76,15 @@ def run_workload():
 
     tables = []
     statistics = []
-    for table, plan, stats in iterable:  # noqa: B007
+    for data_record_collection in iterable:  # noqa: B007
         # record_time = time.time()
+        table = data_record_collection.data_records
+        stats = data_record_collection.plan_stats
         tables += table
         statistics.append(stats)
 
+    processor = QueryProcessorFactory.create_processor(output, config)
+    plan = processor.generate_plan(output, policy)
     return tables, plan, stats
 
 
@@ -115,24 +120,26 @@ if run_pz:
         execution_strategy="sequential",
         optimizer_strategy="pareto",
     )
+    processor = QueryProcessorFactory.create_processor(output, config)
+    plan =processor.generate_plan(output, policy)
     iterable = output.run(config)
 
     references = []
     statistics = []
 
-    for idx, (reference, plan, stats) in enumerate(iterable):
+    for idx, data_record_collection in enumerate(iterable):
         record_time = time.time()
+        references = data_record_collection.data_records
+        stats = data_record_collection.plan_stats
+        plan = data_record_collection.executed_plans[0]
         statistics.append(stats)
 
         if not idx:
             with st.container():
                 st.write("### Executed plan: \n")
-                # st.write(" " + str(plan).replace("\n", "  \n "))
-                for idx, op in enumerate(plan.operators):
-                    strop = f"{idx+1}. {str(op)}"
-                    strop = strop.replace("\n", "  \n")
-                    st.write(strop)
-        for ref in reference:
+                st.write(" " + str(plan).replace("\n", "  \n "))
+                
+        for ref in references:
             try:
                 index = ref.index
             except Exception:

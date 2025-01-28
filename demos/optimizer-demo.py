@@ -207,6 +207,7 @@ class RealEstateValidationSource(ValidationDataSource):
         self.listings_dir = listings_dir
         self.split_idx = split_idx
         self.listings = sorted(os.listdir(self.listings_dir), key=lambda listing: int(listing.split("listing")[-1]))
+        assert len(self.listings) > split_idx, "split_idx is greater than the number of listings"
 
         self.val_listings = self.listings[:split_idx]
         self.listings = self.listings[split_idx:]
@@ -1019,7 +1020,7 @@ if __name__ == "__main__":
         verbose=verbose,
     )
 
-    records, execution_stats = plan.run(
+    data_record_collection = plan.run(
         config=config,
         k=k,
         j=j,
@@ -1031,6 +1032,8 @@ if __name__ == "__main__":
         seed=seed,
         exp_name=exp_name
     )
+
+    print(data_record_collection.to_df())
 
     # create filepaths for records and stats
     records_path = (
@@ -1046,7 +1049,7 @@ if __name__ == "__main__":
 
     # save record outputs
     record_jsons = []
-    for record in records:
+    for record in data_record_collection.data_records:
         record_dict = record.to_dict()
         if workload == "biodex":
             record_dict = {
@@ -1064,6 +1067,6 @@ if __name__ == "__main__":
         json.dump(record_jsons, f)
 
     # save statistics
-    execution_stats_dict = execution_stats.to_json()
+    execution_stats_dict = data_record_collection.execution_stats.to_json()
     with open(stats_path, "w") as f:
         json.dump(execution_stats_dict, f)

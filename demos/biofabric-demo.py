@@ -136,11 +136,11 @@ if __name__ == "__main__":
         processing_strategy="no_sentinel",
         execution_strategy=executor,
     )
-    tables, plan, stats = output.run(config)
+    data_record_collection = output.run(config)
 
-    print_table(tables)
-    print(plan)
-    print(stats)
+    print_table(data_record_collection.data_records)
+    print(data_record_collection.executed_plans)
+    # print(data_record_collection.execution_stats)
 
     end_time = time.time()
     print("Elapsed time:", end_time - start_time)
