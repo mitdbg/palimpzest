@@ -66,10 +66,10 @@ jobs:
       run: |
         git fetch --prune --unshallow
         git checkout ${{ github.event.pull_request.base.sha }}
-        VERSION=$(python -c "import pz; print(pz.__version__)")
+        VERSION=$(python -c "import palimpzest; print(palimpzest.__version__)")
         echo "Current version is $VERSION"
         git checkout ${{ github.event.pull_request.head.sha }}
-        VERSION_PR=$(python -c "import pz; print(pz.__version__)")
+        VERSION_PR=$(python -c "import palimpzest; print(palimpzest.__version__)")
         echo "Version in PR is $VERSION_PR"
         if [ "$VERSION" = "$VERSION_PR" ]; then
           echo "Error: Version has not been bumped"
