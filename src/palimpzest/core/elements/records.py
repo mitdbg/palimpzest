@@ -349,6 +349,14 @@ class DataRecordCollection:
         self.plan_stats = plan_stats
         self.executed_plans = self._get_executed_plans()
 
+    def __iter__(self):
+        """Allow iterating directly over the data records"""
+        yield from self.data_records
+
+    def __len__(self):
+        """Return the number of records in the collection"""
+        return len(self.data_records)
+
     def to_df(self, project_cols: list[str] | None = None):
         return DataRecord.to_df(self.data_records, project_cols)
     

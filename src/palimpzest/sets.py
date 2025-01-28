@@ -214,9 +214,9 @@ class Dataset(Set):
         )
     
     # This is a convenience for users who like DataFrames-like syntax.   
-    def add_columns(self, columns:dict[str, str]) -> Dataset:
-        output_schema = self.schema.add_fields(columns)
-        return self.convert(output_schema, udf=None, cardinality=Cardinality.ONE_TO_MANY, depends_on=None, desc="Add columns " + str(columns))
+    def add_columns(self, columns:dict[str, str], cardinality: Cardinality = Cardinality.ONE_TO_ONE) -> Dataset:
+        new_output_schema = self.schema.add_fields(columns)
+        return self.convert(new_output_schema, udf=None, cardinality=cardinality, depends_on=None, desc="Add columns " + str(columns))
 
     def count(self) -> Dataset:
         """Apply a count aggregation to this set"""

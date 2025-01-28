@@ -297,7 +297,8 @@ class Schema(metaclass=SchemaMetaclass):
         new_field_types = list(cls.field_map().values())
         new_field_descs = [field._desc for field in new_field_types]
 
-        # Add new fields, skip existing fields
+        # TODO: Users will provide explicit descriptions for the fields, 
+        # details in https://github.com/mitdbg/palimpzest/issues/84
         for field_name, field_desc in fields.items():
             if field_name in new_field_names:
                 continue
