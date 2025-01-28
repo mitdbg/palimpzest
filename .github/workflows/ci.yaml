@@ -57,3 +57,21 @@ jobs:
     - name: Check code formatting with Ruff
       run: ruff check --no-fix . --target-version=py38
       continue-on-error: true
+
+  check-version-bump:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Check Version Increased
+      run: |
+        git fetch --prune --unshallow
+        git checkout ${{ github.event.pull_request.base.sha }}
+        VERSION=$(python -c "import pz; print(pz.__version__)")
+        echo "Current version is $VERSION"
+        git checkout ${{ github.event.pull_request.head.sha }}
+        VERSION_PR=$(python -c "import pz; print(pz.__version__)")
+        echo "Version in PR is $VERSION_PR"
+        if [ "$VERSION" = "$VERSION_PR" ]; then
+          echo "Error: Version has not been bumped"
+          exit 1
+        fi
