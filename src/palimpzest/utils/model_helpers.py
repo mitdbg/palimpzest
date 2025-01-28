@@ -26,7 +26,7 @@ def get_models(include_vision: bool = False) -> list[Model]:
         models.extend([Model.GPT_4o, Model.GPT_4o_MINI])
 
     if os.getenv("TOGETHER_API_KEY") is not None:
-        models.extend([Model.LLAMA3, Model.MIXTRAL])
+        models.extend([Model.LLAMA3, Model.MIXTRAL, Model.DEEPSEEK])
 
     if include_vision:
         vision_models = get_vision_models()
@@ -39,13 +39,14 @@ TEXT_MODEL_PRIORITY = [
     Model.GPT_4o,
     Model.GPT_4o_MINI,
     Model.LLAMA3,
-    Model.MIXTRAL
+    Model.MIXTRAL,
+    Model.DEEPSEEK,
 ]
 
 VISION_MODEL_PRIORITY = [
     Model.GPT_4o_V,
     Model.GPT_4o_MINI_V,
-    Model.LLAMA3_V
+    Model.LLAMA3_V,
 ]
 def get_champion_model(available_models, vision=False):    
     # Select appropriate priority list based on task

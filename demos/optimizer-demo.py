@@ -751,13 +751,13 @@ if __name__ == "__main__":
         "--workload", type=str, help="The workload to run. One of enron, real-estate, biodex, biodex-reactions."
     )
     parser.add_argument(
-        "--processing_strategy",
+        "--processing-strategy",
         default="mab_sentinel",
         type=str,
         help="The engine to use. One of mab_sentinel, no_sentinel, random_sampling",
     )
     parser.add_argument(
-        "--execution_strategy",
+        "--execution-strategy",
         default="pipelined_parallel",
         type=str,
         help="The plan executor to use. One of sequential, pipelined_single_thread, pipelined_parallel",
@@ -994,12 +994,14 @@ if __name__ == "__main__":
             "gpt-4o": Model.GPT_4o,
             "gpt-4o-mini": Model.GPT_4o_MINI,
             "mixtral": Model.MIXTRAL,
+            "deepseek": Model.DEEPSEEK,
             "llama": Model.LLAMA3,
         }
         model_str_to_vision_model = {
             "gpt-4o": Model.GPT_4o_V,
             "gpt-4o-mini": Model.GPT_4o_MINI_V,
             "mixtral": Model.LLAMA3_V,
+            "deepseek": Model.LLAMA3_V,
             "llama": Model.LLAMA3_V,
         }
         optimizer_strategy = "none"
@@ -1009,14 +1011,24 @@ if __name__ == "__main__":
     config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
-        available_models=available_models,
+        # available_models=available_models,
         processing_strategy=args.processing_strategy,
         optimizer_strategy=optimizer_strategy,
         execution_strategy=args.execution_strategy,
         allow_code_synth=False,  # (workload != "biodex"),
         use_final_op_quality=use_final_op_quality,
-        max_workers=10,
+        max_workers=5,
         verbose=verbose,
+        available_models=[
+            Model.GPT_4o,
+            Model.GPT_4o_V,
+            Model.GPT_4o_MINI,
+            Model.GPT_4o_MINI_V,
+            Model.DEEPSEEK,
+            Model.MIXTRAL,
+            # Model.LLAMA3,
+            # Model.LLAMA3_V,
+        ],
     )
 
     records, execution_stats = plan.run(

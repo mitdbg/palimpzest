@@ -37,19 +37,10 @@ def get_label_fields_to_values(claims, ground_truth_file):
 
     for entry in ground_truth:
         if str(entry["id"]) in claims:
-            evidence_sets = entry["evidence"]
-            evidence_file_ids = list(
-                {
-                    evidence[2]
-                    for evidence_set in evidence_sets
-                    for evidence in evidence_set
-                }
-            )
             if entry["label"] == "SUPPORTS":
                 claim_to_label[str(entry["id"])] = {"label": "TRUE"}
             else:
                 claim_to_label[str(entry["id"])] = {"label": "FALSE"}
-            claim_to_label[str(entry["id"])]["_evidence_file_ids"] = evidence_file_ids
             claim_to_label[str(entry["id"])]["relevant_wikipedia_articles"] = ["IGNORED_FIELD"]
 
     return claim_to_label           
@@ -114,7 +105,6 @@ class FeverValidationSource(ValidationDataSource):
         fields_to_metric_fn = {
             "label": bool_eval,
             "relevant_wikipedia_articles": skip_eval,
-            "_evidence_file_ids": list_eval
         }
 
         return fields_to_metric_fn
@@ -237,12 +227,14 @@ else:
         "gpt-4o": Model.GPT_4o,
         "gpt-4o-mini": Model.GPT_4o_MINI,
         "mixtral": Model.MIXTRAL,
+        "deepseek": Model.DEEPSEEK,
         "llama": Model.LLAMA3,
     }
     model_str_to_vision_model = {
         "gpt-4o": Model.GPT_4o_V,
         "gpt-4o-mini": Model.GPT_4o_MINI_V,
         "mixtral": Model.LLAMA3_V,
+        "deepseek": Model.LLAMA3_V,
         "llama": Model.LLAMA3_V,
     }
     optimizer_strategy = "none"

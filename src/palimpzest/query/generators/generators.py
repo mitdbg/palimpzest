@@ -25,7 +25,7 @@ from together.types.chat_completions import ChatCompletionResponse
 import palimpzest.prompts as prompts
 from palimpzest.constants import (
     MODEL_CARDS,
-    TOKENS_PER_CHARACTER,
+    # TOKENS_PER_CHARACTER,
     # RETRY_MAX_ATTEMPTS,
     # RETRY_MAX_SECS,
     # RETRY_MULTIPLIER,
@@ -52,7 +52,7 @@ def generator_factory(model: Model, prompt_strategy: PromptStrategy, cardinality
     if model in [Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4o_V, Model.GPT_4o_MINI_V]:
         return OpenAIGenerator(model, prompt_strategy, cardinality, verbose)
 
-    elif model in [Model.MIXTRAL, Model.LLAMA3, Model.LLAMA3_V]:
+    elif model in [Model.MIXTRAL, Model.LLAMA3, Model.LLAMA3_V, Model.DEEPSEEK]:
         return TogetherGenerator(model, prompt_strategy, cardinality, verbose)
 
     raise Exception(f"Unsupported model: {model}")
@@ -145,7 +145,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
     def _generate_user_prompt(self, candidate: DataRecord, fields: list[str], **kwargs) -> str:
         """Returns a prompt based on the prompt strategy with instance-specific instructions."""
         # get context from input record (project_cols will be None if not provided in kwargs)
-        context = candidate.to_json_str(include_bytes=False, project_cols=kwargs.get("project_cols"))
+        context = candidate.to_dict(include_bytes=False, project_cols=kwargs.get("project_cols"))
 
         # get filter condition for filter operations
         filter_condition = (
@@ -183,31 +183,31 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             else prompts.ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION
         )
 
-        # cut down on context based on window length
-        if self.model in [Model.LLAMA3, Model.MIXTRAL]:
-            total_context_len = len(json.dumps(context, indent=2))
+        # # cut down on context based on window length
+        # if self.model in [Model.MIXTRAL, Model.LLAMA3]:
+        #     total_context_len = len(json.dumps(context, indent=2))
 
-            # sort fields by length and progressively strip from the longest field until it is short enough;
-            # NOTE: 6000 is a rough estimate which leaves room for the rest of the prompt text
-            while total_context_len * TOKENS_PER_CHARACTER > 6000:
-                # sort fields by length
-                field_lengths = [(field, len(value)) for field, value in context.items()]
-                sorted_fields = sorted(field_lengths, key=lambda item: item[1], reverse=True)
+        #     # sort fields by length and progressively strip from the longest field until it is short enough;
+        #     # NOTE: 6000 is a rough estimate which leaves room for the rest of the prompt text
+        #     while total_context_len * TOKENS_PER_CHARACTER > 6000:
+        #         # sort fields by length
+        #         field_lengths = [(field, len(value)) for field, value in context.items()]
+        #         sorted_fields = sorted(field_lengths, key=lambda item: item[1], reverse=True)
 
-                # get field with longest context
-                longest_field_name, longest_field_length = sorted_fields[0]
+        #         # get field with longest context
+        #         longest_field_name, longest_field_length = sorted_fields[0]
 
-                # trim the field
-                context_factor =  6000.0 / (total_context_len * TOKENS_PER_CHARACTER)
-                keep_frac_idx = int(len(longest_field_length) * context_factor)
-                context[longest_field_name] = context[longest_field_name][:keep_frac_idx]
+        #         # trim the field
+        #         context_factor =  6000.0 / (total_context_len * TOKENS_PER_CHARACTER)
+        #         keep_frac_idx = int(len(longest_field_length) * context_factor)
+        #         context[longest_field_name] = context[longest_field_name][:keep_frac_idx]
 
-                # update total context length
-                total_context_len = len(json.dumps(context, indent=2))
+        #         # update total context length
+        #         total_context_len = len(json.dumps(context, indent=2))
 
         # initialize format_kwargs
         format_kwargs = {
-            "context": context,
+            "context": json.dumps(context, indent=2),
             "input_fields_desc": input_fields_desc,
         }
 
@@ -340,6 +340,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         prompt = None
         if "prompt" in kwargs:
             prompt: str = kwargs["prompt"]
+            # TODO: add warning if prompt has no field names
             prompt_field_names = [fname for _, fname, _, _ in Formatter().parse(prompt) if fname]
             assert all([field in candidate.get_field_names() for field in prompt_field_names]), f"Prompt string has fields which are not in candidate record.\nPrompt fields: {prompt_field_names}\nRecord fields: {candidate.get_field_names()}"
             prompt = prompt.format({
@@ -562,7 +563,7 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
     """
     def __init__(self, model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality = Cardinality.ONE_TO_ONE, verbose: bool = False):
         # assert that model is a model offered by Together
-        assert model in [Model.MIXTRAL, Model.LLAMA3, Model.LLAMA3_V]
+        assert model in [Model.MIXTRAL, Model.LLAMA3, Model.LLAMA3_V, Model.DEEPSEEK]
         assert prompt_strategy in [
             PromptStrategy.COT_BOOL,
             PromptStrategy.COT_BOOL_IMAGE,

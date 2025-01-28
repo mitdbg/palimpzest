@@ -61,13 +61,10 @@ class RetrieveOp(PhysicalOperator):
 
         query = getattr(candidate, self.search_attr)
 
-        top_k_results, top_k_result_doc_ids = [], []
+        top_k_results = []
         if isinstance(query, str):
             results = self.index.search(query, k=self.k)
             top_k_results = [result["content"] for result in results]
-
-            # This is hacky, fix this later.
-            top_k_result_doc_ids = list({result["document_id"] for result in results})
 
         elif isinstance(query, list):
             try:
@@ -78,7 +75,6 @@ class RetrieveOp(PhysicalOperator):
                 results = [result[0] if isinstance(result, list) else result for result in results]
                 sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
                 top_k_results = [result["content"] for result in sorted_results[:self.k]]
-                top_k_result_doc_ids = [result["document_id"] for result in sorted_results[:self.k]]
             except Exception:
                 os.makedirs("retrieve-errors", exist_ok=True)
                 ts = time.time()
@@ -86,16 +82,13 @@ class RetrieveOp(PhysicalOperator):
                     f.write(str(query))
 
                 top_k_results = ["error-in-retrieve"]
-                top_k_result_doc_ids = ["error-in-retrieve"]
 
         output_dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
         setattr(output_dr, self.output_attr, top_k_results)
-        output_dr._evidence_file_ids = top_k_result_doc_ids
 
         duration_secs = time.time() - start_time
         answer = {self.output_attr: top_k_results}
         record_state = output_dr.to_dict(include_bytes=False)
-        record_state["_evidence_file_ids"] = top_k_result_doc_ids
 
         # NOTE: right now this should be equivalent to [self.output_attr], but in the future we may
         #       want to support the RetrieveOp generating multiple fields. (Also, the function will
