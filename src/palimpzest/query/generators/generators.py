@@ -376,7 +376,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         # finally, try taking all of the text; for JSON output, throw an exception if parsing fails
         if not json_output:
-            return answer_text
+            return completion_text
 
         return self._check_convert_answer_text(completion_text, fields, throw_exception=True)
 
