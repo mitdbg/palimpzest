@@ -262,7 +262,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         return prompt.format(**format_kwargs)
 
-    def _parse_reasoning(self, completion_text: str, **kwargs) -> Any:
+    def _parse_reasoning(self, completion_text: str, **kwargs) -> str:
         """Extract the reasoning for the generated output from the completion object."""
         # use a custom reasoning parser if provided
         if kwargs.get("parse_reasoning"):
@@ -271,13 +271,14 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         # if the model followed the default instructions, the completion text will have reasoning
         # before the "ANSWER:"; if this is the case, we simply extract and return that full section
-        regex = re.compile("(.*?)answer:.*", re.IGNORECASE | re.DOTALL)
-        matches = regex.findall(completion_text)
-        if len(matches) > 0:
-            return matches[0].strip()
+        if "answer" in completion_text.lower():
+            regex = re.compile("(.*?)answer:.*", re.IGNORECASE | re.DOTALL)
+            matches = regex.findall(completion_text)
+            if len(matches) > 0:
+                return matches[0].strip()
 
-        # otherwise, return None
-        return None
+        # otherwise, return the full completion text
+        return completion_text
 
     def _prepare_field_answers(self, field_answers: dict | list[dict], fields: dict[str, Field]) -> dict[str, list]:
         """
@@ -318,7 +319,8 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 if field_type_is_not_list_of_lists and answer_is_list_of_lists:
                     field_answers[field] = answer[0]
 
-            return field_answers
+            # prepare the field answers to match the expected output and return
+            return self._prepare_field_answers(field_answers, fields)
 
         except Exception as e:
             if throw_exception:

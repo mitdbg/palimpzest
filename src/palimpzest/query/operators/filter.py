@@ -253,11 +253,4 @@ class LLMFilter(FilterOp):
         fields = {"passed_operator", BooleanField(desc="")}
         field_answers, _, generation_stats = self.generator(candidate, fields, **gen_kwargs)
 
-        # compute whether the record passed the filter or not
-        passed_operator = False
-        if isinstance(field_answers["passed_operator"], str):
-            passed_operator = "true" in field_answers["passed_operator"].lower()
-        elif isinstance(field_answers["passed_operator"], bool):
-            passed_operator = field_answers["passed_operator"]
-
-        return {"passed_operator": passed_operator}, generation_stats
+        return field_answers, generation_stats

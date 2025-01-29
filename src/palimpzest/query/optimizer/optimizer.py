@@ -182,7 +182,7 @@ class Optimizer:
 
     def update_cost_model(self, cost_model: CostModel):
         self.cost_model = cost_model
-
+        self.costed_phys_op_ids = cost_model.get_costed_phys_op_ids()
 
     def get_physical_op_params(self):
         return {
@@ -435,7 +435,7 @@ class Optimizer:
                 context = {"costed_phys_op_ids": self.costed_phys_op_ids}
                 new_tasks = task.perform(self.groups, self.expressions, context=context, **self.get_physical_op_params())
             elif isinstance(task, OptimizePhysicalExpression):
-                context = {"optimization_strategy_type": self.optimization_strategy_type}
+                context = {"optimization_strategy_type": self.optimization_strategy_type, "costed_phys_op_ids": self.costed_phys_op_ids} # TODO: remove costed_phys_op_ids
                 new_tasks = task.perform(self.cost_model, self.groups, self.policy, context=context)
 
             self.tasks_stack.extend(new_tasks)
@@ -454,6 +454,5 @@ class Optimizer:
 
         # search the optimization space by applying logical and physical transformations to the initial group tree
         self.search_optimization_space(final_group_id)
-        
+
         return self.strategy.get_optimal_plans(self.groups, final_group_id, policy, self.use_final_op_quality)
-    

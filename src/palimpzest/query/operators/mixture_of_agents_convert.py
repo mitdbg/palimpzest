@@ -116,8 +116,9 @@ class MixtureOfAgentsConvert(LLMConvert):
         proposer_model_final_answers, proposer_model_generation_stats = [], []
         for proposer_generator, temperature in zip(self.proposer_generators, self.temperatures):
             gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema, "temperature": temperature}
-            field_answers, reasoning, generation_stats = proposer_generator(candidate, fields, json_output=False, **gen_kwargs)
-            proposer_model_final_answers.append(f"REASONING: {reasoning}\nANSWER:{field_answers}\n")
+            _, reasoning, generation_stats = proposer_generator(candidate, fields, json_output=False, **gen_kwargs)
+            proposer_text = f"REASONING:{reasoning}\n"
+            proposer_model_final_answers.append(proposer_text)
             proposer_model_generation_stats.append(generation_stats)
 
         # call the aggregator

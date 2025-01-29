@@ -51,7 +51,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         self.use_final_op_quality = use_final_op_quality
         self.pick_output_fn = self.pick_ensemble_output
         self.rng = np.random.default_rng(seed=seed)
-
+        self.exp_name = kwargs.get("exp_name")
 
     def update_frontier_ops(
         self,
@@ -807,7 +807,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         optimizer = self.optimizer.deepcopy_clean()
 
         # construct the CostModel with any sample execution data we've gathered
-        cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose)
+        cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose, self.exp_name)
         optimizer.update_cost_model(cost_model)
         total_optimization_time = time.time() - execution_start_time
 
