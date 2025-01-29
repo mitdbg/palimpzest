@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
-
 from palimpzest.constants import MODEL_CARDS, Model, PromptStrategy
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.fields import Field
 from palimpzest.query.generators.generators import generator_factory
 from palimpzest.query.operators.convert import LLMConvert
 
@@ -109,7 +108,7 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         return naive_op_cost_estimates
 
-    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
         # get input fields
         input_fields = self.get_input_fields()
 

@@ -208,11 +208,11 @@ class Optimizer:
             use_final_op_quality=self.use_final_op_quality,
         )
         return optimizer
-    
+
     def update_strategy(self, optimizer_strategy_type: OptimizationStrategyType):
         self.optimization_strategy_type = optimizer_strategy_type
         self.strategy = OptimizerStrategyRegistry.get_strategy(optimizer_strategy_type.value)
-    
+
     def construct_group_tree(self, dataset_nodes: list[Set]) -> tuple[list[int], dict[str, Field], dict[str, set[str]]]:
         # get node, output_schema, and input_schema(if applicable)
         node = dataset_nodes[-1]
@@ -327,7 +327,7 @@ class Optimizer:
                 all_properties["limits"].add(op_limit_str)
             else:
                 all_properties["limits"] = set([op_limit_str])
-    
+
         elif isinstance(op, Project):
             op_project_str = op.get_logical_op_id()
             if "projects" in all_properties:

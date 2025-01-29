@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from numpy import dot
 from numpy.linalg import norm
 from openai import OpenAI
@@ -12,8 +10,8 @@ from palimpzest.constants import (
 )
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import ListField, StringField
-from palimpzest.query.operators.convert import FieldName, LLMConvert
+from palimpzest.core.lib.fields import Field, ListField, StringField
+from palimpzest.query.operators.convert import LLMConvert
 
 
 class RAGConvert(LLMConvert):
@@ -156,7 +154,7 @@ class RAGConvert(LLMConvert):
 
         return candidate
 
-    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
         # get the set of input fields to use for the convert operation
         input_fields = self.get_input_fields()
 
@@ -171,9 +169,9 @@ class RAGConvert(LLMConvert):
         field_answers, _, generation_stats = self.generator(candidate_copy, fields, **gen_kwargs)
 
         # if there was an error for any field, execute a conventional query on that field
-        for field, answers in field_answers.items():
+        for field_name, answers in field_answers.items():
             if answers is None:
-                single_field_answers, _, single_field_stats = self.generator(candidate_copy, [field], **gen_kwargs)
+                single_field_answers, _, single_field_stats = self.generator(candidate_copy, {field_name: fields[field_name]}, **gen_kwargs)
                 field_answers.update(single_field_answers)
                 generation_stats += single_field_stats
 

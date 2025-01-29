@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from typing import Callable
 
 from palimpzest.constants import (
     MODEL_CARDS,
@@ -15,12 +15,10 @@ from palimpzest.constants import (
 )
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.lib.fields import Field
 from palimpzest.query.generators.generators import generator_factory
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.utils.model_helpers import get_vision_models
-
-# TYPE DEFINITIONS
-FieldName = str
 
 
 class ConvertOp(PhysicalOperator, ABC):
@@ -60,7 +58,7 @@ class ConvertOp(PhysicalOperator, ABC):
 
     def _create_data_records_from_field_answers(
         self,
-        field_answers: dict[FieldName, list[Any]],
+        field_answers: dict[str, list],
         candidate: DataRecord,
     ) -> list[DataRecord]:
         """
@@ -103,7 +101,7 @@ class ConvertOp(PhysicalOperator, ABC):
     def _create_record_set(
         self,
         records: list[DataRecord],
-        fields: list[str],
+        field_names: list[str],
         generation_stats: GenerationStats,
         total_time: float,
         successful_convert: bool,
@@ -128,9 +126,9 @@ class ConvertOp(PhysicalOperator, ABC):
                 time_per_record=time_per_record,
                 cost_per_record=per_record_stats.cost_per_record,
                 model_name=self.get_model_name(),
-                answer={field_name: getattr(dr, field_name) for field_name in fields},
+                answer={field_name: getattr(dr, field_name) for field_name in field_names},
                 input_fields=self.input_schema.field_names(),
-                generated_fields=fields,
+                generated_fields=field_names,
                 total_input_tokens=per_record_stats.total_input_tokens,
                 total_output_tokens=per_record_stats.total_output_tokens,
                 total_input_cost=per_record_stats.total_input_cost,
@@ -153,7 +151,7 @@ class ConvertOp(PhysicalOperator, ABC):
         pass
 
     @abstractmethod
-    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
         """
         This abstract method will be implemented by subclasses of ConvertOp to process the input DataRecord
         and generate the value(s) for each of the specified fields. If the convert operator is a one-to-many
@@ -187,7 +185,8 @@ class ConvertOp(PhysicalOperator, ABC):
 
         # execute the convert
         field_answers: dict[str, list]
-        field_answers, generation_stats = self.convert(candidate=candidate, fields=fields_to_generate)
+        fields = {field: field_type for field, field_type in self.output_schema.field_map().items() if field in fields_to_generate}
+        field_answers, generation_stats = self.convert(candidate=candidate, fields=fields)
         assert all([field in field_answers for field in fields_to_generate]), "Not all fields were generated!"
 
         # replace any None values with an empty list; subclasses may override __call__ to change this behavior
@@ -199,7 +198,7 @@ class ConvertOp(PhysicalOperator, ABC):
         # construct and return DataRecordSet
         record_set = self._create_record_set(
             records=drs,
-            fields=fields_to_generate,
+            field_names=fields_to_generate,
             generation_stats=generation_stats,
             total_time=time.time() - start_time,
             successful_convert=successful_convert,
@@ -239,7 +238,7 @@ class NonLLMConvert(ConvertOp):
             quality=1.0,
         )
 
-    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
         # apply UDF to input record
         start_time = time.time()
         field_answers = {}
@@ -404,7 +403,7 @@ class LLMConvertConventional(LLMConvert):
 
         return naive_op_cost_estimates
 
-    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
         # get the set of input fields to use for the convert operation
         input_fields = self.get_input_fields()
 
@@ -413,8 +412,8 @@ class LLMConvertConventional(LLMConvert):
 
         # generate outputs one field at a time
         field_answers, generation_stats_lst = {}, []
-        for field in fields:
-            single_field_answers, _, single_field_stats = self.generator(candidate, [field], **gen_kwargs)
+        for field, field_type in fields.items():
+            single_field_answers, _, single_field_stats = self.generator(candidate, {field: field_type}, **gen_kwargs)
             field_answers.update(single_field_answers)
             generation_stats_lst.append(single_field_stats)
 
@@ -426,7 +425,7 @@ class LLMConvertConventional(LLMConvert):
 
 class LLMConvertBonded(LLMConvert):
 
-    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
         # get the set of input fields to use for the convert operation
         input_fields = self.get_input_fields()
 
@@ -434,12 +433,12 @@ class LLMConvertBonded(LLMConvert):
         gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema}
 
         # generate outputs for all fields in a single query
-        field_answers, _, generation_stats = self.generator(candidate, fields, **gen_kwargs) # TODO: guarantee negative output from generator is None
+        field_answers, _, generation_stats = self.generator(candidate, fields, **gen_kwargs)
 
         # if there was an error for any field, execute a conventional query on that field
-        for field, answers in field_answers.items():
+        for field_name, answers in field_answers.items():
             if answers is None:
-                single_field_answers, _, single_field_stats = self.generator(candidate, [field], **gen_kwargs)
+                single_field_answers, _, single_field_stats = self.generator(candidate, {field_name: fields[field_name]}, **gen_kwargs)
                 field_answers.update(single_field_answers)
                 generation_stats += single_field_stats
 

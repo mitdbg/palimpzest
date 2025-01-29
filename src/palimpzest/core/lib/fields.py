@@ -86,7 +86,7 @@ class IntField(Field):
         self.type = int
 
 
-class ListField(Field, list):
+class ListField(Field):
     """A field representing a list of elements of specified types, with full list functionality."""
 
     def __init__(self, element_type: Field, desc: str):
@@ -95,7 +95,7 @@ class ListField(Field, list):
         self.type = list
 
         if element_type.is_image_field:
-            self.__class__.is_image_field = True
+            self.is_image_field = True
 
 
 class NumericField(Field):

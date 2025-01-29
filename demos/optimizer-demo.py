@@ -488,7 +488,7 @@ class BiodexSerious(BiodexEntry):
     """
 
     serious = NumericField(
-        desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.",
+        desc="The seriousness of the adverse event. Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition. If none of the aforementioned events occurred, equal to 2.",
     )
 
 
@@ -501,7 +501,7 @@ class BiodexPatientSex(BiodexEntry):
     """
 
     patientsex = NumericField(
-        desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.",
+        desc="The reported biological sex of the patient. Equal to 0 for unknown, 1 for male, 2 for female.",
     )
 
 
@@ -513,7 +513,7 @@ class BiodexDrugs(BiodexEntry):
     """
 
     drugs = ListField(
-        desc='The **list** of all active substance names of the drugs discussed in the report.\n - For example: ["azathioprine", "infliximab", "mesalamine", "prednisolone"]',
+        desc='The **list** of all active substance names of the drugs discussed in the report.',
         element_type=StringField,
     )
 
@@ -526,7 +526,7 @@ class BiodexReactions(BiodexEntry):
     """
 
     reactions = ListField(
-        desc='The **list** of all reaction terms discussed in the report.\n - For example: ["Epstein-Barr virus", "infection reactivation", "Idiopathic interstitial pneumonia"]',
+        desc='The **list** of all reaction terms discussed in the report.',
         element_type=StringField,
     )
 
@@ -564,17 +564,17 @@ class BiodexOutput(BiodexEntry):
     """The target output fields for an entry in the Biodex ICSR Dataset."""
 
     serious = NumericField(
-        desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.",
+        desc="The seriousness of the adverse event. Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition. If none of the aforementioned events occurred, equal to 2.",
     )
     patientsex = NumericField(
-        desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.",
+        desc="The reported biological sex of the patient. Equal to 0 for unknown, 1 for male, 2 for female.",
     )
     drugs = ListField(
-        desc='The **list** of all active substance names of the drugs discussed in the report.\n - For example: ["azathioprine", "infliximab", "mesalamine", "prednisolone"]',
+        desc='The **list** of all active substance names of the drugs discussed in the report.',
         element_type=StringField,
     )
     reactions = ListField(
-        desc='The **list** of all reaction terms discussed in the report.\n - For example: ["Epstein-Barr virus", "infection reactivation", "Idiopathic interstitial pneumonia"]',
+        desc='The **list** of all reaction terms discussed in the report.',
         element_type=StringField,
     )
 
@@ -1017,14 +1017,14 @@ if __name__ == "__main__":
         execution_strategy=args.execution_strategy,
         allow_code_synth=False,  # (workload != "biodex"),
         use_final_op_quality=use_final_op_quality,
-        max_workers=5,
+        max_workers=1,
         verbose=verbose,
         available_models=[
             Model.GPT_4o,
             Model.GPT_4o_V,
             Model.GPT_4o_MINI,
             Model.GPT_4o_MINI_V,
-            Model.DEEPSEEK,
+            # Model.DEEPSEEK,
             Model.MIXTRAL,
             # Model.LLAMA3,
             # Model.LLAMA3_V,

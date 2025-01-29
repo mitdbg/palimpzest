@@ -35,7 +35,7 @@ from palimpzest.constants import (
 )
 from palimpzest.core.data.dataclasses import GenerationStats
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import BytesField, ImageBase64Field, ImageFilepathField, ImageURLField, ListField
+from palimpzest.core.lib.fields import BytesField, Field, ImageBase64Field, ImageFilepathField, ImageURLField, ListField
 from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
 
@@ -142,7 +142,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         return prompt
 
-    def _generate_user_prompt(self, candidate: DataRecord, fields: list[str], **kwargs) -> str:
+    def _generate_user_prompt(self, candidate: DataRecord, fields: dict[str, Field], **kwargs) -> str:
         """Returns a prompt based on the prompt strategy with instance-specific instructions."""
         # get context from input record (project_cols will be None if not provided in kwargs)
         context = candidate.to_dict(include_bytes=False, project_cols=kwargs.get("project_cols"))
@@ -276,36 +276,12 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         # otherwise, return None
         return None
 
-    def _parse_answer(self, completion_text: str, fields: list[str] | None, **kwargs) -> Any:
-        """Extract the answer from the completion object."""
-        # use a custom answer parser if provided
-        if kwargs.get("parse_answer"):
-            parse_answer_fn = kwargs.get("parse_answer")
-            return parse_answer_fn(completion_text)
-
-        # if the model followed the default instructions, the completion text will place
-        # its answer between "ANSWER:" and "---"
-        answer_text = None
-        regex = re.compile("answer:(.*?)---", re.IGNORECASE | re.DOTALL)
-        matches = regex.findall(completion_text)
-        if len(matches) > 0:
-            answer_text = matches[0].strip()
-
-        # otherwise, take all the text after "ANSWER:" (or just all of the text)
-        else:
-            regex = re.compile("answer:(.*?)", re.IGNORECASE | re.DOTALL)
-            matches = regex.findall(completion_text)
-            answer_text = matches[0].strip() if len(matches) > 0 else completion_text
-
-        # if this is a filter operator, return True if and only if "true" is in the answer text
-        # NOTE: we may be able to elimiate this condition by specifying this JSON output in the prompt;
-        # however, that would also need to coincide with a change to allow the parse_answer_fn to set "passed_operator"
-        if self.prompt_strategy in [PromptStrategy.COT_BOOL, PromptStrategy.COT_BOOL_IMAGE]:
-            return {"passed_operator": "true" in answer_text.lower()}
-
-        # parse the answer text into a JSON object and return it
-        field_answers = get_json_from_answer(answer_text, self.model, self.cardinality)
-
+    def _prepare_field_answers(self, field_answers: dict | list[dict], fields: dict[str, Field]) -> dict[str, list]:
+        """
+        field_answers is a dictionary mapping fields to their values. For one-to-one converts, wrap each
+        answer in a list. For one-to-many converts, invert the list of dictionaries into a dictionary with
+        list values.
+        """
         # if this is a one-to-one convert, we need to wrap each answer in a list
         if self.cardinality == Cardinality.ONE_TO_ONE:
             field_answers = {field_name: [field_answers[field_name]] for field_name in fields}
@@ -322,12 +298,142 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         return field_answers
 
-    def __call__(self, candidate: DataRecord, fields: list[str] | None, **kwargs) -> GenerationOutput:
+    def _check_convert_answer_text(self, answer_text: str, fields: dict[str, Field], throw_exception: bool=False) -> dict | list[dict] | None:
+        """
+        Try parsing the answer text into a JSON object. If the parsing fails, return None.
+        """
+        try:
+            # extract json from the answer text
+            field_answers = get_json_from_answer(answer_text, self.model, self.cardinality)
+
+            # common error: if the output is a singleton list which contains a list, but the expected field type
+            # is a list of strings, or a list of floats, i.e. not a list of lists; then extract the inner list
+            for field, field_type in fields.items():
+                answer = field_answers[field]
+                field_type_is_not_list_of_lists = isinstance(field_type, ListField) and not issubclass(field_type.element_type, ListField)
+                answer_is_list_of_lists = isinstance(answer, list) and len(answer) == 1 and isinstance(answer[0], list)
+                if field_type_is_not_list_of_lists and answer_is_list_of_lists:
+                    field_answers[field] = answer[0]
+
+            return field_answers
+
+        except Exception as e:
+            if throw_exception:
+                raise e
+
+        return None
+
+    def _check_filter_answer_text(self, answer_text: str) -> dict | None:
+        """
+        Return {"passed_operator": True} if and only if "true" is in the answer text.
+        Return {"passed_operator": False} if and only if "false" is in the answer text.
+        Otherwise, return None.
+        """
+        # NOTE: we may be able to eliminate this condition by specifying this JSON output in the prompt;
+        # however, that would also need to coincide with a change to allow the parse_answer_fn to set "passed_operator"
+        if "true" in answer_text.lower():
+            return {"passed_operator": True}
+        elif "false" in answer_text.lower():
+            return {"passed_operator": False}
+
+        return None
+
+    def _parse_convert_answer(self, completion_text: str, fields: dict[str, Field], json_output: bool) -> dict[str, list]:
+        """Extract the answer from the completion object for convert operations."""
+        # if the model followed the default instructions, the completion text will place
+        # its answer between "ANSWER:" and "---"
+        regex = re.compile("answer:(.*?)---", re.IGNORECASE | re.DOTALL)
+        matches = regex.findall(completion_text)
+        if len(matches) > 0:
+            answer_text = matches[0].strip()
+
+            # if we don't expect a JSON output, return the answer text as is
+            if not json_output:
+                return answer_text
+
+            # otherwise, try to parse the answer text into a JSON object
+            field_answers = self._check_convert_answer_text(answer_text, fields)
+            if field_answers is not None:
+                return field_answers
+
+        # if the first regex didn't find an answer, try taking all the text after "ANSWER:"
+        regex = re.compile("answer:(.*)", re.IGNORECASE | re.DOTALL)
+        matches = regex.findall(completion_text)
+        if len(matches) > 0:
+            answer_text = matches[0].strip()
+
+            # if we don't expect a JSON output, return the answer text as is
+            if not json_output:
+                return answer_text
+            
+            # otherwise, try to parse the answer text into a JSON object
+            field_answers = self._check_convert_answer_text(answer_text, fields)
+            if field_answers is not None:
+                return field_answers
+
+        # finally, try taking all of the text; for JSON output, throw an exception if parsing fails
+        if not json_output:
+            return answer_text
+
+        return self._check_convert_answer_text(completion_text, fields, throw_exception=True)
+
+    def _parse_filter_answer(self, completion_text: str) -> dict[str, list]:
+        """Extract the answer from the completion object for filter operations."""
+        # if the model followed the default instructions, the completion text will place
+        # its answer between "ANSWER:" and "---"
+        regex = re.compile("answer:(.*?)---", re.IGNORECASE | re.DOTALL)
+        matches = regex.findall(completion_text)
+        if len(matches) > 0:
+            answer_text = matches[0].strip()
+            field_answers = self._check_filter_answer_text(answer_text)
+            if field_answers is not None:
+                return field_answers
+
+        # if the first regex didn't find an answer, try taking all the text after "ANSWER:"
+        regex = re.compile("answer:(.*)", re.IGNORECASE | re.DOTALL)
+        matches = regex.findall(completion_text)
+        if len(matches) > 0:
+            answer_text = matches[0].strip()
+            field_answers = self._check_filter_answer_text(answer_text)
+            if field_answers is not None:
+                return field_answers
+
+        # finally, try taking all of the text; throw an exception if this doesn't work
+        field_answers = self._check_filter_answer_text(completion_text)
+        if field_answers is None:
+            raise Exception(f"Could not parse answer from completion text: {completion_text}")
+
+        return field_answers
+
+    def _parse_answer(self, completion_text: str, fields: dict[str, Field] | None, json_output: bool, **kwargs) -> dict[str, list]:
+        """Extract the answer from the completion object."""
+        # use a custom answer parser if provided
+        if kwargs.get("parse_answer"):
+            parse_answer_fn = kwargs.get("parse_answer")
+            return parse_answer_fn(completion_text)
+
+        # fields should be a dict if a custom answer parser is not provided
+        assert isinstance(fields, dict), "Fields must be provided if a custom answer parser is not provided."
+
+        # determine if this is a filter operation
+        is_filter_op = self.prompt_strategy in [PromptStrategy.COT_BOOL, PromptStrategy.COT_BOOL_IMAGE]
+
+        # extract the per-field answers from the completion text
+        field_answers = (
+            self._parse_filter_answer(completion_text)
+            if is_filter_op
+            else self._parse_convert_answer(completion_text, fields, json_output)
+        )
+
+        return field_answers
+
+    def __call__(self, candidate: DataRecord, fields: dict[str, Field] | None, json_output: bool=True, **kwargs) -> GenerationOutput:
         """Take the input record (`candidate`), generate the output `fields`, and return the generated output."""
         client = self._get_client_or_model()
 
         # fields can only be None if the user provides an answer parser
-        assert fields is not None or "parse_answer" in kwargs, "`fields` must be provided if `parse_answer` function is not provided in kwargs."
+        fields_check = fields is not None or "parse_answer" in kwargs
+        assert fields_check, "`fields` must be provided if `parse_answer` function is not provided in kwargs."
 
         # if the user (or operator) provides a developer prompt instead of a prompt, treat this as
         # the prompt and print a warning
@@ -421,14 +527,24 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         try:
             reasoning = self._parse_reasoning(completion_text, **kwargs)
         except Exception as e:
-            print(f"Error parsing reasoning and answers: {e}")
+            print(f"Error parsing reasoning: {e}")
 
         # parse field answers
         field_answers = None if fields is None else {field_name: None for field_name in fields}
         try:
-            field_answers = self._parse_answer(completion_text, fields, **kwargs)
+            field_answers = self._parse_answer(completion_text, fields, json_output, **kwargs)
         except Exception as e:
             print(f"Error parsing answers: {e}")
+            os.makedirs("parse-answer-errors", exist_ok=True)
+            ts = time.time()
+            with open(f"parse-answer-errors/error-{ts}.txt", "w") as f:
+                f.write(f"{str(self.model_name)}\n")
+                f.write("#####\n")
+                f.write(f"{str(completion_text)}\n")
+                f.write("#####\n")
+                f.write(f"{str(fields.keys())}\n")
+                f.write("#####\n")
+                f.write(f"{str(e)}\n")
 
         return field_answers, reasoning, generation_stats
 
@@ -584,10 +700,19 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
         # get basic parameters
         model = self.model_name
         temperature = kwargs.get("temperature", 0.0)
-        max_tokens = kwargs.get("max_tokens", 4096)
 
         # construct messages and add system prompt if present
         messages = []
+
+        # MIXTRAL only can process a single message at a time
+        if self.model == Model.MIXTRAL:
+            messages.append({"role": "user", "content": user_prompt})
+            return {
+                "model": model,
+                "temperature": temperature,
+                "messages": messages,
+            }
+
         if system_prompt is not None:
             messages.append({"role": "system", "content": system_prompt})
 
@@ -638,7 +763,6 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
         payload = {
             "model": model,
             "temperature": temperature,
-            "max_tokens": max_tokens,
             "messages": messages,
         }
 
