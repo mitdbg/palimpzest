@@ -36,6 +36,10 @@ Alternatively, to install the latest version of the package from source, you can
 
    This project is under active development.
 
+Chat Demo
+---------
+To access our chat demo please go to this webpage `Palimpchat <http://3.213.4.62:8888/>`_.
+
 Quickstart
 -----------
 The easiest way to get started with Palimpzest, is to run our demo in Colab: |Colab|. We demonstrate the workflow of working with PZ, including registering a dataset, composing and executing a pipeline, and accessing the results.

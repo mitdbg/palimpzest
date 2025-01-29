@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 
-import pandas as pd
 from ragatouille import RAGPretrainedModel
 
 from palimpzest.core.data.datasources import UserSource
