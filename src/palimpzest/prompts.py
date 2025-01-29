@@ -146,7 +146,7 @@ Be sure to cite information from the context as evidence of why your answers are
 
 You will be provided with a description of each input field and each output field.
 
-{output_format_instruction} Finish your response with a newline character followed by ---
+Finish your response with a newline character followed by ---
 
 An example is shown below:
 ---
@@ -176,7 +176,7 @@ Be sure to cite information from the input(s) as evidence of why your answers ar
 
 You will be provided with a description of each input field and each output field.
 
-{output_format_instruction} Finish your response with a newline character followed by ---
+Finish your response with a newline character followed by ---
 
 An example is shown below:
 ---
@@ -312,7 +312,7 @@ Be sure to cite information from the context as evidence of why your answers are
 
 You will be provided with a description of each input field and each output field.
 
-{output_format_instruction} Finish your response with a newline character followed by ---
+Finish your response with a newline character followed by ---
 ---
 CONTEXT:
 {context}
@@ -333,7 +333,7 @@ Be sure to cite information from the input(s) as evidence of why your answers ar
 
 You will be provided with a description of each input field and each output field.
 
-{output_format_instruction} Finish your response with a newline character followed by ---
+Finish your response with a newline character followed by ---
 ---
 CONTEXT:
 {context}

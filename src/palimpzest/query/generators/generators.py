@@ -132,7 +132,12 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         elif self.prompt_strategy == PromptStrategy.COT_MOA_AGG:
             prompt = prompts.COT_MOA_AGG_BASE_SYSTEM_PROMPT
 
-        if self.prompt_strategy not in [PromptStrategy.COT_BOOL, PromptStrategy.COT_BOOL_IMAGE]:
+        if self.prompt_strategy not in [
+            PromptStrategy.COT_BOOL,
+            PromptStrategy.COT_BOOL_IMAGE,
+            PromptStrategy.COT_MOA_PROPOSER,
+            PromptStrategy.COT_MOA_PROPOSER_IMAGE,
+        ]:
             output_format_instruction = (
                 prompts.ONE_TO_ONE_OUTPUT_FORMAT_INSTRUCTION
                 if self.cardinality == Cardinality.ONE_TO_ONE
@@ -237,14 +242,12 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER:
             prompt = prompts.COT_MOA_PROPOSER_BASE_USER_PROMPT
             format_kwargs.update({
-                "output_format_instruction": output_format_instruction,
                 "output_fields_desc": output_fields_desc,
             })
 
         elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER_IMAGE:
             prompt = prompts.COT_MOA_PROPOSER_IMAGE_BASE_USER_PROMPT
             format_kwargs.update({
-                "output_format_instruction": output_format_instruction,
                 "output_fields_desc": output_fields_desc,
             })
 
@@ -539,6 +542,8 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             ts = time.time()
             with open(f"parse-answer-errors/error-{ts}.txt", "w") as f:
                 f.write(f"{str(self.model_name)}\n")
+                f.write("#####\n")
+                f.write(f"{str(self.prompt_strategy)}\n")
                 f.write("#####\n")
                 f.write(f"{str(completion_text)}\n")
                 f.write("#####\n")
