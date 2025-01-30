@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 project = "Palimpzest"
 copyright = "2025, MIT Data Systems Group"
 author = "MIT Data Systems Group"
-release = "0.4"
+release = "0.5.2"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

@@ -262,12 +262,13 @@ if __name__ == "__main__":
     # records, execution_stats = processor.execute()
 
     # Option 2: Use Dataset.run() to run the plan.
-    records, execution_stats = plan.run(config)
-
+    data_record_collection = plan.run(config)
+    print(data_record_collection.to_df())
     # save statistics
+
     if profile:
         stats_path = f"profiling-data/{workload}-profiling.json"
-        execution_stats_dict = execution_stats.to_json()
+        execution_stats_dict = data_record_collection.execution_stats.to_json()
         with open(stats_path, "w") as f:
             json.dump(execution_stats_dict, f)
 
@@ -275,13 +276,13 @@ if __name__ == "__main__":
     if visualize:
         from palimpzest.utils.demo_helpers import print_table
 
-        plan_str = list(execution_stats.plan_strs.values())[-1]
+        plan_str = list(data_record_collection.execution_stats.plan_strs.values())[-1]
         if workload == "enron":
-            print_table(records, cols=["sender", "subject"], plan_str=plan_str)
+            print_table(data_record_collection.data_records, cols=["sender", "subject"], plan_str=plan_str)
 
         elif workload == "real-estate":
             fst_imgs, snd_imgs, thrd_imgs, addrs, prices = [], [], [], [], []
-            for record in records:
+            for record in data_record_collection:
                 addrs.append(record.address)
                 prices.append(record.price)
                 for idx, img_name in enumerate(["img1.png", "img2.png", "img3.png"]):
@@ -311,7 +312,7 @@ if __name__ == "__main__":
                         with gr.Column():
                             price_blocks.append(gr.Textbox(value=price, info="Price"))
 
-                plan_str = list(execution_stats.plan_strs.values())[0]
+                plan_str = list(data_record_collection.execution_stats.plan_strs.values())[0]
                 gr.Textbox(value=plan_str, info="Query Plan")
 
             demo.launch()

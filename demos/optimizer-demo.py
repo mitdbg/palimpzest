@@ -129,7 +129,9 @@ class EnronValidationSource(ValidationDataSource):
             random.Random(seed).shuffle(self.val_filepaths)
 
         # num samples cannot exceed the number of records
-        assert self.num_samples <= len(self.label_fields_to_values), "cannot have more samples than labelled data records"
+        assert self.num_samples <= len(self.label_fields_to_values), (
+            "cannot have more samples than labelled data records"
+        )
 
         # trim to number of samples
         self.val_filepaths = self.val_filepaths[:num_samples]
@@ -207,6 +209,7 @@ class RealEstateValidationSource(ValidationDataSource):
         self.listings_dir = listings_dir
         self.split_idx = split_idx
         self.listings = sorted(os.listdir(self.listings_dir), key=lambda listing: int(listing.split("listing")[-1]))
+        assert len(self.listings) > split_idx, "split_idx is greater than the number of listings"
 
         self.val_listings = self.listings[:split_idx]
         self.listings = self.listings[split_idx:]
@@ -531,18 +534,7 @@ class BiodexReactions(BiodexEntry):
     )
 
 
-class BiodexReactionLabels(BiodexReactions):
-    """
-    Retrieve the labels which are most relevant for the given set of inferred reactions.
-    """
-
-    reaction_labels = ListField(
-        desc="Most relevant official terms for adverse reactions for the provided `reactions`",
-        element_type=StringField,
-    )
-
-
-class BiodexRankedReactions(BiodexReactionLabels):
+class BiodexRankedReactions(BiodexReactions):
     """
     You will be presented with the text of a medical article which is partially or entirely about
     an adverse event experienced by a patient in response to taking one or more drugs. You will also
@@ -936,11 +928,19 @@ if __name__ == "__main__":
         )
         plan = Dataset(user_dataset_id, schema=BiodexEntry)
         plan = plan.convert(BiodexReactions)  # infer
+
+        def search_func(index, query, k):
+            results = index.search(query, k=1)
+            results = [result[0] if isinstance(result, list) else result for result in results]
+            sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
+            return [result["content"] for result in sorted_results[:k]]
+
         plan = plan.retrieve(
-            output_schema=BiodexReactionLabels,
             index=index,
+            search_func=search_func,
             search_attr="reactions",
             output_attr="reaction_labels",
+            output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
             # k=10, # if we set k, then it will be fixed; if we leave it unspecified then the optimizer will choose
         )  # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
         plan = plan.convert(BiodexRankedReactions)
@@ -972,11 +972,19 @@ if __name__ == "__main__":
         plan = plan.convert(BiodexPatientSex, depends_on=["title", "abstract", "fulltext"])
         plan = plan.convert(BiodexDrugs, depends_on=["title", "abstract", "fulltext"])
         plan = plan.convert(BiodexReactions, depends_on=["title", "abstract", "fulltext"])
+
+        def search_func(index, query, k):
+            results = index.search(query, k=1)
+            results = [result[0] if isinstance(result, list) else result for result in results]
+            sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
+            return [result["content"] for result in sorted_results[:k]]
+
         plan = plan.retrieve(
-            output_schema=BiodexReactionLabels,
             index=index,
+            search_func=search_func,
             search_attr="reactions",
             output_attr="reaction_labels",
+            output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
             # k=10, # if we set k, then it will be fixed; if we leave it unspecified then the optimizer will choose
         )  # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
         plan = plan.convert(BiodexRankedReactions)
@@ -1006,7 +1014,7 @@ if __name__ == "__main__":
         }
         optimizer_strategy = "none"
         available_models = [model_str_to_model[args.model]] + [model_str_to_vision_model[args.model]]
-    
+
     # execute pz plan
     config = QueryProcessorConfig(
         policy=policy,
@@ -1031,7 +1039,7 @@ if __name__ == "__main__":
         ],
     )
 
-    records, execution_stats = plan.run(
+    data_record_collection = plan.run(
         config=config,
         k=k,
         j=j,
@@ -1041,8 +1049,10 @@ if __name__ == "__main__":
         sample_start_idx=sample_start_idx,
         sample_end_idx=sample_end_idx,
         seed=seed,
-        exp_name=exp_name
+        exp_name=exp_name,
     )
+
+    print(data_record_collection.to_df())
 
     # create filepaths for records and stats
     records_path = (
@@ -1058,7 +1068,7 @@ if __name__ == "__main__":
 
     # save record outputs
     record_jsons = []
-    for record in records:
+    for record in data_record_collection:
         record_dict = record.to_dict()
         if workload == "biodex":
             record_dict = {
@@ -1076,6 +1086,6 @@ if __name__ == "__main__":
         json.dump(record_jsons, f)
 
     # save statistics
-    execution_stats_dict = execution_stats.to_json()
+    execution_stats_dict = data_record_collection.execution_stats.to_json()
     with open(stats_path, "w") as f:
         json.dump(execution_stats_dict, f)

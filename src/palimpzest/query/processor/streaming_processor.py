@@ -1,7 +1,7 @@
 import time
 
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
-from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.elements.records import DataRecord, DataRecordCollection
 from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.policy import Policy
 from palimpzest.query.operators.aggregate import AggregateOp
@@ -85,8 +85,8 @@ class StreamingQueryProcessor(QueryProcessor):
             if idx == len(input_records) - 1:
                 total_plan_time = time.time() - start_time
                 self.plan_stats.finalize(total_plan_time)
-
-            yield output_records, self.plan, self.plan_stats
+            self.plan_stats.plan_str = str(self.plan)
+            yield DataRecordCollection(output_records, plan_stats=self.plan_stats)
 
     def get_input_records(self):
         scan_operator = self.plan.operators[0]

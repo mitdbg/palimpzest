@@ -269,6 +269,7 @@ class Optimizer:
                 input_schema=input_schema,
                 output_schema=output_schema,
                 index=node._index,
+                search_func=node._search_func,
                 search_attr=node._search_attr,
                 output_attr=node._output_attr,
                 k=node._k,

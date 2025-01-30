@@ -198,7 +198,7 @@ with st.sidebar:
     run_pz = st.button("Run Palimpzest on dataset")
 
     # st.radio("Biofabric Data Integration")
-run_pz = False
+run_pz = True
 dataset = "bdf-usecase3-tiny"
 
 if run_pz:
@@ -220,24 +220,27 @@ if run_pz:
         execution_strategy="sequential",
         optimizer_strategy="pareto",
     )
-    iterable = output.run(config)
-
+    data_record_collection = output.run(config)
+    
     references = []
     statistics = []
 
-    for idx, (reference, plan, stats) in enumerate(iterable):
+    for idx, record_collection in enumerate(data_record_collection):
         record_time = time.time()
+        stats = record_collection.plan_stats
+        references = record_collection.data_records
+        plan = record_collection.executed_plans[0]
         statistics.append(stats)
 
         if not idx:
             with st.container():
                 st.write("### Executed plan: \n")
-                # st.write(" " + str(plan).replace("\n", "  \n "))
-                for idx, op in enumerate(plan.operators):
-                    strop = f"{idx+1}. {str(op)}"
-                    strop = strop.replace("\n", "  \n")
-                    st.write(strop)
-        for ref in reference:
+                st.write(" " + str(plan).replace("\n", "  \n "))
+                # for idx, op in enumerate(stats.plan_strs[0].operators):
+                #     strop = f"{idx+1}. {str(op)}"
+                #     strop = strop.replace("\n", "  \n")
+                #     st.write(strop)
+        for ref in references:
             try:
                 index = ref.index
             except Exception:
