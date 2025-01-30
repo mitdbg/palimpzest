@@ -1,6 +1,7 @@
 # write tests for src/palimpzest/core/data/datasources.py
 
 import os
+from copy import deepcopy
 
 import pandas as pd
 import pytest
@@ -57,7 +58,7 @@ def test_file_source(temp_text_file):
     assert record.contents == b"Hello, World!"
     assert len(source) == 1
 
-    copied = source.copy()
+    copied = deepcopy(source)
     assert copied.filepath == source.filepath
     assert copied.dataset_id == source.dataset_id
     assert copied.schema == source.schema
@@ -83,7 +84,7 @@ def test_memory_source_list(list_values):
     assert record.value == list_values[0]
     record = source.get_item(3)
     assert record.value == list_values[3]
-    copied = source.copy()
+    copied = deepcopy(source)
     assert copied.vals == source.vals
     assert copied.dataset_id == source.dataset_id
 
@@ -96,7 +97,7 @@ def test_memory_source_df(df_values):
     assert record.a == df_values.iloc[0]['a']
     assert record.b == df_values.iloc[0]['b']
 
-    copied = source.copy()
+    copied = deepcopy(source)
     assert copied.vals.equals(source.vals)
     assert copied.dataset_id == source.dataset_id
 
@@ -104,7 +105,7 @@ def test_memory_source_df(df_values):
 def test_memory_source_copy():
     values = [1, 2, 3]
     source = MemorySource(values, dataset_id="test_memory")
-    copied = source.copy()
+    copied = deepcopy(source)
     
     assert copied.vals == source.vals
     assert copied.dataset_id == source.dataset_id

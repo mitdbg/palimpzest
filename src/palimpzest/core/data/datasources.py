@@ -63,9 +63,6 @@ class AbstractDataSource(abc.ABC):
     def schema(self) -> Schema:
         return self._schema
 
-    def copy(self) -> AbstractDataSource:
-        raise NotImplementedError("You are calling this method from an abstract class.")
-
     def serialize(self) -> dict[str, Any]:
         return {"schema": self._schema.json_schema()}
 
@@ -121,9 +118,6 @@ class FileSource(DataSource):
         super().__init__(File, dataset_id)
         self.filepath = path
 
-    def copy(self):
-        return FileSource(self.filepath, self.dataset_id)
-
     def serialize(self) -> dict[str, Any]:
         return {
             "schema": self.schema.json_schema(),
@@ -163,9 +157,6 @@ class MemorySource(DataSource):
         schema = Schema.from_df(self.vals) if isinstance(self.vals, pd.DataFrame) else DefaultSchema
         super().__init__(schema, dataset_id)
 
-    def copy(self):
-        return MemorySource(self.vals, self.dataset_id)
-
     def __len__(self):
         return len(self.vals)
 
@@ -190,9 +181,6 @@ class HTMLFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=WebPage)
         assert all([filename.endswith(tuple(constants.HTML_EXTENSIONS)) for filename in self.filepaths])
-
-    def copy(self):
-        return HTMLFileDirectorySource(self.path, self.dataset_id)
 
     def html_to_text_with_links(self, html):
         # Parse the HTML content
@@ -232,9 +220,6 @@ class ImageFileDirectorySource(DirectorySource):
         super().__init__(path=path, dataset_id=dataset_id, schema=ImageFile)
         assert all([filename.endswith(tuple(constants.IMAGE_EXTENSIONS)) for filename in self.filepaths])
 
-    def copy(self):
-        return ImageFileDirectorySource(self.path, self.dataset_id)
-
     def get_item(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
         dr = DataRecord(self.schema, source_id=filepath)
@@ -256,9 +241,6 @@ class PDFFileDirectorySource(DirectorySource):
         assert all([filename.endswith(tuple(constants.PDF_EXTENSIONS)) for filename in self.filepaths])
         self.pdfprocessor = pdfprocessor
         self.file_cache_dir = file_cache_dir
-
-    def copy(self):
-        return PDFFileDirectorySource(self.path, self.dataset_id)
 
     def get_item(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
@@ -296,9 +278,6 @@ class TextFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=TextFile)
 
-    def copy(self):
-        return TextFileDirectorySource(self.path, self.dataset_id)
-
     def get_item(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
         dr = DataRecord(self.schema, source_id=filepath)
@@ -312,9 +291,6 @@ class XLSFileDirectorySource(DirectorySource):
     def __init__(self, path: str, dataset_id: str) -> None:
         super().__init__(path=path, dataset_id=dataset_id, schema=XLSFile)
         assert all([filename.endswith(tuple(constants.XLS_EXTENSIONS)) for filename in self.filepaths])
-
-    def copy(self):
-        return XLSFileDirectorySource(self.path, self.dataset_id)
 
     def get_item(self, idx: int) -> DataRecord:
         filepath = self.filepaths[idx]
@@ -349,9 +325,6 @@ class UserSource(DataSource):
         raise NotImplementedError("User may optionally implement this method.")
 
     def get_item(self, idx: int) -> DataRecord:
-        raise NotImplementedError("User needs to implement this method.")
-
-    def copy(self):
         raise NotImplementedError("User needs to implement this method.")
 
 class ValidationDataSource(UserSource):

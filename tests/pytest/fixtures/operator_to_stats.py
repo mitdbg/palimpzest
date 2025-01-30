@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pytest
 
 from palimpzest.constants import Model
@@ -187,7 +189,7 @@ def three_converts_max_quality_at_fixed_cost_operator_to_stats(three_converts_wo
 ### ONE FILTER ONE CONVERT OPERATOR-TO-STATS ###
 def get_one_filter_one_convert_logical_and_physical_op_ids(one_filter_one_convert_workload, enron_eval_tiny, email_schema):
     dataset_nodes = []
-    node = one_filter_one_convert_workload.copy()
+    node = deepcopy(one_filter_one_convert_workload)
     while isinstance(node, Dataset):
         dataset_nodes.append(node)
         node = node._source

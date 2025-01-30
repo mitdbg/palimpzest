@@ -34,9 +34,6 @@ class RealEstateListingSource(UserSource):
         self.listings_dir = listings_dir
         self.listings = sorted(os.listdir(self.listings_dir))
 
-    def copy(self):
-        return RealEstateListingSource(self.dataset_id, self.listings_dir)
-
     def __len__(self):
         return len(self.listings)
 
@@ -65,9 +62,6 @@ class CostModelTestSource(UserSource):
     def __init__(self, dataset_id: str):
         super().__init__(Number, dataset_id)
         self.numbers = [1, 2, 3]
-
-    def copy(self):
-        return CostModelTestSource(self.dataset_id)
 
     def __len__(self):
         return len(self.numbers)

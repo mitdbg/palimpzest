@@ -39,9 +39,6 @@ class FeverUserSource(UserSource):
             self.claims = [entry["claim"] for entry in entries]
             self.ids = [entry["id"] for entry in entries]
 
-    def copy(self):
-        return FeverUserSource(self.dataset_id, self.claims_file_path, self.num_claims_to_process)
-
     def __len__(self):
         return len(self.claims)
 

@@ -136,9 +136,6 @@ class EnronValidationSource(ValidationDataSource):
         # trim to number of samples
         self.val_filepaths = self.val_filepaths[:num_samples]
 
-    def copy(self):
-        return EnronValidationSource(self.file_dir, self.dataset_id, self.num_samples, self.shuffle, self.seed)
-
     def __len__(self):
         return len(self.test_filepaths)
 
@@ -410,11 +407,6 @@ class RealEstateValidationSource(ValidationDataSource):
         # trim to number of samples
         self.val_listings = self.val_listings[:num_samples]
 
-    def copy(self):
-        return RealEstateValidationSource(
-            self.dataset_id, self.listings_dir, self.split_idx, self.num_samples, self.shuffle, self.seed
-        )
-
     def __len__(self):
         return len(self.listings)
 
@@ -626,9 +618,6 @@ class BiodexValidationSource(ValidationDataSource):
 
         # trim to number of samples
         self.train_dataset = self.train_dataset[:num_samples]
-
-    def copy(self):
-        return BiodexValidationSource(self.dataset_id, self.num_samples, self.shuffle, self.seed)
 
     def __len__(self):
         return len(self.test_dataset)

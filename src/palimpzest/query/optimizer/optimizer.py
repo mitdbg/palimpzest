@@ -361,7 +361,7 @@ class Optimizer:
     def convert_query_plan_to_group_tree(self, query_plan: Dataset) -> str:
         # Obtain ordered list of datasets
         dataset_nodes = []
-        node = query_plan.copy()
+        node = deepcopy(query_plan)
 
         while isinstance(node, Dataset):
             dataset_nodes.append(node)

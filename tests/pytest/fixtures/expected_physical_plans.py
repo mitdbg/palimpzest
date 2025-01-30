@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pytest
 
 from palimpzest.constants import Model
@@ -125,7 +127,7 @@ def three_converts_max_quality_at_fixed_cost_expected_plan(three_converts_worklo
 ### ONE FILTER ONE CONVERT PHYSICAL PLANS ###
 def get_one_filter_one_convert_plan(one_filter_one_convert_workload, enron_eval_tiny, email_schema, models, expected_cost, expected_time, expected_quality):
     dataset_nodes = []
-    node = one_filter_one_convert_workload.copy()
+    node = deepcopy(one_filter_one_convert_workload)
     while isinstance(node, Dataset):
         dataset_nodes.append(node)
         node = node._source
