@@ -17,7 +17,6 @@
       MemorySource
       PDFFileDirectorySource
       TextFileDirectorySource
-      UserSource
       ValidationDataSource
       XLSFileDirectorySource
    

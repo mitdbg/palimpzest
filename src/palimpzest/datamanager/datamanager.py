@@ -16,7 +16,6 @@ from palimpzest.core.data.datasources import (
     MemorySource,
     PDFFileDirectorySource,
     TextFileDirectorySource,
-    UserSource,
     XLSFileDirectorySource,
 )
 from palimpzest.utils.hash_helpers import hash_for_id
@@ -159,7 +158,7 @@ class DataDirectory(metaclass=DataDirectorySingletonMeta):
             self.register_memory_source(vals, dataset_id)
         return self.get_registered_dataset(dataset_id)
 
-    def register_user_source(self, src: UserSource, dataset_id: str):
+    def register_user_source(self, src: DataSource, dataset_id: str):
         """Register a user source as a data source."""
         # user sources are always ephemeral
         self._tempRegistry[dataset_id] = ("user", src)

@@ -290,26 +290,7 @@ class XLSFileDirectorySource(DirectorySource):
         return dr
 
 
-# User-defined datasources
-class UserSource(DataSource):
-    """UserSource is a DataSource that is created by the user and not loaded from a file"""
-
-    def __init__(self, schema: Schema, dataset_id: str) -> None:
-        super().__init__(schema, dataset_id)
-
-    def serialize(self) -> dict[str, Any]:
-        return {
-            "schema": self.schema.json_schema(),
-            "source_type": "user-defined:" + self.__class__.__name__,
-        }
-
-    def __len__(self):
-        raise NotImplementedError("User needs to implement this method")
-
-    def get_item(self, idx: int) -> DataRecord:
-        raise NotImplementedError("User needs to implement this method.")
-
-class ValidationDataSource(UserSource):
+class ValidationDataSource(DataSource):
     """
     TODO: update this class interface (and comment)
     """

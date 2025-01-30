@@ -7,7 +7,6 @@ from palimpzest.core.data.datasources import (
     MemorySource,
     PDFFileDirectorySource,
     TextFileDirectorySource,
-    UserSource,
     ValidationDataSource,
     XLSFileDirectorySource,
 )
@@ -75,7 +74,6 @@ __all__ = [
     "MemorySource",
     "PDFFileDirectorySource",
     "TextFileDirectorySource",
-    "UserSource",
     "ValidationDataSource",
     "XLSFileDirectorySource",
     # records

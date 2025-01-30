@@ -4,7 +4,7 @@ import os
 
 from ragatouille import RAGPretrainedModel
 
-from palimpzest.core.data.datasources import UserSource
+from palimpzest.core.data.datasources import DataSource
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import BooleanField, StringField
 from palimpzest.core.lib.schemas import Schema
@@ -23,7 +23,7 @@ class FeverOutputSchema(FeverClaimsSchema):
     )
 
 
-class FeverUserSource(UserSource):
+class FeverDataSource(DataSource):
     def __init__(self, dataset_id, claims_file_path, num_claims_to_process):
         super().__init__(FeverClaimsSchema, dataset_id)
 
@@ -92,7 +92,7 @@ def main():
 
     # Create a user datasource for the FEVER dataset
     dataset_id = f"fever-dataset-{args.num_claims_to_process}"
-    datasource = FeverUserSource(
+    datasource = FeverDataSource(
         dataset_id=dataset_id,
         claims_file_path=args.claims_file_path,
         num_claims_to_process=args.num_claims_to_process,

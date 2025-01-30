@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from palimpzest.core.data.datasources import UserSource
+from palimpzest.core.data.datasources import DataSource
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import ListField, NumericField, StringField
 from palimpzest.core.lib.schemas import Schema
@@ -27,7 +27,7 @@ class Number(Schema):
     value = NumericField(desc="The value of the number")
 
 
-class RealEstateListingSource(UserSource):
+class RealEstateListingSource(DataSource):
     def __init__(self, dataset_id, listings_dir):
         super().__init__(RealEstateListingFiles, dataset_id)
         self.listings_dir = listings_dir
@@ -54,7 +54,7 @@ class RealEstateListingSource(UserSource):
 
         return dr
 
-class CostModelTestSource(UserSource):
+class CostModelTestSource(DataSource):
     def __init__(self, dataset_id: str):
         super().__init__(Number, dataset_id)
         self.numbers = [1, 2, 3]

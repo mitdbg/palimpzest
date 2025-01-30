@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 
 from palimpzest.constants import Cardinality
-from palimpzest.core.data.datasources import UserSource
+from palimpzest.core.data.datasources import DataSource
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import BooleanField, Field, ImageFilepathField, ListField, NumericField, StringField
 from palimpzest.core.lib.schemas import Schema, Table, TextFile, XLSFile
@@ -118,7 +118,7 @@ class ImageRealEstateListing(RealEstateListingFiles):
     )
 
 
-class RealEstateListingSource(UserSource):
+class RealEstateListingSource(DataSource):
     def __init__(self, dataset_id, listings_dir):
         super().__init__(RealEstateListingFiles, dataset_id)
         self.listings_dir = listings_dir
