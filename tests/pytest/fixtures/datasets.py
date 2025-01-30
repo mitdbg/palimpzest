@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 import pytest
 
@@ -37,9 +36,6 @@ class RealEstateListingSource(UserSource):
     def __len__(self):
         return len(self.listings)
 
-    def get_size(self):
-        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
-
     def get_item(self, idx: int):
         # fetch listing
         listing = self.listings[idx]
@@ -65,9 +61,6 @@ class CostModelTestSource(UserSource):
 
     def __len__(self):
         return len(self.numbers)
-
-    def get_size(self):
-        return 0
 
     def get_item(self, idx: int):
         # fetch number

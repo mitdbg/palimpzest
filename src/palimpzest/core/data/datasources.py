@@ -4,7 +4,6 @@ import abc
 import base64
 import json
 import os
-import sys
 from io import BytesIO
 from typing import Any, Callable
 
@@ -56,9 +55,6 @@ class AbstractDataSource(abc.ABC):
     @abc.abstractmethod
     def get_item(self, idx: int) -> DataRecord: ...
 
-    @abc.abstractmethod
-    def get_size(self) -> int: ...
-
     @property
     def schema(self) -> Schema:
         return self._schema
@@ -103,10 +99,6 @@ class DirectorySource(DataSource):
     def __len__(self):
         return len(self.filepaths)
 
-    def get_size(self):
-        # Get the memory size of the files in the directory
-        return sum([os.path.getsize(filepath) for filepath in self.filepaths])
-
     def get_item(self, idx: int):
         raise NotImplementedError("You are calling this method from an abstract class.")
 
@@ -127,10 +119,6 @@ class FileSource(DataSource):
 
     def __len__(self):
         return 1
-
-    def get_size(self):
-        # Get the memory size of the filepath
-        return os.path.getsize(self.filepath)
 
     def get_item(self, idx: int) -> DataRecord:
         dr = DataRecord(self.schema, source_id=self.filepath)
@@ -159,9 +147,6 @@ class MemorySource(DataSource):
 
     def __len__(self):
         return len(self.vals)
-
-    def get_size(self):
-        return sum([sys.getsizeof(self.get_item(idx)) for idx in range(len(self))])
 
     def get_item(self, idx: int) -> DataRecord:
         dr = DataRecord(self.schema, source_id=idx)
@@ -320,9 +305,6 @@ class UserSource(DataSource):
 
     def __len__(self):
         raise NotImplementedError("User needs to implement this method")
-
-    def get_size(self):
-        raise NotImplementedError("User may optionally implement this method.")
 
     def get_item(self, idx: int) -> DataRecord:
         raise NotImplementedError("User needs to implement this method.")

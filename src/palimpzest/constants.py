@@ -98,6 +98,9 @@ LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
 # Assume 30 GB/sec for sequential access of memory
 MEMORY_SCAN_TIME_PER_KB = 1 / (float(30) * 1024 * 1024)
 
+# Assyme 1 KB per record
+NAIVE_BYTES_PER_RECORD = 1024
+
 # Rough conversion from # of characters --> # of tokens; assumes 1 token ~= 4 chars
 TOKENS_PER_CHARACTER = 0.25
 

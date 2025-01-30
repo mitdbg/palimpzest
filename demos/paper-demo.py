@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-from pathlib import Path
 
 import gradio as gr
 import numpy as np
@@ -127,9 +126,6 @@ class RealEstateListingSource(UserSource):
 
     def __len__(self):
         return len(self.listings)
-
-    def get_size(self):
-        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
 
     def get_item(self, idx: int):
         # fetch listing

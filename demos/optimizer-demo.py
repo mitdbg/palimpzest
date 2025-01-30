@@ -3,7 +3,6 @@ import json
 import os
 import random
 import time
-from pathlib import Path
 
 import datasets
 from ragatouille import RAGPretrainedModel
@@ -141,9 +140,6 @@ class EnronValidationSource(ValidationDataSource):
 
     def get_val_length(self):
         return len(self.val_filepaths)
-
-    def get_size(self):
-        return 0
 
     def get_field_to_metric_fn(self):
         return {"sender": "exact", "subject": "exact"}
@@ -413,9 +409,6 @@ class RealEstateValidationSource(ValidationDataSource):
     def get_val_length(self):
         return len(self.val_listings)
 
-    def get_size(self):
-        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
-
     def get_field_to_metric_fn(self):
         # define quality eval function for price field
         def price_eval(price: str, expected_price: int):
@@ -624,9 +617,6 @@ class BiodexValidationSource(ValidationDataSource):
 
     def get_val_length(self):
         return len(self.train_dataset)
-
-    def get_size(self):
-        return 0
 
     def get_field_to_metric_fn(self):
         # define f1 function

@@ -42,9 +42,6 @@ class FeverUserSource(UserSource):
     def __len__(self):
         return len(self.claims)
 
-    def get_size(self):
-        return sum([len(claim) for claim in self.claims])
-
     def get_item(self, idx: int):
         claim = self.claims[idx]
         dr = DataRecord(self.schema, source_id=self.ids[idx])

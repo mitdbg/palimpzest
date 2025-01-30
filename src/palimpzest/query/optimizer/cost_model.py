@@ -14,7 +14,7 @@ from typing import Any
 import pandas as pd
 import scipy.stats as stats
 
-from palimpzest.constants import MODEL_CARDS, GPT_4o_MODEL_CARD, Model
+from palimpzest.constants import MODEL_CARDS, NAIVE_BYTES_PER_RECORD, GPT_4o_MODEL_CARD, Model
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
 from palimpzest.core.elements.records import DataRecordSet
 from palimpzest.datamanager.datamanager import DataDirectory
@@ -614,7 +614,6 @@ class CostModel(BaseCostModel):
             datasource = operator.get_datasource()
             dataset_type = operator.get_datasource_type()
             datasource_len = len(datasource)
-            datasource_memsize = datasource.get_size()
 
             source_op_estimates = OperatorCostEstimates(
                 cardinality=datasource_len,
@@ -624,13 +623,12 @@ class CostModel(BaseCostModel):
             )
 
             op_estimates = operator.naive_cost_estimates(source_op_estimates,
-                                                    input_record_size_in_bytes=datasource_memsize/datasource_len,
+                                                    input_record_size_in_bytes=NAIVE_BYTES_PER_RECORD,
                                                     dataset_type=dataset_type)
 
         elif isinstance(operator, CacheScanDataOp):
             datasource = operator.get_datasource()
             datasource_len = len(datasource)
-            datasource_memsize = datasource.get_size()
 
             source_op_estimates = OperatorCostEstimates(
                 cardinality=datasource_len,
@@ -639,7 +637,7 @@ class CostModel(BaseCostModel):
                 quality=1.0,
             )
 
-            op_estimates = operator.naive_cost_estimates(source_op_estimates, input_record_size_in_bytes=datasource_memsize/datasource_len)
+            op_estimates = operator.naive_cost_estimates(source_op_estimates, input_record_size_in_bytes=NAIVE_BYTES_PER_RECORD)
 
         else:
             op_estimates = operator.naive_cost_estimates(source_op_estimates)
