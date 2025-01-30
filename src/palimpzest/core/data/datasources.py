@@ -287,7 +287,7 @@ class PDFFileDirectorySource(DirectorySource):
         dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = pdf_filename
         dr.contents = pdf_bytes
-        dr.text_contents = text_content[:15000]  # TODO Very hacky
+        dr.text_contents = text_content
 
         return dr
 
