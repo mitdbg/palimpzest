@@ -190,7 +190,7 @@ class TestOptimizer:
 
     def test_push_down_filter(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = Dataset(enron_eval_tiny, schema=email_schema)
-        plan = plan.filter("some text filter", depends_on=["contents"])
+        plan = plan.sem_filter("some text filter", depends_on=["contents"])
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -212,8 +212,8 @@ class TestOptimizer:
 
     def test_push_down_two_filters(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = Dataset(enron_eval_tiny, schema=email_schema)
-        plan = plan.filter("some text filter", depends_on=["contents"])
-        plan = plan.filter("another text filter", depends_on=["contents"])
+        plan = plan.sem_filter("some text filter", depends_on=["contents"])
+        plan = plan.sem_filter("another text filter", depends_on=["contents"])
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -262,13 +262,13 @@ class TestOptimizer:
 
     def test_seven_filters(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = Dataset(enron_eval_tiny, schema=email_schema)
-        plan = plan.filter("filter1", depends_on=["contents"])
-        plan = plan.filter("filter2", depends_on=["contents"])
-        plan = plan.filter("filter3", depends_on=["contents"])
-        plan = plan.filter("filter4", depends_on=["contents"])
-        plan = plan.filter("filter5", depends_on=["contents"])
-        plan = plan.filter("filter6", depends_on=["contents"])
-        plan = plan.filter("filter7", depends_on=["contents"])
+        plan = plan.sem_filter("filter1", depends_on=["contents"])
+        plan = plan.sem_filter("filter2", depends_on=["contents"])
+        plan = plan.sem_filter("filter3", depends_on=["contents"])
+        plan = plan.sem_filter("filter4", depends_on=["contents"])
+        plan = plan.sem_filter("filter5", depends_on=["contents"])
+        plan = plan.sem_filter("filter6", depends_on=["contents"])
+        plan = plan.sem_filter("filter7", depends_on=["contents"])
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -308,6 +308,7 @@ class MockSampleBasedCostModel:
             for _, phys_op_id_to_stats in self.operator_to_stats.items()
             for phys_op_id, _ in phys_op_id_to_stats.items()
         ])
+        
 
         # reference to data directory
         self.datadir = DataDirectory()
