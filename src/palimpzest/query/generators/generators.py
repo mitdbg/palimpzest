@@ -145,7 +145,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
     def _generate_user_prompt(self, candidate: DataRecord, fields: list[str], **kwargs) -> str:
         """Returns a prompt based on the prompt strategy with instance-specific instructions."""
         # get context from input record (project_cols will be None if not provided in kwargs)
-        context = json.loads(candidate.as_json_str(include_bytes=False, project_cols=kwargs.get("project_cols")))
+        context = candidate.as_json_str(include_bytes=False, project_cols=kwargs.get("project_cols"))
 
         # get filter condition for filter operations
         filter_condition = (
@@ -199,7 +199,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
                 # trim the field
                 context_factor =  6000.0 / (total_context_len * TOKENS_PER_CHARACTER)
-                keep_frac_idx = int(longest_field_length * context_factor)
+                keep_frac_idx = int(len(longest_field_length) * context_factor)
                 context[longest_field_name] = context[longest_field_name][:keep_frac_idx]
 
                 # update total context length
@@ -248,8 +248,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 "output_format_instruction": output_format_instruction,
                 "output_fields_desc": output_fields_desc,
             })
-        print("PROMPT IS ")
-        print(prompt.format(**format_kwargs))
+
         return prompt.format(**format_kwargs)
 
     def _parse_reasoning(self, completion_text: str, **kwargs) -> Any:
@@ -368,7 +367,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
         except Exception as e:
-            print("YO")
             print(f"Error generating completion: {e}")
             field_answers = {field_name: None for field_name in fields}
             reasoning = None

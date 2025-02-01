@@ -200,7 +200,7 @@ def execute_task(task, datasetid, execution_engine, policy, verbose=False, profi
 
 def format_results_table(records, cols=None):
     """Format records as a table"""
-    records = [{key: record[key] for key in record.get_field_names()} for record in records]
+    records = [{key: record[key] for key in record.get_fields()} for record in records]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
     final_df = records_df[print_cols] if not records_df.empty else pd.DataFrame(columns=print_cols)
