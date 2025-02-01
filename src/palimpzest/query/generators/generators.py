@@ -38,7 +38,6 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import BytesField, ImageBase64Field, ImageFilepathField, ImageURLField, ListField
 from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
-from palimpzest.query.generators import multi_llm_generator 
 
 # DEFINITIONS
 GenerationOutput = Tuple[dict, str | None, GenerationStats]
@@ -74,13 +73,12 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
     """
     Abstract base class for Generators.
     """
-    def __init__(self, model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality = Cardinality.ONE_TO_ONE, verbose: bool = False, multi_LLM_verification: bool = False):
+    def __init__(self, model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality = Cardinality.ONE_TO_ONE, verbose: bool = False):
         self.model = model
         self.model_name = model.value
         self.cardinality = cardinality
         self.prompt_strategy = prompt_strategy
         self.verbose = verbose
-        self.multi_LLM_verification = True
 
     @abstractmethod
     def _get_client_or_model(self, **kwargs) -> Any:
@@ -118,7 +116,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         pass
 
     def _generate_developer_prompt(self) -> str:
-        """Returns a prompt based on the prompt strategy with high-level instructions for the generation."""            
+        """Returns a prompt based on the prompt strategy with high-level instructions for the generation."""
         if self.prompt_strategy == PromptStrategy.COT_BOOL:
             prompt = prompts.COT_BOOL_SYSTEM_PROMPT
         elif self.prompt_strategy == PromptStrategy.COT_BOOL_IMAGE:
@@ -357,10 +355,9 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         start_time = time.time()
         completion = None
         try:
+            print("HEYYY")
             print(client, chat_payload)
             completion = self._generate_completion(client, chat_payload, **kwargs)
-            if self.multi_LLM_verification:
-                completion = multi_llm_generator.verify(chat_payload, completion, self.prompt_strategy)
             end_time = time.time()
 
         # if there's an error generating the completion, we have to return an empty answer
@@ -430,7 +427,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
     """
     Class for generating text using the OpenAI chat API.
     """
-    def __init__(self, model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality = Cardinality.ONE_TO_ONE, verbose: bool = False, multi_LLM_verification: bool = False):
+    def __init__(self, model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality = Cardinality.ONE_TO_ONE, verbose: bool = False):
         # assert that model is an OpenAI model
         assert model in [Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4o_V, Model.GPT_4o_MINI_V]
         assert prompt_strategy in [
@@ -441,7 +438,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
             PromptStrategy.COT_MOA_AGG,
             PromptStrategy.COT_QA_IMAGE,
         ]
-        super().__init__(model, prompt_strategy, cardinality, verbose, multi_LLM_verification)
+        super().__init__(model, prompt_strategy, cardinality, verbose)
 
     def _get_client_or_model(self, **kwargs) -> OpenAI:
         """Returns a client (or local model) which can be invoked to perform the generation."""
