@@ -26,6 +26,4 @@ jobs:
           restore-keys: |
             mkdocs-material-
       - run: pip install mkdocs-material 
-      - name: Deploy documentation with MkDocs
-        working-directory: .  # Make sure this points to the correct directory containing mkdocs.yml
-        run: mkdocs gh-deploy --force
+      - run: mkdocs gh-deploy --force

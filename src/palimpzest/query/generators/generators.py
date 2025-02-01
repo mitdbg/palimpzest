@@ -145,8 +145,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
     def _generate_user_prompt(self, candidate: DataRecord, fields: list[str], **kwargs) -> str:
         """Returns a prompt based on the prompt strategy with instance-specific instructions."""
         # get context from input record (project_cols will be None if not provided in kwargs)
-        context = candidate.as_json_str(include_bytes=False, project_cols=kwargs.get("project_cols"))
-
+        context = json.loads(candidate.as_json_str(include_bytes=False, project_cols=kwargs.get("project_cols")))
         # get filter condition for filter operations
         filter_condition = (
             kwargs.get("filter_condition")
@@ -199,7 +198,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
                 # trim the field
                 context_factor =  6000.0 / (total_context_len * TOKENS_PER_CHARACTER)
-                keep_frac_idx = int(len(longest_field_length) * context_factor)
+                keep_frac_idx = int(longest_field_length * context_factor)
                 context[longest_field_name] = context[longest_field_name][:keep_frac_idx]
 
                 # update total context length
