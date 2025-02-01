@@ -283,6 +283,8 @@ class Optimizer:
                 depends_on=node._depends_on,
                 target_cache_id=uid,
             )
+        elif output_schema == input_schema:
+            return self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], {}, {})
         else:
             raise NotImplementedError(
                 f"""No logical operator exists for the specified dataset construction.

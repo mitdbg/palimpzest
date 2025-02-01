@@ -306,6 +306,11 @@ class Schema(metaclass=SchemaMetaclass):
             new_field_types.append(StringField(desc=field_desc))  # Assuming StringField for new fields
             new_field_descs.append(field_desc)
 
+        # If the number of fields is the same, this means we are not adding any new fields
+        # This implies that schema column names should be unique, which is reasonable.
+        if len(new_field_names) == len(list(cls.field_names())):
+            return cls
+
         # Generate the schema class dynamically
         attributes = {"_desc": new_desc, "__doc__": new_desc}
         for field_name, field_type, field_desc in zip(new_field_names, new_field_types, new_field_descs):
