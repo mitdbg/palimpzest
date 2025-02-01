@@ -104,7 +104,7 @@ dataset = "bdf-usecase3-tiny"
 if run_pz:
     # reference, plan, stats = run_workload()
     papers = Dataset(dataset, schema=ScientificPaper)
-    papers = papers.filter("The paper mentions phosphorylation of Exo1")
+    papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
     output = papers.convert(Reference, desc="The references cited in the paper", cardinality=Cardinality.ONE_TO_MANY)
 
     # output = references

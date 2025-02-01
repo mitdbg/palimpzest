@@ -41,10 +41,10 @@ def in_price_range(record):
 @pytest.fixture
 def enron_workload(enron_eval_tiny, email_schema):
     emails = Dataset(enron_eval_tiny, schema=email_schema)
-    emails = emails.filter(
+    emails = emails.sem_filter(
         'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
     )
-    emails = emails.filter(
+    emails = emails.sem_filter(
         "The email is not quoting from a news article or an article written by someone outside of Enron"
     )
     return emails
@@ -60,12 +60,18 @@ def real_estate_workload(
     listings = Dataset(real_estate_eval_tiny, schema=real_estate_listing_files_schema)
     listings = listings.convert(text_real_estate_listing_schema, depends_on="text_content")
     listings = listings.convert(image_real_estate_listing_schema, depends_on="image_filepaths")
-    listings = listings.filter(
+    listings = listings.sem_filter(
         "The interior is modern and attractive, and has lots of natural sunlight",
         depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
     )
-    listings = listings.filter(within_two_miles_of_mit, depends_on="address")
-    listings = listings.filter(in_price_range, depends_on="price")
+    listings = listings.filter(
+        within_two_miles_of_mit,
+        depends_on="address",
+    )
+    listings = listings.filter(
+        in_price_range,
+        depends_on="price",
+    )
     return listings
 
 
@@ -82,7 +88,7 @@ def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_sc
 def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
     # construct plan with two converts and two filters
     dataset = Dataset(enron_eval_tiny, schema=TextFile)
-    dataset = dataset.filter("filter1")
+    dataset = dataset.sem_filter("filter1")
     dataset = dataset.convert(email_schema)
 
     return dataset
@@ -92,7 +98,7 @@ def two_converts_two_filters_workload(enron_eval_tiny, email_schema, foobar_sche
     # construct plan with two converts and two filters
     dataset = Dataset(enron_eval_tiny, schema=email_schema)
     dataset = dataset.convert(foobar_schema)
-    dataset = dataset.filter("filter1", depends_on=["sender"])
-    dataset = dataset.filter("filter2", depends_on=["subject"])
+    dataset = dataset.sem_filter("filter1", depends_on=["sender"])
+    dataset = dataset.sem_filter("filter2", depends_on=["subject"])
 
     return dataset

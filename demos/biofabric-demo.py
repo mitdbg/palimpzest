@@ -104,11 +104,11 @@ if __name__ == "__main__":
     elif experiment == "filtering":
         xls = Dataset("biofabric-tiny", schema=XLSFile)
         patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
-        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
-        # patient_tables = patient_tables.filter("The table explains the meaning of attributes")
-        # patient_tables = patient_tables.filter("The table contains patient biometric data")
-        # patient_tables = patient_tables.filter("The table contains proteomic data")
-        # patient_tables = patient_tables.filter("The table records if the patient is excluded from the study")
+        patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
+        # patient_tables = patient_tables.sem_filter("The table explains the meaning of attributes")
+        # patient_tables = patient_tables.sem_filter("The table contains patient biometric data")
+        # patient_tables = patient_tables.sem_filter("The table contains proteomic data")
+        # patient_tables = patient_tables.sem_filter("The table records if the patient is excluded from the study")
         output = patient_tables
 
     elif experiment == "matching":
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     elif experiment == "endtoend":
         xls = Dataset("biofabric-tiny", schema=XLSFile)
         patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
-        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
+        patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(
             CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
         )
