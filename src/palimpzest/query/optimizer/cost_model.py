@@ -131,9 +131,9 @@ class SampleBasedCostModel:
                     "time_per_record": record_op_stats.time_per_record,
                     "quality": record_op_stats.quality,
                     "passed_operator": record_op_stats.passed_operator,
-                    "source_id": record_op_stats.record_source_id,  # TODO: remove
-                    "op_details": record_op_stats.op_details,       # TODO: remove
-                    "answer": record_op_stats.answer,               # TODO: remove
+                    "source_idx": record_op_stats.record_source_idx,  # TODO: remove
+                    "op_details": record_op_stats.op_details,         # TODO: remove
+                    "answer": record_op_stats.answer,                 # TODO: remove
                 }
                 execution_record_op_stats.append(record_op_stats_dict)
 
@@ -192,7 +192,7 @@ class SampleBasedCostModel:
         # create source_op_estimates for datasources if they are not provided
         if isinstance(operator, DataSourcePhysicalOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = operator.get_datasource()
+            datasource = operator.datasource
             datasource_len = len(datasource)
 
             source_op_estimates = OperatorCostEstimates(
@@ -611,8 +611,7 @@ class CostModel(BaseCostModel):
         # initialize estimates of operator metrics based on naive (but sometimes precise) logic
         if isinstance(operator, MarshalAndScanDataOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = operator.get_datasource()
-            dataset_type = operator.get_datasource_type()
+            datasource = operator.datasource
             datasource_len = len(datasource)
 
             source_op_estimates = OperatorCostEstimates(
@@ -622,12 +621,10 @@ class CostModel(BaseCostModel):
                 quality=1.0,
             )
 
-            op_estimates = operator.naive_cost_estimates(source_op_estimates,
-                                                    input_record_size_in_bytes=NAIVE_BYTES_PER_RECORD,
-                                                    dataset_type=dataset_type)
+            op_estimates = operator.naive_cost_estimates(source_op_estimates, input_record_size_in_bytes=NAIVE_BYTES_PER_RECORD)
 
         elif isinstance(operator, CacheScanDataOp):
-            datasource = operator.get_datasource()
+            datasource = operator.datasource
             datasource_len = len(datasource)
 
             source_op_estimates = OperatorCostEstimates(

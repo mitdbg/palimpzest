@@ -1,8 +1,6 @@
 import time
 
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
-from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.datasource import DataSourcePhysicalOp
@@ -49,7 +47,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
         assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-        datasource = source_operator.get_datasource()
+        datasource = source_operator.datasource
         datasource_len = len(datasource)
 
         # initialize processing queues for each operation
@@ -68,15 +66,8 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
             if isinstance(operator, DataSourcePhysicalOp):
                 keep_scanning_source_records = True
                 while keep_scanning_source_records:
-                    # construct input DataRecord for DataSourcePhysicalOp
-                    # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
-                    #       it is simply a vessel to inform the scan_operator which record to fetch
-                    candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
-                    candidate.idx = current_scan_idx
-                    candidate.get_item_fn = datasource.get_item
-
-                    # run DataSourcePhysicalOp on record
-                    record_set = operator(candidate)
+                    # run DataSourcePhysicalOp on current scan index
+                    record_set = operator(current_scan_idx)
                     records.extend(record_set.data_records)
                     record_op_stats.extend(record_set.record_op_stats)
 
@@ -184,7 +175,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
         assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-        datasource = source_operator.get_datasource()
+        datasource = source_operator.datasource
         datasource_len = len(datasource)
 
         # initialize processing queues for each operation
@@ -207,15 +198,8 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 # invoke datasource operator(s) until we run out of source records or hit the num_samples limit
                 if isinstance(operator, DataSourcePhysicalOp):
                     if keep_scanning_source_records:
-                        # construct input DataRecord for DataSourcePhysicalOp
-                        # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
-                        #       it is simply a vessel to inform the scan_operator which record to fetch
-                        candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
-                        candidate.idx = current_scan_idx
-                        candidate.get_item_fn = datasource.get_item
-
-                        # run DataSourcePhysicalOp on record
-                        record_set = operator(candidate)
+                        # run DataSourcePhysicalOp on current scan index
+                        record_set = operator(current_scan_idx)
                         records = record_set.data_records
                         record_op_stats = record_set.record_op_stats
 

@@ -53,11 +53,11 @@ class DataSource(ABC):
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(schema={self.schema}, dataset_id={self.dataset_id})"
-    
+
     @property
     def schema(self) -> Schema:
         return self._schema
-    
+
     def universal_identifier(self) -> str:
         """
         Return a unique identifier for this `DataSource`.
@@ -101,6 +101,10 @@ class DataSource(ABC):
                scoring the computed values against the groundtruth values. If no scoring function is provided
                for a given field then PZ will use exact matching as the default scoring function.
 
+            For some use cases, PZ will be expected to extract multiple output records for a given input. For example,
+            consider a PZ program that extracts the name and institution of each author in a paper. In this case, the
+            "labels" are a list of dictionaries, where each dict contains the groundtruth values for one output record.
+
             Scoring function(s) only need to be provided for fields that require non-exact matching. The scoring
             function accepts two arguments, `output` and `target`, and returns a float in [0, 1] (higher is better)
             The `output` will be filled in by the PZ program, and the `target` will be the groundtruth value provided
@@ -142,6 +146,17 @@ class DataSource(ABC):
                     "fields": {"document": "Jane Doe like apples, oranges, and bananas."},
                     "labels": {"first_name": "Jane", "fruits": ["apples", "oranges", "bananas"]},
                     "score_fn": {"fruits": compute_recall},
+                }
+
+                # Example return value for a validation data source with potentially more than one output per input;
+                # suppose PZ is asked to extract the name and institution of each author in a paper, where each author
+                # is pulled into their own record
+                {
+                    "fields": {"paper": "Jane Doe, MIT; John Smith, University of PZ"},
+                    "labels": [
+                        {"name": "Jane Doe", "institution": "MIT"},
+                        {"name": "John Smith", "University of PZ"},
+                    ]
                 }
         """
         pass

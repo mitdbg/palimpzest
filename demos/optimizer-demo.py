@@ -3,13 +3,13 @@ import json
 import os
 import random
 import time
+from functools import partial
 
 import datasets
 from ragatouille import RAGPretrainedModel
 
 from palimpzest.constants import Model
-from palimpzest.core.data.datasources import ValidationDataSource
-from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.data.datasources import DataSource
 from palimpzest.core.lib.fields import BooleanField, ImageFilepathField, ListField, NumericField, StringField
 from palimpzest.core.lib.schemas import Schema, TextFile
 from palimpzest.datamanager.datamanager import DataDirectory
@@ -61,7 +61,7 @@ class Email(TextFile):
     subject = StringField(desc="The subject of the email")
 
 
-class EnronValidationSource(ValidationDataSource):
+class EnronSource(DataSource):
     def __init__(
         self,
         file_dir,
@@ -70,6 +70,7 @@ class EnronValidationSource(ValidationDataSource):
         shuffle: bool = False,
         seed: int = 42,
     ):
+        assert "enron-eval" in file_dir, "The dataset must be one of the 'enron-eval*' directories"
         super().__init__(TextFile, dataset_id)
         self.file_dir = file_dir
         self.num_samples = num_samples
@@ -77,21 +78,14 @@ class EnronValidationSource(ValidationDataSource):
         self.seed = seed
 
         # get list of filepaths
-        self.test_filepaths = [
+        self.filepaths = [
             os.path.join(file_dir, filename)
             for filename in sorted(os.listdir(file_dir))
             if os.path.isfile(os.path.join(file_dir, filename))
         ]
 
-        # NOTE: this assumes the script is run from the root of the repository
-        self.val_filepaths = [
-            os.path.join("testdata/enron-eval-tiny", filename)
-            for filename in sorted(os.listdir("testdata/enron-eval-tiny"))
-            if os.path.isfile(os.path.join("testdata/enron-eval-tiny", filename))
-        ]
-
         # use six labelled examples
-        self.label_fields_to_values = {
+        self.filename_to_labels = {
             "buy-r-inbox-628.txt": {
                 "sender": "sherron.watkins@enron.com",
                 "subject": "RE: portrac",
@@ -125,44 +119,37 @@ class EnronValidationSource(ValidationDataSource):
         }
 
         if shuffle:
-            random.Random(seed).shuffle(self.val_filepaths)
+            random.Random(seed).shuffle(self.filepaths)
 
         # num samples cannot exceed the number of records
-        assert self.num_samples <= len(self.label_fields_to_values), (
+        assert self.num_samples <= len(self.filename_to_labels), (
             "cannot have more samples than labelled data records"
         )
 
         # trim to number of samples
-        self.val_filepaths = self.val_filepaths[:num_samples]
+        self.filepaths = self.filepaths[:num_samples]
 
     def __len__(self):
-        return len(self.test_filepaths)
+        return len(self.filepaths)
 
-    def get_val_length(self):
-        return len(self.val_filepaths)
+    def get_item(self, idx: int):
+        # get filepath
+        filepath = self.filepaths[idx]
 
-    def get_field_to_metric_fn(self):
-        return {"sender": "exact", "subject": "exact"}
-
-    def get_item(self, idx: int, val: bool = False, include_label: bool = False):
-        # get filepath and filename
-        filepath = self.val_filepaths[idx] if val else self.test_filepaths[idx]
-
-        # create data record
-        dr = DataRecord(self.schema, source_id=filepath)
-        dr.filename = os.path.basename(filepath)
+        # get input fields
+        filename = os.path.basename(filepath)
         with open(filepath) as f:
-            dr.contents = f.read()
+            contents = f.read()
 
-        # if requested, also return the label information
-        if include_label:
-            # augment data record with label info
-            labels_dict = self.label_fields_to_values[dr["filename"]]
+        # create item with fields
+        item = {"fields": {}, "labels": {}}
+        item["fields"]["filename"] = filename
+        item["fields"]["contents"] = contents
 
-            for field, value in labels_dict.items():
-                setattr(dr, field, value)
+        # add label info
+        item["labels"] = self.filename_to_labels[filename]
 
-        return dr
+        return item
 
 
 class RealEstateListingFiles(Schema):
@@ -194,31 +181,31 @@ class ImageRealEstateListing(RealEstateListingFiles):
     )
 
 
-class RealEstateValidationSource(ValidationDataSource):
+class RealEstateSource(DataSource):
     def __init__(
-        self, dataset_id, listings_dir, split_idx: int = 25, num_samples: int = 5, shuffle: bool = False, seed: int = 42
+        self,
+        dataset_id,
+        listings_dir,
+        num_samples: int = 5,
+        shuffle: bool = False,
+        seed: int = 42,
     ):
+        # NOTE: this source will throw an exception for real-estate-eval directories w/more than 25 examples
+        #       due to the fact that shuffling (and lexographical ordering) may cause one of the listings
+        #       to be different from the 25 which we've labelled
+        assert "real-estate-eval" in listings_dir, "The dataset must be one of the 'real-estate-eval*' directories"
         super().__init__(RealEstateListingFiles, dataset_id)
         self.listings_dir = listings_dir
-        self.split_idx = split_idx
         self.listings = sorted(os.listdir(self.listings_dir), key=lambda listing: int(listing.split("listing")[-1]))
-        assert len(self.listings) > split_idx, "split_idx is greater than the number of listings"
-
-        self.val_listings = self.listings[:split_idx]
-        self.listings = self.listings[split_idx:]
-
         self.num_samples = num_samples
         self.shuffle = shuffle
         self.seed = seed
-
-        if split_idx != 25:
-            raise Exception("Currently must split on split_idx=25 for correctness")
 
         if num_samples > 25:
             raise Exception("We have not labelled more than the first 25 listings!")
 
         # construct mapping from listing --> label (field, value) pairs
-        self.label_fields_to_values = {
+        self.listing_to_labels = {
             "listing1": {
                 "address": "161 Auburn St Unit 161, Cambridge, MA 02139",
                 "price": 1550000,
@@ -398,62 +385,51 @@ class RealEstateValidationSource(ValidationDataSource):
 
         # shuffle records if shuffle = True
         if shuffle:
-            random.Random(seed).shuffle(self.val_listings)
+            random.Random(seed).shuffle(self.listings)
 
         # trim to number of samples
-        self.val_listings = self.val_listings[:num_samples]
+        self.listings = self.listings[:num_samples]
+
+    @staticmethod
+    def price_eval(price: str | int, expected_price: int):
+        if isinstance(price, str):
+            try:
+                price = price.strip()
+                price = int(price.replace("$", "").replace(",", ""))
+            except Exception:
+                return 0.0
+        return float(price == expected_price)
 
     def __len__(self):
         return len(self.listings)
 
-    def get_val_length(self):
-        return len(self.val_listings)
+    def get_item(self, idx: int):
+        # get listing
+        listing = self.listings[idx]
 
-    def get_field_to_metric_fn(self):
-        # define quality eval function for price field
-        def price_eval(price: str, expected_price: int):
-            if isinstance(price, str):
-                try:
-                    price = price.strip()
-                    price = int(price.replace("$", "").replace(",", ""))
-                except Exception:
-                    return False
-            return price == expected_price
-
-        fields_to_metric_fn = {
-            "address": "exact",
-            "price": price_eval,
-            "is_modern_and_attractive": "exact",
-            "has_natural_sunlight": "exact",
-        }
-
-        return fields_to_metric_fn
-
-    def get_item(self, idx: int, val: bool = False, include_label: bool = False):
-        # fetch listing
-        listing = self.listings[idx] if not val else self.val_listings[idx]
-
-        # create data record
-        dr = DataRecord(self.schema, source_id=listing)
-        dr.listing = listing
-        dr.image_filepaths = []
+        # get input fields
+        image_filepaths, text_content = [], None
         listing_dir = os.path.join(self.listings_dir, listing)
         for file in os.listdir(listing_dir):
             if file.endswith(".txt"):
                 with open(os.path.join(listing_dir, file), "rb") as f:
-                    dr.text_content = f.read().decode("utf-8")
+                    text_content = f.read().decode("utf-8")
             elif file.endswith(".png"):
-                dr.image_filepaths.append(os.path.join(listing_dir, file))
+                image_filepaths.append(os.path.join(listing_dir, file))
 
-        # if requested, also return the label information
-        if include_label:
-            # augment data record with label info
-            labels_dict = self.label_fields_to_values[listing]
+        # create item with fields
+        item = {"fields": {}, "labels": {}, "score_fn": {}}
+        item["fields"]["listing"] = listing
+        item["fields"]["text_content"] = text_content
+        item["fields"]["image_filepaths"] = image_filepaths
 
-            for field, value in labels_dict.items():
-                setattr(dr, field, value)
+        # add label info
+        item["labels"] = self.listing_to_labels[listing]
 
-        return dr
+        # add scoring function for price
+        item["score_fn"]["price"] = RealEstateSource.price_eval
+
+        return item
 
 
 class BiodexEntry(Schema):
@@ -556,161 +532,139 @@ class BiodexOutput(BiodexEntry):
     )
 
 
-class BiodexValidationSource(ValidationDataSource):
+class BiodexSource(DataSource):
     def __init__(
         self,
         dataset_id,
         reactions_only: bool = True,
         rp_at_k: int = 5,
         num_samples: int = 5,
+        split: str = "test",
         shuffle: bool = False,
         seed: int = 42,
     ):
         super().__init__(BiodexEntry, dataset_id)
+
+        # for some weird reason we need to put the dataset through a generator to get items as dicts
         self.dataset = datasets.load_dataset("BioDEX/BioDEX-ICSR")
-        self.train_dataset = [self.dataset["train"][idx] for idx in range(250)]
+        self.dataset = [self.dataset[split][idx] for idx in range(len(self.dataset[split]))]
 
-        # sample from full test dataset
-        self.test_dataset = [self.dataset["test"][idx] for idx in range(len(self.dataset["test"]))]
-        self.test_dataset = self.test_dataset[:250]  # use first 250 to compare directly with biodex
+        # shuffle records if shuffle = True
+        if shuffle:
+            random.Random(seed).shuffle(self.dataset)
 
+        # trim to number of samples
+        self.dataset = self.dataset[:num_samples]
         self.reactions_only = reactions_only
         self.rp_at_k = rp_at_k
         self.num_samples = num_samples
         self.shuffle = shuffle
         self.seed = seed
 
-        # construct mapping from listing --> label (field, value) pairs
-        def compute_target_record(entry, reactions_only: bool = False):
-            target_lst = entry["target"].split("\n")
+    def compute_label(self, entry: dict) -> dict:
+        """Compute the label for a BioDEX report given its entry in the dataset."""
+        target_lst = entry["target"].split("\n")
+        target_reactions = [reaction.strip().lower() for reaction in target_lst[3].split(":")[-1].split(",")]
+        label_dict = {
+            "reactions": target_reactions,
+            "reaction_labels": target_reactions,
+            "ranked_reaction_labels": target_reactions,
+        }
+        if not self.reactions_only:
             label_dict = {
                 "serious": int(target_lst[0].split(":")[-1]),
                 "patientsex": int(target_lst[1].split(":")[-1]),
                 "drugs": [drug.strip().lower() for drug in target_lst[2].split(":")[-1].split(",")],
-                "reactions": [reaction.strip().lower() for reaction in target_lst[3].split(":")[-1].split(",")],
-                "reaction_labels": [reaction.strip().lower() for reaction in target_lst[3].split(":")[-1].split(",")],
-                "ranked_reaction_labels": [
-                    reaction.strip().lower() for reaction in target_lst[3].split(":")[-1].split(",")
-                ],
+                **label_dict,
             }
-            if reactions_only:
-                label_dict = {
-                    k: v
-                    for k, v in label_dict.items()
-                    if k in ["reactions", "reaction_labels", "ranked_reaction_labels"]
-                }
-            return label_dict
 
-        self.label_fields_to_values = {
-            entry["pmid"]: compute_target_record(entry, reactions_only=reactions_only) for entry in self.train_dataset
-        }
+        return label_dict
 
-        # shuffle records if shuffle = True
-        if shuffle:
-            random.Random(seed).shuffle(self.train_dataset)
+    @staticmethod
+    def rank_precision_at_k(k: int, preds: list | None, targets: list):
+        if preds is None:
+            return 0.0
 
-        # trim to number of samples
-        self.train_dataset = self.train_dataset[:num_samples]
+        try:
+            # lower-case each list
+            preds = [pred.lower() for pred in preds]
+            targets = set([target.lower() for target in targets])
+
+            # compute rank-precision at k
+            rn = len(targets)
+            denom = min(k, rn)
+            total = 0.0
+            for i in range(k):
+                total += preds[i] in targets if i < len(preds) else 0.0
+
+            return total / denom
+
+        except Exception:
+            os.makedirs("rp@k-errors", exist_ok=True)
+            ts = time.time()
+            with open(f"rp@k-errors/error-{ts}.txt", "w") as f:
+                f.write(str(preds))
+            return 0.0
+
+    @staticmethod
+    def f1_eval(preds: list | None, targets: list):
+        if preds is None:
+            return 0.0
+
+        try:
+            # compute precision and recall
+            s_preds = set([pred.lower() for pred in preds])
+            s_targets = set([target.lower() for target in targets])
+
+            intersect = s_preds.intersection(s_targets)
+
+            precision = len(intersect) / len(s_preds) if len(s_preds) > 0 else 0.0
+            recall = len(intersect) / len(s_targets)
+
+            # compute f1 score and return
+            f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+
+            return f1
+
+        except Exception:
+            os.makedirs("f1-eval-errors", exist_ok=True)
+            ts = time.time()
+            with open(f"f1-eval-errors/error-{ts}.txt", "w") as f:
+                f.write(str(preds))
+            return 0.0
 
     def __len__(self):
-        return len(self.test_dataset)
+        return len(self.dataset)
 
-    def get_val_length(self):
-        return len(self.train_dataset)
+    def get_item(self, idx: int):
+        # get entry
+        entry = self.dataset[idx]
 
-    def get_field_to_metric_fn(self):
-        # define f1 function
-        def f1_eval(preds: list, targets: list):
-            if preds is None:
-                return 0.0
+        # get input fields
+        pmid = entry["pmid"]
+        title = entry["title"]
+        abstract = entry["abstract"]
+        fulltext = entry["fulltext"]
 
-            try:
-                # compute precision and recall
-                s_preds = set([pred.lower() for pred in preds])
-                s_targets = set([target.lower() for target in targets])
+        # create item with fields
+        item = {"fields": {}, "labels": {}, "score_fn": {}}
+        item["fields"]["pmid"] = pmid
+        item["fields"]["title"] = title
+        item["fields"]["abstract"] = abstract
+        item["fields"]["fulltext"] = fulltext
 
-                intersect = s_preds.intersection(s_targets)
+        # add label info
+        item["labels"] = self.compute_label(entry)
 
-                precision = len(intersect) / len(s_preds) if len(s_preds) > 0 else 0.0
-                recall = len(intersect) / len(s_targets)
+        # add scoring functions for list fields
+        rank_precision_at_k = partial(BiodexSource.rank_precision_at_k, k=self.rp_at_k)
+        item["score_fn"]["reactions"] = BiodexSource.f1_eval
+        item["score_fn"]["reaction_labels"] = BiodexSource.f1_eval
+        item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k,
+        if not self.reactions_only:
+            item["score_fn"]["drugs"] = BiodexSource.f1_eval
 
-                # compute f1 score and return
-                f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
-
-                return f1
-
-            except Exception:
-                os.makedirs("f1-errors", exist_ok=True)
-                ts = time.time()
-                with open(f"f1-errors/error-{ts}.txt", "w") as f:
-                    f.write(str(preds))
-                return 0.0
-
-        # define rank precision at k
-        def rank_precision_at_k(preds: list, targets: list):
-            if preds is None:
-                return 0.0
-
-            try:
-                # lower-case each list
-                preds = [pred.lower() for pred in preds]
-                targets = set([target.lower() for target in targets])
-
-                # compute rank-precision at k
-                rn = len(targets)
-                denom = min(self.rp_at_k, rn)
-                total = 0.0
-                for i in range(self.rp_at_k):
-                    total += preds[i] in targets if i < len(preds) else 0.0
-
-                return total / denom
-
-            except Exception:
-                os.makedirs("rp@k-errors", exist_ok=True)
-                ts = time.time()
-                with open(f"rp@k-errors/error-{ts}.txt", "w") as f:
-                    f.write(str(preds))
-                return 0.0
-
-        # define quality eval function for drugs and reactions fields
-        fields_to_metric_fn = {}
-        if self.reactions_only:
-            fields_to_metric_fn = {
-                "reactions": f1_eval,
-                "reaction_labels": f1_eval,
-                "ranked_reaction_labels": rank_precision_at_k,
-            }
-
-        else:
-            fields_to_metric_fn = {
-                "serious": "exact",
-                "patientsex": "exact",
-                "drugs": f1_eval,
-                "reactions": f1_eval,
-            }
-
-        return fields_to_metric_fn
-
-    def get_item(self, idx: int, val: bool = False, include_label: bool = False):
-        # fetch entry
-        entry = self.test_dataset[idx] if not val else self.train_dataset[idx]
-
-        # create data record
-        dr = DataRecord(self.schema, source_id=entry["pmid"])
-        dr.pmid = entry["pmid"]
-        dr.title = entry["title"]
-        dr.abstract = entry["abstract"]
-        dr.fulltext = entry["fulltext"]
-
-        # if requested, also return the label information
-        if include_label:
-            # augment data record with label info
-            labels_dict = self.label_fields_to_values[entry["pmid"]]
-
-            for field, value in labels_dict.items():
-                setattr(dr, field, value)
-
-        return dr
+        return item
 
 
 if __name__ == "__main__":
@@ -841,17 +795,17 @@ if __name__ == "__main__":
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     # create pz plan
-    plan, use_final_op_quality = None, False
+    plan, val_datasource, use_final_op_quality = None, None, False
     if workload == "enron":
-        # datasetid="real-estate-eval-100" for paper evaluation
+        # datasetid="enron-eval" for paper evaluation
         data_filepath = f"testdata/{datasetid}"
-        user_dataset_id = f"{datasetid}-user"
+        val_dataset_id = f"val-{datasetid}"
 
         # create and register validation data source
-        datasource = EnronValidationSource(file_dir=data_filepath, dataset_id=user_dataset_id)
-        DataDirectory().register_user_source(src=datasource, dataset_id=user_dataset_id)
+        val_datasource = EnronSource(file_dir=data_filepath, dataset_id=val_dataset_id)
+        DataDirectory().register_user_source(src=val_datasource, dataset_id=val_dataset_id)
 
-        plan = Dataset(user_dataset_id, schema=Email)
+        plan = Dataset(datasetid, schema=Email)
         plan = plan.filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
@@ -862,22 +816,19 @@ if __name__ == "__main__":
     elif workload == "real-estate":
         # datasetid="real-estate-eval-100" for paper evaluation
         data_filepath = f"testdata/{datasetid}"
-        user_dataset_id = f"{datasetid}-user"
+        val_dataset_id = f"val-{datasetid}"
 
         # create and register validation data source
-        datasource = RealEstateValidationSource(
-            dataset_id=f"{user_dataset_id}",
+        val_datasource = RealEstateSource(
+            dataset_id=val_dataset_id,
             listings_dir=data_filepath,
             num_samples=val_examples,
             shuffle=False,
             seed=seed,
         )
-        DataDirectory().register_user_source(
-            src=datasource,
-            dataset_id=f"{user_dataset_id}",
-        )
+        DataDirectory().register_user_source(src=val_datasource, dataset_id=val_dataset_id)
 
-        plan = Dataset(user_dataset_id, schema=RealEstateListingFiles)
+        plan = Dataset(datasetid, schema=RealEstateListingFiles)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
         plan = plan.convert(ImageRealEstateListing, depends_on="image_filepaths")
         plan = plan.filter(
@@ -888,25 +839,36 @@ if __name__ == "__main__":
         plan = plan.filter(in_price_range, depends_on="price")
 
     elif workload == "biodex-reactions":
-        user_dataset_id = "biodex-user"
+        # create and register data source
+        datasource = BiodexSource(
+            dataset_id=datasetid,
+            reactions_only=True,
+            split="test",
+            num_samples=250,
+            shuffle=False,
+            seed=seed,
+        )
+        DataDirectory().register_user_source(src=datasource, dataset_id=datasetid)
+
+        # create and register validation data source
+        val_dataset_id = "val-biodex"
+        val_datasource = BiodexSource(
+            dataset_id=val_dataset_id,
+            reactions_only=True,
+            split="train",
+            num_samples=val_examples,
+            shuffle=False,
+            seed=seed,
+        )
+        DataDirectory().register_user_source(src=val_datasource, dataset_id=val_dataset_id)
 
         # load index
         index_path = ".ragatouille/colbert/indexes/reaction-terms"
         index = RAGPretrainedModel.from_index(index_path)
 
-        # create and register validation data source
-        datasource = BiodexValidationSource(
-            dataset_id=f"{user_dataset_id}",
-            num_samples=val_examples,
-            shuffle=False,
-            seed=seed,
-        )
-        DataDirectory().register_user_source(
-            src=datasource,
-            dataset_id=f"{user_dataset_id}",
-        )
-        plan = Dataset(user_dataset_id, schema=BiodexEntry)
-        plan = plan.convert(BiodexReactions)  # infer
+        # construct plan
+        plan = Dataset(datasetid, schema=BiodexEntry)
+        plan = plan.convert(BiodexReactions)
 
         def search_func(index, query, k):
             results = index.search(query, k=1)
@@ -928,25 +890,35 @@ if __name__ == "__main__":
         use_final_op_quality = True
 
     elif workload == "biodex":
-        user_dataset_id = "biodex-user"
+        # create and register data source
+        datasource = BiodexSource(
+            dataset_id=datasetid,
+            reactions_only=False,
+            split="test",
+            num_samples=250,
+            shuffle=False,
+            seed=seed,
+        )
+        DataDirectory().register_user_source(src=datasource, dataset_id=datasetid)
+
+        # create and register validation data source
+        val_dataset_id = "val-biodex"
+        val_datasource = BiodexSource(
+            dataset_id=val_dataset_id,
+            reactions_only=False,
+            split="train",
+            num_samples=val_examples,
+            shuffle=False,
+            seed=seed,
+        )
+        DataDirectory().register_user_source(src=val_datasource, dataset_id=val_dataset_id)
 
         # load index
         index_path = ".ragatouille/colbert/indexes/reaction-terms"
         index = RAGPretrainedModel.from_index(index_path)
 
-        # create and register validation data source
-        datasource = BiodexValidationSource(
-            dataset_id=f"{user_dataset_id}",
-            reactions_only=False,
-            num_samples=val_examples,
-            shuffle=False,
-            seed=seed,
-        )
-        DataDirectory().register_user_source(
-            src=datasource,
-            dataset_id=f"{user_dataset_id}",
-        )
-        plan = Dataset(user_dataset_id, schema=BiodexEntry)
+        # construct plan
+        plan = Dataset(datasetid, schema=BiodexEntry)
         plan = plan.convert(BiodexSerious, depends_on=["title", "abstract", "fulltext"])
         plan = plan.convert(BiodexPatientSex, depends_on=["title", "abstract", "fulltext"])
         plan = plan.convert(BiodexDrugs, depends_on=["title", "abstract", "fulltext"])
@@ -996,11 +968,11 @@ if __name__ == "__main__":
     config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
+        val_datasource=val_datasource,
         available_models=available_models,
         processing_strategy=args.processing_strategy,
         optimizer_strategy=optimizer_strategy,
         execution_strategy=args.execution_strategy,
-        allow_code_synth=False,  # (workload != "biodex"),
         use_final_op_quality=use_final_op_quality,
         max_workers=10,
         verbose=verbose,

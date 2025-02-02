@@ -2,7 +2,7 @@ from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 
 from palimpzest.core.data.dataclasses import PlanStats, RecordOpStats
-from palimpzest.core.data.datasources import DataSource, ValidationDataSource
+from palimpzest.core.data.datasources import DataSource
 from palimpzest.core.elements.records import DataRecord, DataRecordCollection
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import Policy
@@ -46,7 +46,7 @@ class QueryProcessor:
         self.dataset = dataset
         self.datasource = self._get_datasource(self.dataset)
         self.num_samples = self.config.num_samples
-        self.using_validation_data = isinstance(self.datasource, ValidationDataSource)
+        self.val_datasource = self.config.val_datasource
         self.scan_start_idx = self.config.scan_start_idx
         self.nocache = self.config.nocache
         self.verbose = self.config.verbose

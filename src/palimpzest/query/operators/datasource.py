@@ -9,6 +9,7 @@ from palimpzest.constants import (
     Cardinality,
 )
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, RecordOpStats
+from palimpzest.core.data.datasources import DataSource, DirectorySource, FileSource
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.operators.physical import PhysicalOperator
 
@@ -20,23 +21,30 @@ class DataSourcePhysicalOp(PhysicalOperator, ABC):
     modified abstract base class for these operators.
     """
 
-    def __init__(self, dataset_id: str, *args, **kwargs):
+    def __init__(self, datasource: DataSource, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.dataset_id = dataset_id
+        self.datasource = datasource
 
     def __str__(self):
-        op = f"{self.op_name()}({self.dataset_id}) -> {self.output_schema}\n"
+        op = f"{self.op_name()}({self.datasource}) -> {self.output_schema}\n"
         op += f"    ({', '.join(self.output_schema.field_names())[:30]})\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
-        return {"dataset_id": self.dataset_id, **id_params}
+
+        # NOTE: in order for op ids from validation datasets to map to their corresponding
+        #       non-validation counterparts, we cannot use the dataset_id (i.e. universal identifier)
+        #       in the id_params. Once we have joins (i.e. multiple DataSources), this issue will get
+        #       more complicated.
+        # return {"datasource": self.datasource.universal_identifier(), **id_params}
+        return id_params
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        return {"dataset_id": self.dataset_id, **op_params}
+        return {"datasource": self.datasource, **op_params}
 
+    @abstractmethod
     def naive_cost_estimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
@@ -57,11 +65,42 @@ class DataSourcePhysicalOp(PhysicalOperator, ABC):
         execution data alone -- thus DataSourcePhysicalOps need to give
         at least ballpark correct estimates of this quantity).
         """
-        raise NotImplementedError("Abstract method")
-    
-    @abstractmethod
-    def get_datasource(self):
-        raise NotImplementedError("Abstract method")
+        pass
+
+    def __call__(self, idx: int) -> DataRecordSet:
+        """
+        This function invokes `self.datasource.get_item` on the given `idx` to retrieve the next data item.
+        It then returns this item as a DataRecord wrapped in a DataRecordSet.
+        """
+        start_time = time.time()
+        item = self.datasource.get_item(idx)
+        end_time = time.time()
+
+        # check that item covers fields in output schema
+        output_field_names = self.output_schema.field_names()
+        assert all([field in item for field in output_field_names]), f"Some fields in DataSource schema not present in item!\n - DataSource fields: {output_field_names}\n - Item fields: {list(item.keys())}"
+
+        # construct a DataRecord from the item
+        dr = DataRecord(self.output_schema, source_idx=idx)
+        for field in output_field_names:
+            setattr(dr, field, item[field])
+
+        # create RecordOpStats objects
+        record_op_stats = RecordOpStats(
+            record_id=dr.id,
+            record_parent_id=dr.parent_id,
+            record_source_idx=dr.source_idx,
+            record_state=dr.to_dict(include_bytes=False),
+            op_id=self.get_op_id(),
+            logical_op_id=self.logical_op_id,
+            op_name=self.op_name(),
+            time_per_record=(end_time - start_time),
+            cost_per_record=0.0,
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
+        )
+ 
+        # construct and return DataRecordSet object
+        return DataRecordSet([dr], [record_op_stats])
         
 
 class MarshalAndScanDataOp(DataSourcePhysicalOp):
@@ -69,7 +108,6 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         self,
         source_op_cost_estimates: OperatorCostEstimates,
         input_record_size_in_bytes: int | float,
-        dataset_type: str,
     ) -> OperatorCostEstimates:
         # get inputs needed for naive cost estimation
         # TODO: we should rename cardinality --> "multiplier" or "selectivity" one-to-one / one-to-many
@@ -78,7 +116,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         per_record_size_kb = input_record_size_in_bytes / 1024.0
         time_per_record = (
             LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
-            if dataset_type in ["dir", "file"]
+            if issubclass(self.datasource, DirectorySource) or issubclass(self.datasource, FileSource)
             else MEMORY_SCAN_TIME_PER_KB * per_record_size_kb
         )
 
@@ -92,51 +130,6 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
             cost_per_record=0,
             quality=1.0,
         )
-
-    def __call__(self, candidate: DataRecord) -> DataRecordSet:
-        """
-        This function takes the candidate -- which is a DataRecord with a SourceRecord schema --
-        and invokes its get_item_fn on the given idx to return the next DataRecord from the DataSource.
-        """
-        start_time = time.time()
-        records = candidate.get_item_fn(candidate.idx)
-        end_time = time.time()
-
-        # if records is a DataRecord (instead of a list) wrap it in a list
-        if isinstance(records, DataRecord):
-            records = [records]
-
-        # assert that every element of records is a DataRecord and has a source_id
-        for dr in records:
-            assert isinstance(dr, DataRecord), "Output from DataSource.get_item() must be a DataRecord or List[DataRecord]"
-
-        # create RecordOpStats objects
-        record_op_stats_lst = []
-        for record in records:
-            record_op_stats = RecordOpStats(
-                record_id=record.id,
-                record_parent_id=record.parent_id,
-                record_source_id=record.source_id,
-                record_state=record.to_dict(include_bytes=False),
-                op_id=self.get_op_id(),
-                logical_op_id=self.logical_op_id,
-                op_name=self.op_name(),
-                time_per_record=(end_time - start_time) / len(records),
-                cost_per_record=0.0,
-                op_details={k: str(v) for k, v in self.get_id_params().items()},
-            )
-            record_op_stats_lst.append(record_op_stats)
-
-        # construct and return DataRecordSet object
-        record_set = DataRecordSet(records, record_op_stats_lst)
-
-        return record_set
-    
-    def get_datasource(self):
-        return self.datadir.get_registered_dataset(self.dataset_id)
-    
-    def get_datasource_type(self):
-        return self.datadir.get_registered_dataset_type(self.dataset_id)
 
 
 class CacheScanDataOp(DataSourcePhysicalOp):
@@ -162,41 +155,3 @@ class CacheScanDataOp(DataSourcePhysicalOp):
             cost_per_record=0,
             quality=1.0,
         )
-
-    def __call__(self, candidate: DataRecord) -> DataRecordSet:
-        start_time = time.time()
-        records = candidate.get_item_fn(candidate.idx)
-        end_time = time.time()
-
-        # if records is a DataRecord (instead of a list) wrap it in a list
-        if isinstance(records, DataRecord):
-            records = [records]
-
-        # assert that every element of records is a DataRecord and has a source_id
-        for dr in records:
-            assert isinstance(dr, DataRecord), "Output from DataSource.get_item() must be a DataRecord or List[DataRecord]"
-
-        # create RecordOpStats objects
-        record_op_stats_lst = []
-        for record in records:
-            record_op_stats = RecordOpStats(
-                record_id=record.id,
-                record_parent_id=record.parent_id,
-                record_source_id=record.source_id,
-                record_state=record.to_dict(include_bytes=False),
-                op_id=self.get_op_id(),
-                logical_op_id=self.logical_op_id,
-                op_name=self.op_name(),
-                time_per_record=(end_time - start_time) / len(records),
-                cost_per_record=0.0,
-                op_details={k: str(v) for k, v in self.get_id_params().items()},
-            )
-            record_op_stats_lst.append(record_op_stats)
-
-        # construct and eturn DataRecordSet object
-        record_set = DataRecordSet(records, record_op_stats_lst)
-
-        return record_set
-
-    def get_datasource(self):
-        return self.datadir.get_cached_result(self.dataset_id)

@@ -1,8 +1,7 @@
 import time
 
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats
-from palimpzest.core.elements.records import DataRecord, DataRecordCollection
-from palimpzest.core.lib.schemas import SourceRecord
+from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import (
     PipelinedSingleThreadExecutionStrategy,
@@ -95,7 +94,7 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
         assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-        datasource = source_operator.get_datasource()
+        datasource = source_operator.datasource
         datasource_len = len(datasource)
 
         # Calculate total work units - each record needs to go through each operator
@@ -126,15 +125,8 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
                 if isinstance(operator, DataSourcePhysicalOp):
                     keep_scanning_source_records = True
                     while keep_scanning_source_records:
-                        # construct input DataRecord for DataSourcePhysicalOp
-                        # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
-                        #       it is simply a vessel to inform the scan_operator which record to fetch
-                        candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
-                        candidate.idx = current_scan_idx
-                        candidate.get_item_fn = datasource.get_item
-
-                        # run DataSourcePhysicalOp on record
-                        record_set = operator(candidate)
+                        # run DataSourcePhysicalOp on current scan index
+                        record_set = operator(current_scan_idx)
                         records.extend(record_set.data_records)
                         record_op_stats.extend(record_set.record_op_stats)
 
@@ -270,7 +262,7 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
         # get handle to DataSource and pre-compute its size
         source_operator = plan.operators[0]
         assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-        datasource = source_operator.get_datasource()
+        datasource = source_operator.datasource
         datasource_len = len(datasource)
 
         # Calculate total work units - each record needs to go through each operator
@@ -304,13 +296,8 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
                     # invoke datasource operator(s) until we run out of source records or hit the num_samples limit
                     if isinstance(operator, DataSourcePhysicalOp):
                         if keep_scanning_source_records:
-                            # construct input DataRecord for DataSourcePhysicalOp
-                            candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
-                            candidate.idx = current_scan_idx
-                            candidate.get_item_fn = datasource.get_item
-
-                            # run DataSourcePhysicalOp on record
-                            record_set = operator(candidate)
+                            # run DataSourcePhysicalOp on current scan index
+                            record_set = operator(current_scan_idx)
                             records = record_set.data_records
                             record_op_stats = record_set.record_op_stats
 
@@ -464,7 +451,7 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
     #     # get handle to DataSource and pre-compute its size
     #     source_operator = plan.operators[0]
     #     assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-    #     datasource = source_operator.get_datasource()
+    #     datasource = source_operator.datasource
     #     datasource_len = len(datasource)
 
     #     # Calculate total work units - each record needs to go through each operator
@@ -520,10 +507,7 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
                         
     #                     if isinstance(operator, DataSourcePhysicalOp) and keep_scanning_source_records:
     #                         # Submit source operator task
-    #                         candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
-    #                         candidate.idx = current_scan_idx
-    #                         candidate.get_item_fn = datasource.get_item
-    #                         futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate))
+    #                         futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, operator, current_scan_idx))
     #                         current_scan_idx += 1
     #                         keep_scanning_source_records = current_scan_idx < datasource_len and source_records_scanned < num_samples
                         

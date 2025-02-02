@@ -3,7 +3,6 @@ import os
 import pytest
 
 from palimpzest.core.data.datasources import DataSource
-from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import ListField, NumericField, StringField
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.datamanager.datamanager import DataDirectory
@@ -35,24 +34,23 @@ class RealEstateListingSource(DataSource):
 
     def __len__(self):
         return len(self.listings)
-
+    
     def get_item(self, idx: int):
-        # fetch listing
+        # get listing
         listing = self.listings[idx]
 
-        # create data record
-        dr = DataRecord(self.schema, source_id=listing)
-        dr.listing = listing
-        dr.image_filepaths = []
+        # get fields
+        image_filepaths, text_content = [], None
         listing_dir = os.path.join(self.listings_dir, listing)
         for file in os.listdir(listing_dir):
             if file.endswith(".txt"):
                 with open(os.path.join(listing_dir, file), "rb") as f:
-                    dr.text_content = f.read().decode("utf-8")
+                    text_content = f.read().decode("utf-8")
             elif file.endswith(".png"):
-                dr.image_filepaths.append(os.path.join(listing_dir, file))
+                image_filepaths.append(os.path.join(listing_dir, file))
 
-        return dr
+        # construct and return dictionary with fields
+        return {"listing": listing, "text_content": text_content, "image_filepaths": image_filepaths}
 
 class CostModelTestSource(DataSource):
     def __init__(self, dataset_id: str):
@@ -66,11 +64,8 @@ class CostModelTestSource(DataSource):
         # fetch number
         number = self.numbers[idx]
 
-        # create data record
-        dr = DataRecord(self.schema, source_id=idx)
-        dr.value = number
-
-        return dr
+        # create and return item
+        return {"value": number}
 
 
 ### DATASET DATA PATHS ###

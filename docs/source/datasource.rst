@@ -17,6 +17,10 @@ The `DataSource` class can be sub-classed by programmers to allow for custom dat
    :exclude-members:
    :inherited-members:
 
+.. TODO: add plenty of examples of users constructing datasources
+
+.. TODO: add documentation for pre-defined datasources
+
 .. .. autosummary::
 ..    :toctree: generated
 

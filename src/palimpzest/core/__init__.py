@@ -7,7 +7,6 @@ from palimpzest.core.data.datasources import (
     MemorySource,
     PDFFileDirectorySource,
     TextFileDirectorySource,
-    ValidationDataSource,
     XLSFileDirectorySource,
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
@@ -32,7 +31,6 @@ from palimpzest.core.lib.schemas import (
     PlotImage,
     RawJSONObject,
     Schema,
-    SourceRecord,
     Table,
     TextFile,
     WebPage,
@@ -60,7 +58,6 @@ __all__ = [
     "PlotImage",
     "RawJSONObject",
     "Schema",
-    "SourceRecord",
     "Table",
     "TextFile",
     "WebPage",
@@ -74,7 +71,6 @@ __all__ = [
     "MemorySource",
     "PDFFileDirectorySource",
     "TextFileDirectorySource",
-    "ValidationDataSource",
     "XLSFileDirectorySource",
     # records
     "DataRecord",

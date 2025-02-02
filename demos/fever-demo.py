@@ -5,7 +5,6 @@ import os
 from ragatouille import RAGPretrainedModel
 
 from palimpzest.core.data.datasources import DataSource
-from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import BooleanField, StringField
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.datamanager.datamanager import DataDirectory
@@ -43,10 +42,11 @@ class FeverDataSource(DataSource):
         return len(self.claims)
 
     def get_item(self, idx: int):
+        # get claim
         claim = self.claims[idx]
-        dr = DataRecord(self.schema, source_id=self.ids[idx])
-        dr.claim = claim
-        return dr
+
+        # construct and return dictionary with field(s)
+        return {"claim": claim}
 
 
 def parse_arguments():

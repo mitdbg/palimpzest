@@ -9,7 +9,6 @@ from palimpzest.constants import DERIVED_SCHEMA_PREFIX, MAX_ROWS
 from palimpzest.core.lib.fields import (
     BooleanField,
     BytesField,
-    CallableField,
     Field,
     FloatField,
     ImageBase64Field,
@@ -368,16 +367,6 @@ class RawJSONObject(Schema):
     """A JSON object, which is a dictionary of key-value pairs."""
 
     json = StringField(desc="String representation of a JSON object")
-
-
-class SourceRecord(Schema):
-    """
-    Schema used inside of Execution.execute_dag to produce a candidate for operators
-    which implement the BaseScan or CacheScan logical operators.
-    """
-
-    idx = NumericField(desc="The scan index of the record")
-    get_item_fn = CallableField(desc="The get_item() function from the DataSource")
 
 
 class Table(Schema):

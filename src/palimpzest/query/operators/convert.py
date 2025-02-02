@@ -120,7 +120,7 @@ class ConvertOp(PhysicalOperator, ABC):
             RecordOpStats(
                 record_id=dr.id,
                 record_parent_id=dr.parent_id,
-                record_source_id=dr.source_id,
+                record_source_idx=dr.source_idx,
                 record_state=dr.to_dict(include_bytes=False),
                 op_id=self.get_op_id(),
                 logical_op_id=self.logical_op_id,

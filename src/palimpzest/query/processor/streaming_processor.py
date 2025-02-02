@@ -1,8 +1,7 @@
 import time
 
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
-from palimpzest.core.elements.records import DataRecord, DataRecordCollection
-from palimpzest.core.lib.schemas import SourceRecord
+from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.policy import Policy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.datasource import DataSourcePhysicalOp
@@ -91,20 +90,15 @@ class StreamingQueryProcessor(QueryProcessor):
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
         assert isinstance(scan_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-        datasource = scan_operator.get_datasource()
+        datasource = scan_operator.datasource
         if not datasource:
             raise Exception("Data source not found")
         datasource_len = len(datasource)
 
         input_records = []
         record_op_stats = []
-        for idx in range(datasource_len):
-            # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
-            #       it is simply a vessel to inform the scan_operator which record to fetch
-            candidate = DataRecord(schema=SourceRecord, source_id=idx)
-            candidate.idx = idx
-            candidate.get_item_fn = datasource.get_item
-            record_set = scan_operator(candidate)
+        for source_idx in range(datasource_len):
+            record_set = scan_operator(source_idx)
             input_records += record_set.data_records
             record_op_stats += record_set.record_op_stats
 

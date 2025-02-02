@@ -1,15 +1,18 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
-from functools import partial
-from typing import Callable
+from copy import deepcopy
 
 import numpy as np
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
-from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
-from palimpzest.core.data.datasources import ValidationDataSource
-from palimpzest.core.elements.records import DataRecord, DataRecordCollection, DataRecordSet
-from palimpzest.core.lib.schemas import SourceRecord
+from palimpzest.core.data.dataclasses import (
+    ExecutionStats,
+    OperatorCostEstimates,
+    OperatorStats,
+    PlanStats,
+    RecordOpStats,
+)
+from palimpzest.core.elements.records import DataRecordCollection, DataRecordSet
 from palimpzest.policy import Policy
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import (
@@ -50,8 +53,6 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         # self.max_workers = self.get_parallel_max_workers()
         # TODO: undo
         # self.max_workers = 1
-        assert isinstance(self.datasource, ValidationDataSource), "DataSource must be ValidationDataSource for sentinel execution"
-
         self.k = k
         self.sample_budget = sample_budget
         self.j = int(sample_budget / k)
@@ -68,20 +69,19 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
     def compute_quality(
             self,
             record_set: DataRecordSet,
-            expected_record_set: DataRecordSet | None = None,
+            expected_output: dict | None = None,
             champion_record_set: DataRecordSet | None = None,
             is_filter_op: bool = False,
             is_convert_op: bool = False,
-            field_to_metric_fn: dict[str, str | Callable] | None = None,
         ) -> DataRecordSet:
         """
-        Compute the quality for the given `record_set` by comparing it to the `expected_record_set`.
+        Compute the quality for the given `record_set` by comparing it to the `expected_output`.
 
         Update the record_set by assigning the quality to each entry in its record_op_stats and
         returning the updated record_set.
         """
         # compute whether we can only use the champion
-        only_using_champion = expected_record_set is None
+        only_using_champion = expected_output is None
 
         # if this operation is a failed convert
         if is_convert_op and len(record_set) == 0:
@@ -103,16 +103,17 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                 champion_record = champion_record_set[0]
                 record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
 
-            # - if we are using validation data, we may have multiple expected records in the expected_record_set for this source_id,
+            # - if we are using validation data, we may have multiple expected records in the expected_output for this source_idx,
             #   thus, if we can identify an exact match, we can use that to evaluate the filter's quality
             # - if we are using validation data but we *cannot* find an exact match, then we will once again use the champion record set
             else:
                 # compute number of matches between this record's computed fields and this expected record's outputs
                 found_match_in_output = False
-                for expected_record in expected_record_set:
+                labels_dict_lst = expected_output["labels"] if isinstance(expected_output["labels"], list) else [expected_output["labels"]]
+                for labels_dict in labels_dict_lst:
                     all_correct = True
                     for field, value in record_op_stats.record_state.items():
-                        if value != getattr(expected_record, field):
+                        if value != labels_dict[field]:
                             all_correct = False
                             break
 
@@ -121,7 +122,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                         break
 
                 if found_match_in_output:
-                    record_op_stats.quality = int(record_op_stats.passed_operator == expected_record.passed_operator)
+                    record_op_stats.quality = int(record_op_stats.passed_operator)
                 else:
                     champion_record = champion_record_set[0]
                     record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
@@ -134,13 +135,23 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             #       validation dataset and use the champion model (as opposed to the validation
             #       output) for scoring fields which have their values projected out
 
-            # set the expected_record_set to be the champion_record_set if we do not have validation data
-            expected_record_set = champion_record_set if only_using_champion else expected_record_set
+            # create list of dictionaries of labels for each expected / champion output
+            labels_dict_lst = []
+            if only_using_champion:
+                for champion_record in champion_record_set:
+                    labels_dict_lst.append(champion_record.to_dict())
+            else:
+                labels_dict_lst = (
+                    expected_output["labels"]
+                    if isinstance(expected_output["labels"], list)
+                    else [expected_output["labels"]]
+                )
 
             # GREEDY ALGORITHM
             # for each record in the expected output, we look for the computed record which maximizes the quality metric;
             # once we've identified that computed record we remove it from consideration for the next expected output
-            for expected_record in expected_record_set:
+            field_to_score_fn = {} if only_using_champion else expected_output["score_fn"]
+            for labels_dict in labels_dict_lst:
                 best_quality, best_record_op_stats = 0.0, None
                 for record_op_stats in record_set.record_op_stats:
                     # if we already assigned this record a quality, skip it
@@ -151,26 +162,22 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                     total_quality = 0
                     for field in record_op_stats.generated_fields:
                         computed_value = record_op_stats.record_state.get(field, None)
-                        expected_value = getattr(expected_record, field)
+                        expected_value = labels_dict[field]
 
                         # get the metric function for this field
-                        metric_fn = (
-                            field_to_metric_fn[field]
-                            if field_to_metric_fn is not None and field in field_to_metric_fn
-                            else "exact"
-                        )
+                        score_fn = field_to_score_fn.get(field, "exact")
 
                         # compute exact match
-                        if metric_fn == "exact":
+                        if score_fn == "exact":
                             total_quality += int(computed_value == expected_value)
 
                         # compute UDF metric
-                        elif callable(metric_fn):
-                            total_quality += metric_fn(computed_value, expected_value)
+                        elif callable(score_fn):
+                            total_quality += score_fn(computed_value, expected_value)
 
                         # otherwise, throw an exception
                         else:
-                            raise Exception(f"Unrecognized metric_fn: {metric_fn}")
+                            raise Exception(f"Unrecognized score_fn: {score_fn}")
 
                     # compute recall and update best seen so far
                     quality = total_quality / len(record_op_stats.generated_fields)
@@ -195,8 +202,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             operator_sets: list[list[PhysicalOperator]],
             execution_data: dict[str, dict[str, list[DataRecordSet]]],
             champion_outputs: dict[str, dict[str, DataRecordSet]],
-            expected_outputs: dict[str, DataRecordSet] | None = None,
-            field_to_metric_fn: dict[str, str | Callable] | None = None,
+            expected_outputs: dict[str, dict],
         ) -> list[RecordOpStats]:
         """
         NOTE: This approach to cost modeling does not work directly for aggregation queries;
@@ -242,9 +248,9 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         this_op_execution_data = execution_data[logical_op_id]
 
         # compute quality of each output computed by this operator
-        for source_id, record_sets in this_op_execution_data.items():
+        for source_idx, record_sets in this_op_execution_data.items():
             # NOTE
-            # source_id is a particular input, for which we may have computed multiple output record_sets;
+            # source_idx is a particular input, for which we may have computed multiple output record_sets;
             # each of these record_sets may contain more than one record (b/c one-to-many) and we have one
             # record_set per operator in the op_set
 
@@ -255,30 +261,45 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                         record_op_stats.quality = 1.0
                 continue
 
-            # get the expected output for this source_id if we have one
-            expected_record_set = (
-                expected_outputs[source_id]
-                if expected_outputs is not None and source_id in expected_outputs
+            # get the expected output for this source_idx if we have one
+            expected_output = (
+                expected_outputs[source_idx]
+                if expected_outputs is not None and source_idx in expected_outputs
                 else None
             )
 
             # extract champion output for this record set
-            champion_record_set = champion_outputs[logical_op_id][source_id]
+            champion_record_set = champion_outputs[logical_op_id][source_idx]
 
             # for each record_set produced by an operation, compute its quality
             for record_set in record_sets:
-                record_set = self.compute_quality(record_set, expected_record_set, champion_record_set, is_filter_op, is_convert_op, field_to_metric_fn)
+                record_set = self.compute_quality(record_set, expected_output, champion_record_set, is_filter_op, is_convert_op)
 
         # if this operator is a source op (i.e. has no input logical operator), return the execution data
         if is_source_op:
             return execution_data
 
         # recursively call the function on the next logical operator until you reach a scan
-        execution_data = self.score_quality(operator_sets[:-1], execution_data, champion_outputs, expected_outputs, field_to_metric_fn)
+        execution_data = self.score_quality(operator_sets[:-1], execution_data, champion_outputs, expected_outputs)
 
         # return the quality annotated record op stats
         return execution_data
 
+    def pick_champion_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
+        # if there's only one operator in the set, we return its record_set
+        if len(op_set_record_sets) == 1:
+            record_set, _ = op_set_record_sets[0]
+            return record_set
+
+        # find the operator with the highest average quality and return its record_set
+        base_op_cost_est = OperatorCostEstimates(cardinality=1.0, cost_per_record=0.0, time_per_record=0.0, quality=1.0)
+        champion_record_set, champion_quality = None, -1.0
+        for record_set, op in op_set_record_sets:
+            op_cost_estimates = op.naive_cost_estimates(base_op_cost_est)
+            if op_cost_estimates.quality > champion_quality:
+                champion_record_set, champion_quality = record_set, op_cost_estimates.quality
+
+        return champion_record_set
 
     def pick_ensemble_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
@@ -341,7 +362,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                 # update list of futures
                 futures = not_done_futures
 
-            # compute mapping from source_id to record sets for all operators and for champion operator
+            # compute mapping from source_idx to record sets for all operators and for champion operator
             all_record_sets, champion_record_sets = {}, {}
             for candidate in candidates:
                 candidate_output_record_sets = []
@@ -352,19 +373,19 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                 # select the champion (i.e. best) record_set from all the record sets computed for this operator
                 champion_record_set = self.pick_output_fn(candidate_output_record_sets)
 
-                # get the source_id associated with this input record
-                source_id = candidate.source_id
+                # get the source_idx associated with this input record
+                source_idx = candidate.source_idx
 
-                # add champion record_set to mapping from source_id --> champion record_set
-                champion_record_sets[source_id] = champion_record_set
+                # add champion record_set to mapping from source_idx --> champion record_set
+                champion_record_sets[source_idx] = champion_record_set
 
-                # add all record_sets computed for this source_id to mapping from source_id --> record_sets
-                all_record_sets[source_id] = [tup[0] for tup in candidate_output_record_sets]
+                # add all record_sets computed for this source_idx to mapping from source_idx --> record_sets
+                all_record_sets[source_idx] = [tup[0] for tup in candidate_output_record_sets]
 
         return all_record_sets, champion_record_sets
 
 
-    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, DataRecordSet], policy: Policy):
+    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict], policy: Policy):
         """
         """
         if self.verbose:
@@ -389,26 +410,23 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             )
 
         # sample validation records
-        total_num_samples = self.datasource.get_val_length()
-        sample_indices = np.arange(total_num_samples)
+        total_num_samples = len(self.val_datasource)
+        source_indices = np.arange(total_num_samples)
         if self.sample_start_idx is not None:
             assert self.sample_end_idx is not None
-            sample_indices = sample_indices[self.sample_start_idx:self.sample_end_idx]
+            source_indices = source_indices[self.sample_start_idx:self.sample_end_idx]
         elif not self.sample_all_records:
-            self.rng.shuffle(sample_indices)
-            j = min(self.j, len(sample_indices))
-            sample_indices = sample_indices[:j]
+            self.rng.shuffle(source_indices)
+            j = min(self.j, len(source_indices))
+            source_indices = source_indices[:j]
 
         # initialize output variables
         all_outputs, champion_outputs = {}, {}
 
         # create initial set of candidates for source scan operator
         candidates = []
-        for sample_idx in sample_indices:
-            candidate = DataRecord(schema=SourceRecord, source_id=sample_idx)
-            candidate.idx = sample_idx
-            candidate.get_item_fn = partial(self.datasource.get_item, val=True)
-            candidates.append(candidate)
+        for source_idx in source_indices:
+            candidates.append(source_idx)
 
         # NOTE: because we need to dynamically create sample matrices for each operator,
         #       sentinel execution must be executed one operator at a time (i.e. sequentially)
@@ -422,24 +440,24 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             sampled_ops = self.rng.choice(op_set, size=k, replace=False)
 
             # run sampled operators on sampled candidates
-            source_id_to_record_sets, source_id_to_champion_record_set = self.execute_op_set(candidates, sampled_ops)
+            source_idx_to_record_sets, source_idx_to_champion_record_set = self.execute_op_set(candidates, sampled_ops)
 
             # update all_outputs and champion_outputs dictionary
             if logical_op_id not in all_outputs:
-                all_outputs[logical_op_id] = source_id_to_record_sets
-                champion_outputs[logical_op_id] = source_id_to_champion_record_set
+                all_outputs[logical_op_id] = source_idx_to_record_sets
+                champion_outputs[logical_op_id] = source_idx_to_champion_record_set
             else:
-                for source_id, record_sets in source_id_to_record_sets.items():
-                    if source_id not in all_outputs[logical_op_id]:
-                        all_outputs[logical_op_id][source_id] = record_sets
-                        champion_outputs[logical_op_id][source_id] = source_id_to_champion_record_set[source_id]
+                for source_idx, record_sets in source_idx_to_record_sets.items():
+                    if source_idx not in all_outputs[logical_op_id]:
+                        all_outputs[logical_op_id][source_idx] = record_sets
+                        champion_outputs[logical_op_id][source_idx] = source_idx_to_champion_record_set[source_idx]
                     else:
-                        all_outputs[logical_op_id][source_id].extend(record_sets)
-                        champion_outputs[logical_op_id][source_id].extend(source_id_to_champion_record_set[source_id])
+                        all_outputs[logical_op_id][source_idx].extend(record_sets)
+                        champion_outputs[logical_op_id][source_idx].extend(source_idx_to_champion_record_set[source_idx])
 
             # flatten lists of records and record_op_stats
             all_records, all_record_op_stats = [], []
-            for _, record_sets in source_id_to_record_sets.items():
+            for _, record_sets in source_idx_to_record_sets.items():
                 for record_set in record_sets:
                     all_records.extend(record_set.data_records)
                     all_record_op_stats.extend(record_set.record_op_stats)
@@ -460,7 +478,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             # update candidates for next operator; we use champion outputs as input
             candidates = []
             if next_logical_op_id is not None:
-                for _, record_set in source_id_to_champion_record_set.items():
+                for _, record_set in source_idx_to_champion_record_set.items():
                     for record in record_set:
                         if isinstance(op_set[0], FilterOp) and not record.passed_operator:
                             continue
@@ -471,8 +489,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                 break
 
         # compute quality for each operator
-        field_to_metric_fn = self.datasource.get_field_to_metric_fn()
-        all_outputs = self.score_quality(plan.operator_sets, all_outputs, champion_outputs, expected_outputs, field_to_metric_fn)
+        all_outputs = self.score_quality(plan.operator_sets, all_outputs, champion_outputs, expected_outputs)
 
         # if caching was allowed, close the cache
         if not self.nocache:
@@ -497,28 +514,32 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         """
         # if we're using validation data, get the set of expected output records
         expected_outputs = {}
-        for idx in range(self.datasource.get_val_length()):
-            data_records = self.datasource.get_item(idx, val=True, include_label=True)
-            if not isinstance(data_records, list):
-                data_records = [data_records]
-            record_set = DataRecordSet(data_records, None)
-            expected_outputs[record_set.source_id] = record_set
+        for source_idx in range(len(self.val_datasource)):
+            # TODO: make sure execute_op_set uses self.val_datasource
+            expected_output = self.val_datasource.get_item(source_idx)
+            expected_outputs[source_idx] = expected_output
 
         # run sentinel plan
         execution_data, plan_stats = self.execute_sentinel_plan(sentinel_plan, expected_outputs, policy)
 
         return execution_data, plan_stats
 
-
+    
     def create_sentinel_plan(self, dataset: Set, policy: Policy) -> SentinelPlan:
         """
         Generates and returns a SentinelPlan for the given dataset.
         """
         # TODO: explicitly pull up filters; for SIGMOD we can explicitly write plans w/filters pulled up
-        # initialize the optimizer
-        # TODO: Do we need to re-initialize the optimizer here? 
+
+        # create a new optimizer and update its strategy to SENTINEL
         optimizer = self.optimizer.deepcopy_clean()
         optimizer.update_strategy(OptimizationStrategyType.SENTINEL)
+
+        # create copy of dataset, but change its data source to the validation data source
+        dataset = deepcopy(dataset)
+        dataset._set_data_source(self.val_datasource)
+
+        # get the sentinel plan for the given dataset
         sentinel_plans = optimizer.optimize(dataset, policy)
         sentinel_plan = sentinel_plans[0]
 
@@ -529,8 +550,8 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
-        if not self.using_validation_data:
-            raise Exception("Make sure you are using ValidationDataSource with MABSentinelExecutionEngine")
+        if self.val_datasource is None:
+            raise Exception("Make sure you are using a validation DataSource with MABSentinelExecutionEngine")
 
         # if nocache is True, make sure we do not re-use codegen examples
         if self.nocache:

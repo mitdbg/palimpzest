@@ -1,14 +1,18 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
-from functools import partial
-from typing import Callable
+from copy import deepcopy
 
 import numpy as np
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
-from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats, RecordOpStats
-from palimpzest.core.elements.records import DataRecord, DataRecordCollection, DataRecordSet
-from palimpzest.core.lib.schemas import SourceRecord
+from palimpzest.core.data.dataclasses import (
+    ExecutionStats,
+    OperatorCostEstimates,
+    OperatorStats,
+    PlanStats,
+    RecordOpStats,
+)
+from palimpzest.core.elements.records import DataRecordCollection, DataRecordSet
 from palimpzest.policy import Policy
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
@@ -49,7 +53,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         self.sample_budget = sample_budget
         self.early_stop_iters = early_stop_iters
         self.use_final_op_quality = use_final_op_quality
-        self.pick_output_fn = self.pick_ensemble_output
+        self.pick_output_fn = self.pick_champion_output
         self.rng = np.random.default_rng(seed=seed)
 
 
@@ -72,10 +76,10 @@ class MABSentinelQueryProcessor(QueryProcessor):
         """
         # compute metrics for each operator in all_outputs
         logical_op_id_to_op_metrics = {}
-        for logical_op_id, source_id_to_record_sets in all_outputs.items():
+        for logical_op_id, source_idx_to_record_sets in all_outputs.items():
             # compute selectivity for each physical operator
             phys_op_to_num_inputs, phys_op_to_num_outputs = {}, {}
-            for _, record_sets in source_id_to_record_sets.items():
+            for _, record_sets in source_idx_to_record_sets.items():
                 for record_set in record_sets:
                     op_id = record_set.record_op_stats[0].op_id
                     num_outputs = sum([record_op_stats.passed_operator for record_op_stats in record_set.record_op_stats])
@@ -93,7 +97,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
             # compute average cost, time, and quality
             phys_op_to_costs, phys_op_to_times, phys_op_to_qualities = {}, {}, {}
-            for _, record_sets in source_id_to_record_sets.items():
+            for _, record_sets in source_idx_to_record_sets.items():
                 for record_set in record_sets:
                     for record_op_stats in record_set.record_op_stats:
                         op_id = record_op_stats.op_id
@@ -228,20 +232,19 @@ class MABSentinelQueryProcessor(QueryProcessor):
     def compute_quality(
             self,
             record_set: DataRecordSet,
-            expected_record_set: DataRecordSet | None = None,
+            expected_output: dict | None = None,
             champion_record_set: DataRecordSet | None = None,
             is_filter_op: bool = False,
             is_convert_op: bool = False,
-            field_to_metric_fn: dict[str, str | Callable] | None = None,
         ) -> DataRecordSet:
         """
-        Compute the quality for the given `record_set` by comparing it to the `expected_record_set`.
+        Compute the quality for the given `record_set` by comparing it to the `expected_output`.
 
         Update the record_set by assigning the quality to each entry in its record_op_stats and
         returning the updated record_set.
         """
         # compute whether we can only use the champion
-        only_using_champion = expected_record_set is None
+        only_using_champion = expected_output is None
 
         # if this operation is a failed convert
         if is_convert_op and len(record_set) == 0:
@@ -263,16 +266,17 @@ class MABSentinelQueryProcessor(QueryProcessor):
                 champion_record = champion_record_set[0]
                 record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
 
-            # - if we are using validation data, we may have multiple expected records in the expected_record_set for this source_id,
+            # - if we are using validation data, we may have multiple expected records in the expected_output for this source_idx,
             #   thus, if we can identify an exact match, we can use that to evaluate the filter's quality
             # - if we are using validation data but we *cannot* find an exact match, then we will once again use the champion record set
             else:
                 # compute number of matches between this record's computed fields and this expected record's outputs
                 found_match_in_output = False
-                for expected_record in expected_record_set:
+                labels_dict_lst = expected_output["labels"] if isinstance(expected_output["labels"], list) else [expected_output["labels"]]
+                for labels_dict in labels_dict_lst:
                     all_correct = True
                     for field, value in record_op_stats.record_state.items():
-                        if value != getattr(expected_record, field):
+                        if value != labels_dict[field]:
                             all_correct = False
                             break
 
@@ -281,7 +285,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
                         break
 
                 if found_match_in_output:
-                    record_op_stats.quality = int(record_op_stats.passed_operator == expected_record.passed_operator)
+                    record_op_stats.quality = int(record_op_stats.passed_operator)
                 else:
                     champion_record = champion_record_set[0]
                     record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
@@ -294,13 +298,23 @@ class MABSentinelQueryProcessor(QueryProcessor):
             #       validation dataset and use the champion model (as opposed to the validation
             #       output) for scoring fields which have their values projected out
 
-            # set the expected_record_set to be the champion_record_set if we do not have validation data
-            expected_record_set = champion_record_set if only_using_champion else expected_record_set
+            # create list of dictionaries of labels for each expected / champion output
+            labels_dict_lst = []
+            if only_using_champion:
+                for champion_record in champion_record_set:
+                    labels_dict_lst.append(champion_record.to_dict())
+            else:
+                labels_dict_lst = (
+                    expected_output["labels"]
+                    if isinstance(expected_output["labels"], list)
+                    else [expected_output["labels"]]
+                )
 
             # GREEDY ALGORITHM
             # for each record in the expected output, we look for the computed record which maximizes the quality metric;
             # once we've identified that computed record we remove it from consideration for the next expected output
-            for expected_record in expected_record_set:
+            field_to_score_fn = {} if only_using_champion else expected_output["score_fn"]
+            for labels_dict in labels_dict_lst:
                 best_quality, best_record_op_stats = 0.0, None
                 for record_op_stats in record_set.record_op_stats:
                     # if we already assigned this record a quality, skip it
@@ -311,26 +325,22 @@ class MABSentinelQueryProcessor(QueryProcessor):
                     total_quality = 0
                     for field in record_op_stats.generated_fields:
                         computed_value = record_op_stats.record_state.get(field, None)
-                        expected_value = getattr(expected_record, field)
+                        expected_value = labels_dict[field]
 
                         # get the metric function for this field
-                        metric_fn = (
-                            field_to_metric_fn[field]
-                            if field_to_metric_fn is not None and field in field_to_metric_fn
-                            else "exact"
-                        )
+                        score_fn = field_to_score_fn.get(field, "exact")
 
                         # compute exact match
-                        if metric_fn == "exact":
+                        if score_fn == "exact":
                             total_quality += int(computed_value == expected_value)
 
                         # compute UDF metric
-                        elif callable(metric_fn):
-                            total_quality += metric_fn(computed_value, expected_value)
+                        elif callable(score_fn):
+                            total_quality += score_fn(computed_value, expected_value)
 
                         # otherwise, throw an exception
                         else:
-                            raise Exception(f"Unrecognized metric_fn: {metric_fn}")
+                            raise Exception(f"Unrecognized score_fn: {score_fn}")
 
                     # compute recall and update best seen so far
                     quality = total_quality / len(record_op_stats.generated_fields)
@@ -351,14 +361,13 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
 
     def score_quality(
-            self,
-            op_set: list[PhysicalOperator],
-            logical_op_id: str,
-            execution_data: dict[str, dict[str, list[DataRecordSet]]],
-            champion_outputs: dict[str, dict[str, DataRecordSet]],
-            expected_outputs: dict[str, DataRecordSet] | None = None,
-            field_to_metric_fn: dict[str, str | Callable] | None = None,
-        ) -> list[RecordOpStats]:
+        self,
+        op_set: list[PhysicalOperator],
+        logical_op_id: str,
+        execution_data: dict[str, dict[str, list[DataRecordSet]]],
+        champion_outputs: dict[str, dict[str, DataRecordSet]],
+        expected_outputs: dict[str, dict],
+    ) -> list[RecordOpStats]:
         """
         NOTE: This approach to cost modeling does not work directly for aggregation queries;
               for these queries, we would ask the user to provide validation data for the step immediately
@@ -396,9 +405,9 @@ class MABSentinelQueryProcessor(QueryProcessor):
         this_op_execution_data = execution_data[logical_op_id]
 
         # compute quality of each output computed by this operator
-        for source_id, record_sets in this_op_execution_data.items():
+        for source_idx, record_sets in this_op_execution_data.items():
             # NOTE
-            # source_id is a particular input, for which we may have computed multiple output record_sets;
+            # source_idx is a particular input, for which we may have computed multiple output record_sets;
             # each of these record_sets may contain more than one record (b/c one-to-many) and we have one
             # record_set per operator in the op_set
 
@@ -409,23 +418,38 @@ class MABSentinelQueryProcessor(QueryProcessor):
                         record_op_stats.quality = 1.0
                 continue
 
-            # get the expected output for this source_id if we have one
-            expected_record_set = (
-                expected_outputs[source_id]
-                if expected_outputs is not None and source_id in expected_outputs
+            # get the expected output for this source_idx if we have one
+            expected_output = (
+                expected_outputs[source_idx]
+                if expected_outputs is not None and source_idx in expected_outputs
                 else None
             )
 
             # extract champion output for this record set
-            champion_record_set = champion_outputs[logical_op_id][source_id]
+            champion_record_set = champion_outputs[logical_op_id][source_idx]
 
             # for each record_set produced by an operation, compute its quality
             for record_set in record_sets:
-                record_set = self.compute_quality(record_set, expected_record_set, champion_record_set, is_filter_op, is_convert_op, field_to_metric_fn)
+                record_set = self.compute_quality(record_set, expected_output, champion_record_set, is_filter_op, is_convert_op)
 
         # return the quality annotated record op stats
         return execution_data
 
+    def pick_champion_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
+        # if there's only one operator in the set, we return its record_set
+        if len(op_set_record_sets) == 1:
+            record_set, _ = op_set_record_sets[0]
+            return record_set
+
+        # find the operator with the highest average quality and return its record_set
+        base_op_cost_est = OperatorCostEstimates(cardinality=1.0, cost_per_record=0.0, time_per_record=0.0, quality=1.0)
+        champion_record_set, champion_quality = None, -1.0
+        for record_set, op in op_set_record_sets:
+            op_cost_estimates = op.naive_cost_estimates(base_op_cost_est)
+            if op_cost_estimates.quality > champion_quality:
+                champion_record_set, champion_quality = record_set, op_cost_estimates.quality
+
+        return champion_record_set
 
     def pick_ensemble_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
@@ -463,6 +487,10 @@ class MABSentinelQueryProcessor(QueryProcessor):
             record_set, _ = op_set_record_sets[0]
             return record_set
 
+        # NOTE: I don't like that this assumes the models are consistent in
+        #       how they order their record outputs for one-to-many converts;
+        #       eventually we can try out more robust schemes to account for
+        #       differences in ordering
         # aggregate records at each index in the response
         idx_to_records = {}
         for record_set, _ in op_set_record_sets:
@@ -523,37 +551,30 @@ class MABSentinelQueryProcessor(QueryProcessor):
                 # update list of futures
                 futures = not_done_futures
 
-            # compute mapping from source_id to record sets for all operators and for champion operator
+            # compute mapping from source_idx to record sets for all operators and for champion operator
             all_record_sets, champion_record_sets = {}, {}
-            for op, candidate in op_candidate_pairs:
-                candidate_output_record_sets, source_id = [], None
+            for _, candidate in op_candidate_pairs:
+                candidate_output_record_sets, source_idx = [], None
                 for record_set, operator, candidate_ in output_record_sets:
                     if candidate == candidate_:
                         candidate_output_record_sets.append((record_set, operator))
 
-                        # NOTE: we should resolve this issue in a more thoughtful way, but currently the source_id for
-                        #       scan candidate records is the sample_idx, when we want it to be the source_id which is
-                        #       set by the scan operator when it returns the record
-                        # get the source_id associated with this input record
-                        source_id = (
-                            candidate.source_id
-                            if not (isinstance(op, (MarshalAndScanDataOp, CacheScanDataOp)))
-                            else record_set[0].source_id
-                        )
+                        # get the source_idx associated with this input record
+                        source_idx = candidate.source_idx
 
                 # select the champion (i.e. best) record_set from all the record sets computed for this candidate
                 champion_record_set = self.pick_output_fn(candidate_output_record_sets)
 
-                # add champion record_set to mapping from source_id --> champion record_set
-                champion_record_sets[source_id] = champion_record_set
+                # add champion record_set to mapping from source_idx --> champion record_set
+                champion_record_sets[source_idx] = champion_record_set
 
-                # add all record_sets computed for this source_id to mapping from source_id --> record_sets
-                all_record_sets[source_id] = [tup[0] for tup in candidate_output_record_sets]
+                # add all record_sets computed for this source_idx to mapping from source_idx --> record_sets
+                all_record_sets[source_idx] = [tup[0] for tup in candidate_output_record_sets]
 
         return all_record_sets, champion_record_sets
 
 
-    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, DataRecordSet], policy: Policy):
+    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict], policy: Policy):
         """
         """
         if self.verbose:
@@ -578,9 +599,9 @@ class MABSentinelQueryProcessor(QueryProcessor):
             )
 
         # shuffle the indices of records to sample
-        total_num_samples = self.datasource.get_val_length()
-        shuffled_sample_indices = [int(idx) for idx in np.arange(total_num_samples)]
-        self.rng.shuffle(shuffled_sample_indices)
+        total_num_samples = len(self.val_datasource)
+        shuffled_source_indices = [int(idx) for idx in np.arange(total_num_samples)]
+        self.rng.shuffle(shuffled_source_indices)
 
         # sample k initial operators for each operator set; for each operator maintain a tuple of:
         # (operator, next_shuffled_sample_idx, new_operator); new_operator is True when an operator
@@ -601,12 +622,6 @@ class MABSentinelQueryProcessor(QueryProcessor):
             for logical_op_id, _, op_set in plan
         }
 
-        # TODO: long-term, we should do something which does not rely on scanning validation source to build this mapping
-        sample_idx_to_source_id = {
-            sample_idx: self.datasource.get_item(sample_idx, val=True).source_id
-            for sample_idx in range(total_num_samples)
-        }
-
         # NOTE: to maintain parity with our count of samples drawn in the random sampling execution,
         # for each logical_op_id, we count the number of (record, op) executions as the number of samples within that op_set;
         # the samples drawn is equal to the max of that number across all operator sets
@@ -623,26 +638,22 @@ class MABSentinelQueryProcessor(QueryProcessor):
                 updated_frontier_ops_lst = []
                 for op, next_shuffled_sample_idx, new_operator, fully_sampled in frontier_ops[logical_op_id]:
                     # execute new operators on first j candidates, and previously sampled operators on one additional candidate
-                    j = min(self.j, len(shuffled_sample_indices)) if new_operator else 1
+                    j = min(self.j, len(shuffled_source_indices)) if new_operator else 1
                     for j_idx in range(j):
                         candidates = []
                         if isinstance(op, (MarshalAndScanDataOp, CacheScanDataOp)):
-                            sample_idx = shuffled_sample_indices[(next_shuffled_sample_idx + j_idx) % len(shuffled_sample_indices)]
-                            candidate = DataRecord(schema=SourceRecord, source_id=sample_idx)
-                            candidate.idx = sample_idx
-                            candidate.get_item_fn = partial(self.datasource.get_item, val=True)
-                            candidates = [candidate]
+                            source_idx = shuffled_source_indices[(next_shuffled_sample_idx + j_idx) % len(shuffled_source_indices)]
+                            candidates = [source_idx]
                             logical_op_id_to_num_samples[logical_op_id] += 1
                             phys_op_id_to_num_samples[op.get_op_id()] += 1
                         else:
-                            if next_shuffled_sample_idx + j_idx == len(shuffled_sample_indices):
+                            if next_shuffled_sample_idx + j_idx == len(shuffled_source_indices):
                                 fully_sampled = True
                                 break
 
                             # pick best output from all_outputs from previous logical operator
-                            sample_idx = shuffled_sample_indices[next_shuffled_sample_idx + j_idx]
-                            source_id = sample_idx_to_source_id[sample_idx]
-                            record_sets = all_outputs[prev_logical_op_id][source_id]
+                            source_idx = shuffled_source_indices[next_shuffled_sample_idx + j_idx]
+                            record_sets = all_outputs[prev_logical_op_id][source_idx]
                             all_source_record_sets = [(record_set, None) for record_set in record_sets]
                             max_quality_record_set = self.pick_highest_quality_output(all_source_record_sets)
                             if (
@@ -672,26 +683,26 @@ class MABSentinelQueryProcessor(QueryProcessor):
                     continue
 
                 # run sampled operators on sampled candidates
-                source_id_to_record_sets, source_id_to_champion_record_set = self.execute_op_set(op_candidate_pairs)
+                source_idx_to_record_sets, source_idx_to_champion_record_set = self.execute_op_set(op_candidate_pairs)
 
                 # update all_outputs and champion_outputs dictionary
                 if logical_op_id not in all_outputs:
-                    all_outputs[logical_op_id] = source_id_to_record_sets
-                    champion_outputs[logical_op_id] = source_id_to_champion_record_set
+                    all_outputs[logical_op_id] = source_idx_to_record_sets
+                    champion_outputs[logical_op_id] = source_idx_to_champion_record_set
                 else:
-                    for source_id, record_sets in source_id_to_record_sets.items():
-                        if source_id not in all_outputs[logical_op_id]:
-                            all_outputs[logical_op_id][source_id] = record_sets
-                            champion_outputs[logical_op_id][source_id] = source_id_to_champion_record_set[source_id]
+                    for source_idx, record_sets in source_idx_to_record_sets.items():
+                        if source_idx not in all_outputs[logical_op_id]:
+                            all_outputs[logical_op_id][source_idx] = record_sets
+                            champion_outputs[logical_op_id][source_idx] = source_idx_to_champion_record_set[source_idx]
                         else:
-                            all_outputs[logical_op_id][source_id].extend(record_sets)
+                            all_outputs[logical_op_id][source_idx].extend(record_sets)
                             # NOTE: short-term solution; in practice we can get multiple champion records from different
                             # sets of operators, so we should try to find a way to only take one
-                            champion_outputs[logical_op_id][source_id] = source_id_to_champion_record_set[source_id]
+                            champion_outputs[logical_op_id][source_idx] = source_idx_to_champion_record_set[source_idx]
 
                 # flatten lists of records and record_op_stats
                 all_records, all_record_op_stats = [], []
-                for _, record_sets in source_id_to_record_sets.items():
+                for _, record_sets in source_idx_to_record_sets.items():
                     for record_set in record_sets:
                         all_records.extend(record_set.data_records)
                         all_record_op_stats.extend(record_set.record_op_stats)
@@ -710,14 +721,12 @@ class MABSentinelQueryProcessor(QueryProcessor):
                             self.datadir.append_cache(logical_op_id, record)
 
                 # compute quality for each operator
-                field_to_metric_fn = self.datasource.get_field_to_metric_fn()
                 all_outputs = self.score_quality(
                     op_set,
                     logical_op_id,
                     all_outputs,
                     champion_outputs,
                     expected_outputs,
-                    field_to_metric_fn,
                 )
 
             # update the (pareto) frontier for each set of operators
@@ -757,12 +766,10 @@ class MABSentinelQueryProcessor(QueryProcessor):
         """
         # if we're using validation data, get the set of expected output records
         expected_outputs = {}
-        for idx in range(self.datasource.get_val_length()):
-            data_records = self.datasource.get_item(idx, val=True, include_label=True)
-            if not isinstance(data_records, list):
-                data_records = [data_records]
-            record_set = DataRecordSet(data_records, None)
-            expected_outputs[record_set.source_id] = record_set
+        for source_idx in range(len(self.val_datasource)):
+            # TODO: make sure execute_op_set uses self.val_datasource
+            expected_output = self.val_datasource.get_item(source_idx)
+            expected_outputs[source_idx] = expected_output
 
         # run sentinel plan
         execution_data, plan_stats = self.execute_sentinel_plan(sentinel_plan, expected_outputs, policy)
@@ -775,11 +782,16 @@ class MABSentinelQueryProcessor(QueryProcessor):
         Generates and returns a SentinelPlan for the given dataset.
         """
         # TODO: explicitly pull up filters; for SIGMOD we can explicitly write plans w/filters pulled up
-        # initialize the optimizer
-        # use optimizer to generate sentinel plans
-        # TODO: Do we need to re-initialize the optimizer here? 
+
+        # create a new optimizer and update its strategy to SENTINEL
         optimizer = self.optimizer.deepcopy_clean()
         optimizer.update_strategy(OptimizationStrategyType.SENTINEL)
+
+        # create copy of dataset, but change its data source to the validation data source
+        dataset = deepcopy(dataset)
+        dataset._set_data_source(self.val_datasource)
+
+        # get the sentinel plan for the given dataset
         sentinel_plans = optimizer.optimize(dataset, policy)
         sentinel_plan = sentinel_plans[0]
 
@@ -790,8 +802,8 @@ class MABSentinelQueryProcessor(QueryProcessor):
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
-        if not self.using_validation_data:
-            raise Exception("Make sure you are using ValidationDataSource with MABSentinelExecutionEngine")
+        if self.val_datasource is None:
+            raise Exception("Make sure you are using a validation DataSource with MABSentinelExecutionEngine")
 
         # if nocache is True, make sure we do not re-use codegen examples
         if self.nocache:

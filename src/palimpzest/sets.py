@@ -89,6 +89,12 @@ class Set:
     def schema(self) -> Schema:
         return self._schema
 
+    def _set_data_source(self, source: DataSource):
+        if isinstance(self._source, Set):
+            self._source._set_data_source(source)
+        else:
+            self._source = source
+
     def serialize(self):
         # NOTE: I needed to remove depends_on from the serialization dictionary because
         # the optimizer changes the name of the depends_on fields to be their "full" name.

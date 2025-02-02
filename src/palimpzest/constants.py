@@ -134,9 +134,6 @@ LOG_LLM_OUTPUT = False
 # Derived schema prefix
 DERIVED_SCHEMA_PREFIX = "DerivedSchema_"
 
-# Derived source_id for records created from a DataFrame
-FROM_DF_PREFIX = "FROM_DF_"
-
 #### MODEL PERFORMANCE & COST METRICS ####
 # I've looked across models and grouped knowledge into commonly used categories:
 # - Agg. Benchmark (we only use MMLU for this)
