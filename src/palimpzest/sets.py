@@ -22,20 +22,6 @@ from palimpzest.utils.index_helpers import get_index_str
 #####################################################
 class Set:
     """
-    A Set is the logical abstraction for a set of DataRecords matching some Schema. It is
-    also a node in the computation graph of a Dataset.
-
-    Each Dataset consists of one or more Sets. The "initial" Set in a Dataset can be thought
-    of as the Set that results from reading each DataRecord unaltered from the source. For each
-    filter or transformation that is applied to the Dataset, a new Set is created which defines
-    the set of DataRecords that result from applying that filter or transformation. In brief,
-    the Sets define a Dataset's computation graph. Sets can also be cached to maximize the reuse
-    of past computation.
-
-    Sets are initialized with a dataset_id, a schema, and a source. The source is either an
-    existing Set or a raw data source (such as a directory or S3 prefix). Sets may be initialized
-    with a Filter (which defines the filtering performed on the source to obtain *this* Set),
-    and a description of what this Set is meant to represent.
     """
 
     SET_VERSION = 0.1

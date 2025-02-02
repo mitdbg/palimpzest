@@ -116,7 +116,7 @@ class MarshalAndScanDataOp(DataSourcePhysicalOp):
         per_record_size_kb = input_record_size_in_bytes / 1024.0
         time_per_record = (
             LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
-            if issubclass(self.datasource, DirectorySource) or issubclass(self.datasource, FileSource)
+            if isinstance(self.datasource, (DirectorySource, FileSource))
             else MEMORY_SCAN_TIME_PER_KB * per_record_size_kb
         )
 

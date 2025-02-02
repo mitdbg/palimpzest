@@ -137,30 +137,34 @@ class Aggregate(LogicalOperator):
 class BaseScan(LogicalOperator):
     """A BaseScan is a logical operator that represents a scan of a particular data source."""
 
-    def __init__(self, dataset_id: str, output_schema: Schema):
+    def __init__(self, datasource: str, output_schema: Schema):
         super().__init__(output_schema=output_schema)
-        self.dataset_id = dataset_id
+        self.datasource = datasource
 
     def __str__(self):
-        return f"BaseScan({self.dataset_id},{str(self.output_schema)})"
+        return f"BaseScan({self.datasource},{self.output_schema})"
 
     def __eq__(self, other) -> bool:
         return (
             isinstance(other, BaseScan)
             and self.input_schema.get_desc() == other.input_schema.get_desc()
             and self.output_schema.get_desc() == other.output_schema.get_desc()
-            and self.dataset_id == other.dataset_id
+            and self.datasource == other.datasource
         )
 
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
-        logical_id_params = {"dataset_id": self.dataset_id, **logical_id_params}
+        # NOTE: in order for op ids from validation datasets to map to their corresponding
+        #       non-validation counterparts, we cannot use the dataset_id (i.e. universal identifier)
+        #       in the id_params. Once we have joins (i.e. multiple DataSources), this issue will get
+        #       more complicated.
+        # logical_id_params = {"datasource": self.datasource, **logical_id_params}
 
         return logical_id_params
 
     def get_logical_op_params(self) -> dict:
         logical_op_params = super().get_logical_op_params()
-        logical_op_params = {"dataset_id": self.dataset_id, **logical_op_params}
+        logical_op_params = {"datasource": self.datasource, **logical_op_params}
 
         return logical_op_params
 
@@ -168,7 +172,7 @@ class BaseScan(LogicalOperator):
 class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached Set."""
 
-    def __init__(self, dataset_id: str, *args, **kwargs):
+    def __init__(self, datasource: str, *args, **kwargs):
         if kwargs.get("input_schema") is not None:
             raise Exception(
                 f"CacheScan must be initialized with `input_schema=None` but was initialized with "
@@ -176,20 +180,24 @@ class CacheScan(LogicalOperator):
             )
 
         super().__init__(*args, **kwargs)
-        self.dataset_id = dataset_id
+        self.datasource = datasource
 
     def __str__(self):
-        return f"CacheScan({str(self.output_schema)},{str(self.dataset_id)})"
+        return f"CacheScan({self.datasource},{self.output_schema})"
 
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
-        logical_id_params = {"dataset_id": self.dataset_id, **logical_id_params}
+        # NOTE: in order for op ids from validation datasets to map to their corresponding
+        #       non-validation counterparts, we cannot use the dataset_id (i.e. universal identifier)
+        #       in the id_params. Once we have joins (i.e. multiple DataSources), this issue will get
+        #       more complicated.
+        # logical_id_params = {"datasource": self.datasource, **logical_id_params}
 
         return logical_id_params
 
     def get_logical_op_params(self) -> dict:
         logical_op_params = super().get_logical_op_params()
-        logical_op_params = {"dataset_id": self.dataset_id, **logical_op_params}
+        logical_op_params = {"datasource": self.datasource, **logical_op_params}
 
         return logical_op_params
 

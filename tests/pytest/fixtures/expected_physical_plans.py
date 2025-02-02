@@ -24,8 +24,9 @@ def get_three_converts_plan(three_converts_workload, enron_eval_tiny, email_sche
     third_convert_node_id = three_converts_workload.universal_identifier()
 
     # create physical op for scan operator
-    scan_logical_op = BaseScan(dataset_id=enron_eval_tiny, output_schema=TextFile)
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, dataset_id=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
+    datasource = DataDirectory().get_registered_dataset(enron_eval_tiny)
+    scan_logical_op = BaseScan(datasource=datasource, output_schema=TextFile)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=datasource, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # create physical op for first convert operator
     depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))
@@ -147,8 +148,9 @@ def get_one_filter_one_convert_plan(one_filter_one_convert_workload, enron_eval_
     first_convert_node_id = dataset_nodes[2].universal_identifier()
 
     # create physical op for scan operator
-    scan_logical_op = BaseScan(dataset_id=enron_eval_tiny, output_schema=TextFile)
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, dataset_id=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
+    datasource = DataDirectory().get_registered_dataset(enron_eval_tiny)
+    scan_logical_op = BaseScan(datasource=datasource, output_schema=TextFile)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=datasource, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # get physical op id for first filter operator
     depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))
@@ -199,8 +201,9 @@ def get_two_converts_two_filters_plan(two_converts_two_filters_workload, enron_e
     second_filter_node_id = two_converts_two_filters_workload.universal_identifier()
 
     # create physical op for scan operator
-    scan_logical_op = BaseScan(dataset_id=enron_eval_tiny, output_schema=TextFile)
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, dataset_id=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
+    datasource = DataDirectory().get_registered_dataset(enron_eval_tiny)
+    scan_logical_op = BaseScan(datasource=datasource, output_schema=TextFile)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=datasource, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # create physical op for first convert operator
     depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))

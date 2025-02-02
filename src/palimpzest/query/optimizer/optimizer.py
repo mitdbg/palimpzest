@@ -225,9 +225,9 @@ class Optimizer:
         # create the op for the given node
         op: LogicalOperator | None = None
         if not self.no_cache and DataDirectory().has_cached_answer(uid):
-            op = CacheScan(dataset_id=uid, input_schema=None, output_schema=output_schema)
+            op = CacheScan(datasource=node, input_schema=None, output_schema=output_schema)
         elif isinstance(node, DataSource):
-            op = BaseScan(dataset_id=uid, output_schema=output_schema)
+            op = BaseScan(datasource=node, output_schema=output_schema)
         elif node._filter is not None:
             op = FilteredScan(
                 input_schema=input_schema,

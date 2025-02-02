@@ -1,6 +1,5 @@
 import pytest
 
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.utils.model_helpers import get_models
 
@@ -51,11 +50,8 @@ class TestCostModel:
         indirect=True,
     )
     def test_estimate_plan_cost(self, simple_plan_sample_execution_data, physical_plan, expected_cost_est_results):
-        # register a fake dataset
-        dataset_id = "foobar"
-        vals = [1, 2, 3, 4, 5, 6]
-        DataDirectory().register_memory_source(vals=vals, dataset_id=dataset_id)
-        input_cardinality = len(vals)
+        # TODO: refactor this test to work even if we make changes to simple plans in test/pytest/fixtures/physical_plans.py
+        input_cardinality = 6
 
         # TODO: if we test with a plan other than the simple test plan; this will break
         # get the scan, convert, and filter op ids from the physical_plan and update the simple_plan_sample_execution_data
