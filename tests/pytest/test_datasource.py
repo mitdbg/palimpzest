@@ -28,7 +28,7 @@ def test_marshal_and_scan_memory_source():
     assert len(result.record_op_stats) == 1
     stats = result.record_op_stats[0]
     assert stats.op_name == "MarshalAndScanDataOp"
-    assert stats.op_details["dataset_id"] == "test_dataset"
+    assert stats.op_details["output_schema"] == str(List)
     assert stats.time_per_record > 0
     assert stats.cost_per_record == 0.0
 
