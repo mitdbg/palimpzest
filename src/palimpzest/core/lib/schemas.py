@@ -314,9 +314,8 @@ class Schema(metaclass=SchemaMetaclass):
             new_field_types.append(construct_field_from_python_type(field["type"], desc=field_desc))
             new_field_descs.append(field_desc)
 
-        # If the number of fields is the same, this means we are not adding any new fields
-        # This implies that schema column names should be unique, which is reasonable.
-        if len(new_field_names) == len(list(cls.field_names())):
+        # If we are not adding any new fields, simply return the original schema
+        if sorted(new_field_names) == sorted(list(cls.field_names())):
             return cls
 
         # Generate the schema class dynamically
