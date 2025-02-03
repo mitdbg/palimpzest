@@ -11,7 +11,7 @@ from ragatouille import RAGPretrainedModel
 from palimpzest.constants import Model
 from palimpzest.core.data.datasources import ValidationDataSource
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import BooleanField, ImageFilepathField, ListField, NumericField, StringField
+from palimpzest.core.lib.fields import ImageFilepathField, ListField, StringField
 from palimpzest.core.lib.schemas import Schema, TextFile
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost, MinTime
@@ -54,13 +54,15 @@ def in_price_range(record: dict):
     except Exception:
         return False
 
+FileCols = [
+    {"name": "filename", "type": "string", "desc": "The UNIX-style name of the file"},
+    {"name": "contents", "type": "bytes", "desc": "The contents of the file"},
+]
 
-class Email(TextFile):
-    """Represents an email, which in practice is usually from a text file"""
-
-    sender = StringField(desc="The email address of the sender")
-    subject = StringField(desc="The subject of the email")
-
+EmailCols = FileCols + [
+    {"name": "sender", "type": "string", "desc": "The email address of the sender"},
+    {"name": "subject", "type": "string", "desc": "The subject of the email"},
+]
 
 class EnronValidationSource(ValidationDataSource):
     def __init__(
@@ -170,6 +172,22 @@ class EnronValidationSource(ValidationDataSource):
         return dr
 
 
+RealEstateListingFilesCols = [
+    {"name": "listing", "type": "string", "desc": "The name of the listing"},
+    {"name": "text_content", "type": "string", "desc": "The content of the listing's text description"},
+    {"name": "image_filepaths", "type": "list[str]", "desc": "A list of the filepaths for each image of the listing"},
+]
+
+TextRealEstateListingCols = RealEstateListingFilesCols + [
+    {"name": "address", "type": "string", "desc": "The address of the property"},
+    {"name": "price", "type": "number", "desc": "The listed price of the property"},
+]
+
+ImageRealEstateListingCols = RealEstateListingFilesCols + [
+    {"name": "is_modern_and_attractive", "type": "boolean", "desc": "True if the home interior design is modern and attractive and False otherwise"},
+    {"name": "has_natural_sunlight", "type": "boolean", "desc": "True if the home interior has lots of natural sunlight and False otherwise"},
+]
+
 class RealEstateListingFiles(Schema):
     """The source text and image data for a real estate listing."""
 
@@ -179,25 +197,6 @@ class RealEstateListingFiles(Schema):
         element_type=ImageFilepathField,
         desc="A list of the filepaths for each image of the listing",
     )
-
-
-class TextRealEstateListing(RealEstateListingFiles):
-    """Represents a real estate listing with specific fields extracted from its text."""
-
-    address = StringField(desc="The address of the property")
-    price = NumericField(desc="The listed price of the property")
-
-
-class ImageRealEstateListing(RealEstateListingFiles):
-    """Represents a real estate listing with specific fields extracted from its text and images."""
-
-    is_modern_and_attractive = BooleanField(
-        desc="True if the home interior design is modern and attractive and False otherwise"
-    )
-    has_natural_sunlight = BooleanField(
-        desc="True if the home interior has lots of natural sunlight and False otherwise"
-    )
-
 
 class RealEstateValidationSource(ValidationDataSource):
     def __init__(
@@ -468,6 +467,13 @@ class RealEstateValidationSource(ValidationDataSource):
 
         return dr
 
+BiodexEntryCols = [
+    {"name": "pmid", "type": "string", "desc": "The PubMed ID of the medical paper"},
+    {"name": "title", "type": "string", "desc": "The title of the medical paper"},
+    {"name": "abstract", "type": "string", "desc": "The abstract of the medical paper"},
+    {"name": "fulltext", "type": "string", "desc": "The full text of the medical paper, which contains information relevant for creating a drug safety report."},
+]
+
 
 class BiodexEntry(Schema):
     """A single entry in the Biodex ICSR Dataset."""
@@ -479,45 +485,21 @@ class BiodexEntry(Schema):
         desc="The full text of the medical paper, which contains information relevant for creating a drug safety report.",
     )
 
+BiodexSeriousCols = BiodexEntryCols + [
+    {"name": "serious", "type": "number", "desc": "The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2."},
+]
 
-class BiodexSerious(BiodexEntry):
-    """
-    You will be presented with the text of a medical article which is partially or entirely about
-    an adverse event experienced by a patient in response to taking one or more drugs. In this task,
-    you will be asked to extract a rating of how serious the event was, with a definition of `serious`
-    provided below.
-    """
+BiodexPatientSexCols = BiodexEntryCols + [
+    {"name": "patientsex", "type": "number", "desc": "The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female."},
+]
 
-    serious = NumericField(
-        desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.",
-    )
+BiodexDrugsCols = BiodexEntryCols + [
+    {"name": "drugs", "type": "list[str]", "desc": "The list of all active substance names of the drugs discussed in the report."},
+]
 
-
-class BiodexPatientSex(BiodexEntry):
-    """
-    You will be presented with the text of a medical article which is partially or entirely about
-    an adverse event experienced by a patient in response to taking one or more drugs. In this task,
-    you will be asked to extract the sex of the patient (if provided), with a definition of the
-    expected output `patientsex` provided below.
-    """
-
-    patientsex = NumericField(
-        desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.",
-    )
-
-
-class BiodexDrugs(BiodexEntry):
-    """
-    You will be presented with the text of a medical article which is partially or entirely about
-    an adverse event experienced by a patient in response to taking one or more drugs. In this task,
-    you will be asked to extract a list of every drug mentioned in the article.
-    """
-
-    drugs = ListField(
-        desc='The **list** of all active substance names of the drugs discussed in the report.\n - For example: ["azathioprine", "infliximab", "mesalamine", "prednisolone"]',
-        element_type=StringField,
-    )
-
+BiodexReactionsCols = BiodexEntryCols + [
+    {"name": "reactions", "type": "list[str]", "desc": "The list of all reaction terms discussed in the report."},
+]
 
 class BiodexReactions(BiodexEntry):
     """
@@ -531,6 +513,9 @@ class BiodexReactions(BiodexEntry):
         element_type=StringField,
     )
 
+BiodexReactionLabelsCols = BiodexEntryCols + [
+    {"name": "reaction_labels", "type": "list[str]", "desc": "The list of all reaction terms discussed in the report."},
+]
 
 class BiodexReactionLabels(BiodexReactions):
     """
@@ -542,42 +527,27 @@ class BiodexReactionLabels(BiodexReactions):
         element_type=StringField,
     )
 
-
-class BiodexRankedReactions(BiodexReactionLabels):
-    """
-    You will be presented with the text of a medical article which is partially or entirely about
-    an adverse event experienced by a patient in response to taking one or more drugs. You will also
-    be presented with a list of inferred reactions, and a set of retrieved labels which were matched
-    to these inferred reactions. In this task, you are asked to output a ranked list of the labels
-    which are most applicable based on the context of the article. Your output list must:
-    - contain only elements from `reaction_labels`
-    - place the most likely label first and the least likely label last
-    - you may omit labels if you think they do not describe a reaction experienced by the patient
-    """
-
-    ranked_reaction_labels = ListField(
-        desc="The ranked list of labels for adverse reactions experienced by the patient. The most likely label occurs first in the list.",
-        element_type=StringField,
-    )
+#     """
+#     You will be presented with the text of a medical article which is partially or entirely about
+#     an adverse event experienced by a patient in response to taking one or more drugs. You will also
+#     be presented with a list of inferred reactions, and a set of retrieved labels which were matched
+#     to these inferred reactions. In this task, you are asked to output a ranked list of the labels
+#     which are most applicable based on the context of the article. Your output list must:
+#     - contain only elements from `reaction_labels`
+#     - place the most likely label first and the least likely label last
+#     - you may omit labels if you think they do not describe a reaction experienced by the patient
+#     """
+BiodexRankedReactionsCols = BiodexReactionLabelsCols + [
+    {"name": "ranked_reaction_labels", "type": "list[str]", "desc": "The ranked list of labels for adverse reactions experienced by the patient. The most likely label occurs first in the list."},
+]
 
 
-class BiodexOutput(BiodexEntry):
-    """The target output fields for an entry in the Biodex ICSR Dataset."""
-
-    serious = NumericField(
-        desc="The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2.",
-    )
-    patientsex = NumericField(
-        desc="The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female.",
-    )
-    drugs = ListField(
-        desc='The **list** of all active substance names of the drugs discussed in the report.\n - For example: ["azathioprine", "infliximab", "mesalamine", "prednisolone"]',
-        element_type=StringField,
-    )
-    reactions = ListField(
-        desc='The **list** of all reaction terms discussed in the report.\n - For example: ["Epstein-Barr virus", "infection reactivation", "Idiopathic interstitial pneumonia"]',
-        element_type=StringField,
-    )
+BiodexOutputCols = BiodexEntryCols + [
+    {"name": "serious", "type": "number", "desc": "The seriousness of the adverse event.\n - Equal to 1 if the adverse event resulted in death, a life threatening condition, hospitalization, disability, congenital anomaly, or any other serious condition.\n - If none of the above occurred, equal to 2."},
+    {"name": "patientsex", "type": "number", "desc": "The reported biological sex of the patient.\n - Equal to 0 for unknown, 1 for male, 2 for female."},
+    {"name": "drugs", "type": "list[str]", "desc": "The list of all active substance names of the drugs discussed in the report."},
+    {"name": "reactions", "type": "list[str]", "desc": "The list of all reaction terms discussed in the report."},
+]
 
 
 class BiodexValidationSource(ValidationDataSource):
@@ -881,10 +851,11 @@ if __name__ == "__main__":
         datasource = EnronValidationSource(file_dir=data_filepath, dataset_id=user_dataset_id)
         DataDirectory().register_user_source(src=datasource, dataset_id=user_dataset_id)
 
-        plan = Dataset(user_dataset_id, schema=Email)
+        plan = Dataset(user_dataset_id).sem_add_columns(EmailCols)
         plan = plan.sem_filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
+
         plan = plan.sem_filter(
             'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
         )
@@ -907,9 +878,9 @@ if __name__ == "__main__":
             dataset_id=f"{user_dataset_id}",
         )
 
-        plan = Dataset(user_dataset_id, schema=RealEstateListingFiles)
-        plan = plan.convert(TextRealEstateListing, depends_on="text_content")
-        plan = plan.convert(ImageRealEstateListing, depends_on="image_filepaths")
+        plan = Dataset(user_dataset_id).sem_add_columns(RealEstateListingFilesCols)
+        plan = plan.sem_add_columns(TextRealEstateListingCols)
+        plan = plan.sem_add_columns(ImageRealEstateListingCols)
         plan = plan.sem_filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
@@ -935,8 +906,8 @@ if __name__ == "__main__":
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
-        plan = Dataset(user_dataset_id, schema=BiodexEntry)
-        plan = plan.convert(BiodexReactions)  # infer
+        plan = Dataset(user_dataset_id).sem_add_columns(BiodexEntryCols)
+        plan = plan.sem_add_columns(BiodexReactionsCols)  # infer
         plan = plan.retrieve(
             output_schema=BiodexReactionLabels,
             index=index,
@@ -944,7 +915,7 @@ if __name__ == "__main__":
             output_attr="reaction_labels",
             # k=10, # if we set k, then it will be fixed; if we leave it unspecified then the optimizer will choose
         )  # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
-        plan = plan.convert(BiodexRankedReactions)
+        plan = plan.sem_add_columns(BiodexRankedReactionsCols)
 
         # only use final op quality
         use_final_op_quality = True
@@ -968,11 +939,11 @@ if __name__ == "__main__":
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
-        plan = Dataset(user_dataset_id, schema=BiodexEntry)
-        plan = plan.convert(BiodexSerious, depends_on=["title", "abstract", "fulltext"])
-        plan = plan.convert(BiodexPatientSex, depends_on=["title", "abstract", "fulltext"])
-        plan = plan.convert(BiodexDrugs, depends_on=["title", "abstract", "fulltext"])
-        plan = plan.convert(BiodexReactions, depends_on=["title", "abstract", "fulltext"])
+        plan = Dataset(user_dataset_id).sem_add_columns(BiodexEntryCols)
+        plan = plan.sem_add_columns(BiodexSeriousCols, depends_on=["title", "abstract", "fulltext"])
+        plan = plan.sem_add_columns(BiodexPatientSexCols, depends_on=["title", "abstract", "fulltext"])
+        plan = plan.sem_add_columns(BiodexDrugsCols, depends_on=["title", "abstract", "fulltext"])
+        plan = plan.sem_add_columns(BiodexReactionsCols, depends_on=["title", "abstract", "fulltext"])
         plan = plan.retrieve(
             output_schema=BiodexReactionLabels,
             index=index,
@@ -980,7 +951,7 @@ if __name__ == "__main__":
             output_attr="reaction_labels",
             # k=10, # if we set k, then it will be fixed; if we leave it unspecified then the optimizer will choose
         )  # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
-        plan = plan.convert(BiodexRankedReactions)
+        plan = plan.sem_add_columns(BiodexRankedReactionsCols)
 
         # only use final op quality
         use_final_op_quality = True

@@ -9,7 +9,7 @@ from ragatouille import RAGPretrainedModel
 from palimpzest.constants import Model
 from palimpzest.core.data.datasources import ValidationDataSource
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import BooleanField, ListField, StringField
+from palimpzest.core.lib.fields import ListField, StringField
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost, MinTime
@@ -17,6 +17,17 @@ from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 from palimpzest.utils.model_helpers import get_models
 
+FeverClaimsCols = [
+    {"name": "claim", "type": "string", "desc": "the claim being made"}
+]
+
+FeverIntermediateCols = FeverClaimsCols + [
+    {"name": "relevant_wikipedia_articles", "type": "list", "desc": "Most relevant wikipedia articles to the `claim`"}
+]   
+
+FeverOutputCols = FeverIntermediateCols + [
+    {"name": "label", "type": "boolean", "desc": "Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise."}
+]
 
 class FeverClaimsSchema(Schema):
     claim = StringField(desc="the claim being made")
@@ -24,10 +35,6 @@ class FeverClaimsSchema(Schema):
 class FeverIntermediateSchema(FeverClaimsSchema):
     relevant_wikipedia_articles = ListField(desc="Most relevant wikipedia articles to the `claim`",
                                             element_type=StringField)
-
-class FeverOutputSchema(FeverIntermediateSchema):
-    label = BooleanField("Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise.")
-
 
 def get_label_fields_to_values(claims, ground_truth_file):
     with open(ground_truth_file) as f:
@@ -267,7 +274,7 @@ DataDirectory().register_user_source(
     dataset_id=f"{user_dataset_id}",
 )
 
-claims = Dataset(user_dataset_id, schema=FeverClaimsSchema)
+claims = Dataset(user_dataset_id).sem_add_columns(FeverClaimsCols)
 claims_and_relevant_files = claims.retrieve(
     output_schema=FeverIntermediateSchema,
     index=index,
@@ -275,7 +282,7 @@ claims_and_relevant_files = claims.retrieve(
     output_attr="relevant_wikipedia_articles",
     k=k
 )
-output = claims_and_relevant_files.convert(output_schema=FeverOutputSchema)
+output = claims_and_relevant_files.sem_add_columns(FeverOutputCols)
 
 assert args.processing_strategy in ["no_sentinel", "mab_sentinel"], "We only support no_sentinel and mab_sentinel for this demo"
 

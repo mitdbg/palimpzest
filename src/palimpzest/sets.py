@@ -140,8 +140,13 @@ class Dataset(Set):
     def __init__(self, source: str | list | pd.DataFrame | DataSource, schema: Schema | None = None, *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
         updated_source = DataDirectory().get_or_register_dataset(source) if isinstance(source, (str, list, pd.DataFrame)) else source
+
         if schema is None:
-            schema = Schema.from_df(source) if isinstance(source, pd.DataFrame) else DefaultSchema
+            # This is mainly for DataSource with a schema. 
+            if updated_source.schema is not None:
+                schema = updated_source.schema
+            else:
+                schema = Schema.from_df(source) if isinstance(source, pd.DataFrame) else DefaultSchema
         # intialize class
         super().__init__(updated_source, schema, *args, **kwargs)
 
@@ -281,11 +286,11 @@ class Dataset(Set):
             depends_on = [depends_on]
 
         updated_cols =[]
-        for col_name, col_type in types.items():
+        for cols in types:
             new_col = {}
-            new_col["type"] = col_type
-            new_col["desc"] = "New column: " + col_name
-            new_col["name"] = col_name
+            new_col["type"] = cols.get("type", "string")
+            new_col["desc"] = cols.get("desc", "New column: " + cols.get("name", "new_col"))
+            new_col["name"] = cols.get("name", "new_col")
             updated_cols.append(new_col)
 
         new_output_schema = self.schema.add_fields(updated_cols)

@@ -218,7 +218,7 @@ class Optimizer:
         node = dataset_nodes[-1]
         output_schema = node.schema
         input_schema = dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
-
+        
         ### convert node --> Group ###
         uid = node.universal_identifier()
 
@@ -283,6 +283,9 @@ class Optimizer:
                 depends_on=node._depends_on,
                 target_cache_id=uid,
             )
+        #If the operator doesn't mean anything, we just skip it.
+        elif output_schema == input_schema:
+            return self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], {}, {})
         else:
             raise NotImplementedError(
                 f"""No logical operator exists for the specified dataset construction.

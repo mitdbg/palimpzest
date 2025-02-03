@@ -9,8 +9,6 @@ import gradio as gr
 import numpy as np
 from PIL import Image
 
-from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import ImageFile
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality
 from palimpzest.query.processor.config import QueryProcessorConfig
@@ -21,15 +19,19 @@ if not os.environ.get("OPENAI_API_KEY"):
 
     load_env()
 
+ImageFileCols = [
+    {"name": "filename", "type": "string", "desc": "The name of the file the image was downloaded from"},
+    {"name": "contents", "type": "bytes", "desc": "The contents of the image file"},
+]
 
-class DogImage(ImageFile):
-    breed = Field(desc="The breed of the dog")
-
+DogImageCols = ImageFileCols + [
+    {"name": "breed", "type": "string", "desc": "The breed of the dog"},
+]
 
 def build_image_plan(dataset_id):
-    images = Dataset(dataset_id, schema=ImageFile)
+    images = Dataset(dataset_id).sem_add_columns(ImageFileCols)
     filtered_images = images.sem_filter("The image contains one or more dogs")
-    dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
+    dog_images = filtered_images.sem_add_columns(DogImageCols)
     return dog_images
 
 

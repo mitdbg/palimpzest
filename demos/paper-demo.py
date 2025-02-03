@@ -10,13 +10,13 @@ from PIL import Image
 from palimpzest.constants import Cardinality
 from palimpzest.core.data.datasources import UserSource
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import BooleanField, Field, ImageFilepathField, ListField, NumericField, StringField
-from palimpzest.core.lib.schemas import Schema, Table, TextFile, XLSFile
+from palimpzest.core.lib.fields import ImageFilepathField, ListField, StringField
+from palimpzest.core.lib.schemas import Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
-from palimpzest.utils.udfs import xls_to_tables
+from palimpzest.utils.udfs import file_to_xls, xls_to_tables
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -53,42 +53,71 @@ def in_price_range(record: dict):
     except Exception:
         return False
 
+FileCols = [
+    {"name": "filename", "type": "string", "desc": "The name of the file"},
+    {"name": "contents", "type": "bytes", "desc": "The contents of the file"},
+]
 
-class Email(TextFile):
-    """Represents an email, which in practice is usually from a text file"""
+TextFileCols = FileCols
 
-    sender = StringField(desc="The email address of the sender")
-    subject = StringField(desc="The subject of the email")
+EmailCols = TextFileCols + [
+    {"name": "sender", "type": "string", "desc": "The email address of the sender"},
+    {"name": "subject", "type": "string", "desc": "The subject of the email"},
+]
 
+CaseDataCols = [
+    {"name": "case_submitter_id", "type": "string", "desc": "The ID of the case"},
+    {"name": "age_at_diagnosis", "type": "number", "desc": "The age of the patient at the time of diagnosis"},
+    {"name": "race", "type": "string", "desc": "An arbitrary classification of a taxonomic group that is a division of a species."},
+    {"name": "ethnicity", "type": "string", "desc": "Whether an individual describes themselves as Hispanic or Latino or not."},
+    {"name": "gender", "type": "string", "desc": "Text designations that identify gender."},
+    {"name": "vital_status", "type": "string", "desc": "The vital status of the patient"},
+    {"name": "ajcc_pathologic_t", "type": "string", "desc": "Code of pathological T (primary tumor) to define the size or contiguous extension of the primary tumor (T), using staging criteria from the American Joint Committee on Cancer (AJCC)."},
+    {"name": "ajcc_pathologic_n", "type": "string", "desc": "The codes that represent the stage of cancer based on the nodes present (N stage) according to criteria based on multiple editions of the AJCC's Cancer Staging Manual."},
+    {"name": "ajcc_pathologic_stage", "type": "string", "desc": "The extent of a cancer, especially whether the disease has spread from the original site to other parts of the body based on AJCC staging criteria."},
+    {"name": "tumor_grade", "type": "number", "desc": "Numeric value to express the degree of abnormality of cancer cells, a measure of differentiation and aggressiveness."},
+    {"name": "tumor_focality", "type": "string", "desc": "The text term used to describe whether the patient's disease originated in a single location or multiple locations."},
+    {"name": "tumor_largest_dimension_diameter", "type": "number", "desc": "The tumor largest dimension diameter."},
+    {"name": "primary_diagnosis", "type": "string", "desc": "Text term used to describe the patient's histologic diagnosis, as described by the World Health Organization's (WHO) International Classification of Diseases for Oncology (ICD-O)."},
+    {"name": "morphology", "type": "string", "desc": "The Morphological code of the tumor, as described by the World Health Organization's (WHO) International Classification of Diseases for Oncology (ICD-O)."},
+    {"name": "tissue_or_organ_of_origin", "type": "string", "desc": "The text term used to describe the anatomic site of origin, of the patient's malignant disease, as described by the World Health Organization's (WHO) International Classification of Diseases for Oncology (ICD-O)."},
+    {"name": "study", "type": "string", "desc": "The last name of the author of the study, from the table name"},
+    {"name": "filename", "type": "string", "desc": "The name of the file the record was extracted from"}
+]
 
-class CaseData(Schema):
-    """An individual row extracted from a table containing medical study data."""
+RealEstateListingFilesCols = [
+    {"name": "listing", "type": "string", "desc": "The name of the listing"},
+    {"name": "text_content", "type": "string", "desc": "The content of the listing's text description"},
+    {"name": "image_filepaths", "type": "list[str]", "desc": "A list of the filepaths for each image of the listing"},
+]
 
-    case_submitter_id = Field(desc="The ID of the case")
-    age_at_diagnosis = Field(desc="The age of the patient at the time of diagnosis")
-    race = Field(
-        desc="An arbitrary classification of a taxonomic group that is a division of a species.",
-    )
-    ethnicity = Field(
-        desc="Whether an individual describes themselves as Hispanic or Latino or not.",
-    )
-    gender = Field(desc="Text designations that identify gender.")
-    vital_status = Field(desc="The vital status of the patient")
-    ajcc_pathologic_t = Field(desc="The AJCC pathologic T")
-    ajcc_pathologic_n = Field(desc="The AJCC pathologic N")
-    ajcc_pathologic_stage = Field(desc="The AJCC pathologic stage")
-    tumor_grade = Field(desc="The tumor grade")
-    tumor_focality = Field(desc="The tumor focality")
-    tumor_largest_dimension_diameter = Field(desc="The tumor largest dimension diameter")
-    primary_diagnosis = Field(desc="The primary diagnosis")
-    morphology = Field(desc="The morphology")
-    tissue_or_organ_of_origin = Field(desc="The tissue or organ of origin")
-    # tumor_code = Field(desc="The tumor code")
-    filename = Field(desc="The name of the file the record was extracted from")
-    study = Field(
-        desc="The last name of the author of the study, from the table name",
-    )
+TextRealEstateListingCols = RealEstateListingFilesCols + [
+    {"name": "address", "type": "string", "desc": "The address of the property"},
+    {"name": "price", "type": "number", "desc": "The listed price of the property"},
+]
 
+ImageRealEstateListingCols = RealEstateListingFilesCols + [
+    {"name": "is_modern_and_attractive", "type": "boolean", "desc": "True if the home interior design is modern and attractive and False otherwise"},
+    {"name": "has_natural_sunlight", "type": "boolean", "desc": "True if the home interior has lots of natural sunlight and False otherwise"},
+]
+
+FileCols = [
+    {"name": "filename", "type": "string", "desc": "The name of the file"},
+    {"name": "contents", "type": "bytes", "desc": "The contents of the file"}
+]
+
+TableCols = [
+    {"name": "rows", "type": "list", "desc": "The rows of the table"},
+    {"name": "header", "type": "list", "desc": "The header of the table"},
+    {"name": "name", "type": "string", "desc": "The name of the table"},
+    {"name": "filename", "type": "string", "desc": "The name of the file the table was extracted from"}
+]
+
+XLSCols = FileCols + [
+    {"name": "number_sheets", "type": "number", "desc": "The number of sheets in the Excel file"},
+    {"name": "sheet_names", "type": "list", "desc": "The names of the sheets in the Excel file"},
+    
+]
 
 class RealEstateListingFiles(Schema):
     """The source text and image data for a real estate listing."""
@@ -99,25 +128,6 @@ class RealEstateListingFiles(Schema):
         element_type=ImageFilepathField,
         desc="A list of the filepaths for each image of the listing",
     )
-
-
-class TextRealEstateListing(RealEstateListingFiles):
-    """Represents a real estate listing with specific fields extracted from its text."""
-
-    address = StringField(desc="The address of the property")
-    price = NumericField(desc="The listed price of the property")
-
-
-class ImageRealEstateListing(RealEstateListingFiles):
-    """Represents a real estate listing with specific fields extracted from its text and images."""
-
-    is_modern_and_attractive = BooleanField(
-        desc="True if the home interior design is modern and attractive and False otherwise"
-    )
-    has_natural_sunlight = BooleanField(
-        desc="True if the home interior has lots of natural sunlight and False otherwise"
-    )
-
 
 class RealEstateListingSource(UserSource):
     def __init__(self, dataset_id, listings_dir):
@@ -212,7 +222,7 @@ if __name__ == "__main__":
     # create pz plan
     if workload == "enron":
         # datasetid="enron-eval" for paper evaluation
-        plan = Dataset(datasetid, schema=Email)
+        plan = Dataset(datasetid).sem_add_columns(EmailCols)
         plan = plan.sem_filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
@@ -228,22 +238,23 @@ if __name__ == "__main__":
             src=RealEstateListingSource(user_dataset_id, data_filepath),
             dataset_id=user_dataset_id,
         )
-        plan = Dataset(user_dataset_id, schema=RealEstateListingFiles)
-        plan = plan.convert(TextRealEstateListing, depends_on="text_content")
-        plan = plan.convert(ImageRealEstateListing, depends_on="image_filepaths")
+        plan = Dataset(user_dataset_id).sem_add_columns(RealEstateListingFilesCols)
+        plan = plan.sem_add_columns(TextRealEstateListingCols)
+        plan = plan.sem_add_columns(ImageRealEstateListingCols)
         plan = plan.sem_filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
         )
+        
         plan = plan.filter(within_two_miles_of_mit, depends_on="address")
         plan = plan.filter(in_price_range, depends_on="price")
 
     elif workload == "medical-schema-matching":
         # datasetid="biofabric-medium" for paper evaluation
-        plan = Dataset(datasetid, schema=XLSFile)
-        plan = plan.convert(Table, udf=xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
+        plan = Dataset(datasetid).add_columns(file_to_xls, types=XLSCols)
+        plan = plan.add_columns(xls_to_tables, types=TableCols, cardinality=Cardinality.ONE_TO_MANY)
         plan = plan.sem_filter("The rows of the table contain the patient age")
-        plan = plan.convert(CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY)
+        plan = plan.sem_add_columns(CaseDataCols, cardinality=Cardinality.ONE_TO_MANY)
 
     config = QueryProcessorConfig(
         nocache=True,

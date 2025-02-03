@@ -7,65 +7,72 @@ from tabulate import tabulate
 
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import ImageFile, Number, PDFFile, TextFile
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 
+FileCols = [
+    {"name": "filename", "type": "string", "desc": "The name of the file"},
+    {"name": "contents", "type": "bytes", "desc": "The contents of the file"},
+]
 
-class ScientificPaper(PDFFile):
-    """Represents a scientific research paper, which in practice is usually from a PDF file"""
+TextFileCols = FileCols
 
-    title = Field(
-        desc="The title of the paper. This is a natural language title, not a number or letter.",
-    )
-    publication_year = Field(desc="The year the paper was published. This is a number.")
-    author = Field(desc="The name of the first author of the paper")
-    institution = Field(desc="The institution of the first author of the paper")
-    journal = Field(desc="The name of the journal the paper was published in")
-    funding_agency = Field(desc="The name of the funding agency that supported the research")
+PDFFileCols = FileCols + [
+    {"name": "text_contents", "type": "string", "desc": "The text-only contents of the PDF"},
+]
 
-class Email(TextFile):
-    """Represents an email, which in practice is usually from a text file"""
+ScientificPaperCols = PDFFileCols + [
+    {"name": "title", "type": "string", "desc": "The title of the paper. This is a natural language title, not a number or letter."},
+    {"name": "publication_year", "type": "number", "desc": "The year the paper was published. This is a number."},
+    {"name": "author", "type": "string", "desc": "The name of the first author of the paper"},
+    {"name": "institution", "type": "string", "desc": "The institution of the first author of the paper"},
+    {"name": "journal", "type": "string", "desc": "The name of the journal the paper was published in"},
+    {"name": "funding_agency", "type": "string", "desc": "The name of the funding agency that supported the research"},
+]
 
-    sender = Field(desc="The email address of the sender")
-    subject = Field(desc="The subject of the email")
+EmailCols = TextFileCols + [
+    {"name": "sender", "type": "string", "desc": "The email address of the sender"},
+    {"name": "subject", "type": "string", "desc": "The subject of the email"},
+]
 
-class DogImage(ImageFile):
-    breed = Field(desc="The breed of the dog")
+ImageFileCols = [
+    {"name": "filename", "type": "string", "desc": "The name of the file the image was downloaded from"},
+    {"name": "contents", "type": "bytes", "desc": "The contents of the image file"},
+]
+
+DogImageCols = ImageFileCols + [
+    {"name": "breed", "type": "string", "desc": "The breed of the dog"},
+]
 
 def build_sci_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""
-    return Dataset(dataset_id, schema=ScientificPaper)
+    return Dataset(dataset_id).sem_add_columns(ScientificPaperCols)
 
 def build_test_pdf_plan(dataset_id):
     """This tests whether we can process a PDF file"""
-    return Dataset(dataset_id, schema=PDFFile)
+    return Dataset(dataset_id).sem_add_columns(PDFFileCols)
 
 def build_mit_battery_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""
-    sci_papers = Dataset(dataset_id, schema=ScientificPaper)
+    sci_papers = Dataset(dataset_id).sem_add_columns(ScientificPaperCols)
     battery_papers = sci_papers.sem_filter("The paper is about batteries")
     mit_papers = battery_papers.sem_filter("The paper is from MIT")
     return mit_papers
 
 def build_enron_plan(dataset_id):
     """Build a plan for processing Enron email data"""
-    from palimpzest.sets import Dataset
-    emails = Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
     return emails
 
 def compute_enron_stats(dataset_id):
     """Compute statistics on Enron email data"""
-    from palimpzest.sets import Dataset
-    emails = Dataset(dataset_id, schema=Email)
-    subject_line_lengths = emails.convert(Number, desc="The number of words in the subject field")
+    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
+    subject_line_lengths = emails.sem_add_columns([{"name": "words", "type": "number", "desc": "The number of words in the subject field"}])
     return subject_line_lengths
 
 def enron_gby_plan(dataset_id):
     """Group Enron emails by sender"""
-    from palimpzest.sets import Dataset
-    emails = Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -75,8 +82,7 @@ def enron_gby_plan(dataset_id):
 
 def enron_count_plan(dataset_id):
     """Count total Enron emails"""
-    from palimpzest.sets import Dataset
-    emails = Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = []
@@ -86,8 +92,7 @@ def enron_count_plan(dataset_id):
 
 def enron_average_count_plan(dataset_id):
     """Calculate average number of emails per sender"""
-    from palimpzest.sets import Dataset
-    emails = Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -102,25 +107,22 @@ def enron_average_count_plan(dataset_id):
 
 def enron_limit_plan(dataset_id, limit=5):
     """Get limited number of Enron emails"""
-    from palimpzest.sets import Dataset
-    data = Dataset(dataset_id, schema=Email)
-    limit_data = data.limit(limit)
+    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
+    limit_data = emails.limit(limit)
     return limit_data
 
 def build_image_plan(dataset_id):
     """Build a plan for processing dog images"""
-    from palimpzest.sets import Dataset
-    images = Dataset(dataset_id, schema=ImageFile)
+    images = Dataset(dataset_id).sem_add_columns(ImageFileCols)
     filtered_images = images.sem_filter("The image contains one or more dogs")
-    dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
+    dog_images = filtered_images.sem_add_columns(DogImageCols)
     return dog_images
 
 def build_image_agg_plan(dataset_id):
     """Build a plan for aggregating dog images by breed"""
-    from palimpzest.sets import Dataset
-    images = Dataset(dataset_id, schema=ImageFile)
+    images = Dataset(dataset_id).sem_add_columns(ImageFileCols)
     filtered_images = images.sem_filter("The image contains one or more dogs")
-    dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
+    dog_images = filtered_images.sem_add_columns(DogImageCols)
     ops = ["count"]
     fields = ["breed"]
     groupbyfields = ["breed"]

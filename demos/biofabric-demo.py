@@ -10,8 +10,6 @@ import os
 import time
 
 from palimpzest.constants import Cardinality
-from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import URL, Schema, Table, WebPage, XLSFile
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost
 from palimpzest.query.processor.config import QueryProcessorConfig
@@ -24,30 +22,52 @@ if not os.environ.get("OPENAI_API_KEY"):
     load_env()
 
 
-class CaseData(Schema):
-    """An individual row extracted from a table containing medical study data."""
+CaseDataCols = [
+    {"name": "case_submitter_id", "type": "string", "desc": "The ID of the case"},
+    {"name": "age_at_diagnosis", "type": "string", "desc": "The age of the patient at the time of diagnosis"},
+    {"name": "race", "type": "string", "desc": "An arbitrary classification of a taxonomic group that is a division of a species."},
+    {"name": "ethnicity", "type": "string", "desc": "Whether an individual describes themselves as Hispanic or Latino or not."},
+    {"name": "gender", "type": "string", "desc": "Text designations that identify gender."},
+    {"name": "vital_status", "type": "string", "desc": "The vital status of the patient"},
+    {"name": "ajcc_pathologic_t", "type": "string", "desc": "The AJCC pathologic T"},
+    {"name": "ajcc_pathologic_n", "type": "string", "desc": "The AJCC pathologic N"},
+    {"name": "ajcc_pathologic_stage", "type": "string", "desc": "The AJCC pathologic stage"},
+    {"name": "tumor_grade", "type": "string", "desc": "The tumor grade"},
+    {"name": "tumor_focality", "type": "string", "desc": "The tumor focality"}, 
+    {"name": "tumor_largest_dimension_diameter", "type": "string", "desc": "The tumor largest dimension diameter"}, 
+    {"name": "primary_diagnosis", "type": "string", "desc": "The primary diagnosis"},
+    {"name": "morphology", "type": "string", "desc": "The morphology"},
+    {"name": "tissue_or_organ_of_origin", "type": "string", "desc": "The tissue or organ of origin"},
+    {"name": "tumor_code", "type": "string", "desc": "The tumor code"},
+    {"name": "study", "type": "string", "desc": "The study"},
+]
 
-    case_submitter_id = Field(desc="The ID of the case")
-    age_at_diagnosis = Field(desc="The age of the patient at the time of diagnosis")
-    race = Field(
-        desc="An arbitrary classification of a taxonomic group that is a division of a species."
-    )
-    ethnicity = Field(
-        desc="Whether an individual describes themselves as Hispanic or Latino or not."
-    )
-    gender = Field(desc="Text designations that identify gender.")
-    vital_status = Field(desc="The vital status of the patient")
-    ajcc_pathologic_t = Field(desc="The AJCC pathologic T")
-    ajcc_pathologic_n = Field(desc="The AJCC pathologic N")
-    ajcc_pathologic_stage = Field(desc="The AJCC pathologic stage")
-    tumor_grade = Field(desc="The tumor grade")
-    tumor_focality = Field(desc="The tumor focality")
-    tumor_largest_dimension_diameter = Field(desc="The tumor largest dimension diameter")
-    primary_diagnosis = Field(desc="The primary diagnosis")
-    morphology = Field(desc="The morphology")
-    tissue_or_organ_of_origin = Field(desc="The tissue or organ of origin")
-    # tumor_code = Field(desc="The tumor code")
-    study = Field(desc="The last name of the author of the study, from the table name")
+WebPageCols = [
+    {"name": "text", "type": "string", "desc": "The text contents of the web page"},
+    {"name": "html", "type": "string", "desc": "The html contents of the web page"},
+    {"name": "timestamp", "type": "string", "desc": "The timestamp of the download"},
+]
+
+URLCols = [
+    {"name": "url", "type": "string", "desc": "The URL of the web page"},
+]
+
+FileCols = [
+    {"name": "filename", "type": "string", "desc": "The name of the file"},
+    {"name": "contents", "type": "bytes", "desc": "The contents of the file"}
+]
+
+XLSCols = FileCols + [
+    {"name": "number_sheets", "type": "number", "desc": "The number of sheets in the Excel file"},
+    {"name": "sheet_names", "type": "list", "desc": "The names of the sheets in the Excel file"},
+] 
+
+TableCols = [
+    {"name": "rows", "type": "list", "desc": "The rows of the table"},
+    {"name": "header", "type": "list", "desc": "The header of the table"},
+    {"name": "name", "type": "string", "desc": "The name of the table"},
+    {"name": "filename", "type": "string", "desc": "The name of the file the table was extracted from"}
+]
 
 
 def print_table(output):
@@ -89,11 +109,10 @@ if __name__ == "__main__":
         policy = MaxQuality()
 
     if experiment == "collection":
-        papers_html = Dataset("biofabric-html", schema=WebPage)
-        table_urls = papers_html.convert(
-            URL, desc="The URLs of the XLS tables from the page", cardinality=Cardinality.ONE_TO_MANY
-        )
+        papers_html = Dataset("biofabric-html")
+        table_urls = papers_html.sem_add_columns(URLCols, cardinality=Cardinality.ONE_TO_MANY)
         output = table_urls
+
         # urlFile = Dataset("biofabric-urls", schema=TextFile)
         # table_urls = table_urls.convert(URL, desc="The URLs of the tables")
         # tables = table_urls.convert(File, udf=udfs.url_to_file)
@@ -102,8 +121,9 @@ if __name__ == "__main__":
         # output = patient_tables
 
     elif experiment == "filtering":
-        xls = Dataset("biofabric-tiny", schema=XLSFile)
-        patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
+        xls = Dataset("biofabric-tiny")
+        xls = xls.add_columns(udf=udfs.file_to_xls, types=XLSCols)
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, types=TableCols, cardinality=Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
         # patient_tables = patient_tables.sem_filter("The table explains the meaning of attributes")
         # patient_tables = patient_tables.sem_filter("The table contains patient biometric data")
@@ -112,20 +132,18 @@ if __name__ == "__main__":
         output = patient_tables
 
     elif experiment == "matching":
-        xls = Dataset("biofabric-matching", schema=XLSFile)
-        patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
-        case_data = patient_tables.convert(
-            CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
-        )
+        xls = Dataset("biofabric-matching")
+        xls = xls.add_columns(udf=udfs.file_to_xls, types=XLSCols)
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, types=TableCols, cardinality=Cardinality.ONE_TO_MANY)
+        case_data = patient_tables.sem_add_columns(CaseDataCols, cardinality=Cardinality.ONE_TO_MANY)
         output = case_data
 
     elif experiment == "endtoend":
-        xls = Dataset("biofabric-tiny", schema=XLSFile)
-        patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
+        xls = Dataset("biofabric-tiny")
+        xls = xls.add_columns(udf=udfs.file_to_xls, types=XLSCols)
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, types=TableCols, cardinality=Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
-        case_data = patient_tables.convert(
-            CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
-        )
+        case_data = patient_tables.sem_add_columns(CaseDataCols, cardinality=Cardinality.ONE_TO_MANY)
         output = case_data
 
     config = QueryProcessorConfig(
@@ -138,7 +156,7 @@ if __name__ == "__main__":
     )
     data_record_collection = output.run(config)
 
-    print_table(data_record_collection.data_records)
+    print(data_record_collection.to_df())
     print(data_record_collection.executed_plans)
     # print(data_record_collection.execution_stats)
 

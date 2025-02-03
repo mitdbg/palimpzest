@@ -10,7 +10,7 @@ from palimpzest.core.lib.fields import (
 )
 
 
-def str_to_field_type(type_str: str) -> type[Field]:
+def str_to_field_type(type_str: str, desc: str) -> type[Field]:
     """Convert string type name to corresponding Schema field type.
     
     Args:
@@ -31,13 +31,20 @@ def str_to_field_type(type_str: str) -> type[Field]:
         'float': FloatField,
         'integer': IntField,
         'int': IntField,
-        'list': ListField,
         'numeric': NumericField,
         'number': NumericField
     }
     
     type_str = type_str.lower()
+
+    if 'list' in type_str:
+        if "[" not in type_str:
+            element_type = StringField(desc=desc)
+        else:
+            element_type = str_to_field_type(type_str.split('[')[1].split(']')[0], desc)
+        return ListField(element_type=element_type, desc=desc)
+    
     if type_str not in type_map:
         raise ValueError(f"Unrecognized type: {type_str}. Valid types are: {', '.join(type_map.keys())}")
-    
-    return type_map[type_str]
+
+    return type_map[type_str](desc=desc)

@@ -311,8 +311,12 @@ class Schema(metaclass=SchemaMetaclass):
             if field_name in new_field_names:
                 continue
             new_field_names.append(field_name)
-            new_field_types.append(str_to_field_type(field["type"])(desc=field_desc))
+            new_field_types.append(str_to_field_type(field["type"], field_desc))
             new_field_descs.append(field_desc)
+
+        # If the number of fields is the same, this means we are not adding any new fields
+        if len(new_field_names) == len(list(cls.field_names())):
+            return cls
 
         # Generate the schema class dynamically
         attributes = {"_desc": new_desc, "__doc__": new_desc}
@@ -340,7 +344,7 @@ class Schema(metaclass=SchemaMetaclass):
 class DefaultSchema(Schema):
     """Store context data."""
 
-    value = Field(desc="The context data.")
+    default_schema_value = Field(desc="The context data in DefaultSchema.")
 
 
 class Download(Schema):
@@ -422,6 +426,7 @@ class WebPage(Schema):
     text = StringField(desc="The text contents of the web page")
     html = StringField(desc="The html contents of the web page")
     timestamp = StringField(desc="The timestamp of the download")
+    filename = StringField(desc="The name of the file the web page was downloaded from")
 
 
 # Second-level Schemas
