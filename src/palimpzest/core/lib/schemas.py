@@ -18,6 +18,7 @@ from palimpzest.core.lib.fields import (
     NumericField,
     StringField,
 )
+from palimpzest.utils.field_helpers import construct_field_from_python_type
 from palimpzest.utils.hash_helpers import hash_for_temp_schema
 
 
@@ -276,15 +277,21 @@ class Schema(metaclass=SchemaMetaclass):
         return new_schema
     
     @classmethod
-    def add_fields(cls, fields: dict[str, str]) -> Schema:
+    def add_fields(cls, fields: list[dict]) -> Schema:
         """Add fields to the schema
         
         Args:
-            fields: Dictionary mapping field names to their descriptions
+            fields: List of dictionaries, each containing 'name', 'desc', and 'type' keys
             
         Returns:
             A new Schema with the additional fields
         """
+        assert isinstance(fields, list), "fields must be a list of dictionaries"
+        for field in fields:
+            assert "name" in field, "fields must contain a 'name' key"
+            assert "desc" in field, "fields must contain a 'desc' key"
+            assert "type" in field, "fields must contain a 'type' key"
+
         # Construct the new schema name
         schema_name = cls.class_name()
         new_schema_name = f"{schema_name}Extended"
@@ -297,13 +304,14 @@ class Schema(metaclass=SchemaMetaclass):
         new_field_types = list(cls.field_map().values())
         new_field_descs = [field._desc for field in new_field_types]
 
-        # TODO: Users will provide explicit descriptions for the fields, 
-        # details in https://github.com/mitdbg/palimpzest/issues/84
-        for field_name, field_desc in fields.items():
+        # Process new fields from the list of dictionaries
+        for field in fields:
+            field_name = field["name"]
+            field_desc = field["desc"]
             if field_name in new_field_names:
                 continue
             new_field_names.append(field_name)
-            new_field_types.append(StringField(desc=field_desc))  # Assuming StringField for new fields
+            new_field_types.append(construct_field_from_python_type(field["type"], desc=field_desc))
             new_field_descs.append(field_desc)
 
         # Generate the schema class dynamically

@@ -172,17 +172,18 @@ class Dataset(Set):
 
     def filter(
         self,
-        _filter: str | Callable,
+        _filter: Callable,
         depends_on: str | list[str] | None = None,
     ) -> Dataset:
-        """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
+        """Add a user defined function as a filter to the Set. This filter will possibly restrict the items that are returned later."""
         f = None
-        if isinstance(_filter, str):
-            f = Filter(_filter)
-        elif callable(_filter):
+        if callable(_filter):
             f = Filter(filter_fn=_filter)
         else:
-            raise Exception("Filter type not supported.", type(_filter))
+            error_str = f"Only support callable for filter, currently got {type(_filter)}"
+            if isinstance(_filter, str):
+                error_str += ". Consider using sem_filter() for semantic filters."
+            raise Exception(error_str)
 
         if isinstance(depends_on, str):
             depends_on = [depends_on]
@@ -194,7 +195,31 @@ class Dataset(Set):
             depends_on=depends_on,
             nocache=self._nocache,
         )
+    
+    def sem_filter(
+        self,
+        _filter: str,
+        depends_on: str | list[str] | None = None,
+    ) -> Dataset:
+        """Add a natural language description of a filter to the Set. This filter will possibly restrict the items that are returned later."""
+        f = None
+        if isinstance(_filter, str):
+            f = Filter(_filter)
+        else:
+            raise Exception("sem_filter() only supports `str` input for _filter.", type(_filter))
+        
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
 
+        return Dataset(
+            source=self,
+            schema=self.schema,
+            filter=f,
+            depends_on=depends_on,
+            nocache=self._nocache,
+        )        
+
+    # TODO(Jun): Remove in https://github.com/mitdbg/palimpzest/issues/94
     def convert(
         self,
         output_schema: Schema,
@@ -203,7 +228,10 @@ class Dataset(Set):
         depends_on: str | list[str] | None = None,
         desc: str = "Convert to new schema",
     ) -> Dataset:
-        """Convert the Set to a new schema."""
+        """Convert the Set to a new schema.
+
+        Deprecated: This method will be removed in a future version. Please use add_columns() or sem_add_columns() instead.
+        """
         if isinstance(depends_on, str):
             depends_on = [depends_on]
 
@@ -217,10 +245,67 @@ class Dataset(Set):
             nocache=self._nocache,
         )
     
-    # This is a convenience for users who like DataFrames-like syntax.   
-    def add_columns(self, columns:dict[str, str], cardinality: Cardinality = Cardinality.ONE_TO_ONE) -> Dataset:
-        new_output_schema = self.schema.add_fields(columns)
-        return self.convert(new_output_schema, udf=None, cardinality=cardinality, depends_on=None, desc="Add columns " + str(columns))
+    def sem_add_columns(self, cols: list[dict], 
+                        cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
+                        depends_on: str | list[str] | None = None) -> Dataset:
+        """
+        Add new columns by specifying the column names, descriptions, and types.
+        The column will be computed during the execution of the Dataset.
+        Example:
+            sem_add_columns(cols=[{'name': 'greeting', 'desc': 'The greeting message', 'type': str}])
+        """
+        new_output_schema = self.schema.add_fields(cols)
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+        
+        return Dataset(
+            source=self,
+            schema=new_output_schema,
+            udf=None,
+            cardinality=cardinality,
+            depends_on=depends_on,
+            desc="Add new columns " + str(cols),
+            nocache=self._nocache,
+        )
+
+    def add_columns(self, udf: Callable, 
+                    types: list[dict], 
+                    cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
+                    depends_on: str | list[str] | None = None) -> Dataset:
+        """
+        Add new columns by specifying UDFs.
+
+        Specify UDF for computing new columns. If you need to specify different UDFs for different columns,
+        please make multiple calls to add_columns().
+
+        Examples:
+            add_columns(udf=add_name_and_age, types={'name': str, 'age': int})
+            add_columns(udf=add_birthday, types={'birthday': str})
+        """
+        if udf is None or types is None:
+            raise ValueError("udf and types must be provided for add_columns.")
+        
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+
+        updated_cols =[]
+        for col_name, col_type in types.items():
+            new_col = {}
+            new_col["type"] = col_type
+            new_col["desc"] = "New column: " + col_name
+            new_col["name"] = col_name
+            updated_cols.append(new_col)
+
+        new_output_schema = self.schema.add_fields(updated_cols)
+        return Dataset(
+            source=self,
+            schema=new_output_schema,
+            udf=udf,
+            cardinality=cardinality,
+            desc="Add new columns via UDF",
+            depends_on=depends_on,
+            nocache=self._nocache,
+        )
 
     def count(self) -> Dataset:
         """Apply a count aggregation to this set"""

@@ -133,7 +133,7 @@ def extract_supplemental(processing_strategy, execution_strategy, optimizer_stra
 def integrate_tables(processing_strategy, execution_strategy, optimizer_strategy, policy):
     xls = Dataset("biofabric-tiny", schema=XLSFile)
     patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
-    patient_tables = patient_tables.filter("The table contains biometric information about the patient")
+    patient_tables = patient_tables.sem_filter("The table contains biometric information about the patient")
     case_data = patient_tables.convert(
         CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
     )
@@ -162,7 +162,7 @@ def integrate_tables(processing_strategy, execution_strategy, optimizer_strategy
 @st.cache_resource()
 def extract_references(processing_strategy, execution_strategy, optimizer_strategy, policy):
     papers = Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
-    papers = papers.filter("The paper mentions phosphorylation of Exo1")
+    papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
     references = papers.convert(
         Reference, desc="A paper cited in the reference section", cardinality=Cardinality.ONE_TO_MANY
     )
@@ -204,7 +204,7 @@ dataset = "bdf-usecase3-tiny"
 if run_pz:
     # reference, plan, stats = run_workload()
     papers = Dataset(dataset, schema=ScientificPaper)
-    papers = papers.filter("The paper mentions phosphorylation of Exo1")
+    papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
     output = papers.convert(Reference, desc="The references cited in the paper", cardinality=Cardinality.ONE_TO_MANY)
 
     # output = references

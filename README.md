@@ -57,8 +57,8 @@ class Email(Schema):
 
 # Lazy construction of computation to filter for emails about holidays sent in July
 dataset = dataset.convert(Email, desc="An email from the Enron dataset")
-dataset = dataset.filter("The email was sent in July")
-dataset = dataset.filter("The email is about holidays")
+dataset = dataset.sem_filter("The email was sent in July")
+dataset = dataset.sem_filter("The email is about holidays")
 
 # Executing the compuation
 policy = MinCost()

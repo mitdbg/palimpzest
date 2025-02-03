@@ -873,10 +873,10 @@ if __name__ == "__main__":
         DataDirectory().register_user_source(src=datasource, dataset_id=user_dataset_id)
 
         plan = Dataset(user_dataset_id, schema=Email)
-        plan = plan.filter(
+        plan = plan.sem_filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
-        plan = plan.filter(
+        plan = plan.sem_filter(
             'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
         )
 
@@ -901,7 +901,7 @@ if __name__ == "__main__":
         plan = Dataset(user_dataset_id, schema=RealEstateListingFiles)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
         plan = plan.convert(ImageRealEstateListing, depends_on="image_filepaths")
-        plan = plan.filter(
+        plan = plan.sem_filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
         )

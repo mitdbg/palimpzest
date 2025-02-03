@@ -45,8 +45,8 @@ def build_test_pdf_plan(dataset_id):
 def build_mit_battery_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""
     sci_papers = Dataset(dataset_id, schema=ScientificPaper)
-    battery_papers = sci_papers.filter("The paper is about batteries")
-    mit_papers = battery_papers.filter("The paper is from MIT")
+    battery_papers = sci_papers.sem_filter("The paper is about batteries")
+    mit_papers = battery_papers.sem_filter("The paper is from MIT")
     return mit_papers
 
 def build_enron_plan(dataset_id):
@@ -111,7 +111,7 @@ def build_image_plan(dataset_id):
     """Build a plan for processing dog images"""
     from palimpzest.sets import Dataset
     images = Dataset(dataset_id, schema=ImageFile)
-    filtered_images = images.filter("The image contains one or more dogs")
+    filtered_images = images.sem_filter("The image contains one or more dogs")
     dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
     return dog_images
 
@@ -119,7 +119,7 @@ def build_image_agg_plan(dataset_id):
     """Build a plan for aggregating dog images by breed"""
     from palimpzest.sets import Dataset
     images = Dataset(dataset_id, schema=ImageFile)
-    filtered_images = images.filter("The image contains one or more dogs")
+    filtered_images = images.sem_filter("The image contains one or more dogs")
     dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
     ops = ["count"]
     fields = ["breed"]

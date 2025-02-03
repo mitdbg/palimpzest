@@ -213,10 +213,10 @@ if __name__ == "__main__":
     if workload == "enron":
         # datasetid="enron-eval" for paper evaluation
         plan = Dataset(datasetid, schema=Email)
-        plan = plan.filter(
+        plan = plan.sem_filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
-        plan = plan.filter(
+        plan = plan.sem_filter(
             'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
         )
 
@@ -231,7 +231,7 @@ if __name__ == "__main__":
         plan = Dataset(user_dataset_id, schema=RealEstateListingFiles)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
         plan = plan.convert(ImageRealEstateListing, depends_on="image_filepaths")
-        plan = plan.filter(
+        plan = plan.sem_filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
         )
@@ -242,7 +242,7 @@ if __name__ == "__main__":
         # datasetid="biofabric-medium" for paper evaluation
         plan = Dataset(datasetid, schema=XLSFile)
         plan = plan.convert(Table, udf=xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
-        plan = plan.filter("The rows of the table contain the patient age")
+        plan = plan.sem_filter("The rows of the table contain the patient age")
         plan = plan.convert(CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY)
 
     config = QueryProcessorConfig(
