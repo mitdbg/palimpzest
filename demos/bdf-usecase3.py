@@ -55,7 +55,7 @@ class Reference(Schema):
 @st.cache_resource()
 def run_workload():
     papers = Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
-    # papers = papers.filter("The paper mentions phosphorylation of Exo1")
+    # papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
     references = papers.convert(
         Reference, desc="A paper cited in the reference section", cardinality=Cardinality.ONE_TO_MANY
     )

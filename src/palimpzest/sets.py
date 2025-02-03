@@ -176,7 +176,10 @@ class Dataset(Set):
         if callable(_filter):
             f = Filter(filter_fn=_filter)
         else:
-            raise Exception("Only support callable for filter, currently got ", type(_filter), ". Consider to use sem_filter().")
+            error_str = f"Only support callable for filter, currently got {type(_filter)}"
+            if isinstance(_filter, str):
+                error_str += ". Consider using sem_filter() for semantic filters."
+            raise Exception(error_str)
 
         if isinstance(depends_on, str):
             depends_on = [depends_on]
@@ -199,7 +202,7 @@ class Dataset(Set):
         if isinstance(_filter, str):
             f = Filter(_filter)
         else:
-            raise Exception("Only support string for sem_filter.", type(_filter))
+            raise Exception("sem_filter() only supports `str` input for _filter.", type(_filter))
         
         if isinstance(depends_on, str):
             depends_on = [depends_on]
@@ -245,7 +248,7 @@ class Dataset(Set):
         Add new columns by specifying the column names, descriptions, and types.
         The column will be computed during the execution of the Dataset.
         Example:
-            sem_add_columns(cols=[{'name': 'greeting', 'desc': 'The greeting message', 'type': 'string'}])
+            sem_add_columns(cols=[{'name': 'greeting', 'desc': 'The greeting message', 'type': str}])
         """
         new_output_schema = self.schema.add_fields(cols)
         if isinstance(depends_on, str):
@@ -261,18 +264,19 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def add_columns(self, udf: Callable | None = None, 
-                    types: list[dict] | None = None, 
+    def add_columns(self, udf: Callable, 
+                    types: list[dict], 
                     cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
                     depends_on: str | list[str] | None = None) -> Dataset:
         """
         Add new columns by specifying UDFs.
 
-        Specify UDF for computing new columns. If you need to specify different UDFs for different columns, please make multiple calls to add_columns().
+        Specify UDF for computing new columns. If you need to specify different UDFs for different columns,
+        please make multiple calls to add_columns().
 
         Examples:
-            add_columns(udf=add_greeting_and_age, types={'greeting': 'string', 'age': 'int'})
-            add_columns(udf=add_greeting, types={'greeting': 'string'})
+            add_columns(udf=add_name_and_age, types={'name': str, 'age': int})
+            add_columns(udf=add_birthday, types={'birthday': str})
         """
         if udf is None or types is None:
             raise ValueError("udf and types must be provided for add_columns.")

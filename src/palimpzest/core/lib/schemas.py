@@ -18,7 +18,7 @@ from palimpzest.core.lib.fields import (
     NumericField,
     StringField,
 )
-from palimpzest.utils.field_helpers import str_to_field_type
+from palimpzest.utils.field_helpers import construct_field_from_python_type
 from palimpzest.utils.hash_helpers import hash_for_temp_schema
 
 
@@ -311,7 +311,7 @@ class Schema(metaclass=SchemaMetaclass):
             if field_name in new_field_names:
                 continue
             new_field_names.append(field_name)
-            new_field_types.append(str_to_field_type(field["type"])(desc=field_desc))
+            new_field_types.append(construct_field_from_python_type(field["type"], desc=field_desc))
             new_field_descs.append(field_desc)
 
         # Generate the schema class dynamically

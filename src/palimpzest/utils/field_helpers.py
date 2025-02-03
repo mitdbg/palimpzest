@@ -10,34 +10,42 @@ from palimpzest.core.lib.fields import (
 )
 
 
-def str_to_field_type(type_str: str) -> type[Field]:
-    """Convert string type name to corresponding Schema field type.
-    
+def construct_field_from_python_type(type: type, desc: str) -> type[Field]:
+    """Convert Python type and description to corresponding Schema field type.
+
     Args:
-        type_str: String representation of the type (e.g. 'string', 'bool', 'int')
-        
+        type: Python type for the field (e.g. str, bool, list[int], etc.)
+        desc: description used in the field constructor
+
     Returns:
         Corresponding Field class
-        
+
     Raises:
-        ValueError: If the type string is not recognized
+        ValueError: If the type is not recognized
     """
-    type_map = {
-        'string': StringField,
-        'str': StringField,
-        'boolean': BooleanField,
-        'bool': BooleanField,
-        'bytes': BytesField,
-        'float': FloatField,
-        'integer': IntField,
-        'int': IntField,
-        'list': ListField,
-        'numeric': NumericField,
-        'number': NumericField
+    supported_types_map = {
+        str: (StringField, None),
+        bool: (BooleanField, None),
+        int: (IntField, None),
+        float: (FloatField, None),
+        int | float: (NumericField, None),
+        bytes: (BytesField, None),
+        list[str]: (ListField, StringField),
+        list[bool]: (ListField, BooleanField),
+        list[int]: (ListField, IntField),
+        list[float]: (ListField, FloatField),
+        list[int | float]: (ListField, NumericField),
+        list[bytes]: (ListField, BytesField),
     }
-    
-    type_str = type_str.lower()
-    if type_str not in type_map:
-        raise ValueError(f"Unrecognized type: {type_str}. Valid types are: {', '.join(type_map.keys())}")
-    
-    return type_map[type_str]
+
+    if type not in supported_types_map:
+        raise ValueError(f"Unsupported type: {type}. Supported types are: {list(supported_types_map.keys())}")
+
+    # get the field class and (if applicable) element field class
+    field_cls, element_field_cls = supported_types_map[type]
+
+    # construct and return the field
+    if field_cls == ListField:
+        return field_cls(element_type=element_field_cls, desc=desc)
+
+    return field_cls(desc=desc)
