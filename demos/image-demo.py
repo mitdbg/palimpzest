@@ -28,7 +28,7 @@ class DogImage(ImageFile):
 
 def build_image_plan(dataset_id):
     images = Dataset(dataset_id, schema=ImageFile)
-    filtered_images = images.filter("The image contains one or more dogs")
+    filtered_images = images.sem_filter("The image contains one or more dogs")
     dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
     return dog_images
 

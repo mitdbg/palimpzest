@@ -53,7 +53,7 @@ if __name__ == "__main__":
         excerpts = Dataset(df_input, schema=Papersnippet)
         output = excerpts.convert(
             Variable, desc="A variable used or introduced in the context", cardinality=Cardinality.ONE_TO_MANY
-        ).filter("The value name is 'a'", depends_on="name")
+        ).sem_filter("The value name is 'a'", depends_on="name")
         policy = MaxQuality()
         config = QueryProcessorConfig(
             policy=policy,
