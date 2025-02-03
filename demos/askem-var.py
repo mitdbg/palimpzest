@@ -50,7 +50,8 @@ if __name__ == "__main__":
 
     if run_pz:
         df_input = pd.DataFrame(list_of_strings)
-        excerpts = Dataset(df_input, schema=Papersnippet)
+        excerpts = Dataset(df_input)
+        excerpts = excerpts.convert(Papersnippet, desc="An excerpt from a scientific research paper")
         output = excerpts.convert(
             Variable, desc="A variable used or introduced in the context", cardinality=Cardinality.ONE_TO_MANY
         ).sem_filter("The value name is 'a'", depends_on="name")

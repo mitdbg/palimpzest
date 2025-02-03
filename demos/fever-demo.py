@@ -72,7 +72,8 @@ def parse_arguments():
 
 
 def build_fever_query(index, dataset_id, k):
-    claims = Dataset(dataset_id, schema=FeverClaimsSchema)
+    claims = Dataset(dataset_id)
+    claims = claims.convert(FeverClaimsSchema, desc="Extract the claim")
 
     def search_func(index, query, k):
         results = index.search(query, k=k)

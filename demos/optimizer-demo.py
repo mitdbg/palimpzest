@@ -872,7 +872,8 @@ if __name__ == "__main__":
         datasource = EnronValidationSource(file_dir=data_filepath, dataset_id=user_dataset_id)
         DataDirectory().register_user_source(src=datasource, dataset_id=user_dataset_id)
 
-        plan = Dataset(user_dataset_id, schema=Email)
+        plan = Dataset(user_dataset_id)
+        plan = plan.convert(Email)
         plan = plan.sem_filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
@@ -898,7 +899,7 @@ if __name__ == "__main__":
             dataset_id=f"{user_dataset_id}",
         )
 
-        plan = Dataset(user_dataset_id, schema=RealEstateListingFiles)
+        plan = Dataset(user_dataset_id)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
         plan = plan.convert(ImageRealEstateListing, depends_on="image_filepaths")
         plan = plan.sem_filter(
@@ -926,7 +927,7 @@ if __name__ == "__main__":
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
-        plan = Dataset(user_dataset_id, schema=BiodexEntry)
+        plan = Dataset(user_dataset_id)
         plan = plan.convert(BiodexReactions)  # infer
 
         def search_func(index, query, k):
@@ -967,7 +968,7 @@ if __name__ == "__main__":
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
-        plan = Dataset(user_dataset_id, schema=BiodexEntry)
+        plan = Dataset(user_dataset_id)
         plan = plan.convert(BiodexSerious, depends_on=["title", "abstract", "fulltext"])
         plan = plan.convert(BiodexPatientSex, depends_on=["title", "abstract", "fulltext"])
         plan = plan.convert(BiodexDrugs, depends_on=["title", "abstract", "fulltext"])

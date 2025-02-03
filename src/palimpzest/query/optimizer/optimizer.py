@@ -371,13 +371,6 @@ class Optimizer:
         dataset_nodes.append(node)
         dataset_nodes = list(reversed(dataset_nodes))
 
-        # remove unnecessary convert if output schema from data source scan matches
-        # input schema for the next operator
-        if len(dataset_nodes) > 1 and dataset_nodes[0].schema.get_desc() == dataset_nodes[1].schema.get_desc():
-            dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
-            if len(dataset_nodes) > 1:
-                dataset_nodes[1]._source = dataset_nodes[0]
-
         # compute depends_on field for every node
         short_to_full_field_name = {}
         for node_idx, node in enumerate(dataset_nodes):

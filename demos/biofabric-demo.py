@@ -11,7 +11,7 @@ import time
 
 from palimpzest.constants import Cardinality
 from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import URL, Schema, Table, WebPage, XLSFile
+from palimpzest.core.lib.schemas import URL, Schema, Table, WebPage
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost
 from palimpzest.query.processor.config import QueryProcessorConfig
@@ -89,12 +89,13 @@ if __name__ == "__main__":
         policy = MaxQuality()
 
     if experiment == "collection":
-        papers_html = Dataset("biofabric-html", schema=WebPage)
+        papers_html = Dataset("biofabric-html")
+        papers_html = papers_html.convert(WebPage, desc="Extract HTML content to WebPage")
         table_urls = papers_html.convert(
             URL, desc="The URLs of the XLS tables from the page", cardinality=Cardinality.ONE_TO_MANY
         )
         output = table_urls
-        # urlFile = Dataset("biofabric-urls", schema=TextFile)
+        # urlFile = Dataset("biofabric-urls")
         # table_urls = table_urls.convert(URL, desc="The URLs of the tables")
         # tables = table_urls.convert(File, udf=udfs.url_to_file)
         # xls = tables.convert(XLSFile, udf = udfs.file_to_xls)
@@ -102,7 +103,7 @@ if __name__ == "__main__":
         # output = patient_tables
 
     elif experiment == "filtering":
-        xls = Dataset("biofabric-tiny", schema=XLSFile)
+        xls = Dataset("biofabric-tiny")
         patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
         # patient_tables = patient_tables.sem_filter("The table explains the meaning of attributes")
@@ -112,7 +113,7 @@ if __name__ == "__main__":
         output = patient_tables
 
     elif experiment == "matching":
-        xls = Dataset("biofabric-matching", schema=XLSFile)
+        xls = Dataset("biofabric-matching")
         patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
         case_data = patient_tables.convert(
             CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
@@ -120,7 +121,7 @@ if __name__ == "__main__":
         output = case_data
 
     elif experiment == "endtoend":
-        xls = Dataset("biofabric-tiny", schema=XLSFile)
+        xls = Dataset("biofabric-tiny")
         patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
         case_data = patient_tables.convert(
