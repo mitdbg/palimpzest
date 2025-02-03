@@ -24,7 +24,7 @@ def test_dataset_initialization(sample_df):
     ds = Dataset(sample_df, schema=DefaultSchema)
     assert ds.schema == DefaultSchema
 
-def test_dataset_filter():
+def test_dataset_filter(sample_df):
     ds = Dataset(sample_df)
     
     # Test callable filter
