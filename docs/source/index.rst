@@ -52,7 +52,7 @@ For eager readers, the code in the notebook can be found in the following conden
    import palimpzest.datamanager.datamanager as pzdm
    from palimpzest.sets import Dataset
    from palimpzest.core.lib.fields import Field
-   from palimpzest.core.lib.schemas import Schema, TextFile
+   from palimpzest.core.lib.schemas import Schema
    from palimpzest.policy import MinCost, MaxQuality
    from palimpzest.query import Execute
 
@@ -62,7 +62,7 @@ For eager readers, the code in the notebook can be found in the following conden
    pzdm.DataDirectory().register_local_directory(dataset_path, dataset_name)
 
    # Dataset loading
-   dataset = Dataset(dataset_name, schema=TextFile)
+   dataset = Dataset(dataset_name)
 
    # Schema definition for the fields we wish to compute
    class Email(Schema):
@@ -73,8 +73,8 @@ For eager readers, the code in the notebook can be found in the following conden
 
    # Lazy construction of computation to filter for emails about holidays sent in July
    dataset = dataset.convert(Email, desc="An email from the Enron dataset")
-   dataset = dataset.filter("The email was sent in July")
-   dataset = dataset.filter("The email is about holidays")
+   dataset = dataset.sem_filter("The email was sent in July")
+   dataset = dataset.sem_filter("The email is about holidays")
 
    # Executing the compuation
    policy = MinCost()

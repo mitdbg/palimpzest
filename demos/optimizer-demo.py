@@ -131,7 +131,9 @@ class EnronValidationSource(ValidationDataSource):
             random.Random(seed).shuffle(self.val_filepaths)
 
         # num samples cannot exceed the number of records
-        assert self.num_samples <= len(self.label_fields_to_values), "cannot have more samples than labelled data records"
+        assert self.num_samples <= len(self.label_fields_to_values), (
+            "cannot have more samples than labelled data records"
+        )
 
         # trim to number of samples
         self.val_filepaths = self.val_filepaths[:num_samples]
@@ -540,6 +542,22 @@ class BiodexReactionLabels(BiodexReactions):
 BiodexRankedReactionsCols = BiodexReactionLabelsCols + [
     {"name": "ranked_reaction_labels", "type": "list[str]", "desc": "The ranked list of labels for adverse reactions experienced by the patient. The most likely label occurs first in the list."},
 ]
+class BiodexRankedReactions(BiodexReactions):
+    """
+    You will be presented with the text of a medical article which is partially or entirely about
+    an adverse event experienced by a patient in response to taking one or more drugs. You will also
+    be presented with a list of inferred reactions, and a set of retrieved labels which were matched
+    to these inferred reactions. In this task, you are asked to output a ranked list of the labels
+    which are most applicable based on the context of the article. Your output list must:
+    - contain only elements from `reaction_labels`
+    - place the most likely label first and the least likely label last
+    - you may omit labels if you think they do not describe a reaction experienced by the patient
+    """
+
+    ranked_reaction_labels = ListField(
+        desc="The ranked list of labels for adverse reactions experienced by the patient. The most likely label occurs first in the list.",
+        element_type=StringField,
+    )
 
 
 BiodexOutputCols = BiodexEntryCols + [
@@ -878,9 +896,9 @@ if __name__ == "__main__":
             dataset_id=f"{user_dataset_id}",
         )
 
-        plan = Dataset(user_dataset_id).sem_add_columns(RealEstateListingFilesCols)
-        plan = plan.sem_add_columns(TextRealEstateListingCols)
-        plan = plan.sem_add_columns(ImageRealEstateListingCols)
+        plan = Dataset(user_dataset_id)
+        plan = plan.sem_add_columns(TextRealEstateListingCols, depends_on="text_content")
+        plan = plan.sem_add_columns(ImageRealEstateListingCols, depends_on="image_filepaths")
         plan = plan.sem_filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
@@ -906,13 +924,21 @@ if __name__ == "__main__":
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
-        plan = Dataset(user_dataset_id).sem_add_columns(BiodexEntryCols)
+        plan = Dataset(user_dataset_id)
         plan = plan.sem_add_columns(BiodexReactionsCols)  # infer
+
+        def search_func(index, query, k):
+            results = index.search(query, k=1)
+            results = [result[0] if isinstance(result, list) else result for result in results]
+            sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
+            return [result["content"] for result in sorted_results[:k]]
+
         plan = plan.retrieve(
-            output_schema=BiodexReactionLabels,
             index=index,
+            search_func=search_func,
             search_attr="reactions",
             output_attr="reaction_labels",
+            output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
             # k=10, # if we set k, then it will be fixed; if we leave it unspecified then the optimizer will choose
         )  # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
         plan = plan.sem_add_columns(BiodexRankedReactionsCols)
@@ -939,16 +965,24 @@ if __name__ == "__main__":
             src=datasource,
             dataset_id=f"{user_dataset_id}",
         )
-        plan = Dataset(user_dataset_id).sem_add_columns(BiodexEntryCols)
+        plan = Dataset(user_dataset_id)
         plan = plan.sem_add_columns(BiodexSeriousCols, depends_on=["title", "abstract", "fulltext"])
         plan = plan.sem_add_columns(BiodexPatientSexCols, depends_on=["title", "abstract", "fulltext"])
         plan = plan.sem_add_columns(BiodexDrugsCols, depends_on=["title", "abstract", "fulltext"])
         plan = plan.sem_add_columns(BiodexReactionsCols, depends_on=["title", "abstract", "fulltext"])
+
+        def search_func(index, query, k):
+            results = index.search(query, k=1)
+            results = [result[0] if isinstance(result, list) else result for result in results]
+            sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
+            return [result["content"] for result in sorted_results[:k]]
+
         plan = plan.retrieve(
-            output_schema=BiodexReactionLabels,
             index=index,
+            search_func=search_func,
             search_attr="reactions",
             output_attr="reaction_labels",
+            output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
             # k=10, # if we set k, then it will be fixed; if we leave it unspecified then the optimizer will choose
         )  # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
         plan = plan.sem_add_columns(BiodexRankedReactionsCols)
@@ -976,7 +1010,7 @@ if __name__ == "__main__":
         }
         optimizer_strategy = "none"
         available_models = [model_str_to_model[args.model]] + [model_str_to_vision_model[args.model]]
-    
+
     # execute pz plan
     config = QueryProcessorConfig(
         policy=policy,
@@ -1001,7 +1035,7 @@ if __name__ == "__main__":
         sample_start_idx=sample_start_idx,
         sample_end_idx=sample_end_idx,
         seed=seed,
-        exp_name=exp_name
+        exp_name=exp_name,
     )
 
     print(data_record_collection.to_df())

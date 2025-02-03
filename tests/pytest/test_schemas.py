@@ -18,17 +18,17 @@ def test_schema_equality():
 
 
 def test_schema_add_fields():
-    dog_extended = Dog.add_fields([{"name": "color", "desc": "The color of the dog", "type": "string"}])
+    dog_extended = Dog.add_fields([{"name": "color", "desc": "The color of the dog", "type": str}])
     assert sorted(dog_extended.field_names()) == ["breed", "color", "is_good"]
     assert dog_extended.field_map()["color"] == StringField(desc="The color of the dog")
 
     # Add the same field again, should be skipped
-    dog_extended2 = dog_extended.add_fields([{"name": "color", "desc": "The color of the dog", "type": "string"}])
+    dog_extended2 = dog_extended.add_fields([{"name": "color", "desc": "The color of the dog", "type": str}])
     assert sorted(dog_extended2.field_names()) == ["breed", "color", "is_good"]
     assert dog_extended2.field_map()["color"] == StringField(desc="The color of the dog")
 
 def test_schema_add_fields_with_existing_fields():
-    dog_extended = Dog.add_fields([{"name": "breed", "desc": "The breed of the dog", "type": "string"}])
+    dog_extended = Dog.add_fields([{"name": "breed", "desc": "The breed of the dog", "type": str}])
     assert sorted(dog_extended.field_names()) == ["breed", "is_good"]
     assert dog_extended.field_map()["breed"] == StringField(desc="The breed of the dog")
 

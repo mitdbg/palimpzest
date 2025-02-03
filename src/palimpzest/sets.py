@@ -9,6 +9,7 @@ from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.data.datasources import DataSource
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
+from palimpzest.core.lib.fields import ListField, StringField
 from palimpzest.core.lib.schemas import DefaultSchema, Number, Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.query.processor.config import QueryProcessorConfig
@@ -49,10 +50,11 @@ class Set:
         agg_func: AggFunc | None = None,
         group_by: GroupBySig | None = None,
         project_cols: list[str] | None = None,
-        index = None, # TODO(Siva): Abstract Index and add a type here and elsewhere
+        index=None,  # TODO(Siva): Abstract Index and add a type here and elsewhere
+        search_func: Callable | None = None,
         search_attr: str | None = None,
         output_attr: str | None = None,
-        k: int | None = None, # TODO: disambiguate `k` to be something like `retrieve_k`
+        k: int | None = None,  # TODO: disambiguate `k` to be something like `retrieve_k`
         limit: int | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         depends_on: list[str] | None = None,
@@ -67,6 +69,7 @@ class Set:
         self._group_by = group_by
         self._project_cols = None if project_cols is None else sorted(project_cols)
         self._index = index
+        self._search_func = search_func
         self._search_attr = search_attr
         self._output_attr = output_attr
         self._k = k
@@ -104,6 +107,7 @@ class Set:
             "group_by": (None if self._group_by is None else self._group_by.serialize()),
             "project_cols": (None if self._project_cols is None else self._project_cols),
             "index": None if self._index is None else get_index_str(self._index),
+            "search_func": None if self._search_func is None else str(self._search_func),
             "search_attr": self._search_attr,
             "output_attr": self._output_attr,
             "k": self._k,
@@ -121,7 +125,6 @@ class Set:
     def json_schema(self):
         """Return the JSON schema for this Set."""
         return self.schema.json_schema()
-
 
 
 class Dataset(Set):
@@ -161,6 +164,7 @@ class Dataset(Set):
             agg_func=self._agg_func,
             group_by=self._group_by,
             index=self._index,
+            search_func=self._search_func,
             search_attr=self._search_attr,
             output_attr=self._output_attr,
             k=self._k,
@@ -181,7 +185,10 @@ class Dataset(Set):
         if callable(_filter):
             f = Filter(filter_fn=_filter)
         else:
-            raise Exception("Only support callable for filter, currently got ", type(_filter), ". Consider to use sem_filter().")
+            error_str = f"Only support callable for filter, currently got {type(_filter)}"
+            if isinstance(_filter, str):
+                error_str += ". Consider using sem_filter() for semantic filters."
+            raise Exception(error_str)
 
         if isinstance(depends_on, str):
             depends_on = [depends_on]
@@ -204,7 +211,7 @@ class Dataset(Set):
         if isinstance(_filter, str):
             f = Filter(_filter)
         else:
-            raise Exception("Only support string for sem_filter.", type(_filter))
+            raise Exception("sem_filter() only supports `str` input for _filter.", type(_filter))
         
         if isinstance(depends_on, str):
             depends_on = [depends_on]
@@ -250,7 +257,11 @@ class Dataset(Set):
         Add new columns by specifying the column names, descriptions, and types.
         The column will be computed during the execution of the Dataset.
         Example:
-            sem_add_columns(cols=[{'name': 'greeting', 'desc': 'The greeting message', 'type': 'string'}])
+            sem_add_columns(
+                [{'name': 'greeting', 'desc': 'The greeting message', 'type': str},
+                 {'name': 'age', 'desc': 'The age of the person', 'type': int},
+                 {'name': 'full_name', 'desc': 'The name of the person', 'type': str}]
+            )
         """
         new_output_schema = self.schema.add_fields(cols)
         if isinstance(depends_on, str):
@@ -266,32 +277,35 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def add_columns(self, udf: Callable | None = None, 
-                    types: list[dict] | None = None, 
+    def add_columns(self, udf: Callable, 
+                    types: list[dict], 
                     cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
                     depends_on: str | list[str] | None = None) -> Dataset:
         """
         Add new columns by specifying UDFs.
 
-        Specify UDF for computing new columns. If you need to specify different UDFs for different columns, please make multiple calls to add_columns().
-
         Examples:
-            add_columns(udf=add_greeting_and_age, types={'greeting': 'string', 'age': 'int'})
-            add_columns(udf=add_greeting, types={'greeting': 'string'})
+            add_columns(
+                udf=compute_personal_greeting,
+                types=[
+                    {'name': 'greeting', 'desc': 'The greeting message', 'type': str},
+                    {'name': 'age', 'desc': 'The age of the person', 'type': int},
+                    {'name': 'full_name', 'desc': 'The name of the person', 'type': str},
+                ]
+            )
         """
         if udf is None or types is None:
             raise ValueError("udf and types must be provided for add_columns.")
-        
+
         if isinstance(depends_on, str):
             depends_on = [depends_on]
 
         updated_cols =[]
-        for cols in types:
-            new_col = {}
-            new_col["type"] = cols.get("type", "string")
-            new_col["desc"] = cols.get("desc", "New column: " + cols.get("name", "new_col"))
-            new_col["name"] = cols.get("name", "new_col")
-            updated_cols.append(new_col)
+        for col_dict in types:
+            assert "name" in col_dict, "each type must contain a 'name' key specifying the column name"
+            assert "type" in col_dict, "each type must contain a 'type' key specifying the column type"
+            col_dict["desc"] = col_dict.get("desc", "New column: " + col_dict["name"])
+            updated_cols.append(col_dict)
 
         new_output_schema = self.schema.add_fields(updated_cols)
         return Dataset(
@@ -333,12 +347,27 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def retrieve(self, output_schema, index, search_attr, output_attr, k=-1) -> Dataset:
+    def retrieve(
+        self, index, search_func: Callable, search_attr: str, output_attr: str, output_attr_desc: str, k=-1
+    ) -> Dataset:
+        """
+        Retrieve the top k nearest neighbors of the value of the `search_attr` from the index and
+        stores it in the `output_attr` field. The output schema is a union of the current schema
+        and the `output_attr` with type ListField(StringField). `search_func` is a function of
+        type (index, query: str | list(str), k: int) -> list[str]. It should implement the lookup
+        logic for the index and return the top k results. The value of the `search_attr` field is
+        used as the query to lookup in the index. The results are stored in the `output_attr`
+        field. `output_attr_desc` is the description of the `output_attr` field.
+        """
+        # Output schema is a union of the current schema and the output_attr
+        attributes = {output_attr: ListField(desc=output_attr_desc, element_type=StringField)}
+        output_schema = self.schema().union(type("temp_class", (Schema,), attributes))
         return Dataset(
             source=self,
             schema=output_schema,
             desc="Retrieve",
             index=index,
+            search_func=search_func,
             search_attr=search_attr,
             output_attr=output_attr,
             k=k,
@@ -364,6 +393,7 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def run(self, config: QueryProcessorConfig | None = None, **kwargs): # noqa: F821
+    def run(self, config: QueryProcessorConfig | None = None, **kwargs):  # noqa: F821
         from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+
         return QueryProcessorFactory.create_and_run_processor(self, config, **kwargs)

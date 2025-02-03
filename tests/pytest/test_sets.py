@@ -46,7 +46,7 @@ def test_dataset_add_columns(sample_df):
         df['greeting'] = 'Hello ' + df['name']
         return df
     
-    new_ds = ds.add_columns(udf=add_greeting, types=[{'name': 'greeting', 'type': 'string'}])
+    new_ds = ds.add_columns(udf=add_greeting, types=[{'name': 'greeting', 'type': str}])
     assert isinstance(new_ds, Dataset)
     assert new_ds._udf is not None
     assert new_ds.schema.field_names() == ['age', 'greeting', 'id', 'name']
@@ -55,8 +55,8 @@ def test_dataset_add_columns(sample_df):
     assert greeting_field.desc == 'New column: greeting'
 
     # Test semantic add_columns
-    new_cols = [{'name': 'greeting', 'type': 'string', 'desc': 'Greeting message'},
-                {'name': 'score', 'type': 'numeric', 'desc': 'Score'}]
+    new_cols = [{'name': 'greeting', 'type': str, 'desc': 'Greeting message'},
+                {'name': 'score', 'type': int | float, 'desc': 'Score'}]
     sem_new_ds = ds.sem_add_columns(new_cols)
     assert isinstance(sem_new_ds, Dataset)
     assert sem_new_ds.schema.field_names() == ['age', 'greeting', 'id', 'name', 'score']
@@ -64,12 +64,9 @@ def test_dataset_add_columns(sample_df):
     assert isinstance(greeting_field, StringField)
     assert greeting_field.desc == 'Greeting message'
 
-
     score_field = sem_new_ds.schema.field_map()['score']
     assert isinstance(score_field, NumericField)
     assert score_field.desc == 'Score'
 
     with pytest.raises(ValueError, match="udf and types must be provided for add_columns."):
-        ds.add_columns(udf=add_greeting)
-
-
+        ds.add_columns(udf=add_greeting, types=None)

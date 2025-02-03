@@ -10,69 +10,52 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 
-FileCols = [
-    {"name": "filename", "type": "string", "desc": "The name of the file"},
-    {"name": "contents", "type": "bytes", "desc": "The contents of the file"},
+sci_paper_cols = [
+    {"name": "title", "type": str, "desc": "The title of the paper. This is a natural language title, not a number or letter."},
+    {"name": "publication_year", "type": int, "desc": "The year the paper was published. This is a number."},
+    {"name": "author", "type": str, "desc": "The name of the first author of the paper"},
+    {"name": "institution", "type": str, "desc": "The institution of the first author of the paper"},
+    {"name": "journal", "type": str, "desc": "The name of the journal the paper was published in"},
+    {"name": "funding_agency", "type": str, "desc": "The name of the funding agency that supported the research"},
 ]
 
-TextFileCols = FileCols
-
-PDFFileCols = FileCols + [
-    {"name": "text_contents", "type": "string", "desc": "The text-only contents of the PDF"},
+email_cols = [
+    {"name": "sender", "type": str, "desc": "The email address of the sender"},
+    {"name": "subject", "type": str, "desc": "The subject of the email"},
 ]
 
-ScientificPaperCols = PDFFileCols + [
-    {"name": "title", "type": "string", "desc": "The title of the paper. This is a natural language title, not a number or letter."},
-    {"name": "publication_year", "type": "number", "desc": "The year the paper was published. This is a number."},
-    {"name": "author", "type": "string", "desc": "The name of the first author of the paper"},
-    {"name": "institution", "type": "string", "desc": "The institution of the first author of the paper"},
-    {"name": "journal", "type": "string", "desc": "The name of the journal the paper was published in"},
-    {"name": "funding_agency", "type": "string", "desc": "The name of the funding agency that supported the research"},
-]
-
-EmailCols = TextFileCols + [
-    {"name": "sender", "type": "string", "desc": "The email address of the sender"},
-    {"name": "subject", "type": "string", "desc": "The subject of the email"},
-]
-
-ImageFileCols = [
-    {"name": "filename", "type": "string", "desc": "The name of the file the image was downloaded from"},
-    {"name": "contents", "type": "bytes", "desc": "The contents of the image file"},
-]
-
-DogImageCols = ImageFileCols + [
-    {"name": "breed", "type": "string", "desc": "The breed of the dog"},
+dog_image_cols = [
+    {"name": "breed", "type": str, "desc": "The breed of the dog"},
 ]
 
 def build_sci_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""
-    return Dataset(dataset_id).sem_add_columns(ScientificPaperCols)
+    return Dataset(dataset_id).sem_add_columns(sci_paper_cols)
 
 def build_test_pdf_plan(dataset_id):
     """This tests whether we can process a PDF file"""
-    return Dataset(dataset_id).sem_add_columns(PDFFileCols)
+    return Dataset(dataset_id)
 
 def build_mit_battery_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""
-    sci_papers = Dataset(dataset_id).sem_add_columns(ScientificPaperCols)
+    sci_papers = Dataset(dataset_id).sem_add_columns(sci_paper_cols)
     battery_papers = sci_papers.sem_filter("The paper is about batteries")
     mit_papers = battery_papers.sem_filter("The paper is from MIT")
     return mit_papers
 
 def build_enron_plan(dataset_id):
     """Build a plan for processing Enron email data"""
-    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
-    return emails
+    return Dataset(dataset_id).sem_add_columns(email_cols)
 
 def compute_enron_stats(dataset_id):
     """Compute statistics on Enron email data"""
-    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
-    subject_line_lengths = emails.sem_add_columns([{"name": "words", "type": "number", "desc": "The number of words in the subject field"}])
+    emails = Dataset(dataset_id).sem_add_columns(email_cols)
+    subject_line_lengths = emails.sem_add_columns([{"name": "words", "type": int, "desc": "The number of words in the subject field"}])
     return subject_line_lengths
 
 def enron_gby_plan(dataset_id):
     """Group Enron emails by sender"""
-    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
+    emails = Dataset(dataset_id).sem_add_columns(email_cols)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -82,7 +65,7 @@ def enron_gby_plan(dataset_id):
 
 def enron_count_plan(dataset_id):
     """Count total Enron emails"""
-    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
+    emails = Dataset(dataset_id).sem_add_columns(email_cols)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = []
@@ -92,7 +75,7 @@ def enron_count_plan(dataset_id):
 
 def enron_average_count_plan(dataset_id):
     """Calculate average number of emails per sender"""
-    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
+    emails = Dataset(dataset_id).sem_add_columns(email_cols)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -107,22 +90,22 @@ def enron_average_count_plan(dataset_id):
 
 def enron_limit_plan(dataset_id, limit=5):
     """Get limited number of Enron emails"""
-    emails = Dataset(dataset_id).sem_add_columns(EmailCols)
+    emails = Dataset(dataset_id).sem_add_columns(email_cols)
     limit_data = emails.limit(limit)
     return limit_data
 
 def build_image_plan(dataset_id):
     """Build a plan for processing dog images"""
-    images = Dataset(dataset_id).sem_add_columns(ImageFileCols)
+    images = Dataset(dataset_id)
     filtered_images = images.sem_filter("The image contains one or more dogs")
-    dog_images = filtered_images.sem_add_columns(DogImageCols)
+    dog_images = filtered_images.sem_add_columns(dog_image_cols)
     return dog_images
 
 def build_image_agg_plan(dataset_id):
     """Build a plan for aggregating dog images by breed"""
-    images = Dataset(dataset_id).sem_add_columns(ImageFileCols)
+    images = Dataset(dataset_id)
     filtered_images = images.sem_filter("The image contains one or more dogs")
-    dog_images = filtered_images.sem_add_columns(DogImageCols)
+    dog_images = filtered_images.sem_add_columns(dog_image_cols)
     ops = ["count"]
     fields = ["breed"]
     groupbyfields = ["breed"]

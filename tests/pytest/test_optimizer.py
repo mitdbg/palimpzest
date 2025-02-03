@@ -105,7 +105,7 @@ class TestPrimitives:
 class TestOptimizer:
 
     def test_basic_functionality(self, enron_eval_tiny, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=TextFile)
+        plan = Dataset(enron_eval_tiny)
         policy = MaxQuality()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -123,7 +123,8 @@ class TestOptimizer:
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
 
     def test_simple_max_quality_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.convert(email_schema)
         policy = MaxQuality()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -149,7 +150,8 @@ class TestOptimizer:
         assert physical_plan[1].model == Model.GPT_4o
 
     def test_simple_min_cost_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.convert(email_schema)
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -169,7 +171,8 @@ class TestOptimizer:
         assert isinstance(physical_plan[1], CodeSynthesisConvert)
 
     def test_simple_min_time_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.convert(email_schema)
         policy = MinTime()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -189,7 +192,8 @@ class TestOptimizer:
         assert isinstance(physical_plan[1], CodeSynthesisConvert)
 
     def test_push_down_filter(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.convert(email_schema)
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
@@ -211,7 +215,8 @@ class TestOptimizer:
         assert isinstance(physical_plan[2], CodeSynthesisConvert)
 
     def test_push_down_two_filters(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.convert(email_schema)
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         plan = plan.sem_filter("another text filter", depends_on=["contents"])
         policy = MinCost()
@@ -234,7 +239,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[2], LLMFilter)
         assert isinstance(physical_plan[3], CodeSynthesisConvert)
 
-    def test_real_estate_logical_reorder(self, real_estate_eval_tiny, real_estate_workload, opt_strategy):
+    def test_real_estate_logical_reorder(self, real_estate_workload, opt_strategy):
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -261,7 +266,8 @@ class TestOptimizer:
         assert isinstance(physical_plan[5], LLMFilter)  # ImageRealEstateListing(attractive)
 
     def test_seven_filters(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.convert(email_schema)
         plan = plan.sem_filter("filter1", depends_on=["contents"])
         plan = plan.sem_filter("filter2", depends_on=["contents"])
         plan = plan.sem_filter("filter3", depends_on=["contents"])

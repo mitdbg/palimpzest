@@ -24,34 +24,31 @@ if not os.environ.get("OPENAI_API_KEY"):
 
     load_env()
 
-PDFFileCols = [
-    {"name": "text_contents", "type": "string", "desc": "The text contents of the PDF file"},
+
+sci_paper_cols = [
+    {"name": "paper_title", "type": str, "desc": "The title of the paper. This is a natural language title, not a number or letter."},
+    {"name": "paper_year", "type": int, "desc": "The year the paper was published. This is a number."},
+    {"name": "paper_author", "type": str, "desc": "The name of the first author of the paper"},
+    {"name": "paper_abstract", "type": str, "desc": "A short description of the paper contributions and findings"},
+    {"name": "paper_journal", "type": str, "desc": "The name of the journal the paper was published in"},
+    {"name": "paper_subject", "type": str, "desc": "A summary of the paper contribution in one sentence"},
+    {"name": "paper_doi_url", "type": str, "desc": "The DOI URL for the paper"}
 ]
 
-ScientificPaperCols = PDFFileCols + [
-    {"name": "paper_title", "type": "string", "desc": "The title of the paper. This is a natural language title, not a number or letter."},
-    {"name": "paper_year", "type": "number", "desc": "The year the paper was published. This is a number."},
-    {"name": "paper_author", "type": "string", "desc": "The name of the first author of the paper"},
-    {"name": "paper_abstract", "type": "string", "desc": "A short description of the paper contributions and findings"},
-    {"name": "paper_journal", "type": "string", "desc": "The name of the journal the paper was published in"},
-    {"name": "paper_subject", "type": "string", "desc": "A summary of the paper contribution in one sentence"},
-    {"name": "paper_doi_url", "type": "string", "desc": "The DOI URL for the paper"}
-]
-
-ReferenceCols = [
-    {"name": "reference_index", "type": "number", "desc": "The index of the reference in the paper"},
-    {"name": "reference_title", "type": "string", "desc": "The title of the paper being cited"},
-    {"name": "reference_first_author", "type": "string", "desc": "The author of the paper being cited"},
-    {"name": "reference_year", "type": "number", "desc": "The year in which the cited paper was published"},
+reference_cols = [
+    {"name": "reference_index", "type": int | float, "desc": "The index of the reference in the paper"},
+    {"name": "reference_title", "type": str, "desc": "The title of the paper being cited"},
+    {"name": "reference_first_author", "type": str, "desc": "The author of the paper being cited"},
+    {"name": "reference_year", "type": int, "desc": "The year in which the cited paper was published"},
 ]
 
 
 @st.cache_resource()
 def run_workload():
     papers = Dataset("bdf-usecase3-tiny")
-    papers = papers.sem_add_columns(ScientificPaperCols)
+    papers = papers.sem_add_columns(sci_paper_cols)
     # papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
-    references = papers.sem_add_columns(ReferenceCols, cardinality=Cardinality.ONE_TO_MANY)
+    references = papers.sem_add_columns(reference_cols, cardinality=Cardinality.ONE_TO_MANY)
 
     output = references
     # engine = NoSentinelExecution
@@ -97,9 +94,9 @@ dataset = "bdf-usecase3-tiny"
 if run_pz:
     # reference, plan, stats = run_workload()
     papers = Dataset(dataset)
-    papers = papers.sem_add_columns(ScientificPaperCols)
+    papers = papers.sem_add_columns(sci_paper_cols)
     papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
-    output = papers.sem_add_columns(ReferenceCols, cardinality=Cardinality.ONE_TO_MANY)
+    output = papers.sem_add_columns(reference_cols, cardinality=Cardinality.ONE_TO_MANY)
 
     # output = references
     # engine = NoSentinelExecution

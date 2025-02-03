@@ -22,10 +22,10 @@ dict_of_excerpts = [
     {"id": 1, "text": "t model incorporates geographic connectivity information at county level. The Susceptible-Infected-Hospitalized-Recovered- Dead (SIHRD) COVID-19 model classified the population into susceptibles (S), confirmed infections (I), hospitalized and ICU admitted (H), recovered (R) and dead (D). Based on a previous study that identified local air hubs and main roads as important geospatial attributes linked to differential COVID-19 related hospitalizations and mortality (Correa-Agudelo et a"}
 ]
 
-VariableCols = [
-    {"name": "name", "type": "string", "desc": "The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None"},
-    {"name": "description", "type": "string", "desc": "A description of the variable, optional, set 'null' if not found"},
-    {"name": "value", "type": "numeric", "desc": "The value of the variable, optional, set 'null' if not found"}
+variable_cols = [
+    {"name": "name", "type": str, "desc": "The label used for a the scientific variable, like a, b, 𝜆 or 𝜖, NOT None"},
+    {"name": "description", "type": str, "desc": "A description of the variable, optional, set 'null' if not found"},
+    {"name": "value", "type": int | float, "desc": "The value of the variable, optional, set 'null' if not found"}
 ]
 
 list_of_strings = ["I have a variable a, the value is 1", "I have a variable b, the value is 2"]
@@ -38,9 +38,8 @@ if __name__ == "__main__":
 
     if run_pz:
         excerpts = Dataset(pd.DataFrame(list_of_strings))
-        excerpts = excerpts\
-        .sem_add_columns(VariableCols, cardinality=Cardinality.ONE_TO_MANY)\
-        .sem_filter("The value name is 'a'", depends_on="name")
+        excerpts = excerpts.sem_add_columns(variable_cols, cardinality=Cardinality.ONE_TO_MANY)
+        excerpts = excerpts.sem_filter("The value name is 'a'", depends_on="name")
 
         policy = MaxQuality()
         config = QueryProcessorConfig(

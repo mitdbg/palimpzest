@@ -16,7 +16,7 @@ from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
-from palimpzest.utils.udfs import file_to_xls, xls_to_tables
+from palimpzest.utils.udfs import xls_to_tables
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -238,9 +238,9 @@ if __name__ == "__main__":
             src=RealEstateListingSource(user_dataset_id, data_filepath),
             dataset_id=user_dataset_id,
         )
-        plan = Dataset(user_dataset_id).sem_add_columns(RealEstateListingFilesCols)
-        plan = plan.sem_add_columns(TextRealEstateListingCols)
-        plan = plan.sem_add_columns(ImageRealEstateListingCols)
+        plan = Dataset(user_dataset_id)
+        plan = plan.sem_add_columns(TextRealEstateListingCols, depends_on="text_content")
+        plan = plan.sem_add_columns(ImageRealEstateListingCols, depends_on="image_filepaths")
         plan = plan.sem_filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
@@ -251,7 +251,7 @@ if __name__ == "__main__":
 
     elif workload == "medical-schema-matching":
         # datasetid="biofabric-medium" for paper evaluation
-        plan = Dataset(datasetid).add_columns(file_to_xls, types=XLSCols)
+        plan = Dataset(datasetid)
         plan = plan.add_columns(xls_to_tables, types=TableCols, cardinality=Cardinality.ONE_TO_MANY)
         plan = plan.sem_filter("The rows of the table contain the patient age")
         plan = plan.sem_add_columns(CaseDataCols, cardinality=Cardinality.ONE_TO_MANY)

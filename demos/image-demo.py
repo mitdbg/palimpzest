@@ -19,19 +19,14 @@ if not os.environ.get("OPENAI_API_KEY"):
 
     load_env()
 
-ImageFileCols = [
-    {"name": "filename", "type": "string", "desc": "The name of the file the image was downloaded from"},
-    {"name": "contents", "type": "bytes", "desc": "The contents of the image file"},
-]
-
-DogImageCols = ImageFileCols + [
+dog_image_cols = [
     {"name": "breed", "type": "string", "desc": "The breed of the dog"},
 ]
 
 def build_image_plan(dataset_id):
-    images = Dataset(dataset_id).sem_add_columns(ImageFileCols)
+    images = Dataset(dataset_id)
     filtered_images = images.sem_filter("The image contains one or more dogs")
-    dog_images = filtered_images.sem_add_columns(DogImageCols)
+    dog_images = filtered_images.sem_add_columns(dog_image_cols)
     return dog_images
 
 
