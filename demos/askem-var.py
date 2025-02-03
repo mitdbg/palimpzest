@@ -10,8 +10,8 @@ import time
 import pandas as pd
 import streamlit as st
 
-from palimpzest.core.elements.records import DataRecord
 from palimpzest.constants import Cardinality
+from palimpzest.core.elements.records import DataRecord
 from palimpzest.policy import MaxQuality
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory

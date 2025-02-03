@@ -6,10 +6,11 @@ python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usec
 import os
 import time
 
+import matplotlib.pyplot as plt
+import networkx as nx
 import pandas as pd
 import streamlit as st
-import networkx as nx
-import matplotlib.pyplot as plt
+
 from palimpzest.constants import Cardinality
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality
