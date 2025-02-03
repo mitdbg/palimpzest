@@ -36,15 +36,18 @@ class DogImage(ImageFile):
 
 def build_sci_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""
-    return Dataset(dataset_id, schema=ScientificPaper)
+    papers = Dataset(dataset_id)
+    papers = papers.convert(ScientificPaper, desc="Scientific papers")
+    return papers
 
 def build_test_pdf_plan(dataset_id):
     """This tests whether we can process a PDF file"""
-    return Dataset(dataset_id, schema=PDFFile)
+    return Dataset(dataset_id)
 
 def build_mit_battery_paper_plan(dataset_id):
     """A dataset-independent declarative description of authors of good papers"""
-    sci_papers = Dataset(dataset_id, schema=ScientificPaper)
+    sci_papers = Dataset(dataset_id)
+    sci_papers = sci_papers.convert(ScientificPaper, desc="Scientific papers")
     battery_papers = sci_papers.sem_filter("The paper is about batteries")
     mit_papers = battery_papers.sem_filter("The paper is from MIT")
     return mit_papers
@@ -52,20 +55,23 @@ def build_mit_battery_paper_plan(dataset_id):
 def build_enron_plan(dataset_id):
     """Build a plan for processing Enron email data"""
     from palimpzest.sets import Dataset
-    emails = Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id)
+    emails = emails.convert(Email, desc="Emails")
     return emails
 
 def compute_enron_stats(dataset_id):
     """Compute statistics on Enron email data"""
     from palimpzest.sets import Dataset
-    emails = Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id)
+    emails = emails.convert(Email, desc="Emails")
     subject_line_lengths = emails.convert(Number, desc="The number of words in the subject field")
     return subject_line_lengths
 
 def enron_gby_plan(dataset_id):
     """Group Enron emails by sender"""
     from palimpzest.sets import Dataset
-    emails = Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id)
+    emails = emails.convert(Email, desc="Emails")
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -76,7 +82,8 @@ def enron_gby_plan(dataset_id):
 def enron_count_plan(dataset_id):
     """Count total Enron emails"""
     from palimpzest.sets import Dataset
-    emails = Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id)
+    emails = emails.convert(Email, desc="Emails")
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = []
@@ -87,7 +94,8 @@ def enron_count_plan(dataset_id):
 def enron_average_count_plan(dataset_id):
     """Calculate average number of emails per sender"""
     from palimpzest.sets import Dataset
-    emails = Dataset(dataset_id, schema=Email)
+    emails = Dataset(dataset_id)
+    emails = emails.convert(Email, desc="Emails")
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -103,14 +111,15 @@ def enron_average_count_plan(dataset_id):
 def enron_limit_plan(dataset_id, limit=5):
     """Get limited number of Enron emails"""
     from palimpzest.sets import Dataset
-    data = Dataset(dataset_id, schema=Email)
-    limit_data = data.limit(limit)
-    return limit_data
+    emails = Dataset(dataset_id)
+    emails = emails.convert(Email, desc="Emails")
+    limit_emails = emails.limit(limit)
+    return limit_emails
 
 def build_image_plan(dataset_id):
     """Build a plan for processing dog images"""
     from palimpzest.sets import Dataset
-    images = Dataset(dataset_id, schema=ImageFile)
+    images = Dataset(dataset_id)
     filtered_images = images.sem_filter("The image contains one or more dogs")
     dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
     return dog_images
@@ -118,7 +127,7 @@ def build_image_plan(dataset_id):
 def build_image_agg_plan(dataset_id):
     """Build a plan for aggregating dog images by breed"""
     from palimpzest.sets import Dataset
-    images = Dataset(dataset_id, schema=ImageFile)
+    images = Dataset(dataset_id)
     filtered_images = images.sem_filter("The image contains one or more dogs")
     dog_images = filtered_images.convert(DogImage, desc="Images of dogs")
     ops = ["count"]

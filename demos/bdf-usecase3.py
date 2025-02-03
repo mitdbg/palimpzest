@@ -54,7 +54,8 @@ class Reference(Schema):
 
 @st.cache_resource()
 def run_workload():
-    papers = Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
+    papers = Dataset("bdf-usecase3-tiny")
+    papers = papers.convert(ScientificPaper, desc="The scientific paper")
     # papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
     references = papers.convert(
         Reference, desc="A paper cited in the reference section", cardinality=Cardinality.ONE_TO_MANY
@@ -103,7 +104,8 @@ dataset = "bdf-usecase3-tiny"
 
 if run_pz:
     # reference, plan, stats = run_workload()
-    papers = Dataset(dataset, schema=ScientificPaper)
+    papers = Dataset(dataset)
+    papers = papers.convert(ScientificPaper, desc="The scientific paper")
     papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
     output = papers.convert(Reference, desc="The references cited in the paper", cardinality=Cardinality.ONE_TO_MANY)
 

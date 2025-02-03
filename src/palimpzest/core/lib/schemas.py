@@ -314,6 +314,10 @@ class Schema(metaclass=SchemaMetaclass):
             new_field_types.append(construct_field_from_python_type(field["type"], desc=field_desc))
             new_field_descs.append(field_desc)
 
+        # If we are not adding any new fields, simply return the original schema
+        if sorted(new_field_names) == sorted(list(cls.field_names())):
+            return cls
+
         # Generate the schema class dynamically
         attributes = {"_desc": new_desc, "__doc__": new_desc}
         for field_name, field_type, field_desc in zip(new_field_names, new_field_types, new_field_descs):

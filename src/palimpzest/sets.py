@@ -144,7 +144,11 @@ class Dataset(Set):
         # convert source (str) -> source (DataSource) if need be
         updated_source = DataDirectory().get_or_register_dataset(source) if isinstance(source, (str, list, pd.DataFrame)) else source
         if schema is None:
-            schema = Schema.from_df(source) if isinstance(source, pd.DataFrame) else DefaultSchema
+            # This is for DataSource with a schema.
+            if updated_source.schema is not None:
+                schema = updated_source.schema
+            else:
+                schema = Schema.from_df(source) if isinstance(source, pd.DataFrame) else DefaultSchema
         # intialize class
         super().__init__(updated_source, schema, *args, **kwargs)
 

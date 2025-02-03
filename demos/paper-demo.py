@@ -11,7 +11,7 @@ from palimpzest.constants import Cardinality
 from palimpzest.core.data.datasources import UserSource
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import BooleanField, Field, ImageFilepathField, ListField, NumericField, StringField
-from palimpzest.core.lib.schemas import Schema, Table, TextFile, XLSFile
+from palimpzest.core.lib.schemas import Schema, Table, TextFile
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.query.processor.config import QueryProcessorConfig
@@ -212,7 +212,8 @@ if __name__ == "__main__":
     # create pz plan
     if workload == "enron":
         # datasetid="enron-eval" for paper evaluation
-        plan = Dataset(datasetid, schema=Email)
+        plan = Dataset(datasetid)
+        plan = plan.convert(Email)
         plan = plan.sem_filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
@@ -228,7 +229,7 @@ if __name__ == "__main__":
             src=RealEstateListingSource(user_dataset_id, data_filepath),
             dataset_id=user_dataset_id,
         )
-        plan = Dataset(user_dataset_id, schema=RealEstateListingFiles)
+        plan = Dataset(user_dataset_id)
         plan = plan.convert(TextRealEstateListing, depends_on="text_content")
         plan = plan.convert(ImageRealEstateListing, depends_on="image_filepaths")
         plan = plan.sem_filter(
@@ -240,7 +241,7 @@ if __name__ == "__main__":
 
     elif workload == "medical-schema-matching":
         # datasetid="biofabric-medium" for paper evaluation
-        plan = Dataset(datasetid, schema=XLSFile)
+        plan = Dataset(datasetid)
         plan = plan.convert(Table, udf=xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
         plan = plan.sem_filter("The rows of the table contain the patient age")
         plan = plan.convert(CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY)

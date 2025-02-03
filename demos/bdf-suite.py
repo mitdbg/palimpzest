@@ -95,14 +95,14 @@ class CaseData(Schema):
 
 @st.cache_resource()
 def extract_supplemental(processing_strategy, execution_strategy, optimizer_strategy, policy):
-    papers = Dataset("biofabric-pdf", schema=ScientificPaper)
+    papers = Dataset("biofabric-pdf")
+    papers = papers.convert(ScientificPaper, desc="The scientific paper")
     paper_urls = papers.convert(URL, desc="The DOI url of the paper")
     html_doi = paper_urls.convert(File, udf=udfs.url_to_file)
     table_urls = html_doi.convert(
         URL, desc="The URLs of the XLS tables from the page", cardinality=Cardinality.ONE_TO_MANY
     )
-    # url_file = Dataset("biofabric-urls", schema=TextFile)
-    # table_urls = url_file.convert(URL, desc="The URLs of the tables")
+
     tables = table_urls.convert(File, udf=udfs.url_to_file)
     xls = tables.convert(XLSFile, udf=udfs.file_to_xls)
     patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
@@ -131,7 +131,7 @@ def extract_supplemental(processing_strategy, execution_strategy, optimizer_stra
 
 @st.cache_resource()
 def integrate_tables(processing_strategy, execution_strategy, optimizer_strategy, policy):
-    xls = Dataset("biofabric-tiny", schema=XLSFile)
+    xls = Dataset("biofabric-tiny")
     patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
     patient_tables = patient_tables.sem_filter("The table contains biometric information about the patient")
     case_data = patient_tables.convert(
@@ -161,7 +161,8 @@ def integrate_tables(processing_strategy, execution_strategy, optimizer_strategy
 
 @st.cache_resource()
 def extract_references(processing_strategy, execution_strategy, optimizer_strategy, policy):
-    papers = Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
+    papers = Dataset("bdf-usecase3-tiny")
+    papers = papers.convert(ScientificPaper, desc="The scientific paper")
     papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
     references = papers.convert(
         Reference, desc="A paper cited in the reference section", cardinality=Cardinality.ONE_TO_MANY
@@ -203,7 +204,8 @@ dataset = "bdf-usecase3-tiny"
 
 if run_pz:
     # reference, plan, stats = run_workload()
-    papers = Dataset(dataset, schema=ScientificPaper)
+    papers = Dataset(dataset)
+    papers = papers.convert(ScientificPaper, desc="The scientific paper")
     papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
     output = papers.convert(Reference, desc="The references cited in the paper", cardinality=Cardinality.ONE_TO_MANY)
 

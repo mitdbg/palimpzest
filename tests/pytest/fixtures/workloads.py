@@ -1,6 +1,5 @@
 import pytest
 
-from palimpzest.core.lib.schemas import TextFile
 from palimpzest.sets import Dataset
 
 
@@ -40,7 +39,8 @@ def in_price_range(record):
 ### WORKLOADS ###
 @pytest.fixture
 def enron_workload(enron_eval_tiny, email_schema):
-    emails = Dataset(enron_eval_tiny, schema=email_schema)
+    emails = Dataset(enron_eval_tiny)
+    emails = emails.convert(email_schema)
     emails = emails.sem_filter(
         'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
     )
@@ -53,11 +53,10 @@ def enron_workload(enron_eval_tiny, email_schema):
 @pytest.fixture
 def real_estate_workload(
     real_estate_eval_tiny,
-    real_estate_listing_files_schema,
     text_real_estate_listing_schema,
     image_real_estate_listing_schema,
 ):
-    listings = Dataset(real_estate_eval_tiny, schema=real_estate_listing_files_schema)
+    listings = Dataset(real_estate_eval_tiny)
     listings = listings.convert(text_real_estate_listing_schema, depends_on="text_content")
     listings = listings.convert(image_real_estate_listing_schema, depends_on="image_filepaths")
     listings = listings.sem_filter(
@@ -78,7 +77,8 @@ def real_estate_workload(
 @pytest.fixture
 def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_schema):
     # construct plan with three converts
-    dataset = Dataset(enron_eval_tiny, schema=email_schema)
+    dataset = Dataset(enron_eval_tiny)
+    dataset = dataset.convert(email_schema)
     dataset = dataset.convert(foobar_schema)
     dataset = dataset.convert(baz_schema)
 
@@ -87,7 +87,7 @@ def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_sc
 @pytest.fixture
 def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
     # construct plan with two converts and two filters
-    dataset = Dataset(enron_eval_tiny, schema=TextFile)
+    dataset = Dataset(enron_eval_tiny)
     dataset = dataset.sem_filter("filter1")
     dataset = dataset.convert(email_schema)
 
@@ -96,7 +96,8 @@ def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
 @pytest.fixture
 def two_converts_two_filters_workload(enron_eval_tiny, email_schema, foobar_schema):
     # construct plan with two converts and two filters
-    dataset = Dataset(enron_eval_tiny, schema=email_schema)
+    dataset = Dataset(enron_eval_tiny)
+    dataset = dataset.convert(email_schema)
     dataset = dataset.convert(foobar_schema)
     dataset = dataset.sem_filter("filter1", depends_on=["sender"])
     dataset = dataset.sem_filter("filter2", depends_on=["subject"])
