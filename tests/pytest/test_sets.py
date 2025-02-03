@@ -69,4 +69,4 @@ def test_dataset_add_columns(sample_df):
     assert score_field.desc == 'Score'
 
     with pytest.raises(ValueError, match="udf and types must be provided for add_columns."):
-        ds.add_columns(udf=add_greeting)
+        ds.add_columns(udf=add_greeting, types=None)
