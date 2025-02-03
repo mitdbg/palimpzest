@@ -24,7 +24,7 @@ def test_dataset_initialization(sample_df):
     ds = Dataset(sample_df, schema=DefaultSchema)
     assert ds.schema == DefaultSchema
 
-def test_dataset_filter():
+def test_dataset_filter(sample_df):
     ds = Dataset(sample_df)
     
     # Test callable filter
@@ -46,7 +46,7 @@ def test_dataset_add_columns(sample_df):
         df['greeting'] = 'Hello ' + df['name']
         return df
     
-    new_ds = ds.add_columns(udf=add_greeting, types={'greeting': 'string'})
+    new_ds = ds.add_columns(udf=add_greeting, types=[{'name': 'greeting', 'type': 'string'}])
     assert isinstance(new_ds, Dataset)
     assert new_ds._udf is not None
     assert new_ds.schema.field_names() == ['age', 'greeting', 'id', 'name']
@@ -63,6 +63,7 @@ def test_dataset_add_columns(sample_df):
     greeting_field = sem_new_ds.schema.field_map()['greeting']
     assert isinstance(greeting_field, StringField)
     assert greeting_field.desc == 'Greeting message'
+
 
     score_field = sem_new_ds.schema.field_map()['score']
     assert isinstance(score_field, NumericField)
