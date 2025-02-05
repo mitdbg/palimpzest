@@ -104,7 +104,9 @@ class Schema(metaclass=SchemaMetaclass):
         attributes = dir(cls)
         attributes = [attr for attr in attributes if not attr.startswith("__")]
         prefix = f"{cls.__name__}.{id}." if unique else ""
-        field_desc_map = {prefix + attr: getattr(cls, attr)._desc for attr in attributes if isinstance(getattr(cls, attr), Field)}
+        field_desc_map = {
+            prefix + attr: getattr(cls, attr)._desc for attr in attributes if isinstance(getattr(cls, attr), Field)
+        }
         return field_desc_map
 
     @classmethod
@@ -126,7 +128,6 @@ class Schema(metaclass=SchemaMetaclass):
         fields = cls.field_names()
 
         schema = {
-
             "fields": {},
             "type": "object",
             "description": cls.__doc__,
@@ -188,7 +189,7 @@ class Schema(metaclass=SchemaMetaclass):
                     if left_field_name == right_field_name:
                         matching_field = True
                         break
-                
+
                 # if theres a matching field, add them both with their schema names
                 if matching_field:
                     dup_new_field_names.append(schema_name + "_" + left_field_name)
@@ -243,7 +244,7 @@ class Schema(metaclass=SchemaMetaclass):
         # Create a unique schema name based on columns
         schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
 
-        # consider to save to temp file and load from there 
+        # consider to save to temp file and load from there
         if schema_name in globals():
             return globals()[schema_name]
 
@@ -268,21 +269,24 @@ class Schema(metaclass=SchemaMetaclass):
             else:
                 attributes[field_name] = Field(desc=field_desc)
 
-
         # Create new schema only if it doesn't exist
         new_schema = type(schema_name, (Schema,), attributes)
 
         # Store the schema class globally
         globals()[schema_name] = new_schema
         return new_schema
-    
+
+    @classmethod
+    def from_json(cls, fields: list[dict]) -> Schema:
+        return cls.add_fields(fields)
+
     @classmethod
     def add_fields(cls, fields: list[dict]) -> Schema:
         """Add fields to the schema
-        
+
         Args:
             fields: List of dictionaries, each containing 'name', 'desc', and 'type' keys
-            
+
         Returns:
             A new Schema with the additional fields
         """
@@ -335,10 +339,12 @@ class Schema(metaclass=SchemaMetaclass):
         """Return the name of this class"""
         return cls.__name__
 
+
 ###################################################################################
 # "Core" useful Schemas. These are Schemas that almost everyone will need.
 # File, TextFile, Image, PDF, etc.
 ###################################################################################
+
 
 # First-level Schema's
 class DefaultSchema(Schema):
@@ -432,6 +438,7 @@ class WebPage(Schema):
 # Second-level Schemas
 class ImageFile(File):
     """A file that contains an image."""
+
     contents = ImageBase64Field(desc="The contents of the image")
 
 

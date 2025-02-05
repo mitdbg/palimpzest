@@ -41,8 +41,12 @@ class AbstractDataSource(abc.ABC):
     In the future, programmers can implement their own DataSources using custom Schemas.
     """
 
-    def __init__(self, schema: Schema) -> None:
-        self._schema = schema
+    def __init__(self, schema: type[Schema] | list[dict]) -> None:
+        self._schema = (
+            Schema.from_json(schema)
+            if isinstance(schema, list)
+            else schema
+        )
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(schema={self.schema})"
@@ -71,7 +75,7 @@ class AbstractDataSource(abc.ABC):
 
 
 class DataSource(AbstractDataSource):
-    def __init__(self, schema: Schema, dataset_id: str) -> None:
+    def __init__(self, schema: type[Schema] | list[dict], dataset_id: str) -> None:
         super().__init__(schema)
         self.dataset_id = dataset_id
 
@@ -333,7 +337,7 @@ class XLSFileDirectorySource(DirectorySource):
 class UserSource(DataSource):
     """UserSource is a DataSource that is created by the user and not loaded from a file"""
 
-    def __init__(self, schema: Schema, dataset_id: str) -> None:
+    def __init__(self, schema: type[Schema] | list[dict], dataset_id: str) -> None:
         super().__init__(schema, dataset_id)
 
     def serialize(self) -> dict[str, Any]:

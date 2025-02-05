@@ -11,11 +11,11 @@ from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 
 fever_claims_cols = [
-    {"name": "claim", "type": "string", "desc": "the claim being made"}
+    {"name": "claim", "type": str, "desc": "the claim being made"}
 ]
 
 fever_output_cols = [
-    {"name": "label", "type": "boolean", "desc": "Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise."}
+    {"name": "label", "type": bool, "desc": "Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise."}
 ]
 
 # TODO: DataSource needs to accept new column format

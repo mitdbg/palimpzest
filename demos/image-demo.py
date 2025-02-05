@@ -20,7 +20,7 @@ if not os.environ.get("OPENAI_API_KEY"):
     load_env()
 
 dog_image_cols = [
-    {"name": "breed", "type": "string", "desc": "The breed of the dog"},
+    {"name": "breed", "type": str, "desc": "The breed of the dog"},
 ]
 
 def build_image_plan(dataset_id):
