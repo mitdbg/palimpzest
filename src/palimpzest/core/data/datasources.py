@@ -198,9 +198,6 @@ class DirectorySource(DataSource):
     def __len__(self) -> int:
         return len(self.filepaths)
 
-    def get_item(self, idx: int) -> dict:
-        raise NotImplementedError("You are calling this method from an abstract class.")
-
 
 class FileSource(DataSource):
     """FileSource returns a single dictionary with the filename and contents of a local file (in bytes)."""
