@@ -12,7 +12,7 @@ from palimpzest.constants import (
 )
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import ListField, StringField
+from palimpzest.core.lib.fields import StringField
 from palimpzest.query.operators.convert import FieldName, LLMConvert
 
 
@@ -124,7 +124,7 @@ class RAGConvert(LLMConvert):
 
             # skip this field if it is not a string or a list of strings
             is_string_field = isinstance(field, StringField)
-            is_list_string_field = isinstance(field, ListField) and isinstance(field.element_type, StringField)
+            is_list_string_field = hasattr(field, "element_type") and isinstance(field.element_type, StringField)
             if not (is_string_field or is_list_string_field):
                 continue
 

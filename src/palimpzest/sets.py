@@ -143,8 +143,9 @@ class Dataset(Set):
     def __init__(self, source: str | list | pd.DataFrame | DataSource, schema: Schema | None = None, *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
         updated_source = DataDirectory().get_or_register_dataset(source) if isinstance(source, (str, list, pd.DataFrame)) else source
+
         if schema is None:
-            # This is for DataSource with a schema.
+            # This is mainly for DataSource with a schema. 
             if updated_source.schema is not None:
                 schema = updated_source.schema
             else:
@@ -221,92 +222,90 @@ class Dataset(Set):
             filter=f,
             depends_on=depends_on,
             nocache=self._nocache,
-        )        
-
-    # TODO(Jun): Remove in https://github.com/mitdbg/palimpzest/issues/94
-    def convert(
-        self,
-        output_schema: Schema,
-        udf: Callable | None = None,
-        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-        depends_on: str | list[str] | None = None,
-        desc: str = "Convert to new schema",
-    ) -> Dataset:
-        """Convert the Set to a new schema.
-
-        Deprecated: This method will be removed in a future version. Please use add_columns() or sem_add_columns() instead.
-        """
-        if isinstance(depends_on, str):
-            depends_on = [depends_on]
-
-        return Dataset(
-            source=self,
-            schema=output_schema,
-            udf=udf,
-            cardinality=cardinality,
-            depends_on=depends_on,
-            desc=desc,
-            nocache=self._nocache,
         )
-    
-    def sem_add_columns(self, cols: list[dict], 
+
+    def sem_add_columns(self, cols: list[dict] | type[Schema],
                         cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
-                        depends_on: str | list[str] | None = None) -> Dataset:
+                        depends_on: str | list[str] | None = None,
+                        desc: str = "Add new columns via semantic reasoning") -> Dataset:
         """
         Add new columns by specifying the column names, descriptions, and types.
         The column will be computed during the execution of the Dataset.
         Example:
-            sem_add_columns(cols=[{'name': 'greeting', 'desc': 'The greeting message', 'type': str}])
+            sem_add_columns(
+                [{'name': 'greeting', 'desc': 'The greeting message', 'type': str},
+                 {'name': 'age', 'desc': 'The age of the person', 'type': int},
+                 {'name': 'full_name', 'desc': 'The name of the person', 'type': str}]
+            )
         """
-        new_output_schema = self.schema.add_fields(cols)
         if isinstance(depends_on, str):
             depends_on = [depends_on]
-        
+
+        new_output_schema = None
+        if isinstance(cols, list):
+            new_output_schema = self.schema.add_fields(cols)
+        elif issubclass(cols, Schema):
+            new_output_schema = self.schema.union(cols)
+        else:
+            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+
         return Dataset(
             source=self,
             schema=new_output_schema,
             udf=None,
             cardinality=cardinality,
             depends_on=depends_on,
-            desc="Add new columns " + str(cols),
+            desc=desc,
             nocache=self._nocache,
         )
 
-    def add_columns(self, udf: Callable, 
-                    types: list[dict], 
-                    cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
-                    depends_on: str | list[str] | None = None) -> Dataset:
+    def add_columns(self, udf: Callable,
+                    cols: list[dict] | type[Schema],
+                    cardinality: Cardinality = Cardinality.ONE_TO_ONE,
+                    depends_on: str | list[str] | None = None,
+                    desc: str = "Add new columns via UDF") -> Dataset:
         """
         Add new columns by specifying UDFs.
 
-        Specify UDF for computing new columns. If you need to specify different UDFs for different columns,
-        please make multiple calls to add_columns().
-
         Examples:
-            add_columns(udf=add_name_and_age, types={'name': str, 'age': int})
-            add_columns(udf=add_birthday, types={'birthday': str})
+            add_columns(
+                udf=compute_personal_greeting,
+                cols=[
+                    {'name': 'greeting', 'desc': 'The greeting message', 'type': str},
+                    {'name': 'age', 'desc': 'The age of the person', 'type': int},
+                    {'name': 'full_name', 'desc': 'The name of the person', 'type': str},
+                ]
+            )
         """
-        if udf is None or types is None:
-            raise ValueError("udf and types must be provided for add_columns.")
-        
+        if udf is None or cols is None:
+            raise ValueError("`udf` and `cols` must be provided for add_columns.")
+
         if isinstance(depends_on, str):
             depends_on = [depends_on]
 
-        updated_cols =[]
-        for col_name, col_type in types.items():
-            new_col = {}
-            new_col["type"] = col_type
-            new_col["desc"] = "New column: " + col_name
-            new_col["name"] = col_name
-            updated_cols.append(new_col)
+        new_output_schema = None
+        if isinstance(cols, list):
+            updated_cols = []
+            for col_dict in cols:
+                assert isinstance(col_dict, dict), "each entry in `cols` must be a dictionary"
+                assert "name" in col_dict, "each type must contain a 'name' key specifying the column name"
+                assert "type" in col_dict, "each type must contain a 'type' key specifying the column type"
+                col_dict["desc"] = col_dict.get("desc", "New column: " + col_dict["name"])
+                updated_cols.append(col_dict)
+            new_output_schema = self.schema.add_fields(updated_cols)
+        
+        elif issubclass(cols, Schema):
+            new_output_schema = self.schema.union(cols)
 
-        new_output_schema = self.schema.add_fields(updated_cols)
+        else:
+            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+
         return Dataset(
             source=self,
             schema=new_output_schema,
             udf=udf,
             cardinality=cardinality,
-            desc="Add new columns via UDF",
+            desc=desc,
             depends_on=depends_on,
             nocache=self._nocache,
         )
@@ -353,7 +352,7 @@ class Dataset(Set):
         field. `output_attr_desc` is the description of the `output_attr` field.
         """
         # Output schema is a union of the current schema and the output_attr
-        attributes = {output_attr: ListField(desc=output_attr_desc, element_type=StringField)}
+        attributes = {output_attr: ListField(StringField)(desc=output_attr_desc)}
         output_schema = self.schema().union(type("temp_class", (Schema,), attributes))
         return Dataset(
             source=self,
