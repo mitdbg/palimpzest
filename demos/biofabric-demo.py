@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
     if experiment == "collection":
         papers_html = Dataset("biofabric-html")
-        papers_html = papers_html.add_columns(web_page_cols, desc="Extract HTML content")
+        papers_html = papers_html.sem_add_columns(web_page_cols, desc="Extract HTML content")
         table_urls = papers_html.sem_add_columns(url_cols, cardinality=Cardinality.ONE_TO_MANY)
         output = table_urls
 
