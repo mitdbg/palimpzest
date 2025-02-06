@@ -249,8 +249,8 @@ class Dataset(Set):
             desc=desc,
             nocache=self._nocache,
         )
-    
-    def sem_add_columns(self, cols: list[dict], 
+
+    def sem_add_columns(self, cols: list[dict] | type[Schema],
                         cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
                         depends_on: str | list[str] | None = None) -> Dataset:
         """
@@ -263,10 +263,17 @@ class Dataset(Set):
                  {'name': 'full_name', 'desc': 'The name of the person', 'type': str}]
             )
         """
-        new_output_schema = self.schema.add_fields(cols)
         if isinstance(depends_on, str):
             depends_on = [depends_on]
-        
+
+        new_output_schema = None
+        if isinstance(cols, list):
+            new_output_schema = self.schema.add_fields(cols)
+        elif issubclass(cols, Schema):
+            new_output_schema = self.schema.union(cols)
+        else:
+            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+
         return Dataset(
             source=self,
             schema=new_output_schema,
@@ -278,7 +285,7 @@ class Dataset(Set):
         )
 
     def add_columns(self, udf: Callable, 
-                    types: list[dict], 
+                    cols: list[dict] | type[Schema], 
                     cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
                     depends_on: str | list[str] | None = None) -> Dataset:
         """
@@ -287,27 +294,36 @@ class Dataset(Set):
         Examples:
             add_columns(
                 udf=compute_personal_greeting,
-                types=[
+                cols=[
                     {'name': 'greeting', 'desc': 'The greeting message', 'type': str},
                     {'name': 'age', 'desc': 'The age of the person', 'type': int},
                     {'name': 'full_name', 'desc': 'The name of the person', 'type': str},
                 ]
             )
         """
-        if udf is None or types is None:
-            raise ValueError("udf and types must be provided for add_columns.")
+        if udf is None or cols is None:
+            raise ValueError("`udf` and `cols` must be provided for add_columns.")
 
         if isinstance(depends_on, str):
             depends_on = [depends_on]
 
-        updated_cols =[]
-        for col_dict in types:
-            assert "name" in col_dict, "each type must contain a 'name' key specifying the column name"
-            assert "type" in col_dict, "each type must contain a 'type' key specifying the column type"
-            col_dict["desc"] = col_dict.get("desc", "New column: " + col_dict["name"])
-            updated_cols.append(col_dict)
+        new_output_schema = None
+        if isinstance(cols, list):
+            updated_cols = []
+            for col_dict in cols:
+                assert isinstance(col_dict, dict), "each entry in `cols` must be a dictionary"
+                assert "name" in col_dict, "each type must contain a 'name' key specifying the column name"
+                assert "type" in col_dict, "each type must contain a 'type' key specifying the column type"
+                col_dict["desc"] = col_dict.get("desc", "New column: " + col_dict["name"])
+                updated_cols.append(col_dict)
+            new_output_schema = self.schema.add_fields(updated_cols)
+        
+        elif issubclass(cols, Schema):
+            new_output_schema = self.schema.union(cols)
 
-        new_output_schema = self.schema.add_fields(updated_cols)
+        else:
+            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+
         return Dataset(
             source=self,
             schema=new_output_schema,
@@ -360,7 +376,7 @@ class Dataset(Set):
         field. `output_attr_desc` is the description of the `output_attr` field.
         """
         # Output schema is a union of the current schema and the output_attr
-        attributes = {output_attr: ListField(desc=output_attr_desc, element_type=StringField)}
+        attributes = {output_attr: ListField(StringField)(desc=output_attr_desc)}
         output_schema = self.schema().union(type("temp_class", (Schema,), attributes))
         return Dataset(
             source=self,

@@ -11,8 +11,7 @@ from ragatouille import RAGPretrainedModel
 from palimpzest.constants import Model
 from palimpzest.core.data.datasources import ValidationDataSource
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import ImageFilepathField, ListField, StringField
-from palimpzest.core.lib.schemas import Schema
+from palimpzest.core.lib.fields import ImageFilepathField, ListField
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.query.processor.config import QueryProcessorConfig
@@ -174,11 +173,11 @@ class EnronValidationSource(ValidationDataSource):
         return dr
 
 
-# real_estate_listing_cols = [
-#     {"name": "listing", "type": str, "desc": "The name of the listing"},
-#     {"name": "text_content", "type": str, "desc": "The content of the listing's text description"},
-#     {"name": "image_filepaths", "type": list[str], "desc": "A list of the filepaths for each image of the listing"},
-# ]
+real_estate_listing_cols = [
+    {"name": "listing", "type": str, "desc": "The name of the listing"},
+    {"name": "text_content", "type": str, "desc": "The content of the listing's text description"},
+    {"name": "image_filepaths", "type": ListField(ImageFilepathField), "desc": "A list of the filepaths for each image of the listing"},
+]
 
 real_estate_text_cols = [
     {"name": "address", "type": str, "desc": "The address of the property"},
@@ -190,21 +189,21 @@ real_estate_image_cols = [
     {"name": "has_natural_sunlight", "type": bool, "desc": "True if the home interior has lots of natural sunlight and False otherwise"},
 ]
 
-class RealEstateListingFiles(Schema):
-    """The source text and image data for a real estate listing."""
+# class RealEstateListingFiles(Schema):
+#     """The source text and image data for a real estate listing."""
 
-    listing = StringField(desc="The name of the listing")
-    text_content = StringField(desc="The content of the listing's text description")
-    image_filepaths = ListField(
-        element_type=ImageFilepathField,
-        desc="A list of the filepaths for each image of the listing",
-    )
+#     listing = StringField(desc="The name of the listing")
+#     text_content = StringField(desc="The content of the listing's text description")
+#     image_filepaths = ListField(
+#         element_type=ImageFilepathField,
+#         desc="A list of the filepaths for each image of the listing",
+#     )
 
 class RealEstateValidationSource(ValidationDataSource):
     def __init__(
         self, dataset_id, listings_dir, split_idx: int = 25, num_samples: int = 5, shuffle: bool = False, seed: int = 42
     ):
-        super().__init__(RealEstateListingFiles, dataset_id)
+        super().__init__(real_estate_listing_cols, dataset_id)
         self.listings_dir = listings_dir
         self.split_idx = split_idx
         self.listings = sorted(os.listdir(self.listings_dir), key=lambda listing: int(listing.split("listing")[-1]))

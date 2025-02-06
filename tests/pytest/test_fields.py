@@ -1,5 +1,7 @@
 from palimpzest.core.lib.fields import (
     BooleanField,
+    Field,
+    ListField,
     StringField,
 )
 
@@ -13,3 +15,11 @@ def test_field_equality():
     assert boolean_field1 == boolean_field2
     assert boolean_field1 != boolean_field3
     assert boolean_field1 != string_field1
+
+
+def test_field_metaclass():
+    # test that ListField is a metaclass which produces other field types
+    list_field_type = ListField(StringField)
+    assert issubclass(list_field_type, Field)
+    assert list_field_type.element_type == StringField
+    # assert issubclass(list_field_type, ListField) # TODO: this should be true, but requires more work

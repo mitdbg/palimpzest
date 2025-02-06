@@ -46,7 +46,7 @@ def test_dataset_add_columns(sample_df):
         df['greeting'] = 'Hello ' + df['name']
         return df
     
-    new_ds = ds.add_columns(udf=add_greeting, types=[{'name': 'greeting', 'type': str}])
+    new_ds = ds.add_columns(udf=add_greeting, cols=[{'name': 'greeting', 'type': str}])
     assert isinstance(new_ds, Dataset)
     assert new_ds._udf is not None
     assert new_ds.schema.field_names() == ['age', 'greeting', 'id', 'name']
@@ -68,5 +68,5 @@ def test_dataset_add_columns(sample_df):
     assert isinstance(score_field, NumericField)
     assert score_field.desc == 'Score'
 
-    with pytest.raises(ValueError, match="udf and types must be provided for add_columns."):
-        ds.add_columns(udf=add_greeting, types=None)
+    with pytest.raises(ValueError, match="`udf` and `cols` must be provided for add_columns."):
+        ds.add_columns(udf=add_greeting, cols=None)
