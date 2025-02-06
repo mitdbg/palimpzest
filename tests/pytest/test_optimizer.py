@@ -124,7 +124,7 @@ class TestOptimizer:
 
     def test_simple_max_quality_convert(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = Dataset(enron_eval_tiny)
-        plan = plan.convert(email_schema)
+        plan = plan.sem_add_columns(email_schema)
         policy = MaxQuality()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -151,7 +151,7 @@ class TestOptimizer:
 
     def test_simple_min_cost_convert(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = Dataset(enron_eval_tiny)
-        plan = plan.convert(email_schema)
+        plan = plan.sem_add_columns(email_schema)
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -172,7 +172,7 @@ class TestOptimizer:
 
     def test_simple_min_time_convert(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = Dataset(enron_eval_tiny)
-        plan = plan.convert(email_schema)
+        plan = plan.sem_add_columns(email_schema)
         policy = MinTime()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -193,7 +193,7 @@ class TestOptimizer:
 
     def test_push_down_filter(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = Dataset(enron_eval_tiny)
-        plan = plan.convert(email_schema)
+        plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
@@ -216,7 +216,7 @@ class TestOptimizer:
 
     def test_push_down_two_filters(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = Dataset(enron_eval_tiny)
-        plan = plan.convert(email_schema)
+        plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         plan = plan.sem_filter("another text filter", depends_on=["contents"])
         policy = MinCost()
@@ -267,7 +267,7 @@ class TestOptimizer:
 
     def test_seven_filters(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = Dataset(enron_eval_tiny)
-        plan = plan.convert(email_schema)
+        plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("filter1", depends_on=["contents"])
         plan = plan.sem_filter("filter2", depends_on=["contents"])
         plan = plan.sem_filter("filter3", depends_on=["contents"])

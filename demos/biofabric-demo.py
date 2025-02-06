@@ -114,10 +114,10 @@ if __name__ == "__main__":
         output = table_urls
 
         # urlFile = Dataset("biofabric-urls", schema=TextFile)
-        # table_urls = table_urls.convert(URL, desc="The URLs of the tables")
-        # tables = table_urls.convert(File, udf=udfs.url_to_file)
-        # xls = tables.convert(XLSFile, udf = udfs.file_to_xls)
-        # patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
+        # table_urls = table_urls.sem_add_columns(URL, desc="The URLs of the tables")
+        # tables = table_urls.sem_add_columns(File, udf=udfs.url_to_file)
+        # xls = tables.sem_add_columns(XLSFile, udf = udfs.file_to_xls)
+        # patient_tables = xls.sem_add_columns(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
         # output = patient_tables
 
     elif experiment == "filtering":

@@ -222,37 +222,12 @@ class Dataset(Set):
             filter=f,
             depends_on=depends_on,
             nocache=self._nocache,
-        )        
-
-    # TODO(Jun): Remove in https://github.com/mitdbg/palimpzest/issues/94
-    def convert(
-        self,
-        output_schema: Schema,
-        udf: Callable | None = None,
-        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-        depends_on: str | list[str] | None = None,
-        desc: str = "Convert to new schema",
-    ) -> Dataset:
-        """Convert the Set to a new schema.
-
-        Deprecated: This method will be removed in a future version. Please use add_columns() or sem_add_columns() instead.
-        """
-        if isinstance(depends_on, str):
-            depends_on = [depends_on]
-
-        return Dataset(
-            source=self,
-            schema=output_schema,
-            udf=udf,
-            cardinality=cardinality,
-            depends_on=depends_on,
-            desc=desc,
-            nocache=self._nocache,
         )
 
     def sem_add_columns(self, cols: list[dict] | type[Schema],
                         cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
-                        depends_on: str | list[str] | None = None) -> Dataset:
+                        depends_on: str | list[str] | None = None,
+                        desc: str = "Add new columns via semantic reasoning") -> Dataset:
         """
         Add new columns by specifying the column names, descriptions, and types.
         The column will be computed during the execution of the Dataset.
@@ -280,14 +255,15 @@ class Dataset(Set):
             udf=None,
             cardinality=cardinality,
             depends_on=depends_on,
-            desc="Add new columns " + str(cols),
+            desc=desc,
             nocache=self._nocache,
         )
 
     def add_columns(self, udf: Callable, 
                     cols: list[dict] | type[Schema], 
                     cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
-                    depends_on: str | list[str] | None = None) -> Dataset:
+                    depends_on: str | list[str] | None = None,
+                    desc: str = "Add new columns via UDF") -> Dataset:
         """
         Add new columns by specifying UDFs.
 
@@ -329,7 +305,7 @@ class Dataset(Set):
             schema=new_output_schema,
             udf=udf,
             cardinality=cardinality,
-            desc="Add new columns via UDF",
+            desc=desc,
             depends_on=depends_on,
             nocache=self._nocache,
         )

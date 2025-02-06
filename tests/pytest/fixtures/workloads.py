@@ -40,7 +40,7 @@ def in_price_range(record):
 @pytest.fixture
 def enron_workload(enron_eval_tiny, email_schema):
     emails = Dataset(enron_eval_tiny)
-    emails = emails.convert(email_schema)
+    emails = emails.sem_add_columns(email_schema)
     emails = emails.sem_filter(
         'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
     )
@@ -57,8 +57,8 @@ def real_estate_workload(
     image_real_estate_listing_schema,
 ):
     listings = Dataset(real_estate_eval_tiny)
-    listings = listings.convert(text_real_estate_listing_schema, depends_on="text_content")
-    listings = listings.convert(image_real_estate_listing_schema, depends_on="image_filepaths")
+    listings = listings.sem_add_columns(text_real_estate_listing_schema, depends_on="text_content")
+    listings = listings.sem_add_columns(image_real_estate_listing_schema, depends_on="image_filepaths")
     listings = listings.sem_filter(
         "The interior is modern and attractive, and has lots of natural sunlight",
         depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
@@ -78,9 +78,9 @@ def real_estate_workload(
 def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_schema):
     # construct plan with three converts
     dataset = Dataset(enron_eval_tiny)
-    dataset = dataset.convert(email_schema)
-    dataset = dataset.convert(foobar_schema)
-    dataset = dataset.convert(baz_schema)
+    dataset = dataset.sem_add_columns(email_schema)
+    dataset = dataset.sem_add_columns(foobar_schema)
+    dataset = dataset.sem_add_columns(baz_schema)
 
     return dataset
 
@@ -89,7 +89,7 @@ def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
     # construct plan with two converts and two filters
     dataset = Dataset(enron_eval_tiny)
     dataset = dataset.sem_filter("filter1")
-    dataset = dataset.convert(email_schema)
+    dataset = dataset.sem_add_columns(email_schema)
 
     return dataset
 
@@ -97,8 +97,8 @@ def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
 def two_converts_two_filters_workload(enron_eval_tiny, email_schema, foobar_schema):
     # construct plan with two converts and two filters
     dataset = Dataset(enron_eval_tiny)
-    dataset = dataset.convert(email_schema)
-    dataset = dataset.convert(foobar_schema)
+    dataset = dataset.sem_add_columns(email_schema)
+    dataset = dataset.sem_add_columns(foobar_schema)
     dataset = dataset.sem_filter("filter1", depends_on=["sender"])
     dataset = dataset.sem_filter("filter2", depends_on=["subject"])
 
