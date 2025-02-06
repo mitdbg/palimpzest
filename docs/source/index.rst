@@ -91,7 +91,7 @@ Stay tuned for more walkthroughs and tutorials on how to use PZ! In the meantime
 Contents
 --------
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    usage
    dataset
@@ -99,6 +99,14 @@ Contents
    datasource
    schema
    field
+
+Research
+--------
+.. toctree::
+   :maxdepth: 2
+
+   research_papers
+   chat
 
 
 .. |arXiv| image:: https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv
