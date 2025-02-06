@@ -233,7 +233,7 @@ if __name__ == "__main__":
     elif workload == "medical-schema-matching":
         # datasetid="biofabric-medium" for paper evaluation
         plan = Dataset(datasetid)
-        plan = plan.add_columns(xls_to_tables, types=table_cols, cardinality=Cardinality.ONE_TO_MANY)
+        plan = plan.add_columns(xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
         plan = plan.sem_filter("The rows of the table contain the patient age")
         plan = plan.sem_add_columns(case_data_cols, cardinality=Cardinality.ONE_TO_MANY)
 

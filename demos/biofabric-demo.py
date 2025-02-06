@@ -122,7 +122,7 @@ if __name__ == "__main__":
 
     elif experiment == "filtering":
         xls = Dataset("biofabric-tiny")
-        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, types=table_cols, cardinality=Cardinality.ONE_TO_MANY)
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
         # patient_tables = patient_tables.sem_filter("The table explains the meaning of attributes")
         # patient_tables = patient_tables.sem_filter("The table contains patient biometric data")
@@ -132,13 +132,13 @@ if __name__ == "__main__":
 
     elif experiment == "matching":
         xls = Dataset("biofabric-matching")
-        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, types=table_cols, cardinality=Cardinality.ONE_TO_MANY)
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
         case_data = patient_tables.sem_add_columns(case_data_cols, cardinality=Cardinality.ONE_TO_MANY)
         output = case_data
 
     elif experiment == "endtoend":
         xls = Dataset("biofabric-tiny")
-        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, types=table_cols, cardinality=Cardinality.ONE_TO_MANY)
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
         case_data = patient_tables.sem_add_columns(case_data_cols, cardinality=Cardinality.ONE_TO_MANY)
         output = case_data

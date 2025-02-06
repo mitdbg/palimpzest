@@ -259,9 +259,9 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def add_columns(self, udf: Callable, 
-                    cols: list[dict] | type[Schema], 
-                    cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
+    def add_columns(self, udf: Callable,
+                    cols: list[dict] | type[Schema],
+                    cardinality: Cardinality = Cardinality.ONE_TO_ONE,
                     depends_on: str | list[str] | None = None,
                     desc: str = "Add new columns via UDF") -> Dataset:
         """

@@ -85,11 +85,11 @@ def extract_supplemental(processing_strategy, execution_strategy, optimizer_stra
     papers = Dataset("biofabric-pdf")
     papers = papers.sem_add_columns(sci_paper_cols)
     paper_urls = papers.sem_add_columns([{"name": "url", "type": "string", "desc": "The DOI URL for the paper"}])
-    html_doi = paper_urls.add_columns(udf=udfs.url_to_file, types=file_cols)
+    html_doi = paper_urls.add_columns(udf=udfs.url_to_file, cols=file_cols)
     table_urls = html_doi.sem_add_columns([{"name": "table_url", "type": "string", "desc": "The URLs of the XLS tables from the page"}], cardinality=Cardinality.ONE_TO_MANY)
-    tables = table_urls.add_columns(udf=udfs.url_to_file, types=file_cols)
-    xls = tables.add_columns(udf=udfs.file_to_xls, types=xls_cols)
-    patient_tables = xls.add_columns(udf=udfs.xls_to_tables, types=table_cols, cardinality=Cardinality.ONE_TO_MANY)
+    tables = table_urls.add_columns(udf=udfs.url_to_file, cols=file_cols)
+    xls = tables.add_columns(udf=udfs.file_to_xls, cols=xls_cols)
+    patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
 
     config = QueryProcessorConfig(
         policy=policy,
@@ -116,7 +116,7 @@ def extract_supplemental(processing_strategy, execution_strategy, optimizer_stra
 @st.cache_resource()
 def integrate_tables(processing_strategy, execution_strategy, optimizer_strategy, policy):
     xls = Dataset("biofabric-tiny")
-    patient_tables = xls.add_columns(udf=udfs.xls_to_tables, types=table_cols, cardinality=Cardinality.ONE_TO_MANY)
+    patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
     patient_tables = patient_tables.sem_filter("The table contains biometric information about the patient")
     case_data = patient_tables.sem_add_columns(case_data_cols, cardinality=Cardinality.ONE_TO_MANY)
 
