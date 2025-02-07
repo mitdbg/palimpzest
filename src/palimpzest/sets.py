@@ -135,24 +135,30 @@ class Dataset(Set):
     def __init__(self, source: str | list | pd.DataFrame | DataSource, schema: Schema | None = None, *args, **kwargs):
         # convert source (str) -> source (DataSource) if need be
         updated_source = DataDirectory().get_or_register_dataset(source) if isinstance(source, (str, list, pd.DataFrame)) else source
+
         if schema is None:
-            schema = Schema.from_df(source) if isinstance(source, pd.DataFrame) else DefaultSchema
+            # This is mainly for DataSource with a schema. 
+            if updated_source.schema is not None:
+                schema = updated_source.schema
+            else:
+                schema = Schema.from_df(source) if isinstance(source, pd.DataFrame) else DefaultSchema
         # intialize class
         super().__init__(updated_source, schema, *args, **kwargs)
 
     def filter(
         self,
-        _filter: str | Callable,
+        _filter: Callable,
         depends_on: str | list[str] | None = None,
     ) -> Dataset:
-        """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
+        """Add a user defined function as a filter to the Set. This filter will possibly restrict the items that are returned later."""
         f = None
-        if isinstance(_filter, str):
-            f = Filter(_filter)
-        elif callable(_filter):
+        if callable(_filter):
             f = Filter(filter_fn=_filter)
         else:
-            raise Exception("Filter type not supported.", type(_filter))
+            error_str = f"Only support callable for filter, currently got {type(_filter)}"
+            if isinstance(_filter, str):
+                error_str += ". Consider using sem_filter() for semantic filters."
+            raise Exception(error_str)
 
         if isinstance(depends_on, str):
             depends_on = [depends_on]
@@ -164,33 +170,115 @@ class Dataset(Set):
             depends_on=depends_on,
             nocache=self._nocache,
         )
-
-    def convert(
+    
+    def sem_filter(
         self,
-        output_schema: Schema,
-        udf: Callable | None = None,
-        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
+        _filter: str,
         depends_on: str | list[str] | None = None,
-        desc: str = "Convert to new schema",
     ) -> Dataset:
-        """Convert the Set to a new schema."""
+        """Add a natural language description of a filter to the Set. This filter will possibly restrict the items that are returned later."""
+        f = None
+        if isinstance(_filter, str):
+            f = Filter(_filter)
+        else:
+            raise Exception("sem_filter() only supports `str` input for _filter.", type(_filter))
+        
         if isinstance(depends_on, str):
             depends_on = [depends_on]
 
         return Dataset(
             source=self,
-            schema=output_schema,
-            udf=udf,
+            schema=self.schema,
+            filter=f,
+            depends_on=depends_on,
+            nocache=self._nocache,
+        )
+
+    def sem_add_columns(self, cols: list[dict] | type[Schema],
+                        cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
+                        depends_on: str | list[str] | None = None,
+                        desc: str = "Add new columns via semantic reasoning") -> Dataset:
+        """
+        Add new columns by specifying the column names, descriptions, and types.
+        The column will be computed during the execution of the Dataset.
+        Example:
+            sem_add_columns(
+                [{'name': 'greeting', 'desc': 'The greeting message', 'type': str},
+                 {'name': 'age', 'desc': 'The age of the person', 'type': int},
+                 {'name': 'full_name', 'desc': 'The name of the person', 'type': str}]
+            )
+        """
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+
+        new_output_schema = None
+        if isinstance(cols, list):
+            new_output_schema = self.schema.add_fields(cols)
+        elif issubclass(cols, Schema):
+            new_output_schema = self.schema.union(cols)
+        else:
+            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+
+        return Dataset(
+            source=self,
+            schema=new_output_schema,
+            udf=None,
             cardinality=cardinality,
             depends_on=depends_on,
             desc=desc,
             nocache=self._nocache,
         )
-    
-    # This is a convenience for users who like DataFrames-like syntax.   
-    def add_columns(self, columns:dict[str, str], cardinality: Cardinality = Cardinality.ONE_TO_ONE) -> Dataset:
-        new_output_schema = self.schema.add_fields(columns)
-        return self.convert(new_output_schema, udf=None, cardinality=cardinality, depends_on=None, desc="Add columns " + str(columns))
+
+    def add_columns(self, udf: Callable,
+                    cols: list[dict] | type[Schema],
+                    cardinality: Cardinality = Cardinality.ONE_TO_ONE,
+                    depends_on: str | list[str] | None = None,
+                    desc: str = "Add new columns via UDF") -> Dataset:
+        """
+        Add new columns by specifying UDFs.
+
+        Examples:
+            add_columns(
+                udf=compute_personal_greeting,
+                cols=[
+                    {'name': 'greeting', 'desc': 'The greeting message', 'type': str},
+                    {'name': 'age', 'desc': 'The age of the person', 'type': int},
+                    {'name': 'full_name', 'desc': 'The name of the person', 'type': str},
+                ]
+            )
+        """
+        if udf is None or cols is None:
+            raise ValueError("`udf` and `cols` must be provided for add_columns.")
+
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+
+        new_output_schema = None
+        if isinstance(cols, list):
+            updated_cols = []
+            for col_dict in cols:
+                assert isinstance(col_dict, dict), "each entry in `cols` must be a dictionary"
+                assert "name" in col_dict, "each type must contain a 'name' key specifying the column name"
+                assert "type" in col_dict, "each type must contain a 'type' key specifying the column type"
+                col_dict["desc"] = col_dict.get("desc", "New column: " + col_dict["name"])
+                updated_cols.append(col_dict)
+            new_output_schema = self.schema.add_fields(updated_cols)
+        
+        elif issubclass(cols, Schema):
+            new_output_schema = self.schema.union(cols)
+
+        else:
+            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+
+        return Dataset(
+            source=self,
+            schema=new_output_schema,
+            udf=udf,
+            cardinality=cardinality,
+            desc=desc,
+            depends_on=depends_on,
+            nocache=self._nocache,
+        )
 
     def count(self) -> Dataset:
         """Apply a count aggregation to this set"""
@@ -234,7 +322,7 @@ class Dataset(Set):
         field. `output_attr_desc` is the description of the `output_attr` field.
         """
         # Output schema is a union of the current schema and the output_attr
-        attributes = {output_attr: ListField(desc=output_attr_desc, element_type=StringField)}
+        attributes = {output_attr: ListField(StringField)(desc=output_attr_desc)}
         output_schema = self.schema().union(type("temp_class", (Schema,), attributes))
         return Dataset(
             source=self,

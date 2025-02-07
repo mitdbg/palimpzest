@@ -17,6 +17,7 @@ from palimpzest.core.lib.fields import (
     NumericField,
     StringField,
 )
+from palimpzest.utils.field_helpers import construct_field_type
 from palimpzest.utils.hash_helpers import hash_for_temp_schema
 
 
@@ -102,7 +103,9 @@ class Schema(metaclass=SchemaMetaclass):
         attributes = dir(cls)
         attributes = [attr for attr in attributes if not attr.startswith("__")]
         prefix = f"{cls.__name__}.{id}." if unique else ""
-        field_desc_map = {prefix + attr: getattr(cls, attr)._desc for attr in attributes if isinstance(getattr(cls, attr), Field)}
+        field_desc_map = {
+            prefix + attr: getattr(cls, attr)._desc for attr in attributes if isinstance(getattr(cls, attr), Field)
+        }
         return field_desc_map
 
     @classmethod
@@ -124,7 +127,6 @@ class Schema(metaclass=SchemaMetaclass):
         fields = cls.field_names()
 
         schema = {
-
             "fields": {},
             "type": "object",
             "description": cls.__doc__,
@@ -186,7 +188,7 @@ class Schema(metaclass=SchemaMetaclass):
                     if left_field_name == right_field_name:
                         matching_field = True
                         break
-                
+
                 # if theres a matching field, add them both with their schema names
                 if matching_field:
                     dup_new_field_names.append(schema_name + "_" + left_field_name)
@@ -197,11 +199,7 @@ class Schema(metaclass=SchemaMetaclass):
         # Generate the schema class dynamically
         attributes = {"_desc": new_desc, "__doc__": new_desc}
         for field_name, field_type, field_desc in zip(new_field_names, new_field_types, new_field_descs):
-            attributes[field_name] = (
-                field_type.__class__(desc=field_desc, element_type=field_type.element_type)
-                if isinstance(field_type, ListField)
-                else field_type.__class__(desc=field_desc)
-            )
+            attributes[field_name] = field_type.__class__(desc=field_desc)
 
         # Create the class dynamically
         return type(new_schema_name, (Schema,), attributes)
@@ -241,7 +239,7 @@ class Schema(metaclass=SchemaMetaclass):
         # Create a unique schema name based on columns
         schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
 
-        # consider to save to temp file and load from there 
+        # consider to save to temp file and load from there
         if schema_name in globals():
             return globals()[schema_name]
 
@@ -266,72 +264,68 @@ class Schema(metaclass=SchemaMetaclass):
             else:
                 attributes[field_name] = Field(desc=field_desc)
 
-
         # Create new schema only if it doesn't exist
         new_schema = type(schema_name, (Schema,), attributes)
 
         # Store the schema class globally
         globals()[schema_name] = new_schema
         return new_schema
-    
+
     @classmethod
-    def add_fields(cls, fields: dict[str, str]) -> Schema:
+    def from_json(cls, fields: list[dict]) -> Schema:
+        return cls.add_fields(fields)
+
+    @classmethod
+    def add_fields(cls, fields: list[dict]) -> Schema:
         """Add fields to the schema
-        
+
         Args:
-            fields: Dictionary mapping field names to their descriptions
-            
+            fields: List of dictionaries, each containing 'name', 'desc', and 'type' keys
+
         Returns:
             A new Schema with the additional fields
         """
-        # Construct the new schema name
-        schema_name = cls.class_name()
-        new_schema_name = f"{schema_name}Extended"
+        assert isinstance(fields, list), "fields must be a list of dictionaries"
+        for field in fields:
+            assert "name" in field, "fields must contain a 'name' key"
+            assert "desc" in field, "fields must contain a 'desc' key"
+            assert "type" in field, "fields must contain a 'type' key"
 
-        # Construct new schema description
-        new_desc = f"{cls.__doc__}\nExtended with additional fields"
+        # build up field names, descriptions, and types
+        new_field_names = [field["name"] for field in fields]
+        new_field_objs = [
+            construct_field_type(field["type"], desc=field["desc"])
+            for field in fields
+        ]
 
-        # Get existing fields
-        new_field_names = list(cls.field_names())
-        new_field_types = list(cls.field_map().values())
-        new_field_descs = [field._desc for field in new_field_types]
-
-        # TODO: Users will provide explicit descriptions for the fields, 
-        # details in https://github.com/mitdbg/palimpzest/issues/84
-        for field_name, field_desc in fields.items():
-            if field_name in new_field_names:
-                continue
-            new_field_names.append(field_name)
-            new_field_types.append(StringField(desc=field_desc))  # Assuming StringField for new fields
-            new_field_descs.append(field_desc)
-
-        # Generate the schema class dynamically
+        # construct new schema
+        new_desc = f"Added fields to {cls.__name__}"
         attributes = {"_desc": new_desc, "__doc__": new_desc}
-        for field_name, field_type, field_desc in zip(new_field_names, new_field_types, new_field_descs):
-            attributes[field_name] = (
-                field_type.__class__(desc=str(field_desc), element_type=field_type.element_type)
-                if isinstance(field_type, ListField)
-                else field_type.__class__(desc=str(field_desc))
-            )
+        for field_name, field_obj in zip(new_field_names, new_field_objs):
+            attributes[field_name] = field_obj
 
-        # Create the class dynamically
-        return type(new_schema_name, (Schema,), attributes)
+        new_output_schema = type(f"{cls.__name__}Extended", (Schema,), attributes)
+
+        # return the union of this new schema with the cls
+        return cls.union(new_output_schema)
 
     @classmethod
     def class_name(cls) -> str:
         """Return the name of this class"""
         return cls.__name__
 
+
 ###################################################################################
 # "Core" useful Schemas. These are Schemas that almost everyone will need.
 # File, TextFile, Image, PDF, etc.
 ###################################################################################
 
+
 # First-level Schema's
 class DefaultSchema(Schema):
     """Store context data."""
 
-    value = Field(desc="The context data.")
+    default_schema_value = Field(desc="The context data in DefaultSchema.")
 
 
 class Download(Schema):
@@ -369,14 +363,16 @@ class RawJSONObject(Schema):
     json = StringField(desc="String representation of a JSON object")
 
 
+list_of_strings = ListField(StringField)
+list_of_lists = ListField(ListField)
 class Table(Schema):
     """A Table is an object composed of a header and rows."""
 
     filename = StringField(desc="The name of the file the table was extracted from")
     name = StringField(desc="The name of the table")
-    header = ListField(element_type=StringField, desc="The header of the table")
+    header = list_of_strings(desc="The header of the table")
     # TODO currently no support for nesting data records on data records
-    rows = ListField(element_type=ListField, desc="The rows of the table")
+    rows = list_of_lists(desc="The rows of the table")
 
     def field_to_json(self, field_name: str, field_value: TypingAny) -> TypingAny:
         """Return a truncated JSON representation for `rows` and a string representation for `header`"""
@@ -403,11 +399,13 @@ class WebPage(Schema):
     text = StringField(desc="The text contents of the web page")
     html = StringField(desc="The html contents of the web page")
     timestamp = StringField(desc="The timestamp of the download")
+    filename = StringField(desc="The name of the file the web page was downloaded from")
 
 
 # Second-level Schemas
 class ImageFile(File):
     """A file that contains an image."""
+
     contents = ImageBase64Field(desc="The contents of the image")
 
 
@@ -421,15 +419,12 @@ class PDFFile(File):
 class TextFile(File):
     """A text file is a File that contains only text. No binary data."""
 
-
+list_of_numbers = ListField(NumericField)
 class XLSFile(File):
     """An XLS file is a File that contains one or more Excel spreadsheets."""
 
     number_sheets = NumericField(desc="The number of sheets in the Excel file")
-    sheet_names = ListField(
-        element_type=NumericField,
-        desc="The names of the sheets in the Excel file",
-    )
+    sheet_names = list_of_numbers(desc="The names of the sheets in the Excel file")
 
 
 # Third-level Schemas

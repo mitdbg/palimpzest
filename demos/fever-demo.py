@@ -5,26 +5,21 @@ import os
 from ragatouille import RAGPretrainedModel
 
 from palimpzest.core.data.datasources import DataSource
-from palimpzest.core.lib.fields import BooleanField, StringField
-from palimpzest.core.lib.schemas import Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 
+fever_claims_cols = [
+    {"name": "claim", "type": str, "desc": "the claim being made"}
+]
 
-class FeverClaimsSchema(Schema):
-    claim = StringField(desc="the claim being made")
-
-
-class FeverOutputSchema(FeverClaimsSchema):
-    label = BooleanField(
-        "Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise."
-    )
-
+fever_output_cols = [
+    {"name": "label", "type": bool, "desc": "Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise."}
+]
 
 class FeverDataSource(DataSource):
     def __init__(self, dataset_id, claims_file_path, num_claims_to_process):
-        super().__init__(FeverClaimsSchema, dataset_id)
+        super().__init__(fever_claims_cols, dataset_id)
 
         # `claims_file_path` is the path to the file containing the claims which is expected to be a jsonl file.
         # Each line in the file is a JSON object with an "id" and a "claim" field.
@@ -66,7 +61,8 @@ def parse_arguments():
 
 
 def build_fever_query(index, dataset_id, k):
-    claims = Dataset(dataset_id, schema=FeverClaimsSchema)
+    claims = Dataset(dataset_id)
+    claims = claims.sem_add_columns(fever_claims_cols, desc="Extract the claim")
 
     def search_func(index, query, k):
         results = index.search(query, k=k)
@@ -80,7 +76,7 @@ def build_fever_query(index, dataset_id, k):
         output_attr_desc="Most relevant wikipedia articles to the `claim`",
         k=k,
     )
-    output = claims_and_relevant_files.convert(output_schema=FeverOutputSchema)
+    output = claims_and_relevant_files.sem_add_columns(fever_output_cols)
     return output
 
 

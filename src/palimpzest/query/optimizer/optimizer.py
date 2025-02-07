@@ -218,7 +218,7 @@ class Optimizer:
         node = dataset_nodes[-1]
         output_schema = node.schema
         input_schema = dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
-
+        
         ### convert node --> Group ###
         uid = node.universal_identifier()
 
@@ -284,6 +284,9 @@ class Optimizer:
                 depends_on=node._depends_on,
                 target_cache_id=uid,
             )
+        # some legacy plans may have a useless convert; for now we simply skip it
+        elif output_schema == input_schema:
+            return self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], {}, {})
         else:
             raise NotImplementedError(
                 f"""No logical operator exists for the specified dataset construction.
@@ -368,13 +371,6 @@ class Optimizer:
             node = node._source
         dataset_nodes.append(node)
         dataset_nodes = list(reversed(dataset_nodes))
-
-        # remove unnecessary convert if output schema from data source scan matches
-        # input schema for the next operator
-        if len(dataset_nodes) > 1 and dataset_nodes[0].schema.get_desc() == dataset_nodes[1].schema.get_desc():
-            dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
-            if len(dataset_nodes) > 1:
-                dataset_nodes[1]._source = dataset_nodes[0]
 
         # compute depends_on field for every node
         short_to_full_field_name = {}

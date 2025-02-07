@@ -37,15 +37,20 @@ class DataSource(ABC):
     - `get_item(idx)`: which takes in an `idx` and returns the element at that index
     """
 
-    def __init__(self, schema: Schema, dataset_id: str) -> None:
+    def __init__(self, schema: type[Schema] | list[dict], dataset_id: str) -> None:
         """
-        Constructor for the `DataSource` class.
+            Constructor for the `DataSource` class.
 
-        Args:
-            schema (Schema): The output schema of the data source
-            dataset_id (str): The unique identifier for the dataset
+            Args:
+                schema (Schema): The output schema of the data source
+                dataset_id (str): The unique identifier for the dataset
         """
-        self._schema = schema  # NOTE: _schema currently has to match attribute name in Dataset
+        # NOTE: _schema attribute currently has to match attribute name in Dataset
+        self._schema = (
+            Schema.from_json(schema)
+            if isinstance(schema, list)
+            else schema
+        )
         self.dataset_id = dataset_id
 
     def __eq__(self, __value: object) -> bool:

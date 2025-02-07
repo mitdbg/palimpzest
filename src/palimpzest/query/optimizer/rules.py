@@ -2,7 +2,6 @@ from copy import deepcopy
 from itertools import combinations
 
 from palimpzest.constants import AggFunc, Cardinality, Model, PromptStrategy
-from palimpzest.core.lib.fields import ListField
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
 from palimpzest.query.operators.convert import LLMConvertBonded, LLMConvertConventional, NonLLMConvert
@@ -292,7 +291,7 @@ class LLMConvertRule(ImplementationRule):
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
         list_image_field = any([
-            field.is_image_field and isinstance(field, ListField)
+            field.is_image_field and hasattr(field, "element_type")
             for field_name, field in logical_expression.input_fields.items()
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
@@ -604,7 +603,7 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
         list_image_field = any([
-            field.is_image_field and isinstance(field, ListField)
+            field.is_image_field and hasattr(field, "element_type")
             for field_name, field in logical_expression.input_fields.items()
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
@@ -778,7 +777,7 @@ class LLMFilterRule(ImplementationRule):
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
         list_image_field = any([
-            field.is_image_field and isinstance(field, ListField)
+            field.is_image_field and hasattr(field, "element_type")
             for field_name, field in logical_expression.input_fields.items()
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])

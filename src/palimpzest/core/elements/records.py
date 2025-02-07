@@ -63,6 +63,8 @@ class DataRecord:
             if cardinality_idx is None
             else str(schema) + str(cardinality_idx) + str(parent_id if parent_id is not None else str(self.source_idx))
         )
+        # TODO(Jun): build-in id should has a special name, the current self.id is too general which would conflict with user defined schema too easily.
+        # the options: built_in_id, generated_id
         self.id = hash_for_id(id_str)
 
 
@@ -113,7 +115,7 @@ class DataRecord:
 
 
     def get_field_names(self):
-        return list(self.field_types.keys())
+        return list(self.field_values.keys())
 
 
     def get_field_type(self, field_name: str) -> Field:
@@ -243,8 +245,8 @@ class DataRecord:
     def to_df(records: list[DataRecord], project_cols: list[str] | None = None) -> pd.DataFrame:
         if len(records) == 0:
             return pd.DataFrame()
-        
-        fields = records[0].schema.field_names()
+
+        fields = records[0].get_field_names()
         if project_cols is not None and len(project_cols) > 0:
             fields = [field for field in fields if field in project_cols]
 
