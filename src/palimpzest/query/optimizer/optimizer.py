@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 from palimpzest.constants import Model
-from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.data.datareaders import DataSource
 from palimpzest.core.lib.fields import Field
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import Policy

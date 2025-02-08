@@ -1,7 +1,7 @@
 import pytest
 
 from palimpzest.constants import Cardinality, Model
-from palimpzest.core.data.datasources import MemorySource
+from palimpzest.core.data.datareaders import MemorySource
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import File, Schema, StringField, TextFile
 from palimpzest.datamanager.datamanager import DataDirectory

@@ -2,7 +2,7 @@ from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 
 from palimpzest.core.data.dataclasses import PlanStats, RecordOpStats
-from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.data.datareaders import DataSource
 from palimpzest.core.elements.records import DataRecord, DataRecordCollection
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import Policy

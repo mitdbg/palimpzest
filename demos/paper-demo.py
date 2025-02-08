@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 
 from palimpzest.constants import Cardinality
-from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.data.datareaders import DataSource
 from palimpzest.core.lib.fields import ImageFilepathField, ListField
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost, MinTime

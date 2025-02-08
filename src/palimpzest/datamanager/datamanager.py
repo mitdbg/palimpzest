@@ -8,7 +8,7 @@ import yaml
 from palimpzest import constants
 from palimpzest.config import Config
 from palimpzest.constants import DEFAULT_DATASET_ID_CHARS, MAX_DATASET_ID_CHARS, PZ_DIR
-from palimpzest.core.data.datasources import (
+from palimpzest.core.data.datareaders import (
     DataSource,
     FileSource,
     HTMLFileDirectorySource,

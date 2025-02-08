@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.data.datareaders import DataSource
 from palimpzest.core.lib.fields import ImageFilepathField, ListField, NumericField
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.datamanager.datamanager import DataDirectory

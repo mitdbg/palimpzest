@@ -1,4 +1,4 @@
-from palimpzest.core.data.datasources import MemorySource
+from palimpzest.core.data.datareaders import MemorySource
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.query.operators.datasource import MarshalAndScanDataOp

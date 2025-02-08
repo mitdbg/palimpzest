@@ -6,7 +6,7 @@ from copy import deepcopy
 import pandas as pd
 import pytest
 
-from palimpzest.core.data.datasources import (
+from palimpzest.core.data.datareaders import (
     FileSource,
     HTMLFileDirectorySource,
     ImageFileDirectorySource,

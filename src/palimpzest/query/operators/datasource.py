@@ -9,7 +9,7 @@ from palimpzest.constants import (
     Cardinality,
 )
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.core.data.datasources import DataSource, DirectorySource, FileSource
+from palimpzest.core.data.datareaders import DataSource, DirectorySource, FileSource
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.operators.physical import PhysicalOperator
 

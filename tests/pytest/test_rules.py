@@ -1,6 +1,6 @@
 import pytest
 
-from palimpzest.core.data.datasources import MemorySource
+from palimpzest.core.data.datareaders import MemorySource
 from palimpzest.core.lib.schemas import Schema, StringField
 from palimpzest.query.operators.logical import BaseScan
 from palimpzest.query.optimizer.primitives import LogicalExpression

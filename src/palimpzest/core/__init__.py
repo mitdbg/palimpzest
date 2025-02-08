@@ -1,4 +1,4 @@
-from palimpzest.core.data.datasources import (
+from palimpzest.core.data.datareaders import (
     DataSource,
     DirectorySource,
     FileSource,

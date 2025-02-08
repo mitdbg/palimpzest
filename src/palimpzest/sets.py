@@ -6,7 +6,7 @@ from typing import Callable
 import pandas as pd
 
 from palimpzest.constants import AggFunc, Cardinality
-from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.data.datareaders import DataSource
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.lib.fields import ListField, StringField

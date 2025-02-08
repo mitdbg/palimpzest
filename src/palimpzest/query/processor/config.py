@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass, field
 
 from palimpzest.constants import Model
-from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.data.datareaders import DataSource
 from palimpzest.policy import MaxQuality, Policy
 
 
