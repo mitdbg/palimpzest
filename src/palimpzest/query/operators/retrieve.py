@@ -9,9 +9,10 @@ from palimpzest.query.operators.physical import PhysicalOperator
 
 
 class RetrieveOp(PhysicalOperator):
-    def __init__(self, index, search_attr, output_attr, k, *args, **kwargs):
+    def __init__(self, index, search_func, search_attr, output_attr, k, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.index = index
+        self.search_func = search_func
         self.search_attr = search_attr
         self.output_attr = output_attr
         self.k = k
@@ -36,6 +37,7 @@ class RetrieveOp(PhysicalOperator):
         op_params = super().get_op_params()
         op_params = {
             "index": self.index,
+            "search_func": self.search_func,
             "search_attr": self.search_attr,
             "output_attr": self.output_attr,
             "k": self.k,
@@ -61,41 +63,21 @@ class RetrieveOp(PhysicalOperator):
 
         query = getattr(candidate, self.search_attr)
 
-        top_k_results, top_k_result_doc_ids = [], []
-        if isinstance(query, str):
-            results = self.index.search(query, k=self.k)
-            top_k_results = [result["content"] for result in results]
-
-            # This is hacky, fix this later.
-            top_k_result_doc_ids = list({result["document_id"] for result in results})
-
-        elif isinstance(query, list):
-            try:
-                # retrieve top entry for each query
-                results = self.index.search(query, k=1)
-
-                # filter for the top-k entries
-                results = [result[0] if isinstance(result, list) else result for result in results]
-                sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
-                top_k_results = [result["content"] for result in sorted_results[:self.k]]
-                top_k_result_doc_ids = [result["document_id"] for result in sorted_results[:self.k]]
-            except Exception:
-                os.makedirs("retrieve-errors", exist_ok=True)
-                ts = time.time()
-                with open(f"retrieve-errors/error-{ts}.txt", "w") as f:
-                    f.write(str(query))
-
-                top_k_results = ["error-in-retrieve"]
-                top_k_result_doc_ids = ["error-in-retrieve"]
+        try:
+            top_k_results = self.search_func(self.index, query, self.k)
+        except Exception:
+            top_k_results = ["error-in-retrieve"]
+            os.makedirs("retrieve-errors", exist_ok=True)
+            ts = time.time()
+            with open(f"retrieve-errors/error-{ts}.txt", "w") as f:
+                f.write(str(query))
 
         output_dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
         setattr(output_dr, self.output_attr, top_k_results)
-        output_dr._evidence_file_ids = top_k_result_doc_ids
 
         duration_secs = time.time() - start_time
         answer = {self.output_attr: top_k_results}
         record_state = output_dr.to_dict(include_bytes=False)
-        record_state["_evidence_file_ids"] = top_k_result_doc_ids
 
         # NOTE: right now this should be equivalent to [self.output_attr], but in the future we may
         #       want to support the RetrieveOp generating multiple fields. (Also, the function will

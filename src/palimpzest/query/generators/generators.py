@@ -35,7 +35,7 @@ from palimpzest.constants import (
 )
 from palimpzest.core.data.dataclasses import GenerationStats
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import BytesField, ImageBase64Field, ImageFilepathField, ImageURLField, ListField
+from palimpzest.core.lib.fields import BytesField, ImageBase64Field, ImageFilepathField, ImageURLField
 from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
 
@@ -482,7 +482,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
                     base64_image = base64.b64encode(f.read()).decode('utf-8')
                 user_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}})
 
-            elif isinstance(field_type, ListField) and isinstance(field_type.element_type, ImageFilepathField):
+            elif hasattr(field_type, "element_type") and isinstance(field_type.element_type, ImageFilepathField):
                 is_image_conversion = True
                 for image_filepath in field_value:
                     with open(image_filepath, 'rb') as f:
@@ -494,7 +494,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
                 is_image_conversion = True
                 user_content.append({"type": "image_url", "image_url": {"url": field_value}})
 
-            elif isinstance(field_type, ListField) and isinstance(field_type.element_type, ImageURLField):
+            elif hasattr(field_type, "element_type") and isinstance(field_type.element_type, ImageURLField):
                 is_image_conversion = True
                 for image_url in field_value:
                     user_content.append({"type": "image_url", "image_url": {"url": image_url}})
@@ -505,7 +505,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
                 base64_image_str = field_value.decode("utf-8")
                 user_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}})
 
-            elif isinstance(field_type, ListField) and isinstance(field_type.element_type, ImageBase64Field):
+            elif hasattr(field_type, "element_type") and isinstance(field_type.element_type, ImageBase64Field):
                 is_image_conversion = True
                 for base64_image in field_value:
                     base64_image_str = base64_image.decode("utf-8")

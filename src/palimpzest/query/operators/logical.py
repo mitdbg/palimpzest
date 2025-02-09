@@ -374,6 +374,7 @@ class RetrieveScan(LogicalOperator):
     def __init__(
         self,
         index,
+        search_func,
         search_attr,
         output_attr,
         k,
@@ -383,6 +384,7 @@ class RetrieveScan(LogicalOperator):
     ):
         super().__init__(*args, **kwargs)
         self.index = index
+        self.search_func = search_func
         self.search_attr = search_attr
         self.output_attr = output_attr  
         self.k = k
@@ -409,6 +411,7 @@ class RetrieveScan(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "index": self.index,
+            "search_func": self.search_func,
             "search_attr": self.search_attr,
             "output_attr": self.output_attr,
             "k": self.k,
