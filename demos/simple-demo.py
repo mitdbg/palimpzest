@@ -6,6 +6,9 @@ import time
 from demo_core import execute_task, format_results_table
 
 from palimpzest.policy import MaxQuality, MinCost, MinTime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def main():
