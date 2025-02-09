@@ -4,24 +4,18 @@ import os
 import random
 from pathlib import Path
 
-from palimpzest.constants import Model, OptimizationStrategy
+from ragatouille import RAGPretrainedModel
+
+from palimpzest.constants import Model
 from palimpzest.core.data.datasources import ValidationDataSource
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import BooleanField, ListField, StringField
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost, MinTime
-from palimpzest.query import (
-    Execute,
-    MABSequentialParallelSentinelExecution,
-    MABSequentialSingleThreadSentinelExecution,
-    NoSentinelPipelinedParallelExecution,
-    NoSentinelPipelinedSingleThreadExecution,
-    NoSentinelSequentialSingleThreadExecution,
-)
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 from palimpzest.utils.model_helpers import get_models
-from ragatouille import RAGPretrainedModel
 
 
 class FeverClaimsSchema(Schema):
@@ -160,15 +154,15 @@ parser.add_argument(
 # parser.add_argument("--datasetid", type=str, help="The dataset id")
 # parser.add_argument("--workload", type=str, help="The workload to run. One of enron, real-estate, medical-schema-matching.")
 parser.add_argument(
-    "--engine",
+    "--processing_strategy",
     type=str,
-    help='The engine to use. One of sentinel, nosentinel',
-    default='sentinel',
+    help='The processing strategy to use. One of no_sentinel, mab_sentinel',
+    default='no_sentinel',
 )
 parser.add_argument(
-    "--executor",
+    "--execution_strategy",
     type=str,
-    help='The plan executor to use. One of sequential, pipelined, parallel',
+    help='The execution strategy to use. One of sequential, pipelined_single_thread, pipelined_parallel',
     default='sequential',
 )
 parser.add_argument(
@@ -233,32 +227,10 @@ else:
     print("Policy not supported for this demo")
     exit(1)
 
-if engine == "sentinel":
-    if executor == "sequential":
-        execution_engine = MABSequentialSingleThreadSentinelExecution
-    elif executor == "parallel":
-        execution_engine = MABSequentialParallelSentinelExecution
-    else:
-        print("Unknown executor")
-        exit(1)
-elif engine == "nosentinel":
-    if executor == "sequential":
-        execution_engine = NoSentinelSequentialSingleThreadExecution
-    elif executor == "pipelined":
-        execution_engine = NoSentinelPipelinedSingleThreadExecution
-    elif executor == "parallel":
-        execution_engine = NoSentinelPipelinedParallelExecution
-    else:
-        print("Unknown executor")
-        exit(1)
-else:
-    print("Unknown engine")
-    exit(1)
-
 # select optimization strategy and available models based on engine
-optimization_strategy, available_models = None, None
+optimizer_strategy, available_models = None, None
 if engine == "sentinel":
-    optimization_strategy = OptimizationStrategy.PARETO
+    optimizer_strategy = "pareto"
     available_models = get_models(include_vision=True)
 else:
     model_str_to_model = {
@@ -273,7 +245,7 @@ else:
         "mixtral": Model.LLAMA3_V,
         "llama": Model.LLAMA3_V,
     }
-    optimization_strategy = OptimizationStrategy.NONE
+    optimizer_strategy = "none"
     available_models = [model_str_to_model[model]] + [model_str_to_vision_model[model]]
 
 
@@ -305,19 +277,21 @@ claims_and_relevant_files = claims.retrieve(
 )
 output = claims_and_relevant_files.convert(output_schema=FeverOutputSchema)
 
-# execute pz plan
+assert args.processing_strategy in ["no_sentinel", "mab_sentinel"], "We only support no_sentinel and mab_sentinel for this demo"
 
-records, execution_stats = Execute(
-        output,
-        policy=policy,
-        nocache=True,
-        available_models=available_models,
-        optimization_strategy=optimization_strategy,
-        execution_engine=execution_engine,
-        rank=rank,
-        verbose=verbose,
-        allow_code_synth=allow_code_synth
-    )
+# execute pz plan
+config = QueryProcessorConfig(
+    policy=policy,
+    nocache=True,
+    available_models=available_models,
+    optimizer_strategy=optimizer_strategy,
+    processing_strategy=args.processing_strategy,
+    execution_strategy=args.execution_strategy,
+    rank=rank,
+    verbose=verbose,
+    allow_code_synth=allow_code_synth
+)
+data_record_collection = output.run(config)
 
 # create filepaths for records and stats
 records_path = (
@@ -332,8 +306,8 @@ stats_path = (
 )
 
 record_jsons = []
-for record in records:
-    record_dict = record.as_dict()
+for record in data_record_collection:
+    record_dict = record.to_dict()
     ### field_to_keep = ["claim", "id", "label"]
     ### record_dict = {k: v for k, v in record_dict.items() if k in fields_to_keep}
     record_jsons.append(record_dict)
@@ -342,6 +316,6 @@ with open(records_path, 'w') as f:
     json.dump(record_jsons, f)
 
 # save statistics
-execution_stats_dict = execution_stats.to_json()
+execution_stats_dict = data_record_collection.execution_stats.to_json()
 with open(stats_path, "w") as f:
     json.dump(execution_stats_dict, f)

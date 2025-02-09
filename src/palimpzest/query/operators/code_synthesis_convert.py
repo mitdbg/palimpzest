@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from palimpzest.constants import Cardinality, GPT_4o_MODEL_CARD, Model
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
@@ -15,9 +15,9 @@ from palimpzest.utils.sandbox import API
 FieldName = str
 CodeName = str
 Code = str
-DataRecordDict = Dict[str, Any]
-Exemplar = Tuple[DataRecordDict, DataRecordDict]
-CodeEnsemble = Dict[CodeName, Code]
+DataRecordDict = dict[str, Any]
+Exemplar = tuple[DataRecordDict, DataRecordDict]
+CodeEnsemble = dict[CodeName, Code]
 
 
 class CodeSynthesisConvert(LLMConvert):
@@ -185,8 +185,7 @@ class CodeSynthesisConvert(LLMConvert):
 
     def _bonded_query_fallback(self, candidate: DataRecord) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
         fields_to_generate = self.get_fields_to_generate(candidate, self.input_schema, self.output_schema)
-        candidate_dict = candidate.as_dict(include_bytes=False, project_cols=self.depends_on)
-        candidate = candidate.copy(include_bytes=False, project_cols=self.depends_on)
+        projected_candidate = candidate.copy(include_bytes=False, project_cols=self.depends_on)
 
         # execute the bonded convert
         bonded_op = LLMConvertBonded(
@@ -195,7 +194,7 @@ class CodeSynthesisConvert(LLMConvert):
             model=self.exemplar_generation_model,
             prompt_strategy=self.prompt_strategy,
         )
-        field_answers, generation_stats = bonded_op.convert(candidate, fields_to_generate)
+        field_answers, generation_stats = bonded_op.convert(projected_candidate, fields_to_generate)
         assert all([field in field_answers for field in fields_to_generate]), "Not all fields were generated!"
 
         # for the vanilla LLMConvert, we simply replace any None values with an empty list
@@ -207,7 +206,7 @@ class CodeSynthesisConvert(LLMConvert):
         # NOTE: this now includes bytes input fields which will show up as: `field_name = "<bytes>"`;
         #       keep an eye out for a regression in code synth performance and revert if necessary
         # update operator's set of exemplars
-        exemplars = [(candidate_dict, dr.as_dict(include_bytes=False)) for dr in drs]
+        exemplars = [(projected_candidate.to_dict(include_bytes=False), dr.to_dict(include_bytes=False)) for dr in drs]
         self.exemplars.extend(exemplars)
 
         # if we are allowed to cache exemplars across plan executions, add exemplars to cache
@@ -222,32 +221,30 @@ class CodeSynthesisConvert(LLMConvert):
         """Code synthesis is disallowed on image conversions, so this must be False."""
         return False
 
-    def convert(self, candidate: DataRecord, fields_to_generate: list[str] | None = None) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: list[str] | None = None) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
         # get the dictionary fields for the candidate
-        candidate_dict = candidate.as_dict(include_bytes=False, project_cols=self.depends_on)
+        candidate_dict = candidate.to_dict(include_bytes=False, project_cols=self.depends_on)
 
         # Check if code was already synthesized, or if we have at least one converted sample
         generation_stats = GenerationStats()
         if self._should_synthesize():
-            self.field_to_code_ensemble, total_code_synth_stats = self.synthesize_code_ensemble(
-                fields_to_generate, candidate_dict
-            )
+            self.field_to_code_ensemble, total_code_synth_stats = self.synthesize_code_ensemble(fields, candidate)
             self.code_synthesized = True
             generation_stats += total_code_synth_stats
         else:
             # read the dictionary of ensembles already synthesized by this operator if present
             if self.cache_across_plans:
-                self.field_to_code_ensemble = self._fetch_cached_code(fields_to_generate)
+                self.field_to_code_ensemble = self._fetch_cached_code(fields)
 
         # if we have yet to synthesize code (perhaps b/c we are waiting for more exemplars),
         # use the exemplar generation model to perform the convert (and generate high-quality
         # exemplars) using a bonded query
-        if not len(self.field_to_code_ensemble):            
+        if not len(self.field_to_code_ensemble):
             return self._bonded_query_fallback(candidate)
 
         # if we have synthesized code run it on each field
         field_answers = {}
-        for field_name in fields_to_generate:
+        for field_name in fields:
             # create api instance for executing python code
             api = API.from_input_output_schemas(
                 input_schema=self.input_schema,
@@ -294,7 +291,7 @@ class CodeSynthesisConvert(LLMConvert):
                     else []
                 )
 
-        assert all([field in field_answers for field in fields_to_generate]), "Not all fields were generated!"
+        assert all([field in field_answers for field in fields]), "Not all fields were generated!"
 
         # for the vanilla LLMConvert, we simply replace any None values with an empty list
         field_answers = {field: [] if answers is None else answers for field, answers in field_answers.items()}
@@ -345,7 +342,7 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
                     EXAMPLE_PROMPT.format(
                         idx=f" {i}",
                         example_inputs="\n".join(
-                            [f"- {field_name} = {repr(example[0][field_name])}" for field_name in api.inputs]
+                            [f"- {field_name} = {repr(example[0][field_name])}" for field_name in example[0]]
                         ),
                         example_output=f"{example[1][output_field_name]}",
                     )
@@ -458,7 +455,7 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvertSingle):
                     EXAMPLE_PROMPT.format(
                         idx=f" {i}",
                         example_inputs="\n".join(
-                            [f"- {field_name} = {repr(example[0][field_name])}" for field_name in api.inputs]
+                            [f"- {field_name} = {repr(example[0][field_name])}" for field_name in example[0]]
                         ),
                         example_output=f"{example[1][output_field_name]}",
                     )
@@ -472,7 +469,7 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvertSingle):
         # set prompt for generator
         gen_kwargs = {"prompt": prompt, "parse_answer": lambda text: text.split("answer:")[-1].split("---")[0].strip()}
 
-        pred, stats = self.code_champion_generator(candidate, None, **gen_kwargs)
+        pred, _, stats = self.code_champion_generator(candidate, None, **gen_kwargs)
         advs = self._parse_multiple_outputs(pred, outputs=[f"Idea {i}" for i in range(1, limit + 1)])
 
         return advs, stats

@@ -3,12 +3,14 @@ import json
 import os
 
 import pandas as pd
+from tabulate import tabulate
+
 from palimpzest.core.elements.groupbysig import GroupBySig
+from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import ImageFile, Number, PDFFile, TextFile
-from palimpzest.query import Execute
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
-from tabulate import tabulate
 
 
 class ScientificPaper(PDFFile):
@@ -177,30 +179,31 @@ def get_task_config(task, datasetid):
     
     return root_set, cols, stat_path
 
-def execute_task(task, datasetid, execution_engine, policy, verbose=False, profile=False):
+def execute_task(task, datasetid, policy, verbose=False, profile=False, processing_strategy="no_sentinel", execution_strategy="sequential", optimizer_strategy="pareto"):
     """Execute a task and return results"""
     root_set, cols, stat_path = get_task_config(task, datasetid)
-
-    records, execution_stats = Execute(
-        root_set,
+    config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
+        verbose=verbose,
         allow_token_reduction=False,
         allow_code_synth=False,
-        execution_engine=execution_engine,
-        verbose=verbose,
+        processing_strategy=processing_strategy,
+        execution_strategy=execution_strategy,
+        optimizer_strategy=optimizer_strategy,
     )
+    data_record_collection = root_set.run(config)
 
     if profile:
         os.makedirs("profiling-data", exist_ok=True)
         with open(stat_path, "w") as f:
-            json.dump(execution_stats.to_json(), f)
+            json.dump(data_record_collection.execution_stats.to_json(), f)
 
-    return records, execution_stats, cols
+    return data_record_collection.data_records, data_record_collection.execution_stats, cols
 
-def format_results_table(records, cols=None):
+def format_results_table(records: list[DataRecord], cols=None):
     """Format records as a table"""
-    records = [{key: record[key] for key in record.get_field_names()} for record in records]    
+    records = [{key: record[key] for key in record.get_field_names()} for record in records]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
     final_df = records_df[print_cols] if not records_df.empty else pd.DataFrame(columns=print_cols)

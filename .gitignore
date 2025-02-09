@@ -1,7 +1,11 @@
 .env
 build/*
+docs/build/*
 dist/*
 .vscode/*
+.ragatouille
+plots/
+paper-imgs/
 
 # testdata folders and archive files
 testdata/*/
@@ -22,6 +26,7 @@ venv/
 
 # tmp
 testdata/maildir/
+testdata/real-estate-eval-100.tar
 
 # jupyter
 .ipynb_checkpoints/

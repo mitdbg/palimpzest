@@ -38,6 +38,7 @@ wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/vldbdownload.tar.g
 wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/real-estate-eval-25.tar.gz
 wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/real-estate-eval-30.tar.gz 
 wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/biofabric-pdf.tar.gz
+wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/enron-tiny.csv
 
 echo "Extracting the test data..."
 # Extract the test data

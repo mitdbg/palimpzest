@@ -313,7 +313,7 @@ class LLMConvertRule(ImplementationRule):
             # construct multi-expression
             op = cls.physical_convert_class(
                 model=model,
-                prompt_strategy=PromptStrategy.COT_QA,
+                prompt_strategy=PromptStrategy.COT_QA_IMAGE if is_image_conversion else PromptStrategy.COT_QA,
                 **op_kwargs,
             )
             expression = PhysicalExpression(
@@ -609,11 +609,13 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
             for field_name, field in logical_expression.input_fields.items()
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
-        proposer_model_set = text_models
+        proposer_model_set, is_image_conversion = text_models, False
         if num_image_fields > 1 or list_image_field:
             proposer_model_set = [model for model in vision_models if model != Model.LLAMA3_V]
+            is_image_conversion = True
         elif num_image_fields == 1:
             proposer_model_set = vision_models
+            is_image_conversion = True
         aggregator_model_set = text_models
 
         # filter un-available models out of sets
@@ -633,6 +635,8 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
                             temperatures=[temp] * len(proposer_models),
                             aggregator_model=aggregator_model,
                             proposer_prompt=op_kwargs.get("prompt"),
+                            proposer_prompt_strategy=PromptStrategy.COT_MOA_PROPOSER_IMAGE if is_image_conversion else PromptStrategy.COT_MOA_PROPOSER,
+                            aggregator_prompt_strategy=PromptStrategy.COT_MOA_AGG,
                             **op_kwargs,
                         )
                         expression = PhysicalExpression(
@@ -795,7 +799,7 @@ class LLMFilterRule(ImplementationRule):
             # construct multi-expression
             op = LLMFilter(
                 model=model,
-                prompt_strategy=PromptStrategy.COT_BOOL,
+                prompt_strategy=PromptStrategy.COT_BOOL_IMAGE if is_image_filter else PromptStrategy.COT_BOOL,
                 **op_kwargs,
             )
             expression = PhysicalExpression(
