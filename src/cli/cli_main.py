@@ -1,6 +1,5 @@
 import os
 import subprocess
-from typing import Tuple
 
 import click
 import yaml
@@ -27,7 +26,7 @@ def _print_msg(msg: str) -> None:
     print(f"{msg}")
 
 
-def _run_bash_command(command: str) -> Tuple[str, str]:
+def _run_bash_command(command: str) -> tuple[str, str]:
     """
     Helper function to split a bash command on spaces and execute it using subprocess.
 
@@ -80,6 +79,7 @@ def help() -> None:
     """
     Print the help message for PZ.
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     _print_msg(_help())
 
 
@@ -88,6 +88,7 @@ def init() -> None:
     """
     Initialize data directory for PZ.
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     # set directory and initialize it for PZ
     import palimpzest.datamanager.datamanager as pzdm
     from palimpzest.constants import PZ_DIR
@@ -101,6 +102,7 @@ def ls_data() -> None:
     """
     Print a table listing the datasets registered with PZ.
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     # fetch list of registered datasets
     # Time the loading of the library
     import palimpzest.datamanager.datamanager as pzdm
@@ -135,6 +137,7 @@ def synthesize_data(name: str, count: int) -> None:
     count: int
         The nunber of values to synthesize
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     import palimpzest.datamanager.datamanager as pzdm
 
     name = name.strip()
@@ -162,6 +165,7 @@ def register_data(path: str, name: str) -> None:
     name: str
         Name to register the data file / directory with.
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     import palimpzest.datamanager.datamanager as pzdm
 
     # parse path and name
@@ -192,6 +196,7 @@ def rm_data(name: str) -> None:
     name: str
         Name of the dataset to unregister.
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     import palimpzest.datamanager.datamanager as pzdm
 
     # parse name
@@ -208,6 +213,7 @@ def clear_cache() -> None:
     """
     Clear the Palimpzest cache.
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     import palimpzest.datamanager.datamanager as pzdm
 
     pzdm.DataDirectory().clear_cache(keep_registry=True)
@@ -219,6 +225,7 @@ def print_config() -> None:
     """
     Print the current config that Palimpzest is using.
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     import palimpzest.datamanager.datamanager as pzdm
 
     # load config yaml file
@@ -255,6 +262,7 @@ def create_config(name: str, llmservice: str, parallel: bool, set: bool) -> None
         If this flag is present, it will set the created config to be
         the current config.
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     from palimpzest.config import Config
     from palimpzest.constants import PZ_DIR
 
@@ -284,6 +292,7 @@ def rm_config(name: str) -> None:
     name: str
         Name of the config to remove.
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     from palimpzest.config import Config
     from palimpzest.constants import PZ_DIR
 
@@ -310,6 +319,7 @@ def set_config(name: str) -> None:
     name: str
         Name of the config to set as the current config.
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     from palimpzest.config import Config
     from palimpzest.constants import PZ_DIR
 
@@ -344,6 +354,7 @@ def update_config(name: str, settings: str) -> None:
     params: str
         Comma-separated list of parameter=value pairs to update
     """
+    raise Exception("CLI is deprecated. All functionality has been moved to the Palimpzest package.")
     from palimpzest.config import Config
     from palimpzest.constants import PZ_DIR
 
@@ -376,15 +387,15 @@ def main():
     """
     Entrypoint for Palimpzest CLI tool implemented using Click.
     """
-    cli.add_command(help)
-    cli.add_command(init)
-    cli.add_command(ls_data)
-    cli.add_command(register_data)
-    cli.add_command(rm_data)
-    cli.add_command(clear_cache)
-    cli.add_command(print_config)
-    cli.add_command(create_config)
-    cli.add_command(rm_config)
-    cli.add_command(set_config)
-    cli.add_command(update_config)
+    # cli.add_command(help)
+    # cli.add_command(init)
+    # cli.add_command(ls_data)
+    # cli.add_command(register_data)
+    # cli.add_command(rm_data)
+    # cli.add_command(clear_cache)
+    # cli.add_command(print_config)
+    # cli.add_command(create_config)
+    # cli.add_command(rm_config)
+    # cli.add_command(set_config)
+    # cli.add_command(update_config)
     cli()

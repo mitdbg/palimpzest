@@ -17,15 +17,14 @@ import scipy.stats as stats
 from palimpzest.constants import MODEL_CARDS, NAIVE_BYTES_PER_RECORD, GPT_4o_MODEL_CARD, Model
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
 from palimpzest.core.elements.records import DataRecordSet
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvert
-from palimpzest.query.operators.datasource import CacheScanDataOp, DataSourcePhysicalOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.rag_convert import RAGConvert
+from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.query.operators.token_reduction_convert import TokenReducedConvert
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.model_helpers import get_champion_model_name, get_models
@@ -89,10 +88,6 @@ class SampleBasedCostModel:
             for phys_op_id, _ in phys_op_id_to_stats.items()
         ])
 
-        # reference to data directory
-        self.datadir = DataDirectory()
-
-        # import pdb; pdb.set_trace()
 
     def get_costed_phys_op_ids(self):
         return self.costed_phys_op_ids
@@ -189,14 +184,13 @@ class SampleBasedCostModel:
         est_quality = self.operator_to_stats[logical_op_id][phys_op_id]["quality"]
         est_selectivity = self.operator_to_stats[logical_op_id][phys_op_id]["selectivity"]
 
-        # create source_op_estimates for datasources if they are not provided
-        if isinstance(operator, DataSourcePhysicalOp):
-            # get handle to DataSource and pre-compute its size (number of records)
-            datasource = operator.datasource
-            datasource_len = len(datasource)
+        # create source_op_estimates for scan operators if they are not provided
+        if isinstance(operator, ScanPhysicalOp):
+            # get handle to scan operator and pre-compute its size (number of records)
+            datareader_len = len(operator.datareader)
 
             source_op_estimates = OperatorCostEstimates(
-                cardinality=datasource_len,
+                cardinality=datareader_len,
                 time_per_record=0.0,
                 cost_per_record=0.0,
                 quality=1.0,
@@ -244,9 +238,6 @@ class CostModel(BaseCostModel):
         )
         # df contains a column called record_state, that sometimes contain a dict
         # we want to extract the keys from the dict and create a new column for each key
-
-        # reference to data directory
-        self.datadir = DataDirectory()
 
         # set available models
         self.available_models = available_models
@@ -610,12 +601,11 @@ class CostModel(BaseCostModel):
 
         # initialize estimates of operator metrics based on naive (but sometimes precise) logic
         if isinstance(operator, MarshalAndScanDataOp):
-            # get handle to DataSource and pre-compute its size (number of records)
-            datasource = operator.datasource
-            datasource_len = len(datasource)
+            # get handle to scan operator and pre-compute its size (number of records)
+            datareader_len = len(operator.datareader)
 
             source_op_estimates = OperatorCostEstimates(
-                cardinality=datasource_len,
+                cardinality=datareader_len,
                 time_per_record=0.0,
                 cost_per_record=0.0,
                 quality=1.0,
@@ -624,11 +614,10 @@ class CostModel(BaseCostModel):
             op_estimates = operator.naive_cost_estimates(source_op_estimates, input_record_size_in_bytes=NAIVE_BYTES_PER_RECORD)
 
         elif isinstance(operator, CacheScanDataOp):
-            datasource = operator.datasource
-            datasource_len = len(datasource)
+            datareader_len = len(operator.datareader)
 
             source_op_estimates = OperatorCostEstimates(
-                cardinality=datasource_len,
+                cardinality=datareader_len,
                 time_per_record=0.0,
                 cost_per_record=0.0,
                 quality=1.0,
@@ -655,7 +644,7 @@ class CostModel(BaseCostModel):
                 # NOTE: this cardinality is the only cardinality we estimate directly b/c we can observe how many groups are
                 #       produced by the groupby in our sample and assume it may generalize to the full workload. To estimate
                 #       actual cardinalities of operators we estimate their selectivities / fan-outs and multiply those by
-                #       the input cardinality (where the initial input cardinality from the datasource is known).
+                #       the input cardinality (where the initial input cardinality from the datareader is known).
                 op_estimates.cardinality = sample_op_estimates[op_id]["cardinality"]
                 op_estimates.cardinality_lower_bound = op_estimates.cardinality
                 op_estimates.cardinality_upper_bound = op_estimates.cardinality

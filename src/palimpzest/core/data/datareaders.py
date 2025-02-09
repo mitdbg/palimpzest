@@ -5,7 +5,6 @@ import json
 import os
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import Any
 
 import modal
 import pandas as pd
@@ -27,61 +26,49 @@ from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
 # First level of abstraction
-class DataSource(ABC):
+class DataReader(ABC):
     """
-    The `DataSource` represents a source of data for the PZ system. Every PZ program will have
-    at least one `DataSource` object, which will generate data that is processed by PZ.
+    The `DataReader` is a base class for which may be used to generate data that
+    is processed by PZ.
 
-    Subclasses of the (abstract) `DataSource` class must implement two methods:
-    - `__len__`: which returns the number of elements in the data source
-    - `get_item(idx)`: which takes in an `idx` and returns the element at that index
+    Subclasses of the (abstract) `DataReader` class must implement two methods:
+    - `__len__()`: which returns the number of elements in the data source
+    - `__getitem__(idx: int)`: which takes in an `idx` and returns the element at that index
     """
 
-    def __init__(self, schema: type[Schema] | list[dict], dataset_id: str) -> None:
+    def __init__(self, schema: type[Schema] | list[dict]) -> None:
         """
-            Constructor for the `DataSource` class.
+            Constructor for the `DataReader` class.
 
             Args:
-                schema (Schema): The output schema of the data source
-                dataset_id (str): The unique identifier for the dataset
+                schema (Schema | list[dict]): The output schema of the records returned by the DataReader
         """
         # NOTE: _schema attribute currently has to match attribute name in Dataset
-        self._schema = (
-            Schema.from_json(schema)
-            if isinstance(schema, list)
-            else schema
-        )
-        self.dataset_id = dataset_id
+        self._schema = Schema.from_json(schema) if isinstance(schema, list) else schema
 
     def __eq__(self, __value: object) -> bool:
         return self.__dict__ == __value.__dict__
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(schema={self.schema}, dataset_id={self.dataset_id})"
+        return f"{self.__class__.__name__}(schema={self.schema})"
 
     @property
     def schema(self) -> Schema:
         return self._schema
 
-    def universal_identifier(self) -> str:
-        """
-        Return a unique identifier for this `DataSource`.
-        NOTE: this currently has to mirror the `Dataset`'s `universal_identifier` method.
-        """
-        return self.dataset_id
-
+    # NOTE: currently used by optimizer to compute node id for DataReaders
     def serialize(self) -> dict:
         return {"schema": self._schema.json_schema()}
 
     @abstractmethod
     def __len__(self) -> int:
-        """Returns the number of items in the data source."""
+        """Returns the number of items in the data reader."""
         pass
 
     @abstractmethod
-    def get_item(self, idx: int) -> dict:
+    def __getitem__(self, idx: int) -> dict:
         """
-        Returns a single item from the data source at the given index.
+        Returns a single item from the data reader at the given index.
 
         Args:
             idx (int): The index of the item to return
@@ -96,91 +83,23 @@ class DataSource(ABC):
                 # Example return value
                 {"field1": value1, "field2": value2, ...}
 
-            If the data source is a validation data source, then the dictionary should
-            be modified as follows:
-
-            1. Place the input fields under a top-level key called `"fields"`
-            2. Include a top-level key called `"labels"` which contains the groundtruth values for each **output field**
-               which should be computed by the PZ program.
-            3. (Optional), include a top-level key called `"score_fn"` which contains the function(s) for
-               scoring the computed values against the groundtruth values. If no scoring function is provided
-               for a given field then PZ will use exact matching as the default scoring function.
-
-            For some use cases, PZ will be expected to extract multiple output records for a given input. For example,
-            consider a PZ program that extracts the name and institution of each author in a paper. In this case, the
-            "labels" are a list of dictionaries, where each dict contains the groundtruth values for one output record.
-
-            Scoring function(s) only need to be provided for fields that require non-exact matching. The scoring
-            function accepts two arguments, `output` and `target`, and returns a float in [0, 1] (higher is better)
-            The `output` will be filled in by the PZ program, and the `target` will be the groundtruth value provided
-            for that field in the `"labels"` dictionary.
-
-            Example return values are shown below:
-
-            .. code-block:: python
-            
-                # Example return value for a validation data source with exact match scoring;
-                # suppose PZ is asked to compute the "first_name" and "age" fields (in the year 2025)
-                {
-                    "fields": {"name": "Jane Doe", "birthday": "01/01/1990"},
-                    "labels": {"first_name": "Jane", "age": 35},
-                }
-
-                # Example return value for a validation data source with custom scoring functions;
-                # suppose PZ is asked to compute the "fruits" mentioned in the input document, with recall as the scoring function
-
-                def compute_recall(output, target):
-                    tp = 0
-                    for fruit in target:
-                        if fruit in output:
-                            tp += 1
-                    return tp / len(target)
-                ...
-                {
-                    "fields": {"document": "I like apples, oranges, and bananas."},
-                    "labels": {"fruits": ["apples", "oranges", "bananas"]},
-                    "score_fn": {"fruits": compute_recall},
-                }
-
-                # Example return value for a validation data source with custom and exact match scoring functions;
-                # suppose PZ is asked to compute the "first_name" and "fruits" metnioned in the input document
-                def compute_recall(output, target):
-                    # same definition as above
-                ...
-                {
-                    "fields": {"document": "Jane Doe like apples, oranges, and bananas."},
-                    "labels": {"first_name": "Jane", "fruits": ["apples", "oranges", "bananas"]},
-                    "score_fn": {"fruits": compute_recall},
-                }
-
-                # Example return value for a validation data source with potentially more than one output per input;
-                # suppose PZ is asked to extract the name and institution of each author in a paper, where each author
-                # is pulled into their own record
-                {
-                    "fields": {"paper": "Jane Doe, MIT; John Smith, University of PZ"},
-                    "labels": [
-                        {"name": "Jane Doe", "institution": "MIT"},
-                        {"name": "John Smith", "University of PZ"},
-                    ]
-                }
         """
         pass
 
 
 # Second level of abstraction
-class DirectorySource(DataSource):
+class DirectoryReader(DataReader):
     """
-    DirectorySource returns a dictionary for each file in a directory. Each dictionary contains the filename and
+    DirectoryReader returns a dictionary for each file in a directory. Each dictionary contains the filename and
     contents of a single file in the directory.
     """
 
-    def __init__(self, path: str, dataset_id: str, schema: Schema) -> None:
+    def __init__(self, path: str, schema: Schema) -> None:
         """
-        Constructor for the `DirectorySource` class.
+        Constructor for the `DirectoryReader` class.
 
         Args:
             path (str): The path to the directory
-            dataset_id (str): The unique identifier for the dataset
             schema (Schema): The output schema of the data source
         """
         assert os.path.isdir(path), f"Path {path} is not a directory"
@@ -191,7 +110,7 @@ class DirectorySource(DataSource):
             if os.path.isfile(os.path.join(path, filename))
         ]
         self.path = path
-        super().__init__(schema, dataset_id)
+        super().__init__(schema)
 
     def serialize(self) -> dict:
         return {
@@ -204,18 +123,17 @@ class DirectorySource(DataSource):
         return len(self.filepaths)
 
 
-class FileSource(DataSource):
-    """FileSource returns a single dictionary with the filename and contents of a local file (in bytes)."""
+class FileReader(DataReader):
+    """FileReader returns a single dictionary with the filename and contents of a local file (in bytes)."""
 
-    def __init__(self, path: str, dataset_id: str) -> None:
+    def __init__(self, path: str) -> None:
         """
-        Constructor for the `FileSource` class. The `schema` is set to the default `File` schema.
+        Constructor for the `FileReader` class. The `schema` is set to the default `File` schema.
 
         Args:
             path (str): The path to the file
-            dataset_id (str): The unique identifier for the dataset
         """
-        super().__init__(File, dataset_id)
+        super().__init__(File)
         self.filepath = path
 
     def serialize(self) -> dict:
@@ -228,7 +146,7 @@ class FileSource(DataSource):
     def __len__(self) -> int:
         return 1
 
-    def get_item(self, idx: int) -> dict:
+    def __getitem__(self, idx: int) -> dict:
         """
         Returns a dictionary with the filename and contents of the file.
 
@@ -252,38 +170,33 @@ class FileSource(DataSource):
         return {"filename": filename, "contents": contents}
 
 
-class MemorySource(DataSource):
+class MemoryReader(DataReader):
     """
-    MemorySource returns one or more dictionaries that reflect the contents of an in-memory Python object `vals`.
-    If `vals` is not a pd.DataFrame, then the dictionary returned by `get_item()` has a single field called "value".
+    MemoryReader returns one or more dictionaries that reflect the contents of an in-memory Python object `vals`.
+    If `vals` is not a pd.DataFrame, then the dictionary returned by `__getitem__()` has a single field called "value".
     Otherwise, the dictionary contains the key-value mapping from columns to values for the `idx` row in the dataframe.
 
     TODO(gerardo): Add support for other types of in-memory data structures (he has some code for subclassing
-        MemorySource on his branch)
+        MemoryReader on his branch)
     """
 
-    def __init__(self, vals: Any, dataset_id: str = "default_memory_input") -> None:
+    def __init__(self, vals: list | pd.DataFrame) -> None:
         """
-        Constructor for the `MemorySource` class. The `schema` is set to the default `DefaultSchema` schema.
+        Constructor for the `MemoryReader` class. The `schema` is set to the default `DefaultSchema` schema.
         If `vals` is a pd.DataFrame, then the schema is set to the schema inferred from the DataFrame.
 
         Args:
             vals (Any): The in-memory object to use as the data source
-            dataset_id (str): The unique identifier for the dataset
         """
-        if isinstance(vals, (str, int, float)):
-            self.vals = [vals]
-        elif isinstance(vals, tuple):
-            self.vals = list(vals)
-        else:
-            self.vals = vals
+        # if list[dict] --> convert to pd.DataFrame first
+        self.vals = pd.DataFrame(vals) if isinstance(vals, list) and all([isinstance(item, dict) for item in vals]) else vals
         schema = Schema.from_df(self.vals) if isinstance(self.vals, pd.DataFrame) else DefaultSchema
-        super().__init__(schema, dataset_id)
+        super().__init__(schema)
 
     def __len__(self) -> int:
         return len(self.vals)
 
-    def get_item(self, idx: int) -> dict:
+    def __getitem__(self, idx: int) -> dict:
         """
         Returns a dictionary with the value(s) for the element at the specified `idx` in `vals`.
 
@@ -308,35 +221,31 @@ class MemorySource(DataSource):
                 # |  Alice  |  doctor |  tennis |
                 # |  Bob    |  lawyer |  chess  |
                 # +---------+---------+---------+
-                {"column_name": "Alice", "column_job": "doctor", "column_hobby": "tennis"}
+                {"name": "Alice", "job": "doctor", "hobby": "tennis"}
         """
-        item = {}
-        if isinstance(self.vals, pd.DataFrame):
-            row = self.vals.iloc[idx]
-            for field_name in row.index:
-                field_name_str = f"column_{field_name}" if isinstance(field_name, (int, float)) else str(field_name)
-                item[field_name_str] =  row[field_name]
-        else:
-            item["value"] = self.vals[idx]
+        item = (
+            self.vals.iloc[idx].to_dict()
+            if isinstance(self.vals, pd.DataFrame)
+            else {"value": self.vals[idx]}
+        )
 
         return item
 
 
 # Third level of abstraction
-class HTMLFileDirectorySource(DirectorySource):
+class HTMLFileDirectoryReader(DirectoryReader):
     """
-    HTMLFileDirectorySource returns a dictionary for each HTML file in a directory. Each dictionary contains the
+    HTMLFileDirectoryReader returns a dictionary for each HTML file in a directory. Each dictionary contains the
     filename, raw HTML content, and parsed content of a single HTML file in the directory.
     """
-    def __init__(self, path: str, dataset_id: str) -> None:
+    def __init__(self, path: str) -> None:
         """
-        Constructor for the `HTMLFileDirectorySource` class. The `schema` is set to the `WebPage` schema.
+        Constructor for the `HTMLFileDirectoryReader` class. The `schema` is set to the `WebPage` schema.
 
         Args:
             path (str): The path to the directory
-            dataset_id (str): The unique identifier for the dataset
         """
-        super().__init__(path=path, dataset_id=dataset_id, schema=WebPage)
+        super().__init__(path=path, schema=WebPage)
         assert all([filename.endswith(tuple(constants.HTML_EXTENSIONS)) for filename in self.filepaths])
 
     def _html_to_text_with_links(self, html: str) -> str:
@@ -355,7 +264,7 @@ class HTMLFileDirectorySource(DirectorySource):
 
         return text
 
-    def get_item(self, idx: int) -> dict:
+    def __getitem__(self, idx: int) -> dict:
         """
         Returns a dictionary with the filename, raw HTML content, and parsed content of the HTML file at the
         specified `idx`.
@@ -391,23 +300,22 @@ class HTMLFileDirectorySource(DirectorySource):
         return item
 
 
-class ImageFileDirectorySource(DirectorySource):
+class ImageFileDirectoryReader(DirectoryReader):
     """
-    ImageFileDirectorySource returns a dictionary for each image file in a directory. Each dictionary contains the
+    ImageFileDirectoryReader returns a dictionary for each image file in a directory. Each dictionary contains the
     filename and the base64 encoded bytes content of a single image file in the directory.
     """
-    def __init__(self, path: str, dataset_id: str) -> None:
+    def __init__(self, path: str) -> None:
         """
-        Constructor for the `ImageFileDirectorySource` class. The `schema` is set to the `ImageFile` schema.
+        Constructor for the `ImageFileDirectoryReader` class. The `schema` is set to the `ImageFile` schema.
 
         Args:
             path (str): The path to the directory
-            dataset_id (str): The unique identifier for the dataset
         """
-        super().__init__(path=path, dataset_id=dataset_id, schema=ImageFile)
+        super().__init__(path=path, schema=ImageFile)
         assert all([filename.endswith(tuple(constants.IMAGE_EXTENSIONS)) for filename in self.filepaths])
 
-    def get_item(self, idx: int) -> dict:
+    def __getitem__(self, idx: int) -> dict:
         """
         Returns a dictionary with the filename and base64 encoded bytes content of the image file at the
         specified `idx`.
@@ -433,9 +341,9 @@ class ImageFileDirectorySource(DirectorySource):
         return {"filename": filename, "contents": contents}
 
 
-class PDFFileDirectorySource(DirectorySource):
+class PDFFileDirectoryReader(DirectoryReader):
     """
-    PDFFileDirectorySource returns a dictionary for each PDF file in a directory. Each dictionary contains the
+    PDFFileDirectoryReader returns a dictionary for each PDF file in a directory. Each dictionary contains the
     filename, raw PDF content, and parsed text content of a single PDF file in the directory.
 
     This class also uses one of a predefined set of PDF processors to extract text content from the PDF files.
@@ -443,25 +351,23 @@ class PDFFileDirectorySource(DirectorySource):
     def __init__(
         self,
         path: str,
-        dataset_id: str,
-        pdfprocessor: str = "modal",
+        pdfprocessor: str = "pypdf",
         file_cache_dir: str = "/tmp",
     ) -> None:
         """
-        Constructor for the `PDFFileDirectorySource` class. The `schema` is set to the `PDFFile` schema.
+        Constructor for the `PDFFileDirectoryReader` class. The `schema` is set to the `PDFFile` schema.
 
         Args:
             path (str): The path to the directory
-            dataset_id (str): The unique identifier for the dataset
             pdfprocessor (str): The PDF processor to use for extracting text content from the PDF files
             file_cache_dir (str): The directory to store the temporary files generated during PDF processing
         """
-        super().__init__(path=path, dataset_id=dataset_id, schema=PDFFile)
+        super().__init__(path=path, schema=PDFFile)
         assert all([filename.endswith(tuple(constants.PDF_EXTENSIONS)) for filename in self.filepaths])
         self.pdfprocessor = pdfprocessor
         self.file_cache_dir = file_cache_dir
 
-    def get_item(self, idx: int) -> dict:
+    def __getitem__(self, idx: int) -> dict:
         """
         Returns a dictionary with the filename, raw PDF content, and parsed text content of the PDF file at the
         specified `idx`.
@@ -506,22 +412,21 @@ class PDFFileDirectorySource(DirectorySource):
         return {"filename": pdf_filename, "contents": pdf_bytes, "text_contents": text_content}
 
 
-class TextFileDirectorySource(DirectorySource):
+class TextFileDirectoryReader(DirectoryReader):
     """
-    TextFileDirectorySource returns a dictionary for each text file in a directory. Each dictionary contains the
+    TextFileDirectoryReader returns a dictionary for each text file in a directory. Each dictionary contains the
     filename and contents of a single text file in the directory.
     """
-    def __init__(self, path: str, dataset_id: str) -> None:
+    def __init__(self, path: str) -> None:
         """
-        Constructor for the `TextFileDirectorySource` class. The `schema` is set to the `TextFile` schema.
+        Constructor for the `TextFileDirectoryReader` class. The `schema` is set to the `TextFile` schema.
 
         Args:
             path (str): The path to the directory
-            dataset_id (str): The unique identifier for the dataset
         """
-        super().__init__(path=path, dataset_id=dataset_id, schema=TextFile)
+        super().__init__(path=path, schema=TextFile)
 
-    def get_item(self, idx: int) -> dict:
+    def __getitem__(self, idx: int) -> dict:
         """
         Returns a dictionary with the filename and contents of the text file at the specified `idx`.
 
@@ -546,19 +451,19 @@ class TextFileDirectorySource(DirectorySource):
         return {"filename": filename, "contents": contents}
 
 
-class XLSFileDirectorySource(DirectorySource):
+class XLSFileDirectoryReader(DirectoryReader):
     """
-    XLSFileDirectorySource returns a dictionary for each XLS file in a directory. Each dictionary contains the
+    XLSFileDirectoryReader returns a dictionary for each XLS file in a directory. Each dictionary contains the
     filename, contents, sheet names, and the number of sheets for a single XLS file in the directory.
     """
-    def __init__(self, path: str, dataset_id: str) -> None:
+    def __init__(self, path: str) -> None:
         """
-        Constructor for the `XLSFileDirectorySource` class. The `schema` is set to the `XLSFile` schema.
+        Constructor for the `XLSFileDirectoryReader` class. The `schema` is set to the `XLSFile` schema.
         """
-        super().__init__(path=path, dataset_id=dataset_id, schema=XLSFile)
+        super().__init__(path=path, schema=XLSFile)
         assert all([filename.endswith(tuple(constants.XLS_EXTENSIONS)) for filename in self.filepaths])
 
-    def get_item(self, idx: int) -> dict:
+    def __getitem__(self, idx: int) -> dict:
         """
         Returns a dictionary with the filename, contents, sheet names, and the number of sheets of the XLS file at the
         specified `idx`.

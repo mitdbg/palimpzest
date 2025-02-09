@@ -17,10 +17,10 @@ from palimpzest.policy import Policy
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
 from palimpzest.query.operators.convert import ConvertOp, LLMConvert
-from palimpzest.query.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
+from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
@@ -718,7 +718,8 @@ class MABSentinelQueryProcessor(QueryProcessor):
                 if not self.nocache:
                     for record in all_records:
                         if getattr(record, "passed_operator", True):
-                            self.datadir.append_cache(logical_op_id, record)
+                            # self.datadir.append_cache(logical_op_id, record)
+                            pass
 
                 # compute quality for each operator
                 all_outputs = self.score_quality(
@@ -745,8 +746,9 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
         # if caching was allowed, close the cache
         if not self.nocache:
-            for logical_op_id, _, _ in plan:
-                self.datadir.close_cache(logical_op_id)
+            for _, _, _ in plan:
+                # self.datadir.close_cache(logical_op_id)
+                pass
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
@@ -768,7 +770,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         expected_outputs = {}
         for source_idx in range(len(self.val_datasource)):
             # TODO: make sure execute_op_set uses self.val_datasource
-            expected_output = self.val_datasource.get_item(source_idx)
+            expected_output = self.val_datasource[source_idx]
             expected_outputs[source_idx] = expected_output
 
         # run sentinel plan
@@ -803,11 +805,12 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
         if self.val_datasource is None:
-            raise Exception("Make sure you are using a validation DataSource with MABSentinelExecutionEngine")
+            raise Exception("Make sure you are using validation data with MABSentinelExecutionEngine")
 
         # if nocache is True, make sure we do not re-use codegen examples
         if self.nocache:
-            self.clear_cached_examples()
+            # self.clear_cached_examples()
+            pass
 
         # create sentinel plan
         sentinel_plan = self.create_sentinel_plan(self.dataset, self.policy)
@@ -858,7 +861,6 @@ class MABSentinelSequentialSingleThreadProcessor(MABSentinelQueryProcessor, Sequ
         SequentialSingleThreadExecutionStrategy.__init__(
             self,
             scan_start_idx=self.scan_start_idx,
-            datadir=self.datadir,
             max_workers=self.max_workers,
             nocache=self.nocache,
             verbose=self.verbose
@@ -875,7 +877,6 @@ class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, Pipelined
         PipelinedParallelExecutionStrategy.__init__(
             self,
             scan_start_idx=self.scan_start_idx,
-            datadir=self.datadir,
             max_workers=self.max_workers,
             nocache=self.nocache,
             verbose=self.verbose

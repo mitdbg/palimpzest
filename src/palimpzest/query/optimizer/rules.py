@@ -5,7 +5,6 @@ from palimpzest.constants import AggFunc, Cardinality, Model, PromptStrategy
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
 from palimpzest.query.operators.convert import LLMConvertBonded, LLMConvertConventional, NonLLMConvert
-from palimpzest.query.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.logical import (
@@ -23,6 +22,7 @@ from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgents
 from palimpzest.query.operators.project import ProjectOp
 from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.retrieve import RetrieveOp
+from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.token_reduction_convert import (
     TokenReducedConvertBonded,
     TokenReducedConvertConventional,

@@ -183,7 +183,7 @@ class ConvertOp(PhysicalOperator, ABC):
         start_time = time.time()
 
         # get fields to generate with this convert
-        fields_to_generate = self.get_fields_to_generate(candidate, self.input_schema, self.output_schema)
+        fields_to_generate = self.get_fields_to_generate(candidate)
 
         # execute the convert
         field_answers: dict[str, list]

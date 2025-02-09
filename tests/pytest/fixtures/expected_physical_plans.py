@@ -6,11 +6,11 @@ from palimpzest.constants import Model
 from palimpzest.core.data.dataclasses import PlanCost
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import TextFile
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.query.operators.convert import LLMConvertBonded
-from palimpzest.query.operators.datasource import MarshalAndScanDataOp
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.logical import BaseScan, ConvertScan, FilteredScan
+from palimpzest.query.operators.scan import MarshalAndScanDataOp
+from palimpzest.query.optimizer.optimizer import get_node_uid
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.sets import Dataset
 
@@ -18,15 +18,14 @@ from palimpzest.sets import Dataset
 ### THREE CONVERTS PHYSICAL PLANS ###
 def get_three_converts_plan(three_converts_workload, enron_eval_tiny, email_schema, foobar_schema, baz_schema, models, expected_cost, expected_time, expected_quality):
     # extract node id's from workload Datasets
-    scan_node_id = three_converts_workload._source._source._source.universal_identifier()
-    first_convert_node_id = three_converts_workload._source._source.universal_identifier()
-    second_convert_node_id = three_converts_workload._source.universal_identifier()
-    third_convert_node_id = three_converts_workload.universal_identifier()
+    scan_node_id = get_node_uid(three_converts_workload._source._source._source)
+    first_convert_node_id = get_node_uid(three_converts_workload._source._source)
+    second_convert_node_id = get_node_uid(three_converts_workload._source)
+    third_convert_node_id = get_node_uid(three_converts_workload)
 
     # create physical op for scan operator
-    datasource = DataDirectory().get_registered_dataset(enron_eval_tiny)
-    scan_logical_op = BaseScan(datasource=datasource, output_schema=TextFile)
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=datasource, logical_op_id=scan_logical_op.get_logical_op_id())
+    scan_logical_op = BaseScan(datareader=enron_eval_tiny, output_schema=TextFile)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # create physical op for first convert operator
     depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))
@@ -51,7 +50,7 @@ def get_three_converts_plan(three_converts_workload, enron_eval_tiny, email_sche
 
 @pytest.fixture
 def three_converts_min_cost_expected_plan(three_converts_workload, enron_eval_tiny, email_schema, foobar_schema, baz_schema):
-    cardinality = len(DataDirectory().get_registered_dataset(enron_eval_tiny))
+    cardinality = len(enron_eval_tiny)
     expected_cost = 0.3 * cardinality
     expected_time = 4.0 * cardinality
     expected_quality = 1.0
@@ -70,7 +69,7 @@ def three_converts_min_cost_expected_plan(three_converts_workload, enron_eval_ti
 
 @pytest.fixture
 def three_converts_max_quality_expected_plan(three_converts_workload, enron_eval_tiny, email_schema, foobar_schema, baz_schema):
-    cardinality = len(DataDirectory().get_registered_dataset(enron_eval_tiny))
+    cardinality = len(enron_eval_tiny)
     expected_cost = 3.0 * cardinality
     expected_time = 4.0 * cardinality
     expected_quality = 0.81
@@ -89,7 +88,7 @@ def three_converts_max_quality_expected_plan(three_converts_workload, enron_eval
 
 @pytest.fixture
 def three_converts_min_cost_at_fixed_quality_expected_plan(three_converts_workload, enron_eval_tiny, email_schema, foobar_schema, baz_schema):
-    cardinality = len(DataDirectory().get_registered_dataset(enron_eval_tiny))
+    cardinality = len(enron_eval_tiny)
     expected_cost = 2.0 * cardinality
     expected_time = 4.0 * cardinality
     expected_quality = 0.81
@@ -108,7 +107,7 @@ def three_converts_min_cost_at_fixed_quality_expected_plan(three_converts_worklo
 
 @pytest.fixture
 def three_converts_max_quality_at_fixed_cost_expected_plan(three_converts_workload, enron_eval_tiny, email_schema, foobar_schema, baz_schema):
-    cardinality = len(DataDirectory().get_registered_dataset(enron_eval_tiny))
+    cardinality = len(enron_eval_tiny)
     expected_cost = (0.9 / cardinality) * cardinality
     expected_time = 4.0 * cardinality
     expected_quality = 0.72
@@ -143,14 +142,13 @@ def get_one_filter_one_convert_plan(one_filter_one_convert_workload, enron_eval_
             dataset_nodes[1]._source = dataset_nodes[0]
 
     # extract node id's from workload Datasets
-    scan_node_id = dataset_nodes[0].universal_identifier()
-    first_filter_node_id = dataset_nodes[1].universal_identifier()
-    first_convert_node_id = dataset_nodes[2].universal_identifier()
+    scan_node_id = get_node_uid(dataset_nodes[0])
+    first_filter_node_id = get_node_uid(dataset_nodes[1])
+    first_convert_node_id = get_node_uid(dataset_nodes[2])
 
     # create physical op for scan operator
-    datasource = DataDirectory().get_registered_dataset(enron_eval_tiny)
-    scan_logical_op = BaseScan(datasource=datasource, output_schema=TextFile)
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=datasource, logical_op_id=scan_logical_op.get_logical_op_id())
+    scan_logical_op = BaseScan(datareader=enron_eval_tiny, output_schema=TextFile)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # get physical op id for first filter operator
     depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))
@@ -170,7 +168,7 @@ def get_one_filter_one_convert_plan(one_filter_one_convert_workload, enron_eval_
 
 @pytest.fixture
 def one_filter_one_convert_min_cost_expected_plan(one_filter_one_convert_workload, enron_eval_tiny, email_schema):
-    cardinality = len(DataDirectory().get_registered_dataset(enron_eval_tiny))
+    cardinality = len(enron_eval_tiny)
     expected_cost = (
         1.0 * 1.0 * cardinality
         + 1.0 * 0.5 * cardinality
@@ -194,16 +192,15 @@ def one_filter_one_convert_min_cost_expected_plan(one_filter_one_convert_workloa
 ### TWO CONVERTS TWO FILTERS PHYSICAL PLANS ###
 def get_two_converts_two_filters_plan(two_converts_two_filters_workload, enron_eval_tiny, email_schema, foobar_schema, first_filter_str, models, expected_cost, expected_time, expected_quality):
     # extract node id's from workload Datasets
-    scan_node_id = two_converts_two_filters_workload._source._source._source._source.universal_identifier()
-    first_convert_node_id = two_converts_two_filters_workload._source._source._source.universal_identifier()
-    second_convert_node_id = two_converts_two_filters_workload._source._source.universal_identifier()
-    first_filter_node_id = two_converts_two_filters_workload._source.universal_identifier()
-    second_filter_node_id = two_converts_two_filters_workload.universal_identifier()
+    scan_node_id = get_node_uid(two_converts_two_filters_workload._source._source._source._source)
+    first_convert_node_id = get_node_uid(two_converts_two_filters_workload._source._source._source)
+    second_convert_node_id = get_node_uid(two_converts_two_filters_workload._source._source)
+    first_filter_node_id = get_node_uid(two_converts_two_filters_workload._source)
+    second_filter_node_id = get_node_uid(two_converts_two_filters_workload)
 
     # create physical op for scan operator
-    datasource = DataDirectory().get_registered_dataset(enron_eval_tiny)
-    scan_logical_op = BaseScan(datasource=datasource, output_schema=TextFile)
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=datasource, logical_op_id=scan_logical_op.get_logical_op_id())
+    scan_logical_op = BaseScan(datareader=enron_eval_tiny, output_schema=TextFile)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # create physical op for first convert operator
     depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))
@@ -237,7 +234,7 @@ def get_two_converts_two_filters_plan(two_converts_two_filters_workload, enron_e
 
 @pytest.fixture
 def two_converts_two_filters_min_cost_expected_plan(two_converts_two_filters_workload, enron_eval_tiny, email_schema, foobar_schema):
-    cardinality = len(DataDirectory().get_registered_dataset(enron_eval_tiny))
+    cardinality = len(enron_eval_tiny)
     expected_cost = (
         0.1 * 1.0 * cardinality
         + 1.0 * 1.0 * cardinality
@@ -266,7 +263,7 @@ def two_converts_two_filters_min_cost_expected_plan(two_converts_two_filters_wor
 
 @pytest.fixture
 def two_converts_two_filters_max_quality_expected_plan(two_converts_two_filters_workload, enron_eval_tiny, email_schema, foobar_schema):
-    cardinality = len(DataDirectory().get_registered_dataset(enron_eval_tiny))
+    cardinality = len(enron_eval_tiny)
     expected_cost = (
         0.5 * cardinality
         + 1.0 * cardinality
@@ -295,7 +292,7 @@ def two_converts_two_filters_max_quality_expected_plan(two_converts_two_filters_
 
 @pytest.fixture
 def two_converts_two_filters_min_cost_at_fixed_quality_expected_plan(two_converts_two_filters_workload, enron_eval_tiny, email_schema, foobar_schema):
-    cardinality = len(DataDirectory().get_registered_dataset(enron_eval_tiny))
+    cardinality = len(enron_eval_tiny)
     expected_cost = (
         0.5 * cardinality
         + 1.0 * cardinality
@@ -324,7 +321,7 @@ def two_converts_two_filters_min_cost_at_fixed_quality_expected_plan(two_convert
 
 @pytest.fixture
 def two_converts_two_filters_max_quality_at_fixed_cost_expected_plan(two_converts_two_filters_workload, enron_eval_tiny, email_schema, foobar_schema):
-    cardinality = len(DataDirectory().get_registered_dataset(enron_eval_tiny))
+    cardinality = len(enron_eval_tiny)
     expected_cost = (
         (0.3 / cardinality) * cardinality
         + (0.3 / cardinality) * cardinality

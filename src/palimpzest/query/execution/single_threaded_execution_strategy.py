@@ -3,9 +3,9 @@ import time
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
+from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 
 
@@ -44,14 +44,13 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         output_records = []
         current_scan_idx = self.scan_start_idx
 
-        # get handle to DataSource and pre-compute its size
+        # get handle to scan operator and pre-compute its size
         source_operator = plan.operators[0]
-        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-        datasource = source_operator.datasource
-        datasource_len = len(datasource)
+        assert isinstance(source_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        datareader_len = len(source_operator.datareader)
 
         # initialize processing queues for each operation
-        processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, DataSourcePhysicalOp)}
+        processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, ScanPhysicalOp)}
 
         # execute the plan one operator at a time
         for op_idx, operator in enumerate(plan.operators):
@@ -62,11 +61,11 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
             # initialize output records and record_op_stats for this operator
             records, record_op_stats = [], []
 
-            # invoke datasource operator(s) until we run out of source records or hit the num_samples limit
-            if isinstance(operator, DataSourcePhysicalOp):
+            # invoke scan operator(s) until we run out of source records or hit the num_samples limit
+            if isinstance(operator, ScanPhysicalOp):
                 keep_scanning_source_records = True
                 while keep_scanning_source_records:
-                    # run DataSourcePhysicalOp on current scan index
+                    # run ScanPhysicalOp on current scan index
                     record_set = operator(current_scan_idx)
                     records.extend(record_set.data_records)
                     record_op_stats.extend(record_set.record_op_stats)
@@ -75,7 +74,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                     current_scan_idx += 1
 
                     # update whether to keep scanning source records
-                    keep_scanning_source_records = current_scan_idx < datasource_len and len(records) < num_samples
+                    keep_scanning_source_records = current_scan_idx < datareader_len and len(records) < num_samples
 
             # aggregate operators accept all input records at once
             elif isinstance(operator, AggregateOp):
@@ -104,7 +103,8 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
             if not self.nocache:
                 for record in records:
                     if getattr(record, "passed_operator", True):
-                        self.datadir.append_cache(operator.target_cache_id, record)
+                        # self.datadir.append_cache(operator.target_cache_id, record)
+                        pass
 
             # update processing_queues or output_records
             for record in records:
@@ -121,8 +121,9 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
 
         # if caching was allowed, close the cache
         if not self.nocache:
-            for operator in plan.operators:
-                self.datadir.close_cache(operator.target_cache_id)
+            for _ in plan.operators:
+                # self.datadir.close_cache(operator.target_cache_id)
+                pass
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
@@ -172,14 +173,13 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         source_records_scanned = 0
         current_scan_idx = self.scan_start_idx
 
-        # get handle to DataSource and pre-compute its size
+        # get handle to scan operator and pre-compute its size
         source_operator = plan.operators[0]
-        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-        datasource = source_operator.datasource
-        datasource_len = len(datasource)
+        assert isinstance(source_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        datareader_len = len(source_operator.datareader)
 
         # initialize processing queues for each operation
-        processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, DataSourcePhysicalOp)}
+        processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, ScanPhysicalOp)}
 
         # execute the plan until either:
         # 1. all records have been processed, or
@@ -195,10 +195,10 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 # create empty lists for records and execution stats generated by executing this operator on its next input(s)
                 records, record_op_stats = [], []
 
-                # invoke datasource operator(s) until we run out of source records or hit the num_samples limit
-                if isinstance(operator, DataSourcePhysicalOp):
+                # invoke scan operator(s) until we run out of source records or hit the num_samples limit
+                if isinstance(operator, ScanPhysicalOp):
                     if keep_scanning_source_records:
-                        # run DataSourcePhysicalOp on current scan index
+                        # run ScanPhysicalOp on current scan index
                         record_set = operator(current_scan_idx)
                         records = record_set.data_records
                         record_op_stats = record_set.record_op_stats
@@ -214,8 +214,8 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 elif isinstance(operator, AggregateOp):
                     upstream_ops_are_finished = True
                     for upstream_op_idx in range(op_idx):
-                        # datasources do not have processing queues
-                        if isinstance(plan.operators[upstream_op_idx], DataSourcePhysicalOp):
+                        # scan operators do not have processing queues
+                        if isinstance(plan.operators[upstream_op_idx], ScanPhysicalOp):
                             continue
 
                         # check upstream ops which do have a processing queue
@@ -250,7 +250,8 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     if not self.nocache:
                         for record in records:
                             if getattr(record, "passed_operator", True):
-                                self.datadir.append_cache(operator.target_cache_id, record)
+                                # self.datadir.append_cache(operator.target_cache_id, record)
+                                pass
 
                     # update processing_queues or output_records
                     for record in records:
@@ -263,7 +264,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
             # update finished_executing based on whether all records have been processed
             still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
-            keep_scanning_source_records = current_scan_idx < datasource_len and source_records_scanned < num_samples
+            keep_scanning_source_records = current_scan_idx < datareader_len and source_records_scanned < num_samples
             finished_executing = not keep_scanning_source_records and not still_processing
 
             # update finished_executing based on limit
@@ -272,8 +273,9 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
         # if caching was allowed, close the cache
         if not self.nocache:
-            for operator in plan.operators:
-                self.datadir.close_cache(operator.target_cache_id)
+            for _ in plan.operators:
+                # self.datadir.close_cache(operator.target_cache_id)
+                pass
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time

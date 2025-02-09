@@ -9,12 +9,12 @@ from palimpzest.core.lib.schemas import File
 
 ### EXPECTED RECORDS ###
 @pytest.fixture
-def enron_all_expected_records(enron_eval_tiny_data):
+def enron_all_expected_records(enron_eval_tiny_data_path):
     data_records = []
-    for source_idx, file in enumerate(sorted(os.listdir(enron_eval_tiny_data))):
+    for source_idx, file in enumerate(sorted(os.listdir(enron_eval_tiny_data_path))):
         dr = DataRecord(schema=File, source_idx=source_idx)
         dr.filename = file
-        with open(os.path.join(enron_eval_tiny_data, file), "rb") as f:
+        with open(os.path.join(enron_eval_tiny_data_path, file), "rb") as f:
             dr.contents = f.read()
         data_records.append(dr)
 
@@ -32,8 +32,8 @@ def enron_filter_expected_records(enron_all_expected_records):
 
 
 @pytest.fixture
-def real_estate_all_expected_records(real_estate_eval_tiny_data, image_real_estate_listing_schema):
-    expected_listings = sorted(os.listdir(real_estate_eval_tiny_data))
+def real_estate_all_expected_records(real_estate_eval_tiny_data_path, image_real_estate_listing_schema):
+    expected_listings = sorted(os.listdir(real_estate_eval_tiny_data_path))
     listing_to_modern_and_attractive = {"listing1": True, "listing2": False, "listing3": False}
     listing_to_has_natural_sunlight = {"listing1": True, "listing2": True, "listing3": False}
 
@@ -49,8 +49,8 @@ def real_estate_all_expected_records(real_estate_eval_tiny_data, image_real_esta
 
 
 @pytest.fixture
-def real_estate_one_to_many_expected_records(real_estate_eval_tiny_data, room_real_estate_listing_schema):
-    expected_listings = sorted(os.listdir(real_estate_eval_tiny_data))
+def real_estate_one_to_many_expected_records(real_estate_eval_tiny_data_path, room_real_estate_listing_schema):
+    expected_listings = sorted(os.listdir(real_estate_eval_tiny_data_path))
     listing_to_rooms = {
         "listing1": ["other", "living_room", "kitchen"],
         "listing2": ["other", "living_room", "living_room"],

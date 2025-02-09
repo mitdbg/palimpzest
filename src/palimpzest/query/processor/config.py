@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass, field
 
 from palimpzest.constants import Model
-from palimpzest.core.data.datareaders import DataSource
+from palimpzest.core.data.datareaders import DataReader
 from palimpzest.policy import MaxQuality, Policy
 
 
@@ -15,7 +15,7 @@ class QueryProcessorConfig:
     execution_strategy: str = field(default="sequential")
     optimizer_strategy: str = field(default="pareto")
 
-    val_datasource: DataSource | None = field(default=None)
+    val_datasource: DataReader | None = field(default=None)
 
     policy: Policy = field(default_factory=MaxQuality)
     scan_start_idx: int = field(default=0)

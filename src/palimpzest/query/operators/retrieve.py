@@ -82,7 +82,7 @@ class RetrieveOp(PhysicalOperator):
         # NOTE: right now this should be equivalent to [self.output_attr], but in the future we may
         #       want to support the RetrieveOp generating multiple fields. (Also, the function will
         #       return the full field name (as opposed to the short field name))
-        generated_fields = self.get_fields_to_generate(candidate, self.input_schema, self.output_schema)
+        generated_fields = self.get_fields_to_generate(candidate)
 
         record_op_stats = RecordOpStats(
             record_id=output_dr.id,

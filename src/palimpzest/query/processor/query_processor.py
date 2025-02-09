@@ -2,9 +2,8 @@ from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 
 from palimpzest.core.data.dataclasses import PlanStats, RecordOpStats
-from palimpzest.core.data.datareaders import DataSource
+from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.elements.records import DataRecord, DataRecordCollection
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import Policy
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
@@ -44,7 +43,7 @@ class QueryProcessor:
 
         self.config = config or QueryProcessorConfig()
         self.dataset = dataset
-        self.datasource = self._get_datasource(self.dataset)
+        self.datareader = self._get_datareader(self.dataset)
         self.num_samples = self.config.num_samples
         self.val_datasource = self.config.val_datasource
         self.scan_start_idx = self.config.scan_start_idx
@@ -53,7 +52,6 @@ class QueryProcessor:
         self.max_workers = self.config.max_workers
         self.num_workers_per_plan = self.config.num_workers_per_plan
         self.min_plans = self.config.min_plans
-        self.datadir = DataDirectory()
 
         self.policy = self.config.policy
 
@@ -70,16 +68,15 @@ class QueryProcessor:
         assert optimizer is not None, "Optimizer is required. Please use QueryProcessorFactory.create_processor() to initialize a QueryProcessor."
         self.optimizer = optimizer
 
-    def _get_datasource(self, dataset: Set | DataSource) -> str:
+    def _get_datareader(self, dataset: Set | DataReader) -> DataReader:
         """
-        Gets the DataSource for the given dataset.
+        Gets the DataReader for the given dataset.
         """
-        # iterate until we reach DataSource
+        # iterate until we reach DataReader
         while isinstance(dataset, Set):
             dataset = dataset._source
 
-        # this will throw an exception if datasource is not registered with PZ
-        return DataDirectory().get_registered_dataset(dataset.dataset_id)
+        return dataset
 
     def execution_id(self) -> str:
         """
@@ -91,13 +88,6 @@ class QueryProcessor:
                 id_str += f"{attr}={value},"
 
         return hash_for_id(id_str)
-
-    def clear_cached_examples(self):
-        """
-        Clear cached codegen samples.
-        """
-        cache = self.datadir.get_cache_service()
-        cache.rm_cache()
 
     def get_max_quality_plan_id(self, plans: list[PhysicalPlan]) -> str:
         """
@@ -233,7 +223,7 @@ class QueryProcessor:
 
         # get the initial set of optimal plans according to the optimizer
         plans = optimizer.optimize(dataset, policy)
-        while len(plans) > 1 and self.scan_start_idx < len(self.datasource):
+        while len(plans) > 1 and self.scan_start_idx < len(self.datareader):
             # identify the plan with the highest quality in the set
             max_quality_plan_id = self.get_max_quality_plan_id(plans)
 
@@ -244,7 +234,7 @@ class QueryProcessor:
             records.extend(new_records)
             plan_stats.extend(new_plan_stats)
 
-            if self.scan_start_idx + self.num_samples < len(self.datasource):
+            if self.scan_start_idx + self.num_samples < len(self.datareader):
                 # update cost model and optimizer
                 execution_data.extend(new_execution_data)
                 cost_model = CostModel(sample_execution_data=execution_data)
@@ -256,7 +246,7 @@ class QueryProcessor:
                 # update scan start idx
                 self.scan_start_idx += self.num_samples
 
-        if self.scan_start_idx < len(self.datasource):
+        if self.scan_start_idx < len(self.datareader):
             # execute final plan until end
             final_plan = plans[0]
             new_records, new_plan_stats = self.execute_plan(
