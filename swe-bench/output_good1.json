@@ -1,0 +1,7 @@
+[
+    {
+        "instance_id": "astropy__astropy-11693",
+        "model_patch": "diff --git a/astropy/wcs/wcsapi/fitswcs.py b/astropy/wcs/wcsapi/fitswcs.py --- a/astropy/wcs/wcsapi/fitswcs.py +++ b/astropy/wcs/wcsapi/fitswcs.py @@ -325,7 +325,7 @@          pixel = self.all_world2pix(*world_arrays, 0) -        return pixel[0] if self.pixel_n_dim == 1 else tuple(pixel) +        return pixel[0] if self.pixel_n_dim == 1 else tuple(pixel)  ",
+        "model_name_or_path": "palimpzest"
+    }
+]
