@@ -57,6 +57,11 @@ def get_json_from_answer(answer: str, model: Model, cardinality: Cardinality) ->
     # Handle weird escaped values. I am not sure why the model
     # is returning these, but the JSON parser can't take them
     answer = answer.replace(r"\_", "_")
+
+    # Remove variable quantities of escape chars for new line and double quotes
+    answer = re.sub(r"\\+n", r"\n", answer)
+    answer = re.sub(r'\\+"', r'\"', answer)
+
     answer = answer.replace("\\n", "\n")
     # Remove https and http prefixes to not conflict with comment detection
     # Handle comments in the JSON response. Use regex from // until end of line
