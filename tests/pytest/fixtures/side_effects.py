@@ -1,4 +1,5 @@
 import pytest
+
 from palimpzest.core.data.dataclasses import GenerationStats
 
 

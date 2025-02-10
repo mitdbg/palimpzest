@@ -1,4 +1,5 @@
 import pytest
+
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.utils.model_helpers import get_models
@@ -53,10 +54,7 @@ class TestCostModel:
         # register a fake dataset
         dataset_id = "foobar"
         vals = [1, 2, 3, 4, 5, 6]
-        DataDirectory().register_dataset(
-            vals=vals,
-            dataset_id=dataset_id,
-        )
+        DataDirectory().register_memory_source(vals=vals, dataset_id=dataset_id)
         input_cardinality = len(vals)
 
         # TODO: if we test with a plan other than the simple test plan; this will break

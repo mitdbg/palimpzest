@@ -1,8 +1,6 @@
-from palimpzest.constants import MAX_ROWS, Cardinality, OptimizationStrategy
+from palimpzest.constants import MAX_ROWS, Cardinality
 
-# Dataset functionality
-#from palimpzest.sets import Dataset
-# Data management
+# data management
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import (
     MaxQuality,
@@ -16,11 +14,13 @@ from palimpzest.policy import (
     Policy,
 )
 
+# dataset functionality
+from palimpzest.sets import Dataset
+
 __all__ = [
     # constants
     "MAX_ROWS",
     "Cardinality",
-    "OptimizationStrategy",
     # datamanager
     "DataDirectory",
     # policy
@@ -34,5 +34,5 @@ __all__ = [
     "PlanCost",
     "Policy",
     # sets
-    # "Dataset",
+    "Dataset",
 ]

@@ -12,7 +12,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections import Counter
 from string import Formatter
-from typing import Any, Generic, Tuple, TypeVar
+from typing import Any, Generic, TypeVar
 
 from colorama import Fore, Style
 from openai import OpenAI
@@ -35,13 +35,13 @@ from palimpzest.constants import (
 )
 from palimpzest.core.data.dataclasses import GenerationStats
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import BytesField, ImageBase64Field, ImageFilepathField, ImageURLField, ListField
+from palimpzest.core.lib.fields import BytesField, ImageBase64Field, ImageFilepathField, ImageURLField
 from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
 from palimpzest.query.generators import multi_llm_generator 
 
 # DEFINITIONS
-GenerationOutput = Tuple[dict, str | None, GenerationStats]
+GenerationOutput = tuple[dict, str | None, GenerationStats]
 ContextType = TypeVar("ContextType")
 InputType = TypeVar("InputType")
 
@@ -125,12 +125,14 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             prompt = prompts.COT_BOOL_IMAGE_SYSTEM_PROMPT
         elif self.prompt_strategy == PromptStrategy.COT_QA:
             prompt = prompts.COT_QA_BASE_SYSTEM_PROMPT
-        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER:
-            prompt = prompts.COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT
-        elif self.prompt_strategy == PromptStrategy.COT_MOA_AGG:
-            prompt = prompts.COT_MOA_AGG_BASE_SYSTEM_PROMPT
         elif self.prompt_strategy == PromptStrategy.COT_QA_IMAGE:
             prompt = prompts.COT_QA_IMAGE_BASE_SYSTEM_PROMPT
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER:
+            prompt = prompts.COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER_IMAGE:
+            prompt = prompts.COT_MOA_PROPOSER_IMAGE_BASE_SYSTEM_PROMPT
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_AGG:
+            prompt = prompts.COT_MOA_AGG_BASE_SYSTEM_PROMPT
 
         if self.prompt_strategy not in [PromptStrategy.COT_BOOL, PromptStrategy.COT_BOOL_IMAGE]:
             output_format_instruction = (
@@ -155,7 +157,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         # get model responses for mixture-of-agents aggregation
         model_responses = None
-        if self.prompt_strategy == PromptStrategy.COT_MOA_AGG:
+        if self.prompt_strategy in [PromptStrategy.COT_MOA_AGG]:
             model_responses = ""
             for idx, model_response in enumerate(kwargs.get("model_responses")):
                 model_responses += f"MODEL RESPONSE {idx + 1}: {model_response}\n"
@@ -226,6 +228,13 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 "output_fields_desc": output_fields_desc,
             })
 
+        elif self.prompt_strategy == PromptStrategy.COT_QA_IMAGE:
+            prompt = prompts.COT_QA_IMAGE_BASE_USER_PROMPT
+            format_kwargs.update({
+                "output_format_instruction": output_format_instruction,
+                "output_fields_desc": output_fields_desc,
+            })
+
         elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER:
             prompt = prompts.COT_MOA_PROPOSER_BASE_USER_PROMPT
             format_kwargs.update({
@@ -233,19 +242,20 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 "output_fields_desc": output_fields_desc,
             })
 
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER_IMAGE:
+            prompt = prompts.COT_MOA_PROPOSER_IMAGE_BASE_USER_PROMPT
+            format_kwargs.update({
+                "output_format_instruction": output_format_instruction,
+                "output_fields_desc": output_fields_desc,
+            })
+
         elif self.prompt_strategy == PromptStrategy.COT_MOA_AGG:
             prompt = prompts.COT_MOA_AGG_BASE_USER_PROMPT
+            format_kwargs.pop("context")
             format_kwargs.update({
                 "output_format_instruction": output_format_instruction,
                 "output_fields_desc": output_fields_desc,
                 "model_responses": model_responses,
-            })
-
-        elif self.prompt_strategy == PromptStrategy.COT_QA_IMAGE:
-            prompt = prompts.COT_QA_IMAGE_BASE_USER_PROMPT
-            format_kwargs.update({
-                "output_format_instruction": output_format_instruction,
-                "output_fields_desc": output_fields_desc,
             })
 
         return prompt.format(**format_kwargs)
@@ -417,7 +427,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             print(f"Error parsing reasoning and answers: {e}")
 
         # parse field answers
-        field_answers = {field_name: None for field_name in fields}
+        field_answers = None if fields is None else {field_name: None for field_name in fields}
         try:
             field_answers = self._parse_answer(completion_text, fields, **kwargs)
         except Exception as e:
@@ -437,9 +447,10 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
             PromptStrategy.COT_BOOL,
             PromptStrategy.COT_BOOL_IMAGE,
             PromptStrategy.COT_QA,
-            PromptStrategy.COT_MOA_PROPOSER,
-            PromptStrategy.COT_MOA_AGG,
             PromptStrategy.COT_QA_IMAGE,
+            PromptStrategy.COT_MOA_PROPOSER,
+            PromptStrategy.COT_MOA_PROPOSER_IMAGE,
+            PromptStrategy.COT_MOA_AGG,
         ]
         super().__init__(model, prompt_strategy, cardinality, verbose, multi_LLM_verification)
 
@@ -463,34 +474,54 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
         user_content = [{"type": "text", "text": user_prompt}]
 
         # determine if any field is an image filepath, image URL, or base64 encoded image bytes
-        for field, field_value in candidate:
+        is_image_conversion = False
+        for field_name, field_value in candidate:
+            field_type = candidate.field_types[field_name]
+
             # image filepath (or list of image filepaths)
-            if isinstance(field, ImageFilepathField):
+            if isinstance(field_type, ImageFilepathField):
+                is_image_conversion = True
                 with open(field_value, 'rb') as f:
                     base64_image = base64.b64encode(f.read()).decode('utf-8')
                 user_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}})
 
-            elif isinstance(field, ListField) and isinstance(field.element_type, ImageFilepathField):
+            elif hasattr(field_type, "element_type") and isinstance(field_type.element_type, ImageFilepathField):
+                is_image_conversion = True
                 for image_filepath in field_value:
                     with open(image_filepath, 'rb') as f:
                         base64_image = base64.b64encode(f.read()).decode('utf-8')
                     user_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}})
 
             # image url (or list of image urls)
-            elif isinstance(field, ImageURLField):
+            elif isinstance(field_type, ImageURLField):
+                is_image_conversion = True
                 user_content.append({"type": "image_url", "image_url": {"url": field_value}})
 
-            elif isinstance(field, ListField) and isinstance(field.element_type, ImageURLField):
+            elif hasattr(field_type, "element_type") and isinstance(field_type.element_type, ImageURLField):
+                is_image_conversion = True
                 for image_url in field_value:
                     user_content.append({"type": "image_url", "image_url": {"url": image_url}})
 
             # pre-encoded images (or list of pre-encoded images)
-            elif isinstance(field, ImageBase64Field):
-                user_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{field_value}"}})
+            elif isinstance(field_type, ImageBase64Field):
+                is_image_conversion = True
+                base64_image_str = field_value.decode("utf-8")
+                user_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}})
 
-            elif isinstance(field, ListField) and isinstance(field.element_type, ImageBase64Field):
+            elif hasattr(field_type, "element_type") and isinstance(field_type.element_type, ImageBase64Field):
+                is_image_conversion = True
                 for base64_image in field_value:
-                    user_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}})
+                    base64_image_str = base64_image.decode("utf-8")
+                    user_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}})
+
+        # if this is an image conversion, we need to add the reasoning prompt suffix after the image
+        if is_image_conversion:
+            suffix = (
+                prompts.IMAGE_ANSWER_SUFFIX
+                if self.prompt_strategy  == PromptStrategy.COT_MOA_PROPOSER_IMAGE
+                else prompts.IMAGE_REASONING_SUFFIX
+            )
+            user_content.append({"type": "text", "text": suffix})
 
         # add user message(s)
         messages.append({"role": "user", "content": user_content})
@@ -506,7 +537,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
         return payload
 
     def _generate_completion(self, client: OpenAI, payload: dict, **kwargs) -> ChatCompletion:
-        """Generates a completion object using the client (or local model)."""
+        """Generates a completion object using the client (or local model)."""        
         return client.chat.completions.create(**payload)
 
     def _get_completion_text(self, completion: ChatCompletion, **kwargs) -> str:
@@ -540,9 +571,10 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
             PromptStrategy.COT_BOOL,
             PromptStrategy.COT_BOOL_IMAGE,
             PromptStrategy.COT_QA,
-            PromptStrategy.COT_MOA_PROPOSER,
-            PromptStrategy.COT_MOA_AGG,
             PromptStrategy.COT_QA_IMAGE,
+            PromptStrategy.COT_MOA_PROPOSER,
+            PromptStrategy.COT_MOA_PROPOSER_IMAGE,
+            PromptStrategy.COT_MOA_AGG,
         ]
         super().__init__(model, prompt_strategy, cardinality, verbose)
 
@@ -571,20 +603,36 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
         # determine if any field is an image filepath, image URL, or base64 encoded image bytes
         # NOTE: the Rules for the various convert operators will not consider Together models when converting
         #       fields that are lists of images; thus, we only need to worry about processing image fields directly
-        for field, field_value in candidate:
+        is_image_conversion = False
+        for field_name, field_value in candidate:
+            field_type = candidate.field_types[field_name]
+
             # image filepath
-            if isinstance(field, ImageFilepathField):
+            if isinstance(field_type, ImageFilepathField):
+                is_image_conversion = True
                 with open(field_value, 'rb') as f:
                     base64_image = base64.b64encode(f.read()).decode('utf-8')
                 user_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}})
 
             # image url
-            elif isinstance(field, ImageURLField):
+            elif isinstance(field_type, ImageURLField):
+                is_image_conversion = True
                 user_content.append({"type": "image_url", "image_url": {"url": field_value}})
 
-            # pre-encoded image
-            elif isinstance(field, ImageBase64Field):
-                user_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{field_value}"}})
+            # pre-encoded images
+            elif isinstance(field_type, ImageBase64Field):
+                is_image_conversion = True
+                base64_image_str = field_value.decode("utf-8")
+                user_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}})
+
+        # if this is an image conversion, we need to add the reasoning prompt suffix after the image
+        if is_image_conversion:
+            suffix = (
+                prompts.IMAGE_ANSWER_SUFFIX
+                if self.prompt_strategy  == PromptStrategy.COT_MOA_PROPOSER_IMAGE
+                else prompts.IMAGE_REASONING_SUFFIX
+            )
+            user_content.append({"type": "text", "text": suffix})
 
         # add user message(s)
         messages.append({"role": "user", "content": user_content})
@@ -599,7 +647,7 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
 
         return payload
 
-    def _generate_completion(self, client: OpenAI, payload: dict, **kwargs) -> ChatCompletionResponse:
+    def _generate_completion(self, client: Together, payload: dict, **kwargs) -> ChatCompletionResponse:
         """Generates a completion object using the client (or local model)."""
         return client.chat.completions.create(**payload)
 

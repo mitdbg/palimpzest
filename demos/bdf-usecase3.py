@@ -11,12 +11,12 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
 import streamlit as st  # type: ignore
+
 from palimpzest.constants import Cardinality
-from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import PDFFile, Schema
 from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import MaxQuality, MinCost
-from palimpzest.query import Execute, StreamingSequentialExecution
+from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 from palimpzest.sets import Dataset
 
 if not os.environ.get("OPENAI_API_KEY"):
@@ -25,59 +25,56 @@ if not os.environ.get("OPENAI_API_KEY"):
     load_env()
 
 
-class ScientificPaper(PDFFile):
-    """Represents a scientific research paper, which in practice is usually from a PDF file"""
+sci_paper_cols = [
+    {"name": "paper_title", "type": str, "desc": "The title of the paper. This is a natural language title, not a number or letter."},
+    {"name": "paper_year", "type": int, "desc": "The year the paper was published. This is a number."},
+    {"name": "paper_author", "type": str, "desc": "The name of the first author of the paper"},
+    {"name": "paper_abstract", "type": str, "desc": "A short description of the paper contributions and findings"},
+    {"name": "paper_journal", "type": str, "desc": "The name of the journal the paper was published in"},
+    {"name": "paper_subject", "type": str, "desc": "A summary of the paper contribution in one sentence"},
+    {"name": "paper_doi_url", "type": str, "desc": "The DOI URL for the paper"}
+]
 
-    paper_title = Field(
-        desc="The title of the paper. This is a natural language title, not a number or letter."
-    )
-    author = Field(desc="The name of the first author of the paper")
-    #    publicationYear = Field(desc="The year the paper was published. This is a number.")
-    #    journal = Field(desc="The name of the journal the paper was published in")
-    abstract = Field(desc="A short description of the paper contributions and findings")
-
-
-#    doiURL se= Field(desc="The DOI URL for the paper")
-
-
-class Reference(Schema):
-    """Represents a reference to another paper, which is cited in a scientific paper"""
-
-    index = Field(desc="The index of the reference in the paper")
-    title = Field(desc="The title of the paper being cited")
-    first_author = Field(desc="The author of the paper being cited")
-    year = Field(desc="The year in which the cited paper was published")
-    # snippet = Field(desc="A snippet from the source paper that references the index")
+reference_cols = [
+    {"name": "reference_index", "type": int | float, "desc": "The index of the reference in the paper"},
+    {"name": "reference_title", "type": str, "desc": "The title of the paper being cited"},
+    {"name": "reference_first_author", "type": str, "desc": "The author of the paper being cited"},
+    {"name": "reference_year", "type": int, "desc": "The year in which the cited paper was published"},
+]
 
 
 @st.cache_resource()
 def run_workload():
-    papers = Dataset("bdf-usecase3-tiny", schema=ScientificPaper)
-    # papers = papers.filter("The paper mentions phosphorylation of Exo1")
-    references = papers.convert(
-        Reference, desc="A paper cited in the reference section", cardinality=Cardinality.ONE_TO_MANY
-    )
+    papers = Dataset("bdf-usecase3-tiny")
+    papers = papers.sem_add_columns(sci_paper_cols)
+    # papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
+    references = papers.sem_add_columns(reference_cols, cardinality=Cardinality.ONE_TO_MANY)
 
     output = references
     # engine = NoSentinelExecution
-    engine = StreamingSequentialExecution
     policy = MinCost()
-    iterable = Execute(
-        output,
+    config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=engine,
+        processing_strategy="streaming",
+        execution_strategy="sequential",
+        optimizer_strategy="pareto",
     )
+    iterable = output.run(config)
 
     tables = []
     statistics = []
-    for table, plan, stats in iterable:  # noqa: B007
+    for data_record_collection in iterable:  # noqa: B007
         # record_time = time.time()
+        table = data_record_collection.data_records
+        stats = data_record_collection.plan_stats
         tables += table
         statistics.append(stats)
 
+    processor = QueryProcessorFactory.create_processor(output, config)
+    plan = processor.generate_plan(output, policy)
     return tables, plan, stats
 
 
@@ -96,51 +93,55 @@ dataset = "bdf-usecase3-tiny"
 
 if run_pz:
     # reference, plan, stats = run_workload()
-    papers = Dataset(dataset, schema=ScientificPaper)
-    papers = papers.filter("The paper mentions phosphorylation of Exo1")
-    output = papers.convert(Reference, desc="The references cited in the paper", cardinality=Cardinality.ONE_TO_MANY)
+    papers = Dataset(dataset)
+    papers = papers.sem_add_columns(sci_paper_cols)
+    papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
+    output = papers.sem_add_columns(reference_cols, cardinality=Cardinality.ONE_TO_MANY)
 
     # output = references
     # engine = NoSentinelExecution
-    engine = StreamingSequentialExecution
     # policy = MinCost()
     policy = MaxQuality()
-    iterable = Execute(
-        output,
+    config = QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
         allow_token_reduction=False,
-        execution_engine=engine,
+        processing_strategy="streaming",
+        execution_strategy="sequential",
+        optimizer_strategy="pareto",
     )
+    processor = QueryProcessorFactory.create_processor(output, config)
+    plan =processor.generate_plan(output, policy)
+    iterable = output.run(config)
 
     references = []
     statistics = []
 
-    for idx, (reference, plan, stats) in enumerate(iterable):
+    for idx, data_record_collection in enumerate(iterable):
         record_time = time.time()
+        records = data_record_collection.data_records
+        stats = data_record_collection.plan_stats
+        plan = data_record_collection.executed_plans[0]
         statistics.append(stats)
 
         if not idx:
             with st.container():
                 st.write("### Executed plan: \n")
-                # st.write(" " + str(plan).replace("\n", "  \n "))
-                for idx, op in enumerate(plan.operators):
-                    strop = f"{idx+1}. {str(op)}"
-                    strop = strop.replace("\n", "  \n")
-                    st.write(strop)
-        for ref in reference:
+                st.write(" " + str(plan).replace("\n", "  \n "))
+                
+        for ref in records:
             try:
-                index = ref.index
+                index = ref.reference_index
             except Exception:
                 continue
             # ref.key = ref.first_author.split()[0] + ref.title.split()[0] + str(ref.year)
             references.append(
                 {
-                    "title": ref.title,
+                    "title": ref.reference_title,
                     "index": index,
-                    "first_author": ref.first_author,
-                    "year": ref.year,
+                    "first_author": ref.reference_first_author,
+                    "year": ref.reference_year,
                     # "snippet": ref.snippet,
                     "source": ref.filename,
                     # "key": ref.key,
@@ -148,10 +149,10 @@ if run_pz:
             )
 
             with st.container(height=200, border=True):
-                st.write(" **idx:** ", ref.index)
-                st.write(" **Paper:** ", ref.title)
-                st.write(" **Author:**", ref.first_author)
-                st.write(" **Year:** ", ref.year)
+                st.write(" **idx:** ", ref.reference_index)
+                st.write(" **Paper:** ", ref.reference_title)
+                st.write(" **Author:**", ref.reference_first_author)
+                st.write(" **Year:** ", ref.reference_year)
                 # st.write(" **Key:** ", ref.key)
                 # st.write(" **Reference text:** ", ref.snippet, "\n")
     references_df = pd.DataFrame(references)

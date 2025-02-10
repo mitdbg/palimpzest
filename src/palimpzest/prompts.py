@@ -7,6 +7,14 @@ For now, this is an easy decoupling. In the future, we maybe want a more sophist
 ONE_TO_ONE_OUTPUT_FORMAT_INSTRUCTION = "Remember, your answer must be a valid JSON dictionary. The dictionary should only have the specified output fields."
 ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION = "Remember, your answer must be a valid JSON list of dictionaries. The list may contain one or more dictionaries, and each dictionary should only have the specified output fields."
 
+### REASONING INSTRUCTION FOR IMAGE PROMPTS ###
+IMAGE_REASONING_SUFFIX = """Let's think step by step in order to answer the question.
+
+REASONING: """
+IMAGE_ANSWER_SUFFIX = """Let's think step by step in order to answer the question.
+
+ANSWER: """
+
 ### DEVELOPER / SYSTEM PROMPTS ###
 COT_BOOL_SYSTEM_PROMPT = """You are a helpful assistant whose job is to answer a TRUE / FALSE question.
 You will be presented with a context and a filter condition. Output TRUE if the context satisfies the filter condition, and FALSE otherwise.
@@ -38,7 +46,7 @@ You will be presented with the image(s) and a filter condition. You may also hav
 
 Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 
-An example is shown below (the image will be provided in a subsequent message, suppose it is an image of a dog playing with a cat):
+An example is shown below:
 ---
 CONTEXT:
 {{
@@ -51,6 +59,8 @@ INPUT FIELDS:
 - photographer: the photographer of the image
 
 FILTER CONDITION: there's an animal in this image
+
+<image content provided here; assume in this example the image shows a dog and a cat playing>
 
 Let's think step by step in order to answer the question.
 
@@ -92,14 +102,49 @@ ANSWER:
   "birth_year": 1815
 }}
 ---
+"""
 
+COT_QA_IMAGE_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to analyze input image(s) and/or text in order to produce a JSON object.
+You will be presented with the image(s) and a set of output fields to generate. You may also have some textual inputs. Your task is to generate a JSON object which fills in the output fields with the correct values.
+You will be provided with a description of each output field. All of the fields in the output JSON object can be derived using information from the input(s).
+
+{output_format_instruction} Finish your response with a newline character followed by ---
+
+An example is shown below:
+---
+CONTEXT:
+{{
+  "image": <bytes>,
+  "photographer": "CameraEnthusiast1"
+}}
+
+INPUT FIELDS:
+- image: an image of a scene
+- photographer: the photographer of the image
+
+OUTPUT FIELDS:
+- dog_in_image: true if a dog is in the image and false otherwise
+- person_in_image: true if a person is in the image and false otherwise
+
+<image content provided here; assume in this example the image shows a dog and a cat playing>
+
+Let's think step by step in order to answer the question.
+
+REASONING: The image shows a dog playing with a cat, so there is a dog in the image. There is no person in the image.
+
+ANSWER:
+{{
+  "dog_in_image": true,
+  "person_in_image": false
+}}
+---
 """
 
 COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to produce an answer to a question.
 You will be presented with a context and a set of output fields to generate. Your task is to generate a paragraph or two which describes what you believe is the correct value for each output field.
 Be sure to cite information from the context as evidence of why your answers are correct. Do not hallucinate evidence.
 
-You will be provided with a description of each input field and each output field. All of the fields in the output can be derived using information from the context.
+You will be provided with a description of each input field and each output field.
 
 {output_format_instruction} Finish your response with a newline character followed by ---
 
@@ -123,14 +168,13 @@ Let's think step by step in order to answer the question.
 
 ANSWER: the text passage mentions the scientist's name as "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace" and the scientist's birthday as "December 10, 1815". Therefore, the name of the scientist is "Augusta Ada King" and the birth year is 1815.
 ---
-
 """
 
-COT_MOA_AGG_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to generate a JSON object.
-You will be presented with a context and a set of output fields to generate. The context will contain one or more outputs produced by a set of models. Your task is to synthesize these responses into a single, high-quality JSON object which fills in the output fields with the correct values.
-It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect.
+COT_MOA_PROPOSER_IMAGE_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to analyze input image(s) and/or text in order to produce an answer to a question.
+You will be presented with the image(s) and a set of output fields to generate. You may also have some textual inputs. Your task is to generate a paragraph or two which describes what you believe is the correct value for each output field.
+Be sure to cite information from the input(s) as evidence of why your answers are correct. Do not hallucinate evidence.
 
-You will be provided with a description of each input field and each output field. All of the fields in the output JSON object can be derived using information from the context.
+You will be provided with a description of each input field and each output field.
 
 {output_format_instruction} Finish your response with a newline character followed by ---
 
@@ -138,10 +182,36 @@ An example is shown below:
 ---
 CONTEXT:
 {{
-  "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
-  "birthday": "December 10, 1815"
+  "image": <bytes>,
+  "photographer": "CameraEnthusiast1"
 }}
 
+INPUT FIELDS:
+- image: an image of a scene
+- photographer: the photographer of the image
+
+OUTPUT FIELDS:
+- dog_in_image: true if a dog is in the image and false otherwise
+- person_in_image: true if a person is in the image and false otherwise
+
+<image content provided here; assume in this example the image shows a dog and a cat playing>
+
+Let's think step by step in order to answer the question.
+
+ANSWER: The image shows a dog playing with a cat, so there is a dog in the image. There is no person in the image.
+---
+"""
+
+COT_MOA_AGG_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to generate a JSON object.
+You will be presented with one or more outputs produced by a set of models. Your task is to synthesize these responses into a single, high-quality JSON object which fills in the output fields with the correct values.
+It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect.
+
+You will be provided with a description of each input field and each output field. All of the fields in the output JSON object can be derived using information from the model responses.
+
+{output_format_instruction} Finish your response with a newline character followed by ---
+
+An example is shown below:
+---
 MODEL RESPONSE 1: the text mentions the scientist's full name "Augusta Ada King, Countess of Lovelace" and states she was an English mathematician who worked on Babbage's Analytical Engine.
 
 MODEL RESPONSE 2: the text passage mentions the scientist's name as "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace" and the scientist's birthday as "December 10, 1815". Therefore, the name of the scientist is "Augusta Ada King" and the birth year is 1815.
@@ -164,43 +234,8 @@ ANSWER:
   "birth_year": 1815
 }}
 ---
-
 """
 
-COT_QA_IMAGE_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to analyze input image(s) and/or text in order to produce a JSON object.
-You will be presented with the image(s) and a set of output fields to generate. You may also have some textual inputs. Your task is to generate a JSON object which fills in the output fields with the correct values.
-You will be provided with a description of each output field. All of the fields in the output JSON object can be derived using information from the input(s).
-
-{output_format_instruction} Finish your response with a newline character followed by ---
-
-An example is shown below (the image will be provided in a subsequent message, suppose it is an image of a dog playing with a cat):
----
-CONTEXT:
-{{
-  "image": <bytes>,
-  "photographer": "CameraEnthusiast1"
-}}
-
-INPUT FIELDS:
-- image: an image of a scene
-- photographer: the photographer of the image
-
-OUTPUT FIELDS:
-- dog_in_image: true if a dog is in the image and false otherwise
-- person_in_image: true if a person is in the image and false otherwise
-
-Let's think step by step in order to answer the question.
-
-REASONING: The image shows a dog playing with a cat, so there is a dog in the image. There is no person in the image.
-
-ANSWER:
-{{
-  "dog_in_image": true,
-  "person_in_image": false
-}}
----
-
-"""
 
 ### USER / INSTANCE-SPECIFIC PROMPTS ###
 COT_BOOL_USER_PROMPT = """You are a helpful assistant whose job is to answer a TRUE / FALSE question.
@@ -233,9 +268,7 @@ INPUT FIELDS:
 
 FILTER CONDITION: {filter_condition}
 
-Let's think step by step in order to answer the question.
-
-REASONING: """
+"""
 
 COT_QA_BASE_USER_PROMPT = """You are a helpful assistant whose job is to generate a JSON object.
 You will be presented with a context and a set of output fields to generate. Your task is to generate a JSON object which fills in the output fields with the correct values.
@@ -256,50 +289,6 @@ Let's think step by step in order to answer the question.
 
 REASONING: """
 
-COT_MOA_PROPOSER_BASE_USER_PROMPT = """You are a helpful assistant whose job is to produce an answer to a question.
-You will be presented with a context and a set of output fields to generate. Your task is to generate a paragraph or two which describes what you believe is the correct value for each output field.
-Be sure to cite information from the context as evidence of why your answers are correct. Do not hallucinate evidence.
-
-You will be provided with a description of each input field and each output field. All of the fields in the output can be derived using information from the context.
-
-{output_format_instruction} Finish your response with a newline character followed by ---
----
-CONTEXT:
-{context}
-
-INPUT FIELDS:
-{input_fields_desc}
-
-OUTPUT FIELDS:
-{output_fields_desc}
-
-Let's think step by step in order to answer the question.
-
-REASONING: """
-
-COT_MOA_AGG_BASE_USER_PROMPT = """You are a helpful assistant whose job is to generate a JSON object.
-You will be presented with a context and a set of output fields to generate. The context will contain one or more outputs produced by a set of models. Your task is to synthesize these responses into a single, high-quality JSON object which fills in the output fields with the correct values.
-It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect.
-
-You will be provided with a description of each input field and each output field. All of the fields in the output JSON object can be derived using information from the context.
-
-{output_format_instruction} Finish your response with a newline character followed by ---
----
-CONTEXT:
-{context}
-
-{model_responses}
-
-INPUT FIELDS:
-{input_fields_desc}
-
-OUTPUT FIELDS:
-{output_fields_desc}
-
-Let's think step by step in order to answer the question.
-
-REASONING: """
-
 COT_QA_IMAGE_BASE_USER_PROMPT = """You are a helpful assistant whose job is to analyze input image(s) and/or text in order to produce a JSON object.
 You will be presented with the image(s) and a set of output fields to generate. You may also have some textual inputs. Your task is to generate a JSON object which fills in the output fields with the correct values.
 You will be provided with a description of each output field. All of the fields in the output JSON object can be derived using information from the input(s).
@@ -308,6 +297,64 @@ You will be provided with a description of each output field. All of the fields 
 ---
 CONTEXT:
 {context}
+
+INPUT FIELDS:
+{input_fields_desc}
+
+OUTPUT FIELDS:
+{output_fields_desc}
+
+"""
+
+COT_MOA_PROPOSER_BASE_USER_PROMPT = """You are a helpful assistant whose job is to produce an answer to a question.
+You will be presented with a context and a set of output fields to generate. Your task is to generate a paragraph or two which describes what you believe is the correct value for each output field.
+Be sure to cite information from the context as evidence of why your answers are correct. Do not hallucinate evidence.
+
+You will be provided with a description of each input field and each output field.
+
+{output_format_instruction} Finish your response with a newline character followed by ---
+---
+CONTEXT:
+{context}
+
+INPUT FIELDS:
+{input_fields_desc}
+
+OUTPUT FIELDS:
+{output_fields_desc}
+
+Let's think step by step in order to answer the question.
+
+REASONING: """
+
+COT_MOA_PROPOSER_IMAGE_BASE_USER_PROMPT = """You are a helpful assistant whose job is to analyze input image(s) and/or text in order to produce an answer to a question.
+You will be presented with the image(s) and a set of output fields to generate. You may also have some textual inputs. Your task is to generate a paragraph or two which describes what you believe is the correct value for each output field.
+Be sure to cite information from the input(s) as evidence of why your answers are correct. Do not hallucinate evidence.
+
+You will be provided with a description of each input field and each output field.
+
+{output_format_instruction} Finish your response with a newline character followed by ---
+---
+CONTEXT:
+{context}
+
+INPUT FIELDS:
+{input_fields_desc}
+
+OUTPUT FIELDS:
+{output_fields_desc}
+
+"""
+
+COT_MOA_AGG_BASE_USER_PROMPT = """You are a helpful assistant whose job is to generate a JSON object.
+You will be presented with one or more outputs produced by a set of models. Your task is to synthesize these responses into a single, high-quality JSON object which fills in the output fields with the correct values.
+It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect.
+
+You will be provided with a description of each input field and each output field. All of the fields in the output JSON object can be derived using information from the model responses.
+
+{output_format_instruction} Finish your response with a newline character followed by ---
+---
+{model_responses}
 
 INPUT FIELDS:
 {input_fields_desc}

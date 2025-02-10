@@ -30,21 +30,10 @@ class PromptStrategy(str, Enum):
     COT_BOOL = "chain-of-thought-bool"
     COT_BOOL_IMAGE = "chain-of-thought-bool-image"
     COT_QA = "chain-of-thought-question"
-    COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
-    COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
     COT_QA_IMAGE = "chain-of-thought-question-image"
-
-
-class OptimizationStrategy(str, Enum):
-    """
-    OptimizationStrategy determines which (set of) plan(s) the Optimizer
-    will return to the Execution layer.
-    """
-    GREEDY = "greedy"
-    CONFIDENCE_INTERVAL = "confidence-interval"
-    PARETO = "pareto" 
-    SENTINEL = "sentinel"
-    NONE = "none"
+    COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
+    COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
+    COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
 
 
 class AggFunc(str, Enum):
@@ -80,6 +69,8 @@ PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.3
 
 # character limit for various IDs
 MAX_ID_CHARS = 10
+DEFAULT_DATASET_ID_CHARS = 16
+MAX_DATASET_ID_CHARS = 100
 
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
 RETRY_MULTIPLIER = 2
