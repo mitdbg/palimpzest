@@ -27,13 +27,52 @@ class PromptStrategy(str, Enum):
     PromptStrategy describes the prompting technique to be used by a Generator when
     performing some task with a specified Model.
     """
+    # Chain-of-Thought Boolean Prompt Strategies
     COT_BOOL = "chain-of-thought-bool"
+    COT_BOOL_CRITIC = "chain-of-thought-bool-critic"
+    COT_BOOL_REFINE = "chain-of-thought-bool-refine"
+
+    # Chain-of-Thought Boolean with Image Prompt Strategies
     COT_BOOL_IMAGE = "chain-of-thought-bool-image"
+    COT_BOOL_IMAGE_CRITIC = "chain-of-thought-bool-image-critic"
+    COT_BOOL_IMAGE_REFINE = "chain-of-thought-bool-image-refine"
+
+    # Chain-of-Thought Question Answering Prompt Strategies
     COT_QA = "chain-of-thought-question"
-    COT_QA_IMAGE = "chain-of-thought-question-image"
+    COT_QA_CRITIC = "chain-of-thought-question-critic"
+    COT_QA_REFINE = "chain-of-thought-question-refine"
+
+    # Mixture-of-Agents (Proposer) Prompt Strategies
     COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
+    COT_MOA_PROPOSER_CRITIC = "chain-of-thought-mixture-of-agents-proposer-critic"
+    COT_MOA_PROPOSER_REFINE = "chain-of-thought-mixture-of-agents-proposer-refine"
+
+    # Mixture-of-Agents (Proposer) with Image Prompt Strategies
     COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
+    COT_MOA_PROPOSER_IMAGE_CRITIC = "chain-of-thought-mixture-of-agents-proposer-critic"
+    COT_MOA_PROPOSER_IMAGE_REFINE = "chain-of-thought-mixture-of-agents-proposer-refine"
+
+    # Mixture-of-Agents (Aggregation) Prompt Strategies
     COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
+    COT_MOA_AGG_CRITIC = "chain-of-thought-mixture-of-agents-aggregation-critic"
+    COT_MOA_AGG_REFINE = "chain-of-thought-mixture-of-agents-aggregation-refine"
+
+    # Chain-of-Thought Question with Image Prompt Strategies
+    COT_QA_IMAGE = "chain-of-thought-question-image"
+    COT_QA_IMAGE_CRITIC = "chain-of-thought-question-image-critic"
+    COT_QA_IMAGE_REFINE = "chain-of-thought-question-image-refine"
+
+
+class OptimizationStrategy(str, Enum):
+    """
+    OptimizationStrategy determines which (set of) plan(s) the Optimizer
+    will return to the Execution layer.
+    """
+    GREEDY = "greedy"
+    CONFIDENCE_INTERVAL = "confidence-interval"
+    PARETO = "pareto" 
+    SENTINEL = "sentinel"
+    NONE = "none"
 
 
 class AggFunc(str, Enum):
