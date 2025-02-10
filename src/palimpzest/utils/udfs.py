@@ -3,17 +3,12 @@ This file collects a sample of useful UDFs to convert schemata.
 """
 
 import io
-import json
 from datetime import datetime
 
-import modal
 import pandas as pd
 import requests
-from papermage import Document
 
 from palimpzest.constants import MAX_ROWS
-from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
 def url_to_file(candidate: dict):
@@ -28,29 +23,6 @@ def url_to_file(candidate: dict):
         contents = b""
 
     return {"filename": filename, "timestamp": timestamp, "contents": contents}
-
-
-def file_to_pdf(candidate: dict):
-    pdfprocessor = DataDirectory().current_config.get("pdfprocessor")
-    if pdfprocessor == "modal":
-        print("handling PDF processing remotely")
-        remote_func = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
-    else:
-        remote_func = None
-
-    pdf_bytes = candidate["contents"]
-    # generate text_content from PDF
-    if remote_func is not None:
-        doc_json_str = remote_func.remote([pdf_bytes])
-        docdict = json.loads(doc_json_str[0])
-        doc = Document.from_json(docdict)
-        text_content = ""
-        for p in doc.pages:
-            text_content += p.text
-    else:
-        text_content = get_text_from_pdf(candidate["filename"], candidate["contents"])
-
-    return {"text_contents": text_content[:10000]}  # TODO Very hacky
 
 
 def file_to_xls(candidate: dict):

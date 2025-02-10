@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""This scripts is a demo for the biofabric data integration.
-python src/cli/cli_main.py reg --path testdata/bdf-usecase3-pdf/ --name bdf-usecase3-pdf
-
+"""This script is a demo for the biofabric data integration.
 """
 import os
 import time
@@ -11,19 +9,13 @@ import networkx as nx
 import pandas as pd
 import streamlit as st
 
-from palimpzest.constants import Cardinality
-from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.policy import MaxQuality
-from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.sets import Dataset
+import palimpzest as pz
 from palimpzest.utils import udfs
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env
 
     load_env()
-
-DataDirectory().clear_cache(keep_registry=True)
 
 #"""Represents a scientific research paper, which in practice is usually from a PDF file"""
 #
@@ -82,16 +74,16 @@ xls_cols = file_cols + [
 
 @st.cache_resource()
 def extract_supplemental(processing_strategy, execution_strategy, optimizer_strategy, policy):
-    papers = Dataset("biofabric-pdf")
+    papers = pz.Dataset("testdata/biofabric-pdf")
     papers = papers.sem_add_columns(sci_paper_cols)
     paper_urls = papers.sem_add_columns([{"name": "url", "type": "string", "desc": "The DOI URL for the paper"}])
     html_doi = paper_urls.add_columns(udf=udfs.url_to_file, cols=file_cols)
-    table_urls = html_doi.sem_add_columns([{"name": "table_url", "type": "string", "desc": "The URLs of the XLS tables from the page"}], cardinality=Cardinality.ONE_TO_MANY)
+    table_urls = html_doi.sem_add_columns([{"name": "table_url", "type": "string", "desc": "The URLs of the XLS tables from the page"}], cardinality=pz.Cardinality.ONE_TO_MANY)
     tables = table_urls.add_columns(udf=udfs.url_to_file, cols=file_cols)
     xls = tables.add_columns(udf=udfs.file_to_xls, cols=xls_cols)
-    patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
+    patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
 
-    config = QueryProcessorConfig(
+    config = pz.QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
@@ -115,12 +107,12 @@ def extract_supplemental(processing_strategy, execution_strategy, optimizer_stra
 
 @st.cache_resource()
 def integrate_tables(processing_strategy, execution_strategy, optimizer_strategy, policy):
-    xls = Dataset("biofabric-tiny")
-    patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
+    xls = pz.Dataset("testdata/biofabric-tiny")
+    patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
     patient_tables = patient_tables.sem_filter("The table contains biometric information about the patient")
-    case_data = patient_tables.sem_add_columns(case_data_cols, cardinality=Cardinality.ONE_TO_MANY)
+    case_data = patient_tables.sem_add_columns(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
 
-    config = QueryProcessorConfig(
+    config = pz.QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
@@ -143,12 +135,12 @@ def integrate_tables(processing_strategy, execution_strategy, optimizer_strategy
 
 @st.cache_resource()
 def extract_references(processing_strategy, execution_strategy, optimizer_strategy, policy):
-    papers = Dataset("bdf-usecase3-tiny")
+    papers = pz.Dataset("testdata/bdf-usecase3-tiny")
     papers = papers.sem_add_columns(sci_paper_cols)
     papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
-    references = papers.sem_add_columns(reference_cols, cardinality=Cardinality.ONE_TO_MANY)
+    references = papers.sem_add_columns(reference_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
 
-    config = QueryProcessorConfig(
+    config = pz.QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
@@ -169,31 +161,26 @@ def extract_references(processing_strategy, execution_strategy, optimizer_strate
     return tables, plan, stats
 
 
-pdfdir = "testdata/bdf-usecase3-pdf/"
-
 with st.sidebar:
-    datasets = DataDirectory().list_registered_datasets()
-    options = [name for name, path in datasets if path[0] == "dir"]
-    options = [name for name in options if "bdf-usecase3" in name]
+    options = [os.path.join("testdata", name) for name in os.listdir("testdata")]
+    options = [path for path in options if os.path.isdir(path)]
+    options = [path for path in options if "bdf-usecase3" in path]
     dataset = st.radio("Select a dataset", options)
     run_pz = st.button("Run Palimpzest on dataset")
-
     # st.radio("Biofabric Data Integration")
+
 run_pz = True
-dataset = "bdf-usecase3-tiny"
+dataset = "testdata/bdf-usecase3-tiny"
 
 if run_pz:
     # reference, plan, stats = run_workload()
-    papers = Dataset(dataset)
+    papers = pz.Dataset(dataset)
     papers = papers.sem_add_columns(sci_paper_cols)
     papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
-    papers = papers.sem_add_columns(reference_cols, cardinality=Cardinality.ONE_TO_MANY)
+    papers = papers.sem_add_columns(reference_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
 
-    # output = references
-    # engine = NoSentinelExecution
-    # policy = MinCost()
-    policy = MaxQuality()
-    config = QueryProcessorConfig(
+    policy = pz.MaxQuality()
+    config = pz.QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,

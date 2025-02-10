@@ -12,12 +12,8 @@ import networkx as nx
 import pandas as pd
 import streamlit as st  # type: ignore
 
-from palimpzest.constants import Cardinality
-from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.policy import MaxQuality, MinCost
-from palimpzest.query.processor.config import QueryProcessorConfig
+import palimpzest as pz
 from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
-from palimpzest.sets import Dataset
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env
@@ -45,15 +41,14 @@ reference_cols = [
 
 @st.cache_resource()
 def run_workload():
-    papers = Dataset("bdf-usecase3-tiny")
+    papers = pz.Dataset("testdata/bdf-usecase3-tiny")
     papers = papers.sem_add_columns(sci_paper_cols)
     # papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
-    references = papers.sem_add_columns(reference_cols, cardinality=Cardinality.ONE_TO_MANY)
-
+    references = papers.sem_add_columns(reference_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
     output = references
-    # engine = NoSentinelExecution
-    policy = MinCost()
-    config = QueryProcessorConfig(
+
+    policy = pz.MinCost()
+    config = pz.QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
@@ -78,31 +73,29 @@ def run_workload():
     return tables, plan, stats
 
 
-pdfdir = "testdata/bdf-usecase3-pdf/"
-
 with st.sidebar:
-    datasets = DataDirectory().list_registered_datasets()
-    options = [name for name, path in datasets if path[0] == "dir"]
-    options = [name for name in options if "bdf-usecase3" in name]
+    options = [os.path.join("testdata", name) for name in os.listdir("testdata")]
+    options = [path for path in options if os.path.isdir(path)]
+    options = [path for path in options if "bdf-usecase3" in path]
     dataset = st.radio("Select a dataset", options)
     run_pz = st.button("Run Palimpzest on dataset")
 
     # st.radio("Biofabric Data Integration")
 run_pz = True
-dataset = "bdf-usecase3-tiny"
+dataset = "testdata/bdf-usecase3-tiny"
 
 if run_pz:
     # reference, plan, stats = run_workload()
-    papers = Dataset(dataset)
+    papers = pz.Dataset(dataset)
     papers = papers.sem_add_columns(sci_paper_cols)
     papers = papers.sem_filter("The paper mentions phosphorylation of Exo1")
-    output = papers.sem_add_columns(reference_cols, cardinality=Cardinality.ONE_TO_MANY)
+    output = papers.sem_add_columns(reference_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
 
     # output = references
     # engine = NoSentinelExecution
     # policy = MinCost()
-    policy = MaxQuality()
-    config = QueryProcessorConfig(
+    policy = pz.MaxQuality()
+    config = pz.QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,

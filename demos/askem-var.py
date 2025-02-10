@@ -10,12 +10,9 @@ import time
 import pandas as pd
 import streamlit as st
 
-from palimpzest.constants import Cardinality
+import palimpzest as pz
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.policy import MaxQuality
-from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
-from palimpzest.sets import Dataset
 
 dict_of_excerpts = [
     {"id": 0, "text": "ne of the few states producing detailed daily reports of COVID-19 confirmed cases, COVID-19 related cumulative hospitalizations, intensive care unit (ICU) admissions, and deaths per county. Likewise, Ohio is a state with marked variation of demographic and geographic attributes among counties along with substantial differences in the capacity of healthcare within the state. Our aim is to predict the spatiotemporal dynamics of the COVID-19 pandemic in relation with the distribution of the capacity of healthcare in Ohio. 2. Methods 2.1. Mathematical model We developed a spatial mathematical model to simulate the transmission dynamics of COVID-19 disease infection and spread. The spatially-explicit model incorporates geographic connectivity information at county level. The Susceptible-Infected-Hospitalized-Recovered- Dead (SIHRD) COVID-19 model classified the population into susceptibles (S), confirmed infections (I), hospitalized and ICU admitted (H), recovered (R) and dead (D). Based on a previous study that identified local air hubs and main roads as important geospatial attributes lio residing in the county. In the second scenario, we used the model to generate projections of the impact of potential easing on the non-pharmaceutical interventions in the critical care capacity of each county in Ohio. We assessed the impact of 50% reduction on the estimated impact of non-pharmaceutical interventions in reducing the hazard rate of infection. Under this scenario we calculated the proportion of ICU \n'"},
@@ -37,12 +34,12 @@ if __name__ == "__main__":
     file_path = "testdata/askem-tiny/"
 
     if run_pz:
-        excerpts = Dataset(pd.DataFrame(list_of_strings))
-        excerpts = excerpts.sem_add_columns(variable_cols, cardinality=Cardinality.ONE_TO_MANY)
-        excerpts = excerpts.sem_filter("The value name is 'a'", depends_on="name")
+        dataset = pz.Dataset(pd.DataFrame(list_of_strings))
+        dataset = dataset.sem_add_columns(variable_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
+        dataset = dataset.sem_filter("The value name is 'a'", depends_on="name")
 
-        policy = MaxQuality()
-        config = QueryProcessorConfig(
+        policy = pz.MaxQuality()
+        config = pz.QueryProcessorConfig(
             policy=policy,
             nocache=True,
             verbose=True,
@@ -50,10 +47,8 @@ if __name__ == "__main__":
             execution_strategy="sequential",
             optimizer_strategy="pareto",
         )
- 
-        # Option 1: Use QueryProcessorFactory to create a processor and generate a plan 
-        processor = QueryProcessorFactory.create_processor(excerpts, config)
-        plan = processor.generate_plan(excerpts, policy)
+        processor = QueryProcessorFactory.create_processor(dataset, config)
+        plan = processor.generate_plan(dataset, policy)
         print(processor.plan)
 
         with st.container():

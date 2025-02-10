@@ -4,7 +4,6 @@ from enum import Enum
 
 from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.query.optimizer.plan import PhysicalPlan
 
 
@@ -23,12 +22,10 @@ class ExecutionStrategy(ABC):
     """
     def __init__(self, 
                  scan_start_idx: int = 0, 
-                 datadir: DataDirectory | None = None,
                  max_workers: int | None = None,
                  nocache: bool = True,
                  verbose: bool = False):
         self.scan_start_idx = scan_start_idx
-        self.datadir = datadir
         self.nocache = nocache
         self.verbose = verbose
         self.max_workers = max_workers

@@ -1,6 +1,7 @@
 .env
 build/*
 docs/build/*
+docs/source/generated/*
 dist/*
 .vscode/*
 .ragatouille

@@ -1,7 +1,5 @@
-from palimpzest.constants import MAX_ROWS, Cardinality
-
-# data management
-from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.constants import Cardinality
+from palimpzest.core.data.datareaders import DataReader
 from palimpzest.policy import (
     MaxQuality,
     MaxQualityAtFixedCost,
@@ -13,16 +11,14 @@ from palimpzest.policy import (
     PlanCost,
     Policy,
 )
-
-# dataset functionality
+from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
 
 __all__ = [
     # constants
-    "MAX_ROWS",
     "Cardinality",
-    # datamanager
-    "DataDirectory",
+    # core
+    "DataReader",
     # policy
     "MaxQuality",
     "MaxQualityAtFixedCost",
@@ -33,6 +29,8 @@ __all__ = [
     "MinTimeAtFixedQuality",
     "PlanCost",
     "Policy",
+    # query
+    "QueryProcessorConfig",
     # sets
     "Dataset",
 ]

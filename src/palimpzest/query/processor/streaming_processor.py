@@ -1,13 +1,12 @@
 import time
 
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
-from palimpzest.core.elements.records import DataRecord, DataRecordCollection
-from palimpzest.core.lib.schemas import SourceRecord
+from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.policy import Policy
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
+from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Dataset
@@ -47,7 +46,7 @@ class StreamingQueryProcessor(QueryProcessor):
         self._plan_stats = plan_stats
 
     def generate_plan(self, dataset: Dataset, policy: Policy):
-        self.clear_cached_examples()
+        # self.clear_cached_examples()
         start_time = time.time()
 
         # TODO: Do we need to re-initialize the optimizer here? 
@@ -90,21 +89,16 @@ class StreamingQueryProcessor(QueryProcessor):
 
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
-        assert isinstance(scan_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-        datasource = scan_operator.get_datasource()
-        if not datasource:
-            raise Exception("Data source not found")
-        datasource_len = len(datasource)
+        assert isinstance(scan_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        datareader = scan_operator.datareader
+        if not datareader:
+            raise Exception("DataReader not found")
+        datareader_len = len(datareader)
 
         input_records = []
         record_op_stats = []
-        for idx in range(datasource_len):
-            # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
-            #       it is simply a vessel to inform the scan_operator which record to fetch
-            candidate = DataRecord(schema=SourceRecord, source_id=idx)
-            candidate.idx = idx
-            candidate.get_item_fn = datasource.get_item
-            record_set = scan_operator(candidate)
+        for source_idx in range(datareader_len):
+            record_set = scan_operator(source_idx)
             input_records += record_set.data_records
             record_op_stats += record_set.record_op_stats
 
@@ -130,7 +124,7 @@ class StreamingQueryProcessor(QueryProcessor):
             op_id = operator.get_op_id()
             prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
 
-            if isinstance(operator, DataSourcePhysicalOp):
+            if isinstance(operator, ScanPhysicalOp):
                 continue
             # only invoke aggregate operator(s) once there are no more source records and all
             # upstream operators' processing queues are empty

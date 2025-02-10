@@ -4,13 +4,11 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
-from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.schemas import SourceRecord
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 
 
@@ -72,12 +70,11 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
         }
         op_id_to_op_idx = {op.get_op_id(): idx for idx, op in enumerate(plan.operators)}
 
-        # get handle to DataSource and pre-compute its op_id and size
+        # get handle to scan operator and pre-compute its op_id and size
         source_operator = plan.operators[0]
-        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
+        assert isinstance(source_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
         source_op_id = source_operator.get_op_id()
-        datasource = source_operator.get_datasource()
-        datasource_len = len(datasource)
+        datareader_len = len(source_operator.datareader)
 
         # get limit of final limit operator (if one exists)
         final_limit = plan.operators[-1].limit if isinstance(plan.operators[-1], LimitScanOp) else None
@@ -87,13 +84,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
         current_scan_idx = self.scan_start_idx
         with ThreadPoolExecutor(max_workers=plan_workers) as executor:
             # create initial (set of) future(s) to read first source record;
-            # construct input DataRecord for DataSourcePhysicalOp
-            # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
-            #       it is simply a vessel to inform the scan_operator which record to fetch
-            candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
-            candidate.idx = current_scan_idx
-            candidate.get_item_fn = datasource.get_item
-            futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, source_operator, candidate))
+            futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, source_operator, current_scan_idx))
             op_id_to_futures_in_flight[source_op_id] += 1
             current_scan_idx += 1
 
@@ -131,7 +122,8 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
 
                         # add records (which are not filtered) to the cache, if allowed
                         if not self.nocache:
-                            self.datadir.append_cache(operator.target_cache_id, record)
+                            # self.datadir.append_cache(operator.target_cache_id, record)
+                            pass
 
                         # add records to processing queue if there is a next_operator; otherwise add to output_records
                         next_operator = op_id_to_next_operator[op_id]
@@ -145,14 +137,8 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
                         source_records_scanned += len(record_set)
 
                         # scan next record if we can still draw records from source
-                        if source_records_scanned < num_samples and current_scan_idx < datasource_len:
-                            # construct input DataRecord for DataSourcePhysicalOp
-                            # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
-                            #       it is simply a vessel to inform the scan_operator which record to fetch
-                            candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
-                            candidate.idx = current_scan_idx
-                            candidate.get_item_fn = datasource.get_item
-                            new_futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, source_operator, candidate))
+                        if source_records_scanned < num_samples and current_scan_idx < datareader_len:
+                            new_futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, source_operator, current_scan_idx))
                             op_id_to_futures_in_flight[source_op_id] += 1
                             current_scan_idx += 1
 
@@ -217,8 +203,9 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
 
         # if caching was allowed, close the cache
         if not self.nocache:
-            for operator in plan.operators:
-                self.datadir.close_cache(operator.target_cache_id)
+            for _ in plan.operators:
+                # self.datadir.close_cache(operator.target_cache_id)
+                pass
 
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time

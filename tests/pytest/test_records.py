@@ -16,7 +16,7 @@ class TestDataRecord:
     @pytest.fixture
     def sample_record(self):
         """Fixture to create a sample DataRecord for testing"""
-        record = DataRecord(schema=TestSchema, source_id="test_source")
+        record = DataRecord(schema=TestSchema, source_idx=0)
         record.name = "test"
         record.value = 42
         return record
@@ -33,11 +33,11 @@ class TestDataRecord:
         """Test basic record creation and attribute access"""
         assert sample_record.name == "test"
         assert sample_record.value == 42
-        assert sample_record.source_id == "test_source"
+        assert sample_record.source_idx == 0
 
     def test_record_equality(self, sample_record):
         """Test record equality comparison"""
-        record2 = DataRecord(schema=TestSchema, source_id="test_source")
+        record2 = DataRecord(schema=TestSchema, source_idx=0)
         record2.name = "test"
         record2.value = 42
         assert sample_record == record2

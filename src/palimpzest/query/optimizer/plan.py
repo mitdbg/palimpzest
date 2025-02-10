@@ -3,8 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from palimpzest.core.data.dataclasses import PlanCost
-from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.utils.hash_helpers import hash_for_id
 
 
@@ -100,7 +100,7 @@ class SentinelPlan(Plan):
     def __init__(self, operator_sets: list[list[PhysicalOperator]]):
         # enforce that first operator_set is a scan and that every operator_set has at least one operator
         if len(operator_sets) > 0:
-            assert isinstance(operator_sets[0][0], DataSourcePhysicalOp), "first operator set must be a scan"
+            assert isinstance(operator_sets[0][0], ScanPhysicalOp), "first operator set must be a scan"
             assert all(len(op_set) > 0 for op_set in operator_sets), "every operator set must have at least one operator"
 
         # store operator_sets and logical_op_ids; sort operator_sets internally by op_id

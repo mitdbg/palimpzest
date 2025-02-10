@@ -4,11 +4,7 @@ import os
 
 from ragatouille import RAGPretrainedModel
 
-from palimpzest.core.data.datasources import UserSource
-from palimpzest.core.elements.records import DataRecord
-from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.sets import Dataset
+import palimpzest as pz
 
 fever_claims_cols = [
     {"name": "claim", "type": str, "desc": "the claim being made"}
@@ -18,10 +14,9 @@ fever_output_cols = [
     {"name": "label", "type": bool, "desc": "Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise."}
 ]
 
-# TODO: DataSource needs to accept new column format
-class FeverUserSource(UserSource):
-    def __init__(self, dataset_id, claims_file_path, num_claims_to_process):
-        super().__init__(fever_claims_cols, dataset_id)
+class FeverDataReader(pz.DataReader):
+    def __init__(self, claims_file_path, num_claims_to_process):
+        super().__init__(fever_claims_cols)
 
         # `claims_file_path` is the path to the file containing the claims which is expected to be a jsonl file.
         # Each line in the file is a JSON object with an "id" and a "claim" field.
@@ -35,20 +30,15 @@ class FeverUserSource(UserSource):
             self.claims = [entry["claim"] for entry in entries]
             self.ids = [entry["id"] for entry in entries]
 
-    def copy(self):
-        return FeverUserSource(self.dataset_id, self.claims_file_path, self.num_claims_to_process)
-
     def __len__(self):
         return len(self.claims)
 
-    def get_size(self):
-        return sum([len(claim) for claim in self.claims])
-
-    def get_item(self, idx: int):
+    def __getitem__(self, idx: int):
+        # get claim
         claim = self.claims[idx]
-        dr = DataRecord(self.schema, source_id=self.ids[idx])
-        dr.claim = claim
-        return dr
+
+        # construct and return dictionary with field(s)
+        return {"claim": claim}
 
 
 def parse_arguments():
@@ -67,8 +57,8 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def build_fever_query(index, dataset_id, k):
-    claims = Dataset(dataset_id)
+def build_fever_query(index, dataset, k):
+    claims = pz.Dataset(dataset)
     claims = claims.sem_add_columns(fever_claims_cols, desc="Extract the claim")
 
     def search_func(index, query, k):
@@ -93,24 +83,18 @@ def main():
 
     args = parse_arguments()
 
-    # Create a user datasource for the FEVER dataset
-    dataset_id = f"fever-dataset-{args.num_claims_to_process}"
-    datasource = FeverUserSource(
-        dataset_id=dataset_id,
+    # Create a data reader for the FEVER dataset
+    dataset = FeverDataReader(
         claims_file_path=args.claims_file_path,
         num_claims_to_process=args.num_claims_to_process,
-    )
-    DataDirectory().register_user_source(
-        src=datasource,
-        dataset_id=dataset_id,
     )
 
     # Load the index
     index = RAGPretrainedModel.from_index(args.index_path)
 
     # Build and run the FEVER query
-    query = build_fever_query(index, dataset_id, k=args.k)
-    data_record_collection = query.run(QueryProcessorConfig())
+    query = build_fever_query(index, dataset, k=args.k)
+    data_record_collection = query.run(pz.QueryProcessorConfig())
     print(data_record_collection.to_df())
 
 if __name__ == "__main__":

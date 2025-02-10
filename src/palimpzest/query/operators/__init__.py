@@ -7,9 +7,6 @@ from palimpzest.query.operators.convert import LLMConvert as _LLMConvert
 from palimpzest.query.operators.convert import LLMConvertBonded as _LLMConvertBonded
 from palimpzest.query.operators.convert import LLMConvertConventional as _LLMConvertConventional
 from palimpzest.query.operators.convert import NonLLMConvert as _NonLLMConvert
-from palimpzest.query.operators.datasource import CacheScanDataOp as _CacheScanDataOp
-from palimpzest.query.operators.datasource import DataSourcePhysicalOp as _DataSourcePhysicalOp
-from palimpzest.query.operators.datasource import MarshalAndScanDataOp as _MarshalAndScanDataOp
 from palimpzest.query.operators.filter import FilterOp as _FilterOp
 from palimpzest.query.operators.filter import LLMFilter as _LLMFilter
 from palimpzest.query.operators.filter import NonLLMFilter as _NonLLMFilter
@@ -48,6 +45,9 @@ from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgents
 from palimpzest.query.operators.physical import PhysicalOperator as _PhysicalOperator
 from palimpzest.query.operators.project import ProjectOp as _ProjectOp
 from palimpzest.query.operators.retrieve import RetrieveOp as _RetrieveOp
+from palimpzest.query.operators.scan import CacheScanDataOp as _CacheScanDataOp
+from palimpzest.query.operators.scan import MarshalAndScanDataOp as _MarshalAndScanDataOp
+from palimpzest.query.operators.scan import ScanPhysicalOp as _ScanPhysicalOp
 
 LOGICAL_OPERATORS = [
     _LogicalOperator,
@@ -67,8 +67,8 @@ PHYSICAL_OPERATORS = (
     [_AggregateOp, _ApplyGroupByOp, _AverageAggregateOp, _CountAggregateOp]
     # convert
     + [_ConvertOp, _NonLLMConvert, _LLMConvert, _LLMConvertConventional, _LLMConvertBonded]
-    # datasource
-    + [_DataSourcePhysicalOp, _MarshalAndScanDataOp, _CacheScanDataOp]
+    # scan
+    + [_ScanPhysicalOp, _MarshalAndScanDataOp, _CacheScanDataOp]
     # filter
     + [_FilterOp, _NonLLMFilter, _LLMFilter]
     # limit

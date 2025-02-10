@@ -1,5 +1,3 @@
-import re
-
 import pytest
 
 from palimpzest.constants import Model
@@ -21,10 +19,9 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
 
     # create data records first
     scan_drs, convert_drs, filter_drs = [], [], []
-    for idx in range(10):
-        source_id = f"source{idx}"
-        scan_dr = DataRecord(TextFile, source_id, parent_id=None)
-        scan_dr.filename = f"file{idx}"
+    for source_idx in range(10):
+        scan_dr = DataRecord(TextFile, source_idx, parent_id=None)
+        scan_dr.filename = f"file{source_idx}"
         scan_dr.contents = None
         scan_drs.append(scan_dr)
 
@@ -43,11 +40,11 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
     # create execution data entries for scan operator
     for scan_dr in scan_drs:
         op_id = op_sets[0][0].get_op_id()
-        source_id = scan_dr.source_id
+        source_idx = scan_dr.source_idx
         record_op_stats = RecordOpStats(
             record_id=scan_dr.id,
             record_parent_id=scan_dr.parent_id,
-            record_source_id=scan_dr.source_id,
+            record_source_idx=scan_dr.source_idx,
             op_id=op_id,
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
@@ -58,7 +55,7 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
             generated_fields=None,
         )
         scan_record_set = DataRecordSet([scan_dr], [record_op_stats])
-        execution_data[scan_logical_op_id][source_id] = [scan_record_set]
+        execution_data[scan_logical_op_id][source_idx] = [scan_record_set]
 
     # create execution data entries for convert operator
     for op_idx, op in enumerate(op_sets[1]):
@@ -66,11 +63,10 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
         for source_idx in range(10):
             record_idx = op_idx * len(op_sets) + source_idx
             convert_dr = convert_drs[record_idx]
-            source_id = convert_dr.source_id
             record_op_stats = RecordOpStats(
                 record_id=convert_dr.id,
                 record_parent_id=convert_dr.parent_id,
-                record_source_id=convert_dr.source_id,
+                record_source_idx=convert_dr.source_idx,
                 op_id=op_id,
                 op_name="LLMConvertBonded",
                 time_per_record=1.0,
@@ -81,10 +77,10 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
                 generated_fields=["foo", "bar"],
             )
             convert_record_set = DataRecordSet([convert_dr], [record_op_stats])
-            if source_id not in execution_data[convert_logical_op_id]:
-                execution_data[convert_logical_op_id][source_id] = [convert_record_set]
+            if source_idx not in execution_data[convert_logical_op_id]:
+                execution_data[convert_logical_op_id][source_idx] = [convert_record_set]
             else:
-                execution_data[convert_logical_op_id][source_id].append(convert_record_set)
+                execution_data[convert_logical_op_id][source_idx].append(convert_record_set)
 
     # create execution data entries for filter operator
     for op_idx, op in enumerate(op_sets[2]):
@@ -92,13 +88,10 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
         for source_idx in range(10):
             record_idx = op_idx * len(op_sets) + source_idx
             filter_dr = filter_drs[record_idx]
-            source_id = filter_dr.source_id
-            match = re.match(r"source(.+?)", source_id)
-            source_idx = int(match.group(1))
             record_op_stats = RecordOpStats(
                 record_id=filter_dr.id,
                 record_parent_id=filter_dr.parent_id,
-                record_source_id=filter_dr.source_id,
+                record_source_idx=filter_dr.source_idx,
                 op_id=op_id,
                 op_name="LLMFilter",
                 time_per_record=1.0,
@@ -109,10 +102,10 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
                 generated_fields=None,
             )
             filter_record_set = DataRecordSet([filter_dr], [record_op_stats])
-            if source_id not in execution_data[filter_logical_op_id]:
-                execution_data[filter_logical_op_id][source_id] = [filter_record_set]
+            if source_idx not in execution_data[filter_logical_op_id]:
+                execution_data[filter_logical_op_id][source_idx] = [filter_record_set]
             else:
-                execution_data[filter_logical_op_id][source_id].append(filter_record_set)
+                execution_data[filter_logical_op_id][source_idx].append(filter_record_set)
 
     return execution_data
 
@@ -129,10 +122,9 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
 
     # create data records first
     scan_drs, convert_drs, filter_drs = [], [], []
-    for idx in range(10):
-        source_id = f"source{idx}"
-        scan_dr = DataRecord(TextFile, source_id, parent_id=None)
-        scan_dr.filename = f"file{idx}"
+    for source_idx in range(10):
+        scan_dr = DataRecord(TextFile, source_idx, parent_id=None)
+        scan_dr.filename = f"file{source_idx}"
         scan_dr.contents = None
         scan_drs.append(scan_dr)
 
@@ -152,11 +144,11 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
 
     # create execution data entries for scan operator
     for scan_dr in scan_drs:
-        source_id = scan_dr.source_id
+        source_idx = scan_dr.source_idx
         record_op_stats = RecordOpStats(
             record_id=scan_dr.id,
             record_parent_id=scan_dr.parent_id,
-            record_source_id=scan_dr.source_id,
+            record_source_idx=scan_dr.source_idx,
             op_id="scan1-phys",
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
@@ -167,16 +159,16 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             generated_fields=None,
         )
         scan_record_set = DataRecordSet([scan_dr], [record_op_stats])
-        execution_data[scan_logical_op_id][source_id] = [scan_record_set]
+        execution_data[scan_logical_op_id][source_idx] = [scan_record_set]
 
     # create execution data entries for convert operator
     for idx, convert_dr in enumerate(convert_drs):
-        source_id = convert_dr.source_id
+        source_idx = convert_dr.source_idx
         model = models[idx // 10]
         record_op_stats = RecordOpStats(
             record_id=convert_dr.id,
             record_parent_id=convert_dr.parent_id,
-            record_source_id=convert_dr.source_id,
+            record_source_idx=convert_dr.source_idx,
             op_id=f"convert1-phys-{str(model)}",
             op_name="LLMConvertBonded",
             time_per_record=1.0,
@@ -187,16 +179,15 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             generated_fields=["foo", "bar"],
         )
         convert_record_set = DataRecordSet([convert_dr], [record_op_stats])
-        if source_id not in execution_data[convert_logical_op_id]:
-            execution_data[convert_logical_op_id][source_id] = [convert_record_set]
+        if source_idx not in execution_data[convert_logical_op_id]:
+            execution_data[convert_logical_op_id][source_idx] = [convert_record_set]
         else:
-            execution_data[convert_logical_op_id][source_id].append(convert_record_set)
+            execution_data[convert_logical_op_id][source_idx].append(convert_record_set)
 
     # create execution data entries for filter operator
     for idx, filter_dr in enumerate(filter_drs):
-        source_id = filter_dr.source_id
+        source_idx = filter_dr.source_idx
         model = models[idx // 10]
-        source_idx = idx % 10
 
         # GPT-4 passes odd examples
         # GPT-3.5 passes even examples
@@ -212,7 +203,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
         record_op_stats = RecordOpStats(
             record_id=filter_dr.id,
             record_parent_id=filter_dr.parent_id,
-            record_source_id=filter_dr.source_id,
+            record_source_idx=filter_dr.source_idx,
             op_id=f"filter1-phys-{str(model)}",
             op_name="LLMFilter",
             time_per_record=1.0,
@@ -223,10 +214,10 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             generated_fields=None,
         )
         filter_record_set = DataRecordSet([filter_dr], [record_op_stats])
-        if source_id not in execution_data[filter_logical_op_id]:
-            execution_data[filter_logical_op_id][source_id] = [filter_record_set]
+        if source_idx not in execution_data[filter_logical_op_id]:
+            execution_data[filter_logical_op_id][source_idx] = [filter_record_set]
         else:
-            execution_data[filter_logical_op_id][source_id].append(filter_record_set)
+            execution_data[filter_logical_op_id][source_idx].append(filter_record_set)
 
     return execution_data
 
@@ -245,21 +236,20 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
 
     # create data records first
     scan_drs, convert1_drs, convert2_drs, filter1_drs, filter2_drs = [], [], [], [], []
-    for idx in range(10):
-        source_id = f"source{idx}"
-        scan_dr = DataRecord(TextFile, source_id, parent_id=None)
-        scan_dr.filename = f"file{idx}"
+    for source_idx in range(10):
+        scan_dr = DataRecord(TextFile, source_idx, parent_id=None)
+        scan_dr.filename = f"file{source_idx}"
         scan_dr.contents = None
         scan_drs.append(scan_dr)
 
     # create first convert data records
     models = [Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL]
     for model in models:
-        for idx in range(10):
+        for source_idx in range(10):
             for one_to_many_idx in range(2):
-                convert_dr = DataRecord.from_parent(foobar_schema, scan_drs[idx])
-                convert_dr.foo = f"foo{idx}-one-to-many-{one_to_many_idx}"
-                convert_dr.bar = f"bar{idx}-{str(model)}"
+                convert_dr = DataRecord.from_parent(foobar_schema, scan_drs[source_idx])
+                convert_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
+                convert_dr.bar = f"bar{source_idx}-{str(model)}"
                 convert1_drs.append(convert_dr)
 
     # create first filter data records
@@ -285,11 +275,11 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
 
     # create execution data entries for scan operator
     for scan_dr in scan_drs:
-        source_id = scan_dr.source_id
+        source_idx = scan_dr.source_idx
         record_op_stats = RecordOpStats(
             record_id=scan_dr.id,
             record_parent_id=scan_dr.parent_id,
-            record_source_id=scan_dr.source_id,
+            record_source_idx=scan_dr.source_idx,
             op_id="scan1-phys",
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
@@ -300,20 +290,20 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
             generated_fields=None,
         )
         scan_record_set = DataRecordSet([scan_dr], [record_op_stats])
-        execution_data[scan_logical_op_id][source_id] = [scan_record_set]
+        execution_data[scan_logical_op_id][source_idx] = [scan_record_set]
 
     # create execution data entries for first convert operator
     for model_idx in range(3):
-        for source_idx in range(10):
+        for record_idx in range(10):
             drs, record_op_stats_lst = [], []
             for one_to_many_idx in range(2):
-                abs_idx = model_idx * 20 + source_idx * 2 + one_to_many_idx
+                abs_idx = model_idx * 20 + record_idx * 2 + one_to_many_idx
                 convert_dr = convert1_drs[abs_idx]
-                source_id = convert_dr.source_id
+                source_idx = convert_dr.source_idx
                 record_op_stats = RecordOpStats(
                     record_id=convert_dr.id,
                     record_parent_id=convert_dr.parent_id,
-                    record_source_id=convert_dr.source_id,
+                    record_source_idx=convert_dr.source_idx,
                     op_id=f"convert1-phys-{str(models[model_idx])}",
                     op_name="LLMConvertBonded",
                     time_per_record=1.0,
@@ -326,18 +316,18 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                 drs.append(convert_dr)
                 record_op_stats_lst.append(record_op_stats)
             convert_record_set = DataRecordSet(drs, record_op_stats_lst)
-            if source_id not in execution_data[convert1_logical_op_id]:
-                execution_data[convert1_logical_op_id][source_id] = [convert_record_set]
+            if source_idx not in execution_data[convert1_logical_op_id]:
+                execution_data[convert1_logical_op_id][source_idx] = [convert_record_set]
             else:
-                execution_data[convert1_logical_op_id][source_id].append(convert_record_set)
+                execution_data[convert1_logical_op_id][source_idx].append(convert_record_set)
 
     # create execution data entries for first filter operator
     for model_idx in range(3):
-        for source_idx in range(10):
+        for record_idx in range(10):
             for one_to_many_idx in range(2):
-                abs_idx = model_idx * 20 + source_idx * 2 + one_to_many_idx
+                abs_idx = model_idx * 20 + record_idx * 2 + one_to_many_idx
                 filter_dr = filter1_drs[abs_idx]
-                source_id = filter_dr.source_id
+                source_idx = filter_dr.source_idx
                 model = models[model_idx]
 
                 # GPT-4 filters final 6 records it sees
@@ -355,7 +345,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                 record_op_stats = RecordOpStats(
                     record_id=filter_dr.id,
                     record_parent_id=filter_dr.parent_id,
-                    record_source_id=filter_dr.source_id,
+                    record_source_idx=filter_dr.source_idx,
                     op_id=f"filter1-phys-{str(model)}",
                     op_name="LLMFilter",
                     time_per_record=1.0,
@@ -366,18 +356,18 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     generated_fields=None,
                 )
                 filter_record_set = DataRecordSet([filter_dr], [record_op_stats])
-                if source_id not in execution_data[filter1_logical_op_id]:
-                    execution_data[filter1_logical_op_id][source_id] = [filter_record_set]
+                if source_idx not in execution_data[filter1_logical_op_id]:
+                    execution_data[filter1_logical_op_id][source_idx] = [filter_record_set]
                 else:
-                    execution_data[filter1_logical_op_id][source_id].append(filter_record_set)
+                    execution_data[filter1_logical_op_id][source_idx].append(filter_record_set)
 
     # create execution data entries for second filter operator
     for model_idx in range(3):
-        for source_idx in range(7):
+        for record_idx in range(7):
             for one_to_many_idx in range(2):
-                abs_idx = model_idx * 14 + source_idx * 2 + one_to_many_idx
+                abs_idx = model_idx * 14 + record_idx * 2 + one_to_many_idx
                 filter_dr = filter2_drs[abs_idx]
-                source_id = filter_dr.source_id
+                source_idx = filter_dr.source_idx
                 model = models[model_idx]
 
                 # TODO: this makes # of records seen by convert2 more complicated
@@ -396,7 +386,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                 record_op_stats = RecordOpStats(
                     record_id=filter_dr.id,
                     record_parent_id=filter_dr.parent_id,
-                    record_source_id=filter_dr.source_id,
+                    record_source_idx=filter_dr.source_idx,
                     op_id=f"filter2-phys-{str(model)}",
                     op_name="LLMFilter",
                     time_per_record=1.0,
@@ -407,22 +397,22 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     generated_fields=None,
                 )
                 filter_record_set = DataRecordSet([filter_dr], [record_op_stats])
-                if source_id not in execution_data[filter2_logical_op_id]:
-                    execution_data[filter2_logical_op_id][source_id] = [filter_record_set]
+                if source_idx not in execution_data[filter2_logical_op_id]:
+                    execution_data[filter2_logical_op_id][source_idx] = [filter_record_set]
                 else:
-                    execution_data[filter2_logical_op_id][source_id].append(filter_record_set)
+                    execution_data[filter2_logical_op_id][source_idx].append(filter_record_set)
 
     # create execution data entries for second convert operator
     for model_idx in range(3):
-        for source_idx in range(5):
+        for record_idx in range(5):
             for one_to_many_idx in range(2):
-                abs_idx = model_idx * 10 + source_idx * 2 + one_to_many_idx
+                abs_idx = model_idx * 10 + record_idx * 2 + one_to_many_idx
                 convert_dr = convert2_drs[abs_idx]
-                source_id = convert_dr.source_id
+                source_idx = convert_dr.source_idx
                 record_op_stats = RecordOpStats(
                     record_id=convert_dr.id,
                     record_parent_id=convert_dr.parent_id,
-                    record_source_id=convert_dr.source_id,
+                    record_source_idx=convert_dr.source_idx,
                     op_id=f"convert1-phys-{str(models[model_idx])}",
                     op_name="LLMConvertBonded",
                     time_per_record=1.0,
@@ -433,9 +423,9 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     generated_fields=["baz"],
                 )
                 convert_record_set = DataRecordSet([convert_dr], [record_op_stats])
-                if source_id not in execution_data[convert2_logical_op_id]:
-                    execution_data[convert2_logical_op_id][source_id] = [convert_record_set]
+                if source_idx not in execution_data[convert2_logical_op_id]:
+                    execution_data[convert2_logical_op_id][source_idx] = [convert_record_set]
                 else:
-                    execution_data[convert2_logical_op_id][source_id].append(convert_record_set)
+                    execution_data[convert2_logical_op_id][source_idx].append(convert_record_set)
 
     return execution_data

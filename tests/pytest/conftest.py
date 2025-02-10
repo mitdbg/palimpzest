@@ -3,15 +3,10 @@ import pytest
 from palimpzest.constants import Model
 from palimpzest.policy import MaxQuality, MaxQualityAtFixedCost, MinCost, MinCostAtFixedQuality
 
-# with open(".env") as f:
-#     for line in f:
-#         key, value = line.strip().split("=")
-#         os.environ[key] = value
-
 pytest_plugins = [
     "fixtures.champion_outputs",
     "fixtures.cost_est_data",
-    "fixtures.datasets",
+    "fixtures.datareaders",
     "fixtures.execution_data",
     "fixtures.expected_cost_est_results",
     "fixtures.expected_physical_plans",
@@ -29,17 +24,14 @@ pytest_plugins = [
 #       as arguments) is that pytest will compute each fixture value once
 #       and cache the result. Thus, we minimize recomputation and don't
 #       need to, for example, re-register datasets for each individual test.
-
-
 @pytest.fixture
-def dataset(request, enron_eval_tiny, real_estate_eval_tiny, biofabric_tiny):
-    dataset_id = request.param
-    dataset_id_to_dataset = {
+def datareader(request, enron_eval_tiny, real_estate_eval_tiny):
+    datareader_id = request.param
+    datareader_id_to_datareader = {
         "enron-eval-tiny": enron_eval_tiny,
         "real-estate-eval-tiny": real_estate_eval_tiny,
-        "biofabric-tiny": biofabric_tiny,
     }
-    return dataset_id_to_dataset[dataset_id]
+    return datareader_id_to_datareader[datareader_id]
 
 
 @pytest.fixture

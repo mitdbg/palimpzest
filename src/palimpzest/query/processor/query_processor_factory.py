@@ -88,7 +88,7 @@ class QueryProcessorFactory:
 
         processor_key = (processing_strategy, execution_strategy)
         processor_cls = cls.PROCESSOR_MAPPING.get(processor_key)
-        
+
         if processor_cls is None:
             raise ValueError(f"Unsupported combination of processing strategy {processing_strategy} "
                         f"and execution strategy {execution_strategy}")
@@ -153,8 +153,11 @@ class QueryProcessorFactory:
             raise ValueError("Policy is required for optimizer")
 
         if not config.nocache:
-            raise ValueError("nocache=False is not supported yet!!")
-        
+            raise ValueError("nocache=False is not supported yet")
+
+        if config.val_datasource is None and config.processing_strategy in [ProcessingStrategyType.MAB_SENTINEL, ProcessingStrategyType.RANDOM_SAMPLING]:
+            raise ValueError("val_datasource is required for MAB_SENTINEL and RANDOM_SAMPLING processing strategies")
+
         available_models = getattr(config, 'available_models', [])
         if available_models is None or len(available_models) == 0:
             available_models = get_models(include_vision=True)

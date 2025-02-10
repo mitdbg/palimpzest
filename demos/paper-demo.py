@@ -1,20 +1,13 @@
 import argparse
 import json
 import os
-from pathlib import Path
 
 import gradio as gr
 import numpy as np
 from PIL import Image
 
-from palimpzest.constants import Cardinality
-from palimpzest.core.data.datasources import UserSource
-from palimpzest.core.elements.records import DataRecord
+import palimpzest as pz
 from palimpzest.core.lib.fields import ImageFilepathField, ListField
-from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.policy import MaxQuality, MinCost, MinTime
-from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.sets import Dataset
 from palimpzest.utils.udfs import xls_to_tables
 
 # Addresses far from MIT; we use a simple lookup like this to make the
@@ -111,38 +104,31 @@ table_cols = [
 #         desc="A list of the filepaths for each image of the listing",
 #     )
 
-class RealEstateListingSource(UserSource):
-    def __init__(self, dataset_id, listings_dir):
-        super().__init__(real_estate_listing_cols, dataset_id)
+class RealEstateListingReader(pz.DataReader):
+    def __init__(self, listings_dir):
+        super().__init__(real_estate_listing_cols)
         self.listings_dir = listings_dir
         self.listings = sorted(os.listdir(self.listings_dir))
-
-    def copy(self):
-        return RealEstateListingSource(self.dataset_id, self.listings_dir)
 
     def __len__(self):
         return len(self.listings)
 
-    def get_size(self):
-        return sum(file.stat().st_size for file in Path(self.listings_dir).rglob("*"))
-
-    def get_item(self, idx: int):
-        # fetch listing
+    def __getitem__(self, idx: int):
+        # get listing
         listing = self.listings[idx]
 
-        # create data record
-        dr = DataRecord(self.schema, source_id=listing)
-        dr.listing = listing
-        dr.image_filepaths = []
+        # get fields
+        image_filepaths, text_content = [], None
         listing_dir = os.path.join(self.listings_dir, listing)
         for file in os.listdir(listing_dir):
             if file.endswith(".txt"):
                 with open(os.path.join(listing_dir, file), "rb") as f:
-                    dr.text_content = f.read().decode("utf-8")
+                    text_content = f.read().decode("utf-8")
             elif file.endswith(".png"):
-                dr.image_filepaths.append(os.path.join(listing_dir, file))
+                image_filepaths.append(os.path.join(listing_dir, file))
 
-        return dr
+        # construct and return dictionary with fields
+        return {"listing": listing, "text_content": text_content, "image_filepaths": image_filepaths}
 
 
 if __name__ == "__main__":
@@ -151,7 +137,7 @@ if __name__ == "__main__":
     parser.add_argument("--viz", default=False, action="store_true", help="Visualize output in Gradio")
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--profile", default=False, action="store_true", help="Profile execution")
-    parser.add_argument("--datasetid", type=str, help="The dataset id")
+    parser.add_argument("--dataset", type=str, help="The path to the dataset")
     parser.add_argument(
         "--workload", type=str, help="The workload to run. One of enron, real-estate, medical-schema-matching."
     )
@@ -171,7 +157,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # The user has to indicate the dataset id and the workload
-    if args.datasetid is None:
+    if args.dataset is None:
         print("Please provide a dataset id")
         exit(1)
     if args.workload is None:
@@ -182,18 +168,18 @@ if __name__ == "__main__":
     if args.profile:
         os.makedirs("profiling-data", exist_ok=True)
 
-    datasetid = args.datasetid
+    dataset = args.dataset
     workload = args.workload
     visualize = args.viz
     verbose = args.verbose
     profile = args.profile
-    policy = MaxQuality()
+    policy = pz.MaxQuality()
     if args.policy == "mincost":
-        policy = MinCost()
+        policy = pz.MinCost()
     elif args.policy == "mintime":
-        policy = MinTime()
+        policy = pz.MinTime()
     elif args.policy == "maxquality":
-        policy = MaxQuality()
+        policy = pz.MaxQuality()
     else:
         print("Policy not supported for this demo")
         exit(1)
@@ -203,8 +189,7 @@ if __name__ == "__main__":
 
     # create pz plan
     if workload == "enron":
-        # datasetid="enron-eval" for paper evaluation
-        plan = Dataset(datasetid).sem_add_columns(email_cols)
+        plan = pz.Dataset(dataset).sem_add_columns(email_cols)
         plan = plan.sem_filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
@@ -213,14 +198,7 @@ if __name__ == "__main__":
         )
 
     elif workload == "real-estate":
-        # datasetid="real-estate-eval-100" for paper evaluation
-        data_filepath = f"testdata/{datasetid}"
-        user_dataset_id = f"{datasetid}-user"
-        DataDirectory().register_user_source(
-            src=RealEstateListingSource(user_dataset_id, data_filepath),
-            dataset_id=user_dataset_id,
-        )
-        plan = Dataset(user_dataset_id)
+        plan = pz.Dataset(RealEstateListingReader(dataset))
         plan = plan.sem_add_columns(real_estate_text_cols, depends_on="text_content")
         plan = plan.sem_add_columns(real_estate_image_cols, depends_on="image_filepaths")
         plan = plan.sem_filter(
@@ -231,33 +209,22 @@ if __name__ == "__main__":
         plan = plan.filter(in_price_range, depends_on="price")
 
     elif workload == "medical-schema-matching":
-        # datasetid="biofabric-medium" for paper evaluation
-        plan = Dataset(datasetid)
-        plan = plan.add_columns(xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
+        plan = pz.Dataset(dataset)
+        plan = plan.add_columns(xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         plan = plan.sem_filter("The rows of the table contain the patient age")
-        plan = plan.sem_add_columns(case_data_cols, cardinality=Cardinality.ONE_TO_MANY)
+        plan = plan.sem_add_columns(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
 
-    config = QueryProcessorConfig(
+    # construct config and run plan
+    config = pz.QueryProcessorConfig(
         nocache=True,
         verbose=verbose,
         policy=policy,
-        execution_strategy=args.executor)
-
-    # Option 1: Use QueryProcessorFactory to create a processor
-    # processor = QueryProcessorFactory.create_processor(
-    #     datasource=plan,
-    #     processing_strategy="no_sentinel",  
-    #     execution_strategy="sequential", 
-    #     optimizer_strategy="pareto",
-    #     config=config
-    # )
-    # records, execution_stats = processor.execute()
-
-    # Option 2: Use Dataset.run() to run the plan.
+        execution_strategy=args.executor,
+    )
     data_record_collection = plan.run(config)
     print(data_record_collection.to_df())
-    # save statistics
 
+    # save statistics
     if profile:
         stats_path = f"profiling-data/{workload}-profiling.json"
         execution_stats_dict = data_record_collection.execution_stats.to_json()
@@ -278,7 +245,7 @@ if __name__ == "__main__":
                 addrs.append(record.address)
                 prices.append(record.price)
                 for idx, img_name in enumerate(["img1.png", "img2.png", "img3.png"]):
-                    path = os.path.join(f"testdata/{datasetid}", record.listing, img_name)
+                    path = os.path.join(dataset, record.listing, img_name)
                     img = Image.open(path)
                     img_arr = np.asarray(img)
                     if idx == 0:

@@ -11,6 +11,7 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from collections import Counter
+from copy import deepcopy
 from string import Formatter
 from typing import Any, Generic, TypeVar
 
@@ -312,7 +313,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         # otherwise, we need to invert the list of dictionaries into a dictionary with list values
         else:
-            field_answers_lst: list[dict] = field_answers.copy()
+            field_answers_lst: list[dict] = deepcopy(field_answers)
 
             field_answers = {field_name: [] for field_name in fields}
             for answer_dict in field_answers_lst:
