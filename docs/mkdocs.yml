@@ -1,13 +1,39 @@
 site_name: Palimpzest
-site_url: https://sitename.example
+site_url: https://palimpzest.org
 repo_url: https://github.com/mitdbg/palimpzest
 repo_name: mitdbg/palimpzest
+
+nav:
+  - Home: index.md
+  - Introduction:
+    - Installation: intro/installation.md
+    - Getting Started: intro/getting-started.md
+    - Next Steps: intro/next-steps.md
+  - User Guide:
+    - User Guide Overview: user-guide/overview.md
+    - How to Read Your Own Data: user-guide/datareaders.md
+    - PZ Operator Overview: user-guide/operators.md
+    - Getting Started with Optimization: user-guide/optimization.md
+  - Documentation:
+    - DataReader: api/datareader.md
+    - Dataset: api/dataset.md
+    - Operators:
+      - Aggregate: api/operators/aggregate.md
+      - Convert: api/operators/convert.md
+      - Filter: api/operators/filter.md
+      - Limit: api/operators/limit.md
+      - Retrieve: api/operators/retrieve.md
+      - Scan: api/operators/scan.md
+    - Optimizer: api/optimizer.md
+  - Contact: contact.md
+
 theme:
   name: material
   font: 
     text: Merriweather Sans
     code: Red Hat Mono
-  logo: logos/palimpzest-cropped.png
+  # logo: logos/palimpzest-cropped.png
+  logo: https://palimpzest-workloads.s3.us-east-1.amazonaws.com/palimpzest-cropped.png
   icon:
     logo: fontawesome/solid/w
   features:
@@ -51,4 +77,4 @@ markdown_extensions:
   - admonition
   - pymdownx.details
 
-copyright: Copyright &copy; 2024 MIT Data Systems Group
+copyright: Copyright &copy; 2025 MIT Data Systems Group
