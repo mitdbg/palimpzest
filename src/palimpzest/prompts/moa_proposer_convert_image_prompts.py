@@ -1,4 +1,4 @@
-"""This file contains prompts for Mixture-of-Agents convert operations on image inputs."""
+"""This file contains prompts for MixtureOfAgentsConvert operations on image inputs."""
 
 ### SYSTEM PROMPTS ###
 COT_MOA_PROPOSER_IMAGE_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to analyze input image(s) and/or text in order to produce an answer to a question.
@@ -32,8 +32,6 @@ Let's think step-by-step in order to answer the question.
 ANSWER: The image shows a dog playing with a cat, so there is a dog in the image. There is no person in the image.
 ---
 """
-
-# TODO?: add refine and critique?
 
 ### USER / INSTANCE-SPECIFIC PROMPTS ###
 COT_MOA_PROPOSER_IMAGE_BASE_USER_PROMPT = """You are a helpful assistant whose job is to analyze input image(s) and/or text in order to produce an answer to a question.
