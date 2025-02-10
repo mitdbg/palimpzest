@@ -8,13 +8,14 @@ This method is a simple wrapper for different methods, e.g., from_csv, from_yml,
 import json
 import os
 
-import palimpzest.core.lib.fields as pz_fields
-import palimpzest.core.lib.schemas as pz_schemas
 import pandas as pd
 import yaml
+from pyld import jsonld
+
+import palimpzest.core.lib.fields as pz_fields
+import palimpzest.core.lib.schemas as pz_schemas
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema
-from pyld import jsonld
 
 
 class SchemaBuilder:

@@ -47,6 +47,11 @@ class PromptStrategy(str, Enum):
     COT_MOA_PROPOSER_CRITIC = "chain-of-thought-mixture-of-agents-proposer-critic"
     COT_MOA_PROPOSER_REFINE = "chain-of-thought-mixture-of-agents-proposer-refine"
 
+    # Mixture-of-Agents (Proposer) with Image Prompt Strategies
+    COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
+    COT_MOA_PROPOSER_IMAGE_CRITIC = "chain-of-thought-mixture-of-agents-proposer-critic"
+    COT_MOA_PROPOSER_IMAGE_REFINE = "chain-of-thought-mixture-of-agents-proposer-refine"
+
     # Mixture-of-Agents (Aggregation) Prompt Strategies
     COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
     COT_MOA_AGG_CRITIC = "chain-of-thought-mixture-of-agents-aggregation-critic"
@@ -56,8 +61,6 @@ class PromptStrategy(str, Enum):
     COT_QA_IMAGE = "chain-of-thought-question-image"
     COT_QA_IMAGE_CRITIC = "chain-of-thought-question-image-critic"
     COT_QA_IMAGE_REFINE = "chain-of-thought-question-image-refine"
-
-    
 
 
 class OptimizationStrategy(str, Enum):
@@ -105,6 +108,8 @@ PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.3
 
 # character limit for various IDs
 MAX_ID_CHARS = 10
+DEFAULT_DATASET_ID_CHARS = 16
+MAX_DATASET_ID_CHARS = 100
 
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
 RETRY_MULTIPLIER = 2

@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema
@@ -48,11 +49,17 @@ class TestDataRecord:
         assert records[0].name == "Alice"
         assert records[1].value == 2
 
-    def test_as_df(self, sample_df):
+    def test_to_df(self, sample_df):
         """Test converting records back to DataFrame"""
         records = DataRecord.from_df(sample_df, schema=TestSchema)
-        df_result = DataRecord.as_df(records)
-        pd.testing.assert_frame_equal(df_result, sample_df)
+        df_result = DataRecord.to_df(records)
+        assert df_result.equals(sample_df)
+
+    def test_to_df_with_project_cols(self, sample_df):
+        """Test converting records to DataFrame with project_cols"""
+        records = DataRecord.from_df(sample_df, schema=TestSchema)
+        df_result = DataRecord.to_df(records, project_cols=["name"])
+        assert df_result.equals(sample_df[["name"]])
 
     def test_derived_schema(self, sample_df):
         """Test auto-schema generation from DataFrame"""
@@ -66,15 +73,15 @@ class TestDataRecord:
         with pytest.raises(AttributeError):
             _ = sample_record.nonexistent_field
 
-    def test_as_dict(self, sample_record):
+    def test_to_dict(self, sample_record):
         """Test dictionary representation"""
-        record_dict = sample_record.as_dict()
+        record_dict = sample_record.to_dict()
         assert record_dict['name'] == 'test'
         assert record_dict['value'] == 42
 
-    def test_as_json_str(self, sample_record):
+    def test_to_json_str(self, sample_record):
         """Test JSON string representation"""
-        json_str = sample_record.as_json_str()
+        json_str = sample_record.to_json_str()
         assert 'test' in json_str
         assert '42' in json_str
 

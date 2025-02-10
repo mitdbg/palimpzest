@@ -82,7 +82,7 @@ class FilterOp(PhysicalOperator, ABC):
             record_id=dr.id,
             record_parent_id=dr.parent_id,
             record_source_id=dr.source_id,
-            record_state=dr.as_dict(include_bytes=False),
+            record_state=dr.to_dict(include_bytes=False),
             op_id=self.get_op_id(),
             logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
@@ -150,7 +150,7 @@ class NonLLMFilter(FilterOp):
         answer = {}
         try:
             # execute the UDF filter
-            passed_operator = self.filter_obj.filter_fn(candidate.as_dict())
+            passed_operator = self.filter_obj.filter_fn(candidate.to_dict())
             answer = {"passed_operator": passed_operator}
 
             if self.verbose:

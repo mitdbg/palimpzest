@@ -1,5 +1,6 @@
 import pytest
-from palimpzest.constants import Cardinality, Model, OptimizationStrategy
+
+from palimpzest.constants import Cardinality, Model
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import TextFile
@@ -13,6 +14,7 @@ from palimpzest.query.operators.logical import ConvertScan, FilteredScan
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
+from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
 from palimpzest.sets import Dataset
 
@@ -96,14 +98,14 @@ class TestPrimitives:
 @pytest.mark.parametrize(
     argnames=("opt_strategy",),
     argvalues=[
-        pytest.param(OptimizationStrategy.GREEDY, id="greedy"),
-        pytest.param(OptimizationStrategy.PARETO, id="pareto"),
+        pytest.param(OptimizationStrategyType.GREEDY, id="greedy"),
+        pytest.param(OptimizationStrategyType.PARETO, id="pareto"),
     ]
 )
 class TestOptimizer:
 
     def test_basic_functionality(self, enron_eval_tiny, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=TextFile)
+        plan = Dataset(enron_eval_tiny)
         policy = MaxQuality()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -112,7 +114,7 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan, policy)
         physical_plan = physical_plans[0]
@@ -121,7 +123,8 @@ class TestOptimizer:
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
 
     def test_simple_max_quality_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.sem_add_columns(email_schema)
         policy = MaxQuality()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -130,7 +133,7 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
             # TODO: remove
             allow_code_synth=False,
             allow_conventional_query=False,
@@ -147,7 +150,8 @@ class TestOptimizer:
         assert physical_plan[1].model == Model.GPT_4o
 
     def test_simple_min_cost_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.sem_add_columns(email_schema)
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -156,7 +160,8 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
+            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
         physical_plan = physical_plans[0]
@@ -166,7 +171,8 @@ class TestOptimizer:
         assert isinstance(physical_plan[1], CodeSynthesisConvert)
 
     def test_simple_min_time_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.sem_add_columns(email_schema)
         policy = MinTime()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -175,7 +181,8 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
+            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
         physical_plan = physical_plans[0]
@@ -185,8 +192,9 @@ class TestOptimizer:
         assert isinstance(physical_plan[1], CodeSynthesisConvert)
 
     def test_push_down_filter(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
-        plan = plan.filter("some text filter", depends_on=["contents"])
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.sem_add_columns(email_schema)
+        plan = plan.sem_filter("some text filter", depends_on=["contents"])
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -195,7 +203,8 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
+            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
         physical_plan = physical_plans[0]
@@ -206,9 +215,10 @@ class TestOptimizer:
         assert isinstance(physical_plan[2], CodeSynthesisConvert)
 
     def test_push_down_two_filters(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
-        plan = plan.filter("some text filter", depends_on=["contents"])
-        plan = plan.filter("another text filter", depends_on=["contents"])
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.sem_add_columns(email_schema)
+        plan = plan.sem_filter("some text filter", depends_on=["contents"])
+        plan = plan.sem_filter("another text filter", depends_on=["contents"])
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -217,7 +227,8 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
+            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
         physical_plan = physical_plans[0]
@@ -228,7 +239,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[2], LLMFilter)
         assert isinstance(physical_plan[3], CodeSynthesisConvert)
 
-    def test_real_estate_logical_reorder(self, real_estate_eval_tiny, real_estate_workload, opt_strategy):
+    def test_real_estate_logical_reorder(self, real_estate_workload, opt_strategy):
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -241,7 +252,7 @@ class TestOptimizer:
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_code_synth=False,
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
         )
         physical_plans = optimizer.optimize(real_estate_workload, policy)
         physical_plan = physical_plans[0]
@@ -255,14 +266,15 @@ class TestOptimizer:
         assert isinstance(physical_plan[5], LLMFilter)  # ImageRealEstateListing(attractive)
 
     def test_seven_filters(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny, schema=email_schema)
-        plan = plan.filter("filter1", depends_on=["contents"])
-        plan = plan.filter("filter2", depends_on=["contents"])
-        plan = plan.filter("filter3", depends_on=["contents"])
-        plan = plan.filter("filter4", depends_on=["contents"])
-        plan = plan.filter("filter5", depends_on=["contents"])
-        plan = plan.filter("filter6", depends_on=["contents"])
-        plan = plan.filter("filter7", depends_on=["contents"])
+        plan = Dataset(enron_eval_tiny)
+        plan = plan.sem_add_columns(email_schema)
+        plan = plan.sem_filter("filter1", depends_on=["contents"])
+        plan = plan.sem_filter("filter2", depends_on=["contents"])
+        plan = plan.sem_filter("filter3", depends_on=["contents"])
+        plan = plan.sem_filter("filter4", depends_on=["contents"])
+        plan = plan.sem_filter("filter5", depends_on=["contents"])
+        plan = plan.sem_filter("filter6", depends_on=["contents"])
+        plan = plan.sem_filter("filter7", depends_on=["contents"])
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -271,7 +283,8 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
-            optimization_strategy=opt_strategy,
+            optimization_strategy_type=opt_strategy,
+            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
         physical_plan = physical_plans[0]
@@ -301,6 +314,7 @@ class MockSampleBasedCostModel:
             for _, phys_op_id_to_stats in self.operator_to_stats.items()
             for phys_op_id, _ in phys_op_id_to_stats.items()
         ])
+        
 
         # reference to data directory
         self.datadir = DataDirectory()
@@ -328,7 +342,7 @@ class MockSampleBasedCostModel:
         # create source_op_estimates for datasources if they are not provided
         if isinstance(operator, DataSourcePhysicalOp):
             # get handle to DataSource and pre-compute its size (number of records)
-            datasource = self.datadir.get_registered_dataset(operator.dataset_id)
+            datasource = operator.get_datasource()
             datasource_len = len(datasource)
 
             source_op_estimates = OperatorCostEstimates(
@@ -354,10 +368,7 @@ class MockSampleBasedCostModel:
         # construct and return op estimates
         return PlanCost(cost=op_cost, time=op_time, quality=op_quality, op_estimates=op_estimates)
 
-
-class TestParetoOptimizer:
-
-    @pytest.mark.parametrize(
+@pytest.mark.parametrize(
         argnames=("workload", "policy", "operator_to_stats", "expected_plan"),
         argvalues=[
             pytest.param("three-converts", "mincost", "3c-mincost", "3c-mincost", id="3c-mincost"),
@@ -372,6 +383,8 @@ class TestParetoOptimizer:
         ],
         indirect=True,
     )
+
+class TestParetoOptimizer:
     def test_pareto_optimization_strategy(self, workload, policy, operator_to_stats, expected_plan):
         # initialize cost model with sample execution data
         cost_model = MockSampleBasedCostModel(operator_to_stats)
@@ -383,7 +396,7 @@ class TestParetoOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3],
-            optimization_strategy=OptimizationStrategy.PARETO,
+            optimization_strategy_type=OptimizationStrategyType.PARETO,
             # TODO: remove
             allow_code_synth=False,
             allow_conventional_query=False,
@@ -391,7 +404,6 @@ class TestParetoOptimizer:
             allow_rag_reduction=False,
             allow_mixtures=False,
         )
-
         # run optimizer to get physical plan
         physical_plans = optimizer.optimize(workload, policy)
         physical_plan = physical_plans[0]

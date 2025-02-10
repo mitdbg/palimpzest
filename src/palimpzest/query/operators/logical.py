@@ -137,14 +137,8 @@ class Aggregate(LogicalOperator):
 class BaseScan(LogicalOperator):
     """A BaseScan is a logical operator that represents a scan of a particular data source."""
 
-    def __init__(self, dataset_id: str, *args, **kwargs):
-        if kwargs.get("input_schema") is not None:
-            raise Exception(
-                f"BaseScan must be initialized with `input_schema=None` but was initialized with "
-                f"`input_schema={kwargs.get('input_schema')}`"
-            )
-
-        super().__init__(*args, **kwargs)
+    def __init__(self, dataset_id: str, output_schema: Schema):
+        super().__init__(output_schema=output_schema)
         self.dataset_id = dataset_id
 
     def __str__(self):
@@ -380,6 +374,7 @@ class RetrieveScan(LogicalOperator):
     def __init__(
         self,
         index,
+        search_func,
         search_attr,
         output_attr,
         k,
@@ -389,6 +384,7 @@ class RetrieveScan(LogicalOperator):
     ):
         super().__init__(*args, **kwargs)
         self.index = index
+        self.search_func = search_func
         self.search_attr = search_attr
         self.output_attr = output_attr  
         self.k = k
@@ -415,6 +411,7 @@ class RetrieveScan(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "index": self.index,
+            "search_func": self.search_func,
             "search_attr": self.search_attr,
             "output_attr": self.output_attr,
             "k": self.k,

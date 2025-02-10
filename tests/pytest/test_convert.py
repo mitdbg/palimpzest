@@ -23,8 +23,15 @@ if not os.environ.get("OPENAI_API_KEY"):
     load_env()
 
 
-@pytest.mark.parametrize("convert_op", [LLMConvertBonded, LLMConvertConventional])
-def test_convert(convert_op, email_schema, enron_eval_tiny):
+@pytest.mark.parametrize(
+    argnames=("convert_op", "side_effect"),
+    argvalues=[
+        pytest.param(LLMConvertBonded, "enron-convert", id="bonded-llm-convert"),
+        pytest.param(LLMConvertConventional, "enron-convert", id="conventional-llm-convert"),
+    ],
+    indirect=["side_effect"],
+)
+def test_convert(mocker, convert_op, side_effect, email_schema, enron_eval_tiny):
     """Test whether convert operators"""
     model = Model.GPT_4o
     scan_op = MarshalAndScanDataOp(output_schema=TextFile, dataset_id=enron_eval_tiny)
@@ -34,18 +41,23 @@ def test_convert(convert_op, email_schema, enron_eval_tiny):
         model=model,
         prompt_strategy=PromptStrategy.COT_QA,
     )
+
+    # mock out calls to generators used by the plans which parameterize this test
+    mocker.patch.object(LLMConvertBonded, "convert", side_effect=side_effect)
+    mocker.patch.object(LLMConvertConventional, "convert", side_effect=side_effect)
  
     datasource = DataDirectory().get_registered_dataset(enron_eval_tiny)
     candidate = DataRecord(schema=File, source_id=0)
     candidate.idx = 0
     candidate.get_item_fn = datasource.get_item
 
-    # run DataSourcePhysicalOp on record
-    outputs = []
-    record_set = scan_op(candidate)
-    for record in record_set:
-        output = convert_op(record)
-        outputs.extend(output.data_records)
+    # run scan and convert operators
+    record_op_stats_lst, outputs = [], []
+    for record in scan_op(candidate):
+        record_set = convert_op(record)
+        record_op_stats_lst.extend(record_set.record_op_stats)
+        outputs.extend(record_set.data_records)
 
-    for record in outputs:
-        print(record.sender, record.subject)
+    assert len(outputs) == 1
+    assert outputs[0].schema == email_schema.union(TextFile)
+    assert sorted(outputs[0].get_field_names()) == ["contents", "filename", "sender", "subject"]

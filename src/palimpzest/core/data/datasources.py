@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import base64
 import json
 import os
 import sys
@@ -14,7 +15,16 @@ from papermage import Document
 
 from palimpzest import constants
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.schemas import File, ImageFile, Number, PDFFile, Schema, TextFile, WebPage, XLSFile
+from palimpzest.core.lib.schemas import (
+    DefaultSchema,
+    File,
+    ImageFile,
+    PDFFile,
+    Schema,
+    TextFile,
+    WebPage,
+    XLSFile,
+)
 from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
@@ -31,8 +41,12 @@ class AbstractDataSource(abc.ABC):
     In the future, programmers can implement their own DataSources using custom Schemas.
     """
 
-    def __init__(self, schema: Schema) -> None:
-        self._schema = schema
+    def __init__(self, schema: type[Schema] | list[dict]) -> None:
+        self._schema = (
+            Schema.from_json(schema)
+            if isinstance(schema, list)
+            else schema
+        )
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(schema={self.schema})"
@@ -61,7 +75,7 @@ class AbstractDataSource(abc.ABC):
 
 
 class DataSource(AbstractDataSource):
-    def __init__(self, schema: Schema, dataset_id: str) -> None:
+    def __init__(self, schema: type[Schema] | list[dict], dataset_id: str) -> None:
         super().__init__(schema)
         self.dataset_id = dataset_id
 
@@ -138,12 +152,20 @@ class FileSource(DataSource):
 
 
 class MemorySource(DataSource):
-    """MemorySource returns multiple objects that reflect contents of an in-memory Python list"""
+    """MemorySource returns multiple objects that reflect contents of an in-memory Python list
+        TODO(gerardo): Add support for other types of in-memory data structures (he has some code
+                   for subclassing MemorySource on his branch)
+    """
 
-    def __init__(self, vals: list[int | float], dataset_id: str):
-        # For the moment we assume that we are given a list of floats or ints, but someday it could be strings or something else
-        super().__init__(Number, dataset_id)
-        self.vals = vals
+    def __init__(self, vals: Any, dataset_id: str = "default_memory_input"):
+        if isinstance(vals, (str, int, float)):
+            self.vals = [vals]
+        elif isinstance(vals, tuple):
+            self.vals = list(vals)
+        else:
+            self.vals = vals
+        schema = Schema.from_df(self.vals) if isinstance(self.vals, pd.DataFrame) else DefaultSchema
+        super().__init__(schema, dataset_id)
 
     def copy(self):
         return MemorySource(self.vals, self.dataset_id)
@@ -155,9 +177,14 @@ class MemorySource(DataSource):
         return sum([sys.getsizeof(self.get_item(idx)) for idx in range(len(self))])
 
     def get_item(self, idx: int) -> DataRecord:
-        value = self.vals[idx]
         dr = DataRecord(self.schema, source_id=idx)
-        dr.value = value
+        if isinstance(self.vals, pd.DataFrame):
+            row = self.vals.iloc[idx]
+            for field_name in row.index:
+                field_name_str = f"column_{field_name}" if isinstance(field_name, (int, float)) else str(field_name)
+                setattr(dr, field_name_str, row[field_name])
+        else:
+            dr.value = self.vals[idx]
 
         return dr
 
@@ -217,8 +244,7 @@ class ImageFileDirectorySource(DirectorySource):
         dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
-            dr.contents = f.read()
-        dr.text_description = f"Image file {dr.filename}"
+            dr.contents = base64.b64encode(f.read())
         return dr
 
 
@@ -265,7 +291,7 @@ class PDFFileDirectorySource(DirectorySource):
         dr = DataRecord(self.schema, source_id=filepath)
         dr.filename = pdf_filename
         dr.contents = pdf_bytes
-        dr.text_contents = text_content[:15000]  # TODO Very hacky
+        dr.text_contents = text_content
 
         return dr
 
@@ -311,7 +337,7 @@ class XLSFileDirectorySource(DirectorySource):
 class UserSource(DataSource):
     """UserSource is a DataSource that is created by the user and not loaded from a file"""
 
-    def __init__(self, schema: Schema, dataset_id: str) -> None:
+    def __init__(self, schema: type[Schema] | list[dict], dataset_id: str) -> None:
         super().__init__(schema, dataset_id)
 
     def serialize(self) -> dict[str, Any]:

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Generator
 from typing import Any
 
 import pandas as pd
 
-from palimpzest.constants import DERIVED_SCHEMA_PREFIX, FROM_DF_PREFIX
-from palimpzest.core.data.dataclasses import RecordOpStats
+from palimpzest.constants import FROM_DF_PREFIX
+from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats, RecordOpStats
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema
-from palimpzest.utils.hash_helpers import hash_for_id, hash_for_temp_schema
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class DataRecord:
@@ -61,8 +62,10 @@ class DataRecord:
         id_str = (
             str(schema) + (parent_id if parent_id is not None else self.source_id)
             if cardinality_idx is None
-            else str(schema) + str(cardinality_idx) + (parent_id if parent_id is not None else self.source_id)
+            else str(schema) + str(cardinality_idx) + str(parent_id if parent_id is not None else self.source_id)
         )
+        # TODO(Jun): build-in id should has a special name, the current self.id is too general which would conflict with user defined schema too easily.
+        # the options: built_in_id, generated_id
         self.id = hash_for_id(id_str)
 
 
@@ -97,13 +100,15 @@ class DataRecord:
             items = (f"{k}={v!r}" for k, v in sorted(self.field_values.items()))
         return "{}({})".format(type(self).__name__, ", ".join(items))
 
+    def __repr__(self) -> str:
+        return self.__str__(truncate=None)
 
     def __eq__(self, other):
         return isinstance(other, DataRecord) and self.field_values == other.field_values and self.schema.get_desc() == other.schema.get_desc()
 
 
     def __hash__(self):
-        return hash(self.as_json_str())
+        return hash(self.to_json_str())
 
 
     def __iter__(self):
@@ -111,7 +116,7 @@ class DataRecord:
 
 
     def get_field_names(self):
-        return list(self.field_types.keys())
+        return list(self.field_values.keys())
 
 
     def get_field_type(self, field_name: str) -> Field:
@@ -216,31 +221,9 @@ class DataRecord:
         elif isinstance(source_id, int):
             updated_source_id = str(source_id)
         return f"{FROM_DF_PREFIX}_{updated_source_id}"
-    
+
     @staticmethod
-    def _build_schema_from_df(df: pd.DataFrame) -> Schema:
-        # Create a unique schema name based on columns
-        schema_name = f"{DERIVED_SCHEMA_PREFIX}{hash_for_temp_schema(str(tuple(sorted(df.columns))))}"
-        
-        if schema_name in globals():
-            return globals()[schema_name]
-            
-        # Create new schema only if it doesn't exist
-        new_schema = type(schema_name, (Schema,), {
-            '_desc': "Derived schema from DataFrame",
-            '__module__': Schema.__module__
-        })
-        
-        for col in df.columns:
-            # NOTE: we may need some way of inferring whether fields are images
-            setattr(new_schema, col, Field(desc=f"{col}"))
-        
-        # Store the schema class globally
-        globals()[schema_name] = new_schema
-        return new_schema
-    
-    @staticmethod
-    def from_df(df: pd.DataFrame, schema: Schema = None, source_id: int | str | None = None) -> list[DataRecord]:
+    def from_df(df: pd.DataFrame, schema: Schema | None = None, source_id: int | str | None = None) -> list[DataRecord]:
         """Create a list of DataRecords from a pandas DataFrame
         
         Args:
@@ -256,7 +239,7 @@ class DataRecord:
 
         records = []
         if schema is None:
-            schema = DataRecord._build_schema_from_df(df)
+            schema = Schema.from_df(df)
 
         field_map = schema.field_map()
         source_id = DataRecord._build_source_id_from_df(source_id)
@@ -268,25 +251,35 @@ class DataRecord:
             records.append(record)
 
         return records
-    
+
     @staticmethod
-    def as_df(records: list[DataRecord]) -> pd.DataFrame:
-        return pd.DataFrame([record.as_dict() for record in records])
+    def to_df(records: list[DataRecord], project_cols: list[str] | None = None) -> pd.DataFrame:
+        if len(records) == 0:
+            return pd.DataFrame()
 
+        fields = records[0].get_field_names()
+        if project_cols is not None and len(project_cols) > 0:
+            fields = [field for field in fields if field in project_cols]
 
-    def as_json_str(self, include_bytes: bool = True, project_cols: list[str] | None = None):
+        return pd.DataFrame([
+            {k: record[k] for k in fields}
+            for record in records
+        ])
+
+    def to_json_str(self, include_bytes: bool = True, project_cols: list[str] | None = None):
         """Return a JSON representation of this DataRecord"""
-        record_dict = self.as_dict(include_bytes, project_cols)
+        record_dict = self.to_dict(include_bytes, project_cols)
         record_dict = {
             field_name: self.schema.field_to_json(field_name, field_value)
-            for field_name, field_value in self.field_values.items()
+            for field_name, field_value in record_dict.items()
         }
         return json.dumps(record_dict, indent=2)
 
-
-    def as_dict(self, include_bytes: bool = True, project_cols: list[str] | None = None):
+    def to_dict(self, include_bytes: bool = True, project_cols: list[str] | None = None):
         """Return a dictionary representation of this DataRecord"""
-        dct = self.field_values.copy()
+        # TODO(chjun): In case of numpy types, the json.dumps will fail. Convert to native types.
+        # Better ways to handle this.
+        dct = pd.Series(self.field_values).to_dict()
 
         if project_cols is not None and len(project_cols) > 0:
             project_field_names = set(field.split(".")[-1] for field in project_cols)
@@ -335,3 +328,45 @@ class DataRecordSet:
 
     def __iter__(self):
         yield from self.data_records
+
+
+class DataRecordCollection:
+    """
+    A DataRecordCollection contains a list of DataRecords.
+
+    This is a wrapper class for list[DataRecord] to support more advanced features for output of execute().
+
+    The difference between DataRecordSet and DataRecordCollection 
+    Goal: 
+        DataRecordSet is a set of DataRecords that share the same schema, same parent_id, and same source_id.
+        DataRecordCollection is a general wrapper for list[DataRecord].
+    
+    Usage:
+        DataRecordSet is used for the output of executing an operator.
+        DataRecordCollection is used for the output of executing a query, we definitely could extend it to support more advanced features for output of execute().
+    """
+    # TODO(Jun): consider to have stats_manager class to centralize stats management.
+    def __init__(self, data_records: list[DataRecord], execution_stats: ExecutionStats | None = None, plan_stats: PlanStats | None = None):
+        self.data_records = data_records
+        self.execution_stats = execution_stats
+        self.plan_stats = plan_stats
+        self.executed_plans = self._get_executed_plans()
+
+    def __iter__(self) -> Generator[DataRecord]:
+        """Allow iterating directly over the data records"""
+        yield from self.data_records
+
+    def __len__(self):
+        """Return the number of records in the collection"""
+        return len(self.data_records)
+
+    def to_df(self, project_cols: list[str] | None = None):
+        return DataRecord.to_df(self.data_records, project_cols)
+    
+    def _get_executed_plans(self):
+        if self.plan_stats is not None:
+            return [self.plan_stats.plan_str]
+        elif self.execution_stats is not None:
+            return list(self.execution_stats.plan_strs.values())
+        else:
+            return None
