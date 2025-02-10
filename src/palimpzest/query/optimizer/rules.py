@@ -30,6 +30,7 @@ from palimpzest.query.operators.token_reduction_convert import (
 )
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
 from palimpzest.utils.model_helpers import get_models, get_vision_models
+from palimpzest.query.operators.critique_and_refine_convert import CriticConvert
 
 
 class Rule:
@@ -649,6 +650,59 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
                         physical_expressions.append(expression)
 
         return set(physical_expressions)
+
+class CriticConvertRule(ImplementationRule):
+    """
+    Implementation rule for the MixtureOfAgentsConvert operator.
+    """
+    #num_proposer_models = [1, 2, 3]
+    #temperatures = [0.0, 0.4, 0.8]
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        logical_op = logical_expression.operator
+        return isinstance(logical_op, ConvertScan) and logical_op.udf is None
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+        logical_op = logical_expression.operator
+
+        # Get initial parameters for physical operator
+        op_kwargs = logical_op.get_logical_op_params()
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
+            }
+        )
+
+        # Identify the appropriate models for proposer and aggregator
+        available_models = physical_op_params["available_models"]
+        proposer_models = [available_models[0]]  # Select suitable proposer models
+        aggregator_model = available_models[-1]  # Select aggregator model
+
+        # Construct the `CriticConvert` operator with required models and parameters
+        op = CriticConvert(
+            proposer_models=proposer_models,
+            temperatures=[0.7],  # Example temperature value, can be customized
+            aggregator_model=aggregator_model,
+            proposer_prompt=None,  # Pass prompt if available
+            **op_kwargs,
+        )
+
+        # Create the physical expression
+        expression = PhysicalExpression(
+            operator=op,
+            input_group_ids=logical_expression.input_group_ids,
+            input_fields=logical_expression.input_fields,
+            depends_on_field_names=logical_expression.depends_on_field_names,
+            generated_fields=logical_expression.generated_fields,
+            group_id=logical_expression.group_id,
+        )
+
+        # Return the set containing the new physical expression
+        return {expression}
 
 
 class RetrieveRule(ImplementationRule):

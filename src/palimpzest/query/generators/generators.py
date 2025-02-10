@@ -80,7 +80,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         self.cardinality = cardinality
         self.prompt_strategy = prompt_strategy
         self.verbose = verbose
-        self.multi_LLM_verification = True
+        self.multi_LLM_verification = False
 
     @abstractmethod
     def _get_client_or_model(self, **kwargs) -> Any:
@@ -119,20 +119,32 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
     def _generate_developer_prompt(self) -> str:
         """Returns a prompt based on the prompt strategy with high-level instructions for the generation."""            
-        if self.prompt_strategy == PromptStrategy.COT_BOOL:
-            prompt = prompts.COT_BOOL_SYSTEM_PROMPT
-        elif self.prompt_strategy == PromptStrategy.COT_BOOL_IMAGE:
-            prompt = prompts.COT_BOOL_IMAGE_SYSTEM_PROMPT
-        elif self.prompt_strategy == PromptStrategy.COT_QA:
-            prompt = prompts.COT_QA_BASE_SYSTEM_PROMPT
-        elif self.prompt_strategy == PromptStrategy.COT_QA_IMAGE:
-            prompt = prompts.COT_QA_IMAGE_BASE_SYSTEM_PROMPT
-        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER:
-            prompt = prompts.COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT
-        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER_IMAGE:
-            prompt = prompts.COT_MOA_PROPOSER_IMAGE_BASE_SYSTEM_PROMPT
-        elif self.prompt_strategy == PromptStrategy.COT_MOA_AGG:
-            prompt = prompts.COT_MOA_AGG_BASE_SYSTEM_PROMPT
+        prompt_map = {
+            PromptStrategy.COT_BOOL: prompts.COT_BOOL_SYSTEM_PROMPT,
+            PromptStrategy.COT_BOOL_CRITIC: prompts.COT_BOOL_SYSTEM_PROMPT_CRITIQUE,
+            PromptStrategy.COT_BOOL_REFINE: prompts.COT_BOOL_SYSTEM_PROMPT_REFINEMENT,
+
+            PromptStrategy.COT_BOOL_IMAGE: prompts.COT_BOOL_IMAGE_SYSTEM_PROMPT,
+            PromptStrategy.COT_BOOL_IMAGE_CRITIC: prompts.COT_BOOL_IMAGE_SYSTEM_PROMPT_CRITIQUE,
+            PromptStrategy.COT_BOOL_IMAGE_REFINE: prompts.COT_BOOL_IMAGE_SYSTEM_PROMPT_REFINEMENT,
+
+            PromptStrategy.COT_QA: prompts.COT_QA_BASE_SYSTEM_PROMPT,
+            PromptStrategy.COT_QA_CRITIC: prompts.COT_QA_BASE_SYSTEM_PROMPT_CRITIQUE,
+            PromptStrategy.COT_QA_REFINE: prompts.COT_QA_BASE_SYSTEM_PROMPT_REFINEMENT,
+
+            PromptStrategy.COT_MOA_PROPOSER: prompts.COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT,
+            PromptStrategy.COT_MOA_PROPOSER_CRITIC: prompts.COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT_CRITIQUE,
+            PromptStrategy.COT_MOA_PROPOSER_REFINE: prompts.COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT_REFINEMENT,
+
+            PromptStrategy.COT_MOA_AGG: prompts.COT_MOA_AGG_BASE_SYSTEM_PROMPT,
+            PromptStrategy.COT_MOA_AGG_CRITIC: prompts.COT_MOA_AGG_BASE_SYSTEM_PROMPT_CRITIQUE,
+            PromptStrategy.COT_MOA_AGG_REFINE: prompts.COT_MOA_AGG_BASE_SYSTEM_PROMPT_REFINEMENT,
+
+            PromptStrategy.COT_QA_IMAGE: prompts.COT_QA_IMAGE_BASE_SYSTEM_PROMPT,
+            PromptStrategy.COT_QA_IMAGE_CRITIC: prompts.COT_QA_IMAGE_BASE_SYSTEM_PROMPT_CRITIQUE,
+            PromptStrategy.COT_QA_IMAGE_REFINE: prompts.COT_QA_IMAGE_BASE_SYSTEM_PROMPT_REFINEMENT,
+        }
+        prompt = prompt_map.get(self.prompt_strategy)
 
         if self.prompt_strategy not in [PromptStrategy.COT_BOOL, PromptStrategy.COT_BOOL_IMAGE]:
             output_format_instruction = (
@@ -141,26 +153,37 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 else prompts.ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION
             )
             prompt = prompt.format(output_format_instruction=output_format_instruction)
-
+        print("PROMPT IS ")
+        print(prompt)
         return prompt
 
     def _generate_user_prompt(self, candidate: DataRecord, fields: list[str], **kwargs) -> str:
         """Returns a prompt based on the prompt strategy with instance-specific instructions."""
         # get context from input record (project_cols will be None if not provided in kwargs)
         context = json.loads(candidate.as_json_str(include_bytes=False, project_cols=kwargs.get("project_cols")))
+
         # get filter condition for filter operations
+        print("CONTEXT IS")
+        print(context)
         filter_condition = (
             kwargs.get("filter_condition")
             if self.prompt_strategy in [PromptStrategy.COT_BOOL, PromptStrategy.COT_BOOL_IMAGE]
             else None
         )
-
         # get model responses for mixture-of-agents aggregation
         model_responses = None
         if self.prompt_strategy in [PromptStrategy.COT_MOA_AGG]:
             model_responses = ""
             for idx, model_response in enumerate(kwargs.get("model_responses")):
                 model_responses += f"MODEL RESPONSE {idx + 1}: {model_response}\n"
+
+        original_output = None
+        if "initial_response" in kwargs:
+            original_output = kwargs["initial_response"]
+        
+        critique_output = None
+        if "critique_response" in kwargs:
+            critique_output = kwargs["critique_response"]
 
         # generate input and output fields descriptions
         input_fields_desc = ""
@@ -256,6 +279,73 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 "output_format_instruction": output_format_instruction,
                 "output_fields_desc": output_fields_desc,
                 "model_responses": model_responses,
+            })
+
+        elif self.prompt_strategy == PromptStrategy.COT_QA_IMAGE:
+            prompt = prompts.COT_QA_IMAGE_BASE_USER_PROMPT
+            format_kwargs.update({
+                "output_format_instruction": output_format_instruction,
+                "output_fields_desc": output_fields_desc,
+            })
+        
+        elif self.prompt_strategy == PromptStrategy.COT_BOOL_CRITIC:
+            prompt = prompts.COT_BOOL_SYSTEM_PROMPT_CRITIQUE
+            format_kwargs.update({
+                "user_prompt": kwargs.get("user_prompt"),
+                "original_output": original_output,
+            })
+
+        elif self.prompt_strategy == PromptStrategy.COT_BOOL_REFINE:
+            prompt = prompts.COT_BOOL_SYSTEM_PROMPT_REFINEMENT
+            format_kwargs.update({
+                "user_prompt": kwargs.get("user_prompt"),
+                "original_output": original_output,
+                "critique_output": critique_output,
+            })
+
+        elif self.prompt_strategy == PromptStrategy.COT_QA_CRITIC:
+            prompt = prompts.COT_QA_BASE_SYSTEM_PROMPT_CRITIQUE
+            format_kwargs.update({
+                "user_prompt": kwargs.get("user_prompt"),
+                "original_output": original_output,
+            })
+
+        elif self.prompt_strategy == PromptStrategy.COT_QA_REFINE:
+            prompt = prompts.COT_QA_BASE_SYSTEM_PROMPT_REFINEMENT
+            format_kwargs.update({
+                "user_prompt": kwargs.get("user_prompt"),
+                "original_output": original_output,
+                "critique_output": critique_output,
+            })
+
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER_CRITIC:
+            prompt = prompts.COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT_CRITIQUE
+            format_kwargs.update({
+                "user_prompt": kwargs.get("user_prompt"),
+                "original_output": original_output,
+            })
+
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER_REFINE:
+            prompt = prompts.COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT_REFINEMENT
+            format_kwargs.update({
+                "user_prompt": kwargs.get("user_prompt"),
+                "original_output": original_output,
+                "critique_output": critique_output,
+            })
+
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_AGG_CRITIC:
+            prompt = prompts.COT_MOA_AGG_BASE_SYSTEM_PROMPT_CRITIQUE
+            format_kwargs.update({
+                "user_prompt": kwargs.get("user_prompt"),
+                "original_output": original_output,
+            })
+
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_AGG_REFINE:
+            prompt = prompts.COT_MOA_AGG_BASE_SYSTEM_PROMPT_REFINEMENT
+            format_kwargs.update({
+                "user_prompt": kwargs.get("user_prompt"),
+                "original_output": original_output,
+                "critique_output": critique_output,
             })
 
         return prompt.format(**format_kwargs)
@@ -369,8 +459,8 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         try:
             print(client, chat_payload)
             completion = self._generate_completion(client, chat_payload, **kwargs)
-            if self.multi_LLM_verification:
-                completion = multi_llm_generator.verify(chat_payload, completion, self.prompt_strategy)
+            #if self.multi_LLM_verification:
+            #    completion = multi_llm_generator.verify(chat_payload, completion, self.prompt_strategy)
             end_time = time.time()
 
         # if there's an error generating the completion, we have to return an empty answer
