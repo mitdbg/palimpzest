@@ -1,5 +1,4 @@
 from palimpzest.constants import log_attempt_number, RETRY_MAX_ATTEMPTS, RETRY_MAX_SECS, RETRY_MULTIPLIER
-from dsp.modules.hf import HFModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 import dspy
@@ -69,7 +68,7 @@ class dspyCOT(dspy.Module):
 
 
 ### DSPy wrapped LLM calls ###
-class TogetherHFAdaptor(HFModel):
+class TogetherHFAdaptor(dspy.HFModel):
     def __init__(self, model, apiKey, **kwargs):
         super().__init__(model=model, is_client=True)
         self.api_base = "https://api.together.xyz/inference"

@@ -1,27 +1,14 @@
+import sys
 import palimpzest as pz
-
 from palimpzest.constants import Cardinality
-from palimpzest.elements import DataRecord, GroupBySig
-import difflib
-
-from bs4 import BeautifulSoup
-from PIL import Image
-from requests_html import HTMLSession # for downloading JavaScript content
-from tabulate import tabulate
-from utils import printTable
+from palimpzest.elements import DataRecord 
+from palimpzest.agents.planner_agent import PlannerAgent
 
 import gradio as gr
 import numpy as np
 import pandas as pd
 
-import argparse
-import csv
-import datetime
 import json
-import os
-import requests
-import sys
-import time
 import re
 
 class GithubIssue(pz.TextFile):
@@ -50,7 +37,19 @@ class CodeFix(GithubIssue):
         required=True,
     )
 
-class SimplifiedCodeFix(GithubIssue):
+class SimplifiedCodeFix(pz.RawJSONObject):
+    change_description = pz.Field(
+        desc="A description of the code change made. Be specific and use line numbers.", 
+        required=True,
+    )
+    instance_id = pz.Field(
+        desc="The instance_id",
+        required=True,
+    )
+    relevant_issue_code = pz.Field(
+        desc="The relevant code pertaining to the issue. Code across multiple files may be included where the start and end of each file is indicated by 'start of' and 'end of' statemnts. ",
+        required=True,
+    )
     code_fix = pz.Field(
         desc="You are an expert software engineer. You are provided the relevant issue code and a problem statement describing an issue to fix in the code. Your task is to return the entire modified version of the provided code after addressing the problem, while keeping the structure and any necessary comments intact. This includes preserving the line numbers and the start and end file boundary markings ([start of <filename>]). Make sure to also return every file that was provided, even those that were not modified.", 
         required=True,
@@ -110,20 +109,24 @@ def extract_relevant_fields(candidate: DataRecord):
 
 def remove_irrelevant_fields(candidate: DataRecord):
     data = candidate._asDict()
-    code_fix = DataRecord(schema=CodeFix)
+    code_fix = DataRecord(schema=SimplifiedCodeFix)
     code_fix.instance_id = data['instance_id']
     code_fix.relevant_issue_code = data['relevant_issue_code']
     code_fix.code_fix = data['new_code'] 
-    code_fix.contents = ""
-    code_fix.problem_statement = ""
+    # code_fix.contents = ""
+    # code_fix.problem_statement = ""
     code_fix.change_description = data['change_description']
-    code_fix.filename = data['instance_id']
+    # code_fix.filename = data['instance_id']
 
     return code_fix 
 
 def buildSweBenchPlan(dataset):
+    planner_agent = PlannerAgent()
+
     github_issues = pz.Dataset(dataset, schema=GithubIssue, udf=extract_relevant_fields, cardinality=Cardinality.ONE_TO_ONE)
-    code_fixes = github_issues.convert(outputSchema=CodeFix)
+    code_plans = planner_agent(github_issues)
+    # code_fixes = github_issues.convert(outputSchema=CodeFix)
+    code_fixes = code_plans.convert(outputSchema=CodeFix)
     # patches = code_fixes.convert(outputSchema=GithubCodePatch, udf=generate_patch)
     simplified_code_fixes = code_fixes.convert(outputSchema=SimplifiedCodeFix, udf=remove_irrelevant_fields)
     patches = simplified_code_fixes.convert(outputSchema=GithubCodePatch)
@@ -172,4 +175,4 @@ if __name__ == "__main__":
 
     # Output Records into json file
     filename = 'output.json'
-    dump_records(filename, records, values=['instance_id', 'model_patch'])
+    dump_records(filename, records, values=['instance_id', 'model_patch']) 
