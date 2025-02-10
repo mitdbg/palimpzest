@@ -36,9 +36,9 @@ from palimpzest.constants import (
 from palimpzest.core.data.dataclasses import GenerationStats
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import BytesField, ImageBase64Field, ImageFilepathField, ImageURLField
+from palimpzest.query.generators import multi_llm_generator
 from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
-from palimpzest.query.generators import multi_llm_generator 
 
 # DEFINITIONS
 GenerationOutput = tuple[dict, str | None, GenerationStats]
@@ -608,7 +608,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
         if is_image_conversion:
             suffix = (
                 prompts.IMAGE_ANSWER_SUFFIX
-                if self.prompt_strategy  == PromptStrategy.COT_MOA_PROPOSER_IMAGE
+                if self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER_IMAGE
                 else prompts.IMAGE_REASONING_SUFFIX
             )
             user_content.append({"type": "text", "text": suffix})
@@ -719,7 +719,7 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
         if is_image_conversion:
             suffix = (
                 prompts.IMAGE_ANSWER_SUFFIX
-                if self.prompt_strategy  == PromptStrategy.COT_MOA_PROPOSER_IMAGE
+                if self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER_IMAGE
                 else prompts.IMAGE_REASONING_SUFFIX
             )
             user_content.append({"type": "text", "text": suffix})

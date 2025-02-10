@@ -42,6 +42,11 @@ class PromptStrategy(str, Enum):
     COT_QA_CRITIC = "chain-of-thought-question-critic"
     COT_QA_REFINE = "chain-of-thought-question-refine"
 
+    # Chain-of-Thought Question with Image Prompt Strategies
+    COT_QA_IMAGE = "chain-of-thought-question-image"
+    COT_QA_IMAGE_CRITIC = "chain-of-thought-question-image-critic"
+    COT_QA_IMAGE_REFINE = "chain-of-thought-question-image-refine"
+
     # Mixture-of-Agents (Proposer) Prompt Strategies
     COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
     COT_MOA_PROPOSER_CRITIC = "chain-of-thought-mixture-of-agents-proposer-critic"
@@ -56,11 +61,6 @@ class PromptStrategy(str, Enum):
     COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
     COT_MOA_AGG_CRITIC = "chain-of-thought-mixture-of-agents-aggregation-critic"
     COT_MOA_AGG_REFINE = "chain-of-thought-mixture-of-agents-aggregation-refine"
-
-    # Chain-of-Thought Question with Image Prompt Strategies
-    COT_QA_IMAGE = "chain-of-thought-question-image"
-    COT_QA_IMAGE_CRITIC = "chain-of-thought-question-image-critic"
-    COT_QA_IMAGE_REFINE = "chain-of-thought-question-image-refine"
 
 
 class OptimizationStrategy(str, Enum):
