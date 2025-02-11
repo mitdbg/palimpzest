@@ -653,10 +653,8 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
 
 class CriticConvertRule(ImplementationRule):
     """
-    Implementation rule for the MixtureOfAgentsConvert operator.
+    Implementation rule for the CriticConvert operator.
     """
-    #num_proposer_models = [1, 2, 3]
-    #temperatures = [0.0, 0.4, 0.8]
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
@@ -677,32 +675,72 @@ class CriticConvertRule(ImplementationRule):
             }
         )
 
-        # Identify the appropriate models for proposer and aggregator
-        available_models = physical_op_params["available_models"]
-        proposer_models = [available_models[0]]  # Select suitable proposer models
-        aggregator_model = available_models[-1]  # Select aggregator model
+        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
+        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
+        #
+        # identify models which can be used strictly for text or strictly for images
+        vision_models = set(get_vision_models())
+        text_models = set(get_models())
+        pure_text_models = {model for model in text_models if model not in vision_models}
+        pure_vision_models = {model for model in vision_models if model not in text_models}
 
-        # Construct the `CriticConvert` operator with required models and parameters
-        op = CriticConvert(
-            proposer_models=proposer_models,
-            temperatures=[0.7],  # Example temperature value, can be customized
-            aggregator_model=aggregator_model,
-            proposer_prompt=None,  # Pass prompt if available
-            **op_kwargs,
-        )
+        # compute attributes about this convert operation
+        is_image_conversion = any([
+            field.is_image_field
+            for field_name, field in logical_expression.input_fields.items()
+            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+        num_image_fields = sum([
+            field.is_image_field
+            for field_name, field in logical_expression.input_fields.items()
+            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+        list_image_field = any([
+            field.is_image_field and hasattr(field, "element_type")
+            for field_name, field in logical_expression.input_fields.items()
+            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
 
-        # Create the physical expression
-        expression = PhysicalExpression(
-            operator=op,
-            input_group_ids=logical_expression.input_group_ids,
-            input_fields=logical_expression.input_fields,
-            depends_on_field_names=logical_expression.depends_on_field_names,
-            generated_fields=logical_expression.generated_fields,
-            group_id=logical_expression.group_id,
-        )
+        # identify models which can be used for this convert operation
+        models = []
+        for model in physical_op_params["available_models"]:
+            # skip this model if:
+            # 1. this is a pure vision model and we're not doing an image conversion, or
+            # 2. this is a pure text model and we're doing an image conversion, or
+            # 3. this is a vision model hosted by Together (i.e. LLAMA3_V) and there is more than one image field
+            first_criteria = model in pure_vision_models and not is_image_conversion
+            second_criteria = model in pure_text_models and is_image_conversion
+            third_criteria = model == Model.LLAMA3_V and (num_image_fields > 1 or list_image_field)
+            if first_criteria or second_criteria or third_criteria:
+                continue
+
+            models.append(model)
+
+        # construct CriticConvert operations for every combination of model, critic model, and refinement model
+        physical_expressions = []
+        for model in models:
+            for critic_model in models:
+                for refine_model in models:
+                    # construct multi-expression
+                    op = CriticConvert(
+                        model=model,
+                        prompt_strategy=PromptStrategy.COT_QA_IMAGE if is_image_conversion else PromptStrategy.COT_QA,
+                        critic_model=critic_model,
+                        refine_model=refine_model,
+                        **op_kwargs,
+                    )
+                    expression = PhysicalExpression(
+                        operator=op,
+                        input_group_ids=logical_expression.input_group_ids,
+                        input_fields=logical_expression.input_fields,
+                        depends_on_field_names=logical_expression.depends_on_field_names,
+                        generated_fields=logical_expression.generated_fields,
+                        group_id=logical_expression.group_id,
+                    )
+                    physical_expressions.append(expression)
 
         # Return the set containing the new physical expression
-        return {expression}
+        return set(physical_expressions)
 
 
 class RetrieveRule(ImplementationRule):

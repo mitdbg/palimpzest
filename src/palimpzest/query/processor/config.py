@@ -33,6 +33,7 @@ class QueryProcessorConfig:
     allow_token_reduction: bool = field(default=False)
     allow_rag_reduction: bool = field(default=True)
     allow_mixtures: bool = field(default=True)
+    allow_critic: bool = field(default=True)
     use_final_op_quality: bool = field(default=False)
 
     def to_json_str(self):
@@ -57,5 +58,6 @@ class QueryProcessorConfig:
             "allow_token_reduction": self.allow_token_reduction,
             "allow_rag_reduction": self.allow_rag_reduction,
             "allow_mixtures": self.allow_mixtures,
+            "allow_critic": self.allow_critic,
             "use_final_op_quality": self.use_final_op_quality,
         }, indent=2)

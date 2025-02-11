@@ -31,15 +31,6 @@ class CriticConvert(LLMConvert):
         elif self.prompt_strategy == PromptStrategy.COT_QA_IMAGE:
             self.critic_prompt_strategy = PromptStrategy.COT_QA_IMAGE_CRITIC
             self.refinement_prompt_strategy = PromptStrategy.COT_QA_IMAGE_REFINE
-        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER:
-            self.critic_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_CRITIC
-            self.refinement_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_REFINE
-        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER_IMAGE:
-            self.critic_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_IMAGE_CRITIC
-            self.refinement_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_IMAGE_REFINE
-        elif self.prompt_strategy == PromptStrategy.COT_MOA_AGG:
-            self.critic_prompt_strategy = PromptStrategy.COT_MOA_AGG_CRITIC
-            self.refinement_prompt_strategy = PromptStrategy.COT_MOA_AGG_REFINE
         else:
             raise ValueError(f"Unsupported prompt strategy: {self.prompt_strategy}")
 
