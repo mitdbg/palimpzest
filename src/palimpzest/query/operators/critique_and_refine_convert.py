@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from palimpzest.constants import MODEL_CARDS, Model
+from palimpzest.constants import MODEL_CARDS, Model, PromptStrategy
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.query.generators.generators import generator_factory
 from palimpzest.query.operators.convert import LLMConvert
-from palimpzest.constants import PromptStrategy
+
 # TYPE DEFINITIONS
 FieldName = str
 
@@ -16,64 +16,50 @@ class CriticConvert(LLMConvert):
 
     def __init__(
         self,
-        proposer_models: list[Model],
-        temperatures: list[float],
-        aggregator_model: Model,
-        proposer_prompt: str | None = None,
+        critic_model: Model,
+        refine_model: Model,
         *args,
         **kwargs,
     ):
-        kwargs["model"] = None
         super().__init__(*args, **kwargs)
-        self.original_prompt_strategy = self.prompt_strategy
-        sorted_proposers, sorted_temps = zip(*[(m, t) for m, t in sorted(zip(proposer_models, temperatures), key=lambda pair: pair[0])])
-        self.proposer_models = list(sorted_proposers)
-        self.temperatures = list(sorted_temps)
-        self.aggregator_model = aggregator_model
-        self.proposer_prompt = proposer_prompt
+        self.critic_model = critic_model
+        self.refine_model = refine_model
         
-        if self.original_prompt_strategy == PromptStrategy.COT_BOOL:
-            self.critic_prompt_strategy = PromptStrategy.COT_BOOL_CRITIC
-            self.refinement_prompt_strategy = PromptStrategy.COT_BOOL_REFINE
-        elif self.original_prompt_strategy == PromptStrategy.COT_BOOL_IMAGE:
-            self.critic_prompt_strategy = PromptStrategy.COT_BOOL_IMAGE_CRITIC
-            self.refinement_prompt_strategy = PromptStrategy.COT_BOOL_IMAGE_REFINE
-        elif self.original_prompt_strategy == PromptStrategy.COT_QA:
+        if self.prompt_strategy == PromptStrategy.COT_QA:
             self.critic_prompt_strategy = PromptStrategy.COT_QA_CRITIC
             self.refinement_prompt_strategy = PromptStrategy.COT_QA_REFINE
-        elif self.original_prompt_strategy == PromptStrategy.COT_MOA_PROPOSER:
-            self.critic_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_CRITIC
-            self.refinement_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_REFINE
-        elif self.original_prompt_strategy == PromptStrategy.COT_MOA_AGG:
-            self.critic_prompt_strategy = PromptStrategy.COT_MOA_AGG_CRITIC
-            self.refinement_prompt_strategy = PromptStrategy.COT_MOA_AGG_REFINE
-        elif self.original_prompt_strategy == PromptStrategy.COT_QA_IMAGE:
+        elif self.prompt_strategy == PromptStrategy.COT_QA_IMAGE:
             self.critic_prompt_strategy = PromptStrategy.COT_QA_IMAGE_CRITIC
             self.refinement_prompt_strategy = PromptStrategy.COT_QA_IMAGE_REFINE
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER:
+            self.critic_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_CRITIC
+            self.refinement_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_REFINE
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_PROPOSER_IMAGE:
+            self.critic_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_IMAGE_CRITIC
+            self.refinement_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_IMAGE_REFINE
+        elif self.prompt_strategy == PromptStrategy.COT_MOA_AGG:
+            self.critic_prompt_strategy = PromptStrategy.COT_MOA_AGG_CRITIC
+            self.refinement_prompt_strategy = PromptStrategy.COT_MOA_AGG_REFINE
         else:
-            raise ValueError(f"Unsupported original prompt strategy: {self.original_prompt_strategy}")
+            raise ValueError(f"Unsupported prompt strategy: {self.prompt_strategy}")
 
         # create generators
-        self.proposer_generators = [
-            generator_factory(proposer_models[0], self.prompt_strategy, self.cardinality, self.verbose),
-            generator_factory(proposer_models[0], self.critic_prompt_strategy, self.cardinality, self.verbose),
-            generator_factory(proposer_models[0], self.refinement_prompt_strategy, self.cardinality, self.verbose),
-        ]
-        self.aggregator_generator = generator_factory(aggregator_model, self.prompt_strategy, self.cardinality, self.verbose)
+        self.critic_generator = generator_factory(self.critic_model, self.critic_prompt_strategy, self.cardinality, self.verbose)
+        self.refine_generator = generator_factory(self.refine_model, self.refinement_prompt_strategy, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()
-        op += f"    Proposer Models: {self.proposer_models}\n"
-        op += f"    Temperatures: {self.temperatures}\n"
-        op += f"    Aggregator Model: {self.aggregator_model}\n"
+        op += f"    Critic Model: {self.critic_model}\n"
+        op += f"    Critic Prompt Strategy: {self.critic_prompt_strategy}\n"
+        op += f"    Refine Model: {self.refine_model}\n"
+        op += f"    Refinement Prompt Strategy: {self.refinement_prompt_strategy}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {
-            "proposer_models": [model.value for model in self.proposer_models],
-            "temperatures": self.temperatures,
-            "aggregator_model": self.aggregator_model.value,
+            "critic_model": self.critic_model.value,
+            "refine_model": self.refine_model.value,
             **id_params,
         }
 
@@ -82,9 +68,8 @@ class CriticConvert(LLMConvert):
     def get_op_params(self):
         op_params = super().get_op_params()
         op_params = {
-            "proposer_models": self.proposer_models,
-            "temperatures": self.temperatures,
-            "aggregator_model": self.aggregator_model,
+            "critic_model": self.critic_model,
+            "refine_model": self.refine_model,
             **op_params,
         }
 
@@ -92,30 +77,19 @@ class CriticConvert(LLMConvert):
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
-        Currently, we are using multiple proposer models with different temperatures to synthesize
-        answers, which are then aggregated and summarized by a single aggregator model. Thus, we
-        roughly expect to incur the cost and time of an LLMConvert * (len(proposer_models) + 1).
-        In practice, this naive quality estimate will be overwritten by the CostModel's estimate
-        once it executes a few code generated examples.
+        Currently, we are invoking `self.model`, then critiquing its output with `self.critic_model`, and
+        finally refining the output with `self.refine_model`. Thus, we roughly expect to incur the cost
+        and time of three LLMConverts. In practice, this naive quality estimate will be overwritten by the
+        CostModel's estimate once it executes a few instances of the operator.
         """
-        # temporarily set self.model so that super().naive_cost_estimates(...) can compute an estimate
-        self.model = self.proposer_models[0]
+        # get naive cost estimates for first LLM call and multiply by 3 for now;
+        # of course we should sum individual estimates for each model, but this is a rough estimate
+        # and in practice we will need to revamp our naive cost estimates in the near future
+        naive_op_cost_estimates = 3 * super().naive_cost_estimates(source_op_cost_estimates)
 
-        # get naive cost estimates for single LLM call and scale it by number of LLMs used in MoA
-        naive_op_cost_estimates = super().naive_cost_estimates(source_op_cost_estimates)
-        naive_op_cost_estimates.time_per_record *= (len(self.proposer_models) + 1)
-        naive_op_cost_estimates.time_per_record_lower_bound = naive_op_cost_estimates.time_per_record
-        naive_op_cost_estimates.time_per_record_upper_bound = naive_op_cost_estimates.time_per_record
-        naive_op_cost_estimates.cost_per_record *= (len(self.proposer_models) + 1)
-        naive_op_cost_estimates.cost_per_record_lower_bound = naive_op_cost_estimates.cost_per_record
-        naive_op_cost_estimates.cost_per_record_upper_bound = naive_op_cost_estimates.cost_per_record
-
-        # for naive setting, estimate quality as mean of all model qualities
-        model_qualities = [
-            MODEL_CARDS[model.value]["overall"] / 100.0
-            for model in self.proposer_models + [self.aggregator_model]
-        ]
-        naive_op_cost_estimates.quality = sum(model_qualities)/(len(self.proposer_models) + 1)
+        # for naive setting, estimate quality as quality of refine model
+        model_quality = MODEL_CARDS[self.refine_model.value]["overall"] / 100.0
+        naive_op_cost_estimates.quality = model_quality
         naive_op_cost_estimates.quality_lower_bound = naive_op_cost_estimates.quality
         naive_op_cost_estimates.quality_upper_bound = naive_op_cost_estimates.quality
 
@@ -125,46 +99,22 @@ class CriticConvert(LLMConvert):
         # get input fields
         input_fields = self.get_input_fields()
 
-        # execute generator models in sequence
-        proposer_generator = self.proposer_generators[0]
-        initial_response, initial_stats = proposer_generator(candidate, fields)
+        # NOTE: when I merge in the `abacus` branch, I will want to update this to reflect the changes I made to reasoning extraction
+        # execute the initial model
+        original_gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema}
+        field_answers, reasoning, original_gen_stats = self.generator(candidate, fields, **original_gen_kwargs)
+        original_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
 
-        # Step 2: Generate the critique based on the initial response
-        critique_generator = self.proposer_generators[1]  # Assuming a separate generator for critique
-        critique_kwargs = {
-            "user_prompt": self._generate_user_prompt(candidate, fields),
-            "initial_response": initial_response
-        }
-        critique_response, critique_stats = critique_generator(candidate, fields, **critique_kwargs)
+        # execute the critic model
+        critic_gen_kwargs = {"original_output": original_output, **original_gen_kwargs}
+        field_answers, reasoning, critic_gen_stats = self.critic_generator(candidate, fields, **critic_gen_kwargs)
+        critic_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
 
-        # Step 3: Generate the refinement based on both the initial and critique responses
-        refinement_generator = self.proposer_generators[2]
-        refinement_kwargs = {
-            "user_prompt": self._generate_user_prompt(candidate, fields),
-            "initial_response": initial_response,
-            "critique_response": critique_response
-        }
-        refined_response, refinement_stats = refinement_generator(candidate, fields, **refinement_kwargs)
+        # execute the refinement model
+        refine_gen_kwargs = {"critic_output": critic_output, **critic_gen_kwargs}
+        field_answers, reasoning, refine_gen_stats = self.refine_generator(candidate, fields, **refine_gen_kwargs)
 
-        '''
-        proposer_model_final_answers, proposer_model_generation_stats = [], []
-        for proposer_generator, temperature in zip(self.proposer_generators, self.temperatures):
-            gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema, "temperature": temperature}
-            field_answers, generation_stats = proposer_generator(candidate, fields, **gen_kwargs)
-            proposer_model_final_answers.append(field_answers)
-            proposer_model_generation_stats.append(generation_stats)
-
-        # call the aggregator
-        gen_kwargs = {
-            "project_cols": input_fields,
-            "output_schema": self.output_schema,
-            "model_responses": proposer_model_final_answers,
-        }
-
-        field_answers, aggregator_gen_stats = self.aggregator_generator(candidate, fields, **gen_kwargs)
-        '''
         # compute the total generation stats
-        total_stats = initial_stats + critique_stats + refinement_stats + aggregator_gen_stats
+        generation_stats = original_gen_stats + critic_gen_stats + refine_gen_stats
 
-        return refined_response, total_stats
-
+        return field_answers, generation_stats
