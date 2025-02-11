@@ -1,4 +1,4 @@
-"""This file contains prompts for Mixture-of-Agents aggregotr operations."""
+"""This file contains prompts for Mixture-of-Agents aggregator operations."""
 
 ### SYSTEM PROMPTS ###
 COT_MOA_AGG_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to generate a JSON object.
