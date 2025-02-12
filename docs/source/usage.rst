@@ -18,9 +18,9 @@ To use Palimpzest, first install it using pip:
 
 .. .. autofunction:: palimpzest.sets.Dataset
 
-.. .. .. function:: Dataset(source: str | list | pd.DataFrame | DataSource, schema: Schema | None = None, *args, **kwargs)
+.. .. .. function:: Dataset(source: str | list | pd.DataFrame | DataReader, schema: Schema | None = None, *args, **kwargs)
 
-.. ..    :param source: The source of data for the dataset. This can be a string, a list, a Pandas DataFrame, or a ``DataSource`` object.
+.. ..    :param source: The source of data for the dataset. This can be a string, a list, a Pandas DataFrame, or a ``DataReader`` object.
 .. ..    :param schema: The schema of the dataset. If not provided, it will be inferred from the source.
 
 

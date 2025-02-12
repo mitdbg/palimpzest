@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-import json
+from pathlib import Path
 from typing import Callable
 
 import pandas as pd
 
 from palimpzest.constants import AggFunc, Cardinality
-from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.lib.fields import ListField, StringField
-from palimpzest.core.lib.schemas import DefaultSchema, Number, Schema
-from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.core.lib.schemas import Number, Schema
 from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.utils.hash_helpers import hash_for_id
+from palimpzest.utils.datareader_helpers import get_local_datareader
+from palimpzest.utils.hash_helpers import hash_for_serialized_dict
 from palimpzest.utils.index_helpers import get_index_str
 
 
@@ -22,27 +22,11 @@ from palimpzest.utils.index_helpers import get_index_str
 #####################################################
 class Set:
     """
-    A Set is the logical abstraction for a set of DataRecords matching some Schema. It is
-    also a node in the computation graph of a Dataset.
-
-    Each Dataset consists of one or more Sets. The "initial" Set in a Dataset can be thought
-    of as the Set that results from reading each DataRecord unaltered from the source. For each
-    filter or transformation that is applied to the Dataset, a new Set is created which defines
-    the set of DataRecords that result from applying that filter or transformation. In brief,
-    the Sets define a Dataset's computation graph. Sets can also be cached to maximize the reuse
-    of past computation.
-
-    Sets are initialized with a dataset_id, a schema, and a source. The source is either an
-    existing Set or a raw data source (such as a directory or S3 prefix). Sets may be initialized
-    with a Filter (which defines the filtering performed on the source to obtain *this* Set),
-    and a description of what this Set is meant to represent.
     """
-
-    SET_VERSION = 0.1
 
     def __init__(
         self,
-        source: Set | DataSource,
+        source: Set | DataReader,
         schema: Schema,
         desc: str | None = None,
         filter: Filter | None = None,
@@ -78,16 +62,15 @@ class Set:
         self._depends_on = [] if depends_on is None else sorted(depends_on)
         self._nocache = nocache
 
-    def __str__(self):
-        return (
-            f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, "
-            f"filter={str(self._filter)}, udf={str(self._udf)}, agg_func={str(self._agg_func)}, limit={str(self._limit)}, "
-            f"project_cols={str(self._project_cols)}, uid={self.universal_identifier()})"
-        )
-
     @property
     def schema(self) -> Schema:
         return self._schema
+
+    def _set_data_source(self, source: DataReader):
+        if isinstance(self._source, Set):
+            self._source._set_data_source(source)
+        else:
+            self._source = source
 
     def serialize(self):
         # NOTE: I needed to remove depends_on from the serialization dictionary because
@@ -95,7 +78,6 @@ class Set:
         # This created an issue with the node.universal_identifier() not being consistent
         # after changing the field to its full name.
         d = {
-            "version": Set.SET_VERSION,
             "schema": self.schema.json_schema(),
             "source": self._source.serialize(),
             "desc": repr(self._desc),
@@ -117,10 +99,7 @@ class Set:
 
     def universal_identifier(self):
         """Return a unique identifier for this Set."""
-        d = self.serialize()
-        ordered = json.dumps(d, sort_keys=True)
-        result = hash_for_id(ordered)
-        return result
+        return hash_for_serialized_dict(self.serialize())
 
     def json_schema(self):
         """Return the JSON schema for this Set."""
@@ -129,51 +108,32 @@ class Set:
 
 class Dataset(Set):
     """
-    A Dataset is the intended abstraction for programmers to interact with when manipulating Sets.
+    A Dataset is the intended abstraction for programmers to interact with when writing PZ programs.
 
-    Users instantiate a Dataset by specifying a `source` that either points to a
-    DataSource or an existing cached Set. Users can then perform computations on
-    the Dataset in an imperative fashion by leveraging functions such as `filter`,
-    `convert`, `aggregate`, etc. Underneath the hood, each of these operations creates
-    a new Set which is cached by the DataManager. As a result, the Sets define the
-    lineage of computation on a Dataset, and this enables programmers to re-use
-    previously cached computation by providing it as a `source` to some future Dataset.
+    Users instantiate a Dataset by specifying a `source` that either points to a DataReader
+    or an existing Dataset. Users can then perform computations on the Dataset in a lazy fashion
+    by leveraging functions such as `filter`, `sem_filter`, `sem_add_columns`, `aggregate`, etc.
+    Underneath the hood, each of these operations creates a new Dataset. As a result, the Dataset
+    defines a lineage of computation.
     """
 
-    def __init__(self, source: str | list | pd.DataFrame | DataSource, schema: Schema | None = None, *args, **kwargs):
-        # convert source (str) -> source (DataSource) if need be
-        updated_source = DataDirectory().get_or_register_dataset(source) if isinstance(source, (str, list, pd.DataFrame)) else source
+    def __init__(
+        self,
+        source: str | Path | list | pd.DataFrame | DataReader | Dataset,
+        schema: Schema | None = None,
+        *args,
+        **kwargs,
+    ) -> None:
+        # NOTE: this function currently assumes that DataReader will always be provided with a schema;
+        #       we will relax this assumption in a subsequent PR
+        # convert source into a DataReader
+        updated_source = get_local_datareader(source, **kwargs) if isinstance(source, (str, Path, list, pd.DataFrame)) else source
 
-        if schema is None:
-            # This is mainly for DataSource with a schema. 
-            if updated_source.schema is not None:
-                schema = updated_source.schema
-            else:
-                schema = Schema.from_df(source) if isinstance(source, pd.DataFrame) else DefaultSchema
+        # get the schema
+        schema = updated_source.schema if schema is None else schema
+ 
         # intialize class
         super().__init__(updated_source, schema, *args, **kwargs)
-
-    def copy(self) -> Dataset:
-        source_copy = self._source.copy()
-        dataset_copy = Dataset(
-            schema=self.schema,
-            source=source_copy,
-            desc=self._desc,
-            filter=self._filter,
-            udf=self._udf,
-            agg_func=self._agg_func,
-            group_by=self._group_by,
-            index=self._index,
-            search_func=self._search_func,
-            search_attr=self._search_attr,
-            output_attr=self._output_attr,
-            k=self._k,
-            limit=self._limit,
-            cardinality=self._cardinality,
-            depends_on=self._depends_on,
-            nocache=self._nocache,
-        )
-        return dataset_copy
 
     def filter(
         self,
@@ -353,7 +313,7 @@ class Dataset(Set):
         """
         # Output schema is a union of the current schema and the output_attr
         attributes = {output_attr: ListField(StringField)(desc=output_attr_desc)}
-        output_schema = self.schema().union(type("temp_class", (Schema,), attributes))
+        output_schema = self.schema().union(type("Schema", (Schema,), attributes))
         return Dataset(
             source=self,
             schema=output_schema,
