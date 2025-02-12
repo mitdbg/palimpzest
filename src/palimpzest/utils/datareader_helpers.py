@@ -44,7 +44,7 @@ def get_local_source(path: str | Path, **kwargs) -> DataReader:
         raise Exception(f"Path {path} is invalid. Does not point to a file or directory.")
 
 
-def get_datareader(source: str | Path | list | pd.DataFrame, **kwargs) -> DataReader:
+def get_local_datareader(source: str | Path | list | pd.DataFrame, **kwargs) -> DataReader:
     """
     This helper function returns a `DataReader` object based on the `source` type.
     The returned `DataReader` object is guaranteed to have a schema.

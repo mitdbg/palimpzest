@@ -245,6 +245,7 @@ class Schema(metaclass=SchemaMetaclass):
         # get new field names, types, and descriptions
         new_field_names, new_field_types, new_field_descs = [], [], []
         for column, dtype in zip(df.columns, df.dtypes):
+            column = f"column_{column}" if isinstance(column, int) else column
             field_desc = f"The {column} column from an input DataFrame"
             if dtype == "object":
                 new_field_types.append(StringField(desc=field_desc))

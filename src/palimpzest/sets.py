@@ -12,7 +12,7 @@ from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.lib.fields import ListField, StringField
 from palimpzest.core.lib.schemas import Number, Schema
 from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.utils.data_helpers import get_datareader
+from palimpzest.utils.datareader_helpers import get_datareader
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
 from palimpzest.utils.index_helpers import get_index_str
 
@@ -127,7 +127,7 @@ class Dataset(Set):
         # NOTE: this function currently assumes that DataReader will always be provided with a schema;
         #       we will relax this assumption in a subsequent PR
         # convert source into a DataReader
-        updated_source = get_datareader(source, **kwargs) if isinstance(source, (str, list, pd.DataFrame)) else source
+        updated_source = get_datareader(source, **kwargs) if isinstance(source, (str, Path, list, pd.DataFrame)) else source
 
         # get the schema
         schema = updated_source.schema if schema is None else schema
