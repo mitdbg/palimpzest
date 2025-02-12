@@ -13,9 +13,9 @@ INPUT FIELDS:
 
 CONTEXT:
 {example_context}
-
-FILTER CONDITION: {example_filter_condition}
 {image_disclaimer}
+FILTER CONDITION: {example_filter_condition}
+
 Let's think step-by-step in order to answer the question.
 
 REASONING: {example_reasoning}
@@ -34,10 +34,12 @@ INPUT FIELDS:
 
 CONTEXT:
 {context}
-
+<<image-placeholder>>
 FILTER CONDITION: {filter_condition}
 
-{reasoning_instruction}""" # TODO: this should be COT_REASONING_INSTRUCTION for text and "" for image
+Let's think step-by-step in order to answer the question.
+
+REASONING: """
 
 
 ### TEMPLATE INPUTS ###

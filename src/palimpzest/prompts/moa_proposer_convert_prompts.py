@@ -42,8 +42,10 @@ OUTPUT FIELDS:
 
 CONTEXT:
 {context}
+<<image-placeholder>>
+Let's think step-by-step in order to answer the question.
 
-{answer_instruction}""" # TODO: this should be COT_ANSWER_INSTRUCTION for text and "" for image
+ANSWER: """
 
 
 ### TEMPLATE INPUTS ###
@@ -57,7 +59,7 @@ COT_MOA_PROPOSER_IMAGE_EXAMPLE_INPUT_FIELDS = """- image: an image of a scene
 
 COT_MOA_PROPOSER_EXAMPLE_OUTPUT_FIELDS = """- name: the name of the scientist
 - birth_year: the year the scientist was born"""
-COT_MOA_PROPOSER_EXAMPLE_IMAGE_OUTPUT_FIELDS = """- dog_in_image: true if a dog is in the image and false otherwise
+COT_MOA_PROPOSER_IMAGE_EXAMPLE_OUTPUT_FIELDS = """- dog_in_image: true if a dog is in the image and false otherwise
 - person_in_image: true if a person is in the image and false otherwise"""
 
 COT_MOA_PROPOSER_EXAMPLE_CONTEXT = """{{

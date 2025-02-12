@@ -95,14 +95,15 @@ class CriticConvert(LLMConvert):
         original_gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema}
         field_answers, reasoning, original_gen_stats = self.generator(candidate, fields, **original_gen_kwargs)
         original_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
+        original_messages = self.generator.get_messages()
 
         # execute the critic model
-        critic_gen_kwargs = {"original_output": original_output, **original_gen_kwargs}
+        critic_gen_kwargs = {"original_output": original_output, "original_messages": original_messages, **original_gen_kwargs}
         field_answers, reasoning, critic_gen_stats = self.critic_generator(candidate, fields, **critic_gen_kwargs)
-        critic_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
+        critique_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
 
         # execute the refinement model
-        refine_gen_kwargs = {"critic_output": critic_output, **critic_gen_kwargs}
+        refine_gen_kwargs = {"critique_output": critique_output, **critic_gen_kwargs}
         field_answers, reasoning, refine_gen_stats = self.refine_generator(candidate, fields, **refine_gen_kwargs)
 
         # compute the total generation stats

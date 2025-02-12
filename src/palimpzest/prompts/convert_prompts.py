@@ -41,8 +41,10 @@ OUTPUT FIELDS:
 
 CONTEXT:
 {context}
+<<image-placeholder>>
+Let's think step-by-step in order to answer the question.
 
-{reasoning_instruction}""" # TODO: this should be COT_REASONING_INSTRUCTION for text and "" for image
+REASONING: """
 
 
 ### TEMPLATE INPUTS ###

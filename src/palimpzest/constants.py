@@ -47,23 +47,31 @@ class PromptStrategy(str, Enum):
     COT_QA_IMAGE_CRITIC = "chain-of-thought-question-critic-image"
     COT_QA_IMAGE_REFINE = "chain-of-thought-question-refine-image"
 
-    # Mixture-of-Agents (Proposer) Prompt Strategies
+    # Mixture-of-Agents Prompt Strategies
     COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
-    COT_MOA_PROPOSER_CRITIC = "chain-of-thought-mixture-of-agents-proposer-critic"
-    COT_MOA_PROPOSER_REFINE = "chain-of-thought-mixture-of-agents-proposer-refine"
-
-    # Mixture-of-Agents (Proposer) with Image Prompt Strategies
     COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
-    COT_MOA_PROPOSER_IMAGE_CRITIC = "chain-of-thought-mixture-of-agents-proposer-critic-image"
-    COT_MOA_PROPOSER_IMAGE_REFINE = "chain-of-thought-mixture-of-agents-proposer-refine-image"
-
-    # Mixture-of-Agents (Aggregation) Prompt Strategies
     COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
-    COT_MOA_AGG_CRITIC = "chain-of-thought-mixture-of-agents-aggregation-critic"
-    COT_MOA_AGG_REFINE = "chain-of-thought-mixture-of-agents-aggregation-refine"
 
     def is_image_prompt(self):
         return "image" in self.value
+
+    def is_cot_bool_prompt(self):
+        return "chain-of-thought-bool" in self.value
+
+    def is_cot_qa_prompt(self):
+        return "chain-of-thought-question" in self.value
+
+    def is_critic_prompt(self):
+        return "critic" in self.value
+
+    def is_refine_prompt(self):
+        return "refine" in self.value
+
+    def is_moa_proposer_prompt(self):
+        return "mixture-of-agents-proposer" in self.value
+
+    def is_moa_aggregator_prompt(self):
+        return "mixture-of-agents-aggregation" in self.value
 
 
 class OptimizationStrategy(str, Enum):
