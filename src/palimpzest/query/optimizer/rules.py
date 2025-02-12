@@ -5,6 +5,7 @@ from palimpzest.constants import AggFunc, Cardinality, Model, PromptStrategy
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
 from palimpzest.query.operators.convert import LLMConvertBonded, LLMConvertConventional, NonLLMConvert
+from palimpzest.query.operators.critique_and_refine_convert import CriticConvert
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.logical import (
@@ -29,7 +30,6 @@ from palimpzest.query.operators.token_reduction_convert import (
 )
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
 from palimpzest.utils.model_helpers import get_models, get_vision_models
-from palimpzest.query.operators.critique_and_refine_convert import CriticConvert
 
 
 class Rule:
@@ -661,7 +661,7 @@ class CriticConvertRule(ImplementationRule):
         return isinstance(logical_op, ConvertScan) and logical_op.udf is None
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
 
         # Get initial parameters for physical operator
