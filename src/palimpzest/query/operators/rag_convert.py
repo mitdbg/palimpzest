@@ -20,7 +20,7 @@ class RAGConvert(LLMConvert):
     def __init__(self, num_chunks_per_field: int, chunk_size: int = 1000, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # NOTE: in the future, we should abstract the embedding model to allow for different models
-        self.client = OpenAI()
+        self.client = None
         self.embedding_model = "text-embedding-3-small"
         self.num_chunks_per_field = num_chunks_per_field
         self.chunk_size = chunk_size
@@ -157,6 +157,9 @@ class RAGConvert(LLMConvert):
         return candidate
 
     def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
+        # set client
+        self.client = OpenAI() if self.client is None else self.client
+
         # get the set of input fields to use for the convert operation
         input_fields = self.get_input_fields()
 
