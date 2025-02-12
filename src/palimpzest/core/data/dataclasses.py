@@ -124,8 +124,8 @@ class RecordOpStats:
     # identifier for the parent of this record
     record_parent_id: str
 
-    # idenifier for the source of this record
-    record_source_id: str
+    # idenifier for the source idx of this record
+    record_source_idx: str
 
     # a dictionary with the record state after being processed by the operator
     record_state: dict[str, Any]

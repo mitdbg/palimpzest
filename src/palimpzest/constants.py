@@ -117,10 +117,11 @@ HTML_EXTENSIONS = [".html", ".htm"]
 # the number of seconds the parallel execution will sleep for while waiting for futures to complete
 PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS = 0.3
 
+# default PDF parser
+DEFAULT_PDF_PROCESSOR = "pypdf"
+
 # character limit for various IDs
 MAX_ID_CHARS = 10
-DEFAULT_DATASET_ID_CHARS = 16
-MAX_DATASET_ID_CHARS = 100
 
 # retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
 RETRY_MULTIPLIER = 2
@@ -147,6 +148,9 @@ LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
 
 # Assume 30 GB/sec for sequential access of memory
 MEMORY_SCAN_TIME_PER_KB = 1 / (float(30) * 1024 * 1024)
+
+# Assume 1 KB per record
+NAIVE_BYTES_PER_RECORD = 1024
 
 # Rough conversion from # of characters --> # of tokens; assumes 1 token ~= 4 chars
 TOKENS_PER_CHARACTER = 0.25
@@ -178,11 +182,6 @@ NAIVE_PDF_PROCESSOR_TIME_PER_RECORD = 10.0
 # Whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False
 
-# Derived schema prefix
-DERIVED_SCHEMA_PREFIX = "DerivedSchema_"
-
-# Derived source_id for records created from a DataFrame
-FROM_DF_PREFIX = "FROM_DF_"
 
 #### MODEL PERFORMANCE & COST METRICS ####
 # I've looked across models and grouped knowledge into commonly used categories:

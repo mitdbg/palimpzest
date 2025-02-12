@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from demo_core import execute_task, format_results_table
 
-from palimpzest.policy import MaxQuality, MinCost, MinTime
+import palimpzest as pz
 
 load_dotenv()
 
@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--profile", default=False, action="store_true", help="Profile execution")
-    parser.add_argument("--datasetid", type=str, help="The dataset id")
+    parser.add_argument("--dataset", type=str, help="Path to the dataset")
     parser.add_argument("--task", type=str, help="The task to run")
     parser.add_argument(
         "--execution_strategy",
@@ -33,28 +33,28 @@ def main():
 
     args = parser.parse_args()
 
-    # The user has to indicate the dataset id and the task
-    if args.datasetid is None:
-        print("Please provide a dataset id")
+    # The user has to indicate the dataset and the task
+    if args.dataset is None:
+        print("Please provide a path to the dataset")
         exit(1)
     if args.task is None:
         print("Please provide a task")
         exit(1)
 
     # Set up execution parameters
-    datasetid = args.datasetid
+    dataset = args.dataset
     task = args.task
     verbose = args.verbose
     profile = args.profile
 
     # Set policy
-    policy = MaxQuality()
+    policy = pz.MaxQuality()
     if args.policy == "mincost":
-        policy = MinCost()
+        policy = pz.MinCost()
     elif args.policy == "mintime":
-        policy = MinTime()
+        policy = pz.MinTime()
     elif args.policy == "maxquality":
-        policy = MaxQuality()
+        policy = pz.MaxQuality()
     else:
         print("Policy not supported for this demo")
         exit(1)
@@ -65,7 +65,7 @@ def main():
     # Execute task
     records, execution_stats, cols = execute_task(
         task=task,
-        datasetid=datasetid,
+        datasetid=dataset,
         policy=policy,
         verbose=verbose,
         profile=profile,

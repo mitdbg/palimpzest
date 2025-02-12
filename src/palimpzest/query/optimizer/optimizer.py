@@ -3,14 +3,12 @@ from __future__ import annotations
 from copy import deepcopy
 
 from palimpzest.constants import Model
-from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.lib.fields import Field
-from palimpzest.datamanager.datamanager import DataDirectory
 from palimpzest.policy import Policy
 from palimpzest.query.operators.logical import (
     Aggregate,
     BaseScan,
-    CacheScan,
     ConvertScan,
     FilteredScan,
     GroupByAggregate,
@@ -49,7 +47,16 @@ from palimpzest.query.optimizer.tasks import (
     OptimizePhysicalExpression,
 )
 from palimpzest.sets import Dataset, Set
+from palimpzest.utils.hash_helpers import hash_for_serialized_dict
 from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_conventional_fallback_model
+
+
+def get_node_uid(node: Dataset | DataReader) -> str:
+    """Helper function to compute the universal identifier for a node in the query plan."""
+    # NOTE: technically, hash_for_serialized_dict(node.serialize()) would be valid for both DataReader and Dataset;
+    #       for the moment, I want to be explicit in Dataset about what constitutes a unique Dataset object, but
+    #       in ther future we may be able to remove universal_identifier() from Dataset and just use this function
+    return node.universal_identifier() if isinstance(node, Dataset) else hash_for_serialized_dict(node.serialize())
 
 
 class Optimizer:
@@ -222,20 +229,22 @@ class Optimizer:
         self.strategy = OptimizerStrategyRegistry.get_strategy(optimizer_strategy_type.value)
     
     def construct_group_tree(self, dataset_nodes: list[Set]) -> tuple[list[int], dict[str, Field], dict[str, set[str]]]:
-        # get node, output_schema, and input_schema(if applicable)
+        # get node, output_schema, and input_schema (if applicable)
         node = dataset_nodes[-1]
         output_schema = node.schema
         input_schema = dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
         
         ### convert node --> Group ###
-        uid = node.universal_identifier()
+        uid = get_node_uid(node)
 
         # create the op for the given node
         op: LogicalOperator | None = None
-        if not self.no_cache and DataDirectory().has_cached_answer(uid):
-            op = CacheScan(dataset_id=uid, input_schema=None, output_schema=output_schema)
-        elif isinstance(node, DataSource):
-            op = BaseScan(dataset_id=uid, output_schema=output_schema)
+
+        # TODO: add cache scan when we add caching back to PZ
+        # if not self.no_cache:
+        #     op = CacheScan(datareader=node, output_schema=output_schema)
+        if isinstance(node, DataReader):
+            op = BaseScan(datareader=node, output_schema=output_schema)
         elif node._filter is not None:
             op = FilteredScan(
                 input_schema=input_schema,
@@ -318,7 +327,7 @@ class Optimizer:
         # compute the set of (short) field names this operation depends on
         depends_on_field_names = (
             {}
-            if isinstance(node, DataSource)
+            if isinstance(node, DataReader)
             else {field_name.split(".")[-1] for field_name in node._depends_on}
         )
 
@@ -371,9 +380,10 @@ class Optimizer:
 
     def convert_query_plan_to_group_tree(self, query_plan: Dataset) -> str:
         # Obtain ordered list of datasets
-        dataset_nodes = []
-        node = query_plan.copy()
+        dataset_nodes: list[Dataset | DataReader] = []
+        node = deepcopy(query_plan)
 
+        # NOTE: the very first node will be a DataReader; the rest will be Dataset
         while isinstance(node, Dataset):
             dataset_nodes.append(node)
             node = node._source
@@ -385,7 +395,7 @@ class Optimizer:
         for node_idx, node in enumerate(dataset_nodes):
             # update mapping from short to full field names
             short_field_names = node.schema.field_names()
-            full_field_names = node.schema.field_names(unique=True, id=node.universal_identifier())
+            full_field_names = node.schema.field_names(unique=True, id=get_node_uid(node))
             for short_field_name, full_field_name in zip(short_field_names, full_field_names):
                 # set mapping automatically if this is a new field
                 if short_field_name not in short_to_full_field_name or (
@@ -394,7 +404,7 @@ class Optimizer:
                     short_to_full_field_name[short_field_name] = full_field_name
 
             # if the node is a data source, then skip
-            if isinstance(node, DataSource):
+            if isinstance(node, DataReader):
                 continue
 
             # If the node already has depends_on specified, then resolve each field name to a full (unique) field name
@@ -405,7 +415,7 @@ class Optimizer:
             # otherwise, make the node depend on all upstream nodes
             node._depends_on = set()
             for upstream_node in dataset_nodes[:node_idx]:
-                node._depends_on.update(upstream_node.schema.field_names(unique=True, id=upstream_node.universal_identifier()))
+                node._depends_on.update(upstream_node.schema.field_names(unique=True, id=get_node_uid(upstream_node)))
             node._depends_on = list(node._depends_on)
 
         # construct tree of groups

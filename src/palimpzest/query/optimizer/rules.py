@@ -1,12 +1,10 @@
 from copy import deepcopy
 from itertools import combinations
-from typing import Dict, Set, Tuple
 
 from palimpzest.constants import AggFunc, Cardinality, Model, PromptStrategy
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
 from palimpzest.query.operators.convert import LLMConvertBonded, LLMConvertConventional, NonLLMConvert
-from palimpzest.query.operators.datasource import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.logical import (
@@ -24,6 +22,7 @@ from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgents
 from palimpzest.query.operators.project import ProjectOp
 from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.retrieve import RetrieveOp
+from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.token_reduction_convert import (
     TokenReducedConvertBonded,
     TokenReducedConvertConventional,
@@ -47,7 +46,7 @@ class Rule:
         raise NotImplementedError("Calling this method from an abstract base class.")
 
     @staticmethod
-    def substitute(logical_expression: LogicalExpression, **kwargs) -> Set[Expression]:
+    def substitute(logical_expression: LogicalExpression, **kwargs) -> set[Expression]:
         raise NotImplementedError("Calling this method from an abstract base class.")
 
 
@@ -60,8 +59,8 @@ class TransformationRule(Rule):
 
     @staticmethod
     def substitute(
-        logical_expression: LogicalExpression, groups: Dict[int, Group], expressions: Dict[int, Expression], **kwargs
-    ) -> Tuple[Set[LogicalExpression], Set[Group]]:
+        logical_expression: LogicalExpression, groups: dict[int, Group], expressions: dict[int, Expression], **kwargs
+    ) -> tuple[set[LogicalExpression], set[Group]]:
         """
         This function applies the transformation rule to the logical expression, which
         potentially creates new intermediate expressions and groups.
@@ -86,8 +85,8 @@ class PushDownFilter(TransformationRule):
 
     @staticmethod
     def substitute(
-        logical_expression: LogicalExpression, groups: Dict[int, Group], expressions: Dict[int, Expression], **kwargs
-    ) -> Tuple[Set[LogicalExpression], Set[Group]]:
+        logical_expression: LogicalExpression, groups: dict[int, Group], expressions: dict[int, Expression], **kwargs
+    ) -> tuple[set[LogicalExpression], set[Group]]:
         # initialize the sets of new logical expressions and groups to be returned
         new_logical_expressions, new_groups = set(), set()
 
@@ -103,7 +102,7 @@ class PushDownFilter(TransformationRule):
                 continue
 
             # iterate over logical expressions
-            logical_exprs = input_group.logical_expressions.copy()
+            logical_exprs = deepcopy(input_group.logical_expressions)
             for expr in logical_exprs:
                 # if the expression operator is not a convert or a filter, we cannot swap
                 if not (isinstance(expr.operator, (ConvertScan, FilteredScan))):
@@ -114,10 +113,10 @@ class PushDownFilter(TransformationRule):
                     continue
 
                 # create new logical expression with filter pushed down to the input group's logical expression
-                new_input_group_ids = expr.input_group_ids.copy()
-                new_input_fields = expr.input_fields.copy()
-                new_depends_on_field_names = logical_expression.depends_on_field_names.copy()
-                new_generated_fields = logical_expression.generated_fields.copy()
+                new_input_group_ids = deepcopy(expr.input_group_ids)
+                new_input_fields = deepcopy(expr.input_fields)
+                new_depends_on_field_names = deepcopy(logical_expression.depends_on_field_names)
+                new_generated_fields = deepcopy(logical_expression.generated_fields)
                 new_filter_expr = LogicalExpression(
                     filter_operator,
                     input_group_ids=new_input_group_ids,
@@ -215,7 +214,7 @@ class NonLLMConvertRule(ImplementationRule):
         return isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is not None
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -259,7 +258,7 @@ class LLMConvertRule(ImplementationRule):
         return isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is None
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -368,7 +367,7 @@ class TokenReducedConvertRule(ImplementationRule):
         return isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -459,7 +458,7 @@ class CodeSynthesisConvertRule(ImplementationRule):
         )
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -518,7 +517,7 @@ class RAGConvertRule(ImplementationRule):
         return isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -580,7 +579,7 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
         return isinstance(logical_op, ConvertScan) and logical_op.udf is None
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -758,7 +757,7 @@ class RetrieveRule(ImplementationRule):
     @classmethod
     def substitute(
         cls, logical_expression: LogicalExpression, **physical_op_params
-    ) -> Set[PhysicalExpression]:
+    ) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
 
         physical_expressions = []
@@ -804,7 +803,7 @@ class NonLLMFilterRule(ImplementationRule):
         )
 
     @staticmethod
-    def substitute(logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+    def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
@@ -840,7 +839,7 @@ class LLMFilterRule(ImplementationRule):
         )
 
     @staticmethod
-    def substitute(logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+    def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update({
@@ -916,7 +915,7 @@ class AggregateRule(ImplementationRule):
         return isinstance(logical_expression.operator, Aggregate)
 
     @staticmethod
-    def substitute(logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+    def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
@@ -966,7 +965,7 @@ class BasicSubstitutionRule(ImplementationRule):
         return logical_op_class in cls.LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> Set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
