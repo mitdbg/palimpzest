@@ -126,7 +126,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         # get basic parameters
         model = self.model_name
         temperature = kwargs.get("temperature", 0.0)
-        max_tokens = kwargs.get("max_tokens", 4096)
 
         # construct messages and add system prompt if present
         chat_messages, user_content = [], []
@@ -155,7 +154,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         payload = {
             "model": model,
             "temperature": temperature,
-            "max_completion_tokens": max_tokens,
             "messages": chat_messages,
         }
 
