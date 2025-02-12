@@ -522,7 +522,7 @@ class PromptFactory:
                     base64_image_str = base64.b64encode(f.read()).decode('utf-8')
                 image_messages.append({"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"})
 
-            elif hasattr(field_type, "element_type") and isinstance(field_type.element_type, ImageFilepathField):
+            elif hasattr(field_type, "element_type") and issubclass(field_type.element_type, ImageFilepathField):
                 for image_filepath in field_value:
                     with open(image_filepath, 'rb') as f:
                         base64_image_str = base64.b64encode(f.read()).decode('utf-8')
@@ -532,7 +532,7 @@ class PromptFactory:
             elif isinstance(field_type, ImageURLField):
                 image_messages.append({"role": "user", "type": "image", "content": field_value})
 
-            elif hasattr(field_type, "element_type") and isinstance(field_type.element_type, ImageURLField):
+            elif hasattr(field_type, "element_type") and issubclass(field_type.element_type, ImageURLField):
                 for image_url in field_value:
                     image_messages.append({"role": "user", "type": "image", "content": image_url})
 
@@ -541,7 +541,7 @@ class PromptFactory:
                 base64_image_str = field_value.decode("utf-8")
                 image_messages.append({"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"})
 
-            elif hasattr(field_type, "element_type") and isinstance(field_type.element_type, ImageBase64Field):
+            elif hasattr(field_type, "element_type") and issubclass(field_type.element_type, ImageBase64Field):
                 for base64_image in field_value:
                     base64_image_str = base64_image.decode("utf-8")
                     image_messages.append({"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"})
@@ -565,7 +565,7 @@ class PromptFactory:
 
         return base_prompt.format(**format_kwargs)
 
-    def _get_user_messages(self, candidate: DataRecord, input_fields: list[str], output_fields: list[str], **kwargs) -> str:
+    def _get_user_messages(self, candidate: DataRecord, input_fields: list[str], **kwargs) -> str:
         """
         Returns a list of messages for the chat payload based on the prompt strategy.
 
@@ -573,15 +573,12 @@ class PromptFactory:
             candidate (DataRecord): The input record.
             input_fields (list[str]): The input fields.
             output_fields (list[str]): The output fields.
-            kwargs: keywork arguments for templating the user prompt.
+            kwargs: The formatting kwargs and some keyword arguments provided by the user.
 
         Returns:
             Tuple[str, str | None]: The fully templated start and end of the user prompt.
                 The second element will be None for text prompts.
         """
-        # compute the full dictionary of format kwargs
-        format_kwargs = self._get_all_format_kwargs(candidate, input_fields, output_fields, **kwargs)
-
         # get the base prompt template
         base_prompt = self.BASE_USER_PROMPT_MAP.get(self.prompt_strategy)
 
@@ -603,19 +600,19 @@ class PromptFactory:
             # NOTE: if this critic / refinement prompt is processing images, those images will
             #       be part of the `original_messages` and will show up in the final chat payload
             base_prompt_start, base_prompt_end = base_prompt.split("<<original-prompt-placeholder>>\n")
-            user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**format_kwargs)})
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
             user_messages.extend(original_messages)
-            user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**format_kwargs)})
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
 
         elif self.prompt_strategy.is_image_prompt():
             base_prompt_start, base_prompt_end = base_prompt.split("<<image-placeholder>>\n")
-            user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**format_kwargs)})
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
             user_messages.extend(image_messages)
-            user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**format_kwargs)})
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
 
         else:
             base_prompt = base_prompt.replace("<<image-placeholder>>", "")
-            user_messages.append({"role": "user", "type": "text", "content": base_prompt.format(**format_kwargs)})
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt.format(**kwargs)})
 
         return user_messages
 
@@ -708,13 +705,17 @@ class PromptFactory:
         # initialize messages
         messages = []
 
+        # compute the full dictionary of format kwargs and add to kwargs
+        format_kwargs = self._get_all_format_kwargs(candidate, input_fields, output_fields, **kwargs)
+        kwargs = {**kwargs, **format_kwargs}
+
         # generate system message (if applicable)
-        system_prompt = self._get_system_prompt()
+        system_prompt = self._get_system_prompt(**kwargs)
         if system_prompt is not None:
             messages.append({"role": "system", "type": "text", "content": system_prompt})
 
         # generate user messages and add to messages
-        user_messages = self._get_user_messages(candidate, input_fields, output_fields, **kwargs)
+        user_messages = self._get_user_messages(candidate, input_fields, **kwargs)
         messages.extend(user_messages)
 
         return messages
