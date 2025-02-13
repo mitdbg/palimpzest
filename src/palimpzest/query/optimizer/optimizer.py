@@ -30,7 +30,7 @@ from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
 from palimpzest.query.optimizer.rules import (
     CodeSynthesisConvertRule,
-    CriticConvertRule,
+    CriticAndRefineConvertRule,
     LLMConvertBondedRule,
     LLMConvertConventionalRule,
     MixtureOfAgentsConvertRule,
@@ -193,7 +193,7 @@ class Optimizer:
 
         if not self.allow_critic:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules if not issubclass(rule, CriticConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, CriticAndRefineConvertRule)
             ]
 
     def update_cost_model(self, cost_model: CostModel):

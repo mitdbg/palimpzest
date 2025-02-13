@@ -5,7 +5,7 @@ from palimpzest.constants import AggFunc, Cardinality, Model, PromptStrategy
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
 from palimpzest.query.operators.convert import LLMConvertBonded, LLMConvertConventional, NonLLMConvert
-from palimpzest.query.operators.critique_and_refine_convert import CriticConvert
+from palimpzest.query.operators.critique_and_refine_convert import CriticAndRefineConvert
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.logical import (
@@ -650,9 +650,9 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
 
         return set(physical_expressions)
 
-class CriticConvertRule(ImplementationRule):
+class CriticAndRefineConvertRule(ImplementationRule):
     """
-    Implementation rule for the CriticConvert operator.
+    Implementation rule for the CriticAndRefineConvert operator.
     """
 
     @classmethod
@@ -716,13 +716,13 @@ class CriticConvertRule(ImplementationRule):
             models.append(model)
 
         # TODO: heuristic(s) to narrow the space of critic and refine models we consider using class attributes
-        # construct CriticConvert operations for every combination of model, critic model, and refinement model
+        # construct CriticAndRefineConvert operations for every combination of model, critic model, and refinement model
         physical_expressions = []
         for model in models:
             for critic_model in models:
                 for refine_model in models:
                     # construct multi-expression
-                    op = CriticConvert(
+                    op = CriticAndRefineConvert(
                         model=model,
                         prompt_strategy=PromptStrategy.COT_QA_IMAGE if is_image_conversion else PromptStrategy.COT_QA,
                         critic_model=critic_model,

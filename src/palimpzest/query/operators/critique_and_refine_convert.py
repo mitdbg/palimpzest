@@ -12,7 +12,7 @@ from palimpzest.query.operators.convert import LLMConvert
 FieldName = str
 
 
-class CriticConvert(LLMConvert):
+class CriticAndRefineConvert(LLMConvert):
 
     def __init__(
         self,

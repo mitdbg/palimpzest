@@ -11,7 +11,7 @@ from palimpzest.query.optimizer.rules import (
     CodeSynthesisConvertSingleRule as _CodeSynthesisConvertSingleRule,
 )
 from palimpzest.query.optimizer.rules import (
-    CriticConvertRule as _CriticConvertRule,
+    CriticAndRefineConvertRule as _CriticAndRefineConvertRule,
 )
 from palimpzest.query.optimizer.rules import (
     ImplementationRule as _ImplementationRule,
@@ -67,7 +67,7 @@ ALL_RULES = [
     _BasicSubstitutionRule,
     _CodeSynthesisConvertRule,
     _CodeSynthesisConvertSingleRule,
-    _CriticConvertRule,
+    _CriticAndRefineConvertRule,
     _ImplementationRule,
     _LLMConvertBondedRule,
     _LLMConvertConventionalRule,

@@ -1,4 +1,4 @@
-"""This file contains prompts for CriticConvert operations."""
+"""This file contains prompts for CriticAndRefineConvert operations."""
 
 ### CRITIQUE PROMPT AND CRITERIA ###
 BASE_CRITIQUE_PROMPT = """You are a helpful assistant tasked with critiquing the output of a model based on a given prompt.
