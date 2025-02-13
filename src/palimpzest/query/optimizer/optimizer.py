@@ -93,9 +93,9 @@ class Optimizer:
         allow_conventional_query: bool = False,
         allow_code_synth: bool = False,
         allow_token_reduction: bool = False,
-        allow_rag_reduction: bool = True,
+        allow_rag_reduction: bool = False,
         allow_mixtures: bool = True,
-        allow_critic: bool = True,
+        allow_critic: bool = False,
         optimization_strategy_type: OptimizationStrategyType = OptimizationStrategyType.PARETO,
         use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
     ):
