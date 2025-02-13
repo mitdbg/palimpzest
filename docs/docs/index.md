@@ -1,8 +1,3 @@
----
-hide:
-#   - navigation
-#   - toc
----
 # Simple and Powerful Semantic Computation
 [![Discord](https://img.shields.io/discord/1245561987480420445?logo=discord)](https://discord.gg/DNUsemgQ)
 [![Colab Demo](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1zqOxnh_G6eZ8_xax6PvDr-EjMt7hp4R5?usp=sharing)

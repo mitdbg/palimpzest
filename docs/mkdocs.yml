@@ -42,8 +42,8 @@ extra_css:
 
 plugins:
   - search
-  - social
   - mkdocstrings
+  - social
 
 theme:
   name: material
