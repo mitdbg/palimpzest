@@ -35,3 +35,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: docs/build/html/
           force_orphan: true
+
+
+# TODO: pip install mike
+#       mike deploy --push --update-aliases 0.1 latest

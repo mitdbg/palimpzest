@@ -1,19 +1,21 @@
-site_name: Palimpzest
+site_name: palimpzest
 site_url: https://palimpzest.org
 repo_url: https://github.com/mitdbg/palimpzest
 repo_name: mitdbg/palimpzest
 
 nav:
-  - Home: index.md
-  - Introduction:
+  - Getting Started:
+    - Overview: index.md
     - Installation: intro/installation.md
-    - Getting Started: intro/getting-started.md
+    - Quick Start Tutorial: intro/getting-started.md
     - Next Steps: intro/next-steps.md
+
   - User Guide:
-    - User Guide Overview: user-guide/overview.md
+    - user-guide/overview.md
     - How to Read Your Own Data: user-guide/datareaders.md
     - PZ Operator Overview: user-guide/operators.md
     - Getting Started with Optimization: user-guide/optimization.md
+
   - Documentation:
     - DataReader: api/datareader.md
     - Dataset: api/dataset.md
@@ -25,19 +27,40 @@ nav:
       - Retrieve: api/operators/retrieve.md
       - Scan: api/operators/scan.md
     - Optimizer: api/optimizer.md
-  - Contact: contact.md
+
+  - Join the Community: community.md
+
+extra:
+  analytics:
+    provider: google
+    property: G-ZW0TNQXT8Y
+  # version:
+  #   provider: mike
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+  - social
+  - mkdocstrings
 
 theme:
   name: material
   font: 
-    text: Merriweather Sans
-    code: Red Hat Mono
-  # logo: logos/palimpzest-cropped.png
-  logo: https://palimpzest-workloads.s3.us-east-1.amazonaws.com/palimpzest-cropped.png
-  icon:
-    logo: fontawesome/solid/w
+    text: Roboto
+    code: Roboto Mono
+  logo: logos/palimpzest-cropped.png
+  # logo: https://palimpzest-workloads.s3.us-east-1.amazonaws.com/palimpzest-cropped.png
+  language: en
   features:
     - navigation.footer
+    - navigation.instant
+    - navigation.tabs
+    # - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - header.autohide
   palette:
     # Dark Mode
     - scheme: slate
@@ -54,6 +77,7 @@ theme:
         name: Light mode
       primary: white
       accent: black
+  # custom_dir: overrides
 
 markdown_extensions:
   - attr_list

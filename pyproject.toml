@@ -25,6 +25,8 @@ dependencies = [
     "lxml-html-clean>=0.1.1",
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.6.3",
+    "mkdocs-material[imaging]",
+    "mkdocstrings-python>=1.15.0",
     "modal>=0.62.198",
     "ncls==0.0.68",
     "necessary>=0.3.2",

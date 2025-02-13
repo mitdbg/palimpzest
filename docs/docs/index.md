@@ -1,10 +1,16 @@
+---
+hide:
+#   - navigation
+#   - toc
+---
 # Simple and Powerful Semantic Computation
-[![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv)](https://arxiv.org/pdf/2405.14696)
+[![Discord](https://img.shields.io/discord/1245561987480420445?logo=discord)](https://discord.gg/DNUsemgQ)
 [![Colab Demo](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1zqOxnh_G6eZ8_xax6PvDr-EjMt7hp4R5?usp=sharing)
-[![Video](https://img.shields.io/badge/YouTube-Talk-red?logo=youtube)](https://youtu.be/T8VQfyBiki0?si=eiph57DSEkDNbEIu)
 [![PyPI](https://img.shields.io/pypi/v/palimpzest)](https://pypi.org/project/palimpzest/)
-[![PyPI - Monthly Downloads](https://img.shields.io/pypi/dm/palimpzest)](https://pypi.org/project/palimpzest/)
+[![PyPI - Monthly Downloads](https://img.shields.io/pypi/dm/palimpzest?color=teal)](https://pypi.org/project/palimpzest/)
 [![GitHub](https://img.shields.io/badge/GitHub-Code-blue?logo=github)](https://github.com/mitdbg/palimpzest)
+<!-- [![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv)](https://arxiv.org/pdf/2405.14696) -->
+<!-- [![Video](https://img.shields.io/badge/YouTube-Talk-red?logo=youtube)](https://youtu.be/T8VQfyBiki0?si=eiph57DSEkDNbEIu) -->
 
 Palimpzest (PZ) enables developers to write simple, powerful programs which use semantic operators (i.e. LLMs) to perform computation:
 ```python
