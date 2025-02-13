@@ -120,6 +120,11 @@ class PromptFactory:
         # get context from input record (project_cols will be None if not provided in kwargs)
         context: dict = candidate.to_dict(include_bytes=False, project_cols=input_fields)
 
+        # TODO: MOVE THIS LOGIC INTO A CHUNKING / CONTEXT MANAGEMENT CLASS
+        #   - this class should be able to:
+        #      - handle the context length of different models (i.e. self.model should be an input)
+        #      - handle images
+        #      - handle the issue with `original_messages` (ask Matt if this is not clear)
         # TODO: this does not work for image prompts
         # TODO: this ignores the size of the `orignal_messages` in critique and refine prompts
         # cut down on context based on window length
