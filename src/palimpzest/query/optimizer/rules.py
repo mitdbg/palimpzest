@@ -715,6 +715,7 @@ class CriticConvertRule(ImplementationRule):
 
             models.append(model)
 
+        # TODO: heuristic(s) to narrow the space of critic and refine models we consider using class attributes
         # construct CriticConvert operations for every combination of model, critic model, and refinement model
         physical_expressions = []
         for model in models:

@@ -3,7 +3,13 @@ import base64
 import json
 from string import Formatter
 
-from palimpzest.constants import TOKENS_PER_CHARACTER, Cardinality, Model, PromptStrategy
+from palimpzest.constants import (
+    MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT,
+    TOKENS_PER_CHARACTER,
+    Cardinality,
+    Model,
+    PromptStrategy,
+)
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import BytesField, ImageBase64Field, ImageFilepathField, ImageURLField
 from palimpzest.core.lib.schemas import Schema
@@ -132,8 +138,8 @@ class PromptFactory:
             total_context_len = len(json.dumps(context, indent=2))
 
             # sort fields by length and progressively strip from the longest field until it is short enough;
-            # NOTE: 6000 is a rough estimate which leaves room for the rest of the prompt text
-            while total_context_len * TOKENS_PER_CHARACTER > 6000:
+            # NOTE: MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT is a rough estimate which leaves room for the rest of the prompt text
+            while total_context_len * TOKENS_PER_CHARACTER > MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT:
                 # sort fields by length
                 field_lengths = [(field, len(value)) for field, value in context.items()]
                 sorted_fields = sorted(field_lengths, key=lambda item: item[1], reverse=True)
@@ -142,7 +148,7 @@ class PromptFactory:
                 longest_field_name, longest_field_length = sorted_fields[0]
 
                 # trim the field
-                context_factor =  6000.0 / (total_context_len * TOKENS_PER_CHARACTER)
+                context_factor =  MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT / (total_context_len * TOKENS_PER_CHARACTER)
                 keep_frac_idx = int(longest_field_length * context_factor)
                 context[longest_field_name] = context[longest_field_name][:keep_frac_idx]
 

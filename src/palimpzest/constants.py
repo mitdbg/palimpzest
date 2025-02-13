@@ -143,6 +143,9 @@ NAIVE_BYTES_PER_RECORD = 1024
 # Rough conversion from # of characters --> # of tokens; assumes 1 token ~= 4 chars
 TOKENS_PER_CHARACTER = 0.25
 
+# Rough estimate of the number of tokens the context is allowed to take up for MIXTRAL and LLAMA3 models
+MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT = 6000
+
 # a naive estimate for the input record size
 NAIVE_EST_SOURCE_RECORD_SIZE_IN_BYTES = 1_000_000
 
