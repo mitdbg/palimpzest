@@ -44,16 +44,7 @@ And then access the notebook from the jupyter interface in your browser at `loca
 ### Even Quicker Start
 For eager readers, the code in the notebook can be found in the following condensed snippet. However, we do suggest reading the notebook as it contains more insight into each element of the program.
 ```python
-import pandas as pd
-import palimpzest.datamanager.datamanager as pzdm
-from palimpzest.sets import Dataset
-from palimpzest.policy import MinCost, MaxQuality
-from palimpzest.query.processor.config import QueryProcessorConfig
-
-# register dataset
-dataset_path = "testdata/enron-tiny"
-dataset_name = "enron-tiny"
-pzdm.DataDirectory().register_local_directory(dataset_path, dataset_name)
+import palimpzest as pz
 
 # define the fields we wish to compute
 email_cols = [
@@ -63,13 +54,13 @@ email_cols = [
 ]
 
 # lazily construct the computation to get emails about holidays sent in July
-dataset = Dataset(dataset_name).sem_add_columns(email_cols)
+dataset = pz.Dataset("testdata/enron-tiny/")
+dataset = dataset.sem_add_columns(email_cols)
 dataset = dataset.sem_filter("The email was sent in July")
 dataset = dataset.sem_filter("The email is about holidays")
 
-# execute the computation
-policy = MinCost()
-config = QueryProcessorConfig(policy=policy, verbose=True)
+# execute the computation w/the MinCost policy
+config = pz.QueryProcessorConfig(policy=pz.MinCost(), verbose=True)
 output = dataset.run(config)
 
 # display output (if using Jupyter, otherwise use print(output_df))

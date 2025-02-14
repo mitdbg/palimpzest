@@ -9,11 +9,7 @@ import argparse
 import os
 import time
 
-from palimpzest.constants import Cardinality
-from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.policy import MaxQuality, MinCost
-from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.sets import Dataset
+import palimpzest as pz
 from palimpzest.utils import udfs
 
 if not os.environ.get("OPENAI_API_KEY"):
@@ -84,7 +80,6 @@ def print_table(output):
 if __name__ == "__main__":
     start_time = time.time()
     parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument("--no-cache", action="store_true", help="Do not use cached results")
     parser.add_argument("--verbose", action="store_true", help="Do not use cached results", default=True)
     parser.add_argument("--from_xls", action="store_true", help="Start from pre-downloaded excel files", default=False)
     parser.add_argument("--experiment", type=str, help="The experiment to run", default="matching")
@@ -99,30 +94,27 @@ if __name__ == "__main__":
     experiment = args.experiment
     executor = args.executor
 
-    if no_cache:
-        DataDirectory().clear_cache(keep_registry=True)
-
     if policy == "cost":
-        policy = MinCost()
+        policy = pz.MinCost()
     elif policy == "quality":
-        policy = MaxQuality()
+        policy = pz.MaxQuality()
 
     if experiment == "collection":
-        papers_html = Dataset("biofabric-html")
+        papers_html = pz.Dataset("testdata/biofabric-html")
         papers_html = papers_html.sem_add_columns(web_page_cols, desc="Extract HTML content")
-        table_urls = papers_html.sem_add_columns(url_cols, cardinality=Cardinality.ONE_TO_MANY)
+        table_urls = papers_html.sem_add_columns(url_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         output = table_urls
 
-        # urlFile = Dataset("biofabric-urls", schema=TextFile)
+        # urlFile = pz.Dataset("testdata/biofabric-urls", schema=TextFile)
         # table_urls = table_urls.sem_add_columns(URL, desc="The URLs of the tables")
         # tables = table_urls.sem_add_columns(File, udf=udfs.url_to_file)
         # xls = tables.sem_add_columns(XLSFile, udf = udfs.file_to_xls)
-        # patient_tables = xls.sem_add_columns(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
+        # patient_tables = xls.sem_add_columns(Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         # output = patient_tables
 
     elif experiment == "filtering":
-        xls = Dataset("biofabric-tiny")
-        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
+        xls = pz.Dataset("testdata/biofabric-tiny")
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
         # patient_tables = patient_tables.sem_filter("The table explains the meaning of attributes")
         # patient_tables = patient_tables.sem_filter("The table contains patient biometric data")
@@ -131,19 +123,19 @@ if __name__ == "__main__":
         output = patient_tables
 
     elif experiment == "matching":
-        xls = Dataset("biofabric-matching")
-        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
-        case_data = patient_tables.sem_add_columns(case_data_cols, cardinality=Cardinality.ONE_TO_MANY)
+        xls = pz.Dataset("testdata/biofabric-matching")
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
+        case_data = patient_tables.sem_add_columns(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         output = case_data
 
     elif experiment == "endtoend":
-        xls = Dataset("biofabric-tiny")
-        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=Cardinality.ONE_TO_MANY)
+        xls = pz.Dataset("testdata/biofabric-tiny")
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
-        case_data = patient_tables.sem_add_columns(case_data_cols, cardinality=Cardinality.ONE_TO_MANY)
+        case_data = patient_tables.sem_add_columns(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         output = case_data
 
-    config = QueryProcessorConfig(
+    config = pz.QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
