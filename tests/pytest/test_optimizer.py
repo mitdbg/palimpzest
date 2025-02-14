@@ -133,12 +133,12 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
-            # TODO: remove
             allow_code_synth=False,
             allow_conventional_query=False,
             allow_token_reduction=False,
             allow_rag_reduction=False,
             allow_mixtures=False,
+            allow_critic=False,
         )
         physical_plans = optimizer.optimize(plan, policy)
         physical_plan = physical_plans[0]
@@ -247,10 +247,12 @@ class TestOptimizer:
             no_cache=True,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
+            allow_code_synth=False,
+            allow_conventional_query=False,
             allow_token_reduction=False,
             allow_rag_reduction=False,
             allow_mixtures=False,
-            allow_code_synth=False,
+            allow_critic=False,
             optimization_strategy_type=opt_strategy,
         )
         physical_plans = optimizer.optimize(real_estate_workload, policy)
@@ -391,12 +393,12 @@ class TestParetoOptimizer:
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3],
             optimization_strategy_type=OptimizationStrategyType.PARETO,
-            # TODO: remove
             allow_code_synth=False,
             allow_conventional_query=False,
             allow_token_reduction=False,
             allow_rag_reduction=False,
             allow_mixtures=False,
+            allow_critic=False,
         )
         # run optimizer to get physical plan
         physical_plans = optimizer.optimize(workload, policy)

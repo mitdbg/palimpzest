@@ -30,6 +30,7 @@ from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
 from palimpzest.query.optimizer.rules import (
     CodeSynthesisConvertRule,
+    CriticAndRefineConvertRule,
     LLMConvertBondedRule,
     LLMConvertConventionalRule,
     MixtureOfAgentsConvertRule,
@@ -92,8 +93,9 @@ class Optimizer:
         allow_conventional_query: bool = False,
         allow_code_synth: bool = False,
         allow_token_reduction: bool = False,
-        allow_rag_reduction: bool = True,
+        allow_rag_reduction: bool = False,
         allow_mixtures: bool = True,
+        allow_critic: bool = False,
         optimization_strategy_type: OptimizationStrategyType = OptimizationStrategyType.PARETO,
         use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
     ):
@@ -136,6 +138,7 @@ class Optimizer:
             self.allow_token_reduction = False
             self.allow_rag_reduction = False
             self.allow_mixtures = False
+            self.allow_critic = False
             self.available_models = [available_models[0]]
 
         # store optimization hyperparameters
@@ -148,6 +151,7 @@ class Optimizer:
         self.allow_token_reduction = allow_token_reduction
         self.allow_rag_reduction = allow_rag_reduction
         self.allow_mixtures = allow_mixtures
+        self.allow_critic = allow_critic
         self.optimization_strategy_type = optimization_strategy_type
         self.use_final_op_quality = use_final_op_quality
 
@@ -187,9 +191,13 @@ class Optimizer:
                 if not issubclass(rule, MixtureOfAgentsConvertRule)
             ]
 
+        if not self.allow_critic:
+            self.implementation_rules = [
+                rule for rule in self.implementation_rules if not issubclass(rule, CriticAndRefineConvertRule)
+            ]
+
     def update_cost_model(self, cost_model: CostModel):
         self.cost_model = cost_model
-
 
     def get_physical_op_params(self):
         return {

@@ -2,11 +2,13 @@
 import argparse
 import os
 import time
+from dotenv import load_dotenv
 
 from demo_core import execute_task, format_results_table
 
 import palimpzest as pz
 
+load_dotenv()
 
 def main():
     # parse arguments

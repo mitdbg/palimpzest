@@ -406,6 +406,13 @@ class OperatorCostEstimates:
     # upper bound on quality
     quality_upper_bound: float | None = None
 
+    def __rmul__(self, multiplier: float) -> OperatorCostEstimates:
+        """
+        Multiply all fields by a scalar.
+        """
+        dct = {field.name: getattr(self, field.name) * multiplier for field in fields(self)}
+        return OperatorCostEstimates(**dct)
+
     def __post_init__(self):
         if self.cardinality_lower_bound is None and self.cardinality_upper_bound is None:
             self.cardinality_lower_bound = self.cardinality

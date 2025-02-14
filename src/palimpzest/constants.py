@@ -27,13 +27,51 @@ class PromptStrategy(str, Enum):
     PromptStrategy describes the prompting technique to be used by a Generator when
     performing some task with a specified Model.
     """
+    # Chain-of-Thought Boolean Prompt Strategies
     COT_BOOL = "chain-of-thought-bool"
+    # COT_BOOL_CRITIC = "chain-of-thought-bool-critic"
+    # COT_BOOL_REFINE = "chain-of-thought-bool-refine"
+
+    # Chain-of-Thought Boolean with Image Prompt Strategies
     COT_BOOL_IMAGE = "chain-of-thought-bool-image"
+    # COT_BOOL_IMAGE_CRITIC = "chain-of-thought-bool-image-critic"
+    # COT_BOOL_IMAGE_REFINE = "chain-of-thought-bool-image-refine"
+
+    # Chain-of-Thought Question Answering Prompt Strategies
     COT_QA = "chain-of-thought-question"
+    COT_QA_CRITIC = "chain-of-thought-question-critic"
+    COT_QA_REFINE = "chain-of-thought-question-refine"
+
+    # Chain-of-Thought Question with Image Prompt Strategies
     COT_QA_IMAGE = "chain-of-thought-question-image"
+    COT_QA_IMAGE_CRITIC = "chain-of-thought-question-critic-image"
+    COT_QA_IMAGE_REFINE = "chain-of-thought-question-refine-image"
+
+    # Mixture-of-Agents Prompt Strategies
     COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
     COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
     COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
+
+    def is_image_prompt(self):
+        return "image" in self.value
+
+    def is_cot_bool_prompt(self):
+        return "chain-of-thought-bool" in self.value
+
+    def is_cot_qa_prompt(self):
+        return "chain-of-thought-question" in self.value
+
+    def is_critic_prompt(self):
+        return "critic" in self.value
+
+    def is_refine_prompt(self):
+        return "refine" in self.value
+
+    def is_moa_proposer_prompt(self):
+        return "mixture-of-agents-proposer" in self.value
+
+    def is_moa_aggregator_prompt(self):
+        return "mixture-of-agents-aggregation" in self.value
 
 
 class AggFunc(str, Enum):
@@ -104,6 +142,9 @@ NAIVE_BYTES_PER_RECORD = 1024
 
 # Rough conversion from # of characters --> # of tokens; assumes 1 token ~= 4 chars
 TOKENS_PER_CHARACTER = 0.25
+
+# Rough estimate of the number of tokens the context is allowed to take up for MIXTRAL and LLAMA3 models
+MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT = 6000
 
 # a naive estimate for the input record size
 NAIVE_EST_SOURCE_RECORD_SIZE_IN_BYTES = 1_000_000
