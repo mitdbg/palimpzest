@@ -1,7 +1,7 @@
 ![pz-banner](https://palimpzest-workloads.s3.us-east-1.amazonaws.com/palimpzest-cropped.png)
 
 # Palimpzest (PZ)
-[![Discord](https://img.shields.io/discord/1245561987480420445?logo=discord)](https://discord.gg/DNUsemgQ)
+[![Discord](https://img.shields.io/discord/1245561987480420445?logo=discord)](https://discord.gg/dN85JJ6jaH)
 [![Docs](https://img.shields.io/badge/Read_the_Docs-purple?logo=readthedocs)](https://palimpzest.org/)
 [![Colab Demo](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1zqOxnh_G6eZ8_xax6PvDr-EjMt7hp4R5?usp=sharing)
 [![PyPI](https://img.shields.io/pypi/v/palimpzest)](https://pypi.org/project/palimpzest/)
@@ -23,9 +23,9 @@ $ pip install .
 ```
 
 ## Join the PZ Community
-We are actively hacking on PZ and would love to have you join our community [![Discord](https://img.shields.io/discord/1245561987480420445?logo=discord)](https://discord.gg/DNUsemgQ)
+We are actively hacking on PZ and would love to have you join our community [![Discord](https://img.shields.io/discord/1245561987480420445?logo=discord)](https://discord.gg/dN85JJ6jaH)
 
-[Our Discord server](https://discord.gg/DNUsemgQ) is the best place to:
+[Our Discord server](https://discord.gg/dN85JJ6jaH) is the best place to:
 - Get help with your PZ program(s)
 - Give feedback to the maintainers
 - Discuss the future direction(s) of the project

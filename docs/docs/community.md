@@ -8,9 +8,9 @@ hide:
 
 <!-- **Editorial Note: Can we create^ this email address for correspondence? (I geniunely don't know if this is possible)?** -->
 
-We are actively hacking on PZ and would love to have you join our community: [![Discord](https://img.shields.io/discord/1245561987480420445?logo=discord)](https://discord.gg/DNUsemgQ)
+We are actively hacking on PZ and would love to have you join our community: [![Discord](https://img.shields.io/discord/1245561987480420445?logo=discord)](https://discord.gg/dN85JJ6jaH)
 
-[Our Discord server](https://discord.gg/DNUsemgQ) is the best place to:
+[Our Discord server](https://discord.gg/dN85JJ6jaH) is the best place to:
 
 - Get help with your PZ program(s)
 - Give feedback to the maintainers
