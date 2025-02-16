@@ -87,9 +87,7 @@ class PlannerAgent(BaseAgent):
     @staticmethod
     def extract_method(file_name: str, function_name: str) -> str: 
         """
-        Given the Python source code as a string and a function name,
-        returns the full source code of that function (including decorators,
-        signature, and body) or None if the function isn't found.
+        Extracts the implementation of a method from a file 
         """
 
         import pdb; pdb.set_trace()
