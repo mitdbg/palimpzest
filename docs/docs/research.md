@@ -11,7 +11,7 @@ Palimpzest has been the source of a number of research papers. Here is a timelin
 
 Winter 2025
 -----------
-**PalimpChat: A Chat Interface for Palimpzest** [[arXiv](https://arxiv.org/abs/2502.03368)]
+**PalimpChat: A Chat Interface for Palimpzest** \[[arXiv](https://arxiv.org/abs/2502.03368)\]
 
 !!! abstract
 
@@ -31,7 +31,7 @@ Winter 2025
 }
 ```
 
-**SciVar: Enabling Optimized Scientific Discovery in 16 Lines of Palimpzest Code** [[arXiv](https://arxiv.org/abs/2411.14569)]
+**SciVar: Enabling Optimized Scientific Discovery in 16 Lines of Palimpzest Code** \[[arXiv](https://arxiv.org/abs/2411.14569)\]
 
 !!! abstract
 
@@ -53,7 +53,7 @@ Winter 2025
 
 Spring 2024
 -----------
-**Palimpzest: Optimizing AI-Powered Analytics with Declarative Query Processing** [[CIDR'25](https://www.vldb.org/cidrdb/papers/2025/p12-liu.pdf)] [[arXiv](https://arxiv.org/abs/2405.14696)]
+**Palimpzest: Optimizing AI-Powered Analytics with Declarative Query Processing** \[[CIDR'25](https://www.vldb.org/cidrdb/papers/2025/p12-liu.pdf)\] \[[arXiv](https://arxiv.org/abs/2405.14696)\]
 
 !!! abstract
 

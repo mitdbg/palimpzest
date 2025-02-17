@@ -25,7 +25,7 @@ jobs:
         run: |
           cd docs
           mkdocs build
-          echo "palimpzest.org" > docs/site/CNAME
+          echo "palimpzest.org" > site/CNAME
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/docs-dev' }}

@@ -59,7 +59,7 @@ print(output.to_df())
 ```
 ??? note "What is `output`?"
 
-    The `output` in the program above has type [`pz.DataRecordCollection`](../api/datarecordcollection.py).
+    The `output` in the program above has type [`pz.DataRecordCollection`](../api/data/datarecordcollection.md).
     
     This object contains:
 
@@ -92,7 +92,7 @@ PZ will then use one (or more) LLM(s) to generate the field for every input to t
 
     PZ can choose from 1,000+ possible implementations of its `PhysicalOperators`. Each operator uses one (or more) LLMs and may use techniques such as RAG, Mixture-of-Agents, Critique and Refine, etc. to produce a final output.
 
-    For a full list of `PhysicalOperators` in PZ, please consult our documentation on [Operators](../api/operators/overview.md).
+    For a full list of `PhysicalOperators` in PZ, please consult our documentation on [Operators](../api/operators/physical.md).
 
 ### Filtering Inputs
 PZ also provides users with the ability to filter inputs using natural language. In order to apply a semantic filter, users need to invoke the `sem_filter()` method with a natural language description of the critieria they are *selecting for*:
