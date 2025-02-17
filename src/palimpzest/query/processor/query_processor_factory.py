@@ -77,10 +77,14 @@ class QueryProcessorFactory:
 
         Args:
             dataset: The dataset to process
-            config: Additional configuration parameters:
+            config: The user-provided QueryProcessorConfig; if it is None, the default config will be used
+            kwargs: Additional keyword arguments to pass to the QueryProcessorConfig
         """
         if config is None:
             config = QueryProcessorConfig()
+
+        # apply any additional keyword arguments to the config
+        config.update(**kwargs)
 
         config = cls._config_validation_and_normalization(config)
         processing_strategy, execution_strategy, optimizer_strategy = cls._normalize_strategies(config)
@@ -96,7 +100,7 @@ class QueryProcessorFactory:
         return processor_cls(dataset=dataset, optimizer=optimizer, config=config, **kwargs)
 
     @classmethod
-    def create_and_run_processor(cls, dataset: Dataset, config: QueryProcessorConfig, **kwargs) -> DataRecordCollection:
+    def create_and_run_processor(cls, dataset: Dataset, config: QueryProcessorConfig | None = None, **kwargs) -> DataRecordCollection:
         # TODO(Jun): Consider to use cache here.
         processor = cls.create_processor(dataset=dataset, config=config, **kwargs)
         return processor.execute()

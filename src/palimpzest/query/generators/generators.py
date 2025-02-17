@@ -247,8 +247,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         start_time = time.time()
         completion = None
         try:
-            print("HEYYY")
-            print(client, chat_payload)
             completion = self._generate_completion(client, chat_payload, **kwargs)
             end_time = time.time()
 

@@ -9,6 +9,9 @@
 <!-- [![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv)](https://arxiv.org/pdf/2405.14696) -->
 <!-- [![Video](https://img.shields.io/badge/YouTube-Talk-red?logo=youtube)](https://youtu.be/T8VQfyBiki0?si=eiph57DSEkDNbEIu) -->
 
+## Learn How to Use PZ
+Our [full documentation](https://palimpzest.org) is the definitive resource for learning how to use PZ. It contains all of the installation and quickstart materials on this page, as well as user guides, full API documentation, and much more.
+
 ## Getting started
 You can find a stable version of the PZ package on PyPI [here](https://pypi.org/project/palimpzest/). To install the package, run:
 ```bash
@@ -64,7 +67,7 @@ config = pz.QueryProcessorConfig(policy=pz.MinCost(), verbose=True)
 output = dataset.run(config)
 
 # display output (if using Jupyter, otherwise use print(output_df))
-output_df = output.to_df(project_cols=["date", "sender", "subject"])
+output_df = output.to_df(cols=["date", "sender", "subject"])
 display(output_df)
 ```
 

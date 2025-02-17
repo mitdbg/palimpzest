@@ -6,9 +6,9 @@ repo_name: mitdbg/palimpzest
 nav:
   - Getting Started:
     - Overview: index.md
-    - Installation: intro/installation.md
-    - Quick Start Tutorial: intro/getting-started.md
-    - Next Steps: intro/next-steps.md
+    - Installation: getting-started/installation.md
+    - Quick Start Tutorial: getting-started/quickstart.md
+    - Next Steps: getting-started/next-steps.md
 
   - User Guide:
     - user-guide/overview.md
@@ -17,18 +17,39 @@ nav:
     - Getting Started with Optimization: user-guide/optimization.md
 
   - Documentation:
-    - DataReader: api/datareader.md
+    - api/overview.md
     - Dataset: api/dataset.md
+    - Data:
+      - DataReader: api/data/datareader.md
+      - DataRecord: api/data/datarecord.md
+      - DataRecordCollection: api/data/datarecordcollection.md
     - Operators:
+      - Logical: api/operators/logical.md
+      - Physical: api/operators/physical.md
       - Aggregate: api/operators/aggregate.md
-      - Convert: api/operators/convert.md
-      - Filter: api/operators/filter.md
+      - Convert:
+        - Base: api/operators/convert/convert.md
+        - LLMConvert: api/operators/convert/llm-convert.md
+        - NonLLMConvert: api/operators/convert/non-llm-convert.md
+        - CodeSynthesisConvert: api/operators/convert/code-synthesis-convert.md
+        - CriticAndRefineConvert: api/operators/convert/critique-and-refine-convert.md
+        - MixtureOfAgentsConvert: api/operators/convert/mixture-of-agents-convert.md
+        - RAGConvert: api/operators/convert/rag-convert.md
+        - TokenReducedConvert: api/operators/convert/token-reduction-convert.md
+      - Filter:
+        - Base: api/operators/filter/filter.md
+        - LLMFilter: api/operators/filter/llm-filter.md
+        - NonLLMFilter: api/operators/filter/non-llm-filter.md
       - Limit: api/operators/limit.md
       - Retrieve: api/operators/retrieve.md
       - Scan: api/operators/scan.md
-    - Optimizer: api/optimizer.md
+    - Optimizer: api/optimization/optimizer.md
 
   - Join the Community: community.md
+
+  - Chat Demo: chat-demo.md
+
+  - Research: research.md
 
 extra:
   analytics:
@@ -50,7 +71,7 @@ theme:
   font: 
     text: Roboto
     code: Roboto Mono
-  logo: logos/palimpzest-cropped.png
+  logo: images/palimpzest-cropped.png
   # logo: https://palimpzest-workloads.s3.us-east-1.amazonaws.com/palimpzest-cropped.png
   language: en
   features:

@@ -236,3 +236,10 @@ body[data-md-color-scheme="slate"] .jp-Cell-outputWrapper .jp-OutputArea-output 
 .highlight .md-clipboard:hover {
     color: var(--md-accent-fg-color);
 }
+
+/* make palimpchat image smaller and centered */
+img[alt=PalimpChatImage] { 
+    height: 400px;
+    display: block;
+    margin: auto;
+}

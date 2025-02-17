@@ -15,5 +15,5 @@ output = ds.run()
 output_df = output.to_df()
 print(output_df)
 
-output_df = output.to_df(project_cols=["sender", "subject", "date"])
+output_df = output.to_df(cols=["sender", "subject", "date"])
 print(output_df)

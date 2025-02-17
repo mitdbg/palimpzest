@@ -7,48 +7,87 @@
 <!-- [![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv)](https://arxiv.org/pdf/2405.14696) -->
 <!-- [![Video](https://img.shields.io/badge/YouTube-Talk-red?logo=youtube)](https://youtu.be/T8VQfyBiki0?si=eiph57DSEkDNbEIu) -->
 
-Palimpzest (PZ) enables developers to write simple, powerful programs which use semantic operators (i.e. LLMs) to perform computation:
+Palimpzest (PZ) enables developers to write simple, powerful programs which use semantic operators (i.e. LLMs) to perform computation.
+
+The following code snippet sets up PZ and downloads a small datast of emails:
+```bash
+# setup in the terminal
+$ pip install palimpzest
+$ export OPENAI_API_KEY="<your-api-key>"
+$ wget https://palimpzest-workloads.s3.us-east-1.amazonaws.com/emails.zip
+$ unzip emails.zip
+```
+We can then execute a simple PZ program to:
+
+1. compute the `subject` and `date` of each email
+2. filter for emails about vacations which are sent in July
+
 ```python
 import palimpzest as pz
 
-emails = pz.Dataset(["emails/1.txt", "emails/2.txt", "emails/3.txt"])
+emails = pz.Dataset("emails/")
 emails = emails.sem_add_columns([
     {"name": "subject", "type": str, "desc": "the subject of the email"},
     {"name": "date", "type": str, "desc": "the date the email was sent"},
 ])
-emails = emails.filter("The email is about holidays")
-emails = emails.filter("The email was sent in July")
-output = emails.run()
+emails = emails.sem_filter("The email is about vacation")
+emails = emails.sem_filter("The email was sent in July")
+output = emails.run(max_quality=True)
 
-print(output.to_df())
+print(output.to_df(cols=["filename", "date", "subject"]))
 ```
-**[[start of quick editorial note]]**
+The output from this program is shown below:
+```
+     filename         date                  subject
+0  email4.txt   6 Jul 2001           Vacation plans
+1  email5.txt  26 Jul 2001  Vacation Days in August
+```
 
+### Key Features of PZ
+There are a few features of this program which are worth highlighting:
+
+1. The programmer creates a `pz.Dataset` from the directory of emails and defines a series of ***semantic computations*** on that dataset:
+    - `sem_add_columns()` specifies a set of fields which PZ must compute
+    - `sem_filter()` selects for emails which satisfy the natural language filter
+2. The user does not specify ***how*** the computation should be performed -- they simply declare ***what*** they want PZ to compute
+    - This is what makes PZ declarative
+3. Under the hood, PZ's optimizer determines the best way to execute each **semantic operator**
+    - In this example, PZ optimizes for output quality because the user sets `max_quality=True`
+3. The `output` is not generated until the call to `emails.run()`
+    - i.e. PZ uses [lazy evaluation](https://en.wikipedia.org/wiki/Lazy_evaluation)
+
+### Declarative Optimization for AI
+The core philosophy behind PZ is that programmers should simply specify the high-level logic of their AI programs while offloading much of the performance tuning to a powerful optimizer. Of course, users still have the ability to fully control their program, and can override and assist the optimizer (if needed) to get the best possible performance.
+
+This email processing example only showcases a small set of the semantic operators implemented in PZ. Other operators include:
+
+- `retrieve()` which takes a vector database and a search string as input and retrieves the most relevant entries from the database
+- `add_columns()` and `filter()` which are the non-semantic equivalents of `sem_add_columns()` and `sem_filter()`
+- `groupby()`, `count()`, `average()`, `limit()`, and `project()` which mirror their implementations in frameworks like Pandas and Spark.
+
+<!-- **[[start of quick editorial note]]**
 This^ example is significantly improved from before, but it can be simplified and clarified further:
-
-1. We should show the output from printing `output.to_df()`
-2. If possible, we should show the (abbreviated) contents of the inputs
-3. (Minor note: the list of filepaths syntax would not work today, but it's a 2 line change to make it work)
-4. As discussed offline, the `sem_add_columns()` arguments are very verbose, and it would be nice to support (and show off) syntax like:
+0. Add `maxquality=True` as a flag for `.run()` (i.e. make it possible to construct config from `.run()` kwargs)
+1. If possible, we should show the (abbreviated) contents of the inputs
+2. As discussed offline, the `sem_add_columns()` arguments are very verbose, and it would be nice to support (and show off) syntax like:
     - `emails.sem_add_columns(["sender", "subject"], prompt="Please compute the subject and sent date of the email")`.
-5. I also think we should also consider making our example a bit more impressive.
+3. I also think we should also consider making our example a bit more impressive.
     - Right now it feels like a childish example which a few regexes could solve
     - We need to be showcasing PZ's muscle right from the jump (e.g. computing a summary of the email)
-6. A good solution to 5. can also solve (1.) - (4.)
+4. A good solution to 5. can also solve (1.) - (4.)
+**[[end of quick editorial note]]** -->
 
-**[[end of quick editorial note]]**
+<!-- PZ provides the developer with a high-level interface for composing semantic operators into concise programs. The call to `emails.run()` triggers PZ's optimizer, which automatically selects which LLMs and execution strategies to use for each semantic operation. Users have the ability to fully control the program, and can override and assist the optimizer (if needed) to get the best possible performance. -->
 
-PZ provides the developer with a high-level interface for composing semantic operators into concise programs. The call to `emails.run()` triggers PZ's optimizer, which automatically selects which LLMs and execution strategies to use for each semantic operation. Users have the ability to fully control the program, and can override and assist the optimizer (if needed) to get the best possible performance.
+### Join our community
+We strongly encourage you to join our [Discord server](https://discord.gg/dN85JJ6jaH) where we are happy to help you get started with PZ.
 
-### Installation
+### What's Next?
+The rest of our Getting Started section will:
 
-You can find a stable version of the Palimpzest package on PyPI: ![PyPI]. To install PZ, run:
-```bash
-$ pip install palimpzest
-```
-
-### Chat Demo
-To access our chat demo please go to our demo webpage for [PalimpChat](http://3.213.4.62:8888/).
+1. Help you install PZ
+2. Explore more of PZ's features in our [Quick Start Tutorial](getting-started/quickstart.md)
+3. Give you an overview of our [User Guides](user-guide/overview.md) which discuss features of PZ in more depth
 
 
 <!-- Palimpzest is a **cost-based optimizer for AI-powered analytical workloads**. It enables users to express complex AI-powered data queries in a **high-level declarative language**, and it **automatically generates optimized execution plans** that minimize cost, maximize quality, or balance both.

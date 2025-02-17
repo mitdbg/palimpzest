@@ -1,4 +1,4 @@
-## Goal
+<!-- ## Goal
 This page should provide the reader with a brief demonstration of how they can implement their own `DataReader`.
 
 Key takeaways for the reader should include:
@@ -10,4 +10,8 @@ Key takeaways for the reader should include:
 
 Keeping in line with "show don't tell", this page should have a motivating use case and start with the implementation of a simple `DataReader`. The problem should then be expanded to include image and text inputs, with a demonstration of the changes made to the `DataReader` to support these.
 
-I would strongly suggest that we finish with example(s) demonstrating how to use our off-the-shelf `DataReaders`. If the user understands (1.), (2.), and (3.), then (4.) will follow quite naturally. However, the inverse is not necessarily true.
+I would strongly suggest that we finish with example(s) demonstrating how to use our off-the-shelf `DataReaders`. If the user understands (1.), (2.), and (3.), then (4.) will follow quite naturally. However, the inverse is not necessarily true. -->
+
+Coming Soon!
+
+In the meantime, if you have questions about how to read your own data with PZ, please send us a message on [Discord](https://discord.gg/dN85JJ6jaH).
