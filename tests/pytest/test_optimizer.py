@@ -110,7 +110,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -129,7 +129,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -156,7 +156,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -177,7 +177,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -199,7 +199,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -223,7 +223,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -244,7 +244,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
             allow_code_synth=False,
@@ -281,7 +281,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
             optimization_strategy_type=opt_strategy,
@@ -389,7 +389,7 @@ class TestParetoOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3],
             optimization_strategy_type=OptimizationStrategyType.PARETO,

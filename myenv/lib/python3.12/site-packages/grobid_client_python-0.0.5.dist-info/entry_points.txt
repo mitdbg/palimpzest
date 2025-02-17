@@ -1,0 +1,2 @@
+[console_scripts]
+grobid_client = grobid_client.grobid_client:main

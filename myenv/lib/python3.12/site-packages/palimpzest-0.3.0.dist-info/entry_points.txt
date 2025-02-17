@@ -1,0 +1,2 @@
+[console_scripts]
+pz = cli.cli_main:main

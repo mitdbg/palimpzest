@@ -1,0 +1,55 @@
+Metadata-Version: 2.1
+Name: click-aliases
+Version: 1.0.5
+Summary: Add (mutiple) aliases to a click group or command
+License: MIT
+Author: Robbin Bonthond
+Author-email: robbin@bonthond.com
+Requires-Python: >=3.7
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Requires-Dist: click (>=8.1.7,<9.0.0)
+Description-Content-Type: text/markdown
+
+# click-aliases
+
+[![build](https://travis-ci.org/click-contrib/click-aliases.svg?branch=master)](https://travis-ci.org/click-contrib/click-aliases)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](https://raw.githubusercontent.com/click-contrib/click-aliases/master/LICENSE)
+[![coverage](https://coveralls.io/repos/github/click-contrib/click-aliases/badge.svg?branch=master)](https://coveralls.io/github/click-contrib/click-aliases?branch=master)
+
+Add (multiple) aliases to a click_ group or command.
+
+In your [click](http://click.pocoo.org/) app:
+
+```python
+import click
+from click_aliases import ClickAliasedGroup
+
+@click.group(cls=ClickAliasedGroup)
+def cli():
+    pass
+
+@cli.command(aliases=['bar', 'baz', 'qux'])
+def foo():
+    """Run a command."""
+    click.echo('foo')
+```
+
+Will result in:
+```
+Usage: cli [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  foo (bar,baz,qux)  Run a command.
+```
+

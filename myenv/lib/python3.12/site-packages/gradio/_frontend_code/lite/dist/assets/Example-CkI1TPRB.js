@@ -1,0 +1,2 @@
+import{a as u,i,s as r,f as o,w as f,d as c,x as v,D as l,l as d}from"../lite.js";function m(n){let t=(n[0]||"")+"",a;return{c(){a=f(t)},m(e,s){c(e,a,s)},p(e,[s]){s&1&&t!==(t=(e[0]||"")+"")&&v(a,t)},i:l,o:l,d(e){e&&d(a)}}}function x(n,t,a){let{value:e}=t;return n.$$set=s=>{"value"in s&&a(0,e=s.value)},[e]}class p extends u{constructor(t){super(),i(this,t,x,m,r,{value:0})}get value(){return this.$$.ctx[0]}set value(t){this.$$set({value:t}),o()}}export{p as default};
+//# sourceMappingURL=Example-CkI1TPRB.js.map

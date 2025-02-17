@@ -26,8 +26,8 @@ class NoSentinelQueryProcessor(QueryProcessor):
     def execute(self) -> DataRecordCollection:
         execution_start_time = time.time()
 
-        # if nocache is True, make sure we do not re-use codegen examples
-        if self.nocache:
+        # if cache is False, make sure we do not re-use codegen examples
+        if not self.cache:
             # self.clear_cached_examples()
             pass
 
@@ -61,7 +61,7 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
             self,
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
-            nocache=self.nocache,
+            cache=self.cache,
             verbose=self.verbose
         )
         self.progress_manager = None
@@ -181,7 +181,7 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
                 )
 
                 # add records (which are not filtered) to the cache, if allowed
-                if not self.nocache:
+                if  self.cache:
                     for record in records:
                         if getattr(record, "passed_operator", True):
                             # self.datadir.append_cache(operator.target_cache_id, record)
@@ -201,7 +201,7 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
                     break
 
             # if caching was allowed, close the cache
-            if not self.nocache:
+            if  self.cache:
                 for _ in plan.operators:
                     # self.datadir.close_cache(operator.target_cache_id)
                     pass
@@ -228,7 +228,7 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
             self,
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
-            nocache=self.nocache,
+            cache=self.cache,
             verbose=self.verbose
         )
         self.progress_manager = None
@@ -366,7 +366,7 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
                         )
 
                         # add records (which are not filtered) to the cache, if allowed
-                        if not self.nocache:
+                        if  self.cache:
                             for record in records:
                                 if getattr(record, "passed_operator", True):
                                     # self.datadir.append_cache(operator.target_cache_id, record)
@@ -390,7 +390,7 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
                     finished_executing = len(output_records) == operator.limit
 
             # if caching was allowed, close the cache
-            if not self.nocache:
+            if  self.cache:
                 for _ in plan.operators:
                     # self.datadir.close_cache(operator.target_cache_id)
                     pass
@@ -417,7 +417,7 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
             self,
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
-            nocache=self.nocache,
+            cache=self.cache,
             verbose=self.verbose
         )
         self.progress_manager = None
@@ -520,7 +520,7 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
     #                 finished_executing = not keep_scanning_source_records and not still_processing and len(futures) == 0
 
     #         # if caching was allowed, close the cache
-    #         if not self.nocache:
+    #         if  self.cache:
     #             for _ in plan.operators:
     #                 # self.datadir.close_cache(operator.target_cache_id)
     #                 pass

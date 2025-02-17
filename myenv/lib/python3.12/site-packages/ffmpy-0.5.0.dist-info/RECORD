@@ -1,0 +1,10 @@
+ffmpy-0.5.0.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+ffmpy-0.5.0.dist-info/LICENSE,sha256=Ge5d77thSMVMLWBa3du0njex83-_GOW0Xk4frpS-UzE,1059
+ffmpy-0.5.0.dist-info/METADATA,sha256=6zybtTB4TvjpeHekU20YalS8f-k3NFIAh3tomm5mJHU,2970
+ffmpy-0.5.0.dist-info/RECORD,,
+ffmpy-0.5.0.dist-info/WHEEL,sha256=Nq82e9rUAnEjt98J6MlVmMCZb-t9cYE2Ir1kpBmnWfs,88
+ffmpy/__init__.py,sha256=V35dif9q5U16VDP-fYVaJBpxtL6OfVP5tFGw3O1nQTo,158
+ffmpy/__pycache__/__init__.cpython-312.pyc,,
+ffmpy/__pycache__/ffmpy.cpython-312.pyc,,
+ffmpy/ffmpy.py,sha256=XGEDzwokfD3wRZH6NZqslHOwKm1rfRX_4nc2stiQ_pc,9399
+ffmpy/py.typed,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0

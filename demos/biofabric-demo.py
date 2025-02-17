@@ -87,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument("--executor", type=str, help="The plan executor to use. The avaliable executors are: sequential, pipelined_parallel, pipelined_single_thread", default="pipelined_parallel")
 
     args = parser.parse_args()
-    no_cache = args.no_cache
+    cache = args.cache
     verbose = args.verbose
     from_xls = args.from_xls
     policy = args.policy
@@ -137,7 +137,7 @@ if __name__ == "__main__":
 
     config = pz.QueryProcessorConfig(
         policy=policy,
-        nocache=True,
+        cache=False,
         allow_code_synth=False,
         allow_token_reduction=False,
         processing_strategy="no_sentinel",

@@ -42,7 +42,7 @@ class Set:
         limit: int | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         depends_on: list[str] | None = None,
-        nocache: bool = False,
+        cache: bool = True,
     ):
         self._schema = schema
         self._source = source
@@ -60,7 +60,7 @@ class Set:
         self._limit = limit
         self._cardinality = cardinality
         self._depends_on = [] if depends_on is None else sorted(depends_on)
-        self._nocache = nocache
+        self.cache = cache
 
     @property
     def schema(self) -> Schema:
@@ -158,7 +158,7 @@ class Dataset(Set):
             schema=self.schema,
             filter=f,
             depends_on=depends_on,
-            nocache=self._nocache,
+            cache=self.cache,
         )
     
     def sem_filter(
@@ -181,7 +181,7 @@ class Dataset(Set):
             schema=self.schema,
             filter=f,
             depends_on=depends_on,
-            nocache=self._nocache,
+            cache=self.cache,
         )
 
     def sem_add_columns(self, cols: list[dict] | type[Schema],
@@ -216,7 +216,7 @@ class Dataset(Set):
             cardinality=cardinality,
             depends_on=depends_on,
             desc=desc,
-            nocache=self._nocache,
+            cache=self.cache,
         )
 
     def add_columns(self, udf: Callable,
@@ -267,7 +267,7 @@ class Dataset(Set):
             cardinality=cardinality,
             desc=desc,
             depends_on=depends_on,
-            nocache=self._nocache,
+            cache=self.cache,
         )
 
     def count(self) -> Dataset:
@@ -277,7 +277,7 @@ class Dataset(Set):
             schema=Number,
             desc="Count results",
             agg_func=AggFunc.COUNT,
-            nocache=self._nocache,
+            cache=self.cache,
         )
 
     def average(self) -> Dataset:
@@ -287,7 +287,7 @@ class Dataset(Set):
             schema=Number,
             desc="Average results",
             agg_func=AggFunc.AVERAGE,
-            nocache=self._nocache,
+            cache=self.cache,
         )
 
     def groupby(self, groupby: GroupBySig) -> Dataset:
@@ -296,7 +296,7 @@ class Dataset(Set):
             schema=groupby.output_schema(),
             desc="Group By",
             group_by=groupby,
-            nocache=self._nocache,
+            cache=self.cache,
         )
 
     def retrieve(
@@ -323,7 +323,7 @@ class Dataset(Set):
             search_attr=search_attr,
             output_attr=output_attr,
             k=k,
-            nocache=self._nocache,
+            cache=self.cache,
         )
 
     def limit(self, n: int) -> Dataset:
@@ -333,7 +333,7 @@ class Dataset(Set):
             schema=self.schema,
             desc="LIMIT " + str(n),
             limit=n,
-            nocache=self._nocache,
+            cache=self.cache,
         )
 
     def project(self, project_cols: list[str] | str) -> Dataset:
@@ -342,7 +342,7 @@ class Dataset(Set):
             source=self,
             schema=self.schema.project(project_cols),
             project_cols=project_cols if isinstance(project_cols, list) else [project_cols],
-            nocache=self._nocache,
+            cache=self.cache,
         )
 
     def run(self, config: QueryProcessorConfig | None = None, **kwargs):  # noqa: F821

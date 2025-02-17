@@ -1,0 +1,64 @@
+Metadata-Version: 2.1
+Name: sigtools
+Version: 4.0.1
+Summary: Utilities for working with inspect.Signature objects.
+Home-page: https://sigtools.readthedocs.io/
+Author: Yann Kaiser
+Author-email: kaiser.yann@gmail.com
+License: MIT
+Keywords: introspection signature
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.6
+Description-Content-Type: text/x-rst
+License-File: LICENSE
+Requires-Dist: attrs
+Provides-Extra: test
+Requires-Dist: repeated-test (>=2.2.1) ; extra == 'test'
+Requires-Dist: sphinx ; extra == 'test'
+Requires-Dist: mock ; extra == 'test'
+Requires-Dist: coverage ; extra == 'test'
+Provides-Extra: tests
+Requires-Dist: repeated-test (>=2.2.1) ; extra == 'tests'
+Requires-Dist: sphinx ; extra == 'tests'
+Requires-Dist: mock ; extra == 'tests'
+Requires-Dist: coverage ; extra == 'tests'
+
+``sigtools``: utilities to manipulate callable objects' signatures
+==================================================================
+
+The ``sigtools`` python library provides:
+
+* ``sigtools.signature`` to resolve function signatures,
+  taking into account parameters added or removed by decorators.
+* Decorators to specify keyword-only parameters, annotations and
+  positional-only parameters, even on python2: ``sigtools.modifiers``
+* Decorators to specify how ``*args, **kwargs`` are handled, in a way
+  that can be introspected: ``sigtools.specifiers``
+* Function combination routines that preserve signatures: ``sigtools.wrappers``
+* Functions to manipulate signature objects likewise: ``sigtools.signatures``
+
+The documentation can be found at Read The Docs:
+https://sigtools.readthedocs.org
+
+Installing
+----------
+
+Within a `virtualenv
+<https://virtualenv.readthedocs.org/en/latest/virtualenv.html>`_::
+
+    $ pip install sigtools
+
+Or for a user-wide install::
+
+    $ pip install --user sigtools

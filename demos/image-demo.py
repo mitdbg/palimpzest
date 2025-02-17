@@ -32,10 +32,10 @@ if __name__ == "__main__":
     start_time = time.time()
 
     parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument("--no-cache", action="store_true", help="Do not use cached results", default=True)
+    parser.add_argument("cache", action="store_false", help="Use cached results", default=False)
 
     args = parser.parse_args()
-    no_cache = args.no_cache
+    cache = args.cache
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     plan = build_image_plan("testdata/images-tiny")
     config = pz.QueryProcessorConfig(
         policy=policy,
-        nocache=no_cache,
+        cache=cache,
         verbose=True,
         processing_strategy="no_sentinel"
     )

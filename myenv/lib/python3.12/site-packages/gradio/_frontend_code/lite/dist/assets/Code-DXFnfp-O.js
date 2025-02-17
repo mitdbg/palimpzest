@@ -1,0 +1,2 @@
+import{a as i,i as p,s as c,E as n,z as e,d,C as m,D as l,l as h}from"../lite.js";function u(o){let t,s;return{c(){t=n("svg"),s=n("path"),e(s,"fill","currentColor"),e(s,"d","m31 16l-7 7l-1.41-1.41L28.17 16l-5.58-5.59L24 9l7 7zM1 16l7-7l1.41 1.41L3.83 16l5.58 5.59L8 23l-7-7zm11.42 9.484L17.64 6l1.932.517L14.352 26z"),e(t,"width","100%"),e(t,"height","100%"),e(t,"viewBox","0 0 32 32")},m(a,r){d(a,t,r),m(t,s)},p:l,i:l,o:l,d(a){a&&h(t)}}}class L extends i{constructor(t){super(),p(this,t,null,u,c,{})}}export{L as C};
+//# sourceMappingURL=Code-DXFnfp-O.js.map

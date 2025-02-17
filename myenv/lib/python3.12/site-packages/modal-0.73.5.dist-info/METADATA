@@ -1,0 +1,69 @@
+Metadata-Version: 2.1
+Name: modal
+Version: 0.73.5
+Summary: Python client library for Modal
+Author: Modal Labs
+Author-email: support@modal.com
+Project-URL: Homepage, https://modal.com
+Project-URL: Source, https://github.com/modal-labs/modal-client
+Keywords: modal,client,cloud,serverless,infrastructure
+Classifier: Topic :: System :: Distributed Computing
+Classifier: Operating System :: OS Independent
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: aiohttp
+Requires-Dist: certifi
+Requires-Dist: click (>=8.1.0)
+Requires-Dist: fastapi
+Requires-Dist: grpclib (==0.4.7)
+Requires-Dist: protobuf (!=4.24.0,<6.0,>=3.19)
+Requires-Dist: rich (>=12.0.0)
+Requires-Dist: synchronicity (~=0.9.10)
+Requires-Dist: toml
+Requires-Dist: typer (>=0.9)
+Requires-Dist: types-certifi
+Requires-Dist: types-toml
+Requires-Dist: watchfiles
+Requires-Dist: typing-extensions (~=4.6)
+
+# Modal Python Library
+
+[![PyPI Version](https://img.shields.io/pypi/v/modal.svg)](https://pypi.org/project/modal/)
+[![License](https://img.shields.io/badge/license-apache_2.0-darkviolet.svg)](https://github.com/modal-labs/modal-client/blob/master/LICENSE)
+[![Tests](https://github.com/modal-labs/modal-client/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/modal-labs/modal-client/actions/workflows/ci-cd.yml)
+[![Slack](https://img.shields.io/badge/slack-join-blue.svg?logo=slack)](https://modal.com/slack)
+
+The [Modal](https://modal.com/) Python library provides convenient, on-demand
+access to serverless cloud compute from Python scripts on your local computer.
+
+## Documentation
+
+See the [online documentation](https://modal.com/docs/guide) for many
+[example applications](https://modal.com/docs/examples),
+a [user guide](https://modal.com/docs/guide), and the detailed
+[API reference](https://modal.com/docs/reference).
+
+## Installation
+
+**This library requires Python 3.9 – 3.13.**
+
+Install the package with `pip`:
+
+```bash
+pip install modal
+```
+
+You can create a Modal account (or link your existing one) directly on the
+command line:
+
+```bash
+python3 -m modal setup
+```
+
+## Support
+
+For usage questions and other support, please reach out on the
+[Modal Slack](https://modal.com/slack).
