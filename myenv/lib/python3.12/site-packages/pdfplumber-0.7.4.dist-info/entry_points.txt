@@ -1,2 +1,0 @@
-[console_scripts]
-pdfplumber = pdfplumber.cli:main
