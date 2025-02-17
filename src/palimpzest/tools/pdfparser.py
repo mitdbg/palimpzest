@@ -3,7 +3,7 @@ import io
 import json
 import os
 import time
-from typing import BinaryIO, List
+from typing import BinaryIO
 from zipfile import ZipFile
 
 import pandas as pd
@@ -11,30 +11,7 @@ import requests
 from fastapi import status
 from pypdf import PdfReader
 
-from palimpzest.config import Config
-
 COSMOS_ADDRESS = "https://xdd.wisc.edu/cosmos_service"
-
-
-class PdfParser:
-    def __init__(self, pdf_path: str):
-        self.pdf_path = pdf_path
-        with open(pdf_path, "rb") as f:
-            self.pdf = f.read()
-        self.text = ""
-        self.pages = []
-        self._parse()
-
-    def _parse(self):
-        for page in self.pdf:
-            self.text += page.get_text()  # type: ignore
-            self.pages.append(page.get_text())  # type: ignore
-
-    def get_text(self) -> str:
-        return self.text
-
-    def get_pages(self) -> List[str]:
-        return self.pages
 
 
 def get_md5(file_bytes: bytes) -> str:
@@ -209,15 +186,9 @@ def cosmos_client(name: str, data: BinaryIO, output_dir: str, delay=10):
 # 1. Check if the text file already exists in the cache, if so, read from the cache
 # 2. If not, call the cosmos_client function to process the PDF file and cache the text file
 ##
-# NOTE: I don't believe anyone actively depends on this function, but we need to remove the
-# dependency on DataDirectory() in order to prevent circular imports. The long-term solution
-# is to separate out the pieces of DataDirectory which the DataSources depend on, from the
-# pieces which are related to setting / reading external configurations (like "pdfprocessor").
-# However, given that I can fix this in two minutes by adding this is a kwarg, I'm going to
-# do that for now and revisit the issue if/when this matters.
 
 # TODO(Jun): 1. cosmos returns 202 for me. 2. why only accept "pypdf" and "cosmos" as pdfprocessor?
-def get_text_from_pdf(filename, pdf_bytes, pdfprocessor="cosmos", enable_file_cache=True, file_cache_dir="/tmp"):
+def get_text_from_pdf(filename, pdf_bytes, pdfprocessor="pypdf", enable_file_cache=True, file_cache_dir="/tmp"):
     pdf_filename = filename
     file_name = os.path.basename(pdf_filename)
     file_name_without_extension = os.path.splitext(file_name)[0]
@@ -229,11 +200,12 @@ def get_text_from_pdf(filename, pdf_bytes, pdfprocessor="cosmos", enable_file_ca
         for page in pdf.pages:
             all_text += page.extract_text() + "\n"
         return all_text
-        # return pdf.pages[0].extract_text() # TODO we can only return first page
+
     else:
         # Get md5 of the pdf_bytes
         md5 = get_md5(pdf_bytes)
         cached_extraction_folder = f"COSMOS_{os.path.splitext(file_name)[0].replace(' ', '_')}_{md5}"
+
         # Check if pz_file_cache_dir exists in the file system
         pz_file_cache_dir = os.path.join(file_cache_dir, cached_extraction_folder)
         if enable_file_cache and os.path.exists(pz_file_cache_dir):
@@ -243,43 +215,12 @@ def get_text_from_pdf(filename, pdf_bytes, pdfprocessor="cosmos", enable_file_ca
                 text_content = file.read()
                 return text_content
 
-        #
-        # CHUNWEI: This code has a bug
-        # It checks to see if the text file name is in the registry, but there are two things wrong here.
-        # 1) The registry is for 'official' datasets that have been inserted by the user, not cached objects.
-        # 2) The filename isn't enough to check for cached results. Maybe the file moved directories, or maybe there are
-        # multiple different files with the same name. You need the checksum of the original file to ensure the cached
-        # object is valid.
-        #
-        #    if DataDirectory().exists(text_file_name):
-        #        print(f"Text file {text_file_name} already exists, reading from cache")
-        #        text_file_path = DataDirectory().get_path(text_file_name)
-        #        with open(text_file_path, 'r') as file:
-        #            text_content = file.read()
-        #            return text_content
-        # cosmos_file_dir = file_name_without_extension.replace(" ", "_")
-        # get a tmp of the system temp directory
-
-        print(f"Processing {file_name} through COSMOS")
         # Call the cosmos_client function
+        print(f"Processing {file_name} through COSMOS")
         cosmos_client(file_name, pdf_bytes, file_cache_dir)
         text_file_path = os.path.join(pz_file_cache_dir, text_file_name)
         if not os.path.exists(text_file_path):
             raise FileNotFoundError(f"Text file {text_file_name} not found in {pz_file_cache_dir}/{text_file_name}")
-        # DataDirectory().register_local_file(text_file_path, text_file_name)
         with open(text_file_path) as file:
             text_content = file.read()
             return text_content
-
-
-if __name__ == "__main__":
-    config = Config("default")
-    file_path = "../../../testdata/pdfs-tiny/battery.pdf"
-    # output_dir = "../../../tests/testFileDirectory/cosmos"
-    with open(file_path, "rb") as file:
-        text = get_text_from_pdf(file_path, file.read())
-        print(text)
-        # file_name = os.path.basename(file_path)
-        # # Call the cosmos_client function
-        # cosmos_client(file_name, file, output_dir)
-    # DataDirectory().rm_registered_dataset("sidarthe.annotations.txt")

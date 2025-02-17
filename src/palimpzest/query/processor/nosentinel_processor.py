@@ -1,17 +1,16 @@
 import time
 
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats
-from palimpzest.core.elements.records import DataRecord, DataRecordCollection
-from palimpzest.core.lib.schemas import SourceRecord
+from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import (
     PipelinedSingleThreadExecutionStrategy,
     SequentialSingleThreadExecutionStrategy,
 )
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.datasource import DataSourcePhysicalOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
+from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.utils.progress import create_progress_manager
@@ -29,7 +28,8 @@ class NoSentinelQueryProcessor(QueryProcessor):
 
         # if nocache is True, make sure we do not re-use codegen examples
         if self.nocache:
-            self.clear_cached_examples()
+            # self.clear_cached_examples()
+            pass
 
         # execute plan(s) according to the optimization strategy
         records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, self.optimizer)
@@ -60,7 +60,6 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
         SequentialSingleThreadExecutionStrategy.__init__(
             self,
             scan_start_idx=self.scan_start_idx,
-            datadir=self.datadir,
             max_workers=self.max_workers,
             nocache=self.nocache,
             verbose=self.verbose
@@ -92,21 +91,20 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
         output_records = []
         current_scan_idx = self.scan_start_idx
 
-        # get handle to DataSource and pre-compute its size
+        # get handle to scan operator and pre-compute its size
         source_operator = plan.operators[0]
-        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-        datasource = source_operator.get_datasource()
-        datasource_len = len(datasource)
+        assert isinstance(source_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        datareader_len = len(source_operator.datareader)
 
         # Calculate total work units - each record needs to go through each operator
         total_ops = len(plan.operators)
-        total_items = min(num_samples, datasource_len) if num_samples != float("inf") else datasource_len
+        total_items = min(num_samples, datareader_len) if num_samples != float("inf") else datareader_len
         total_work_units = total_items * total_ops
         self.progress_manager.start(total_work_units)
         work_units_completed = 0
 
         # initialize processing queues for each operation
-        processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, DataSourcePhysicalOp)}
+        processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, ScanPhysicalOp)}
 
         try:
             # execute the plan one operator at a time
@@ -122,19 +120,12 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
                 # initialize output records and record_op_stats for this operator
                 records, record_op_stats = [], []
 
-                # invoke datasource operator(s) until we run out of source records or hit the num_samples limit
-                if isinstance(operator, DataSourcePhysicalOp):
+                # invoke scan operator(s) until we run out of source records or hit the num_samples limit
+                if isinstance(operator, ScanPhysicalOp):
                     keep_scanning_source_records = True
                     while keep_scanning_source_records:
-                        # construct input DataRecord for DataSourcePhysicalOp
-                        # NOTE: this DataRecord will be discarded and replaced by the scan_operator;
-                        #       it is simply a vessel to inform the scan_operator which record to fetch
-                        candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
-                        candidate.idx = current_scan_idx
-                        candidate.get_item_fn = datasource.get_item
-
-                        # run DataSourcePhysicalOp on record
-                        record_set = operator(candidate)
+                        # run ScanPhysicalOp on current scan index
+                        record_set = operator(current_scan_idx)
                         records.extend(record_set.data_records)
                         record_op_stats.extend(record_set.record_op_stats)
 
@@ -149,7 +140,7 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
                         current_scan_idx += 1
 
                         # update whether to keep scanning source records
-                        keep_scanning_source_records = current_scan_idx < datasource_len and len(records) < num_samples
+                        keep_scanning_source_records = current_scan_idx < datareader_len and len(records) < num_samples
 
                 # aggregate operators accept all input records at once
                 elif isinstance(operator, AggregateOp):
@@ -193,7 +184,8 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
                 if not self.nocache:
                     for record in records:
                         if getattr(record, "passed_operator", True):
-                            self.datadir.append_cache(operator.target_cache_id, record)
+                            # self.datadir.append_cache(operator.target_cache_id, record)
+                            pass
 
                 # update processing_queues or output_records
                 for record in records:
@@ -210,8 +202,9 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
 
             # if caching was allowed, close the cache
             if not self.nocache:
-                for operator in plan.operators:
-                    self.datadir.close_cache(operator.target_cache_id)
+                for _ in plan.operators:
+                    # self.datadir.close_cache(operator.target_cache_id)
+                    pass
 
             # finalize plan stats
             total_plan_time = time.time() - plan_start_time
@@ -234,7 +227,6 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
         PipelinedSingleThreadExecutionStrategy.__init__(
             self,
             scan_start_idx=self.scan_start_idx,
-            datadir=self.datadir,
             max_workers=self.max_workers,
             nocache=self.nocache,
             verbose=self.verbose
@@ -267,22 +259,21 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
         source_records_scanned = 0
         current_scan_idx = self.scan_start_idx
 
-        # get handle to DataSource and pre-compute its size
+        # get handle to scan operator and pre-compute its size
         source_operator = plan.operators[0]
-        assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-        datasource = source_operator.get_datasource()
-        datasource_len = len(datasource)
+        assert isinstance(source_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        datareader_len = len(source_operator.datareader)
 
         # Calculate total work units - each record needs to go through each operator
         total_ops = len(plan.operators)
-        total_items = min(num_samples, datasource_len) if num_samples != float("inf") else datasource_len
+        total_items = min(num_samples, datareader_len) if num_samples != float("inf") else datareader_len
         total_work_units = total_items * total_ops
         self.progress_manager.start(total_work_units)
         work_units_completed = 0
 
         try:
             # initialize processing queues for each operation
-            processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, DataSourcePhysicalOp)}
+            processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, ScanPhysicalOp)}
 
             # execute the plan until either:
             # 1. all records have been processed, or
@@ -301,16 +292,11 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
                     # create empty lists for records and execution stats generated by executing this operator on its next input(s)
                     records, record_op_stats = [], []
 
-                    # invoke datasource operator(s) until we run out of source records or hit the num_samples limit
-                    if isinstance(operator, DataSourcePhysicalOp):
+                    # invoke scan operator(s) until we run out of source records or hit the num_samples limit
+                    if isinstance(operator, ScanPhysicalOp):
                         if keep_scanning_source_records:
-                            # construct input DataRecord for DataSourcePhysicalOp
-                            candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
-                            candidate.idx = current_scan_idx
-                            candidate.get_item_fn = datasource.get_item
-
-                            # run DataSourcePhysicalOp on record
-                            record_set = operator(candidate)
+                            # run ScanPhysicalOp on current scan index
+                            record_set = operator(current_scan_idx)
                             records = record_set.data_records
                             record_op_stats = record_set.record_op_stats
 
@@ -326,15 +312,15 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
                             current_scan_idx += 1
 
                             # update whether to keep scanning source records
-                            keep_scanning_source_records = current_scan_idx < datasource_len and source_records_scanned < num_samples
+                            keep_scanning_source_records = current_scan_idx < datareader_len and source_records_scanned < num_samples
 
                     # only invoke aggregate operator(s) once there are no more source records and all
                     # upstream operators' processing queues are empty
                     elif isinstance(operator, AggregateOp):
                         upstream_ops_are_finished = True
                         for upstream_op_idx in range(op_idx):
-                            # datasources do not have processing queues
-                            if isinstance(plan.operators[upstream_op_idx], DataSourcePhysicalOp):
+                            # scan operators do not have processing queues
+                            if isinstance(plan.operators[upstream_op_idx], ScanPhysicalOp):
                                 continue
 
                             # check upstream ops which do have a processing queue
@@ -383,7 +369,8 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
                         if not self.nocache:
                             for record in records:
                                 if getattr(record, "passed_operator", True):
-                                    self.datadir.append_cache(operator.target_cache_id, record)
+                                    # self.datadir.append_cache(operator.target_cache_id, record)
+                                    pass
 
                         # update processing_queues or output_records
                         for record in records:
@@ -404,8 +391,9 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
 
             # if caching was allowed, close the cache
             if not self.nocache:
-                for operator in plan.operators:
-                    self.datadir.close_cache(operator.target_cache_id)
+                for _ in plan.operators:
+                    # self.datadir.close_cache(operator.target_cache_id)
+                    pass
 
             # finalize plan stats
             total_plan_time = time.time() - plan_start_time
@@ -428,7 +416,6 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
         PipelinedParallelExecutionStrategy.__init__(
             self,
             scan_start_idx=self.scan_start_idx,
-            datadir=self.datadir,
             max_workers=self.max_workers,
             nocache=self.nocache,
             verbose=self.verbose
@@ -461,15 +448,14 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
     #     source_records_scanned = 0
     #     current_scan_idx = self.scan_start_idx
 
-    #     # get handle to DataSource and pre-compute its size
+    #     # get handle to scan operator and pre-compute its size
     #     source_operator = plan.operators[0]
-    #     assert isinstance(source_operator, DataSourcePhysicalOp), "First operator in physical plan must be a DataSourcePhysicalOp"
-    #     datasource = source_operator.get_datasource()
-    #     datasource_len = len(datasource)
+    #     assert isinstance(source_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+    #     datareader_len = len(source_operator.datareader)
 
     #     # Calculate total work units - each record needs to go through each operator
     #     total_ops = len(plan.operators)
-    #     total_items = min(num_samples, datasource_len) if num_samples != float("inf") else datasource_len
+    #     total_items = min(num_samples, datareader_len) if num_samples != float("inf") else datareader_len
     #     total_work_units = total_items * total_ops
     #     self.progress_manager.start(total_work_units)
     #     work_units_completed = 0
@@ -518,14 +504,11 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
     #                 for _, operator in enumerate(plan.operators):
     #                     op_id = operator.get_op_id()
                         
-    #                     if isinstance(operator, DataSourcePhysicalOp) and keep_scanning_source_records:
+    #                     if isinstance(operator, ScanPhysicalOp) and keep_scanning_source_records:
     #                         # Submit source operator task
-    #                         candidate = DataRecord(schema=SourceRecord, source_id=current_scan_idx)
-    #                         candidate.idx = current_scan_idx
-    #                         candidate.get_item_fn = datasource.get_item
-    #                         futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate))
+    #                         futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, operator, current_scan_idx))
     #                         current_scan_idx += 1
-    #                         keep_scanning_source_records = current_scan_idx < datasource_len and source_records_scanned < num_samples
+    #                         keep_scanning_source_records = current_scan_idx < datareader_len and source_records_scanned < num_samples
                         
     #                     elif len(processing_queues[op_id]) > 0:
     #                         # Submit task for next record in queue
@@ -538,8 +521,9 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
 
     #         # if caching was allowed, close the cache
     #         if not self.nocache:
-    #             for operator in plan.operators:
-    #                 self.datadir.close_cache(operator.target_cache_id)
+    #             for _ in plan.operators:
+    #                 # self.datadir.close_cache(operator.target_cache_id)
+    #                 pass
 
     #         # finalize plan stats
     #         total_plan_time = time.time() - plan_start_time

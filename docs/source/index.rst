@@ -48,41 +48,28 @@ For eager readers, the code in the notebook can be found in the following conden
 
 .. code-block:: python
 
-   import pandas as pd
-   import palimpzest.datamanager.datamanager as pzdm
-   from palimpzest.sets import Dataset
-   from palimpzest.core.lib.fields import Field
-   from palimpzest.core.lib.schemas import Schema, TextFile
-   from palimpzest.policy import MinCost, MaxQuality
-   from palimpzest.query import Execute
+   import palimpzest as pz
 
-   # Dataset registration
-   dataset_path = "testdata/enron-tiny"
-   dataset_name = "enron-tiny"
-   pzdm.DataDirectory().register_local_directory(dataset_path, dataset_name)
+   # define the fields we wish to compute
+   email_cols = [
+      {"name": "sender", "type": str, "desc": "The email address of the sender"},
+      {"name": "subject", "type": str, "desc": "The subject of the email"},
+      {"name": "date", "type": str, "desc": "The date the email was sent"},
+   ]
 
-   # Dataset loading
-   dataset = Dataset(dataset_name, schema=TextFile)
+   # lazily construct the computation to get emails about holidays sent in July
+   dataset = pz.Dataset("testdata/enron-tiny/")
+   dataset = dataset.sem_add_columns(email_cols)
+   dataset = dataset.sem_filter("The email was sent in July")
+   dataset = dataset.sem_filter("The email is about holidays")
 
-   # Schema definition for the fields we wish to compute
-   class Email(Schema):
-      """Represents an email, which in practice is usually from a text file"""
-      sender = Field(desc="The email address of the sender")
-      subject = Field(desc="The subject of the email")
-      date = Field(desc="The date the email was sent")
+   # execute the computation w/the MinCost policy
+   config = pz.QueryProcessorConfig(policy=pz.MinCost(), verbose=True)
+   output = dataset.run(config)
 
-   # Lazy construction of computation to filter for emails about holidays sent in July
-   dataset = dataset.convert(Email, desc="An email from the Enron dataset")
-   dataset = dataset.filter("The email was sent in July")
-   dataset = dataset.filter("The email is about holidays")
-
-   # Executing the compuation
-   policy = MinCost()
-   results, execution_stats = Execute(dataset, policy)
-
-   # Writing output to disk
-   output_df = pd.DataFrame([r.to_dict() for r in results])[["date","sender","subject"]]
-   output_df.to_csv("july_holiday_emails.csv")
+   # display output (if using Jupyter, otherwise use print(output_df))
+   output_df = output.to_df(project_cols=["date", "sender", "subject"])
+   display(output_df)
 
 Next Steps
 ----------
@@ -96,7 +83,7 @@ Contents
    usage
    dataset
    policy
-   datasource
+   datareader
    schema
    field
 

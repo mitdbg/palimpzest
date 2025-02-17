@@ -9,13 +9,7 @@ import argparse
 import os
 import time
 
-from palimpzest.constants import Cardinality
-from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import URL, Schema, Table, WebPage, XLSFile
-from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.policy import MaxQuality, MinCost
-from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.sets import Dataset
+import palimpzest as pz
 from palimpzest.utils import udfs
 
 if not os.environ.get("OPENAI_API_KEY"):
@@ -24,30 +18,51 @@ if not os.environ.get("OPENAI_API_KEY"):
     load_env()
 
 
-class CaseData(Schema):
-    """An individual row extracted from a table containing medical study data."""
+case_data_cols = [
+    {"name": "case_submitter_id", "type": str, "desc": "The ID of the case"},
+    {"name": "age_at_diagnosis", "type": int | float, "desc": "The age of the patient at the time of diagnosis"},
+    {"name": "race", "type": str, "desc": "An arbitrary classification of a taxonomic group that is a division of a species."},
+    {"name": "ethnicity", "type": str, "desc": "Whether an individual describes themselves as Hispanic or Latino or not."},
+    {"name": "gender", "type": str, "desc": "Text designations that identify gender."},
+    {"name": "vital_status", "type": str, "desc": "The vital status of the patient"},
+    {"name": "ajcc_pathologic_t", "type": str, "desc": "Code of pathological T (primary tumor) to define the size or contiguous extension of the primary tumor (T), using staging criteria from the American Joint Committee on Cancer (AJCC)."},
+    {"name": "ajcc_pathologic_n", "type": str, "desc": "The codes that represent the stage of cancer based on the nodes present (N stage) according to criteria based on multiple editions of the AJCC's Cancer Staging Manual."},
+    {"name": "ajcc_pathologic_stage", "type": str, "desc": "The extent of a cancer, especially whether the disease has spread from the original site to other parts of the body based on AJCC staging criteria."},
+    {"name": "tumor_grade", "type": int | float, "desc": "Numeric value to express the degree of abnormality of cancer cells, a measure of differentiation and aggressiveness."},
+    {"name": "tumor_focality", "type": str, "desc": "The text term used to describe whether the patient's disease originated in a single location or multiple locations."},
+    {"name": "tumor_largest_dimension_diameter", "type": int | float, "desc": "The tumor largest dimension diameter."},
+    {"name": "primary_diagnosis", "type": str, "desc": "Text term used to describe the patient's histologic diagnosis, as described by the World Health Organization's (WHO) International Classification of Diseases for Oncology (ICD-O)."},
+    {"name": "morphology", "type": str, "desc": "The Morphological code of the tumor, as described by the World Health Organization's (WHO) International Classification of Diseases for Oncology (ICD-O)."},
+    {"name": "tissue_or_organ_of_origin", "type": str, "desc": "The text term used to describe the anatomic site of origin, of the patient's malignant disease, as described by the World Health Organization's (WHO) International Classification of Diseases for Oncology (ICD-O)."},
+    {"name": "study", "type": str, "desc": "The last name of the author of the study, from the table name"}
+]
 
-    case_submitter_id = Field(desc="The ID of the case")
-    age_at_diagnosis = Field(desc="The age of the patient at the time of diagnosis")
-    race = Field(
-        desc="An arbitrary classification of a taxonomic group that is a division of a species."
-    )
-    ethnicity = Field(
-        desc="Whether an individual describes themselves as Hispanic or Latino or not."
-    )
-    gender = Field(desc="Text designations that identify gender.")
-    vital_status = Field(desc="The vital status of the patient")
-    ajcc_pathologic_t = Field(desc="The AJCC pathologic T")
-    ajcc_pathologic_n = Field(desc="The AJCC pathologic N")
-    ajcc_pathologic_stage = Field(desc="The AJCC pathologic stage")
-    tumor_grade = Field(desc="The tumor grade")
-    tumor_focality = Field(desc="The tumor focality")
-    tumor_largest_dimension_diameter = Field(desc="The tumor largest dimension diameter")
-    primary_diagnosis = Field(desc="The primary diagnosis")
-    morphology = Field(desc="The morphology")
-    tissue_or_organ_of_origin = Field(desc="The tissue or organ of origin")
-    # tumor_code = Field(desc="The tumor code")
-    study = Field(desc="The last name of the author of the study, from the table name")
+web_page_cols = [
+    {"name": "text", "type": str, "desc": "The text contents of the web page"},
+    {"name": "html", "type": str, "desc": "The html contents of the web page"},
+    {"name": "timestamp", "type": str, "desc": "The timestamp of the download"},
+]
+
+url_cols = [
+    {"name": "url", "type": str, "desc": "The URL of the web page"},
+]
+
+file_cols = [
+    {"name": "filename", "type": str, "desc": "The name of the file"},
+    {"name": "contents", "type": bytes, "desc": "The contents of the file"}
+]
+
+xls_cols = file_cols + [
+    {"name": "number_sheets", "type": int, "desc": "The number of sheets in the Excel file"},
+    {"name": "sheet_names", "type": list[str], "desc": "The names of the sheets in the Excel file"},
+] 
+
+table_cols = [
+    {"name": "rows", "type": list[str], "desc": "The rows of the table"},
+    {"name": "header", "type": list[str], "desc": "The header of the table"},
+    {"name": "name", "type": str, "desc": "The name of the table"},
+    {"name": "filename", "type": str, "desc": "The name of the file the table was extracted from"}
+]
 
 
 def print_table(output):
@@ -65,7 +80,6 @@ def print_table(output):
 if __name__ == "__main__":
     start_time = time.time()
     parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument("--no-cache", action="store_true", help="Do not use cached results")
     parser.add_argument("--verbose", action="store_true", help="Do not use cached results", default=True)
     parser.add_argument("--from_xls", action="store_true", help="Start from pre-downloaded excel files", default=False)
     parser.add_argument("--experiment", type=str, help="The experiment to run", default="matching")
@@ -80,55 +94,48 @@ if __name__ == "__main__":
     experiment = args.experiment
     executor = args.executor
 
-    if no_cache:
-        DataDirectory().clear_cache(keep_registry=True)
-
     if policy == "cost":
-        policy = MinCost()
+        policy = pz.MinCost()
     elif policy == "quality":
-        policy = MaxQuality()
+        policy = pz.MaxQuality()
 
     if experiment == "collection":
-        papers_html = Dataset("biofabric-html", schema=WebPage)
-        table_urls = papers_html.convert(
-            URL, desc="The URLs of the XLS tables from the page", cardinality=Cardinality.ONE_TO_MANY
-        )
+        papers_html = pz.Dataset("testdata/biofabric-html")
+        papers_html = papers_html.sem_add_columns(web_page_cols, desc="Extract HTML content")
+        table_urls = papers_html.sem_add_columns(url_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         output = table_urls
-        # urlFile = Dataset("biofabric-urls", schema=TextFile)
-        # table_urls = table_urls.convert(URL, desc="The URLs of the tables")
-        # tables = table_urls.convert(File, udf=udfs.url_to_file)
-        # xls = tables.convert(XLSFile, udf = udfs.file_to_xls)
-        # patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
+
+        # urlFile = pz.Dataset("testdata/biofabric-urls", schema=TextFile)
+        # table_urls = table_urls.sem_add_columns(URL, desc="The URLs of the tables")
+        # tables = table_urls.sem_add_columns(File, udf=udfs.url_to_file)
+        # xls = tables.sem_add_columns(XLSFile, udf = udfs.file_to_xls)
+        # patient_tables = xls.sem_add_columns(Table, udf=udfs.xls_to_tables, cardinality=pz.Cardinality.ONE_TO_MANY)
         # output = patient_tables
 
     elif experiment == "filtering":
-        xls = Dataset("biofabric-tiny", schema=XLSFile)
-        patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
-        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
-        # patient_tables = patient_tables.filter("The table explains the meaning of attributes")
-        # patient_tables = patient_tables.filter("The table contains patient biometric data")
-        # patient_tables = patient_tables.filter("The table contains proteomic data")
-        # patient_tables = patient_tables.filter("The table records if the patient is excluded from the study")
+        xls = pz.Dataset("testdata/biofabric-tiny")
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
+        patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
+        # patient_tables = patient_tables.sem_filter("The table explains the meaning of attributes")
+        # patient_tables = patient_tables.sem_filter("The table contains patient biometric data")
+        # patient_tables = patient_tables.sem_filter("The table contains proteomic data")
+        # patient_tables = patient_tables.sem_filter("The table records if the patient is excluded from the study")
         output = patient_tables
 
     elif experiment == "matching":
-        xls = Dataset("biofabric-matching", schema=XLSFile)
-        patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
-        case_data = patient_tables.convert(
-            CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
-        )
+        xls = pz.Dataset("testdata/biofabric-matching")
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
+        case_data = patient_tables.sem_add_columns(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         output = case_data
 
     elif experiment == "endtoend":
-        xls = Dataset("biofabric-tiny", schema=XLSFile)
-        patient_tables = xls.convert(Table, udf=udfs.xls_to_tables, cardinality=Cardinality.ONE_TO_MANY)
-        patient_tables = patient_tables.filter("The rows of the table contain the patient age")
-        case_data = patient_tables.convert(
-            CaseData, desc="The patient data in the table", cardinality=Cardinality.ONE_TO_MANY
-        )
+        xls = pz.Dataset("testdata/biofabric-tiny")
+        patient_tables = xls.add_columns(udf=udfs.xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
+        patient_tables = patient_tables.sem_filter("The rows of the table contain the patient age")
+        case_data = patient_tables.sem_add_columns(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         output = case_data
 
-    config = QueryProcessorConfig(
+    config = pz.QueryProcessorConfig(
         policy=policy,
         nocache=True,
         allow_code_synth=False,
@@ -138,7 +145,7 @@ if __name__ == "__main__":
     )
     data_record_collection = output.run(config)
 
-    print_table(data_record_collection.data_records)
+    print(data_record_collection.to_df())
     print(data_record_collection.executed_plans)
     # print(data_record_collection.execution_stats)
 

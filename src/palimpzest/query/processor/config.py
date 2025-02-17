@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass, field
 
 from palimpzest.constants import Model
+from palimpzest.core.data.datareaders import DataReader
 from palimpzest.policy import MaxQuality, Policy
 
 
@@ -13,6 +14,8 @@ class QueryProcessorConfig:
     processing_strategy: str = field(default="no_sentinel")
     execution_strategy: str = field(default="sequential")
     optimizer_strategy: str = field(default="pareto")
+
+    val_datasource: DataReader | None = field(default=None)
 
     policy: Policy = field(default_factory=MaxQuality)
     scan_start_idx: int = field(default=0)
@@ -31,8 +34,9 @@ class QueryProcessorConfig:
     allow_model_selection: bool = field(default=True)
     allow_code_synth: bool = field(default=False)
     allow_token_reduction: bool = field(default=False)
-    allow_rag_reduction: bool = field(default=True)
+    allow_rag_reduction: bool = field(default=False)
     allow_mixtures: bool = field(default=True)
+    allow_critic: bool = field(default=False)
     use_final_op_quality: bool = field(default=False)
 
     def to_json_str(self):
@@ -40,6 +44,7 @@ class QueryProcessorConfig:
             "processing_strategy": self.processing_strategy,
             "execution_strategy": self.execution_strategy,
             "optimizer_strategy": self.optimizer_strategy,
+            "val_datasource": None if self.val_datasource is None else self.val_datasource.serialize(),
             "policy": self.policy.to_json_str(),
             "scan_start_idx": self.scan_start_idx,
             "num_samples": self.num_samples,
@@ -57,5 +62,6 @@ class QueryProcessorConfig:
             "allow_token_reduction": self.allow_token_reduction,
             "allow_rag_reduction": self.allow_rag_reduction,
             "allow_mixtures": self.allow_mixtures,
+            "allow_critic": self.allow_critic,
             "use_final_op_quality": self.use_final_op_quality,
         }, indent=2)

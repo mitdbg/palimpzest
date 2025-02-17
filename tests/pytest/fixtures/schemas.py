@@ -18,15 +18,13 @@ def email_schema():
 
 @pytest.fixture
 def real_estate_listing_files_schema():
+    list_of_img_filepaths = ListField(ImageFilepathField)
     class RealEstateListingFiles(Schema):
         """The source text and image data for a real estate listing."""
 
         listing = StringField(desc="The name of the listing")
         text_content = StringField(desc="The content of the listing's text description")
-        image_filepaths = ListField(
-            element_type=ImageFilepathField,
-            desc="A list of the filepaths for each image of the listing",
-        )
+        image_filepaths = list_of_img_filepaths(desc="A list of the filepaths for each image of the listing")
 
     return RealEstateListingFiles
 

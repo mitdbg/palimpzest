@@ -86,18 +86,6 @@ class IntField(Field):
         self.type = int
 
 
-class ListField(Field):
-    """A field representing a list of elements of specified types, with full list functionality."""
-
-    def __init__(self, element_type: Field, desc: str):
-        super().__init__(desc=desc)
-        self.element_type = element_type
-        self.type = list
-
-        if element_type.is_image_field:
-            self.is_image_field = True
-
-
 class NumericField(Field):
     """A NumericField is a Field that is definitely a number."""
 
@@ -136,3 +124,18 @@ class ImageBase64Field(BytesField):
 
     def __init__(self, desc: str):
         super().__init__(desc=desc)
+
+
+### fields which are metaclasses that produce other field types ###
+class ListField(Field):
+    """A field representing a list of elements of specified types, with full list functionality."""
+
+    def __new__(cls, element_type: Field, desc: str | None = None):
+        attrs = {
+            "element_type": element_type,
+            "is_image_field": element_type.is_image_field,
+            "type": list,
+            "_desc": desc,
+        }
+
+        return type(f"List[{element_type.__name__}]", (Field,), attrs)
