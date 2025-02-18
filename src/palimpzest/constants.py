@@ -57,11 +57,11 @@ class PromptStrategy(str, Enum):
     def is_image_prompt(self):
         return "image" in self.value
 
-    def is_cot_bool_prompt(self):
-        return "chain-of-thought-bool" in self.value
+    def is_bool_prompt(self):
+        return "bool" in self.value
 
-    def is_cot_qa_prompt(self):
-        return "chain-of-thought-question" in self.value
+    def is_convert_prompt(self):
+        return "bool" not in self.value
 
     def is_critic_prompt(self):
         return "critic" in self.value

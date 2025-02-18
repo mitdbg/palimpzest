@@ -141,7 +141,7 @@ class PromptFactory:
             # NOTE: MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT is a rough estimate which leaves room for the rest of the prompt text
             while total_context_len * TOKENS_PER_CHARACTER > MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT:
                 # sort fields by length
-                field_lengths = [(field, len(value)) for field, value in context.items()]
+                field_lengths = [(field, len(value) if value is not None else 0) for field, value in context.items()]
                 sorted_fields = sorted(field_lengths, key=lambda item: item[1], reverse=True)
 
                 # get field with longest context
@@ -201,7 +201,7 @@ class PromptFactory:
         """
         output_fields_desc = ""
         output_schema: Schema = kwargs.get("output_schema")
-        if self.prompt_strategy.is_cot_qa_prompt():
+        if self.prompt_strategy.is_convert_prompt():
             assert output_schema is not None, "Output schema must be provided for convert prompts."
 
             field_desc_map = output_schema.field_desc_map()
@@ -219,7 +219,7 @@ class PromptFactory:
             str | None: The filter condition (if applicable).
         """
         filter_condition = kwargs.get("filter_condition")
-        if self.prompt_strategy.is_cot_bool_prompt():
+        if self.prompt_strategy.is_bool_prompt():
             assert filter_condition is not None, "Filter condition must be provided for filter operations."
 
         return filter_condition

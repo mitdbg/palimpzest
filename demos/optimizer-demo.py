@@ -92,7 +92,7 @@ class BiodexReader(pz.DataReader):
         return label_dict
 
     @staticmethod
-    def rank_precision_at_k(k: int, preds: list | None, targets: list):
+    def rank_precision_at_k(preds: list | None, targets: list, k: int):
         if preds is None:
             return 0.0
 
@@ -171,7 +171,7 @@ class BiodexReader(pz.DataReader):
         rank_precision_at_k = partial(BiodexReader.rank_precision_at_k, k=self.rp_at_k)
         item["score_fn"]["reactions"] = BiodexReader.f1_eval
         item["score_fn"]["reaction_labels"] = BiodexReader.f1_eval
-        item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k,
+        item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k
         if not self.reactions_only:
             item["score_fn"]["drugs"] = BiodexReader.f1_eval
 
@@ -432,15 +432,20 @@ if __name__ == "__main__":
         max_workers=1,
         verbose=verbose,
         available_models=[
-            Model.GPT_4o,
-            Model.GPT_4o_V,
-            Model.GPT_4o_MINI,
-            Model.GPT_4o_MINI_V,
+            # Model.GPT_4o,
+            # Model.GPT_4o_V,
+            # Model.GPT_4o_MINI,
+            # Model.GPT_4o_MINI_V,
             # Model.DEEPSEEK,
             Model.MIXTRAL,
             # Model.LLAMA3,
             # Model.LLAMA3_V,
         ],
+        allow_code_synth=False,
+        allow_critic=False,
+        allow_mixtures=False,
+        allow_rag_reduction=False,
+        allow_token_reduction=False,
     )
 
     data_record_collection = plan.run(

@@ -382,7 +382,7 @@ class Optimizer:
     def convert_query_plan_to_group_tree(self, query_plan: Dataset) -> str:
         # Obtain ordered list of datasets
         dataset_nodes: list[Dataset | DataReader] = []
-        node = deepcopy(query_plan)
+        node = query_plan.copy()
 
         # NOTE: the very first node will be a DataReader; the rest will be Dataset
         while isinstance(node, Dataset):

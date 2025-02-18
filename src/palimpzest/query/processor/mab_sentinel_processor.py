@@ -1,6 +1,5 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
-from copy import deepcopy
 
 import numpy as np
 
@@ -12,7 +11,7 @@ from palimpzest.core.data.dataclasses import (
     PlanStats,
     RecordOpStats,
 )
-from palimpzest.core.elements.records import DataRecordCollection, DataRecordSet
+from palimpzest.core.elements.records import DataRecord, DataRecordCollection, DataRecordSet
 from palimpzest.policy import Policy
 from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
@@ -521,7 +520,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         return DataRecordSet(out_records, out_record_op_stats)
 
 
-    def execute_op_set(self, op_candidate_pairs):
+    def execute_op_set(self, op_candidate_pairs: list[PhysicalOperator, DataRecord | int]):
         # TODO: post-submission we will need to modify this to:
         # - submit all candidates for aggregate operators
         # - handle limits
@@ -559,8 +558,9 @@ class MABSentinelQueryProcessor(QueryProcessor):
                     if candidate == candidate_:
                         candidate_output_record_sets.append((record_set, operator))
 
-                        # get the source_idx associated with this input record
-                        source_idx = candidate.source_idx
+                        # get the source_idx associated with this input record;
+                        # for scan operators, `candidate` will be the source_idx
+                        source_idx = candidate.source_idx if isinstance(candidate, DataRecord) else candidate
 
                 # select the champion (i.e. best) record_set from all the record sets computed for this candidate
                 champion_record_set = self.pick_output_fn(candidate_output_record_sets)
@@ -790,7 +790,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         optimizer.update_strategy(OptimizationStrategyType.SENTINEL)
 
         # create copy of dataset, but change its data source to the validation data source
-        dataset = deepcopy(dataset)
+        dataset = dataset.copy()
         dataset._set_data_source(self.val_datasource)
 
         # get the sentinel plan for the given dataset
@@ -857,7 +857,7 @@ class MABSentinelSequentialSingleThreadProcessor(MABSentinelQueryProcessor, Sequ
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
+        MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
         SequentialSingleThreadExecutionStrategy.__init__(
             self,
             scan_start_idx=self.scan_start_idx,
