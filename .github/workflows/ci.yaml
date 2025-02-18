@@ -61,14 +61,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Check Version Increased
-      # run only if some file in 'src' folder was changed (docs: https://github.com/dorny/paths-filter)
-      uses: dorny/paths-filter@v3
-      id: changes
-      with:
-        filters: |
-          src:
-            - 'src/**'
-      if: steps.changes.outputs.src == 'true'
       run: |
         git fetch --prune --unshallow
         git checkout ${{ github.event.pull_request.base.sha }}
