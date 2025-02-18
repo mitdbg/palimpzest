@@ -326,6 +326,7 @@ class DataRecordCollection:
     This is a wrapper class for list[DataRecord] to support more advanced features for output of execute().
 
     The difference between DataRecordSet and DataRecordCollection 
+
     Goal: 
         DataRecordSet is a set of DataRecords that share the same schema, same parent_id, and same source_idx.
         DataRecordCollection is a general wrapper for list[DataRecord].
@@ -349,9 +350,9 @@ class DataRecordCollection:
         """Return the number of records in the collection"""
         return len(self.data_records)
 
-    def to_df(self, project_cols: list[str] | None = None):
-        return DataRecord.to_df(self.data_records, project_cols)
-    
+    def to_df(self, cols: list[str] | None = None):
+        return DataRecord.to_df(self.data_records, cols)
+
     def _get_executed_plans(self):
         if self.plan_stats is not None:
             return [self.plan_stats.plan_str]

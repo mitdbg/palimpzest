@@ -1,6 +1,64 @@
+from __future__ import annotations
+
 import json
 
 from palimpzest.core.data.dataclasses import PlanCost
+
+
+def construct_policy_from_kwargs(**kwargs) -> Policy | None:
+    """
+    Construct and return a policy object which is defined by the keyword arguments.
+
+    This function accepts the following keyword arguments:
+    - max_quality
+    - min_cost
+    - min_time
+    - cost_budget
+    - time_budget
+    - quality_threshold
+
+    If none of these keyword arguments are provided, the function will return None.
+    """
+    # compute the number of objectives and constraints in the kwargs
+    num_objectives = sum([bool(kwargs.get(key, False)) for key in ["max_quality", "min_cost", "min_time"]])
+    num_constraints = sum([bool(kwargs.get(key, False)) for key in ["cost_budget", "time_budget", "quality_threshold"]])
+
+    # if there are no policy kwargs provided, return None
+    if num_objectives == 0 and num_constraints == 0:
+        return None
+
+    # Otherwise, assert that kwargs are valid
+    assert num_objectives == 1, "Must optimize for one of max_quality, min_cost, or min_time."
+    assert num_constraints <= 1, "Currently, PZ supports at most one constraint."
+
+    # print warning if user tries to set a constraint and optimization goal on the same metric
+    if "max_quality" in kwargs and "quality_threshold" in kwargs:
+        print("Warning: Setting a constraint on quality and optimizing for quality is redundant.")
+
+    if "min_cost" in kwargs and "cost_budget" in kwargs:
+        print("Warning: Setting a constraint on cost and optimizing for cost is redundant.")
+
+    if "min_time" in kwargs and "time_budget" in kwargs:
+        print("Warning: Setting a constraint on time and optimizing for time is redundant.")
+
+    # construct the policy object
+    policy = None
+    if "max_quality" in kwargs and "cost_budget" in kwargs:
+        policy = MaxQualityAtFixedCost(kwargs["cost_budget"])
+    elif "max_quality" in kwargs and "time_budget" in kwargs:
+        policy = MaxQualityAtFixedTime(kwargs["time_budget"])
+    elif "max_quality" in kwargs:
+        policy = MaxQuality()
+    elif "min_cost" in kwargs and "quality_threshold" in kwargs:
+        policy = MinCostAtFixedQuality(kwargs["quality_threshold"])
+    elif "min_cost" in kwargs:
+        policy = MinCost()
+    elif "min_time" in kwargs and "quality_threshold" in kwargs:
+        policy = MinTimeAtFixedQuality(kwargs["quality_threshold"])
+    elif "min_time" in kwargs:
+        policy = MinTime()
+
+    return policy
 
 
 class Policy:
