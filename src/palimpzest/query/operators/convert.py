@@ -275,6 +275,9 @@ class NonLLMConvert(ConvertOp):
 
 
 class LLMConvert(ConvertOp):
+    """
+    This is the base class for convert operations which use an LLM to generate the output fields.
+    """
     def __init__(
         self,
         model: Model,

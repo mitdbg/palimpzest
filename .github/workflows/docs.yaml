@@ -20,18 +20,20 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install sphinx sphinx-book-theme pydata-sphinx-theme furo
           pip install .
-      - name: Sphinx build
+      - name: MkDocs build
         run: |
           cd docs
-          make html
-          echo "palimpzest.org" > build/html/CNAME
+          mkdocs build
+          echo "palimpzest.org" > site/CNAME
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         with:
           publish_branch: gh-pages
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/build/html/
+          publish_dir: docs/site/
           force_orphan: true
+
+# TODO: pip install mike
+#       mike deploy --push --update-aliases 0.1 latest

@@ -1,3 +1,6 @@
+docs/site/
+*.zip
+.cache/
 .env
 build/*
 docs/build/*

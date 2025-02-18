@@ -2,9 +2,9 @@
 import argparse
 import os
 import time
-from dotenv import load_dotenv
 
 from demo_core import execute_task, format_results_table
+from dotenv import load_dotenv
 
 import palimpzest as pz
 

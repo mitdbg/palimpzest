@@ -11,6 +11,7 @@ from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.lib.fields import ListField, StringField
 from palimpzest.core.lib.schemas import Number, Schema
+from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.utils.datareader_helpers import get_local_datareader
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
@@ -366,7 +367,14 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def run(self, config: QueryProcessorConfig | None = None, **kwargs):  # noqa: F821
+    def run(self, config: QueryProcessorConfig | None = None, **kwargs):
+        """Invoke the QueryProcessor to execute the query. `kwargs` will be applied to the QueryProcessorConfig."""
+        # TODO: this import currently needs to be here to avoid a circular import; we should fix this in a subsequent PR
         from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+
+        # as syntactic sugar, we will allow some keyword arguments to parameterize our policies
+        policy = construct_policy_from_kwargs(**kwargs)
+        if policy is not None:
+            kwargs["policy"] = policy
 
         return QueryProcessorFactory.create_and_run_processor(self, config, **kwargs)
