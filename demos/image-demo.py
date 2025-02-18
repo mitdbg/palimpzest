@@ -50,7 +50,6 @@ if __name__ == "__main__":
     )
     data_record_collection = plan.run(config)
 
-    print("Obtained records", data_record_collection.data_records)
     imgs, breeds = [], []
     for record in data_record_collection:
         print("Trying to open ", record.filename)
