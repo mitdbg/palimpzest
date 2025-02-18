@@ -215,27 +215,11 @@ if __name__ == "__main__":
         plan = plan.sem_add_columns(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
 
     # construct config and run plan
-    from palimpzest.constants import Model
     config = pz.QueryProcessorConfig(
         nocache=True,
         verbose=verbose,
         policy=policy,
         execution_strategy=args.executor,
-        available_models=[
-            # Model.GPT_4o,
-            # Model.GPT_4o_V,
-            Model.GPT_4o_MINI,
-            Model.GPT_4o_MINI_V,
-            # Model.DEEPSEEK,
-            # Model.MIXTRAL,
-            # Model.LLAMA3,
-            # Model.LLAMA3_V,
-        ],
-        allow_code_synth=False,
-        allow_critic=False,
-        allow_mixtures=False,
-        allow_rag_reduction=False,
-        allow_token_reduction=False,
     )
     data_record_collection = plan.run(config)
     print(data_record_collection.to_df())

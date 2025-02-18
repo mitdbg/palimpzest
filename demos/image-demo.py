@@ -46,11 +46,10 @@ if __name__ == "__main__":
         policy=policy,
         nocache=no_cache,
         verbose=True,
-        processing_strategy="no_sentinel"
+        processing_strategy="no_sentinel",
     )
     data_record_collection = plan.run(config)
 
-    print("Obtained records", data_record_collection.data_records)
     imgs, breeds = [], []
     for record in data_record_collection:
         print("Trying to open ", record.filename)
