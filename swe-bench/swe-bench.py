@@ -3,7 +3,7 @@ from palimpzest.constants import Cardinality
 from palimpzest.core.elements.records import DataRecord 
 from palimpzest.core.lib.schemas import RawJSONObject, TextFile
 from palimpzest.core.lib.fields import Field 
-from palimpzest.agents.planner_agent import PlannerAgent
+from palimpzest.agents.planner_agent import DebuggerAgent 
 from palimpzest.query.processor.config import QueryProcessorConfig
 
 import json
@@ -114,10 +114,10 @@ def remove_irrelevant_fields(candidate: DataRecord):
     return code_fix 
 
 def buildSweBenchPlan(dataset):
-    planner_agent = PlannerAgent()
+    debugger_agent = DebuggerAgent()
 
     github_issues = pz.Dataset(dataset, schema=GithubIssue, udf=extract_relevant_fields, cardinality=Cardinality.ONE_TO_ONE)
-    code_plans = planner_agent(github_issues)
+    code_plans = debugger_agent(github_issues)
     # code_fixes = github_issues.convert(outputSchema=CodeFix)
     code_fixes = code_plans.convert(output_schema=CodeFix)
     # patches = code_fixes.convert(outputSchema=GithubCodePatch, udf=generate_patch)

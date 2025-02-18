@@ -4,24 +4,27 @@ import difflib
 import base64
 import ast
 
+TEMP_VARS = {
+    "owner": "astropy",
+    "repo": "astropy", 
+    "branch": "main", 
+}
+
 def fetch_github_code(file_name: str, base_commit: str = None) -> str:
     """ Fetches the code of a file from the relevant issue code """
     # Customize these variables for your repository.
-    owner = "astropy"
-    repo = "astropy"
-    branch = "main" 
     token = os.getenv("GITHUB_TOKEN")
 
     print("Fetching repository file list...")
-    ref = base_commit if base_commit else branch 
-    file_paths = get_repo_files(owner, repo, ref, token)
+    ref = base_commit if base_commit else TEMP_VARS["branch"]
+    file_paths = get_repo_files(TEMP_VARS["owner"], TEMP_VARS["repo"], ref, token)
     if file_paths is None:
         return
 
     best_match = find_best_match(file_name, file_paths)
     if best_match:
         print(f"\nBest match found: {best_match}\n")
-        content = get_file_content(owner, repo, best_match, branch, token)
+        content = get_file_content(owner=TEMP_VARS["owner"], repo=TEMP_VARS["repo"], path=best_match, token=token, ref=ref)
         if content:
             return content
 
@@ -73,7 +76,7 @@ def find_best_match(query, file_paths):
         return best_match
     return None
 
-def get_file_content(owner, repo, path, ref="main", token=None):
+def get_file_content(owner, repo, path, token=None, ref="main"):
     """
     Fetch the file content from the GitHub Contents API.
     The returned content is Base64-encoded if it's a text file.
@@ -97,6 +100,55 @@ def get_file_content(owner, repo, path, ref="main", token=None):
             return data.get("content")
     else:
         print("Error fetching file content:", response.status_code, response.text)
+        return None
+    
+def search_files(keywords, per_page=30, page=1):
+    """
+    Search for files on GitHub that contain the provided keywords.
+    
+    Parameters:
+      - keywords: a list of strings containing keywords to search for.
+      - per_page: number of results per page (max 100).
+      - page: which page of results to retrieve.
+    
+    Returns:
+      - A JSON object with search results, or None if an error occurred.
+    """
+
+    # TO DO: This might be buggy because it doesn't search over the state at the base commit 
+    import pdb; pdb.set_trace()
+
+    base_url = "https://api.github.com/search/code"
+    
+    # Build the query string from keywords.
+    query = " ".join(keywords)
+    
+    # Add repository qualifier if provided.
+    if TEMP_VARS["owner"] and TEMP_VARS["repo"]:
+        query += f' repo:{TEMP_VARS["owner"]}/{TEMP_VARS["repo"]}'
+    
+    # Optionally, to ensure we search inside file content rather than just filenames,
+    # you could add: query += " in:file"
+    
+    params = {
+        "q": query,
+        "per_page": per_page,
+        "page": page
+    }
+    
+    headers = {}
+    token = os.getenv("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"token {token}"
+    
+    response = requests.get(base_url, headers=headers, params=params)
+    
+    if response.status_code == 200:
+        data = response.json()
+        file_paths = [item["path"] for item in data.get("tree", []) if item["type"] == "blob"]
+        return file_paths
+    else:
+        print("Error during search:", response.status_code, response.text)
         return None
 
 class FunctionClassVisitor(ast.NodeVisitor):

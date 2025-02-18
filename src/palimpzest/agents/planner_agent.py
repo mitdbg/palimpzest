@@ -6,7 +6,7 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.query.generators.generators import get_api_key
 from palimpzest.core.lib.fields import Field, ListField, StringField
 from palimpzest.core.lib.schemas import RawJSONObject
-from palimpzest.agents.utils import fetch_github_code, extract_structure
+from palimpzest.agents.utils import fetch_github_code, extract_structure, search_files
 import palimpzest as pz
 import dspy
 from dspy import Tool
@@ -18,15 +18,14 @@ openai_key = get_api_key("OPENAI_API_KEY")
 
 GLOBAL_CONTEXT = {
     "relevant_issue_code": None,
-    "model": dspy.LM('openai/gpt-4o-mini', api_key=openai_key),
+    "model": dspy.LM('openai/gpt-4o', api_key=openai_key),
     "base_commit": None,
 }
 
 class FixPlan(RawJSONObject):
   """ Defines a plan for fixing a code issue """
-  plan = ListField(
-    element_type=StringField,
-    desc="The list of steps required to fix the code issue", 
+  bug_report = Field(
+    desc="A report on the cause of the bug and how it can be fixed, including the problem statement and relevant code",
   )
   instance_id = Field(
       desc="The instance_id",
@@ -38,59 +37,89 @@ class FixPlan(RawJSONObject):
       desc="The relevant code pertaining to the issue. Code across multiple files may be included where the start and end of each file is indicated by 'start of' and 'end of' statemnts. ",
   )
 
-class PlanGeneration(dspy.Signature): 
-  """ Generates a report on the cause of the code issue and how it can be fixed, detailing exact line numbers """
+class DebugGeneration(dspy.Signature): 
+  """ 
+    Generates a report on the cause of the code issue and how it can be fixed, referencing function and file names 
+  """
 
   relevant_code: str = dspy.InputField(desc="The code where the problem is located")
-  problem_statement: str = dspy.InputField(desc="A description of the problem")
-  fix_report: str = dspy.OutputField(desc="A report detailing the cause of the code issue and how it can be fixed, referencing to exact line numbers and files.")
+  problem_statement: str = dspy.InputField(desc="A description of the problem causing the bug")
+  fix_report: str = dspy.OutputField(desc="A report detailing the cause of the bug and how it can be fixed, referencing to exact line numbers and files.")
 
-class PlannerAgent(BaseAgent): 
+class DebuggerAgent(BaseAgent): 
 
     def __call__(self, data: Dataset) -> Dataset:
         """ Generates a solution plan for the Dataset """
         return Dataset(
             source=data,
             schema=FixPlan,
-            udf=self.generate_plan,
+            udf=self.generate_debug_plan,
             cardinality=Cardinality.ONE_TO_ONE,
         )
   
-    def generate_plan(self, candidate: DataRecord) -> dict:
+    def generate_debug_plan(self, candidate: DataRecord) -> dict:
         # Store relevant issue code and configure model 
         GLOBAL_CONTEXT["relevant_issue_code"] = candidate['relevant_issue_code']
         GLOBAL_CONTEXT["base_commit"] = candidate['base_commit']
         dspy.configure(lm=GLOBAL_CONTEXT['model'])
 
+        # Clean problem statement
+        problem_statement = re.sub(r'<!--.*?-->', '', candidate['problem_statement'], flags=re.DOTALL).strip()
+
         plan = {
             'instance_id': candidate['instance_id'],
-            'problem_statement': candidate['problem_statement'],
+            'problem_statement': problem_statement,
             'relevant_issue_code': candidate['relevant_issue_code'],
         }
 
-        # TO DO: clean the problem statement 
+        # Maybe we can try this a few times and generate a few theories 
 
         react = dspy.ReAct(
-            PlanGeneration, 
+            DebugGeneration, 
             tools=[
-                Tool(PlannerAgent.get_classes_and_methods),
-                Tool(PlannerAgent.get_range),
-                Tool(PlannerAgent.extract_method)
-            ]
+                Tool(DebuggerAgent.get_classes_and_methods),
+                Tool(DebuggerAgent.get_file_content),
+                Tool(DebuggerAgent.extract_method), 
+                Tool(DebuggerAgent.search_keyword),
+                # Tool(PlannerAgent.get_range),
+            ],
+            max_iters=10    
         )
 
-        import pdb; pdb.set_trace()
-        plan['plan'] = react(relevant_code=candidate['relevant_issue_code'], problem_statement=candidate['problem_statement'], max_iters=10)
+        plan['plan'] = react(relevant_code=candidate['relevant_issue_code'], problem_statement=problem_statement)
+        print(plan)
         import pdb; pdb.set_trace()
         return plan 
+
+    def get_file_content(file_name: str) -> str:
+        """
+        Returns the content of an entire file. Use this when the entire context of a file is imporant. 
+        """
+        content = fetch_github_code(file_name, GLOBAL_CONTEXT["base_commit"])
+        return content
+
     
+    @staticmethod
+    def search_keyword(keywords: list[str]) -> str:
+        """
+        Searches the codebase for keywords and returns the files that contain them.
+        """
+        results = search_files(keywords)
+
+        if results and "items" in results:
+            print(f"Found {results['total_count']} matching files:")
+            relevant_files = ', '.join([item['name'] for item in results["items"]])
+            return relevant_files 
+        else:
+            print("No results found.")
+            return "No Results found"
+
+
     @staticmethod
     def extract_method(file_name: str, function_name: str) -> str: 
         """
-        Extracts the implementation of a method from a file 
+        Extracts the implementation of a function from a file. Use this when you only need a single function in the file.
         """
-
-        import pdb; pdb.set_trace()
 
         try:
             # Parse the source code into an AST
@@ -119,11 +148,12 @@ class PlannerAgent(BaseAgent):
 
     @staticmethod
     def get_classes_and_methods(file_name: str) -> str:
-        """ Summarizes all the classes and methods in a file, returning a dict where keys are classes and values are a list of methods """
-        # import pdb; pdb.set_trace()
+        """ 
+            Summarizes all the classes and methods in a file, returning a dict where keys are classes and values are a list of method. 
+            Useful for understanding the structure of a file for subsequent method extraction. 
+        """
 
         relevant_issue_code = GLOBAL_CONTEXT["relevant_issue_code"]
-        model = GLOBAL_CONTEXT["model"]
 
         pattern = rf"\[start of ([^\]]*{re.escape(file_name)}[^\]]*)\](.*?)\[end of \1\]"
         match = re.search(pattern, relevant_issue_code, re.DOTALL)
@@ -135,14 +165,12 @@ class PlannerAgent(BaseAgent):
             if not code: 
                 return "That file is not found in the relevant issue code, please try another file"
 
-        # import pdb; pdb.set_trace()
         code_structure = extract_structure(code)
         return code_structure 
 
     @staticmethod
     def get_range(file_name: str, start_line: str, end_line: str) -> str:
         """ Gets the code in a file between a range of lines """
-        import pdb; pdb.set_trace()
 
         code = fetch_github_code(file_name, GLOBAL_CONTEXT["base_commit"])
         lines = code.splitlines()
