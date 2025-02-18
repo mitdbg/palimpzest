@@ -1,321 +1,101 @@
 import argparse
 import json
 import os
-import random
-from pathlib import Path
 
 from ragatouille import RAGPretrainedModel
 
-from palimpzest.constants import Model
-from palimpzest.core.data.datasources import ValidationDataSource
-from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import BooleanField, ListField, StringField
-from palimpzest.core.lib.schemas import Schema
-from palimpzest.datamanager.datamanager import DataDirectory
-from palimpzest.policy import MaxQuality, MinCost, MinTime
-from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.sets import Dataset
-from palimpzest.utils.model_helpers import get_models
+import palimpzest as pz
 
+fever_claims_cols = [
+    {"name": "claim", "type": str, "desc": "the claim being made"}
+]
 
-class FeverClaimsSchema(Schema):
-    claim = StringField(desc="the claim being made")
+fever_output_cols = [
+    {"name": "label", "type": bool, "desc": "Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise."}
+]
 
-class FeverIntermediateSchema(FeverClaimsSchema):
-    relevant_wikipedia_articles = ListField(desc="Most relevant wikipedia articles to the `claim`",
-                                            element_type=StringField)
+class FeverDataReader(pz.DataReader):
+    def __init__(self, claims_file_path, num_claims_to_process):
+        super().__init__(fever_claims_cols)
 
-class FeverOutputSchema(FeverIntermediateSchema):
-    label = BooleanField("Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise.")
+        # `claims_file_path` is the path to the file containing the claims which is expected to be a jsonl file.
+        # Each line in the file is a JSON object with an "id" and a "claim" field.
 
+        self.claims_file_path = claims_file_path
+        self.num_claims_to_process = num_claims_to_process
 
-def get_label_fields_to_values(claims, ground_truth_file):
-    with open(ground_truth_file) as f:
-        ground_truth = [json.loads(line) for line in f]
-
-    claim_to_label = {}
-
-    for entry in ground_truth:
-        if str(entry["id"]) in claims:
-            evidence_sets = entry["evidence"]
-            evidence_file_ids = list(
-                {
-                    evidence[2]
-                    for evidence_set in evidence_sets
-                    for evidence in evidence_set
-                }
-            )
-            if entry["label"] == "SUPPORTS":
-                claim_to_label[str(entry["id"])] = {"label": "TRUE"}
-            else:
-                claim_to_label[str(entry["id"])] = {"label": "FALSE"}
-            claim_to_label[str(entry["id"])]["_evidence_file_ids"] = evidence_file_ids
-            claim_to_label[str(entry["id"])]["relevant_wikipedia_articles"] = ["IGNORED_FIELD"]
-
-    return claim_to_label           
-
-class FeverValidationSource(ValidationDataSource):
-    def __init__(self, dataset_id, claims_dir, split_idx: int=25, num_samples: int=5, shuffle: bool=False, seed: int=42):
-        super().__init__(FeverClaimsSchema, dataset_id)
-        self.claims_dir = claims_dir
-        self.split_idx = split_idx
-        self.claims = os.listdir(self.claims_dir)
-
-        # shuffle records if shuffle = True
-        if shuffle:
-            random.Random(seed).shuffle(self.claims)
-
-        self.val_claims = self.claims[:split_idx]
-        self.claims = self.claims[split_idx:]
-
-        self.num_samples = num_samples
-        self.shuffle = shuffle
-        self.seed = seed
-
-        if split_idx != 25:
-            raise Exception("Currently must split on split_idx=25 for correctness")
-
-        if num_samples > 25:
-            raise Exception("We have not labelled more than the first 25 listings!")
-
-        # construct mapping from claim --> label (field, value) pairs
-        self.label_fields_to_values = get_label_fields_to_values(self.val_claims, "testdata/paper_test.jsonl")
-
-        # trim to number of samples
-        self.val_claims = self.val_claims[:num_samples]
-
-    def copy(self):
-        return FeverValidationSource(self.dataset_id, self.claims_dir, self.split_idx, self.num_samples, self.shuffle, self.seed)
+        with open(claims_file_path) as f:
+            entries = [json.loads(line) for line in f]
+            entries = entries[: min(num_claims_to_process, len(entries))]
+            self.claims = [entry["claim"] for entry in entries]
+            self.ids = [entry["id"] for entry in entries]
 
     def __len__(self):
         return len(self.claims)
 
-    def get_val_length(self):
-        return len(self.val_claims)
+    def __getitem__(self, idx: int):
+        # get claim
+        claim = self.claims[idx]
 
-    def get_size(self):
-        return sum(file.stat().st_size for file in Path(self.claims_dir).rglob('*'))
-
-    def get_field_to_metric_fn(self):
-        def bool_eval(label, expected_label):
-            return str(label).upper() == str(expected_label).upper()
-        
-        def skip_eval(label, expected_label):
-            return 1
-
-        def list_eval(label, expected_label):
-            # print("label: ", label)
-            # print("expected_label: ", expected_label)
-            if len(expected_label) == 0:
-                return 1
-
-            return len(set(label).intersection(set(expected_label))) * 1.0 / len(expected_label)
-
-        fields_to_metric_fn = {
-            "label": bool_eval,
-            "relevant_wikipedia_articles": skip_eval,
-            "_evidence_file_ids": list_eval
-        }
-
-        return fields_to_metric_fn
-
-    def get_item(self, idx: int, val: bool=False, include_label: bool=False):
-        # fetch listing
-        claim = self.claims[idx] if not val else self.val_claims[idx]
-
-        # create data record
-        dr = DataRecord(self.schema, source_id=claim)
-
-        claim_file = os.path.join(self.claims_dir, claim)
-        with open(claim_file, "rb") as f:
-            dr.claim = f.read().decode("utf-8")
-
-        # if requested, also return the label information
-        if include_label:
-            # augment data record with label info
-            labels_dict = self.label_fields_to_values[claim]
-
-            for field, value in labels_dict.items():
-                setattr(dr, field, value)
-
-        return dr
+        # construct and return dictionary with field(s)
+        return {"claim": claim}
 
 
-if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Run FEVER demo")
+    parser.add_argument("--claims-file-path", type=str, help="Path to the claims file")
+    parser.add_argument(
+        "--num-claims-to-process", type=int, help="Number of claims from the dataset to process", default=5
+    )
+    parser.add_argument("--index-path", type=str, help="Path to the index")
+    parser.add_argument(
+        "--k",
+        type=int,
+        help="Number of relevant documents to retrieve from the index (k for the k-nearest-neighbor lookup from the index)",
+        default=5,
+    )
+    return parser.parse_args()
+
+
+def build_fever_query(index, dataset, k):
+    claims = pz.Dataset(dataset)
+    claims = claims.sem_add_columns(fever_claims_cols, desc="Extract the claim")
+
+    def search_func(index, query, k):
+        results = index.search(query, k=k)
+        return [result["content"] for result in results]
+
+    claims_and_relevant_files = claims.retrieve(
+        index=index,
+        search_func=search_func,
+        search_attr="claim",
+        output_attr="relevant_wikipedia_articles",
+        output_attr_desc="Most relevant wikipedia articles to the `claim`",
+        k=k,
+    )
+    output = claims_and_relevant_files.sem_add_columns(fever_output_cols)
+    return output
+
+
+def main():
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
-# params
+    args = parse_arguments()
 
-# parse arguments
-parser = argparse.ArgumentParser(description="Run a simple demo")
-parser.add_argument(
-    "--verbose", default=False, action="store_true", help="Print verbose output"
-)
-# parser.add_argument("--datasetid", type=str, help="The dataset id")
-# parser.add_argument("--workload", type=str, help="The workload to run. One of enron, real-estate, medical-schema-matching.")
-parser.add_argument(
-    "--processing_strategy",
-    type=str,
-    help='The processing strategy to use. One of no_sentinel, mab_sentinel',
-    default='no_sentinel',
-)
-parser.add_argument(
-    "--execution_strategy",
-    type=str,
-    help='The execution strategy to use. One of sequential, pipelined_single_thread, pipelined_parallel',
-    default='sequential',
-)
-parser.add_argument(
-    "--policy",
-    type=str,
-    help="One of 'mincost', 'mintime', 'maxquality'",
-    default='maxquality',
-)
-parser.add_argument(
-    "--num-samples",
-    type=int,
-    help="Number of validation samples",
-    default=5,
-)
-parser.add_argument(
-    "--rank",
-    type=int,
-    help="Rank for low-rank MC",
-    default=4,
-)
-parser.add_argument(
-    "--model",
-    type=str,
-    help="One of 'gpt-4o', 'gpt-4o-mini', 'llama', 'mixtral'",
-    default='gpt-4o',
-)
+    # Create a data reader for the FEVER dataset
+    dataset = FeverDataReader(
+        claims_file_path=args.claims_file_path,
+        num_claims_to_process=args.num_claims_to_process,
+    )
 
-args = parser.parse_args()
+    # Load the index
+    index = RAGPretrainedModel.from_index(args.index_path)
 
-num_claims = 100
-dataset_id = f"fever-{num_claims}"
-workload = "fever"
-num_docs = 1000
+    # Build and run the FEVER query
+    query = build_fever_query(index, dataset, k=args.k)
+    data_record_collection = query.run(pz.QueryProcessorConfig())
+    print(data_record_collection.to_df())
 
-index_path = f".ragatouille/colbert/indexes/fever-articles-{num_claims}-{num_docs}-index"
-index = RAGPretrainedModel.from_index(index_path)
-
-rank=4
-num_samples=10
-k = 10
-
-engine = args.engine
-
-if engine == "sentinel":
-    k = -1
-
-executor = "parallel" if engine == "sentinel" else "sequential"
-model = args.model
-policy_type = "maxquality"
-
-verbose = True
-allow_code_synth = False
-
-policy = MaxQuality()
-if policy_type == "mincost":
-    policy = MinCost()
-elif policy_type == "mintime":
-    policy = MinTime()
-elif policy_type == "maxquality":
-    policy = MaxQuality()
-else:
-    print("Policy not supported for this demo")
-    exit(1)
-
-# select optimization strategy and available models based on engine
-optimizer_strategy, available_models = None, None
-if engine == "sentinel":
-    optimizer_strategy = "pareto"
-    available_models = get_models(include_vision=True)
-else:
-    model_str_to_model = {
-        "gpt-4o": Model.GPT_4o,
-        "gpt-4o-mini": Model.GPT_4o_MINI,
-        "mixtral": Model.MIXTRAL,
-        "llama": Model.LLAMA3,
-    }
-    model_str_to_vision_model = {
-        "gpt-4o": Model.GPT_4o_V,
-        "gpt-4o-mini": Model.GPT_4o_MINI_V,
-        "mixtral": Model.LLAMA3_V,
-        "llama": Model.LLAMA3_V,
-    }
-    optimizer_strategy = "none"
-    available_models = [model_str_to_model[model]] + [model_str_to_vision_model[model]]
-
-
-# datasetid="real-estate-eval-100" for paper evaluation
-data_filepath = f"testdata/{dataset_id}"
-user_dataset_id = f"{dataset_id}-user"
-
-# create and register validation data source
-datasource = FeverValidationSource(
-    datasetId=f"{user_dataset_id}",
-    claims_dir=data_filepath,
-    num_samples=num_samples,
-    shuffle=False,
-    seed=42,
-)
-
-DataDirectory().register_user_source(
-    src=datasource,
-    dataset_id=f"{user_dataset_id}",
-)
-
-claims = Dataset(user_dataset_id, schema=FeverClaimsSchema)
-claims_and_relevant_files = claims.retrieve(
-    output_schema=FeverIntermediateSchema,
-    index=index,
-    search_attr="claim",
-    output_attr="relevant_wikipedia_articles",
-    k=k
-)
-output = claims_and_relevant_files.convert(output_schema=FeverOutputSchema)
-
-assert args.processing_strategy in ["no_sentinel", "mab_sentinel"], "We only support no_sentinel and mab_sentinel for this demo"
-
-# execute pz plan
-config = QueryProcessorConfig(
-    policy=policy,
-    nocache=True,
-    available_models=available_models,
-    optimizer_strategy=optimizer_strategy,
-    processing_strategy=args.processing_strategy,
-    execution_strategy=args.execution_strategy,
-    rank=rank,
-    verbose=verbose,
-    allow_code_synth=allow_code_synth
-)
-data_record_collection = output.run(config)
-
-# create filepaths for records and stats
-records_path = (
-    f"opt-profiling-data/{workload}-rank-{rank}-num-samples-{num_samples}-records.json"
-    if engine == "sentinel"
-    else f"opt-profiling-data/{workload}-baseline-{model}-records.json"
-)
-stats_path = (
-    f"opt-profiling-data/{workload}-rank-{rank}-num-samples-{num_samples}-profiling.json"
-    if engine == "sentinel"
-    else f"opt-profiling-data/{workload}-baseline-{model}-profiling.json"
-)
-
-record_jsons = []
-for record in data_record_collection:
-    record_dict = record.to_dict()
-    ### field_to_keep = ["claim", "id", "label"]
-    ### record_dict = {k: v for k, v in record_dict.items() if k in fields_to_keep}
-    record_jsons.append(record_dict)
-
-with open(records_path, 'w') as f:
-    json.dump(record_jsons, f)
-
-# save statistics
-execution_stats_dict = data_record_collection.execution_stats.to_json()
-with open(stats_path, "w") as f:
-    json.dump(execution_stats_dict, f)
+if __name__ == "__main__":
+    main()

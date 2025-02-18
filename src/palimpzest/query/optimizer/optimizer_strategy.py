@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from enum import Enum
 
 from palimpzest.policy import Policy
@@ -30,6 +31,31 @@ class OptimizationStrategy(ABC):
     def get_strategy(cls, strategy_type: str) -> OptimizationStrategy:
         """Factory method to create strategy instances"""
         return OptimizerStrategyRegistry.get_strategy(strategy_type)
+
+    def normalize_final_plans(self, plans: list[PhysicalPlan]) -> list[PhysicalPlan]:
+        """
+        For each plan in `plans`, this function enforces that the input schema of every
+        operator is the output schema of the previous operator in the plan.
+
+        Args:
+            plans list[PhysicalPlan]: list of physical plans to normalize
+
+        Returns:
+            list[PhysicalPlan]: list of normalized physical plans
+        """
+        normalized_plans = []
+        for plan in plans:
+            normalized_ops = []
+            for idx, op in enumerate(plan.operators):
+                op_copy = deepcopy(op)
+                if idx == 0:
+                    normalized_ops.append(op_copy)
+                else:
+                    op_copy.input_schema = plan.operators[-1].output_schema
+                    normalized_ops.append(op_copy)
+            normalized_plans.append(PhysicalPlan(operators=normalized_ops, plan_cost=plan.plan_cost))
+
+        return normalized_plans
 
 
 class GreedyStrategy(OptimizationStrategy):

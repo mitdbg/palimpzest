@@ -1,0 +1,125 @@
+site_name: palimpzest
+site_url: https://palimpzest.org
+repo_url: https://github.com/mitdbg/palimpzest
+repo_name: mitdbg/palimpzest
+
+nav:
+  - Getting Started:
+    - Overview: index.md
+    - Installation: getting-started/installation.md
+    - Quick Start Tutorial: getting-started/quickstart.md
+    - Next Steps: getting-started/next-steps.md
+
+  - User Guide:
+    - user-guide/overview.md
+    - How to Read Your Own Data: user-guide/datareaders.md
+    - PZ Operator Overview: user-guide/operators.md
+    - Getting Started with Optimization: user-guide/optimization.md
+
+  - Documentation:
+    - api/overview.md
+    - Dataset: api/dataset.md
+    - Data:
+      - DataReader: api/data/datareader.md
+      - DataRecord: api/data/datarecord.md
+      - DataRecordCollection: api/data/datarecordcollection.md
+    - Operators:
+      - Logical: api/operators/logical.md
+      - Physical: api/operators/physical.md
+      - Aggregate: api/operators/aggregate.md
+      - Convert:
+        - Base: api/operators/convert/convert.md
+        - LLMConvert: api/operators/convert/llm-convert.md
+        - NonLLMConvert: api/operators/convert/non-llm-convert.md
+        - CodeSynthesisConvert: api/operators/convert/code-synthesis-convert.md
+        - CriticAndRefineConvert: api/operators/convert/critique-and-refine-convert.md
+        - MixtureOfAgentsConvert: api/operators/convert/mixture-of-agents-convert.md
+        - RAGConvert: api/operators/convert/rag-convert.md
+        - TokenReducedConvert: api/operators/convert/token-reduction-convert.md
+      - Filter:
+        - Base: api/operators/filter/filter.md
+        - LLMFilter: api/operators/filter/llm-filter.md
+        - NonLLMFilter: api/operators/filter/non-llm-filter.md
+      - Limit: api/operators/limit.md
+      - Retrieve: api/operators/retrieve.md
+      - Scan: api/operators/scan.md
+    - Optimizer: api/optimization/optimizer.md
+
+  - Join the Community: community.md
+
+  - Chat Demo: chat-demo.md
+
+  - Research: research.md
+
+extra:
+  analytics:
+    provider: google
+    property: G-ZW0TNQXT8Y
+  # version:
+  #   provider: mike
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+  - mkdocstrings
+  - social
+
+theme:
+  name: material
+  font: 
+    text: Roboto
+    code: Roboto Mono
+  logo: images/palimpzest-cropped.png
+  # logo: https://palimpzest-workloads.s3.us-east-1.amazonaws.com/palimpzest-cropped.png
+  language: en
+  features:
+    - navigation.footer
+    - navigation.instant
+    - navigation.tabs
+    # - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - header.autohide
+  palette:
+    # Dark Mode
+    - scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Dark mode
+      primary: black
+      accent: lime
+
+    # Light Mode
+    - scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Light mode
+      primary: white
+      accent: black
+  # custom_dir: overrides
+
+markdown_extensions:
+  - attr_list
+  - def_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+            - name: mermaid
+              class: mermaid
+              format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+
+copyright: Copyright &copy; 2025 MIT Data Systems Group

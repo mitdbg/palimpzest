@@ -84,7 +84,7 @@ class MixtureOfAgentsConvert(LLMConvert):
         answers, which are then aggregated and summarized by a single aggregator model. Thus, we
         roughly expect to incur the cost and time of an LLMConvert * (len(proposer_models) + 1).
         In practice, this naive quality estimate will be overwritten by the CostModel's estimate
-        once it executes a few code generated examples.
+        once it executes a few instances of the operator.
         """
         # temporarily set self.model so that super().naive_cost_estimates(...) can compute an estimate
         self.model = self.proposer_models[0]
@@ -106,6 +106,9 @@ class MixtureOfAgentsConvert(LLMConvert):
         naive_op_cost_estimates.quality = sum(model_qualities)/(len(self.proposer_models) + 1)
         naive_op_cost_estimates.quality_lower_bound = naive_op_cost_estimates.quality
         naive_op_cost_estimates.quality_upper_bound = naive_op_cost_estimates.quality
+
+        # reset self.model to be None
+        self.model = None
 
         return naive_op_cost_estimates
 

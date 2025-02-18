@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-import json
+from pathlib import Path
 from typing import Callable
 
 import pandas as pd
 
 from palimpzest.constants import AggFunc, Cardinality
-from palimpzest.core.data.datasources import DataSource
+from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
-from palimpzest.core.lib.schemas import DefaultSchema, Number, Schema
-from palimpzest.datamanager.datamanager import DataDirectory
+from palimpzest.core.lib.fields import ListField, StringField
+from palimpzest.core.lib.schemas import Number, Schema
+from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.utils.hash_helpers import hash_for_id
+from palimpzest.utils.datareader_helpers import get_local_datareader
+from palimpzest.utils.hash_helpers import hash_for_serialized_dict
 from palimpzest.utils.index_helpers import get_index_str
 
 
@@ -21,27 +23,11 @@ from palimpzest.utils.index_helpers import get_index_str
 #####################################################
 class Set:
     """
-    A Set is the logical abstraction for a set of DataRecords matching some Schema. It is
-    also a node in the computation graph of a Dataset.
-
-    Each Dataset consists of one or more Sets. The "initial" Set in a Dataset can be thought
-    of as the Set that results from reading each DataRecord unaltered from the source. For each
-    filter or transformation that is applied to the Dataset, a new Set is created which defines
-    the set of DataRecords that result from applying that filter or transformation. In brief,
-    the Sets define a Dataset's computation graph. Sets can also be cached to maximize the reuse
-    of past computation.
-
-    Sets are initialized with a dataset_id, a schema, and a source. The source is either an
-    existing Set or a raw data source (such as a directory or S3 prefix). Sets may be initialized
-    with a Filter (which defines the filtering performed on the source to obtain *this* Set),
-    and a description of what this Set is meant to represent.
     """
-
-    SET_VERSION = 0.1
 
     def __init__(
         self,
-        source: Set | DataSource,
+        source: Set | DataReader,
         schema: Schema,
         desc: str | None = None,
         filter: Filter | None = None,
@@ -49,10 +35,11 @@ class Set:
         agg_func: AggFunc | None = None,
         group_by: GroupBySig | None = None,
         project_cols: list[str] | None = None,
-        index = None, # TODO(Siva): Abstract Index and add a type here and elsewhere
+        index=None,  # TODO(Siva): Abstract Index and add a type here and elsewhere
+        search_func: Callable | None = None,
         search_attr: str | None = None,
         output_attr: str | None = None,
-        k: int | None = None, # TODO: disambiguate `k` to be something like `retrieve_k`
+        k: int | None = None,  # TODO: disambiguate `k` to be something like `retrieve_k`
         limit: int | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         depends_on: list[str] | None = None,
@@ -67,6 +54,7 @@ class Set:
         self._group_by = group_by
         self._project_cols = None if project_cols is None else sorted(project_cols)
         self._index = index
+        self._search_func = search_func
         self._search_attr = search_attr
         self._output_attr = output_attr
         self._k = k
@@ -75,16 +63,15 @@ class Set:
         self._depends_on = [] if depends_on is None else sorted(depends_on)
         self._nocache = nocache
 
-    def __str__(self):
-        return (
-            f"{self.__class__.__name__}(schema={self.schema}, desc={self._desc}, "
-            f"filter={str(self._filter)}, udf={str(self._udf)}, agg_func={str(self._agg_func)}, limit={str(self._limit)}, "
-            f"project_cols={str(self._project_cols)}, uid={self.universal_identifier()})"
-        )
-
     @property
     def schema(self) -> Schema:
         return self._schema
+
+    def _set_data_source(self, source: DataReader):
+        if isinstance(self._source, Set):
+            self._source._set_data_source(source)
+        else:
+            self._source = source
 
     def serialize(self):
         # NOTE: I needed to remove depends_on from the serialization dictionary because
@@ -92,7 +79,6 @@ class Set:
         # This created an issue with the node.universal_identifier() not being consistent
         # after changing the field to its full name.
         d = {
-            "version": Set.SET_VERSION,
             "schema": self.schema.json_schema(),
             "source": self._source.serialize(),
             "desc": repr(self._desc),
@@ -104,6 +90,7 @@ class Set:
             "group_by": (None if self._group_by is None else self._group_by.serialize()),
             "project_cols": (None if self._project_cols is None else self._project_cols),
             "index": None if self._index is None else get_index_str(self._index),
+            "search_func": None if self._search_func is None else str(self._search_func),
             "search_attr": self._search_attr,
             "output_attr": self._output_attr,
             "k": self._k,
@@ -113,72 +100,56 @@ class Set:
 
     def universal_identifier(self):
         """Return a unique identifier for this Set."""
-        d = self.serialize()
-        ordered = json.dumps(d, sort_keys=True)
-        result = hash_for_id(ordered)
-        return result
+        return hash_for_serialized_dict(self.serialize())
 
     def json_schema(self):
         """Return the JSON schema for this Set."""
         return self.schema.json_schema()
 
 
-
 class Dataset(Set):
     """
-    A Dataset is the intended abstraction for programmers to interact with when manipulating Sets.
+    A Dataset is the intended abstraction for programmers to interact with when writing PZ programs.
 
-    Users instantiate a Dataset by specifying a `source` that either points to a
-    DataSource or an existing cached Set. Users can then perform computations on
-    the Dataset in an imperative fashion by leveraging functions such as `filter`,
-    `convert`, `aggregate`, etc. Underneath the hood, each of these operations creates
-    a new Set which is cached by the DataManager. As a result, the Sets define the
-    lineage of computation on a Dataset, and this enables programmers to re-use
-    previously cached computation by providing it as a `source` to some future Dataset.
+    Users instantiate a Dataset by specifying a `source` that either points to a DataReader
+    or an existing Dataset. Users can then perform computations on the Dataset in a lazy fashion
+    by leveraging functions such as `filter`, `sem_filter`, `sem_add_columns`, `aggregate`, etc.
+    Underneath the hood, each of these operations creates a new Dataset. As a result, the Dataset
+    defines a lineage of computation.
     """
 
-    def __init__(self, source: str | list | pd.DataFrame | DataSource, schema: Schema | None = None, *args, **kwargs):
-        # convert source (str) -> source (DataSource) if need be
-        updated_source = DataDirectory().get_or_register_dataset(source) if isinstance(source, (str, list, pd.DataFrame)) else source
-        if schema is None:
-            schema = Schema.from_df(source) if isinstance(source, pd.DataFrame) else DefaultSchema
+    def __init__(
+        self,
+        source: str | Path | list | pd.DataFrame | DataReader | Dataset,
+        schema: Schema | None = None,
+        *args,
+        **kwargs,
+    ) -> None:
+        # NOTE: this function currently assumes that DataReader will always be provided with a schema;
+        #       we will relax this assumption in a subsequent PR
+        # convert source into a DataReader
+        updated_source = get_local_datareader(source, **kwargs) if isinstance(source, (str, Path, list, pd.DataFrame)) else source
+
+        # get the schema
+        schema = updated_source.schema if schema is None else schema
+ 
         # intialize class
         super().__init__(updated_source, schema, *args, **kwargs)
 
-    def copy(self) -> Dataset:
-        source_copy = self._source.copy()
-        dataset_copy = Dataset(
-            schema=self.schema,
-            source=source_copy,
-            desc=self._desc,
-            filter=self._filter,
-            udf=self._udf,
-            agg_func=self._agg_func,
-            group_by=self._group_by,
-            index=self._index,
-            search_attr=self._search_attr,
-            output_attr=self._output_attr,
-            k=self._k,
-            limit=self._limit,
-            cardinality=self._cardinality,
-            depends_on=self._depends_on,
-            nocache=self._nocache,
-        )
-        return dataset_copy
-
     def filter(
         self,
-        _filter: str | Callable,
+        _filter: Callable,
         depends_on: str | list[str] | None = None,
     ) -> Dataset:
-        """Add a filter to the Set. This filter will possibly restrict the items that are returned later."""
+        """Add a user defined function as a filter to the Set. This filter will possibly restrict the items that are returned later."""
         f = None
-        if isinstance(_filter, str):
-            f = Filter(_filter)
-        elif callable(_filter):
+        if callable(_filter):
             f = Filter(filter_fn=_filter)
         else:
-            raise Exception("Filter type not supported.", type(_filter))
+            error_str = f"Only support callable for filter, currently got {type(_filter)}"
+            if isinstance(_filter, str):
+                error_str += ". Consider using sem_filter() for semantic filters."
+            raise Exception(error_str)
 
         if isinstance(depends_on, str):
             depends_on = [depends_on]
@@ -190,33 +161,115 @@ class Dataset(Set):
             depends_on=depends_on,
             nocache=self._nocache,
         )
-
-    def convert(
+    
+    def sem_filter(
         self,
-        output_schema: Schema,
-        udf: Callable | None = None,
-        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
+        _filter: str,
         depends_on: str | list[str] | None = None,
-        desc: str = "Convert to new schema",
     ) -> Dataset:
-        """Convert the Set to a new schema."""
+        """Add a natural language description of a filter to the Set. This filter will possibly restrict the items that are returned later."""
+        f = None
+        if isinstance(_filter, str):
+            f = Filter(_filter)
+        else:
+            raise Exception("sem_filter() only supports `str` input for _filter.", type(_filter))
+        
         if isinstance(depends_on, str):
             depends_on = [depends_on]
 
         return Dataset(
             source=self,
-            schema=output_schema,
-            udf=udf,
+            schema=self.schema,
+            filter=f,
+            depends_on=depends_on,
+            nocache=self._nocache,
+        )
+
+    def sem_add_columns(self, cols: list[dict] | type[Schema],
+                        cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
+                        depends_on: str | list[str] | None = None,
+                        desc: str = "Add new columns via semantic reasoning") -> Dataset:
+        """
+        Add new columns by specifying the column names, descriptions, and types.
+        The column will be computed during the execution of the Dataset.
+        Example:
+            sem_add_columns(
+                [{'name': 'greeting', 'desc': 'The greeting message', 'type': str},
+                 {'name': 'age', 'desc': 'The age of the person', 'type': int},
+                 {'name': 'full_name', 'desc': 'The name of the person', 'type': str}]
+            )
+        """
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+
+        new_output_schema = None
+        if isinstance(cols, list):
+            new_output_schema = self.schema.add_fields(cols)
+        elif issubclass(cols, Schema):
+            new_output_schema = self.schema.union(cols)
+        else:
+            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+
+        return Dataset(
+            source=self,
+            schema=new_output_schema,
+            udf=None,
             cardinality=cardinality,
             depends_on=depends_on,
             desc=desc,
             nocache=self._nocache,
         )
-    
-    # This is a convenience for users who like DataFrames-like syntax.   
-    def add_columns(self, columns:dict[str, str], cardinality: Cardinality = Cardinality.ONE_TO_ONE) -> Dataset:
-        new_output_schema = self.schema.add_fields(columns)
-        return self.convert(new_output_schema, udf=None, cardinality=cardinality, depends_on=None, desc="Add columns " + str(columns))
+
+    def add_columns(self, udf: Callable,
+                    cols: list[dict] | type[Schema],
+                    cardinality: Cardinality = Cardinality.ONE_TO_ONE,
+                    depends_on: str | list[str] | None = None,
+                    desc: str = "Add new columns via UDF") -> Dataset:
+        """
+        Add new columns by specifying UDFs.
+
+        Examples:
+            add_columns(
+                udf=compute_personal_greeting,
+                cols=[
+                    {'name': 'greeting', 'desc': 'The greeting message', 'type': str},
+                    {'name': 'age', 'desc': 'The age of the person', 'type': int},
+                    {'name': 'full_name', 'desc': 'The name of the person', 'type': str},
+                ]
+            )
+        """
+        if udf is None or cols is None:
+            raise ValueError("`udf` and `cols` must be provided for add_columns.")
+
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+
+        new_output_schema = None
+        if isinstance(cols, list):
+            updated_cols = []
+            for col_dict in cols:
+                assert isinstance(col_dict, dict), "each entry in `cols` must be a dictionary"
+                assert "name" in col_dict, "each type must contain a 'name' key specifying the column name"
+                assert "type" in col_dict, "each type must contain a 'type' key specifying the column type"
+                col_dict["desc"] = col_dict.get("desc", "New column: " + col_dict["name"])
+                updated_cols.append(col_dict)
+            new_output_schema = self.schema.add_fields(updated_cols)
+        
+        elif issubclass(cols, Schema):
+            new_output_schema = self.schema.union(cols)
+
+        else:
+            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+
+        return Dataset(
+            source=self,
+            schema=new_output_schema,
+            udf=udf,
+            cardinality=cardinality,
+            desc=desc,
+            depends_on=depends_on,
+            nocache=self._nocache,
+        )
 
     def count(self) -> Dataset:
         """Apply a count aggregation to this set"""
@@ -247,12 +300,27 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def retrieve(self, output_schema, index, search_attr, output_attr, k=-1) -> Dataset:
+    def retrieve(
+        self, index, search_func: Callable, search_attr: str, output_attr: str, output_attr_desc: str, k=-1
+    ) -> Dataset:
+        """
+        Retrieve the top k nearest neighbors of the value of the `search_attr` from the index and
+        stores it in the `output_attr` field. The output schema is a union of the current schema
+        and the `output_attr` with type ListField(StringField). `search_func` is a function of
+        type (index, query: str | list(str), k: int) -> list[str]. It should implement the lookup
+        logic for the index and return the top k results. The value of the `search_attr` field is
+        used as the query to lookup in the index. The results are stored in the `output_attr`
+        field. `output_attr_desc` is the description of the `output_attr` field.
+        """
+        # Output schema is a union of the current schema and the output_attr
+        attributes = {output_attr: ListField(StringField)(desc=output_attr_desc)}
+        output_schema = self.schema().union(type("Schema", (Schema,), attributes))
         return Dataset(
             source=self,
             schema=output_schema,
             desc="Retrieve",
             index=index,
+            search_func=search_func,
             search_attr=search_attr,
             output_attr=output_attr,
             k=k,
@@ -278,6 +346,14 @@ class Dataset(Set):
             nocache=self._nocache,
         )
 
-    def run(self, config: QueryProcessorConfig | None = None, **kwargs): # noqa: F821
+    def run(self, config: QueryProcessorConfig | None = None, **kwargs):
+        """Invoke the QueryProcessor to execute the query. `kwargs` will be applied to the QueryProcessorConfig."""
+        # TODO: this import currently needs to be here to avoid a circular import; we should fix this in a subsequent PR
         from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+
+        # as syntactic sugar, we will allow some keyword arguments to parameterize our policies
+        policy = construct_policy_from_kwargs(**kwargs)
+        if policy is not None:
+            kwargs["policy"] = policy
+
         return QueryProcessorFactory.create_and_run_processor(self, config, **kwargs)
