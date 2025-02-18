@@ -105,6 +105,8 @@ class QueryProcessorFactory:
         processor = cls.create_processor(dataset=dataset, config=config, **kwargs)
         return processor.execute()
 
+    #TODO(Matt): we have to update the config / parameters in a lot of places (e.g. here, Optimizer init, Optimizer.deepcopy_clean, etc.);
+    #            ideally the config created here is all we need
     #TODO(Jun): The all avaliable plans could be generated earlier and outside Optimizer.
     @classmethod
     def _create_optimizer(cls, optimizer_strategy: OptimizationStrategyType, config: QueryProcessorConfig) -> Optimizer:
@@ -123,6 +125,9 @@ class QueryProcessorFactory:
             allow_conventional_query=config.allow_conventional_query,
             allow_code_synth=config.allow_code_synth,
             allow_token_reduction=config.allow_token_reduction,
+            allow_rag_reduction=config.allow_rag_reduction,
+            allow_mixtures=config.allow_mixtures,
+            allow_critic=config.allow_critic,
             optimization_strategy_type=optimizer_strategy,
             use_final_op_quality=config.use_final_op_quality
         )

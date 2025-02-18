@@ -220,6 +220,9 @@ class Optimizer:
             allow_conventional_query=self.allow_conventional_query,
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
+            allow_rag_reduction=self.allow_rag_reduction,
+            allow_mixtures=self.allow_mixtures,
+            allow_critic=self.allow_critic,
             optimization_strategy_type=self.optimization_strategy_type,
             use_final_op_quality=self.use_final_op_quality,
         )

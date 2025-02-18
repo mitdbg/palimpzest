@@ -434,10 +434,10 @@ if __name__ == "__main__":
         available_models=[
             # Model.GPT_4o,
             # Model.GPT_4o_V,
-            # Model.GPT_4o_MINI,
+            Model.GPT_4o_MINI,
             # Model.GPT_4o_MINI_V,
             # Model.DEEPSEEK,
-            Model.MIXTRAL,
+            # Model.MIXTRAL,
             # Model.LLAMA3,
             # Model.LLAMA3_V,
         ],

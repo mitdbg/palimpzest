@@ -319,13 +319,10 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         # fields should be a dict if a custom answer parser is not provided
         assert isinstance(fields, dict), "Fields must be provided if a custom answer parser is not provided."
 
-        # determine if this is a filter operation
-        is_filter_op = self.prompt_strategy in [PromptStrategy.COT_BOOL, PromptStrategy.COT_BOOL_IMAGE]
-
         # extract the per-field answers from the completion text
         field_answers = (
             self._parse_filter_answer(completion_text)
-            if is_filter_op
+            if self.prompt_strategy.is_bool_prompt()
             else self._parse_convert_answer(completion_text, fields, json_output)
         )
 
@@ -431,7 +428,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 f.write("#####\n")
                 f.write(f"{str(completion_text)}\n")
                 f.write("#####\n")
-                f.write(f"{str(fields.keys())}\n")
+                f.write(f"{str(fields)}\n")
                 f.write("#####\n")
                 f.write(f"{str(e)}\n")
 
@@ -483,6 +480,41 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
         # assert that model is a model offered by Together
         assert model in [Model.MIXTRAL, Model.LLAMA3, Model.LLAMA3_V, Model.DEEPSEEK]
         super().__init__(model, prompt_strategy, cardinality, verbose, "system")
+
+    def _generate_payload(self, messages: list[dict], **kwargs) -> dict:
+        """
+        Generates the payload which will be fed into the client (or local model).
+
+        Each message will be a dictionary with the following format:
+        {
+            "role": "user" | "system",
+            "type": "text" | "image",
+            "content": str
+        }
+
+        For LLAMA3, the payload needs to be in a {"role": <role>, "content": <content>} format.
+        """
+        # for other models, use our standard payload generation
+        if self.model != Model.LLAMA3:
+            return super()._generate_payload(messages, **kwargs)
+
+        # get basic parameters
+        model = self.model_name
+        temperature = kwargs.get("temperature", 0.0)
+
+        # construct messages in simple {"role": <role>, "content": <content>} format
+        chat_messages = []
+        for message in messages:
+            chat_messages.append({"role": message["role"], "content": message["content"]})
+
+        # construct and return payload
+        payload = {
+            "model": model,
+            "temperature": temperature,
+            "messages": chat_messages,
+        }
+
+        return payload
 
     def _get_client_or_model(self, **kwargs) -> Together:
         """Returns a client (or local model) which can be invoked to perform the generation."""
