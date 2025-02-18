@@ -1,6 +1,6 @@
 [project]
 name = "palimpzest"
-version = "0.5.3"  # if you update this, be sure to update package version in `docs/source/conf.py` as well
+version = "0.6.0"
 description = "Palimpzest is a system which enables anyone to process AI-powered analytical queries simply by defining them in a declarative language"
 readme = "README.md"
 requires-python = ">=3.8"

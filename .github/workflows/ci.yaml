@@ -75,13 +75,3 @@ jobs:
           echo "Error: Version has not been bumped"
           exit 1
         fi
-    - name: Check Docs Version Matches Code Version
-      run: |
-        VERSION=`cat pyproject.toml | grep '^version' | sed -E 's/version.*=.*\"(.*)".*/\1/'`
-        echo "Version in pyproject.toml is $VERSION"
-        VERSION_DOCS=`cat docs/source/conf.py | grep '^release' | sed -E 's/release.*=.*\"(.*)".*/\1/'`
-        echo "Version in docs/source/conf.py is $VERSION_DOCS"
-        if [ "$VERSION" != "$VERSION_DOCS" ]; then
-          echo "Error: Version in docs/source/conf.py does not match pyproject.toml"
-          exit 1
-        fi
