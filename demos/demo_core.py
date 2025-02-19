@@ -168,7 +168,7 @@ def execute_task(task, dataset, policy, verbose=False, profile=False, processing
     root_set, cols, stat_path = get_task_config(task, dataset)
     config = pz.QueryProcessorConfig(
         policy=policy,
-        nocache=True,
+        cache=False,
         verbose=verbose,
         allow_token_reduction=False,
         allow_code_synth=False,
