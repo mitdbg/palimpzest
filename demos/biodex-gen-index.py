@@ -15,7 +15,7 @@ if __name__ == "__main__":
     )
 
     # create a collection
-    collection = chroma_client.create_collection(name="biodex-reaction-terms-test", embedding_function=openai_ef)
+    collection = chroma_client.create_collection(name="biodex-reaction-terms", embedding_function=openai_ef)
 
     # load reaction terms
     reaction_terms = []
@@ -25,6 +25,6 @@ if __name__ == "__main__":
 
     # insert documents
     collection.add(
-        documents=reaction_terms[:10],
-        ids=[f"id{idx + 1}" for idx in range(len(reaction_terms[:10]))]
+        documents=reaction_terms,
+        ids=[f"id{idx + 1}" for idx in range(len(reaction_terms))]
     )
