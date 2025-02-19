@@ -29,7 +29,8 @@ if __name__ == "__main__":
     # insert documents slowly (~10 at a time)
     indices = np.linspace(0, len(reaction_terms), len(reaction_terms)//10, dtype=int)
     total_inserts = len(indices)
-    for iter_idx, start_idx in tqdm(enumerate(indices)):
+    print(f"Total inserts: {total_inserts}")
+    for iter_idx, start_idx in tqdm(enumerate(indices), total=total_inserts):
         if iter_idx + 1 < len(indices):
             end_idx = indices[iter_idx + 1]
             collection.upsert(
