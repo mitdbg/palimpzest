@@ -20,7 +20,7 @@ class QueryProcessorConfig:
     policy: Policy = field(default_factory=MaxQuality)
     scan_start_idx: int = field(default=0)
     num_samples: int = field(default=float("inf"))
-    cache: bool = field(default=False)  # NOTE: until we properly implement caching, let's set the default to True
+    cache: bool = field(default=False)  # NOTE: until we properly implement caching, let's set the default to False
     include_baselines: bool = field(default=False)
     min_plans: int | None = field(default=None)
     verbose: bool = field(default=False)
