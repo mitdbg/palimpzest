@@ -1,4 +1,5 @@
 """This file contains factory methods which return template prompts and return messages for chat payloads."""
+
 import base64
 import json
 from string import Formatter
@@ -82,6 +83,7 @@ from palimpzest.prompts.util_phrases import (
 
 class PromptFactory:
     """Factory class for generating prompts for the Generator given the input(s)."""
+
     BASE_SYSTEM_PROMPT_MAP = {
         PromptStrategy.COT_BOOL: COT_BOOL_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_BASE_SYSTEM_PROMPT,
@@ -150,13 +152,13 @@ class PromptFactory:
                 longest_field_name, longest_field_length = sorted_fields[0]
 
                 # trim the field
-                context_factor =  MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT / (total_context_len * TOKENS_PER_CHARACTER)
+                context_factor = MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT / (total_context_len * TOKENS_PER_CHARACTER)
                 keep_frac_idx = int(longest_field_length * context_factor)
                 context[longest_field_name] = context[longest_field_name][:keep_frac_idx]
 
                 # update total context length
                 total_context_len = len(json.dumps(context, indent=2))
-        
+
         return json.dumps(context, indent=2)
 
     def _get_input_fields(self, candidate: DataRecord, **kwargs) -> list[str]:
@@ -203,7 +205,11 @@ class PromptFactory:
         """
         output_fields_desc = ""
         output_schema: Schema = kwargs.get("output_schema")
-        if self.prompt_strategy.is_cot_qa_prompt():
+        if (
+            self.prompt_strategy.is_cot_qa_prompt()
+            or self.prompt_strategy.is_moa_proposer_prompt()
+            or self.prompt_strategy.is_moa_aggregator_prompt()
+        ):
             assert output_schema is not None, "Output schema must be provided for convert prompts."
 
             field_desc_map = output_schema.field_desc_map()
@@ -232,14 +238,16 @@ class PromptFactory:
 
         Args:
             kwargs: The keyword arguments provided by the user.
-        
+
         Returns:
             str | None: The original output.
         """
         original_output = kwargs.get("original_output")
         if self.prompt_strategy.is_critic_prompt() or self.prompt_strategy.is_refine_prompt():
-            assert original_output is not None, "Original output must be provided for critique and refinement operations."
-        
+            assert original_output is not None, (
+                "Original output must be provided for critique and refinement operations."
+            )
+
         return original_output
 
     def _get_critique_output(self, **kwargs) -> str | None:
@@ -248,7 +256,7 @@ class PromptFactory:
 
         Args:
             kwargs: The keyword arguments provided by the user.
-        
+
         Returns:
             str | None: The critique output.
         """
@@ -261,10 +269,10 @@ class PromptFactory:
     def _get_model_responses(self, **kwargs) -> str | None:
         """
         Returns the model responses for the mixture-of-agents aggregation operation.
-        
+
         Args:
             kwargs: The keyword arguments provided by the user.
-            
+
         Returns:
             str | None: The model responses.
         """
@@ -316,9 +324,7 @@ class PromptFactory:
         critique_criteria = None
         if self.prompt_strategy.is_critic_prompt():
             critique_criteria = (
-                COT_QA_IMAGE_CRITIQUE_CRITERIA
-                if self.prompt_strategy.is_image_prompt()
-                else COT_QA_CRITIQUE_CRITERIA
+                COT_QA_IMAGE_CRITIQUE_CRITERIA if self.prompt_strategy.is_image_prompt() else COT_QA_CRITIQUE_CRITERIA
             )
 
         return critique_criteria
@@ -469,16 +475,18 @@ class PromptFactory:
 
         return prompt_strategy_to_example_answer.get(self.prompt_strategy)
 
-    def _get_all_format_kwargs(self, candidate: DataRecord, input_fields: list[str], output_fields: list[str], **kwargs) -> dict:
+    def _get_all_format_kwargs(
+        self, candidate: DataRecord, input_fields: list[str], output_fields: list[str], **kwargs
+    ) -> dict:
         """
         Returns a dictionary containing all the format kwargs for templating the prompts.
-        
+
         Args:
             candidate (DataRecord): The input record.
             input_fields (list[str]): The input fields.
             output_fields (list[str]): The output fields.
             kwargs: The keyword arguments provided by the user.
-        
+
         Returns:
             dict: The dictionary containing all the format kwargs.
         """
@@ -519,7 +527,7 @@ class PromptFactory:
         Args:
             candidate (DataRecord): The input record.
             input_fields (list[str]): The list of input fields.
-        
+
         Returns:
             list[dict]: The image messages for the chat payload.
         """
@@ -531,15 +539,19 @@ class PromptFactory:
 
             # image filepath (or list of image filepaths)
             if isinstance(field_type, ImageFilepathField):
-                with open(field_value, 'rb') as f:
-                    base64_image_str = base64.b64encode(f.read()).decode('utf-8')
-                image_messages.append({"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"})
+                with open(field_value, "rb") as f:
+                    base64_image_str = base64.b64encode(f.read()).decode("utf-8")
+                image_messages.append(
+                    {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                )
 
             elif hasattr(field_type, "element_type") and issubclass(field_type.element_type, ImageFilepathField):
                 for image_filepath in field_value:
-                    with open(image_filepath, 'rb') as f:
-                        base64_image_str = base64.b64encode(f.read()).decode('utf-8')
-                    image_messages.append({"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"})
+                    with open(image_filepath, "rb") as f:
+                        base64_image_str = base64.b64encode(f.read()).decode("utf-8")
+                    image_messages.append(
+                        {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                    )
 
             # image url (or list of image urls)
             elif isinstance(field_type, ImageURLField):
@@ -552,12 +564,16 @@ class PromptFactory:
             # pre-encoded images (or list of pre-encoded images)
             elif isinstance(field_type, ImageBase64Field):
                 base64_image_str = field_value.decode("utf-8")
-                image_messages.append({"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"})
+                image_messages.append(
+                    {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                )
 
             elif hasattr(field_type, "element_type") and issubclass(field_type.element_type, ImageBase64Field):
                 for base64_image in field_value:
                     base64_image_str = base64_image.decode("utf-8")
-                    image_messages.append({"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"})
+                    image_messages.append(
+                        {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                    )
 
         return image_messages
 
@@ -597,15 +613,15 @@ class PromptFactory:
 
         # get any image messages for the chat payload (will be an empty list if this is not an image prompt)
         image_messages = (
-            self._create_image_messages(candidate, input_fields)
-            if self.prompt_strategy.is_image_prompt()
-            else []
+            self._create_image_messages(candidate, input_fields) if self.prompt_strategy.is_image_prompt() else []
         )
 
         # get any original messages for critique and refinement operations
         original_messages = kwargs.get("original_messages")
         if self.prompt_strategy.is_critic_prompt() or self.prompt_strategy.is_refine_prompt():
-            assert original_messages is not None, "Original messages must be provided for critique and refinement operations."
+            assert original_messages is not None, (
+                "Original messages must be provided for critique and refinement operations."
+            )
 
         # construct the user messages based on the prompt strategy
         user_messages = []
@@ -663,17 +679,19 @@ class PromptFactory:
                     f"Input fields: {input_fields}\n"
                 )
             assert fields_check, err_msg
-        
+
         # build set of format kwargs
         format_kwargs = {
-            field_name: "<bytes>" if isinstance(candidate.get_field_type(field_name), BytesField) else candidate[field_name]
+            field_name: "<bytes>"
+            if isinstance(candidate.get_field_type(field_name), BytesField)
+            else candidate[field_name]
             for field_name in input_fields
         }
 
         # split prompt on <<image-placeholder>> if it exists
         if "<<image-placeholder>>" in user_prompt:
             raise NotImplementedError("Image prompts are not yet supported.")
-        
+
         prompt_sections = user_prompt.split("<<image-placeholder>>")
         messages = [{"role": "user", "type": "text", "content": prompt_sections[0].format(**format_kwargs)}]
 
@@ -688,7 +706,7 @@ class PromptFactory:
     def create_messages(self, candidate: DataRecord, output_fields: list[str], **kwargs) -> list[dict]:
         """
         Creates the messages for the chat payload based on the prompt strategy.
-        
+
         Each message will be a dictionary with the following format:
         {
             "role": "user" | "system",
