@@ -123,6 +123,9 @@ class QueryProcessorFactory:
             allow_conventional_query=config.allow_conventional_query,
             allow_code_synth=config.allow_code_synth,
             allow_token_reduction=config.allow_token_reduction,
+            allow_rag_reduction=config.allow_rag_reduction,
+            allow_mixtures=config.allow_mixtures,
+            allow_critic=config.allow_critic,
             optimization_strategy_type=optimizer_strategy,
             use_final_op_quality=config.use_final_op_quality
         )
