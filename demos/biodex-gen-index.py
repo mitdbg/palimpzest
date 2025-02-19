@@ -2,6 +2,8 @@ import os
 
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
+import numpy as np
+import tqdm
 
 # NOTE: this script is meant to be run from the root of the repository
 if __name__ == "__main__":
@@ -23,8 +25,13 @@ if __name__ == "__main__":
         for line in f:
             reaction_terms.append(line.strip())
 
-    # insert documents
-    collection.add(
-        documents=reaction_terms,
-        ids=[f"id{idx + 1}" for idx in range(len(reaction_terms))]
-    )
+    # insert documents slowly (~10 at a time)
+    indices = np.linspace(0, len(reaction_terms), len(reaction_terms)//10, dtype=int)
+    total_inserts = len(indices)
+    for iter_idx, start_idx in tqdm(enumerate(indices)):
+        if iter_idx + 1 < len(indices):
+            end_idx = indices[iter_idx + 1]
+            collection.upsert(
+                documents=reaction_terms[start_idx:end_idx],
+                ids=[f"id{idx}" for idx in range(start_idx, end_idx)]
+            )
