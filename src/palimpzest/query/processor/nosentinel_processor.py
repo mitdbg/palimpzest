@@ -181,7 +181,7 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
                 )
 
                 # add records (which are not filtered) to the cache, if allowed
-                if  self.cache:
+                if self.cache:
                     for record in records:
                         if getattr(record, "passed_operator", True):
                             # self.datadir.append_cache(operator.target_cache_id, record)
@@ -201,7 +201,7 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
                     break
 
             # if caching was allowed, close the cache
-            if  self.cache:
+            if self.cache:
                 for _ in plan.operators:
                     # self.datadir.close_cache(operator.target_cache_id)
                     pass
@@ -366,7 +366,7 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
                         )
 
                         # add records (which are not filtered) to the cache, if allowed
-                        if  self.cache:
+                        if self.cache:
                             for record in records:
                                 if getattr(record, "passed_operator", True):
                                     # self.datadir.append_cache(operator.target_cache_id, record)
@@ -390,7 +390,7 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
                     finished_executing = len(output_records) == operator.limit
 
             # if caching was allowed, close the cache
-            if  self.cache:
+            if self.cache:
                 for _ in plan.operators:
                     # self.datadir.close_cache(operator.target_cache_id)
                     pass
