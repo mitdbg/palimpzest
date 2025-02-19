@@ -65,3 +65,8 @@ class QueryProcessorConfig:
             "allow_critic": self.allow_critic,
             "use_final_op_quality": self.use_final_op_quality,
         }, indent=2)
+
+    def update(self, **kwargs) -> None:
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)

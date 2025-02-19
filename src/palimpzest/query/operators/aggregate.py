@@ -21,6 +21,11 @@ class AggregateOp(PhysicalOperator):
 
 
 class ApplyGroupByOp(AggregateOp):
+    """
+    Implementation of a GroupBy operator. This operator groups records by a set of fields
+    and applies a function to each group. The group_by_sig object contains the fields to
+    group by and the aggregation functions to apply to each group.
+    """
     def __init__(self, group_by_sig: GroupBySig, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.group_by_sig = group_by_sig

@@ -32,6 +32,7 @@ class DataReader(ABC):
     is processed by PZ.
 
     Subclasses of the (abstract) `DataReader` class must implement two methods:
+
     - `__len__()`: which returns the number of elements in the data source
     - `__getitem__(idx: int)`: which takes in an `idx` and returns the element at that index
     """
@@ -75,13 +76,11 @@ class DataReader(ABC):
 
         Returns:
             dict: A dictionary representing the item at the given index. The dictionary
-            keys (i.e. fields) should match the fields specified in the schema of the
-            data source, and the values should be the values associated with those fields.
+                  keys (i.e. fields) should match the fields specified in the schema of the
+                  data source, and the values should be the values associated with those fields.
 
-            .. code-block:: python
-
-                # Example return value
-                {"field1": value1, "field2": value2, ...}
+                    # Example return value
+                    {"field1": value1, "field2": value2, ...}
 
         """
         pass
