@@ -1,4 +1,5 @@
 import os
+import time
 
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
@@ -35,3 +36,4 @@ if __name__ == "__main__":
                 documents=reaction_terms[start_idx:end_idx],
                 ids=[f"id{idx}" for idx in range(start_idx, end_idx)]
             )
+        time.sleep(1)
