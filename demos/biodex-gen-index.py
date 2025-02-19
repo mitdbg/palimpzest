@@ -4,7 +4,7 @@ import time
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
 import numpy as np
-import tqdm
+from tqdm import tqdm
 
 # NOTE: this script is meant to be run from the root of the repository
 if __name__ == "__main__":
