@@ -715,7 +715,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
                 )
 
                 # add records (which are not filtered) to the cache, if allowed
-                if  self.cache:
+                if self.cache:
                     for record in all_records:
                         if getattr(record, "passed_operator", True):
                             # self.datadir.append_cache(logical_op_id, record)
@@ -745,7 +745,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
             samples_drawn = max(logical_op_id_to_num_samples.values())
 
         # if caching was allowed, close the cache
-        if  self.cache:
+        if self.cache:
             for _, _, _ in plan:
                 # self.datadir.close_cache(logical_op_id)
                 pass

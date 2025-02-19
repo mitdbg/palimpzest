@@ -152,7 +152,7 @@ class QueryProcessorFactory:
         if config.policy is None:
             raise ValueError("Policy is required for optimizer")
 
-        if  config.cache:
+        if config.cache:
             raise ValueError("cache=True is not supported yet")
 
         if config.val_datasource is None and config.processing_strategy in [ProcessingStrategyType.MAB_SENTINEL, ProcessingStrategyType.RANDOM_SAMPLING]:

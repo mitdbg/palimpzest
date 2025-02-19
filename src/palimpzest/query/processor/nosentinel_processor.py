@@ -520,7 +520,7 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
     #                 finished_executing = not keep_scanning_source_records and not still_processing and len(futures) == 0
 
     #         # if caching was allowed, close the cache
-    #         if  self.cache:
+    #         if self.cache:
     #             for _ in plan.operators:
     #                 # self.datadir.close_cache(operator.target_cache_id)
     #                 pass

@@ -470,7 +470,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             )
 
             # add records (which are not filtered) to the cache, if allowed
-            if  self.cache:
+            if self.cache:
                 for record in all_records:
                     if getattr(record, "passed_operator", True):
                         # self.datadir.append_cache(logical_op_id, record)
@@ -493,7 +493,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         all_outputs = self.score_quality(plan.operator_sets, all_outputs, champion_outputs, expected_outputs)
 
         # if caching was allowed, close the cache
-        if  self.cache:
+        if self.cache:
             for _, _, _ in plan:
                 # self.datadir.close_cache(logical_op_id)
                 pass

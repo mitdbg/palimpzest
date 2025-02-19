@@ -241,7 +241,7 @@ class Optimizer:
         op: LogicalOperator | None = None
 
         # TODO: add cache scan when we add caching back to PZ
-        # if  self.cache:
+        # if self.cache:
         #     op = CacheScan(datareader=node, output_schema=output_schema)
         if isinstance(node, DataReader):
             op = BaseScan(datareader=node, output_schema=output_schema)
