@@ -206,6 +206,7 @@ class PromptFactory:
         if (
             self.prompt_strategy.is_cot_qa_prompt()
             or self.prompt_strategy.is_moa_proposer_prompt()
+            or self.prompt_strategy.is_moa_aggregator_prompt()
         ):
             assert output_schema is not None, "Output schema must be provided for convert prompts."
 
