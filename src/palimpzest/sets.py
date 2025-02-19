@@ -42,7 +42,7 @@ class Set:
         limit: int | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         depends_on: list[str] | None = None,
-        cache: bool = True,
+        cache: bool = False,
     ):
         self._schema = schema
         self._source = source
@@ -60,7 +60,7 @@ class Set:
         self._limit = limit
         self._cardinality = cardinality
         self._depends_on = [] if depends_on is None else sorted(depends_on)
-        self.cache = cache
+        self._cache = cache
 
     @property
     def schema(self) -> Schema:
@@ -131,7 +131,7 @@ class Dataset(Set):
 
         # get the schema
         schema = updated_source.schema if schema is None else schema
- 
+
         # intialize class
         super().__init__(updated_source, schema, *args, **kwargs)
 
@@ -158,9 +158,9 @@ class Dataset(Set):
             schema=self.schema,
             filter=f,
             depends_on=depends_on,
-            cache=self.cache,
+            cache=self._cache,
         )
-    
+
     def sem_filter(
         self,
         _filter: str,
@@ -172,7 +172,7 @@ class Dataset(Set):
             f = Filter(_filter)
         else:
             raise Exception("sem_filter() only supports `str` input for _filter.", type(_filter))
-        
+
         if isinstance(depends_on, str):
             depends_on = [depends_on]
 
@@ -181,11 +181,11 @@ class Dataset(Set):
             schema=self.schema,
             filter=f,
             depends_on=depends_on,
-            cache=self.cache,
+            cache=self._cache,
         )
 
     def sem_add_columns(self, cols: list[dict] | type[Schema],
-                        cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
+                        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
                         depends_on: str | list[str] | None = None,
                         desc: str = "Add new columns via semantic reasoning") -> Dataset:
         """
@@ -216,7 +216,7 @@ class Dataset(Set):
             cardinality=cardinality,
             depends_on=depends_on,
             desc=desc,
-            cache=self.cache,
+            cache=self._cache,
         )
 
     def add_columns(self, udf: Callable,
@@ -253,7 +253,7 @@ class Dataset(Set):
                 col_dict["desc"] = col_dict.get("desc", "New column: " + col_dict["name"])
                 updated_cols.append(col_dict)
             new_output_schema = self.schema.add_fields(updated_cols)
-        
+
         elif issubclass(cols, Schema):
             new_output_schema = self.schema.union(cols)
 
@@ -267,7 +267,7 @@ class Dataset(Set):
             cardinality=cardinality,
             desc=desc,
             depends_on=depends_on,
-            cache=self.cache,
+            cache=self._cache,
         )
 
     def count(self) -> Dataset:
@@ -277,7 +277,7 @@ class Dataset(Set):
             schema=Number,
             desc="Count results",
             agg_func=AggFunc.COUNT,
-            cache=self.cache,
+            cache=self._cache,
         )
 
     def average(self) -> Dataset:
@@ -287,7 +287,7 @@ class Dataset(Set):
             schema=Number,
             desc="Average results",
             agg_func=AggFunc.AVERAGE,
-            cache=self.cache,
+            cache=self._cache,
         )
 
     def groupby(self, groupby: GroupBySig) -> Dataset:
@@ -296,7 +296,7 @@ class Dataset(Set):
             schema=groupby.output_schema(),
             desc="Group By",
             group_by=groupby,
-            cache=self.cache,
+            cache=self._cache,
         )
 
     def retrieve(
@@ -323,7 +323,7 @@ class Dataset(Set):
             search_attr=search_attr,
             output_attr=output_attr,
             k=k,
-            cache=self.cache,
+            cache=self._cache,
         )
 
     def limit(self, n: int) -> Dataset:
@@ -333,7 +333,7 @@ class Dataset(Set):
             schema=self.schema,
             desc="LIMIT " + str(n),
             limit=n,
-            cache=self.cache,
+            cache=self._cache,
         )
 
     def project(self, project_cols: list[str] | str) -> Dataset:
@@ -342,7 +342,7 @@ class Dataset(Set):
             source=self,
             schema=self.schema.project(project_cols),
             project_cols=project_cols if isinstance(project_cols, list) else [project_cols],
-            cache=self.cache,
+            cache=self._cache,
         )
 
     def run(self, config: QueryProcessorConfig | None = None, **kwargs):  # noqa: F821

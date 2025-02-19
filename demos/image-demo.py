@@ -32,7 +32,7 @@ if __name__ == "__main__":
     start_time = time.time()
 
     parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument("cache", action="store_false", help="Use cached results", default=False)
+    parser.add_argument("--cache", action="store_true", help="Use cached results",default=False)
 
     args = parser.parse_args()
     cache = args.cache

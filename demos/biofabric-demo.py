@@ -55,7 +55,7 @@ file_cols = [
 xls_cols = file_cols + [
     {"name": "number_sheets", "type": int, "desc": "The number of sheets in the Excel file"},
     {"name": "sheet_names", "type": list[str], "desc": "The names of the sheets in the Excel file"},
-] 
+]
 
 table_cols = [
     {"name": "rows", "type": list[str], "desc": "The rows of the table"},
@@ -87,7 +87,6 @@ if __name__ == "__main__":
     parser.add_argument("--executor", type=str, help="The plan executor to use. The avaliable executors are: sequential, pipelined_parallel, pipelined_single_thread", default="pipelined_parallel")
 
     args = parser.parse_args()
-    cache = args.cache
     verbose = args.verbose
     from_xls = args.from_xls
     policy = args.policy
