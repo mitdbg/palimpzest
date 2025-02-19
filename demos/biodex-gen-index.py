@@ -6,7 +6,7 @@ import chromadb.utils.embedding_functions as embedding_functions
 # NOTE: this script is meant to be run from the root of the repository
 if __name__ == "__main__":
     # initialize chroma client
-    chroma_client = chromadb.PersistentClient()
+    chroma_client = chromadb.PersistentClient(".chroma")
 
     # initialize embedding function
     openai_ef = embedding_functions.OpenAIEmbeddingFunction(
