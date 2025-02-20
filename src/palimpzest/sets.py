@@ -137,6 +137,27 @@ class Dataset(Set):
         # intialize class
         super().__init__(updated_source, schema, *args, **kwargs)
 
+    def copy(self):
+        return Dataset(
+            source=self._source.copy() if isinstance(self._source, Set) else self._source,
+            schema=self._schema,
+            desc=self._desc,
+            filter=self._filter,
+            udf=self._udf,
+            agg_func=self._agg_func,
+            group_by=self._group_by,
+            project_cols=self._project_cols,
+            index=self._index,
+            search_func=self._search_func,
+            search_attr=self._search_attr,
+            output_attr=self._output_attr,
+            k=self._k,
+            limit=self._limit,
+            cardinality=self._cardinality,
+            depends_on=self._depends_on,
+            cache=self._cache,
+        )
+
     def filter(
         self,
         _filter: Callable,
