@@ -332,7 +332,7 @@ if __name__ == "__main__":
         #     results = index.search(query, k=1)
         #     results = [result[0] if isinstance(result, list) else result for result in results]
         #     sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
-        #     return [result["content"] for result in sorted_results[:k]]
+        #     return [result["content"] for result in sorted_results[:k]], GenerationStats(model_name="colbert")
 
         # load index [text-embedding-3-small]
         # chroma_client = chromadb.PersistentClient(".chroma")
@@ -344,8 +344,7 @@ if __name__ == "__main__":
         chroma_client = chromadb.PersistentClient(".chroma")
         index = chroma_client.get_collection("biodex-reaction-terms")
 
-        # TODO: support results per query item and total results
-        def search_func(index: chromadb.Collection, query: str | list[str], k: int, results_per_query: int) -> tuple[list[str], GenerationStats]:
+        def search_func(index: chromadb.Collection, query: str | list[str], k: int) -> tuple[list[str], GenerationStats]:
             # set model name
             model_name = "text-embedding-3-small"
 
@@ -383,6 +382,7 @@ if __name__ == "__main__":
             )
 
             # execute query with embeddings
+            results_per_query = int(50 / len(query))  # NOTE: 50 is chosen to ~match k=49 in Lotus / DocETL evaluation
             results = index.query(embeddings, n_results=results_per_query)
 
             # get list of result terms with their cosine similarity scores
@@ -397,11 +397,6 @@ if __name__ == "__main__":
 
             return [result["content"] for result in sorted_results[:k]], gen_stats
 
-        # TODO
-        # 1. add results_per_query to Retrieve operator
-        # 2. make rule iterate over results_per_query in addition to k (if k is not fixed by user)
-        # 3. get Retrieve operator to parse the tuple output and make use of the gen_stats
-
         # construct plan
         plan = pz.Dataset(datareader)
         plan = plan.sem_add_columns(biodex_reactions_cols)
@@ -412,8 +407,7 @@ if __name__ == "__main__":
             search_attr="reactions",
             output_attr="reaction_labels",
             output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
-            # k=10, # if we set k, then it will be fixed; if we leave it unspecified then the optimizer will choose
-        )  # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
+        )
         plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols)
 
         # only use final op quality

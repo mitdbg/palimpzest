@@ -322,16 +322,23 @@ class Dataset(Set):
         )
 
     def retrieve(
-        self, index, search_func: Callable, search_attr: str, output_attr: str, output_attr_desc: str, k=-1
+        self,
+        index,
+        search_func: Callable,
+        search_attr: str,
+        output_attr: str,
+        output_attr_desc: str,
+        k: int = -1,
     ) -> Dataset:
         """
-        Retrieve the top k nearest neighbors of the value of the `search_attr` from the index and
-        stores it in the `output_attr` field. The output schema is a union of the current schema
-        and the `output_attr` with type ListField(StringField). `search_func` is a function of
-        type (index, query: str | list(str), k: int) -> list[str]. It should implement the lookup
-        logic for the index and return the top k results. The value of the `search_attr` field is
-        used as the query to lookup in the index. The results are stored in the `output_attr`
-        field. `output_attr_desc` is the description of the `output_attr` field.
+        Retrieve the top-k nearest neighbors of the value of the `search_attr` from the index and
+        stores it in the `output_attr` field.
+
+        The output schema is a union of the current schema and the `output_attr` with type ListField(StringField).
+        `search_func` is a function of type (index, query: str | list(str), k: int) -> list[str]. It should
+        implement the lookuplogic for the index and return the top-k results. The value of the `search_attr`
+        field is used as the query to lookup in the index. The results are stored in the `output_attr` field.
+        `output_attr_desc` is the description of the `output_attr` field.
         """
         # Output schema is a union of the current schema and the output_attr
         attributes = {output_attr: ListField(StringField)(desc=output_attr_desc)}

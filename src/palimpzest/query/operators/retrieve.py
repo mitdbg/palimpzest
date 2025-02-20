@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import time
 
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, RecordOpStats
+from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.operators.physical import PhysicalOperator
 
@@ -64,9 +64,10 @@ class RetrieveOp(PhysicalOperator):
         query = getattr(candidate, self.search_attr)
 
         try:
-            top_k_results = self.search_func(self.index, query, self.k)
+            top_k_results, gen_stats = self.search_func(self.index, query, self.k)
         except Exception:
             top_k_results = ["error-in-retrieve"]
+            gen_stats = GenerationStats()
             os.makedirs("retrieve-errors", exist_ok=True)
             ts = time.time()
             with open(f"retrieve-errors/error-{ts}.txt", "w") as f:
@@ -93,11 +94,12 @@ class RetrieveOp(PhysicalOperator):
             logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=duration_secs,
-            cost_per_record=0.0,
+            cost_per_record=gen_stats.cost_per_record,
             answer=answer,
             input_fields=self.input_schema.field_names(),
             generated_fields=generated_fields,
-            fn_call_duration_secs=duration_secs,
+            llm_call_duration_secs=gen_stats.llm_call_duration_secs,
+            fn_call_duration_secs=duration_secs - gen_stats.llm_call_duration_secs,
             op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 
