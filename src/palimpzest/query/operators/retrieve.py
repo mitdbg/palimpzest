@@ -242,6 +242,7 @@ class RetrieveOp(PhysicalOperator):
             with open(f"retrieve-errors/error-{ts}.txt", "w") as f:
                 f.write(str(query))
 
+        # TODO: the user is always right! let's drop this post-processing in the future
         # filter top_results for the top_k_results
         top_k_results = []
         if all([isinstance(result, list) for result in top_results]):
