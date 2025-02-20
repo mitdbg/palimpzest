@@ -208,7 +208,7 @@ class RAGConvert(LLMConvert):
         gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema}
 
         # generate outputs for all fields in a single query
-        field_answers, _, generation_stats = self.generator(candidate_copy, fields, **gen_kwargs)
+        field_answers, _, generation_stats, _ = self.generator(candidate_copy, fields, **gen_kwargs)
 
         # NOTE: summing embedding stats with generation stats is messy because it will lead to misleading
         #       measurements of total_input_tokens and total_output_tokens. We should fix this in the future.
@@ -222,7 +222,7 @@ class RAGConvert(LLMConvert):
         # if there was an error for any field, execute a conventional query on that field
         for field_name, answers in field_answers.items():
             if answers is None:
-                single_field_answers, _, single_field_stats = self.generator(candidate_copy, {field_name: fields[field_name]}, **gen_kwargs)
+                single_field_answers, _, single_field_stats, _ = self.generator(candidate_copy, {field_name: fields[field_name]}, **gen_kwargs)
                 field_answers.update(single_field_answers)
                 generation_stats += single_field_stats
 

@@ -251,6 +251,6 @@ class LLMFilter(FilterOp):
 
         # generate output; NOTE: BooleanField is used to indicate the output type; thus, the desc is not needed
         fields = {"passed_operator": BooleanField(desc="")}
-        field_answers, _, generation_stats = self.generator(candidate, fields, **gen_kwargs)
+        field_answers, _, generation_stats, _ = self.generator(candidate, fields, **gen_kwargs)
 
         return field_answers, generation_stats
