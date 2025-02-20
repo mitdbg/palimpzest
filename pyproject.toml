@@ -10,6 +10,7 @@ authors = [
 ]
 dependencies = [
     "charset-normalizer>=3.3.2",
+    "chromadb>=0.6.3",
     "click>=8.1.7",
     "click-aliases>=1.0.4",
     "colorama>=0.4.6",

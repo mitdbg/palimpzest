@@ -92,7 +92,7 @@ class BiodexReader(pz.DataReader):
         return label_dict
 
     @staticmethod
-    def rank_precision_at_k(k: int, preds: list | None, targets: list):
+    def rank_precision_at_k(preds: list | None, targets: list, k: int):
         if preds is None:
             return 0.0
 
@@ -171,7 +171,7 @@ class BiodexReader(pz.DataReader):
         rank_precision_at_k = partial(BiodexReader.rank_precision_at_k, k=self.rp_at_k)
         item["score_fn"]["reactions"] = BiodexReader.f1_eval
         item["score_fn"]["reaction_labels"] = BiodexReader.f1_eval
-        item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k,
+        item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k
         if not self.reactions_only:
             item["score_fn"]["drugs"] = BiodexReader.f1_eval
 

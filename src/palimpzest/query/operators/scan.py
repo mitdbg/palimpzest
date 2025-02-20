@@ -69,14 +69,17 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
         item = self.datareader[idx]
         end_time = time.time()
 
+        # TODO: remove once validation data is refactored
+        item_field_dict = item.get("fields", item)
+
         # check that item covers fields in output schema
         output_field_names = self.output_schema.field_names()
-        assert all([field in item for field in output_field_names]), f"Some fields in DataReader schema not present in item!\n - DataReader fields: {output_field_names}\n - Item fields: {list(item.keys())}"
+        assert all([field in item_field_dict for field in output_field_names]), f"Some fields in DataReader schema not present in item!\n - DataReader fields: {output_field_names}\n - Item fields: {list(item.keys())}"
 
         # construct a DataRecord from the item
         dr = DataRecord(self.output_schema, source_idx=idx)
         for field in output_field_names:
-            setattr(dr, field, item[field])
+            setattr(dr, field, item_field_dict[field])
 
         # create RecordOpStats objects
         record_op_stats = RecordOpStats(
