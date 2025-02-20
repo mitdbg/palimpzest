@@ -60,7 +60,9 @@ if __name__ == "__main__":
     total_inserts = len(gen_indices)
     print(f"Inserting {total_inserts} batches into the collection...")
     for start_idx, end_idx in tqdm(gen_indices, total=total_inserts):
-        collection.upsert(
+        embeddings = np.load(f"testdata/reaction-term-embeddings/{start_idx}_{end_idx}.npy")
+        collection.add(
             documents=reaction_terms[start_idx:end_idx],
+            embeddings=embeddings.tolist(),
             ids=[f"id{idx}" for idx in range(start_idx, end_idx)]
         )
