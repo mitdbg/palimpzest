@@ -94,6 +94,7 @@ class PromptFactory:
         PromptStrategy.COT_QA_IMAGE_CRITIC: None,
         PromptStrategy.COT_QA_IMAGE_REFINE: None,
         PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_MOA_AGG: COT_MOA_AGG_BASE_SYSTEM_PROMPT,
     }
     BASE_USER_PROMPT_MAP = {
@@ -106,6 +107,7 @@ class PromptFactory:
         PromptStrategy.COT_QA_IMAGE_CRITIC: BASE_CRITIQUE_PROMPT,
         PromptStrategy.COT_QA_IMAGE_REFINE: BASE_REFINEMENT_PROMPT,
         PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_BASE_USER_PROMPT,
+        PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_BASE_USER_PROMPT,
         PromptStrategy.COT_MOA_AGG: COT_MOA_AGG_BASE_USER_PROMPT,
     }
 

@@ -116,13 +116,16 @@ class QueryProcessorFactory:
         return Optimizer(
             policy=config.policy,
             cost_model=CostModel(),
-            no_cache=config.nocache,
+            cache=config.cache,
             verbose=config.verbose,
             available_models=available_models,
             allow_bonded_query=config.allow_bonded_query,
             allow_conventional_query=config.allow_conventional_query,
             allow_code_synth=config.allow_code_synth,
             allow_token_reduction=config.allow_token_reduction,
+            allow_rag_reduction=config.allow_rag_reduction,
+            allow_mixtures=config.allow_mixtures,
+            allow_critic=config.allow_critic,
             optimization_strategy_type=optimizer_strategy,
             use_final_op_quality=config.use_final_op_quality
         )
@@ -156,8 +159,8 @@ class QueryProcessorFactory:
         if config.policy is None:
             raise ValueError("Policy is required for optimizer")
 
-        if not config.nocache:
-            raise ValueError("nocache=False is not supported yet")
+        if config.cache:
+            raise ValueError("cache=True is not supported yet")
 
         if config.val_datasource is None and config.processing_strategy in [ProcessingStrategyType.MAB_SENTINEL, ProcessingStrategyType.RANDOM_SAMPLING]:
             raise ValueError("val_datasource is required for MAB_SENTINEL and RANDOM_SAMPLING processing strategies")

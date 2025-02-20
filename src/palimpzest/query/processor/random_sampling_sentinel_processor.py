@@ -470,7 +470,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             )
 
             # add records (which are not filtered) to the cache, if allowed
-            if not self.nocache:
+            if self.cache:
                 for record in all_records:
                     if getattr(record, "passed_operator", True):
                         # self.datadir.append_cache(logical_op_id, record)
@@ -493,7 +493,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         all_outputs = self.score_quality(plan.operator_sets, all_outputs, champion_outputs, expected_outputs)
 
         # if caching was allowed, close the cache
-        if not self.nocache:
+        if self.cache:
             for _, _, _ in plan:
                 # self.datadir.close_cache(logical_op_id)
                 pass
@@ -555,8 +555,8 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         if self.val_datasource is None:
             raise Exception("Make sure you are using validation data with MABSentinelExecutionEngine")
 
-        # if nocache is True, make sure we do not re-use codegen examples
-        if self.nocache:
+        # if cache is False, make sure we do not re-use codegen examples
+        if not self.cache:
             # self.clear_cached_examples()
             pass
 

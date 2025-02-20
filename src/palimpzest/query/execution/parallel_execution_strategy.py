@@ -121,7 +121,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
                             continue
 
                         # add records (which are not filtered) to the cache, if allowed
-                        if not self.nocache:
+                        if self.cache:
                             # self.datadir.append_cache(operator.target_cache_id, record)
                             pass
 
@@ -202,7 +202,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
                 futures = not_done_futures
 
         # if caching was allowed, close the cache
-        if not self.nocache:
+        if self.cache:
             for _ in plan.operators:
                 # self.datadir.close_cache(operator.target_cache_id)
                 pass

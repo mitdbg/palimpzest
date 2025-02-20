@@ -421,7 +421,7 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
-        nocache=True,
+        cache=False,
         val_datasource=val_datasource,
         available_models=available_models,
         processing_strategy=args.processing_strategy,
