@@ -216,7 +216,7 @@ if __name__ == "__main__":
 
     # construct config and run plan
     config = pz.QueryProcessorConfig(
-        nocache=True,
+        cache=False,
         verbose=verbose,
         policy=policy,
         execution_strategy=args.executor,

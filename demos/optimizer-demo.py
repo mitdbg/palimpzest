@@ -456,7 +456,7 @@ if __name__ == "__main__":
             output_attr="reaction_labels",
             output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
             # k=10, # if we set k, then it will be fixed; if we leave it unspecified then the optimizer will choose
-        )  # TODO: retrieve (top-1 retrieve per prediction? or top-k retrieve for all predictions?)
+        )
         plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols)
 
         # only use final op quality
@@ -488,7 +488,7 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
-        nocache=True,
+        cache=False,
         val_datasource=val_datasource,
         processing_strategy=args.processing_strategy,
         optimizer_strategy=optimizer_strategy,

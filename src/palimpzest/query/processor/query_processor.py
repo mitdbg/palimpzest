@@ -47,7 +47,7 @@ class QueryProcessor:
         self.num_samples = self.config.num_samples
         self.val_datasource = self.config.val_datasource
         self.scan_start_idx = self.config.scan_start_idx
-        self.nocache = self.config.nocache
+        self.cache = self.config.cache
         self.verbose = self.config.verbose
         self.max_workers = self.config.max_workers
         self.num_workers_per_plan = self.config.num_workers_per_plan

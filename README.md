@@ -71,9 +71,6 @@ output_df = output.to_df(cols=["date", "sender", "subject"])
 display(output_df)
 ```
 
-## Palimpzest CLI
-Installing Palimpzest also installs its CLI tool `pz` which provides users with basic utilities at the command line for creating and managing their own Palimpzest system. Please read the readme in [src/cli/README.md](./src/cli/README.md) for instructions on how to use it.
-
 ## Python Demos
 Below are simple instructions to run PZ on a test data set of enron emails that is included with the system.
 
@@ -83,19 +80,27 @@ To run the provided demos, you will need to download the test data. Due to the s
 chmod +x testdata/download-testdata.sh
 ./testdata/download-testdata.sh
 ```
-For convenience, we have also provided a script to register all test data with Palimpzest:
-```
-chmod +x testdata/register-sources.sh
-./testdata/register-sources.sh
-```
 
 ### Running the Demos
-- Initialize the configuration by running `pz init`.
+Set your OpenAI (or Together.ai) api key at the command line:
+```bash
+# set one (or both) of the following:
+export OPENAI_API_KEY=<your-api-key>
+export TOGETHER_API_KEY=<your-api-key>
+```
 
-- Palimpzest defaults to using OpenAI. You’ll need to export an environment variable `OPENAI_API_KEY`
+Now you can run the simple test program with:
+```bash
+$ python demos/simple-demo.py --task enron --dataset testdata/enron-eval-tiny --verbose
+```
 
-- (Skip this step if you ran the `register-sources.sh` script successfully) Add the enron data set with:
-`pz reg --path testdata/enron-tiny --name enron-tiny`
-
-- Finally, run the simple test program with:
-      `python demos/simpleDemo.py --task enron --datasetid enron-eval-tiny --verbose`
+### Citation
+If you would like to cite our work, please use the following citation:
+```
+@inproceedings{palimpzestCIDR,
+    title={Palimpzest: Optimizing AI-Powered Analytics with Declarative Query Processing},
+    author={Liu, Chunwei and Russo, Matthew and Cafarella, Michael and Cao, Lei and Chen, Peter Baile and Chen, Zui and Franklin, Michael and Kraska, Tim and Madden, Samuel and Shahout, Rana and Vitagliano, Gerardo},
+    booktitle = {Proceedings of the {{Conference}} on {{Innovative Database Research}} ({{CIDR}})},
+    date = 2025,
+}
+```

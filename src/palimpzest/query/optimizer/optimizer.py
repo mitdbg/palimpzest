@@ -86,7 +86,7 @@ class Optimizer:
         self,
         policy: Policy,
         cost_model: CostModel,
-        no_cache: bool = False,
+        cache: bool = False,
         verbose: bool = False,
         available_models: list[Model] | None = None,
         allow_bonded_query: bool = True,
@@ -142,7 +142,7 @@ class Optimizer:
             self.available_models = [available_models[0]]
 
         # store optimization hyperparameters
-        self.no_cache = no_cache
+        self.cache = cache
         self.verbose = verbose
         self.available_models = available_models
         self.allow_bonded_query = allow_bonded_query
@@ -213,7 +213,7 @@ class Optimizer:
         optimizer = Optimizer(
             policy=self.policy,
             cost_model=CostModel(),
-            no_cache=self.no_cache,
+            cache=self.cache,
             verbose=self.verbose,
             available_models=self.available_models,
             allow_bonded_query=self.allow_bonded_query,
@@ -237,7 +237,7 @@ class Optimizer:
         node = dataset_nodes[-1]
         output_schema = node.schema
         input_schema = dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
-        
+
         ### convert node --> Group ###
         uid = get_node_uid(node)
 
@@ -245,7 +245,7 @@ class Optimizer:
         op: LogicalOperator | None = None
 
         # TODO: add cache scan when we add caching back to PZ
-        # if not self.no_cache:
+        # if self.cache:
         #     op = CacheScan(datareader=node, output_schema=output_schema)
         if isinstance(node, DataReader):
             op = BaseScan(datareader=node, output_schema=output_schema)

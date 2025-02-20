@@ -49,3 +49,5 @@ src/palimpzest/agents/
 .venv
 .zed
 pyrightconfig.json
+
+myenv/
