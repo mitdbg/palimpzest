@@ -22,7 +22,7 @@ if __name__ == "__main__":
     os.makedirs("testdata/reaction-term-embeddings/", exist_ok=True)
 
     # generate embeddings in batches of 1000 at a time
-    indices = np.linspace(0, len(reaction_terms), 1000, dtype=int)
+    indices = np.linspace(0, len(reaction_terms), len(reaction_terms)//1000, dtype=int)
     total_embeds = len(indices)
     print(f"Generating {total_embeds} embeddings...")
     gen_indices = []
