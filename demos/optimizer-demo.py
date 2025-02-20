@@ -5,11 +5,14 @@ import random
 import time
 from functools import partial
 
+import chromadb
 import datasets
+from openai import OpenAI
 from ragatouille import RAGPretrainedModel
 
 import palimpzest as pz
-from palimpzest.constants import Model
+from palimpzest.constants import MODEL_CARDS, Model
+from palimpzest.core.data.dataclasses import GenerationStats
 from palimpzest.utils.model_helpers import get_models
 
 biodex_entry_cols = [
@@ -321,19 +324,87 @@ if __name__ == "__main__":
             seed=seed,
         )
 
-        # load index
-        index_path = ".ragatouille/colbert/indexes/reaction-terms"
-        index = RAGPretrainedModel.from_index(index_path)
+        # load index [Colbert]
+        # index_path = ".ragatouille/colbert/indexes/reaction-terms"
+        # index = RAGPretrainedModel.from_index(index_path)
+
+        # def search_func(index, query, k):
+        #     results = index.search(query, k=1)
+        #     results = [result[0] if isinstance(result, list) else result for result in results]
+        #     sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
+        #     return [result["content"] for result in sorted_results[:k]]
+
+        # load index [text-embedding-3-small]
+        # chroma_client = chromadb.PersistentClient(".chroma")
+        # openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+        #     api_key=os.environ["OPENAI_API_KEY"],
+        #     model_name="text-embedding-3-small",
+        # )
+        # index = chroma_client.get_collection("biodex-reaction-terms", embedding_function=openai_ef)
+        chroma_client = chromadb.PersistentClient(".chroma")
+        index = chroma_client.get_collection("biodex-reaction-terms")
+
+        # TODO: support results per query item and total results
+        def search_func(index: chromadb.Collection, query: str | list[str], k: int, results_per_query: int) -> tuple[list[str], GenerationStats]:
+            # set model name
+            model_name = "text-embedding-3-small"
+
+            # check that query is a string or list of strings, otherwise we return None
+            query_is_str = isinstance(query, str)
+            query_is_list_of_str = isinstance(query, list) and all(isinstance(q, str) for q in query)
+            if not query_is_str and not query_is_list_of_str:
+                return None, GenerationStats()
+
+            # if query is a string, convert it to a list of strings
+            if query_is_str:
+                query = [query]
+
+            # compute embedding(s)
+            client = OpenAI()
+            start_time = time.time()
+            resp = client.embeddings.create(input=query, model=model_name)
+            total_time = time.time() - start_time
+
+            # extract embedding(s)
+            embeddings = [item.embedding for item in resp.data]
+
+            # update stats
+            model_card = MODEL_CARDS[model_name]
+            total_input_tokens = resp.usage.total_tokens
+            total_input_cost = model_card["usd_per_input_token"] * total_input_tokens
+            gen_stats = GenerationStats(
+                model_name=model_name,
+                total_input_tokens=total_input_tokens,
+                total_output_tokens=0.0,
+                total_input_cost=total_input_cost,
+                total_output_cost=0.0,
+                cost_per_record=total_input_cost,
+                llm_call_duration_secs=total_time,
+            )
+
+            # execute query with embeddings
+            results = index.query(embeddings, n_results=results_per_query)
+
+            # get list of result terms with their cosine similarity scores
+            final_results = []
+            for query_docs, query_distances in zip(results["documents"], results["distances"]):
+                for doc, dist in zip(query_docs, query_distances):
+                    cosine_similarity = 1 - dist
+                    final_results.append({"content": doc, "similarity": cosine_similarity})
+
+            # return the top-k similar results and generation stats
+            sorted_results = sorted(final_results, key=lambda result: result["similarity"], reverse=True)
+
+            return [result["content"] for result in sorted_results[:k]], gen_stats
+
+        # TODO
+        # 1. add results_per_query to Retrieve operator
+        # 2. make rule iterate over results_per_query in addition to k (if k is not fixed by user)
+        # 3. get Retrieve operator to parse the tuple output and make use of the gen_stats
 
         # construct plan
         plan = pz.Dataset(datareader)
         plan = plan.sem_add_columns(biodex_reactions_cols)
-
-        def search_func(index, query, k):
-            results = index.search(query, k=1)
-            results = [result[0] if isinstance(result, list) else result for result in results]
-            sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
-            return [result["content"] for result in sorted_results[:k]]
 
         plan = plan.retrieve(
             index=index,

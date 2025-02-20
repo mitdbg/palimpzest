@@ -54,7 +54,11 @@ if __name__ == "__main__":
     )
 
     # create a collection
-    collection = chroma_client.get_or_create_collection(name="biodex-reaction-terms", embedding_function=openai_ef)
+    collection = chroma_client.get_or_create_collection(
+        name="biodex-reaction-terms",
+        embedding_function=openai_ef,
+        metadata={"hnsw:space": "cosine"},
+    )
 
     # insert documents in batches
     total_inserts = len(gen_indices)

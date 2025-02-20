@@ -105,7 +105,7 @@ class RAGConvert(LLMConvert):
         # compute the embedding
         start_time = time.time()
         response = self.client.embeddings.create(input=text, model=model_name)
-        embed_time = time.time() - start_time
+        total_time = time.time() - start_time
 
         # extract the embedding
         embedding = response.data[0].embedding
@@ -121,7 +121,7 @@ class RAGConvert(LLMConvert):
             total_input_cost=total_input_cost,
             total_output_cost=0.0,
             cost_per_record=total_input_cost,
-            llm_call_duration_secs=embed_time,
+            llm_call_duration_secs=total_time,
         )
 
         return embedding, embed_stats
