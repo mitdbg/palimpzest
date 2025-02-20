@@ -268,7 +268,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 model_name=self.model_name, llm_call_duration_secs=time.time() - start_time
             )
 
-            return field_answers, reasoning, generation_stats
+            return field_answers, reasoning, generation_stats, messages
 
         # parse usage statistics and create the GenerationStats
         generation_stats = None
