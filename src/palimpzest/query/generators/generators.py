@@ -77,11 +77,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         self.verbose = verbose
         self.system_role = system_role
         self.prompt_factory = PromptFactory(prompt_strategy, model, cardinality)
-        self.messages = None
-
-    def get_messages(self) -> list[dict] | None:
-        """Returns the messages used in the last generation."""
-        return self.messages
 
     @abstractmethod
     def _get_client_or_model(self, **kwargs) -> Any:
@@ -238,10 +233,10 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             warnings.warn("Provided `system_prompt` without providing `prompt`; setting `prompt` = `system_prompt`.")  # noqa: B028
 
         # generate a list of messages which can be used to construct a payload
-        self.messages = self.prompt_factory.create_messages(candidate, fields, **kwargs)
+        messages = self.prompt_factory.create_messages(candidate, fields, **kwargs)
 
         # create the chat payload
-        chat_payload = self._generate_payload(self.messages, **kwargs)
+        chat_payload = self._generate_payload(messages, **kwargs)
 
         # generate the text completion
         start_time = time.time()
@@ -294,7 +289,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         completion_text = self._get_completion_text(completion, **kwargs)
         if self.verbose:
             prompt = ""
-            for message in self.messages:
+            for message in messages:
                 if message["role"] == "user":
                     prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
             print(f"PROMPT:\n{prompt}")
