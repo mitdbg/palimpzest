@@ -27,10 +27,10 @@ class ExecutionStrategy(ABC):
     def __init__(self, 
                  scan_start_idx: int = 0, 
                  max_workers: int | None = None,
-                 nocache: bool = True,
+                 cache: bool = False,
                  verbose: bool = False):
         self.scan_start_idx = scan_start_idx
-        self.nocache = nocache
+        self.cache = cache
         self.verbose = verbose
         self.max_workers = max_workers
         self.execution_stats = []
