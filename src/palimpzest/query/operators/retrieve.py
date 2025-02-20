@@ -11,7 +11,6 @@ from ragatouille.RAGPretrainedModel import RAGPretrainedModel
 
 from palimpzest.constants import MODEL_CARDS, Model
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
-from palimpzest.core.elements.index import PZIndex
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.operators.physical import PhysicalOperator
 
@@ -31,7 +30,7 @@ class RetrieveOp(PhysicalOperator):
         Initialize the RetrieveOp object.
         
         Args:
-            index (PZIndex): The PZ index to use for retrieval.
+            index (Collection | RAGPretrainedModel): The PZ index to use for retrieval.
             search_attr (str): The attribute to search on.
             output_attr (str): The attribute to output the search results to.
             search_func (Callable | None): The function to use for searching the index. If None, the default search function will be used.
@@ -86,21 +85,52 @@ class RetrieveOp(PhysicalOperator):
             quality=1.0,
         )
 
-    def default_search_func(self, index: PZIndex, query: str | list[str], k: int) -> list[str] | list[list[str]]:
+    def default_search_func(self, index: Collection | RAGPretrainedModel, query: list[str] | list[list[float]], k: int) -> list[str] | list[list[str]]:
         """
         Default search function for the Retrieve operation. This function uses the index to
-        retrieve the top-k results for the given query. If query is a list, it retrieves the
-        top-k results for each query in the list.
+        retrieve the top-k results for the given query. The query will be a (possibly singleton)
+        list of strings or a list of lists of floats (i.e., embeddings). The function will return
+        the top-k results per-query in (descending) sorted order. If the input is a singleton list,
+        then the output will be a list of strings. If the input is a list of lists, then the output
+        will be a list of lists of strings.
 
         Args:
             index (PZIndex): The index to use for retrieval.
-            query (str | list[str]): The query string or list of strings to search for.
+            query (list[str] | list[list[float]]): The query (or queries) to search for.
             k (int): The maximum number of results the retrieve operator will return.
 
         Returns:
-            list[str]: The top results in (descending) sorted order.
+            list[str] | list[list[str]]: The top results in (descending) sorted order per query.
         """
-        pass
+        # check if the input is a singleton list or a list of lists
+        is_singleton_list = len(query) == 1
+
+        if isinstance(index, Collection):
+            # if the index is a chromadb collection, use the query method
+            results = index.query(query, n_results=k)
+
+            # the results["documents"] will be a list[list[str]]; if the input is a singleton list,
+            # then we output the list of strings (i.e., the first element of the list), otherwise
+            # we output the list of lists
+            return results["documents"][0] if is_singleton_list else results["documents"]
+
+        elif isinstance(index, RAGPretrainedModel):
+            # if the index is a rag model, use the rag model to get the top k results
+            results = index.search(query, k=k)
+
+            # the results will be a list[dict]; if the input is a singleton list, however
+            # it will be a list[list[dict]]; if the input is a list of lists
+            final_results = []
+            if is_singleton_list:
+                final_results = [result["content"] for result in results]
+            else:
+                for query_results in results:
+                    final_results.append([result["content"] for result in query_results])
+
+            return final_results
+
+        else:
+            raise ValueError("Unsupported index type. Must be either a Collection or RAGPretrainedModel.")
 
     def _create_record_set(
         self,
@@ -204,13 +234,21 @@ class RetrieveOp(PhysicalOperator):
             )
 
         try:
-            top_k_results = self.search_func(self.index, query, self.k)
+            top_results = self.search_func(self.index, query, self.k)
         except Exception:
-            top_k_results = ["error-in-retrieve"]
+            top_results = ["error-in-retrieve"]
             os.makedirs("retrieve-errors", exist_ok=True)
             ts = time.time()
             with open(f"retrieve-errors/error-{ts}.txt", "w") as f:
                 f.write(str(query))
+
+        # filter top_results for the top_k_results
+        top_k_results = []
+        if all([isinstance(result, list) for result in top_results]):
+            for result in top_results:
+                top_k_results.append(result[:self.k])
+        else:
+            top_k_results = top_results[:self.k]
 
         # construct and return the record set
         return self._create_record_set(
