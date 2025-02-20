@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Callable
 
 import pandas as pd
+from chromadb.api.models.Collection import Collection
+from ragatouille.RAGPretrainedModel import RAGPretrainedModel
 
 from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.data.datareaders import DataReader
@@ -15,7 +17,6 @@ from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.utils.datareader_helpers import get_local_datareader
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
-from palimpzest.utils.index_helpers import get_index_str
 
 
 #####################################################
@@ -35,7 +36,7 @@ class Set:
         agg_func: AggFunc | None = None,
         group_by: GroupBySig | None = None,
         project_cols: list[str] | None = None,
-        index=None,  # TODO(Siva): Abstract Index and add a type here and elsewhere
+        index: Collection | RAGPretrainedModel | None = None,
         search_func: Callable | None = None,
         search_attr: str | None = None,
         output_attr: str | None = None,
@@ -89,7 +90,7 @@ class Set:
             "limit": self._limit,
             "group_by": (None if self._group_by is None else self._group_by.serialize()),
             "project_cols": (None if self._project_cols is None else self._project_cols),
-            "index": None if self._index is None else get_index_str(self._index),
+            "index": None if self._index is None else self._index.__class__.__name__,
             "search_func": None if self._search_func is None else str(self._search_func),
             "search_attr": self._search_attr,
             "output_attr": self._output_attr,
@@ -301,7 +302,13 @@ class Dataset(Set):
         )
 
     def retrieve(
-        self, index, search_func: Callable, search_attr: str, output_attr: str, output_attr_desc: str, k=-1
+        self,
+        index: Collection | RAGPretrainedModel,
+        search_attr: str,
+        output_attr: str,
+        search_func: Callable | None = None,
+        output_attr_desc: str | None = None,
+        k: int = -1,
     ) -> Dataset:
         """
         Retrieve the top k nearest neighbors of the value of the `search_attr` from the index and
@@ -315,6 +322,11 @@ class Dataset(Set):
         # Output schema is a union of the current schema and the output_attr
         attributes = {output_attr: ListField(StringField)(desc=output_attr_desc)}
         output_schema = self.schema().union(type("Schema", (Schema,), attributes))
+
+        # TODO: revisit once we can think through abstraction(s)
+        # # construct the PZIndex from the user-provided index
+        # index = index_factory(index)
+
         return Dataset(
             source=self,
             schema=output_schema,
