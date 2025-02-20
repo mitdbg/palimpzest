@@ -93,3 +93,14 @@ Now you can run the simple test program with:
 ```bash
 $ python demos/simple-demo.py --task enron --dataset testdata/enron-eval-tiny --verbose
 ```
+
+### Citation
+If you would like to cite our work, please use the following citation:
+```
+@inproceedings{palimpzestCIDR,
+    title={Palimpzest: Optimizing AI-Powered Analytics with Declarative Query Processing},
+    author={Liu, Chunwei and Russo, Matthew and Cafarella, Michael and Cao, Lei and Chen, Peter Baile and Chen, Zui and Franklin, Michael and Kraska, Tim and Madden, Samuel and Shahout, Rana and Vitagliano, Gerardo},
+    booktitle = {Proceedings of the {{Conference}} on {{Innovative Database Research}} ({{CIDR}})},
+    date = 2025,
+}
+```
