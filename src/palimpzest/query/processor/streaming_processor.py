@@ -10,7 +10,9 @@ from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Dataset
+from palimpzest.tools.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class StreamingQueryProcessor(QueryProcessor):
     """This class can be used for a streaming, record-based execution.
@@ -24,6 +26,7 @@ class StreamingQueryProcessor(QueryProcessor):
         self.current_scan_idx: int = 0
         self.plan_generated: bool = False
         self.records_count: int = 0
+        logger.info("Initialized StreamingQueryProcessor")
 
     @property
     def plan(self) -> PhysicalPlan:
@@ -68,6 +71,7 @@ class StreamingQueryProcessor(QueryProcessor):
         return self.plan
 
     def execute(self):
+        logger.info("Executing StreamingQueryProcessor")
         start_time = time.time()
         # Always delete cache
         if not self.plan_generated:
@@ -86,6 +90,9 @@ class StreamingQueryProcessor(QueryProcessor):
                 self.plan_stats.finalize(total_plan_time)
             self.plan_stats.plan_str = str(self.plan)
             yield DataRecordCollection(output_records, plan_stats=self.plan_stats)
+
+        logger.info("Done executing StreamingQueryProcessor")
+
 
     def get_input_records(self):
         scan_operator = self.plan.operators[0]

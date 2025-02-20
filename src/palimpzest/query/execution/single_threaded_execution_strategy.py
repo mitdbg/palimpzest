@@ -7,7 +7,9 @@ from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.tools.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
     """
@@ -22,13 +24,11 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+
     def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
         """Initialize the stats and the execute the plan."""
-        if self.verbose:
-            print("----------------------")
-            print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
-            print(plan)
-            print("---")
+        logger.info(f"Executing plan {plan.plan_id} with {plan_workers} workers")
+        logger.info(f"Plan Details: {plan}")
 
         plan_start_time = time.time()
 
@@ -54,6 +54,8 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
 
         # execute the plan one operator at a time
         for op_idx, operator in enumerate(plan.operators):
+            logger.info(f"Processing operator {operator.op_name()} ({operator.get_op_id()})")
+
             op_id = operator.get_op_id()
             prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
             next_op_id = plan.operators[op_idx + 1].get_op_id() if op_idx + 1 < len(plan.operators) else None
@@ -115,6 +117,9 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 else:
                     output_records.append(record)
 
+            logger.info(f"Finished processing operator {operator.op_name()} ({operator.get_op_id()}), and generated {len(records)} records")
+            logger.debug(f"Records Stats: {record_op_stats}")
+
             # if we've filtered out all records, terminate early
             if next_op_id is not None and processing_queues[next_op_id] == []:
                 break
@@ -128,6 +133,9 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
         plan_stats.finalize(total_plan_time)
+
+        logger.info(f"Completed execution of plan {plan.plan_id} in {time.time() - plan_start_time:.2f} seconds")
+        logger.debug(f"Plan execution stats: {plan_stats}")
 
         return output_records, plan_stats
 
@@ -152,11 +160,8 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
     def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
         """Initialize the stats and the execute the plan."""
-        if self.verbose:
-            print("----------------------")
-            print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
-            print(plan)
-            print("---")
+        logger.info(f"Executing plan {plan.plan_id} with {plan_workers} workers")
+        logger.info(f"Plan Details: {plan}")
 
         plan_start_time = time.time()
 
@@ -188,7 +193,8 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         while not finished_executing:
             for op_idx, operator in enumerate(plan.operators):
                 op_id = operator.get_op_id()
-
+                logger.info(f"Processing operator {operator.op_name()} ({operator.get_op_id()}) over records_index={current_scan_idx}")
+                
                 prev_op_id = plan.operators[op_idx - 1].get_op_id() if op_idx > 1 else None
                 next_op_id = plan.operators[op_idx + 1].get_op_id() if op_idx + 1 < len(plan.operators) else None
 
@@ -262,6 +268,8 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                         else:
                             output_records.append(record)
 
+                logger.info(f"Finished processing operator {operator.op_name()} ({operator.get_op_id()}) over records_index={current_scan_idx}")
+
             # update finished_executing based on whether all records have been processed
             still_processing = any([len(queue) > 0 for queue in processing_queues.values()])
             keep_scanning_source_records = current_scan_idx < datareader_len and source_records_scanned < num_samples
@@ -280,5 +288,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
         plan_stats.finalize(total_plan_time)
+        logger.info(f"Completed execution of plan {plan.plan_id} in {time.time() - plan_start_time:.2f} seconds")
+        logger.debug(f"Plan execution stats: {plan_stats}")
 
         return output_records, plan_stats

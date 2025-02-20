@@ -22,8 +22,10 @@ from palimpzest.query.processor.random_sampling_sentinel_processor import (
 )
 from palimpzest.query.processor.streaming_processor import StreamingQueryProcessor
 from palimpzest.sets import Dataset, Set
+from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.model_helpers import get_models
 
+logger = setup_logger(__name__) 
 
 class ProcessingStrategyType(Enum):
     """How to generate and optimize query plans"""
@@ -102,7 +104,9 @@ class QueryProcessorFactory:
     @classmethod
     def create_and_run_processor(cls, dataset: Dataset, config: QueryProcessorConfig | None = None, **kwargs) -> DataRecordCollection:
         # TODO(Jun): Consider to use cache here.
+        logger.info(f"Creating processor for dataset: {dataset}")
         processor = cls.create_processor(dataset=dataset, config=config, **kwargs)
+        logger.info(f"Created processor: {processor}")
         return processor.execute()
 
     #TODO(Jun): The all avaliable plans could be generated earlier and outside Optimizer.

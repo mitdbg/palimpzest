@@ -11,9 +11,11 @@ from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyTy
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset, Set
+from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.model_helpers import get_models
 
+logger = setup_logger(__name__)
 
 class QueryProcessor:
     """
@@ -67,6 +69,9 @@ class QueryProcessor:
         # In this case, we only use the initialized optimizer. Later after we split the config to multiple configs, there won't be such confusion.
         assert optimizer is not None, "Optimizer is required. Please use QueryProcessorFactory.create_processor() to initialize a QueryProcessor."
         self.optimizer = optimizer
+
+        logger.info(f"Initialized QueryProcessor {self.__class__.__name__}")
+        logger.debug(f"QueryProcessor initialized with config: {self.config}")
 
     def _get_datareader(self, dataset: Set | DataReader) -> DataReader:
         """
@@ -125,6 +130,7 @@ class QueryProcessor:
         Execute a given list of plans for num_samples records each. Plans are executed in parallel.
         If any workers are unused, then additional workers are distributed evenly among plans.
         """
+        logger.info(f"Executing plans: {plans}")
         # compute number of plans
         num_plans = len(plans)
 
@@ -172,6 +178,10 @@ class QueryProcessor:
             if plan.plan_id == max_quality_plan_id:
                 return_records = records
 
+        logger.info(f"Done executing plans: {plans}")
+        logger.debug(f"All sample execution data: {all_sample_execution_data}")
+        logger.debug(f"Return records: {return_records}")
+        logger.debug(f"All plan stats: {all_plan_stats}")
         return all_sample_execution_data, return_records, all_plan_stats
     
     def _execute_best_plan(

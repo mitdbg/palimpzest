@@ -6,7 +6,9 @@ from enum import Enum
 
 from palimpzest.policy import Policy
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
+from palimpzest.tools.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class OptimizationStrategyType(str, Enum):
     """
@@ -79,7 +81,12 @@ class GreedyStrategy(OptimizationStrategy):
         return PhysicalPlan.from_ops_and_sub_plan([best_phys_expr.operator], input_best_phys_plan, best_phys_expr.plan_cost)
 
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
-        return [self._get_greedy_physical_plan(groups, final_group_id)]
+        logger.info(f"Getting greedy optimal plans for final group id: {final_group_id}")
+        plans = [self._get_greedy_physical_plan(groups, final_group_id)]
+        logger.info(f"Greedy optimal plans: {plans}")
+        logger.info(f"Done getting greedy optimal plans for final group id: {final_group_id}")
+        
+        return plans
 
 
 class ParetoStrategy(OptimizationStrategy):
@@ -129,6 +136,7 @@ class ParetoStrategy(OptimizationStrategy):
         return pareto_optimal_plans
     
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
+        logger.info(f"Getting pareto optimal plans for final group id: {final_group_id}")
         # compute all of the pareto optimal physical plans
         plans = self._get_candidate_pareto_physical_plans(groups, final_group_id, policy)
 
@@ -148,6 +156,8 @@ class ParetoStrategy(OptimizationStrategy):
             optimal_plan = optimal_plan if policy.choose(optimal_plan.plan_cost, plan.plan_cost) else plan
 
         plans = [optimal_plan]
+        logger.info(f"Pareto optimal plans: {plans}")
+        logger.info(f"Done getting pareto optimal plans for final group id: {final_group_id}")
         return plans
     
 
@@ -177,7 +187,11 @@ class SentinelStrategy(OptimizationStrategy):
         return SentinelPlan.from_ops_and_sub_plan([phys_op_set], best_phys_subplan)
 
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[SentinelPlan]:
-        return [self._get_sentinel_plan(groups, final_group_id)]
+        logger.info(f"Getting sentinel optimal plans for final group id: {final_group_id}")
+        plans = [self._get_sentinel_plan(groups, final_group_id)]
+        logger.info(f"Sentinel optimal plans: {plans}")
+        logger.info(f"Done getting sentinel optimal plans for final group id: {final_group_id}")
+        return plans
 
 
 class NoOptimizationStrategy(GreedyStrategy):

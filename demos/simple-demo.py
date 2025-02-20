@@ -65,7 +65,7 @@ def main():
     # Execute task
     records, execution_stats, cols = execute_task(
         task=task,
-        datasetid=dataset,
+        dataset=dataset,
         policy=policy,
         verbose=verbose,
         profile=profile,
