@@ -165,7 +165,7 @@ class RetrieveOp(PhysicalOperator):
             logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=total_time,
-            cost_per_record=0.0,
+            cost_per_record=generation_stats.cost_per_record,
             answer=answer,
             input_fields=self.input_schema.field_names(),
             generated_fields=generated_fields,
