@@ -308,7 +308,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         # pretty print prompt + full completion output for debugging
         completion_text = self._get_completion_text(completion, **kwargs)
         prompt = ""
-        for message in self.messages:
+        for message in messages:
             if message["role"] == "user":
                 prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
         logger.debug(f"PROMPT:\n{prompt}")
