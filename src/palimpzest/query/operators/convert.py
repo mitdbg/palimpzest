@@ -439,10 +439,11 @@ class LLMConvertBonded(LLMConvert):
         )  # TODO: guarantee negative output from generator is None
 
         # if there was an error for any field, execute a conventional query on that field
-        for field, answers in field_answers.items():
-            if answers is None:
-                single_field_answers, _, single_field_stats, _ = self.generator(candidate, [field], **gen_kwargs)
-                field_answers.update(single_field_answers)
-                generation_stats += single_field_stats
+        if len(field_answers) > 1:
+            for field, answers in field_answers.items():
+                if answers is None:
+                    single_field_answers, _, single_field_stats, _ = self.generator(candidate, [field], **gen_kwargs)
+                    field_answers.update(single_field_answers)
+                    generation_stats += single_field_stats
 
         return field_answers, generation_stats
