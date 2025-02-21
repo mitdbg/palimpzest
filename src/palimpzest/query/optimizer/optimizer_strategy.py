@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from enum import Enum
 
 from palimpzest.policy import Policy
@@ -47,7 +46,7 @@ class OptimizationStrategy(ABC):
         for plan in plans:
             normalized_ops = []
             for idx, op in enumerate(plan.operators):
-                op_copy = deepcopy(op)
+                op_copy = op.copy()
                 if idx == 0:
                     normalized_ops.append(op_copy)
                 else:
