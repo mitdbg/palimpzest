@@ -23,6 +23,7 @@ from together.types.chat_completions import ChatCompletionResponse
 
 from palimpzest.constants import (
     MODEL_CARDS,
+    APIClient,
     # RETRY_MAX_ATTEMPTS,
     # RETRY_MAX_SECS,
     # RETRY_MULTIPLIER,
@@ -33,6 +34,7 @@ from palimpzest.constants import (
 from palimpzest.core.data.dataclasses import GenerationStats
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.prompts import PromptFactory
+from palimpzest.query.generators.api_client_factory import APIClientFactory
 from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
@@ -350,7 +352,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
 
     def _get_client_or_model(self, **kwargs) -> OpenAI:
         """Returns a client (or local model) which can be invoked to perform the generation."""
-        return OpenAI(api_key=get_api_key("OPENAI_API_KEY"))
+        return APIClientFactory.get_client(APIClient.OPENAI, get_api_key("OPENAI_API_KEY"))
 
     def _generate_completion(self, client: OpenAI, payload: dict, **kwargs) -> ChatCompletion:
         """Generates a completion object using the client (or local model)."""
@@ -394,7 +396,7 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
 
     def _get_client_or_model(self, **kwargs) -> Together:
         """Returns a client (or local model) which can be invoked to perform the generation."""
-        return Together(api_key=get_api_key("TOGETHER_API_KEY"))
+        return APIClientFactory.get_client(APIClient.TOGETHER, get_api_key("TOGETHER_API_KEY"))
 
     def _generate_completion(self, client: Together, payload: dict, **kwargs) -> ChatCompletionResponse:
         """Generates a completion object using the client (or local model)."""

@@ -14,6 +14,7 @@ def setup_logger(name):
 
 class JsonFormatter(logging.Formatter):
     """Format logs as JSON for easier parsing"""
+
     def format(self, record):
         log_data = {
             "timestamp": self.formatTime(record),
@@ -27,11 +28,12 @@ class JsonFormatter(logging.Formatter):
         # hasattr(record, "exc_info") will runinto error.
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
-            
+
         return json.dumps(log_data)
 
 class PZLogger:
     """Central logging class for Palimpzest"""
+
     _instance = None
     root_log_dir = ".pz_logs"
 
@@ -44,7 +46,7 @@ class PZLogger:
                 json_format: bool = True):
         if cls._instance is None:
             instance = super().__new__(cls)
-            
+
             # Initialize all attributes
             instance.root_logger = logging.getLogger("palimpzest")
             instance.root_logger.setLevel(logging.DEBUG)  # Set root logger to capture all levels
@@ -71,7 +73,7 @@ class PZLogger:
             
             # Setup logging
             instance._setup_root_logging()
-            
+
             cls._instance = instance
         return cls._instance
 
@@ -99,7 +101,7 @@ class PZLogger:
         self.streaming_log_level = level
         self.console_handler.setLevel(level)
         self.file_handler.setLevel(level)
-    
+
     def get_logger(self, name: str) -> logging.Logger:
         """Get a logger for a specific component"""
         logger = logging.getLogger(f"palimpzest.{name}")
