@@ -84,14 +84,14 @@ class Set:
             "source": self._source.serialize(),
             "desc": repr(self._desc),
             "filter": None if self._filter is None else self._filter.serialize(),
-            "udf": None if self._udf is None else str(self._udf),
+            "udf": None if self._udf is None else self._udf.__name__,
             "agg_func": None if self._agg_func is None else self._agg_func.value,
             "cardinality": self._cardinality,
             "limit": self._limit,
             "group_by": None if self._group_by is None else self._group_by.serialize(),
             "project_cols": None if self._project_cols is None else self._project_cols,
             "index": None if self._index is None else self._index.__class__.__name__,
-            "search_func": None if self._search_func is None else str(self._search_func),
+            "search_func": None if self._search_func is None else self._search_func.__name__,
             "search_attr": self._search_attr,
             "output_attr": self._output_attr,
             "k": self._k,
@@ -289,6 +289,27 @@ class Dataset(Set):
             udf=udf,
             cardinality=cardinality,
             desc=desc,
+            depends_on=depends_on,
+            cache=self._cache,
+        )
+
+    def map(self, udf: Callable, depends_on: str | list[str] | None = None) -> Dataset:
+        """
+        Apply a UDF map function.
+
+        Examples:
+            map(udf=clean_column_values)
+        """
+        if udf is None:
+            raise ValueError("`udf` must be provided for map.")
+
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+
+        return Dataset(
+            source=self,
+            schema=self.schema,
+            udf=udf,
             depends_on=depends_on,
             cache=self._cache,
         )

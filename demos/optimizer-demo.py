@@ -7,12 +7,11 @@ from functools import partial
 
 import chromadb
 import datasets
-from openai import OpenAI
+from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 from ragatouille import RAGPretrainedModel
 
 import palimpzest as pz
-from palimpzest.constants import MODEL_CARDS, Model
-from palimpzest.core.data.dataclasses import GenerationStats
+from palimpzest.constants import Model
 from palimpzest.utils.model_helpers import get_models
 
 biodex_entry_cols = [
@@ -324,7 +323,7 @@ if __name__ == "__main__":
             seed=seed,
         )
 
-        # load index [Colbert]
+        # # load index [Colbert]
         # index_path = ".ragatouille/colbert/indexes/reaction-terms"
         # index = RAGPretrainedModel.from_index(index_path)
 
@@ -335,55 +334,17 @@ if __name__ == "__main__":
         #     return [result["content"] for result in sorted_results[:k]], GenerationStats(model_name="colbert")
 
         # load index [text-embedding-3-small]
-        # chroma_client = chromadb.PersistentClient(".chroma")
-        # openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-        #     api_key=os.environ["OPENAI_API_KEY"],
-        #     model_name="text-embedding-3-small",
-        # )
-        # index = chroma_client.get_collection("biodex-reaction-terms", embedding_function=openai_ef)
         chroma_client = chromadb.PersistentClient(".chroma")
-        index = chroma_client.get_collection("biodex-reaction-terms")
+        openai_ef = OpenAIEmbeddingFunction(
+            api_key=os.environ["OPENAI_API_KEY"],
+            model_name="text-embedding-3-small",
+        )
+        index = chroma_client.get_collection("biodex-reaction-terms", embedding_function=openai_ef)
 
-        def search_func(index: chromadb.Collection, query: str | list[str], k: int) -> tuple[list[str], GenerationStats]:
-            # set model name
-            model_name = "text-embedding-3-small"
-
-            # check that query is a string or list of strings, otherwise we return None
-            query_is_str = isinstance(query, str)
-            query_is_list_of_str = isinstance(query, list) and all(isinstance(q, str) for q in query)
-            if not query_is_str and not query_is_list_of_str:
-                return None, GenerationStats()
-
-            # if query is a string, convert it to a list of strings
-            if query_is_str:
-                query = [query]
-
-            # compute embedding(s)
-            client = OpenAI()
-            start_time = time.time()
-            resp = client.embeddings.create(input=query, model=model_name)
-            total_time = time.time() - start_time
-
-            # extract embedding(s)
-            embeddings = [item.embedding for item in resp.data]
-
-            # update stats
-            model_card = MODEL_CARDS[model_name]
-            total_input_tokens = resp.usage.total_tokens
-            total_input_cost = model_card["usd_per_input_token"] * total_input_tokens
-            gen_stats = GenerationStats(
-                model_name=model_name,
-                total_input_tokens=total_input_tokens,
-                total_output_tokens=0.0,
-                total_input_cost=total_input_cost,
-                total_output_cost=0.0,
-                cost_per_record=total_input_cost,
-                llm_call_duration_secs=total_time,
-            )
-
+        def search_func(index: chromadb.Collection, query: list[list[float]], k: int) -> list[str]:
             # execute query with embeddings
             results_per_query = int(50 / len(query))  # NOTE: 50 is chosen to ~match k=49 in Lotus / DocETL evaluation
-            results = index.query(embeddings, n_results=results_per_query)
+            results = index.query(query, n_results=results_per_query)
 
             # get list of result terms with their cosine similarity scores
             final_results = []
@@ -395,7 +356,22 @@ if __name__ == "__main__":
             # return the top-k similar results and generation stats
             sorted_results = sorted(final_results, key=lambda result: result["similarity"], reverse=True)
 
-            return [result["content"] for result in sorted_results[:k]], gen_stats
+            return [result["content"] for result in sorted_results[:k]]
+
+        def trim_terms(record: dict) -> dict:
+            """Only keep `reaction_labels` for which every word appears in the record's `fulltext`."""
+            reaction_labels = [label.lower() for label in record["reaction_labels"]]
+            fulltext = record["fulltext"].lower()
+            trimmed_reaction_labels = [
+                label
+                for label in reaction_labels
+                if all(word in fulltext for word in label.split(" "))
+            ]
+            record["reaction_labels"] = trimmed_reaction_labels
+
+            print(f"Trimmed reaction labels: {trimmed_reaction_labels}")
+
+            return record
 
         # construct plan
         plan = pz.Dataset(datareader)
@@ -408,6 +384,7 @@ if __name__ == "__main__":
             output_attr="reaction_labels",
             output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
         )
+        plan = plan.map(trim_terms, depends_on=["reaction_labels"])
         plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols)
 
         # only use final op quality
@@ -497,20 +474,20 @@ if __name__ == "__main__":
         max_workers=1,
         verbose=verbose,
         available_models=[
-            Model.GPT_4o,
-            Model.GPT_4o_V,
+            # Model.GPT_4o,
+            # Model.GPT_4o_V,
             Model.GPT_4o_MINI,
-            Model.GPT_4o_MINI_V,
-            Model.DEEPSEEK,
-            Model.MIXTRAL,
-            Model.LLAMA3,
-            Model.LLAMA3_V,
+            # Model.GPT_4o_MINI_V,
+            # Model.DEEPSEEK,
+            # Model.MIXTRAL,
+            # Model.LLAMA3,
+            # Model.LLAMA3_V,
         ],
         allow_bonded_query=True,
         allow_code_synth=False,
-        allow_critic=True,
-        allow_mixtures=True,
-        allow_rag_reduction=True,
+        allow_critic=False, # True
+        allow_mixtures=False, # True
+        allow_rag_reduction=False, # True
         allow_token_reduction=False,
     )
 

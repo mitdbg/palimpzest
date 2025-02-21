@@ -14,6 +14,7 @@ from palimpzest.query.operators.logical import (
     GroupByAggregate,
     LimitScan,
     LogicalOperator,
+    MapScan,
     Project,
     RetrieveScan,
 )
@@ -305,6 +306,14 @@ class Optimizer:
                 depends_on=node._depends_on,
                 target_cache_id=uid,
             )
+        elif output_schema == input_schema and node._udf is not None:
+            op = MapScan(
+                input_schema=input_schema,
+                output_schema=output_schema,
+                udf=node._udf,
+                depends_on=node._depends_on,
+                target_cache_id=uid,
+            )
         # some legacy plans may have a useless convert; for now we simply skip it
         elif output_schema == input_schema:
             return self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], {}, {})
@@ -359,6 +368,13 @@ class Optimizer:
                 all_properties["projects"].add(op_project_str)
             else:
                 all_properties["projects"] = set([op_project_str])
+
+        elif isinstance(op, MapScan):
+            op_udf_str = op.udf.__name__
+            if "udfs" in all_properties:
+                all_properties["udfs"].add(op_udf_str)
+            else:
+                all_properties["udfs"] = set([op_udf_str])
 
         # construct the logical expression and group
         logical_expression = LogicalExpression(

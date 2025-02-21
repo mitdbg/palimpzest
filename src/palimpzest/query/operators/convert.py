@@ -205,7 +205,7 @@ class ConvertOp(PhysicalOperator, ABC):
 class NonLLMConvert(ConvertOp):
     def __str__(self):
         op = super().__str__()
-        op += f"    UDF: {str(self.udf)}\n"
+        op += f"    UDF: {self.udf.__name__}\n"
         return op
 
     def is_image_conversion(self) -> bool:
@@ -259,7 +259,7 @@ class NonLLMConvert(ConvertOp):
                         field_answers[field_name].append(answer_dict.get(field_name, None))
 
             if self.verbose:
-                print(f"{str(self.udf)}:\n{answer}")
+                print(f"{self.udf.__name__}:\n{answer}")
 
         except Exception as e:
             print(f"Error invoking user-defined function for convert: {e}")
