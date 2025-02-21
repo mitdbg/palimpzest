@@ -23,10 +23,9 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
 
-        # Add extra fields if they exist (for metrics/stats)
         if hasattr(record, "stats"):
             log_data["stats"] = record.stats
-        if record.exc_info:
+        if hasattr(record, "exc_info"):
             log_data["exception"] = self.formatException(record.exc_info)
             
         return json.dumps(log_data)
@@ -40,7 +39,7 @@ class PZLogger:
     def __new__(cls,
                 file_log_level: str = "ERROR",
                 streaming_log_level: str = "ERROR", 
-                log_file: Optional[str] = None, 
+                log_file: str | None = None, 
                 log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
                 json_format: bool = True):
         if cls._instance is None:
@@ -53,7 +52,7 @@ class PZLogger:
             instance.file_log_level = file_log_level
             if log_file is None:
                 # TODO: Save by day for now.
-                log_dir = Path("logs")
+                log_dir = Path(".pz_logs")
                 log_dir.mkdir(exist_ok=True)
                 date_str = datetime.now().strftime("%Y-%m-%d")
                 instance.log_file = f"{LOG_FILE}_{date_str}.log"

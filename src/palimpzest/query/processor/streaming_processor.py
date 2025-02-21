@@ -65,9 +65,9 @@ class StreamingQueryProcessor(QueryProcessor):
             op_name = op.op_name()
             op_details = {k: str(v) for k, v in op.get_id_params().items()}
             self.plan_stats.operator_stats[op_id] = OperatorStats(op_id=op_id, op_name=op_name, op_details=op_details) 
-        print("Time for planning: ", time.time() - start_time)
+        logger.info(f"Time for planning: {time.time() - start_time:.2f} seconds")
         self.plan_generated = True
-        print("Generated plan:\n", self.plan)
+        logger.info(f"Generated plan:\n{self.plan}")
         return self.plan
 
     def execute(self):

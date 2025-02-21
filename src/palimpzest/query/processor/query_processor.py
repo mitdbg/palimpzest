@@ -178,10 +178,10 @@ class QueryProcessor:
             if plan.plan_id == max_quality_plan_id:
                 return_records = records
 
-        logger.info(f"Done executing plans: {plans}")
-        logger.debug(f"All sample execution data: {all_sample_execution_data}")
-        logger.debug(f"Return records: {return_records}")
-        logger.debug(f"All plan stats: {all_plan_stats}")
+        logger.info(f"Done executing plans number: {len(plans)}")
+        logger.debug(f"All sample execution data number: {len(all_sample_execution_data)}")
+        logger.debug(f"Return records number: {len(return_records)}")
+        logger.debug(f"All plan stats number: {len(all_plan_stats)}")
         return all_sample_execution_data, return_records, all_plan_stats
     
     def _execute_best_plan(

@@ -223,9 +223,8 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
             if self.progress_manager:
                 self.progress_manager.finish()
 
-        logger.info(f"Done executing plan: {plan}")
-        logger.debug(f"Output records: {output_records}")
-        logger.debug(f"Plan stats: {plan_stats}")
+        logger.info(f"Done executing plan: {plan.plan_id}")
+        logger.debug(f"Plan stats: (plan_str={plan.plan_str}, plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")
         return output_records, plan_stats
 
 
@@ -418,9 +417,8 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
             if self.progress_manager:
                 self.progress_manager.finish()
 
-        logger.info(f"Done executing plan: {plan}")
-        logger.debug(f"Output records: {output_records}")
-        logger.debug(f"Plan stats: {plan_stats}")
+        logger.info(f"Done executing plan: {plan.plan_id}")
+        logger.debug(f"Plan stats: (plan_str={plan.plan_str}, plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")
         return output_records, plan_stats
 
 

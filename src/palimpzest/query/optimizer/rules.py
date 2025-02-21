@@ -254,10 +254,12 @@ class NonLLMConvertRule(ImplementationRule):
             generated_fields=logical_expression.generated_fields,
             group_id=logical_expression.group_id,
         )
-        logger.debug(f"Done substituting NonLLMConvertRule for {logical_expression}")
-        logger.debug(f"Expression: {[expression]}")
 
-        return set([expression])
+        deduped_physical_expressions = set([expression])
+        logger.debug(f"Done substituting NonLLMConvertRule for {logical_expression}")
+        logger.debug(f"Expression: {deduped_physical_expressions}")
+
+        return deduped_physical_expressions
 
 
 class LLMConvertRule(ImplementationRule):
@@ -349,9 +351,10 @@ class LLMConvertRule(ImplementationRule):
             )
             physical_expressions.append(expression)
 
+        deduped_physical_expressions = set(physical_expressions)
         logger.debug(f"Done substituting LLMConvertRule for {logical_expression}")
-        logger.debug(f"Physical expressions: {physical_expressions}")
-        return set(physical_expressions)
+        logger.debug(f"Physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions
 
 
 class LLMConvertBondedRule(LLMConvertRule):

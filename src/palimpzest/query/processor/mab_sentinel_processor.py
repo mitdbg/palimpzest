@@ -579,11 +579,9 @@ class MABSentinelQueryProcessor(QueryProcessor):
     def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict], policy: Policy):
         """
         """
-        if self.verbose:
-            print("----------------------")
-            print(f"PLAN[{plan.plan_id}] (sentinel):")
-            print(plan)
-            print("---")
+        logger.debug(f"Executing plan: {plan.plan_id}")
+        logger.debug(f"Plan: {plan}")
+        logger.debug("---")
 
         plan_start_time = time.time()
 

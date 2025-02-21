@@ -212,6 +212,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
         plan_stats.finalize(total_plan_time)
-        logger.debug(f"Plan execution stats: {plan_stats}")
+        logger.info(f"Completed execution of plan {plan.plan_id} in {time.time() - plan_start_time:.2f} seconds")
+        logger.debug(f"Plan execution stats: (plan_str={plan.plan_str}, plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")
 
         return output_records, plan_stats
