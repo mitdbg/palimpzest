@@ -20,12 +20,6 @@ from palimpzest.query.optimizer.rules import (
     LLMConvertBondedRule as _LLMConvertBondedRule,
 )
 from palimpzest.query.optimizer.rules import (
-    LLMConvertConventionalRule as _LLMConvertConventionalRule,
-)
-from palimpzest.query.optimizer.rules import (
-    LLMConvertRule as _LLMConvertRule,
-)
-from palimpzest.query.optimizer.rules import (
     LLMFilterRule as _LLMFilterRule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -53,12 +47,6 @@ from palimpzest.query.optimizer.rules import (
     TokenReducedConvertBondedRule as _TokenReducedConvertBondedRule,
 )
 from palimpzest.query.optimizer.rules import (
-    TokenReducedConvertConventionalRule as _TokenReducedConvertConventionalRule,
-)
-from palimpzest.query.optimizer.rules import (
-    TokenReducedConvertRule as _TokenReducedConvertRule,
-)
-from palimpzest.query.optimizer.rules import (
     TransformationRule as _TransformationRule,
 )
 
@@ -70,8 +58,6 @@ ALL_RULES = [
     _CriticAndRefineConvertRule,
     _ImplementationRule,
     _LLMConvertBondedRule,
-    _LLMConvertConventionalRule,
-    _LLMConvertRule,
     _LLMFilterRule,
     _MixtureOfAgentsConvertRule,
     _NonLLMConvertRule,
@@ -81,8 +67,6 @@ ALL_RULES = [
     _RetrieveRule,
     _Rule,
     _TokenReducedConvertBondedRule,
-    _TokenReducedConvertConventionalRule,
-    _TokenReducedConvertRule,
     _TransformationRule,
 ]
 
@@ -90,7 +74,7 @@ IMPLEMENTATION_RULES = [
     rule
     for rule in ALL_RULES
     if issubclass(rule, _ImplementationRule)
-    and rule not in [_CodeSynthesisConvertRule, _ImplementationRule, _LLMConvertRule, _TokenReducedConvertRule]
+    and rule not in [_CodeSynthesisConvertRule, _ImplementationRule]
 ]
 
 TRANSFORMATION_RULES = [

@@ -5,7 +5,6 @@ from palimpzest.query.operators.aggregate import CountAggregateOp as _CountAggre
 from palimpzest.query.operators.convert import ConvertOp as _ConvertOp
 from palimpzest.query.operators.convert import LLMConvert as _LLMConvert
 from palimpzest.query.operators.convert import LLMConvertBonded as _LLMConvertBonded
-from palimpzest.query.operators.convert import LLMConvertConventional as _LLMConvertConventional
 from palimpzest.query.operators.convert import NonLLMConvert as _NonLLMConvert
 from palimpzest.query.operators.filter import FilterOp as _FilterOp
 from palimpzest.query.operators.filter import LLMFilter as _LLMFilter
@@ -66,7 +65,7 @@ PHYSICAL_OPERATORS = (
     # aggregate
     [_AggregateOp, _ApplyGroupByOp, _AverageAggregateOp, _CountAggregateOp]
     # convert
-    + [_ConvertOp, _NonLLMConvert, _LLMConvert, _LLMConvertConventional, _LLMConvertBonded]
+    + [_ConvertOp, _NonLLMConvert, _LLMConvert, _LLMConvertBonded]
     # scan
     + [_ScanPhysicalOp, _MarshalAndScanDataOp, _CacheScanDataOp]
     # filter

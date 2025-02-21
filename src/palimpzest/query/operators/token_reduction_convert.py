@@ -9,7 +9,7 @@ from palimpzest.constants import (
     NAIVE_EST_NUM_OUTPUT_TOKENS,
 )
 from palimpzest.core.data.dataclasses import OperatorCostEstimates
-from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded, LLMConvertConventional
+from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded
 from palimpzest.utils.token_reduction_helpers import best_substring_match, find_best_range
 
 
@@ -165,10 +165,6 @@ class TokenReducedConvert(LLMConvert):
         self.heatmap[norm_si:norm_ei] = map(lambda x: x + 1, self.heatmap[norm_si:norm_ei])
 
         return answer, query_stats
-
-
-class TokenReducedConvertConventional(TokenReducedConvert, LLMConvertConventional):
-    pass
 
 
 class TokenReducedConvertBonded(TokenReducedConvert, LLMConvertBonded):

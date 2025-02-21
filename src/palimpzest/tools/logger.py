@@ -8,7 +8,7 @@ from pathlib import Path
 def setup_logger(name):
     pz_logger = PZLogger()
     logger = pz_logger.get_logger(name)
-    log_level = os.getenv("PZ_LOG_LEVEL", "ERROR").upper()
+    log_level = os.getenv("PZ_LOG_LEVEL", "DEBUG").upper()
     if log_level == "DEBUG":
         logger.setLevel(logging.DEBUG)
     elif log_level == "INFO":
@@ -31,6 +31,7 @@ class JsonFormatter(logging.Formatter):
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
+            "location": f"{record.pathname}:{record.lineno} {record.funcName}",
         }
 
         if hasattr(record, "stats"):
@@ -41,19 +42,23 @@ class JsonFormatter(logging.Formatter):
 
         return json.dumps(log_data)
 
+
 class PZLogger:
     """Central logging class for Palimpzest"""
 
     _instance = None
     root_log_dir = ".pz_logs"
 
-    def __new__(cls,
-                file_log_level: str = "ERROR",
-                streaming_log_level: str = "ERROR", 
-                log_file: str | None = None,
-                intermediate_log_dir: str | None = None,
-                log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                json_format: bool = True):
+    def __new__(
+        cls,
+        file_log_level: str = "ERROR",
+        streaming_log_level: str = "ERROR",
+        log_file: str | None = None,
+        intermediate_log_dir: str | None = None,
+        log_format: str = "%(asctime)s - %(pathname)s:%(lineno)d(%(funcName)s) - %(levelname)s - %(message)s",
+        json_format: bool = True,
+        time_format: str = "%Y-%m-%d %H:%M:%S %Z",
+    ):
         if cls._instance is None:
             instance = super().__new__(cls)
 
@@ -73,6 +78,7 @@ class PZLogger:
                 instance.log_file = log_file
             instance.log_format = log_format
             instance.json_format = json_format
+            instance.time_format = time_format
 
             # Setup intermediate results directory
             if intermediate_log_dir is None:
@@ -80,7 +86,7 @@ class PZLogger:
             else:
                 instance.intermediate_log_dir = Path(intermediate_log_dir)
             instance.intermediate_log_dir.mkdir(exist_ok=True)
-            
+
             # Setup logging
             instance._setup_root_logging()
 
@@ -98,12 +104,12 @@ class PZLogger:
             if self.json_format:
                 self.file_handler.setFormatter(JsonFormatter())
             else:
-                self.file_handler.setFormatter(logging.Formatter(self.log_format))
+                self.file_handler.setFormatter(logging.Formatter(self.log_format, self.time_format))
             self.root_logger.addHandler(self.file_handler)
 
         self.console_handler = logging.StreamHandler()
         self.console_handler.setLevel(self.streaming_log_level)
-        self.console_handler.setFormatter(logging.Formatter(self.log_format))
+        self.console_handler.setFormatter(logging.Formatter(self.log_format, self.time_format))
         self.root_logger.addHandler(self.console_handler)
 
     # TODO: we save everything into file when verbose is on.
