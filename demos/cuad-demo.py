@@ -289,6 +289,13 @@ def get_jaccard(label, pred):
 def evaluate_entry(labels, preds, substr_ok):
     tp, fp, fn = 0, 0, 0
 
+    # jaccard similarity expects strings
+    # TODO: This is a hack, ideally, the return type of the preds should be known
+    for pred in preds:
+        if not isinstance(pred, str):
+            print(pred)
+            pred = str(pred)
+
     # first check if labels is empty
     if len(labels) == 0:
         if len(preds) > 0:
@@ -313,9 +320,6 @@ def evaluate_entry(labels, preds, substr_ok):
 
         # now also get any fps by looping through preds
         for pred in preds:
-            if not isinstance(pred, str):
-                print(pred)
-                pred = str(pred)
             # Check if there's a match. if so, don't count (don't want to double count based on the above)
             # but if there's no match, then this is a false positive.
             # (Note: we get the true positives in the above loop instead of this loop so that we don't double count
