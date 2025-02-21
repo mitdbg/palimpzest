@@ -34,15 +34,15 @@ biodex_drugs_cols = [
 ]
 
 biodex_reactions_cols = [
-    {"name": "reactions", "type": list[str], "desc": "The list of all reaction terms discussed in the report."},
+    {"name": "reactions", "type": list[str], "desc": "The list of all medical conditions discussed in the report."},
 ]
 
 biodex_reaction_labels_cols = [
-    {"name": "reaction_labels", "type": list[str], "desc": "Most relevant official terms for adverse reactions for the provided `reactions`"},
+    {"name": "reaction_labels", "type": list[str], "desc": "Official terms for medical conditions listed in `reactions`"},
 ]
 
 biodex_ranked_reactions_labels_cols = [
-    {"name": "ranked_reaction_labels", "type": list[str], "desc": "The ranked list of labels for adverse reactions experienced by the patient. The most likely label occurs first in the list."},
+    {"name": "ranked_reaction_labels", "type": list[str], "desc": "The ranked list of medical conditions experienced by the patient. The most relevant label occurs first in the list."},
 ]
 
 
@@ -353,10 +353,23 @@ if __name__ == "__main__":
                     cosine_similarity = 1 - dist
                     final_results.append({"content": doc, "similarity": cosine_similarity})
 
-            # return the top-k similar results and generation stats
+            # sort the results by similarity score
             sorted_results = sorted(final_results, key=lambda result: result["similarity"], reverse=True)
 
-            return [result["content"] for result in sorted_results[:k]]
+            # remove duplicates
+            sorted_results_set = set()
+            final_sorted_results = []
+            for result in sorted_results:
+                if result["content"] not in sorted_results_set:
+                    sorted_results_set.add(result["content"])
+                    final_sorted_results.append(result["content"])
+
+            # return the top-k similar results and generation stats
+            return final_sorted_results[:k]
+
+        def store_og_reactions(record: dict) -> dict:
+            """Store the original reactions in a separate column."""
+            return {"og_reaction_labels": record["reaction_labels"]}
 
         def trim_terms(record: dict) -> dict:
             """Only keep `reaction_labels` for which every word appears in the record's `fulltext`."""
@@ -376,7 +389,6 @@ if __name__ == "__main__":
         # construct plan
         plan = pz.Dataset(datareader)
         plan = plan.sem_add_columns(biodex_reactions_cols)
-
         plan = plan.retrieve(
             index=index,
             search_func=search_func,
@@ -384,8 +396,9 @@ if __name__ == "__main__":
             output_attr="reaction_labels",
             output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
         )
+        plan = plan.add_columns(store_og_reactions, cols=[{"name": "og_reaction_labels", "type": list[str], "desc": ""}], depends_on=["reaction_labels"])
         plan = plan.map(trim_terms, depends_on=["reaction_labels"])
-        plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols)
+        plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
         # only use final op quality
         use_final_op_quality = True
@@ -474,14 +487,14 @@ if __name__ == "__main__":
         max_workers=1,
         verbose=verbose,
         available_models=[
-            Model.GPT_4o,
-            Model.GPT_4o_V,
+            # Model.GPT_4o,
+            # Model.GPT_4o_V,
             Model.GPT_4o_MINI,
-            Model.GPT_4o_MINI_V,
-            Model.DEEPSEEK,
-            Model.MIXTRAL,
-            Model.LLAMA3,
-            Model.LLAMA3_V,
+            # Model.GPT_4o_MINI_V,
+            # Model.DEEPSEEK,
+            # Model.MIXTRAL,
+            # Model.LLAMA3,
+            # Model.LLAMA3_V,
         ],
         allow_bonded_query=True,
         allow_code_synth=False,
@@ -531,7 +544,7 @@ if __name__ == "__main__":
             record_dict = {
                 k: v
                 for k, v in record_dict.items()
-                if k in ["pmid", "reactions", "reaction_labels", "ranked_reaction_labels"]
+                if k in ["pmid", "reactions", "og_reaction_labels", "reaction_labels", "ranked_reaction_labels"]
             }
         record_jsons.append(record_dict)
 

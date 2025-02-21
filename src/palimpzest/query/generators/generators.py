@@ -420,6 +420,10 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
+        # TODO: remove
+        print(f"PROMPT:\n{prompt}")
+        print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
+
         # parse reasoning
         reasoning = None
         try:
