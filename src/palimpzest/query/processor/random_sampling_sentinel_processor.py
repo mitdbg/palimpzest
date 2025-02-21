@@ -1,6 +1,5 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
-from copy import deepcopy
 
 import numpy as np
 
@@ -541,7 +540,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         optimizer.update_strategy(OptimizationStrategyType.SENTINEL)
 
         # create copy of dataset, but change its data source to the validation data source
-        dataset = deepcopy(dataset)
+        dataset = dataset.copy()
         dataset._set_data_source(self.val_datasource)
 
         # get the sentinel plan for the given dataset

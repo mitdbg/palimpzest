@@ -1,6 +1,7 @@
 """
 This file contains the Generator classes and generator factory.
 """
+
 from __future__ import annotations
 
 import os
@@ -37,14 +38,16 @@ from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
 
 # DEFINITIONS
-GenerationOutput = tuple[dict, str | None, GenerationStats]
+GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
 ContextType = TypeVar("ContextType")
 InputType = TypeVar("InputType")
 
 
 logger = setup_logger(__name__)
 
-def generator_factory(model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality, verbose: bool = False) -> BaseGenerator:
+def generator_factory(
+    model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality, verbose: bool = False
+) -> BaseGenerator:
     """
     Factory function to return the correct generator based on the model, strategy, and cardinality.
     """
@@ -72,7 +75,15 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
     """
     Abstract base class for Generators.
     """
-    def __init__(self, model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality = Cardinality.ONE_TO_ONE, verbose: bool = False, system_role: str = "system"):
+
+    def __init__(
+        self,
+        model: Model,
+        prompt_strategy: PromptStrategy,
+        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
+        verbose: bool = False,
+        system_role: str = "system",
+    ):
         self.model = model
         self.model_name = model.value
         self.cardinality = cardinality
@@ -80,11 +91,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         self.verbose = verbose
         self.system_role = system_role
         self.prompt_factory = PromptFactory(prompt_strategy, model, cardinality)
-        self.messages = None
-
-    def get_messages(self) -> list[dict] | None:
-        """Returns the messages used in the last generation."""
-        return self.messages
 
     @abstractmethod
     def _get_client_or_model(self, **kwargs) -> Any:
@@ -232,7 +238,9 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         logger.debug(f"Generating for candidate {candidate} with fields {fields}")
 
         # fields can only be None if the user provides an answer parser
-        assert fields is not None or "parse_answer" in kwargs, "`fields` must be provided if `parse_answer` function is not provided in kwargs."
+        assert fields is not None or "parse_answer" in kwargs, (
+            "`fields` must be provided if `parse_answer` function is not provided in kwargs."
+        )
 
         # if the user (or operator) provides a system prompt instead of a prompt, treat this as
         # the prompt and print a warning
@@ -242,10 +250,10 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             warnings.warn("Provided `system_prompt` without providing `prompt`; setting `prompt` = `system_prompt`.")  # noqa: B028
 
         # generate a list of messages which can be used to construct a payload
-        self.messages = self.prompt_factory.create_messages(candidate, fields, **kwargs)
+        messages = self.prompt_factory.create_messages(candidate, fields, **kwargs)
 
         # create the chat payload
-        chat_payload = self._generate_payload(self.messages, **kwargs)
+        chat_payload = self._generate_payload(messages, **kwargs)
 
         # generate the text completion
         start_time = time.time()
@@ -261,9 +269,11 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             print(f"Error generating completion: {e}")
             field_answers = {field_name: None for field_name in fields}
             reasoning = None
-            generation_stats = GenerationStats(model_name=self.model_name, llm_call_duration_secs=time.time() - start_time)
+            generation_stats = GenerationStats(
+                model_name=self.model_name, llm_call_duration_secs=time.time() - start_time
+            )
 
-            return field_answers, reasoning, generation_stats
+            return field_answers, reasoning, generation_stats, messages
 
         # parse usage statistics and create the GenerationStats
         generation_stats = None
@@ -303,7 +313,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
-        
 
         # parse reasoning
         reasoning = None
@@ -320,14 +329,21 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             logger.error(f"Error parsing answers: {e}")
 
         logger.debug(f"Generated field answers: {field_answers}")
-        return field_answers, reasoning, generation_stats
+        return field_answers, reasoning, generation_stats, messages
 
 
 class OpenAIGenerator(BaseGenerator[str | list[str], str]):
     """
     Class for generating text using the OpenAI chat API.
     """
-    def __init__(self, model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality = Cardinality.ONE_TO_ONE, verbose: bool = False):
+
+    def __init__(
+        self,
+        model: Model,
+        prompt_strategy: PromptStrategy,
+        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
+        verbose: bool = False,
+    ):
         # assert that model is an OpenAI model
         assert model in [Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4o_V, Model.GPT_4o_MINI_V]
         super().__init__(model, prompt_strategy, cardinality, verbose, "developer")
@@ -337,7 +353,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
         return OpenAI(api_key=get_api_key("OPENAI_API_KEY"))
 
     def _generate_completion(self, client: OpenAI, payload: dict, **kwargs) -> ChatCompletion:
-        """Generates a completion object using the client (or local model)."""        
+        """Generates a completion object using the client (or local model)."""
         return client.chat.completions.create(**payload)
 
     def _get_completion_text(self, completion: ChatCompletion, **kwargs) -> str:
@@ -364,7 +380,14 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
     """
     Class for generating text using the Together chat API.
     """
-    def __init__(self, model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality = Cardinality.ONE_TO_ONE, verbose: bool = False):
+
+    def __init__(
+        self,
+        model: Model,
+        prompt_strategy: PromptStrategy,
+        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
+        verbose: bool = False,
+    ):
         # assert that model is a model offered by Together
         assert model in [Model.MIXTRAL, Model.LLAMA3, Model.LLAMA3_V]
         super().__init__(model, prompt_strategy, cardinality, verbose, "system")
@@ -395,7 +418,6 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
     def _get_answer_log_probs(self, completion: ChatCompletionResponse, **kwargs) -> list[float]:
         """Extract the log probabilities from the completion object."""
         return completion.choices[0].logprobs
-
 
 
 ### CODE SYNTHESIS EXECUTION ###
