@@ -25,11 +25,20 @@ class Model(str, Enum):
         return f"{self.name}"
 
 
+class APIClient(str, Enum):
+    """
+    APIClient describes the API client to be used when invoking an LLM.
+    """
+
+    OPENAI = "openai"
+    TOGETHER = "together"
+
 class PromptStrategy(str, Enum):
     """
     PromptStrategy describes the prompting technique to be used by a Generator when
     performing some task with a specified Model.
     """
+
     # Chain-of-Thought Boolean Prompt Strategies
     COT_BOOL = "chain-of-thought-bool"
     # COT_BOOL_CRITIC = "chain-of-thought-bool-critic"
@@ -96,9 +105,11 @@ class Cardinality(str, Enum):
                     return member
         return cls.ONE_TO_ONE
 
+
 class PickOutputStrategy(str, Enum):
     CHAMPION = "champion"
     ENSEMBLE = "ensemble"
+
 
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
 PDF_EXTENSIONS = [".pdf"]
@@ -217,8 +228,8 @@ LOG_LLM_OUTPUT = False
 # }
 LLAMA3_3_70B_INSTRUCT_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 0.88 / 1E6,
-    "usd_per_output_token": 0.88 / 1E6,
+    "usd_per_input_token": 0.88 / 1e6,
+    "usd_per_output_token": 0.88 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0139,
     ##### Agg. Benchmark #####
@@ -237,8 +248,8 @@ LLAMA3_3_70B_INSTRUCT_MODEL_CARD = {
 # }
 LLAMA3_2_90B_V_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 1.2 / 1E6,
-    "usd_per_output_token": 1.2 / 1E6,
+    "usd_per_input_token": 1.2 / 1e6,
+    "usd_per_output_token": 1.2 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0222,
     ##### Agg. Benchmark #####
@@ -268,8 +279,8 @@ DEEPSEEK_V3_MODEL_CARD = {
 }
 GPT_4o_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 2.5 / 1E6,
-    "usd_per_output_token": 10.0 / 1E6,
+    "usd_per_input_token": 2.5 / 1e6,
+    "usd_per_output_token": 10.0 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0079,
     ##### Agg. Benchmark #####
@@ -280,8 +291,8 @@ GPT_4o_MODEL_CARD = {
 GPT_4o_V_MODEL_CARD = {
     # NOTE: it is unclear if the same ($ / token) costs can be applied, or if we have to calculate this ourselves
     ##### Cost in USD #####
-    "usd_per_input_token": 2.5 / 1E6,
-    "usd_per_output_token": 10.0 / 1E6,
+    "usd_per_input_token": 2.5 / 1e6,
+    "usd_per_output_token": 10.0 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0079,
     ##### Agg. Benchmark #####
@@ -289,8 +300,8 @@ GPT_4o_V_MODEL_CARD = {
 }
 GPT_4o_MINI_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 0.15 / 1E6,
-    "usd_per_output_token": 0.6 / 1E6,
+    "usd_per_input_token": 0.15 / 1e6,
+    "usd_per_output_token": 0.6 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0098,
     ##### Agg. Benchmark #####
@@ -301,8 +312,8 @@ GPT_4o_MINI_MODEL_CARD = {
 GPT_4o_MINI_V_MODEL_CARD = {
     # NOTE: it is unclear if the same ($ / token) costs can be applied, or if we have to calculate this ourselves
     ##### Cost in USD #####
-    "usd_per_input_token": 0.15 / 1E6,
-    "usd_per_output_token": 0.6 / 1E6,
+    "usd_per_input_token": 0.15 / 1e6,
+    "usd_per_output_token": 0.6 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0098,
     ##### Agg. Benchmark #####
@@ -310,7 +321,7 @@ GPT_4o_MINI_V_MODEL_CARD = {
 }
 TEXT_EMBEDDING_3_SMALL_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 0.02 / 1E6,
+    "usd_per_input_token": 0.02 / 1e6,
     "usd_per_output_token": None,
     ##### Time #####
     "seconds_per_output_token": 0.0098,  # NOTE: just copying GPT_4o_MINI_MODEL_CARD for now
@@ -338,9 +349,6 @@ MODEL_CARDS = {
 }
 
 
-
-
-
 ###### DEPRECATED ######
 # # NOTE: seconds_per_output_token is based on `gpt-3.5-turbo-1106`
 # GPT_3_5_MODEL_CARD = {
@@ -361,7 +369,7 @@ MODEL_CARDS = {
 #     ### "DROP": 64.1, # 3-shot
 #     ##### Code #####
 #     "code": 48.1,
-#     ### "HumanEval": 48.1,^ # 0-shot    
+#     ### "HumanEval": 48.1,^ # 0-shot
 #     ##### Math #####
 #     "math": 57.1,
 #     ### "GSM8K": 57.1,^     # 5-shot
@@ -408,10 +416,10 @@ MODEL_CARDS = {
 
 # GEMINI_1_MODEL_CARD = {
 #     ##### Cost in USD #####
-#     "usd_per_input_token": 125 / 1E8, # Gemini is free but rate limited for now. Pricing will be updated 
+#     "usd_per_input_token": 125 / 1E8, # Gemini is free but rate limited for now. Pricing will be updated
 #     "usd_per_output_token": 375 / 1E9,
 #     ##### Time #####
-#     "seconds_per_output_token": 0.042 / 10.0, # TODO: 
+#     "seconds_per_output_token": 0.042 / 10.0, # TODO:
 #     ##### Agg. Benchmark #####
 #     "overall": 65.0, # 90.0 TODO: we are using the free version of Gemini which is substantially worse than its paid version; I'm manually revising it's quality below that of Mixtral
 #     ##### Commonsense Reasoning #####
@@ -423,7 +431,7 @@ MODEL_CARDS = {
 #     ##### Code #####
 #     "code": 74.4,
 #     # "HumanEval": 74.4, # 0-shot (IT)*
-#     # "Natural2Code": 74.9, # 0-shot 
+#     # "Natural2Code": 74.9, # 0-shot
 #     ##### Math #####
 #     "math": 94.4,
 #     # "GSM8K": 94.4,     # maj1@32
@@ -432,10 +440,10 @@ MODEL_CARDS = {
 
 # GEMINI_1V_MODEL_CARD = {
 #     ##### Cost in USD #####
-#     "usd_per_input_token": 25 / 1E6,  # Gemini is free but rate limited for now. Pricing will be updated 
+#     "usd_per_input_token": 25 / 1E6,  # Gemini is free but rate limited for now. Pricing will be updated
 #     "usd_per_output_token": 375 / 1E9,
 #     ##### Time #####
-#     "seconds_per_output_token": 0.042, # / 10.0, # TODO: 
+#     "seconds_per_output_token": 0.042, # / 10.0, # TODO:
 #     ##### Agg. Benchmark #####
 #     "overall": 65.0, # 90.0, TODO: see note above in Gemini_1 model card
 #     ##### Commonsense Reasoning #####
@@ -447,7 +455,7 @@ MODEL_CARDS = {
 #     ##### Code #####
 #     "code": 74.4,
 #     # "HumanEval": 74.4, # 0-shot (IT)*
-#     # "Natural2Code": 74.9, # 0-shot 
+#     # "Natural2Code": 74.9, # 0-shot
 #     ##### Math #####
 #     "math": 94.4,
 #     # "GSM8K": 94.4,     # maj1@32

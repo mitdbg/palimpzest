@@ -25,7 +25,9 @@ from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyTy
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
+from palimpzest.tools.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class MABSentinelQueryProcessor(QueryProcessor):
     """
@@ -577,11 +579,9 @@ class MABSentinelQueryProcessor(QueryProcessor):
     def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict], policy: Policy):
         """
         """
-        if self.verbose:
-            print("----------------------")
-            print(f"PLAN[{plan.plan_id}] (sentinel):")
-            print(plan)
-            print("---")
+        logger.debug(f"Executing plan: {plan.plan_id}")
+        logger.debug(f"Plan: {plan}")
+        logger.debug("---")
 
         plan_start_time = time.time()
 
@@ -801,6 +801,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
 
     def execute(self) -> DataRecordCollection:
+        logger.info("Executing MABSentinelQueryProcessor")
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
@@ -848,7 +849,10 @@ class MABSentinelQueryProcessor(QueryProcessor):
             plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 
-        return DataRecordCollection(all_records, execution_stats = execution_stats)
+        result = DataRecordCollection(all_records, execution_stats = execution_stats)
+        logger.info("Done executing MABSentinelQueryProcessor")
+        logger.debug(f"Result: {result}")
+        return result
     
 
 
@@ -866,6 +870,7 @@ class MABSentinelSequentialSingleThreadProcessor(MABSentinelQueryProcessor, Sequ
             verbose=self.verbose
         )
         self.progress_manager = None
+        logger.info("Created MABSentinelSequentialSingleThreadProcessor")
 
 
 class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
@@ -882,3 +887,4 @@ class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, Pipelined
             verbose=self.verbose
         )
         self.progress_manager = None
+        logger.info("Created MABSentinelPipelinedParallelProcessor")

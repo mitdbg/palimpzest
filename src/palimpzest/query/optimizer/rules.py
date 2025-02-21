@@ -31,8 +31,10 @@ from palimpzest.query.operators.token_reduction_convert import (
     TokenReducedConvertConventional,
 )
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
+from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.model_helpers import get_models, get_vision_models
 
+logger = setup_logger(__name__)
 
 class Rule:
     """
@@ -83,12 +85,19 @@ class PushDownFilter(TransformationRule):
 
     @staticmethod
     def matches_pattern(logical_expression: Expression) -> bool:
-        return isinstance(logical_expression.operator, FilteredScan)
+        is_match = isinstance(logical_expression.operator, FilteredScan)
+        logger.debug(f"PushDownFilter matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @staticmethod
     def substitute(
         logical_expression: LogicalExpression, groups: dict[int, Group], expressions: dict[int, Expression], **kwargs
     ) -> tuple[set[LogicalExpression], set[Group]]:
+        logger.debug(f"Substituting PushDownFilter for {logical_expression}")
+        logger.debug(f"Groups: {groups}")
+        logger.debug(f"Expressions: {expressions}")
+        logger.debug(f"kwargs: {kwargs}")
+
         # initialize the sets of new logical expressions and groups to be returned
         new_logical_expressions, new_groups = set(), set()
 
@@ -197,6 +206,9 @@ class PushDownFilter(TransformationRule):
                 # add newly created expression to set of returned expressions
                 new_logical_expressions.add(new_expr)
 
+        logger.debug(f"Done substituting PushDownFilter for {logical_expression}")
+        logger.debug(f"New logical expressions: {new_logical_expressions}")
+        logger.debug(f"New groups: {new_groups}")
         return new_logical_expressions, new_groups
 
 
@@ -215,10 +227,15 @@ class NonLLMConvertRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        return isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is not None
+        is_match = isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is not None
+        logger.debug(f"NonLLMConvertRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting NonLLMConvertRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -242,7 +259,11 @@ class NonLLMConvertRule(ImplementationRule):
             group_id=logical_expression.group_id,
         )
 
-        return set([expression])
+        deduped_physical_expressions = set([expression])
+        logger.debug(f"Done substituting NonLLMConvertRule for {logical_expression}")
+        logger.debug(f"Expression: {deduped_physical_expressions}")
+
+        return deduped_physical_expressions
 
 
 class LLMConvertRule(ImplementationRule):
@@ -259,10 +280,15 @@ class LLMConvertRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        return isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is None
+        is_match = isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is None
+        logger.debug(f"LLMConvertRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting LLMConvertRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -329,7 +355,10 @@ class LLMConvertRule(ImplementationRule):
             )
             physical_expressions.append(expression)
 
-        return set(physical_expressions)
+        deduped_physical_expressions = set(physical_expressions)
+        logger.debug(f"Done substituting LLMConvertRule for {logical_expression}")
+        logger.debug(f"Physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions
 
 
 class LLMConvertBondedRule(LLMConvertRule):
@@ -368,10 +397,15 @@ class TokenReducedConvertRule(ImplementationRule):
             for field_name, field in logical_expression.input_fields.items()
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
-        return isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
+        is_match = isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
+        logger.debug(f"TokenReducedConvertRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting TokenReducedConvertRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -416,7 +450,10 @@ class TokenReducedConvertRule(ImplementationRule):
                 )
                 physical_expressions.append(expression)
 
-        return set(physical_expressions)
+        logger.debug(f"Done substituting TokenReducedConvertRule for {logical_expression}")
+        deduped_physical_expressions = set(physical_expressions)
+        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions
 
 
 class TokenReducedConvertBondedRule(TokenReducedConvertRule):
@@ -454,15 +491,20 @@ class CodeSynthesisConvertRule(ImplementationRule):
             for field_name, field in logical_expression.input_fields.items()
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
-        return (
+        is_match = (
             isinstance(logical_op, ConvertScan)
             and not is_image_conversion
             and logical_op.cardinality != Cardinality.ONE_TO_MANY
             and logical_op.udf is None
         )
+        logger.debug(f"CodeSynthesisConvertRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting CodeSynthesisConvertRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -491,8 +533,10 @@ class CodeSynthesisConvertRule(ImplementationRule):
             generated_fields=logical_expression.generated_fields,
             group_id=logical_expression.group_id,
         )
-
-        return set([expression])
+        deduped_physical_expressions = set([expression])
+        logger.debug(f"Done substituting CodeSynthesisConvertRule for {logical_expression}")
+        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions
 
 
 class CodeSynthesisConvertSingleRule(CodeSynthesisConvertRule):
@@ -518,10 +562,15 @@ class RAGConvertRule(ImplementationRule):
             for field_name, field in logical_expression.input_fields.items()
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
-        return isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
+        is_match = (isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None)
+        logger.debug(f"RAGConvertRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting RAGConvertRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -568,7 +617,10 @@ class RAGConvertRule(ImplementationRule):
                     )
                     physical_expressions.append(expression)
 
-        return set(physical_expressions)
+        logger.debug(f"Done substituting RAGConvertRule for {logical_expression}")
+        deduped_physical_expressions = set(physical_expressions)
+        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions
 
 class MixtureOfAgentsConvertRule(ImplementationRule):
     """
@@ -580,10 +632,15 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        return isinstance(logical_op, ConvertScan) and logical_op.udf is None
+        is_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None
+        logger.debug(f"MixtureOfAgentsConvertRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting MixtureOfAgentsConvertRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
 
         # get initial set of parameters for physical op
@@ -652,7 +709,10 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
                         )
                         physical_expressions.append(expression)
 
-        return set(physical_expressions)
+        logger.debug(f"Done substituting MixtureOfAgentsConvertRule for {logical_expression}")
+        deduped_physical_expressions = set(physical_expressions)
+        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions
 
 class CriticAndRefineConvertRule(ImplementationRule):
     """
@@ -662,10 +722,15 @@ class CriticAndRefineConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        return isinstance(logical_op, ConvertScan) and logical_op.udf is None
+        is_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None
+        logger.debug(f"CriticAndRefineConvertRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting CriticAndRefineConvertRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
 
         # Get initial parameters for physical operator
@@ -743,8 +808,10 @@ class CriticAndRefineConvertRule(ImplementationRule):
                     )
                     physical_expressions.append(expression)
 
-        # Return the set containing the new physical expression
-        return set(physical_expressions)
+        logger.debug(f"Done substituting CriticAndRefineConvertRule for {logical_expression}")
+        deduped_physical_expressions = set(physical_expressions)
+        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions
 
 
 class RetrieveRule(ImplementationRule):
@@ -755,14 +822,17 @@ class RetrieveRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        return (
-            isinstance(logical_expression.operator, RetrieveScan)
-        )
+        is_match = isinstance(logical_expression.operator, RetrieveScan)
+        logger.debug(f"RetrieveRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @classmethod
     def substitute(
         cls, logical_expression: LogicalExpression, **physical_op_params
     ) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting RetrieveRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
 
         physical_expressions = []
@@ -792,7 +862,10 @@ class RetrieveRule(ImplementationRule):
 
             physical_expressions.append(expression)
 
-        return set(physical_expressions)
+        logger.debug(f"Done substituting RetrieveRule for {logical_expression}")
+        deduped_physical_expressions = set(physical_expressions)
+        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions
 
 
 class NonLLMFilterRule(ImplementationRule):
@@ -802,13 +875,18 @@ class NonLLMFilterRule(ImplementationRule):
 
     @staticmethod
     def matches_pattern(logical_expression: LogicalExpression) -> bool:
-        return (
+        is_match = (
             isinstance(logical_expression.operator, FilteredScan)
             and logical_expression.operator.filter.filter_fn is not None
         )
+        logger.debug(f"NonLLMFilterRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @staticmethod
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting NonLLMFilterRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
@@ -828,7 +906,10 @@ class NonLLMFilterRule(ImplementationRule):
             generated_fields=logical_expression.generated_fields,
             group_id=logical_expression.group_id,
         )
-        return set([expression])
+        logger.debug(f"Done substituting NonLLMFilterRule for {logical_expression}")
+        deduped_physical_expressions = set([expression])
+        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions
 
 
 class LLMFilterRule(ImplementationRule):
@@ -838,13 +919,18 @@ class LLMFilterRule(ImplementationRule):
 
     @staticmethod
     def matches_pattern(logical_expression: LogicalExpression) -> bool:
-        return (
+        is_match = (
             isinstance(logical_expression.operator, FilteredScan)
             and logical_expression.operator.filter.filter_condition is not None
         )
+        logger.debug(f"LLMFilterRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @staticmethod
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting LLMFilterRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update({
@@ -907,7 +993,10 @@ class LLMFilterRule(ImplementationRule):
             )
             physical_expressions.append(expression)
 
-        return set(physical_expressions)
+        logger.debug(f"Done substituting LLMFilterRule for {logical_expression}")
+        deduped_physical_expressions = set(physical_expressions)
+        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions
 
 
 class AggregateRule(ImplementationRule):
@@ -917,10 +1006,15 @@ class AggregateRule(ImplementationRule):
 
     @staticmethod
     def matches_pattern(logical_expression: LogicalExpression) -> bool:
-        return isinstance(logical_expression.operator, Aggregate)
+        is_match = isinstance(logical_expression.operator, Aggregate)
+        logger.debug(f"AggregateRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @staticmethod
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting AggregateRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
@@ -947,7 +1041,11 @@ class AggregateRule(ImplementationRule):
             generated_fields=logical_expression.generated_fields,
             group_id=logical_expression.group_id,
         )
-        return set([expression])
+
+        logger.debug(f"Done substituting AggregateRule for {logical_expression}")
+        deduped_physical_expressions = set([expression])
+        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions
 
 
 class BasicSubstitutionRule(ImplementationRule):
@@ -968,10 +1066,15 @@ class BasicSubstitutionRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op_class = logical_expression.operator.__class__
-        return logical_op_class in cls.LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP
+        is_match = logical_op_class in cls.LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP
+        logger.debug(f"BasicSubstitutionRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting BasicSubstitutionRule for {logical_expression}")
+        logger.debug(f"Physical op params: {physical_op_params}")
+
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
         op_kwargs.update(
@@ -992,4 +1095,8 @@ class BasicSubstitutionRule(ImplementationRule):
             generated_fields=logical_expression.generated_fields,
             group_id=logical_expression.group_id,
         )
-        return set([expression])
+        
+        logger.debug(f"Done substituting BasicSubstitutionRule for {logical_expression}")
+        deduped_physical_expressions = set([expression])
+        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        return deduped_physical_expressions

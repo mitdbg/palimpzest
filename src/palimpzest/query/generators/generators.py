@@ -23,6 +23,7 @@ from together.types.chat_completions import ChatCompletionResponse
 
 from palimpzest.constants import (
     MODEL_CARDS,
+    APIClient,
     # RETRY_MAX_ATTEMPTS,
     # RETRY_MAX_SECS,
     # RETRY_MULTIPLIER,
@@ -34,6 +35,8 @@ from palimpzest.core.data.dataclasses import GenerationStats
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.fields import Field, ListField
 from palimpzest.prompts import PromptFactory
+from palimpzest.query.generators.api_client_factory import APIClientFactory
+from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
 
@@ -42,6 +45,8 @@ GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
 ContextType = TypeVar("ContextType")
 InputType = TypeVar("InputType")
 
+
+logger = setup_logger(__name__)
 
 def generator_factory(
     model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality, verbose: bool = False
@@ -337,6 +342,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
     def __call__(self, candidate: DataRecord, fields: dict[str, Field] | None, json_output: bool=True, **kwargs) -> GenerationOutput:
         """Take the input record (`candidate`), generate the output `fields`, and return the generated output."""
         client = self._get_client_or_model()
+        logger.debug(f"Generating for candidate {candidate} with fields {fields}")
 
         # fields can only be None if the user provides an answer parser
         fields_check = fields is not None or "parse_answer" in kwargs
@@ -361,10 +367,11 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         try:
             completion = self._generate_completion(client, chat_payload, **kwargs)
             end_time = time.time()
-
+            logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
         except Exception as e:
+            logger.error(f"Error generating completion: {e}")
             print(f"Error generating completion: {e}")
             field_answers = {field_name: None for field_name in fields}
             reasoning = None
@@ -406,27 +413,26 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         # pretty print prompt + full completion output for debugging
         completion_text = self._get_completion_text(completion, **kwargs)
-        if self.verbose:
-            prompt = ""
-            for message in messages:
-                if message["role"] == "user":
-                    prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
-            print(f"PROMPT:\n{prompt}")
-            print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
+        prompt = ""
+        for message in messages:
+            if message["role"] == "user":
+                prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
+        logger.debug(f"PROMPT:\n{prompt}")
+        logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
         # parse reasoning
         reasoning = None
         try:
             reasoning = self._parse_reasoning(completion_text, **kwargs)
         except Exception as e:
-            print(f"Error parsing reasoning: {e}")
+            logger.error(f"Error parsing reasoning and answers: {e}")
 
         # parse field answers
         field_answers = None if fields is None else {field_name: None for field_name in fields}
         try:
             field_answers = self._parse_answer(completion_text, fields, json_output, **kwargs)
         except Exception as e:
-            print(f"Error parsing answers: {e}")
+            logger.error(f"Error parsing answers: {e}")
             os.makedirs("parse-answer-errors", exist_ok=True)
             ts = time.time()
             with open(f"parse-answer-errors/error-{ts}.txt", "w") as f:
@@ -440,6 +446,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 f.write("#####\n")
                 f.write(f"{str(e)}\n")
 
+        logger.debug(f"Generated field answers: {field_answers}")
         return field_answers, reasoning, generation_stats, messages
 
 
@@ -461,7 +468,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
 
     def _get_client_or_model(self, **kwargs) -> OpenAI:
         """Returns a client (or local model) which can be invoked to perform the generation."""
-        return OpenAI(api_key=get_api_key("OPENAI_API_KEY"))
+        return APIClientFactory.get_client(APIClient.OPENAI, get_api_key("OPENAI_API_KEY"))
 
     def _generate_completion(self, client: OpenAI, payload: dict, **kwargs) -> ChatCompletion:
         """Generates a completion object using the client (or local model)."""
@@ -540,7 +547,7 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
 
     def _get_client_or_model(self, **kwargs) -> Together:
         """Returns a client (or local model) which can be invoked to perform the generation."""
-        return Together(api_key=get_api_key("TOGETHER_API_KEY"))
+        return APIClientFactory.get_client(APIClient.TOGETHER, get_api_key("TOGETHER_API_KEY"))
 
     def _generate_completion(self, client: Together, payload: dict, **kwargs) -> ChatCompletionResponse:
         """Generates a completion object using the client (or local model)."""

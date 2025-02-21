@@ -10,7 +10,9 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.tools.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class PipelinedParallelExecutionStrategy(ExecutionStrategy):
     """
@@ -37,11 +39,8 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
 
     def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
         """Initialize the stats and the execute the plan."""
-        if self.verbose:
-            print("----------------------")
-            print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
-            print(plan)
-            print("---")
+        logger.info(f"Executing plan {plan.plan_id} with {plan_workers} workers")
+        logger.info(f"Plan Details: {plan}")
 
         plan_start_time = time.time()
 
@@ -83,6 +82,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
         futures = []
         current_scan_idx = self.scan_start_idx
         with ThreadPoolExecutor(max_workers=plan_workers) as executor:
+            logger.debug(f"Created thread pool with {plan_workers} workers")
             # create initial (set of) future(s) to read first source record;
             futures.append(executor.submit(PhysicalOperator.execute_op_wrapper, source_operator, current_scan_idx))
             op_id_to_futures_in_flight[source_op_id] += 1
@@ -102,6 +102,7 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
                     # get the result
                     record_set, operator, _ = future.result()
                     op_id = operator.get_op_id()
+                    logger.debug(f"Processed future for operator {op_id} with {len(record_set)} records")
 
                     # decrement future from mapping of futures in-flight
                     op_id_to_futures_in_flight[op_id] -= 1
@@ -207,8 +208,11 @@ class PipelinedParallelExecutionStrategy(ExecutionStrategy):
                 # self.datadir.close_cache(operator.target_cache_id)
                 pass
 
+        logger.info(f"Completed execution of plan {plan.plan_id} in {time.time() - plan_start_time:.2f} seconds")
         # finalize plan stats
         total_plan_time = time.time() - plan_start_time
         plan_stats.finalize(total_plan_time)
+        logger.info(f"Completed execution of plan {plan.plan_id} in {time.time() - plan_start_time:.2f} seconds")
+        logger.debug(f"Plan execution stats: (plan_str={plan_stats.plan_str}, plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")
 
         return output_records, plan_stats
