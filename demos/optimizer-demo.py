@@ -77,7 +77,10 @@ class BiodexReader(pz.DataReader):
     def compute_label(self, entry: dict) -> dict:
         """Compute the label for a BioDEX report given its entry in the dataset."""
         target_lst = entry["target"].split("\n")
-        target_reactions = [reaction.strip().lower() for reaction in target_lst[3].split(":")[-1].split(",")]
+        target_reactions = [
+            reaction.strip().lower().replace("'", "").replace("^", "")
+            for reaction in target_lst[3].split(":")[-1].split(",")
+        ]
         label_dict = {
             "reactions": target_reactions,
             "reaction_labels": target_reactions,
@@ -100,8 +103,8 @@ class BiodexReader(pz.DataReader):
 
         try:
             # lower-case each list
-            preds = [pred.lower() for pred in preds]
-            targets = set([target.lower() for target in targets])
+            preds = [pred.lower().replace("'", "").replace("^", "") for pred in preds]
+            targets = set([target.lower().replace("'", "").replace("^", "") for target in targets])
 
             # compute rank-precision at k
             rn = len(targets)
@@ -126,8 +129,8 @@ class BiodexReader(pz.DataReader):
 
         try:
             # compute precision and recall
-            s_preds = set([pred.lower() for pred in preds])
-            s_targets = set([target.lower() for target in targets])
+            s_preds = set([pred.lower().replace("'", "").replace("^", "") for pred in preds])
+            s_targets = set([target.lower().replace("'", "").replace("^", "") for target in targets])
 
             intersect = s_preds.intersection(s_targets)
 
@@ -373,8 +376,8 @@ if __name__ == "__main__":
 
         def trim_terms(record: dict) -> dict:
             """Only keep `reaction_labels` for which every word appears in the record's `fulltext`."""
-            reaction_labels = [label.lower() for label in record["reaction_labels"]]
-            fulltext = record["fulltext"].lower()
+            reaction_labels = [label.lower().replace("'", "").replace("^", "") for label in record["reaction_labels"]]
+            fulltext = record["fulltext"].lower().replace("'", "").replace("^", "")
             trimmed_reaction_labels = [
                 label
                 for label in reaction_labels
