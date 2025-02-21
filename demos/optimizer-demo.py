@@ -505,6 +505,7 @@ if __name__ == "__main__":
     )
 
     print(data_record_collection.to_df())
+    data_record_collection.to_df().to_csv(f"opt-profiling-data/{workload}-{exp_name}-output.csv", index=False)
 
     # create filepaths for records and stats
     records_path = (
