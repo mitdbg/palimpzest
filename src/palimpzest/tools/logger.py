@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -7,7 +8,16 @@ from pathlib import Path
 def setup_logger(name):
     pz_logger = PZLogger()
     logger = pz_logger.get_logger(name)
-    logger.setLevel(logging.DEBUG)
+    log_level = os.getenv("PZ_LOG_LEVEL", "ERROR").upper()
+    if log_level == "DEBUG":
+        logger.setLevel(logging.DEBUG)
+    elif log_level == "INFO":
+        logger.setLevel(logging.INFO)
+    elif log_level == "WARNING":
+        logger.setLevel(logging.WARNING)
+    else:
+        logger.setLevel(logging.ERROR)
+
     logger.info(f"Initialized logger for {name}")
     return logger
 
@@ -56,7 +66,7 @@ class PZLogger:
             if log_file is None:
                 # TODO: Save by day for now.
                 log_dir = Path(cls.root_log_dir + "/logs")
-                log_dir.mkdir(exist_ok=True)
+                log_dir.mkdir(exist_ok=True, parents=True)
                 date_str = datetime.now().strftime("%Y-%m-%d")
                 instance.log_file = f"{log_dir}/palimpzest_{date_str}.log"
             else:

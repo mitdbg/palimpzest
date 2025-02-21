@@ -65,7 +65,7 @@ class OptimizeGroup(Task):
             new_tasks.append(task)
 
         logger.debug(f"Done optimizing group {self.group_id}")
-        logger.debug(f"New tasks: {new_tasks}")
+        logger.debug(f"New tasks: {len(new_tasks)}")
         return new_tasks
 
 
@@ -102,7 +102,7 @@ class ExpandGroup(Task):
         group.set_explored()
 
         logger.debug(f"Done expanding group {self.group_id}")
-        logger.debug(f"New tasks: {new_tasks}")
+        logger.debug(f"New tasks: {len(new_tasks)}")
         return new_tasks
 
 
@@ -146,7 +146,7 @@ class OptimizeLogicalExpression(Task):
             new_tasks.append(apply_rule_task)
 
         logger.debug(f"Done optimizing logical expression {self.logical_expression}")
-        logger.debug(f"New tasks: {new_tasks}")
+        logger.debug(f"New tasks: {len(new_tasks)}")
         return new_tasks
 
 
@@ -250,7 +250,7 @@ class ApplyRule(Task):
         self.logical_expression.add_applied_rule(self.rule)
 
         logger.debug(f"Done applying rule {self.rule} to logical expression {self.logical_expression}")
-        logger.debug(f"New tasks: {new_tasks}")
+        logger.debug(f"New tasks: {len(new_tasks)}")
         return new_tasks
 
 
