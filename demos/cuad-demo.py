@@ -291,10 +291,10 @@ def evaluate_entry(labels, preds, substr_ok):
 
     # jaccard similarity expects strings
     # TODO: This is a hack, ideally, the return type of the preds should be known
-    for pred in preds:
+    for idx, pred in enumerate(preds):
         if not isinstance(pred, str):
-            print(pred)
-            pred = str(pred)
+            print(f"Expected string, but got {pred}")
+            preds[idx] = str(pred)
 
     # first check if labels is empty
     if len(labels) == 0:
