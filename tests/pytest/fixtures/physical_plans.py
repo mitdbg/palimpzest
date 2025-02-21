@@ -91,7 +91,7 @@ def rag_convert_plan(email_schema, enron_eval_tiny):
     plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
     return plan
 
-# NOTE: removing until TokenReducedConvert has implementation changes
+# NOTE: removing until TokenReducedConvertBonded has implementation changes
 # @pytest.fixture
 # def token_reduction_convert_plan(email_schema, enron_eval_tiny):
 #     scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny)

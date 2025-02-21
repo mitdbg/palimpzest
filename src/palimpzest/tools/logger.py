@@ -8,15 +8,20 @@ from pathlib import Path
 def setup_logger(name):
     pz_logger = PZLogger()
     logger = pz_logger.get_logger(name)
-    log_level = os.getenv("PZ_LOG_LEVEL", "DEBUG").upper()
-    if log_level == "DEBUG":
-        logger.setLevel(logging.DEBUG)
-    elif log_level == "INFO":
-        logger.setLevel(logging.INFO)
-    elif log_level == "WARNING":
-        logger.setLevel(logging.WARNING)
-    else:
-        logger.setLevel(logging.ERROR)
+    log_level = os.getenv("PZ_LOG_LEVEL", "CRITICAL").upper()
+    match log_level:
+        case "DEBUG":
+            logger.setLevel(logging.DEBUG)
+        case "INFO":
+            logger.setLevel(logging.INFO)
+        case "ERROR":
+            logger.setLevel(logging.ERROR)
+        case "WARNING":
+            logger.setLevel(logging.WARNING)
+        case "CRITICAL":
+            logger.setLevel(logging.CRITICAL)
+        case _:
+            raise ValueError(f"Invalid log level: {log_level}")
 
     logger.info(f"Initialized logger for {name}")
     return logger
