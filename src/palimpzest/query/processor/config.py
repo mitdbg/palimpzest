@@ -20,7 +20,7 @@ class QueryProcessorConfig:
     policy: Policy = field(default_factory=MaxQuality)
     scan_start_idx: int = field(default=0)
     num_samples: int = field(default=float("inf"))
-    nocache: bool = field(default=True)  # NOTE: until we properly implement caching, let's set the default to True
+    cache: bool = field(default=False)  # NOTE: until we properly implement caching, let's set the default to False
     include_baselines: bool = field(default=False)
     min_plans: int | None = field(default=None)
     verbose: bool = field(default=False)
@@ -48,7 +48,7 @@ class QueryProcessorConfig:
             "policy": self.policy.to_json_str(),
             "scan_start_idx": self.scan_start_idx,
             "num_samples": self.num_samples,
-            "nocache": self.nocache,
+            "cache": self.cache,
             "include_baselines": self.include_baselines,
             "min_plans": self.min_plans,
             "verbose": self.verbose,

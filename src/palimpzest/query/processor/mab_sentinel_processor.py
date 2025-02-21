@@ -715,7 +715,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
                 )
 
                 # add records (which are not filtered) to the cache, if allowed
-                if not self.nocache:
+                if self.cache:
                     for record in all_records:
                         if getattr(record, "passed_operator", True):
                             # self.datadir.append_cache(logical_op_id, record)
@@ -745,7 +745,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
             samples_drawn = max(logical_op_id_to_num_samples.values())
 
         # if caching was allowed, close the cache
-        if not self.nocache:
+        if self.cache:
             for _, _, _ in plan:
                 # self.datadir.close_cache(logical_op_id)
                 pass
@@ -808,8 +808,8 @@ class MABSentinelQueryProcessor(QueryProcessor):
         if self.val_datasource is None:
             raise Exception("Make sure you are using validation data with MABSentinelExecutionEngine")
 
-        # if nocache is True, make sure we do not re-use codegen examples
-        if self.nocache:
+        # if cache is False, make sure we do not re-use codegen examples
+        if not self.cache:
             # self.clear_cached_examples()
             pass
 
@@ -866,7 +866,7 @@ class MABSentinelSequentialSingleThreadProcessor(MABSentinelQueryProcessor, Sequ
             self,
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
-            nocache=self.nocache,
+            cache=self.cache,
             verbose=self.verbose
         )
         self.progress_manager = None
@@ -883,7 +883,7 @@ class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, Pipelined
             self,
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
-            nocache=self.nocache,
+            cache=self.cache,
             verbose=self.verbose
         )
         self.progress_manager = None
