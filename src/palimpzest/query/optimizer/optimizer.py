@@ -475,7 +475,6 @@ class Optimizer:
             self.tasks_stack.extend(new_tasks)
 
         logger.debug(f"Done searching optimization space for group_id: {group_id}")
-        logger.debug(f"Tasks stack: {self.tasks_stack}")
 
     def optimize(self, query_plan: Dataset, policy: Policy | None = None) -> list[PhysicalPlan]:
         """
