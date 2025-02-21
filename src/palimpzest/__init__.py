@@ -13,6 +13,10 @@ from palimpzest.policy import (
 )
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
+from palimpzest.tools.logger import setup_logger
+
+# Initialize the root logger
+logger = setup_logger(__name__)
 
 __all__ = [
     # constants

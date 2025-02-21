@@ -13,8 +13,10 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
+from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.progress import create_progress_manager
 
+logger = setup_logger(__name__)
 
 class NoSentinelQueryProcessor(QueryProcessor):
     """
@@ -24,6 +26,7 @@ class NoSentinelQueryProcessor(QueryProcessor):
 
     # TODO: Consider to support dry_run.
     def execute(self) -> DataRecordCollection:
+        logger.info("Executing NoSentinelQueryProcessor")
         execution_start_time = time.time()
 
         # if cache is False, make sure we do not re-use codegen examples
@@ -48,7 +51,10 @@ class NoSentinelQueryProcessor(QueryProcessor):
             plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 
-        return DataRecordCollection(records, execution_stats=execution_stats)
+        result = DataRecordCollection(records, execution_stats=execution_stats)
+        logger.info("Done executing NoSentinelQueryProcessor")
+        logger.debug(f"Result: {result}")
+        return result
 
 
 class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, SequentialSingleThreadExecutionStrategy):
@@ -65,9 +71,11 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
             verbose=self.verbose
         )
         self.progress_manager = None
+        logger.info("Created NoSentinelSequentialSingleThreadProcessor")
 
     def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
         """Initialize the stats and execute the plan with progress reporting."""
+        logger.info(f"Executing plan: {plan}")
         if self.verbose:
             print("----------------------")
             print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
@@ -215,6 +223,8 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
             if self.progress_manager:
                 self.progress_manager.finish()
 
+        logger.info(f"Done executing plan: {plan.plan_id}")
+        logger.debug(f"Plan stats: (plan_str={plan.plan_str}, plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")
         return output_records, plan_stats
 
 
@@ -232,9 +242,12 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
             verbose=self.verbose
         )
         self.progress_manager = None
+        logger.info("Created NoSentinelPipelinedSingleThreadProcessor")
 
     def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
         """Initialize the stats and execute the plan with progress reporting."""
+        logger.info(f"Executing plan: {plan}")
+
         if self.verbose:
             print("----------------------")
             print(f"PLAN[{plan.plan_id}] (n={num_samples}):")
@@ -404,6 +417,8 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
             if self.progress_manager:
                 self.progress_manager.finish()
 
+        logger.info(f"Done executing plan: {plan.plan_id}")
+        logger.debug(f"Plan stats: (plan_str={plan.plan_str}, plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")
         return output_records, plan_stats
 
 
@@ -421,6 +436,7 @@ class NoSentinelPipelinedParallelProcessor(NoSentinelQueryProcessor, PipelinedPa
             verbose=self.verbose
         )
         self.progress_manager = None
+        logger.info("Created NoSentinelPipelinedParallelProcessor")
 
     # def execute_plan(self, plan: PhysicalPlan, num_samples: int | float = float("inf"), plan_workers: int = 1):
     #     """Initialize the stats and execute the plan with progress reporting."""

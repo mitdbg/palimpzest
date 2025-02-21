@@ -28,7 +28,9 @@ from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyTy
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
+from palimpzest.tools.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class RandomSamplingSentinelQueryProcessor(QueryProcessor):
     """
@@ -63,6 +65,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         self.pick_output_fn = self.pick_ensemble_output
         self.rng = np.random.default_rng(seed=seed)
         self.exp_name = exp_name
+        logger.info(f"Initialized RandomSamplingSentinelQueryProcessor with config: {self.config}")
 
 
     def compute_quality(
@@ -548,6 +551,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
 
 
     def execute(self) -> DataRecordCollection:
+        logger.info("Executing RandomSamplingSentinelQueryProcessor")
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
@@ -593,7 +597,10 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 
-        return DataRecordCollection(all_records, execution_stats=execution_stats)
+        result =  DataRecordCollection(all_records, execution_stats=execution_stats)
+        logger.info("Done executing RandomSamplingSentinelQueryProcessor")
+        logger.debug(f"Result: {result}")
+        return result
 
 
 class RandomSamplingSentinelSequentialSingleThreadProcessor(RandomSamplingSentinelQueryProcessor, SequentialSingleThreadExecutionStrategy):
@@ -608,7 +615,7 @@ class RandomSamplingSentinelSequentialSingleThreadProcessor(RandomSamplingSentin
             max_workers=self.max_workers,
             verbose=self.verbose
         )
-
+        logger.info("Created RandomSamplingSentinelSequentialSingleThreadProcessor")
 
 class RandomSamplingSentinelPipelinedParallelProcessor(RandomSamplingSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
     """
@@ -622,6 +629,7 @@ class RandomSamplingSentinelPipelinedParallelProcessor(RandomSamplingSentinelQue
             max_workers=self.max_workers,
             verbose=self.verbose
         )
+        logger.info("Created RandomSamplingSentinelPipelinedParallelProcessor")
 
 
 class RandomSamplingSentinelPipelinedSingleThreadProcessor(RandomSamplingSentinelQueryProcessor, PipelinedSingleThreadExecutionStrategy):
@@ -636,3 +644,4 @@ class RandomSamplingSentinelPipelinedSingleThreadProcessor(RandomSamplingSentine
             max_workers=self.max_workers,
             verbose=self.verbose
         )
+        logger.info("Created RandomSamplingSentinelPipelinedSingleThreadProcessor")
