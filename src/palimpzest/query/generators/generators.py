@@ -35,6 +35,7 @@ from palimpzest.core.data.dataclasses import GenerationStats
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.prompts import PromptFactory
 from palimpzest.query.generators.api_client_factory import APIClientFactory
+from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
 
@@ -43,6 +44,8 @@ GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
 ContextType = TypeVar("ContextType")
 InputType = TypeVar("InputType")
 
+
+logger = setup_logger(__name__)
 
 def generator_factory(
     model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality, verbose: bool = False
@@ -234,6 +237,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
     def __call__(self, candidate: DataRecord, fields: list[str] | None, **kwargs) -> GenerationOutput:
         """Take the input record (`candidate`), generate the output `fields`, and return the generated output."""
         client = self._get_client_or_model()
+        logger.debug(f"Generating for candidate {candidate} with fields {fields}")
 
         # fields can only be None if the user provides an answer parser
         assert fields is not None or "parse_answer" in kwargs, (
@@ -259,10 +263,11 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         try:
             completion = self._generate_completion(client, chat_payload, **kwargs)
             end_time = time.time()
-
+            logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
         except Exception as e:
+            logger.error(f"Error generating completion: {e}")
             print(f"Error generating completion: {e}")
             field_answers = {field_name: None for field_name in fields}
             reasoning = None
@@ -304,28 +309,28 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         # pretty print prompt + full completion output for debugging
         completion_text = self._get_completion_text(completion, **kwargs)
-        if self.verbose:
-            prompt = ""
-            for message in messages:
-                if message["role"] == "user":
-                    prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
-            print(f"PROMPT:\n{prompt}")
-            print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
+        prompt = ""
+        for message in self.messages:
+            if message["role"] == "user":
+                prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
+        logger.debug(f"PROMPT:\n{prompt}")
+        logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
         # parse reasoning
         reasoning = None
         try:
             reasoning = self._parse_reasoning(completion_text, **kwargs)
         except Exception as e:
-            print(f"Error parsing reasoning and answers: {e}")
+            logger.error(f"Error parsing reasoning and answers: {e}")
 
         # parse field answers
         field_answers = None if fields is None else {field_name: None for field_name in fields}
         try:
             field_answers = self._parse_answer(completion_text, fields, **kwargs)
         except Exception as e:
-            print(f"Error parsing answers: {e}")
+            logger.error(f"Error parsing answers: {e}")
 
+        logger.debug(f"Generated field answers: {field_answers}")
         return field_answers, reasoning, generation_stats, messages
 
 

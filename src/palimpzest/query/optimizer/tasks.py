@@ -8,7 +8,9 @@ from palimpzest.query.optimizer.cost_model import BaseCostModel
 from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.primitives import Expression, Group
 from palimpzest.query.optimizer.rules import ImplementationRule, Rule, TransformationRule
+from palimpzest.tools.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class Task:
     """
@@ -41,6 +43,7 @@ class OptimizeGroup(Task):
         self.group_id = group_id
 
     def perform(self, groups: dict[int, Group], context: dict[str, Any] | None = None) -> list[Task]:
+        logger.debug(f"Optimizing group {self.group_id}")
         # get updated instance of the group to be optimized
         if context is None:
             context = {}
@@ -61,6 +64,8 @@ class OptimizeGroup(Task):
             task = OptimizePhysicalExpression(physical_expr)
             new_tasks.append(task)
 
+        logger.debug(f"Done optimizing group {self.group_id}")
+        logger.debug(f"New tasks: {new_tasks}")
         return new_tasks
 
 
@@ -76,6 +81,8 @@ class ExpandGroup(Task):
         self.group_id = group_id
 
     def perform(self, groups: dict[int, Group], context: dict[str, Any] | None = None) -> list[Task]:
+        logger.debug(f"Expanding group {self.group_id}")
+
         # fetch group
         if context is None:
             context = {}
@@ -94,6 +101,8 @@ class ExpandGroup(Task):
         # mark the group as explored and return tasks
         group.set_explored()
 
+        logger.debug(f"Done expanding group {self.group_id}")
+        logger.debug(f"New tasks: {new_tasks}")
         return new_tasks
 
 
@@ -115,6 +124,7 @@ class OptimizeLogicalExpression(Task):
         implementation_rules: list[ImplementationRule],
         context: dict[str, Any] | None = None,
     ) -> list[Task]:
+        logger.debug(f"Optimizing logical expression {self.logical_expression}")
         # if we're exploring, only apply transformation rules
         if context is None:
             context = {}
@@ -135,6 +145,8 @@ class OptimizeLogicalExpression(Task):
             apply_rule_task = ApplyRule(rule, self.logical_expression, self.exploring)
             new_tasks.append(apply_rule_task)
 
+        logger.debug(f"Done optimizing logical expression {self.logical_expression}")
+        logger.debug(f"New tasks: {new_tasks}")
         return new_tasks
 
 
@@ -170,6 +182,8 @@ class ApplyRule(Task):
         context: dict[str, Any] | None = None,
         **physical_op_params,
     ) -> tuple[list[Task], int]:
+        logger.debug(f"Applying rule {self.rule} to logical expression {self.logical_expression}")
+        
         # check if rule has already been applied to this logical expression; return [] if so
         if context is None:
             context = {}
@@ -235,6 +249,8 @@ class ApplyRule(Task):
         # mark that the rule has been applied to the logical expression
         self.logical_expression.add_applied_rule(self.rule)
 
+        logger.debug(f"Done applying rule {self.rule} to logical expression {self.logical_expression}")
+        logger.debug(f"New tasks: {new_tasks}")
         return new_tasks
 
 
@@ -459,6 +475,8 @@ class OptimizePhysicalExpression(Task):
         policy: Policy,
         context: dict[str, Any] | None = None,
     ) -> list[Task]:
+        logger.debug(f"Optimizing physical expression {self.physical_expression}")
+
         if context is None:
             context = {}
 
@@ -583,4 +601,5 @@ class OptimizePhysicalExpression(Task):
         group.optimized = True
         groups[self.physical_expression.group_id] = group
 
+        logger.debug(f"Done optimizing physical expression {self.physical_expression}")
         return []
