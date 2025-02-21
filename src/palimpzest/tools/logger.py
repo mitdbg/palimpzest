@@ -56,7 +56,7 @@ class PZLogger:
             if log_file is None:
                 # TODO: Save by day for now.
                 log_dir = Path(cls.root_log_dir + "/logs")
-                log_dir.mkdir(exist_ok=True)
+                log_dir.mkdir(exist_ok=True, parents=True)
                 date_str = datetime.now().strftime("%Y-%m-%d")
                 instance.log_file = f"{log_dir}/palimpzest_{date_str}.log"
             else:
