@@ -2,7 +2,6 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 
 def setup_logger(name):
@@ -25,21 +24,22 @@ class JsonFormatter(logging.Formatter):
 
         if hasattr(record, "stats"):
             log_data["stats"] = record.stats
-        if hasattr(record, "exc_info"):
+        # hasattr(record, "exc_info") will runinto error.
+        if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
             
         return json.dumps(log_data)
-    
-LOG_FILE = "logs/palimpzest"  
 
 class PZLogger:
     """Central logging class for Palimpzest"""
     _instance = None
+    root_log_dir = ".pz_logs"
 
     def __new__(cls,
                 file_log_level: str = "ERROR",
                 streaming_log_level: str = "ERROR", 
-                log_file: str | None = None, 
+                log_file: str | None = None,
+                intermediate_log_dir: str | None = None,
                 log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
                 json_format: bool = True):
         if cls._instance is None:
@@ -50,16 +50,24 @@ class PZLogger:
             instance.root_logger.setLevel(logging.DEBUG)  # Set root logger to capture all levels
             instance.streaming_log_level = streaming_log_level
             instance.file_log_level = file_log_level
+            instance.intermediate_log_dir = intermediate_log_dir
             if log_file is None:
                 # TODO: Save by day for now.
-                log_dir = Path(".pz_logs")
+                log_dir = Path(cls.root_log_dir + "/logs")
                 log_dir.mkdir(exist_ok=True)
                 date_str = datetime.now().strftime("%Y-%m-%d")
-                instance.log_file = f"{LOG_FILE}_{date_str}.log"
+                instance.log_file = f"{log_dir}/palimpzest_{date_str}.log"
             else:
                 instance.log_file = log_file
             instance.log_format = log_format
             instance.json_format = json_format
+
+            # Setup intermediate results directory
+            if intermediate_log_dir is None:
+                instance.intermediate_log_dir = Path(f"{cls.root_log_dir}/intermediate_files")
+            else:
+                instance.intermediate_log_dir = Path(intermediate_log_dir)
+            instance.intermediate_log_dir.mkdir(exist_ok=True)
             
             # Setup logging
             instance._setup_root_logging()
