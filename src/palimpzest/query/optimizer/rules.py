@@ -34,6 +34,7 @@ from palimpzest.utils.model_helpers import get_models, get_vision_models
 
 logger = setup_logger(__name__)
 
+
 class Rule:
     """
     The abstract base class for transformation and implementation rules.
@@ -275,12 +276,6 @@ class LLMConvertRule(ImplementationRule):
     physical_convert_class = None
 
     @classmethod
-    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is None
-        logger.debug(f"LLMConvertRule matches_pattern: {is_match} for {logical_expression}")
-        return is_match
-
-    @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting LLMConvertRule for {logical_expression}")
         logger.debug(f"Physical op params: {physical_op_params}")
@@ -307,21 +302,27 @@ class LLMConvertRule(ImplementationRule):
         pure_vision_models = {model for model in vision_models if model not in text_models}
 
         # compute attributes about this convert operation
-        is_image_conversion = any([
-            field.is_image_field
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
-        num_image_fields = sum([
-            field.is_image_field
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
-        list_image_field = any([
-            field.is_image_field and hasattr(field, "element_type")
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
+        is_image_conversion = any(
+            [
+                field.is_image_field
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        num_image_fields = sum(
+            [
+                field.is_image_field
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        list_image_field = any(
+            [
+                field.is_image_field and hasattr(field, "element_type")
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
 
         physical_expressions = []
         for model in physical_op_params["available_models"]:
@@ -364,6 +365,17 @@ class LLMConvertBondedRule(LLMConvertRule):
 
     physical_convert_class = LLMConvertBonded
 
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        is_match = (
+            isinstance(logical_expression.operator, ConvertScan)
+            and logical_expression.operator.udf is None
+            # Use bonded convert only if there are multiple generated fields
+            and len(logical_expression.operator.get_generated_fields()) > 1
+        )
+        logger.debug(f"LLMConvertRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
+
 
 class LLMConvertConventionalRule(LLMConvertRule):
     """
@@ -371,6 +383,12 @@ class LLMConvertConventionalRule(LLMConvertRule):
     """
 
     physical_convert_class = LLMConvertConventional
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        is_match = isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is None
+        logger.debug(f"LLMConvertRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
 
 
 class TokenReducedConvertRule(ImplementationRule):
@@ -388,11 +406,13 @@ class TokenReducedConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_image_conversion = any([
-            field.is_image_field
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
+        is_image_conversion = any(
+            [
+                field.is_image_field
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
         is_match = isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
         logger.debug(f"TokenReducedConvertRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
@@ -482,11 +502,13 @@ class CodeSynthesisConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_image_conversion = any([
-            field.is_image_field
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
+        is_image_conversion = any(
+            [
+                field.is_image_field
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
         is_match = (
             isinstance(logical_op, ConvertScan)
             and not is_image_conversion
@@ -547,18 +569,21 @@ class RAGConvertRule(ImplementationRule):
     """
     Substitute a logical expression for a ConvertScan with a RAGConvert physical implementation.
     """
+
     num_chunks_per_fields = [1, 2, 4]
     chunk_sizes = [1000, 2000, 4000]
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_image_conversion = any([
-            field.is_image_field
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
-        is_match = (isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None)
+        is_image_conversion = any(
+            [
+                field.is_image_field
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        is_match = isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
         logger.debug(f"RAGConvertRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -618,10 +643,12 @@ class RAGConvertRule(ImplementationRule):
         logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
 
+
 class MixtureOfAgentsConvertRule(ImplementationRule):
     """
     Implementation rule for the MixtureOfAgentsConvert operator.
     """
+
     num_proposer_models = [1, 2, 3]
     temperatures = [0.0, 0.4, 0.8]
 
@@ -641,11 +668,13 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
 
         # get initial set of parameters for physical op
         op_kwargs: dict = logical_op.get_logical_op_params()
-        op_kwargs.update({
-            "verbose": physical_op_params['verbose'],
-            "logical_op_id": logical_op.get_logical_op_id(),
-            "logical_op_name": logical_op.logical_op_name(),
-        })
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
+            }
+        )
 
         # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
         #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
@@ -655,16 +684,20 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
         text_models = set(get_models())
 
         # construct set of proposer models and set of aggregator models
-        num_image_fields = sum([
-            field.is_image_field
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
-        list_image_field = any([
-            field.is_image_field and hasattr(field, "element_type")
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
+        num_image_fields = sum(
+            [
+                field.is_image_field
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        list_image_field = any(
+            [
+                field.is_image_field and hasattr(field, "element_type")
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
         proposer_model_set, is_image_conversion = text_models, False
         if num_image_fields > 1 or list_image_field:
             proposer_model_set = [model for model in vision_models if model != Model.LLAMA3_V]
@@ -675,8 +708,10 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
         aggregator_model_set = text_models
 
         # filter un-available models out of sets
-        proposer_model_set = {model for model in proposer_model_set if model in physical_op_params['available_models']}
-        aggregator_model_set = {model for model in aggregator_model_set if model in physical_op_params['available_models']}
+        proposer_model_set = {model for model in proposer_model_set if model in physical_op_params["available_models"]}
+        aggregator_model_set = {
+            model for model in aggregator_model_set if model in physical_op_params["available_models"]
+        }
 
         # construct MixtureOfAgentsConvert operations for various numbers of proposer models
         # and for every combination of proposer models and aggregator model
@@ -691,7 +726,9 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
                             temperatures=[temp] * len(proposer_models),
                             aggregator_model=aggregator_model,
                             proposer_prompt=op_kwargs.get("prompt"),
-                            proposer_prompt_strategy=PromptStrategy.COT_MOA_PROPOSER_IMAGE if is_image_conversion else PromptStrategy.COT_MOA_PROPOSER,
+                            proposer_prompt_strategy=PromptStrategy.COT_MOA_PROPOSER_IMAGE
+                            if is_image_conversion
+                            else PromptStrategy.COT_MOA_PROPOSER,
                             aggregator_prompt_strategy=PromptStrategy.COT_MOA_AGG,
                             **op_kwargs,
                         )
@@ -709,6 +746,7 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
         deduped_physical_expressions = set(physical_expressions)
         logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
+
 
 class CriticAndRefineConvertRule(ImplementationRule):
     """
@@ -749,21 +787,27 @@ class CriticAndRefineConvertRule(ImplementationRule):
         pure_vision_models = {model for model in vision_models if model not in text_models}
 
         # compute attributes about this convert operation
-        is_image_conversion = any([
-            field.is_image_field
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
-        num_image_fields = sum([
-            field.is_image_field
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
-        list_image_field = any([
-            field.is_image_field and hasattr(field, "element_type")
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
+        is_image_conversion = any(
+            [
+                field.is_image_field
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        num_image_fields = sum(
+            [
+                field.is_image_field
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        list_image_field = any(
+            [
+                field.is_image_field and hasattr(field, "element_type")
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
 
         # identify models which can be used for this convert operation
         models = []
@@ -814,6 +858,7 @@ class RetrieveRule(ImplementationRule):
     """
     Substitute a logical expression for a RetrieveScan with a Retrieve physical implementation.
     """
+
     k_budgets = [1, 3, 5, 10]
 
     @classmethod
@@ -823,9 +868,7 @@ class RetrieveRule(ImplementationRule):
         return is_match
 
     @classmethod
-    def substitute(
-        cls, logical_expression: LogicalExpression, **physical_op_params
-    ) -> set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting RetrieveRule for {logical_expression}")
         logger.debug(f"Physical op params: {physical_op_params}")
 
@@ -929,11 +972,13 @@ class LLMFilterRule(ImplementationRule):
 
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update({
-            "verbose": physical_op_params["verbose"],
-            "logical_op_id": logical_op.get_logical_op_id(),
-            "logical_op_name": logical_op.logical_op_name(),
-        })
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
+            }
+        )
 
         # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
         #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
@@ -945,21 +990,27 @@ class LLMFilterRule(ImplementationRule):
         pure_vision_models = {model for model in vision_models if model not in text_models}
 
         # compute attributes about this filter operation
-        is_image_filter = any([
-            field.is_image_field
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
-        num_image_fields = sum([
-            field.is_image_field
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
-        list_image_field = any([
-            field.is_image_field and hasattr(field, "element_type")
-            for field_name, field in logical_expression.input_fields.items()
-            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ])
+        is_image_filter = any(
+            [
+                field.is_image_field
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        num_image_fields = sum(
+            [
+                field.is_image_field
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        list_image_field = any(
+            [
+                field.is_image_field and hasattr(field, "element_type")
+                for field_name, field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
 
         physical_expressions = []
         for model in physical_op_params["available_models"]:
@@ -1090,7 +1141,7 @@ class BasicSubstitutionRule(ImplementationRule):
             generated_fields=logical_expression.generated_fields,
             group_id=logical_expression.group_id,
         )
-        
+
         logger.debug(f"Done substituting BasicSubstitutionRule for {logical_expression}")
         deduped_physical_expressions = set([expression])
         logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
