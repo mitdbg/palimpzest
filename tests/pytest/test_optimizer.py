@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from palimpzest.constants import Cardinality, Model
@@ -267,6 +269,8 @@ class TestOptimizer:
         assert isinstance(physical_plan[5], LLMFilter)  # ImageRealEstateListing(attractive)
 
     def test_seven_filters(self, enron_eval_tiny, email_schema, opt_strategy):
+        start_time = time.time()
+
         plan = Dataset(enron_eval_tiny)
         plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("filter1", depends_on=["contents"])
@@ -301,6 +305,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[7], LLMFilter)
         assert isinstance(physical_plan[8], CodeSynthesisConvert)
 
+        assert time.time() - start_time < 2.0, "Optimizer should complete this test within 2 seconds; if it's failed, something has caused a regression, and you should ping Matthew Russo (mdrusso@mit.edu)"
 
 class MockSampleBasedCostModel:
     """

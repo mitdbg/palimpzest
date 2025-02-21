@@ -92,9 +92,9 @@ class PushDownFilter(TransformationRule):
         logical_expression: LogicalExpression, groups: dict[int, Group], expressions: dict[int, Expression], **kwargs
     ) -> tuple[set[LogicalExpression], set[Group]]:
         logger.debug(f"Substituting PushDownFilter for {logical_expression}")
-        logger.debug(f"Groups: {groups}")
-        logger.debug(f"Expressions: {expressions}")
-        logger.debug(f"kwargs: {kwargs}")
+        # logger.debug(f"Groups: {groups}")
+        # logger.debug(f"Expressions: {expressions}")
+        # logger.debug(f"kwargs: {kwargs}")
 
         # initialize the sets of new logical expressions and groups to be returned
         new_logical_expressions, new_groups = set(), set()
@@ -203,8 +203,8 @@ class PushDownFilter(TransformationRule):
                 new_logical_expressions.add(new_expr)
 
         logger.debug(f"Done substituting PushDownFilter for {logical_expression}")
-        logger.debug(f"New logical expressions: {new_logical_expressions}")
-        logger.debug(f"New groups: {new_groups}")
+        # logger.debug(f"New logical expressions: {new_logical_expressions}")
+        # logger.debug(f"New groups: {new_groups}")
         return new_logical_expressions, new_groups
 
 
@@ -230,7 +230,7 @@ class NonLLMConvertRule(ImplementationRule):
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting NonLLMConvertRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
 
@@ -257,7 +257,7 @@ class NonLLMConvertRule(ImplementationRule):
 
         deduped_physical_expressions = set([expression])
         logger.debug(f"Done substituting NonLLMConvertRule for {logical_expression}")
-        logger.debug(f"Expression: {deduped_physical_expressions}")
+        # logger.debug(f"Expression: {deduped_physical_expressions}")
 
         return deduped_physical_expressions
 
@@ -283,7 +283,7 @@ class LLMConvertRule(ImplementationRule):
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting LLMConvertRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
 
@@ -353,7 +353,7 @@ class LLMConvertRule(ImplementationRule):
 
         deduped_physical_expressions = set(physical_expressions)
         logger.debug(f"Done substituting LLMConvertRule for {logical_expression}")
-        logger.debug(f"Physical expressions: {deduped_physical_expressions}")
+        # logger.debug(f"Physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
 
 
@@ -400,7 +400,7 @@ class TokenReducedConvertRule(ImplementationRule):
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting TokenReducedConvertRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
 
@@ -448,7 +448,7 @@ class TokenReducedConvertRule(ImplementationRule):
 
         logger.debug(f"Done substituting TokenReducedConvertRule for {logical_expression}")
         deduped_physical_expressions = set(physical_expressions)
-        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        # logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
 
 
@@ -499,7 +499,7 @@ class CodeSynthesisConvertRule(ImplementationRule):
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting CodeSynthesisConvertRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
 
@@ -531,7 +531,7 @@ class CodeSynthesisConvertRule(ImplementationRule):
         )
         deduped_physical_expressions = set([expression])
         logger.debug(f"Done substituting CodeSynthesisConvertRule for {logical_expression}")
-        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        # logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
 
 
@@ -565,7 +565,7 @@ class RAGConvertRule(ImplementationRule):
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting RAGConvertRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
 
@@ -615,7 +615,7 @@ class RAGConvertRule(ImplementationRule):
 
         logger.debug(f"Done substituting RAGConvertRule for {logical_expression}")
         deduped_physical_expressions = set(physical_expressions)
-        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        # logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
 
 class MixtureOfAgentsConvertRule(ImplementationRule):
@@ -635,7 +635,7 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting MixtureOfAgentsConvertRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
 
@@ -707,7 +707,7 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
 
         logger.debug(f"Done substituting MixtureOfAgentsConvertRule for {logical_expression}")
         deduped_physical_expressions = set(physical_expressions)
-        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        # logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
 
 class CriticAndRefineConvertRule(ImplementationRule):
@@ -725,7 +725,7 @@ class CriticAndRefineConvertRule(ImplementationRule):
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting CriticAndRefineConvertRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
 
@@ -806,7 +806,7 @@ class CriticAndRefineConvertRule(ImplementationRule):
 
         logger.debug(f"Done substituting CriticAndRefineConvertRule for {logical_expression}")
         deduped_physical_expressions = set(physical_expressions)
-        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        # logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
 
 
@@ -827,7 +827,7 @@ class RetrieveRule(ImplementationRule):
         cls, logical_expression: LogicalExpression, **physical_op_params
     ) -> set[PhysicalExpression]:
         logger.debug(f"Substituting RetrieveRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
 
@@ -860,7 +860,7 @@ class RetrieveRule(ImplementationRule):
 
         logger.debug(f"Done substituting RetrieveRule for {logical_expression}")
         deduped_physical_expressions = set(physical_expressions)
-        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        # logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
 
 
@@ -881,7 +881,7 @@ class NonLLMFilterRule(ImplementationRule):
     @staticmethod
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting NonLLMFilterRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
@@ -904,7 +904,7 @@ class NonLLMFilterRule(ImplementationRule):
         )
         logger.debug(f"Done substituting NonLLMFilterRule for {logical_expression}")
         deduped_physical_expressions = set([expression])
-        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        # logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
 
 
@@ -925,7 +925,7 @@ class LLMFilterRule(ImplementationRule):
     @staticmethod
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting LLMFilterRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
@@ -991,7 +991,7 @@ class LLMFilterRule(ImplementationRule):
 
         logger.debug(f"Done substituting LLMFilterRule for {logical_expression}")
         deduped_physical_expressions = set(physical_expressions)
-        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        # logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
 
 
@@ -1009,7 +1009,7 @@ class AggregateRule(ImplementationRule):
     @staticmethod
     def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting AggregateRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
@@ -1040,7 +1040,7 @@ class AggregateRule(ImplementationRule):
 
         logger.debug(f"Done substituting AggregateRule for {logical_expression}")
         deduped_physical_expressions = set([expression])
-        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        # logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
 
 
@@ -1068,7 +1068,7 @@ class BasicSubstitutionRule(ImplementationRule):
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logger.debug(f"Substituting BasicSubstitutionRule for {logical_expression}")
-        logger.debug(f"Physical op params: {physical_op_params}")
+        # logger.debug(f"Physical op params: {physical_op_params}")
 
         logical_op = logical_expression.operator
         op_kwargs = logical_op.get_logical_op_params()
@@ -1093,5 +1093,5 @@ class BasicSubstitutionRule(ImplementationRule):
         
         logger.debug(f"Done substituting BasicSubstitutionRule for {logical_expression}")
         deduped_physical_expressions = set([expression])
-        logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
+        # logger.debug(f"Deduped physical expressions: {deduped_physical_expressions}")
         return deduped_physical_expressions
