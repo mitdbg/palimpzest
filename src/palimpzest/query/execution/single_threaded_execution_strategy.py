@@ -8,6 +8,7 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.tools.logger import setup_logger
+from palimpzest.utils.progress import create_progress_manager
 
 logger = setup_logger(__name__)
 
@@ -32,6 +33,9 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
 
         plan_start_time = time.time()
 
+        # Initialize progress manager
+        self.progress_manager = create_progress_manager()
+
         # initialize plan stats and operator stats
         plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
         for op in plan.operators:
@@ -48,6 +52,13 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         source_operator = plan.operators[0]
         assert isinstance(source_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
         datareader_len = len(source_operator.datareader)
+
+        # Calculate total work units - each record needs to go through each operator
+        total_ops = len(plan.operators)
+        total_items = min(num_samples, datareader_len) if num_samples != float("inf") else datareader_len
+        total_work_units = total_items * total_ops
+        self.progress_manager.start(total_work_units)
+        work_units_completed = 0
 
         # initialize processing queues for each operation
         processing_queues = {op.get_op_id(): [] for op in plan.operators if not isinstance(op, ScanPhysicalOp)}

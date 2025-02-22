@@ -87,7 +87,7 @@ class CLIProgressManager(ProgressManager):
         super().__init__()
         self.console = Console()
         
-        # Create single progress bar that includes both progress and recent text
+        # create single progress bar that includes both progress and recent text
         self.progress = RichProgress(
             SpinnerColumn(),
             TextColumn("[bold blue]{task.description}"),
@@ -117,25 +117,29 @@ class CLIProgressManager(ProgressManager):
             recent="",
         )
 
-        # Store the mapping of operator ID to task ID
+        # store the mapping of operator ID to task ID
         self.op_id_to_task_id[op_id] = task_id
 
     def start(self):
-        # Print a newline before starting to separate from previous output
+        # print a newline before starting to separate from previous output
         print()
 
-        # Start progress bar
+        # start progress bar
         self.progress.start()
 
-    def update(self, current: int, sample: str | None = None, **kwargs):
+    def update(self, op_id: str, current: int, sample: str | None = None, **kwargs):
         self.update_stats(**kwargs)
         
-        # Update progress bar and recent text in one update
+        # update progress bar and recent text in one update
         if sample:
             self.stats.recent_text = sample
-            
+
+        # get the task ID for the current operation
+        task_id = self.op_id_to_task_id.get(op_id)
+
+        # update the task with the current progress
         self.progress.update(
-            self.task_id, 
+            task_id, 
             completed=current,
             description=f"[bold blue]{self.stats.current_operation}",
             cost=self.stats.total_cost,
@@ -144,13 +148,13 @@ class CLIProgressManager(ProgressManager):
             memory=self.stats.memory_usage_mb,
             recent=f"Recent: {self.stats.recent_text}"
         )
-        
+
     def finish(self):
         self.progress.stop()
-        
+
         # Print final stats on new lines after progress display
         print(f"Total time: {time.time() - self.stats.start_time:.2f}s")
-        #print(f"Total cost: ${self.stats.total_cost:.4f}")
+        print(f"Total cost: ${self.stats.total_cost:.4f}")
         print(f"Success rate: {self.stats.success_count}/{self.stats.success_count + self.stats.failure_count}")
 
 class NotebookProgressManager(ProgressManager):
