@@ -399,8 +399,8 @@ if __name__ == "__main__":
             output_attr="reaction_labels",
             output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
         )
-        plan = plan.add_columns(store_og_reactions, cols=[{"name": "og_reaction_labels", "type": list[str], "desc": ""}], depends_on=["reaction_labels"])
-        plan = plan.map(trim_terms, depends_on=["reaction_labels"])
+        # plan = plan.add_columns(store_og_reactions, cols=[{"name": "og_reaction_labels", "type": list[str], "desc": ""}], depends_on=["reaction_labels"])
+        # plan = plan.map(trim_terms, depends_on=["reaction_labels"])
         plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
         # only use final op quality
