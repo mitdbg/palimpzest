@@ -2,10 +2,11 @@
 import argparse
 import os
 import time
+import logging
 
 from demo_core import execute_task, format_results_table
 from dotenv import load_dotenv
-
+from palimpzest.tools.logger import setup_logger
 import palimpzest as pz
 
 load_dotenv()
@@ -63,6 +64,8 @@ def main():
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     # Execute task
+    logger = setup_logger("palimpzest")
+    logger.pz_logger.set_console_level(logging.DEBUG if verbose else logging.ERROR)
     records, execution_stats, cols = execute_task(
         task=task,
         dataset=dataset,

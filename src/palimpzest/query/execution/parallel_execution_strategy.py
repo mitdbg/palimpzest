@@ -1,3 +1,4 @@
+import logging
 import multiprocessing
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -10,9 +11,8 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
-from palimpzest.tools.logger import setup_logger
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class PipelinedParallelExecutionStrategy(ExecutionStrategy):
     """

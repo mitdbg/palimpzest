@@ -1,3 +1,4 @@
+import logging
 from copy import deepcopy
 from itertools import combinations
 
@@ -29,10 +30,9 @@ from palimpzest.query.operators.token_reduction_convert import (
     TokenReducedConvertConventional,
 )
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
-from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.model_helpers import get_models, get_vision_models
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class Rule:
     """

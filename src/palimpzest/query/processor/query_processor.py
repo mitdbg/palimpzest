@@ -1,3 +1,4 @@
+import logging
 from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 
@@ -11,11 +12,10 @@ from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyTy
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset, Set
-from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.model_helpers import get_models
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class QueryProcessor:
     """

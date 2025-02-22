@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 
 from palimpzest.core.elements.records import DataRecordCollection
@@ -22,10 +23,9 @@ from palimpzest.query.processor.random_sampling_sentinel_processor import (
 )
 from palimpzest.query.processor.streaming_processor import StreamingQueryProcessor
 from palimpzest.sets import Dataset, Set
-from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.model_helpers import get_models
 
-logger = setup_logger(__name__) 
+logger = logging.getLogger(__name__)
 
 class ProcessingStrategyType(Enum):
     """How to generate and optimize query plans"""
