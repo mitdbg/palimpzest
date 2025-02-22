@@ -30,9 +30,6 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         logger.info(f"Executing plan {plan.plan_id} with {plan_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
-        # TODO: remove
-        print(f"Executing plan {plan.plan_id} with {plan_workers} workers")
-        print(f"Plan Details: {plan}")
 
         plan_start_time = time.time()
 
