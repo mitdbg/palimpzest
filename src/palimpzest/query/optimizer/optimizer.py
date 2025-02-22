@@ -486,7 +486,7 @@ class Optimizer:
                 context = {"costed_phys_op_ids": self.costed_phys_op_ids}
                 new_tasks = task.perform(self.groups, self.expressions, context=context, **self.get_physical_op_params())
             elif isinstance(task, OptimizePhysicalExpression):
-                context = {"optimization_strategy_type": self.optimization_strategy_type, "costed_phys_op_ids": self.costed_phys_op_ids} # TODO: remove costed_phys_op_ids
+                context = {"optimization_strategy_type": self.optimization_strategy_type}
                 new_tasks = task.perform(self.cost_model, self.groups, self.policy, context=context)
 
             self.tasks_stack.extend(new_tasks)
