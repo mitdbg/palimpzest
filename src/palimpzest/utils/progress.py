@@ -49,20 +49,25 @@ def get_memory_usage() -> float:
 
 class ProgressManager(ABC):
     """Abstract base class for progress managers"""
-    
+
     def __init__(self):
         self.stats = ProgressStats(start_time=time.time())
-    
+
     @abstractmethod
-    def start(self, total: int):
-        """Initialize progress tracking with total items"""
+    def add_task(self, op_id: str, op_str: str, total: int):
+        """Initialize progress tracking for operator execution with total items"""
         pass
-    
+
+    @abstractmethod
+    def start(self):
+        """Start the progress bar(s)"""
+        pass
+
     @abstractmethod
     def update(self, current: int, sample: str | None = None, **kwargs):
         """Update progress with current count and optional sample"""
         pass
-    
+
     @abstractmethod
     def finish(self):
         """Clean up and finalize progress tracking"""
@@ -98,25 +103,30 @@ class CLIProgressManager(ProgressManager):
             refresh_per_second=10,
             expand=True,   # Use full width
         )
-        self.task_id = None
+        self.op_id_to_task_id = {}
         
-    def start(self, total: int):
-        # Print a newline before starting to separate from previous output
-        print()
-        
-        self.task_id = self.progress.add_task(
-            "Processing", 
+    def add_task(self, op_id: str, op_str: str, total: int):
+        """Add a new task to the progress bar"""
+        task_id = self.progress.add_task(
+            f"[blue]{op_str}", 
             total=total,
             cost=0.0,
             success=0,
             failed=0,
             memory=0.0,
-            recent=""
+            recent="",
         )
-        
+
+        # Store the mapping of operator ID to task ID
+        self.op_id_to_task_id[op_id] = task_id
+
+    def start(self):
+        # Print a newline before starting to separate from previous output
+        print()
+
         # Start progress bar
         self.progress.start()
-        
+
     def update(self, current: int, sample: str | None = None, **kwargs):
         self.update_stats(**kwargs)
         
