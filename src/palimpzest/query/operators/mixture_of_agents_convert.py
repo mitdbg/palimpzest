@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
-
 from palimpzest.constants import MODEL_CARDS, Model, PromptStrategy
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.fields import Field
 from palimpzest.query.generators.generators import generator_factory
 from palimpzest.query.operators.convert import LLMConvert
 
@@ -112,7 +111,7 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         return naive_op_cost_estimates
 
-    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
         # get input fields
         input_fields = self.get_input_fields()
 
@@ -120,8 +119,9 @@ class MixtureOfAgentsConvert(LLMConvert):
         proposer_model_final_answers, proposer_model_generation_stats = [], []
         for proposer_generator, temperature in zip(self.proposer_generators, self.temperatures):
             gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema, "temperature": temperature}
-            field_answers, reasoning, generation_stats, _ = proposer_generator(candidate, fields, **gen_kwargs)
-            proposer_model_final_answers.append(f"REASONING: {reasoning}\nANSWER:{field_answers}\n")
+            _, reasoning, generation_stats, _ = proposer_generator(candidate, fields, json_output=False, **gen_kwargs)
+            proposer_text = f"REASONING:{reasoning}\n"
+            proposer_model_final_answers.append(proposer_text)
             proposer_model_generation_stats.append(generation_stats)
 
         # call the aggregator

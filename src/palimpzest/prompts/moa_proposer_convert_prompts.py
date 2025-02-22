@@ -7,8 +7,6 @@ Be sure to cite information from the context as evidence of why your answers are
 
 You will be provided with a description of each input field and each output field.
 
-{output_format_instruction} Finish your response with a newline character followed by ---
-
 An example is shown below:
 ---
 INPUT FIELDS:
@@ -31,8 +29,6 @@ You will be presented with a context and a set of output fields to generate. You
 Be sure to cite information from the context as evidence of why your answers are correct. Do not hallucinate evidence.
 
 You will be provided with a description of each input field and each output field.
-
-{output_format_instruction} Finish your response with a newline character followed by ---
 ---
 INPUT FIELDS:
 {input_fields_desc}

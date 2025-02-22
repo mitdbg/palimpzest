@@ -15,6 +15,7 @@ from palimpzest.constants import (
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.lib.fields import BooleanField
 from palimpzest.query.generators.generators import generator_factory
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.utils.model_helpers import get_vision_models
@@ -248,14 +249,8 @@ class LLMFilter(FilterOp):
         # construct kwargs for generation
         gen_kwargs = {"project_cols": input_fields, "filter_condition": self.filter_obj.filter_condition}
 
-        # generate output
-        field_answers, _, generation_stats, _ = self.generator(candidate, ["passed_operator"], **gen_kwargs)
+        # generate output; NOTE: BooleanField is used to indicate the output type; thus, the desc is not needed
+        fields = {"passed_operator": BooleanField(desc="")}
+        field_answers, _, generation_stats, _ = self.generator(candidate, fields, **gen_kwargs)
 
-        # compute whether the record passed the filter or not
-        passed_operator = False
-        if isinstance(field_answers["passed_operator"], str):
-            passed_operator = "true" in field_answers["passed_operator"].lower()
-        elif isinstance(field_answers["passed_operator"], bool):
-            passed_operator = field_answers["passed_operator"]
-
-        return {"passed_operator": passed_operator}, generation_stats
+        return field_answers, generation_stats

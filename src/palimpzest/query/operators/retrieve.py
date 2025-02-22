@@ -45,13 +45,13 @@ class RetrieveOp(PhysicalOperator):
 
     def __str__(self):
         op = super().__str__()
-        op += f"    Retrieve: {str(self.index)} with top {self.k}\n"
+        op += f"    Retrieve: {self.index.__class__.__name__} with top {self.k}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {
-            "index": str(self.index),
+            "index": self.index.__class__.__name__,
             "search_attr": self.search_attr,
             "output_attr": self.output_attr,
             "k": self.k,
@@ -250,6 +250,9 @@ class RetrieveOp(PhysicalOperator):
                 top_k_results.append(result[:self.k])
         else:
             top_k_results = top_results[:self.k]
+
+        if self.verbose:
+            print(f"Top {self.k} results: {top_k_results}")
 
         # construct and return the record set
         return self._create_record_set(

@@ -46,7 +46,7 @@ if __name__ == "__main__":
         policy=policy,
         cache=cache,
         verbose=True,
-        processing_strategy="no_sentinel"
+        processing_strategy="no_sentinel",
     )
     data_record_collection = plan.run(config)
 
