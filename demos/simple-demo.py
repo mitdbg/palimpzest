@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 import argparse
+import logging
 import os
 import time
-import logging
 
 from demo_core import execute_task, format_results_table
 from dotenv import load_dotenv
-from palimpzest.tools.logger import setup_logger
+
 import palimpzest as pz
+from palimpzest.tools.logger import setup_logger
 
 load_dotenv()
 
