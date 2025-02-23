@@ -70,7 +70,7 @@ def code_synth_convert_plan(email_schema, enron_eval_tiny):
         output_schema=email_schema,
         exemplar_generation_model=Model.GPT_4o,
         code_synth_model=Model.GPT_4o,
-        conventional_fallback_model=Model.GPT_4o_MINI,
+        fallback_model=Model.GPT_4o_MINI,
         target_cache_id="abc123",
         cache_across_plans=False,
     )

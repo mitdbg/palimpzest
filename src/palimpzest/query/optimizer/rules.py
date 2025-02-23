@@ -261,11 +261,7 @@ class LLMConvertBondedRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = (
-            isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is None
-            # Use bonded convert only if there are multiple generated fields
-            # and len(logical_expression.operator.get_generated_fields()) > 1
-        )
+        is_match = isinstance(logical_expression.operator, ConvertScan) and logical_expression.operator.udf is None
         logger.debug(f"LLMConvertBondedRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -476,7 +472,7 @@ class CodeSynthesisConvertRule(ImplementationRule):
         op = cls.physical_convert_class(
             exemplar_generation_model=physical_op_params["champion_model"],
             code_synth_model=physical_op_params["code_champion_model"],
-            conventional_fallback_model=physical_op_params["conventional_fallback_model"],
+            fallback_model=physical_op_params["fallback_model"],
             prompt_strategy=PromptStrategy.COT_QA,
             **op_kwargs,
         )

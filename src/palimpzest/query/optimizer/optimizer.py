@@ -47,7 +47,7 @@ from palimpzest.query.optimizer.tasks import (
 from palimpzest.sets import Dataset, Set
 from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
-from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_conventional_fallback_model
+from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_fallback_model
 
 logger = setup_logger(__name__)
 
@@ -199,7 +199,7 @@ class Optimizer:
             "available_models": self.available_models,
             "champion_model": get_champion_model(self.available_models),
             "code_champion_model": get_code_champion_model(self.available_models),
-            "conventional_fallback_model": get_conventional_fallback_model(self.available_models),
+            "fallback_model": get_fallback_model(self.available_models),
         }
 
     def deepcopy_clean(self):

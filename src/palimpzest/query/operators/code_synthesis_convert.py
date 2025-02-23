@@ -24,7 +24,7 @@ class CodeSynthesisConvert(LLMConvert):
         self,
         exemplar_generation_model: Model = Model.GPT_4o,
         code_synth_model: Model = Model.GPT_4o,
-        conventional_fallback_model: Model = Model.GPT_4o_MINI,
+        fallback_model: Model = Model.GPT_4o_MINI,
         *args,
         **kwargs,
     ):
@@ -34,7 +34,7 @@ class CodeSynthesisConvert(LLMConvert):
         # set models
         self.exemplar_generation_model = exemplar_generation_model
         self.code_synth_model = code_synth_model
-        self.conventional_fallback_model = conventional_fallback_model
+        self.fallback_model = fallback_model
 
         # initialize parameters
         self.field_to_code_ensemble = None
@@ -58,7 +58,7 @@ class CodeSynthesisConvert(LLMConvert):
         id_params = {
             "exemplar_generation_model": self.exemplar_generation_model.value,
             "code_synth_model": self.code_synth_model.value,
-            "conventional_fallback_model": self.conventional_fallback_model.value,
+            "fallback_model": self.fallback_model.value,
             **id_params,
         }
 
@@ -69,7 +69,7 @@ class CodeSynthesisConvert(LLMConvert):
         op_params = {
             "exemplar_generation_model": self.exemplar_generation_model,
             "code_synth_model": self.code_synth_model,
-            "conventional_fallback_model": self.conventional_fallback_model,
+            "fallback_model": self.fallback_model,
             **op_params,
         }
 
@@ -229,13 +229,13 @@ class CodeSynthesisConvert(LLMConvert):
                     print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
 
                 # execute the conventional llm convert
-                conventional_op = LLMConvertBonded(
+                convert_op = LLMConvertBonded(
                     input_schema=self.input_schema,
                     output_schema=self.output_schema,
-                    model=self.conventional_fallback_model,
+                    model=self.fallback_model,
                     prompt_strategy=self.prompt_strategy,
                 )
-                single_field_answers, single_field_stats = conventional_op.convert(candidate, [field_name])
+                single_field_answers, single_field_stats = convert_op.convert(candidate, [field_name])
 
                 # include code execution time in single_field_stats
                 single_field_stats.fn_call_duration_secs += exec_stats.fn_call_duration_secs
