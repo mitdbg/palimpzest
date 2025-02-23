@@ -33,12 +33,9 @@ from palimpzest.query.optimizer.rules import (
     CodeSynthesisConvertRule,
     CriticAndRefineConvertRule,
     LLMConvertBondedRule,
-    LLMConvertConventionalRule,
     MixtureOfAgentsConvertRule,
     RAGConvertRule,
     TokenReducedConvertBondedRule,
-    TokenReducedConvertConventionalRule,
-    TokenReducedConvertRule,
 )
 from palimpzest.query.optimizer.tasks import (
     ApplyRule,
@@ -50,7 +47,7 @@ from palimpzest.query.optimizer.tasks import (
 from palimpzest.sets import Dataset, Set
 from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
-from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_conventional_fallback_model
+from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_fallback_model
 
 logger = setup_logger(__name__)
 
@@ -94,14 +91,13 @@ class Optimizer:
         verbose: bool = False,
         available_models: list[Model] | None = None,
         allow_bonded_query: bool = True,
-        allow_conventional_query: bool = False,
         allow_code_synth: bool = False,
         allow_token_reduction: bool = False,
         allow_rag_reduction: bool = False,
         allow_mixtures: bool = True,
         allow_critic: bool = False,
         optimization_strategy_type: OptimizationStrategyType = OptimizationStrategyType.PARETO,
-        use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
+        use_final_op_quality: bool = False,  # TODO: make this func(plan) -> final_quality
     ):
         # store the policy
         if available_models is None or len(available_models) == 0:
@@ -137,7 +133,6 @@ class Optimizer:
         # and remove all optimizations (except for bonded queries)
         if optimization_strategy_type == OptimizationStrategyType.NONE:
             self.allow_bonded_query = True
-            self.allow_conventional_query = False
             self.allow_code_synth = False
             self.allow_token_reduction = False
             self.allow_rag_reduction = False
@@ -150,7 +145,6 @@ class Optimizer:
         self.verbose = verbose
         self.available_models = available_models
         self.allow_bonded_query = allow_bonded_query
-        self.allow_conventional_query = allow_conventional_query
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.allow_rag_reduction = allow_rag_reduction
@@ -167,13 +161,6 @@ class Optimizer:
                 if rule not in [LLMConvertBondedRule, TokenReducedConvertBondedRule]
             ]
 
-        if not self.allow_conventional_query:
-            self.implementation_rules = [
-                rule
-                for rule in self.implementation_rules
-                if rule not in [LLMConvertConventionalRule, TokenReducedConvertConventionalRule]
-            ]
-
         if not self.allow_code_synth:
             self.implementation_rules = [
                 rule for rule in self.implementation_rules if not issubclass(rule, CodeSynthesisConvertRule)
@@ -181,7 +168,7 @@ class Optimizer:
 
         if not self.allow_token_reduction:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules if not issubclass(rule, TokenReducedConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, TokenReducedConvertBondedRule)
             ]
 
         if not self.allow_rag_reduction:
@@ -191,8 +178,7 @@ class Optimizer:
 
         if not self.allow_mixtures:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules
-                if not issubclass(rule, MixtureOfAgentsConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, MixtureOfAgentsConvertRule)
             ]
 
         if not self.allow_critic:
@@ -213,7 +199,7 @@ class Optimizer:
             "available_models": self.available_models,
             "champion_model": get_champion_model(self.available_models),
             "code_champion_model": get_code_champion_model(self.available_models),
-            "conventional_fallback_model": get_conventional_fallback_model(self.available_models),
+            "fallback_model": get_fallback_model(self.available_models),
         }
 
     def deepcopy_clean(self):
@@ -224,7 +210,6 @@ class Optimizer:
             verbose=self.verbose,
             available_models=self.available_models,
             allow_bonded_query=self.allow_bonded_query,
-            allow_conventional_query=self.allow_conventional_query,
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
             allow_rag_reduction=self.allow_rag_reduction,
@@ -303,7 +288,7 @@ class Optimizer:
                 search_attr=node._search_attr,
                 output_attr=node._output_attr,
                 k=node._k,
-                target_cache_id=uid
+                target_cache_id=uid,
             )
         elif output_schema != input_schema:
             op = ConvertScan(
@@ -329,7 +314,9 @@ class Optimizer:
         )
 
         # compute the fields added by this operation and all fields
-        input_group_short_field_names = list(map(lambda full_field: full_field.split(".")[-1], input_group_fields.keys()))
+        input_group_short_field_names = list(
+            map(lambda full_field: full_field.split(".")[-1], input_group_fields.keys())
+        )
         new_fields = {
             field_name: field
             for field_name, field in op.output_schema.field_map(unique=True, id=uid).items()
@@ -339,9 +326,7 @@ class Optimizer:
 
         # compute the set of (short) field names this operation depends on
         depends_on_field_names = (
-            {}
-            if isinstance(node, DataReader)
-            else {field_name.split(".")[-1] for field_name in node._depends_on}
+            {} if isinstance(node, DataReader) else {field_name.split(".")[-1] for field_name in node._depends_on}
         )
 
         # compute all properties including this operations'
@@ -467,7 +452,9 @@ class Optimizer:
                 new_tasks = task.perform(self.transformation_rules, self.implementation_rules)
             elif isinstance(task, ApplyRule):
                 context = {"costed_phys_op_ids": self.costed_phys_op_ids}
-                new_tasks = task.perform(self.groups, self.expressions, context=context, **self.get_physical_op_params())
+                new_tasks = task.perform(
+                    self.groups, self.expressions, context=context, **self.get_physical_op_params()
+                )
             elif isinstance(task, OptimizePhysicalExpression):
                 context = {"optimization_strategy_type": self.optimization_strategy_type}
                 new_tasks = task.perform(self.cost_model, self.groups, self.policy, context=context)
@@ -492,5 +479,5 @@ class Optimizer:
         # search the optimization space by applying logical and physical transformations to the initial group tree
         self.search_optimization_space(final_group_id)
         logger.info(f"Getting optimal plans for final group id: {final_group_id}")
-        
+
         return self.strategy.get_optimal_plans(self.groups, final_group_id, policy, self.use_final_op_quality)

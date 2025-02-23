@@ -124,7 +124,6 @@ class QueryProcessorFactory:
             verbose=config.verbose,
             available_models=available_models,
             allow_bonded_query=config.allow_bonded_query,
-            allow_conventional_query=config.allow_conventional_query,
             allow_code_synth=config.allow_code_synth,
             allow_token_reduction=config.allow_token_reduction,
             allow_rag_reduction=config.allow_rag_reduction,
