@@ -45,11 +45,10 @@ from palimpzest.query.optimizer.tasks import (
     OptimizePhysicalExpression,
 )
 from palimpzest.sets import Dataset, Set
-from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
 from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_fallback_model
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def get_node_uid(node: Dataset | DataReader) -> str:
@@ -186,7 +185,6 @@ class Optimizer:
                 rule for rule in self.implementation_rules if not issubclass(rule, CriticAndRefineConvertRule)
             ]
 
-        logger.pz_logger.set_console_level(logging.DEBUG if self.verbose else logging.ERROR)
         logger.info(f"Initialized Optimizer with verbose={self.verbose}")
         logger.debug(f"Initialized Optimizer with params: {self.__dict__}")
 

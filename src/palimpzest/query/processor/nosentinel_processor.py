@@ -1,3 +1,4 @@
+import logging
 import time
 
 from palimpzest.core.data.dataclasses import ExecutionStats, OperatorStats, PlanStats
@@ -13,10 +14,9 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.progress import create_progress_manager
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class NoSentinelQueryProcessor(QueryProcessor):
     """

@@ -1,3 +1,4 @@
+import logging
 import time
 
 from palimpzest.core.data.dataclasses import OperatorStats, PlanStats
@@ -7,9 +8,8 @@ from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
-from palimpzest.tools.logger import setup_logger
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
     """
