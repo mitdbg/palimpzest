@@ -3,10 +3,11 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import PlanStats
-from palimpzest.core.elements.records import DataRecordSet
+from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.limit import LimitScanOp
+from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.tools.logger import setup_logger
@@ -52,6 +53,43 @@ class ParallelExecutionStrategy(ExecutionStrategy):
 
         return True
 
+    def _process_future_results(self, operator: PhysicalOperator, future_queues: dict[str, list], plan_stats: PlanStats) -> list[DataRecord]:
+        """
+        Helper function which takes an operator, the future queues, and plan stats, and performs
+        the updates to plan stats and progress manager before returning the results from the finished futures.
+        """
+        # get the op_id for the operator
+        op_id = operator.get_op_id()
+
+        # this function is called when the future queue is not empty
+        # and the executor is not busy processing other futures
+        done_futures, not_done_futures = wait(future_queues[op_id], timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
+
+        # add the unfinished futures back to the previous op's future queue
+        future_queues[op_id] = list(not_done_futures)
+
+        # add the finished futures to the input queue for this operator
+        output_records = []
+        for future in done_futures:
+            record_set: DataRecordSet = future.result()
+            records = record_set.data_records
+            record_op_stats = record_set.record_op_stats
+            num_outputs = sum(record.passed_operator for record in records)
+
+            # update the progress manager
+            self.progress_manager.incr(op_id, num_outputs=num_outputs, display_text=f"{operator.op_name()} processed record")
+
+            # update plan stats
+            plan_stats.add_record_op_stats(record_op_stats)
+
+            # add records to the cache
+            self._add_records_to_cache(operator.target_cache_id, records)
+
+            # add records which aren't filtered to the output records
+            output_records.extend([record for record in records if record.passed_operator])
+        
+        return output_records
+
     def execute_plan(self, plan: PhysicalPlan):
         """Initialize the stats and the execute the plan."""
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
@@ -88,30 +126,9 @@ class ParallelExecutionStrategy(ExecutionStrategy):
 
                     # get any finished futures from the previous operator and add them to the input queue for this operator
                     if not isinstance(operator, ScanPhysicalOp):
-                        prev_op_id = plan.operators[op_idx - 1].get_op_id()
-                        done_futures, not_done_futures = wait(future_queues[prev_op_id], timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
-
-                        # add the unfinished futures back to the previous op's future queue
-                        future_queues[prev_op_id] = list(not_done_futures)
-
-                        # add the finished futures to the input queue for this operator
-                        for future in done_futures:
-                            record_set: DataRecordSet = future.result()
-                            records = record_set.data_records
-                            record_op_stats = record_set.record_op_stats
-                            num_outputs = sum(record.passed_operator for record in records)
-
-                            # update the progress manager
-                            self.progress_manager.incr(op_id, num_outputs=num_outputs, display_text=f"{operator.op_name()} processed record")
-
-                            # update plan stats
-                            plan_stats.add_record_op_stats(record_op_stats)
-
-                            # add records to the cache
-                            self._add_records_to_cache(operator.target_cache_id, records)
-
-                            # add records (which aren't filtered) to the input queue for this operator
-                            input_queues[op_id].extend([record for record in records if record.passed_operator])
+                        prev_operator = plan.operators[op_idx - 1]
+                        records = self._process_future_results(prev_operator, future_queues, plan_stats)
+                        input_queues[op_id].extend(records)
 
                     # if this operator does not have enough inputs to execute, then skip it
                     num_inputs = len(input_queues[op_id])
@@ -136,8 +153,8 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                     break
 
             # get final output records from the future queue of the last operator
-            final_futures = wait(future_queues[final_op_id])
-            output_records = [future.result() for future in final_futures]
+            final_op = plan.operators[-1]
+            output_records = self._process_future_results(final_op, future_queues, plan_stats)
 
         # close the cache
         self._close_cache([op.target_cache_id for op in plan.operators])

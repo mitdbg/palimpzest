@@ -1,5 +1,3 @@
-import time
-
 import pytest
 
 from palimpzest.policy import MaxQuality
@@ -76,8 +74,6 @@ class TestParallelExecutionNoCache:
         """
         This test executes the given
         """
-        start_time = time.time()
-
         # NOTE: supplying datareader in place of dataset is a bit of a band-aid but it works
         # create processor
         processor = query_processor(
@@ -93,8 +89,7 @@ class TestParallelExecutionNoCache:
         mocker.patch.object(RAGConvert, "convert", side_effect=side_effect)
 
         # execute the plan
-        output_records, plan_stats = processor.execute_plan(physical_plan)
-        plan_stats.finalize(time.time() - start_time)        
+        output_records, plan_stats = processor.execute_plan(physical_plan)     
 
         # check that we get the expected set of output records
         def get_id(record):

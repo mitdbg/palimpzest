@@ -157,8 +157,8 @@ class ProgressManager(ABC):
 class CLIProgressManager(ProgressManager):
     """Progress manager for command line interface using rich"""
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, plan: PhysicalPlan, num_samples: int | None = None):
+        super().__init__(plan, num_samples)
         self.console = Console()
 
     def add_task(self, op_id: str, op_str: str, total: int):
@@ -246,7 +246,7 @@ class NotebookProgressManager(ProgressManager):
     """Progress manager for Jupyter notebooks using ipywidgets"""
     
     def __init__(self, plan: PhysicalPlan, num_samples: int | None = None):
-        super().__init__()
+        super().__init__(plan, num_samples)
         if not JUPYTER_AVAILABLE:
             raise ImportError("ipywidgets not available. Install with: pip install ipywidgets")
             

@@ -4,8 +4,6 @@ import time
 from dataclasses import dataclass, field, fields
 from typing import Any
 
-from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
-
 
 @dataclass
 class GenerationStats:
@@ -308,7 +306,7 @@ class PlanStats:
     start_time: float | None = None
 
     @staticmethod
-    def from_plan(plan: PhysicalPlan) -> PlanStats:
+    def from_plan(plan) -> PlanStats:
         """
         Initialize this PlanStats object from a PhysicalPlan object.
         """
@@ -325,23 +323,23 @@ class PlanStats:
     
         return PlanStats(plan_id=plan.plan_id, plan_str=str(plan), operator_stats=operator_stats)
  
-    @staticmethod
-    def from_sentinel_plan(sentinel_plan: SentinelPlan) -> PlanStats:
-        """
-        Initialize this PlanStats object from a SentinelPlan object.
-        """
-        operator_stats = {}
-        for op_idx, op in enumerate(plan.operators):
-            op_id = op.get_op_id()
-            operator_stats[op_id] = OperatorStats(
-                op_id=op_id,
-                op_name=op.op_name(),
-                source_op_id=None if op_idx == 0 else plan.operators[op_idx - 1].get_op_id(),
-                plan_id=plan.plan_id,
-                op_details={k: str(v) for k, v in op.get_id_params().items()},
-            )
+    # @staticmethod
+    # def from_sentinel_plan(sentinel_plan) -> PlanStats:
+    #     """
+    #     Initialize this PlanStats object from a SentinelPlan object.
+    #     """
+    #     operator_stats = {}
+    #     for op_idx, op in enumerate(plan.operators):
+    #         op_id = op.get_op_id()
+    #         operator_stats[op_id] = OperatorStats(
+    #             op_id=op_id,
+    #             op_name=op.op_name(),
+    #             source_op_id=None if op_idx == 0 else plan.operators[op_idx - 1].get_op_id(),
+    #             plan_id=plan.plan_id,
+    #             op_details={k: str(v) for k, v in op.get_id_params().items()},
+    #         )
     
-        return PlanStats(plan_id=plan.plan_id, plan_str=str(plan), operator_stats=operator_stats)
+    #     return PlanStats(plan_id=plan.plan_id, plan_str=str(plan), operator_stats=operator_stats)
 
     def start(self) -> None:
         """Start the timer for this plan execution."""
