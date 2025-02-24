@@ -249,7 +249,7 @@ class LLMFilter(FilterOp):
         gen_kwargs = {"project_cols": input_fields, "filter_condition": self.filter_obj.filter_condition}
 
         # generate output
-        field_answers, _, generation_stats = self.generator(candidate, ["passed_operator"], **gen_kwargs)
+        field_answers, _, generation_stats, _ = self.generator(candidate, ["passed_operator"], **gen_kwargs)
 
         # compute whether the record passed the filter or not
         passed_operator = False

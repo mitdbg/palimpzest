@@ -187,15 +187,3 @@ class PhysicalOperator:
 
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         raise NotImplementedError("Calling __call__ from abstract method")
-
-    @staticmethod
-    def execute_op_wrapper(operator: PhysicalOperator, op_input: DataRecord | list[DataRecord] | int) -> tuple[DataRecordSet, PhysicalOperator]:
-        """
-        Wrapper function around operator execution which also and returns the operator.
-        This is useful in the parallel setting(s) where operators are executed by a worker pool,
-        and it is convenient to return the op_id along with the computation result.
-        """
-        record_set = operator(op_input)
-
-        return record_set, operator, op_input
-    

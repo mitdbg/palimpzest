@@ -42,9 +42,12 @@ class Expression:
     def __eq__(self, other):
         return self.operator == other.operator and self.input_group_ids == other.input_group_ids
 
-    def __hash__(self):
+    def __str__(self):
         op_id = self.operator.get_logical_op_id() if isinstance(self.operator, LogicalOperator) else self.operator.get_op_id()
-        hash_str = str(tuple(sorted(self.input_group_ids)) + (op_id, str(self.__class__.__name__)))
+        return str(tuple(sorted(self.input_group_ids)) + (op_id, str(self.__class__.__name__)))
+
+    def __hash__(self):
+        hash_str = self.__str__()
         hash_id = int(hash_for_id(hash_str), 16)
         return hash_id
 

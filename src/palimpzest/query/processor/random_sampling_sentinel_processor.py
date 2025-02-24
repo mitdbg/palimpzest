@@ -1,6 +1,5 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
-from copy import deepcopy
 
 import numpy as np
 
@@ -14,7 +13,7 @@ from palimpzest.core.data.dataclasses import (
 )
 from palimpzest.core.elements.records import DataRecordCollection, DataRecordSet
 from palimpzest.policy import Policy
-from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
+from palimpzest.query.execution.parallel_execution_strategy import ParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import (
     PipelinedSingleThreadExecutionStrategy,
     SequentialSingleThreadExecutionStrategy,
@@ -29,7 +28,9 @@ from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyTy
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
+from palimpzest.tools.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class RandomSamplingSentinelQueryProcessor(QueryProcessor):
     """
@@ -64,6 +65,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         self.pick_output_fn = self.pick_ensemble_output
         self.rng = np.random.default_rng(seed=seed)
         self.exp_name = exp_name
+        logger.info(f"Initialized RandomSamplingSentinelQueryProcessor with config: {self.config}")
 
 
     def compute_quality(
@@ -470,7 +472,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             )
 
             # add records (which are not filtered) to the cache, if allowed
-            if not self.nocache:
+            if self.cache:
                 for record in all_records:
                     if getattr(record, "passed_operator", True):
                         # self.datadir.append_cache(logical_op_id, record)
@@ -493,7 +495,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         all_outputs = self.score_quality(plan.operator_sets, all_outputs, champion_outputs, expected_outputs)
 
         # if caching was allowed, close the cache
-        if not self.nocache:
+        if self.cache:
             for _, _, _ in plan:
                 # self.datadir.close_cache(logical_op_id)
                 pass
@@ -538,7 +540,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         optimizer.update_strategy(OptimizationStrategyType.SENTINEL)
 
         # create copy of dataset, but change its data source to the validation data source
-        dataset = deepcopy(dataset)
+        dataset = dataset.copy()
         dataset._set_data_source(self.val_datasource)
 
         # get the sentinel plan for the given dataset
@@ -549,14 +551,15 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
 
 
     def execute(self) -> DataRecordCollection:
+        logger.info("Executing RandomSamplingSentinelQueryProcessor")
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
         if self.val_datasource is None:
             raise Exception("Make sure you are using validation data with MABSentinelExecutionEngine")
 
-        # if nocache is True, make sure we do not re-use codegen examples
-        if self.nocache:
+        # if cache is False, make sure we do not re-use codegen examples
+        if not self.cache:
             # self.clear_cached_examples()
             pass
 
@@ -594,7 +597,10 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 
-        return DataRecordCollection(all_records, execution_stats=execution_stats)
+        result =  DataRecordCollection(all_records, execution_stats=execution_stats)
+        logger.info("Done executing RandomSamplingSentinelQueryProcessor")
+        logger.debug(f"Result: {result}")
+        return result
 
 
 class RandomSamplingSentinelSequentialSingleThreadProcessor(RandomSamplingSentinelQueryProcessor, SequentialSingleThreadExecutionStrategy):
@@ -609,25 +615,11 @@ class RandomSamplingSentinelSequentialSingleThreadProcessor(RandomSamplingSentin
             max_workers=self.max_workers,
             verbose=self.verbose
         )
-
-
-class RandomSamplingSentinelPipelinedParallelProcessor(RandomSamplingSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
-    """
-    This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
-    """
-    def __init__(self, *args, **kwargs):
-        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
-        PipelinedParallelExecutionStrategy.__init__(
-            self,
-            scan_start_idx=self.scan_start_idx,
-            max_workers=self.max_workers,
-            verbose=self.verbose
-        )
-
+        logger.info("Created RandomSamplingSentinelSequentialSingleThreadProcessor")
 
 class RandomSamplingSentinelPipelinedSingleThreadProcessor(RandomSamplingSentinelQueryProcessor, PipelinedSingleThreadExecutionStrategy):
     """
-    This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
+    This class performs sentinel execution while executing plans in a pipelined fashion.
     """
     def __init__(self, *args, **kwargs):
         RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
@@ -637,3 +629,18 @@ class RandomSamplingSentinelPipelinedSingleThreadProcessor(RandomSamplingSentine
             max_workers=self.max_workers,
             verbose=self.verbose
         )
+        logger.info("Created RandomSamplingSentinelPipelinedSingleThreadProcessor")
+
+class RandomSamplingSentinelParallelProcessor(RandomSamplingSentinelQueryProcessor, ParallelExecutionStrategy):
+    """
+    This class performs sentinel execution while executing plans in a parallel fashion.
+    """
+    def __init__(self, *args, **kwargs):
+        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        ParallelExecutionStrategy.__init__(
+            self,
+            scan_start_idx=self.scan_start_idx,
+            max_workers=self.max_workers,
+            verbose=self.verbose
+        )
+        logger.info("Created RandomSamplingSentinelParallelProcessor")

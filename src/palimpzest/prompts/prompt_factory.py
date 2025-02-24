@@ -145,7 +145,7 @@ class PromptFactory:
             # NOTE: MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT is a rough estimate which leaves room for the rest of the prompt text
             while total_context_len * TOKENS_PER_CHARACTER > MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT:
                 # sort fields by length
-                field_lengths = [(field, len(value)) for field, value in context.items()]
+                field_lengths = [(field, len(value) if value is not None else 0) for field, value in context.items()]
                 sorted_fields = sorted(field_lengths, key=lambda item: item[1], reverse=True)
 
                 # get field with longest context

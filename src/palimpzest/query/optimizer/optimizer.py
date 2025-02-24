@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from copy import deepcopy
 
 from palimpzest.constants import Model
@@ -47,8 +48,11 @@ from palimpzest.query.optimizer.tasks import (
     OptimizePhysicalExpression,
 )
 from palimpzest.sets import Dataset, Set
+from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
 from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_conventional_fallback_model
+
+logger = setup_logger(__name__)
 
 
 def get_node_uid(node: Dataset | DataReader) -> str:
@@ -86,7 +90,7 @@ class Optimizer:
         self,
         policy: Policy,
         cost_model: CostModel,
-        no_cache: bool = False,
+        cache: bool = False,
         verbose: bool = False,
         available_models: list[Model] | None = None,
         allow_bonded_query: bool = True,
@@ -142,7 +146,7 @@ class Optimizer:
             self.available_models = [available_models[0]]
 
         # store optimization hyperparameters
-        self.no_cache = no_cache
+        self.cache = cache
         self.verbose = verbose
         self.available_models = available_models
         self.allow_bonded_query = allow_bonded_query
@@ -196,6 +200,10 @@ class Optimizer:
                 rule for rule in self.implementation_rules if not issubclass(rule, CriticAndRefineConvertRule)
             ]
 
+        logger.pz_logger.set_console_level(logging.DEBUG if self.verbose else logging.ERROR)
+        logger.info(f"Initialized Optimizer with verbose={self.verbose}")
+        logger.debug(f"Initialized Optimizer with params: {self.__dict__}")
+
     def update_cost_model(self, cost_model: CostModel):
         self.cost_model = cost_model
 
@@ -212,7 +220,7 @@ class Optimizer:
         optimizer = Optimizer(
             policy=self.policy,
             cost_model=CostModel(),
-            no_cache=self.no_cache,
+            cache=self.cache,
             verbose=self.verbose,
             available_models=self.available_models,
             allow_bonded_query=self.allow_bonded_query,
@@ -226,17 +234,19 @@ class Optimizer:
             use_final_op_quality=self.use_final_op_quality,
         )
         return optimizer
-    
+
     def update_strategy(self, optimizer_strategy_type: OptimizationStrategyType):
         self.optimization_strategy_type = optimizer_strategy_type
         self.strategy = OptimizerStrategyRegistry.get_strategy(optimizer_strategy_type.value)
-    
+
     def construct_group_tree(self, dataset_nodes: list[Set]) -> tuple[list[int], dict[str, Field], dict[str, set[str]]]:
         # get node, output_schema, and input_schema (if applicable)
+        logger.debug(f"Constructing group tree for dataset_nodes: {dataset_nodes}")
+
         node = dataset_nodes[-1]
         output_schema = node.schema
         input_schema = dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
-        
+
         ### convert node --> Group ###
         uid = get_node_uid(node)
 
@@ -244,7 +254,7 @@ class Optimizer:
         op: LogicalOperator | None = None
 
         # TODO: add cache scan when we add caching back to PZ
-        # if not self.no_cache:
+        # if self.cache:
         #     op = CacheScan(datareader=node, output_schema=output_schema)
         if isinstance(node, DataReader):
             op = BaseScan(datareader=node, output_schema=output_schema)
@@ -351,7 +361,7 @@ class Optimizer:
                 all_properties["limits"].add(op_limit_str)
             else:
                 all_properties["limits"] = set([op_limit_str])
-    
+
         elif isinstance(op, Project):
             op_project_str = op.get_logical_op_id()
             if "projects" in all_properties:
@@ -378,13 +388,16 @@ class Optimizer:
         # add the expression and group to the optimizer's expressions and groups and return
         self.expressions[logical_expression.get_expr_id()] = logical_expression
         self.groups[group.group_id] = group
+        logger.debug(f"Constructed group tree for dataset_nodes: {dataset_nodes}")
+        logger.debug(f"Group: {group.group_id}, {all_fields}, {all_properties}")
 
         return [group.group_id], all_fields, all_properties
 
     def convert_query_plan_to_group_tree(self, query_plan: Dataset) -> str:
+        logger.debug(f"Converting query plan to group tree for query_plan: {query_plan}")
         # Obtain ordered list of datasets
         dataset_nodes: list[Dataset | DataReader] = []
-        node = deepcopy(query_plan)
+        node = query_plan.copy()
 
         # NOTE: the very first node will be a DataReader; the rest will be Dataset
         while isinstance(node, Dataset):
@@ -427,7 +440,8 @@ class Optimizer:
         # check that final_group_id is a singleton
         assert len(final_group_id) == 1
         final_group_id = final_group_id[0]
-
+        logger.debug(f"Converted query plan to group tree for query_plan: {query_plan}")
+        logger.debug(f"Final group id: {final_group_id}")
         return final_group_id
 
     def heuristic_optimization(self, group_id: int) -> None:
@@ -437,6 +451,8 @@ class Optimizer:
         pass
 
     def search_optimization_space(self, group_id: int) -> None:
+        logger.debug(f"Searching optimization space for group_id: {group_id}")
+
         # begin the search for an optimal plan with a task to optimize the final group
         initial_task = OptimizeGroup(group_id)
         self.tasks_stack.append(initial_task)
@@ -458,11 +474,14 @@ class Optimizer:
 
             self.tasks_stack.extend(new_tasks)
 
+        logger.debug(f"Done searching optimization space for group_id: {group_id}")
+
     def optimize(self, query_plan: Dataset, policy: Policy | None = None) -> list[PhysicalPlan]:
         """
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
         """
+        logger.info(f"Optimizing query plan: {query_plan}")
         # compute the initial group tree for the user plan
         final_group_id = self.convert_query_plan_to_group_tree(query_plan)
 
@@ -472,6 +491,6 @@ class Optimizer:
 
         # search the optimization space by applying logical and physical transformations to the initial group tree
         self.search_optimization_space(final_group_id)
+        logger.info(f"Getting optimal plans for final group id: {final_group_id}")
         
         return self.strategy.get_optimal_plans(self.groups, final_group_id, policy, self.use_final_op_quality)
-    

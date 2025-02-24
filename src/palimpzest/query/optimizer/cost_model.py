@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 
 # NOTE: the answer.mode() call(s) inside of _est_quality() throw a UserWarning when there are multiple
@@ -27,9 +28,12 @@ from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.query.operators.token_reduction_convert import TokenReducedConvert
 from palimpzest.query.optimizer.plan import SentinelPlan
+from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.model_helpers import get_champion_model_name, get_models
 
 warnings.simplefilter(action='ignore', category=UserWarning)
+
+logger = setup_logger(__name__)
 
 class BaseCostModel:
     """
@@ -87,7 +91,9 @@ class SampleBasedCostModel:
             for _, phys_op_id_to_stats in self.operator_to_stats.items()
             for phys_op_id, _ in phys_op_id_to_stats.items()
         ])
-
+        logger.pz_logger.set_console_level(logging.DEBUG if self.verbose else logging.ERROR)
+        logger.info(f"Initialized SampleBasedCostModel with verbose={self.verbose}")
+        logger.debug(f"Initialized SampleBasedCostModel with params: {self.__dict__}")
 
     def get_costed_phys_op_ids(self):
         return self.costed_phys_op_ids
@@ -97,9 +103,11 @@ class SampleBasedCostModel:
             self,
             execution_data: dict[str, dict[str, list[DataRecordSet]]],
         ):
+        logger.debug("Computing operator statistics")
         # flatten the nested dictionary of execution data and pull out fields relevant to cost estimation
         execution_record_op_stats = []
         for idx, (logical_op_id, _, _) in enumerate(self.sentinel_plan):
+            logger.debug(f"Computing operator statistics for sentinel_plan: {idx}, {logical_op_id}")
             # initialize variables
             upstream_logical_op_id = self.sentinel_plan.logical_op_ids[idx - 1] if idx > 0 else None
 
@@ -138,6 +146,7 @@ class SampleBasedCostModel:
         # for each physical_op_id, compute its average cost_per_record, time_per_record, selectivity, and quality
         operator_to_stats = {}
         for logical_op_id, logical_op_df in operator_stats_df.groupby("logical_op_id"):
+            logger.debug(f"Computing operator statistics for logical_op_id: {logical_op_id}")
             operator_to_stats[logical_op_id] = {}
 
             # get the logical_op_id of the upstream operator
@@ -165,6 +174,7 @@ class SampleBasedCostModel:
         if self.exp_name is not None:
             operator_stats_df.to_csv(f"opt-profiling-data/{self.exp_name}-operator-stats.csv", index=False)
 
+        logger.debug(f"Done computing operator statistics for {len(operator_to_stats)} operators!")
         return operator_to_stats
 
 
@@ -177,6 +187,7 @@ class SampleBasedCostModel:
         phys_op_id = operator.get_op_id()
         logical_op_id = operator.logical_op_id
         assert self.operator_to_stats.get(logical_op_id).get(phys_op_id) is not None, f"No execution data for {str(operator)}"
+        logger.debug(f"Calling __call__ for {str(operator)}")
 
         # look up stats for this operation
         est_cost_per_record = self.operator_to_stats[logical_op_id][phys_op_id]["cost"]
@@ -210,7 +221,10 @@ class SampleBasedCostModel:
         op_quality = op_estimates.quality
 
         # construct and return op estimates
-        return PlanCost(cost=op_cost, time=op_time, quality=op_quality, op_estimates=op_estimates)
+        plan_cost = PlanCost(cost=op_cost, time=op_time, quality=op_quality, op_estimates=op_estimates)
+        logger.debug(f"Done calling __call__ for {str(operator)}")
+        logger.debug(f"Plan cost: {plan_cost}")
+        return plan_cost
 
 
 class CostModel(BaseCostModel):
@@ -250,6 +264,8 @@ class CostModel(BaseCostModel):
 
         # compute set of costed physical op ids from operator_to_stats
         self.costed_phys_op_ids = None if self.operator_estimates is None else set(self.operator_estimates.keys())
+        logger.info("Initialized CostModel.")
+        logger.debug(f"Initialized CostModel with params: {self.__dict__}")
 
     def get_costed_phys_op_ids(self):
         return self.costed_phys_op_ids
@@ -598,6 +614,7 @@ class CostModel(BaseCostModel):
     def __call__(self, operator: PhysicalOperator, source_op_estimates: OperatorCostEstimates | None = None) -> PlanCost:
         # get identifier for operation which is unique within sentinel plan but consistent across sentinels
         op_id = operator.get_op_id()
+        logger.debug(f"Calling __call__ for {str(operator)} with op_id: {op_id}")
 
         # initialize estimates of operator metrics based on naive (but sometimes precise) logic
         if isinstance(operator, MarshalAndScanDataOp):
@@ -804,5 +821,7 @@ class CostModel(BaseCostModel):
             quality_lower_bound=op_quality_lower_bound,
             quality_upper_bound=op_quality_upper_bound,
         )
+        logger.debug(f"Done calling __call__ for {str(operator)} with op_id: {op_id}")
+        logger.debug(f"Plan cost: {op_plan_cost}")
 
         return op_plan_cost

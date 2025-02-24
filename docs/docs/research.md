@@ -62,7 +62,7 @@ Spring 2024
 ```
 @inproceedings{palimpzestCIDR,
     title={Palimpzest: Optimizing AI-Powered Analytics with Declarative Query Processing},
-    author={Liu, Chunwei and Russo, Matthew and Cafarella, Michael and Cao, Lei and Chen, Peter Baile and Chen, Zui and Franklin, Michael and Kraska, Tim and Madden, Samuel and Shahout, Rana and others},
+    author={Liu, Chunwei and Russo, Matthew and Cafarella, Michael and Cao, Lei and Chen, Peter Baile and Chen, Zui and Franklin, Michael and Kraska, Tim and Madden, Samuel and Shahout, Rana and Vitagliano, Gerardo},
     booktitle = {Proceedings of the {{Conference}} on {{Innovative Database Research}} ({{CIDR}})},
     date = 2025,
 }

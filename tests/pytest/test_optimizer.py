@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from palimpzest.constants import Cardinality, Model
@@ -110,7 +112,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -129,7 +131,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -156,7 +158,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -177,7 +179,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -199,7 +201,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -223,7 +225,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimization_strategy_type=opt_strategy,
@@ -244,7 +246,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
             allow_code_synth=False,
@@ -267,6 +269,8 @@ class TestOptimizer:
         assert isinstance(physical_plan[5], LLMFilter)  # ImageRealEstateListing(attractive)
 
     def test_seven_filters(self, enron_eval_tiny, email_schema, opt_strategy):
+        start_time = time.time()
+
         plan = Dataset(enron_eval_tiny)
         plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("filter1", depends_on=["contents"])
@@ -281,7 +285,7 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
             optimization_strategy_type=opt_strategy,
@@ -301,6 +305,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[7], LLMFilter)
         assert isinstance(physical_plan[8], CodeSynthesisConvert)
 
+        assert time.time() - start_time < 2.0, "Optimizer should complete this test within 2 seconds; if it's failed, something has caused a regression, and you should ping Matthew Russo (mdrusso@mit.edu)"
 
 class MockSampleBasedCostModel:
     """
@@ -389,7 +394,7 @@ class TestParetoOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            no_cache=True,
+            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3],
             optimization_strategy_type=OptimizationStrategyType.PARETO,

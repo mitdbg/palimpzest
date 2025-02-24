@@ -1,6 +1,5 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
-from copy import deepcopy
 
 import numpy as np
 
@@ -12,9 +11,9 @@ from palimpzest.core.data.dataclasses import (
     PlanStats,
     RecordOpStats,
 )
-from palimpzest.core.elements.records import DataRecordCollection, DataRecordSet
+from palimpzest.core.elements.records import DataRecord, DataRecordCollection, DataRecordSet
 from palimpzest.policy import Policy
-from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
+from palimpzest.query.execution.parallel_execution_strategy import ParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
 from palimpzest.query.operators.convert import ConvertOp, LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
@@ -26,7 +25,9 @@ from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyTy
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
+from palimpzest.tools.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class MABSentinelQueryProcessor(QueryProcessor):
     """
@@ -521,7 +522,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         return DataRecordSet(out_records, out_record_op_stats)
 
 
-    def execute_op_set(self, op_candidate_pairs):
+    def execute_op_set(self, op_candidate_pairs: list[PhysicalOperator, DataRecord | int]):
         # TODO: post-submission we will need to modify this to:
         # - submit all candidates for aggregate operators
         # - handle limits
@@ -559,8 +560,9 @@ class MABSentinelQueryProcessor(QueryProcessor):
                     if candidate == candidate_:
                         candidate_output_record_sets.append((record_set, operator))
 
-                        # get the source_idx associated with this input record
-                        source_idx = candidate.source_idx
+                        # get the source_idx associated with this input record;
+                        # for scan operators, `candidate` will be the source_idx
+                        source_idx = candidate.source_idx if isinstance(candidate, DataRecord) else candidate
 
                 # select the champion (i.e. best) record_set from all the record sets computed for this candidate
                 champion_record_set = self.pick_output_fn(candidate_output_record_sets)
@@ -577,11 +579,9 @@ class MABSentinelQueryProcessor(QueryProcessor):
     def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict], policy: Policy):
         """
         """
-        if self.verbose:
-            print("----------------------")
-            print(f"PLAN[{plan.plan_id}] (sentinel):")
-            print(plan)
-            print("---")
+        logger.debug(f"Executing plan: {plan.plan_id}")
+        logger.debug(f"Plan: {plan}")
+        logger.debug("---")
 
         plan_start_time = time.time()
 
@@ -715,7 +715,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
                 )
 
                 # add records (which are not filtered) to the cache, if allowed
-                if not self.nocache:
+                if self.cache:
                     for record in all_records:
                         if getattr(record, "passed_operator", True):
                             # self.datadir.append_cache(logical_op_id, record)
@@ -745,7 +745,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
             samples_drawn = max(logical_op_id_to_num_samples.values())
 
         # if caching was allowed, close the cache
-        if not self.nocache:
+        if self.cache:
             for _, _, _ in plan:
                 # self.datadir.close_cache(logical_op_id)
                 pass
@@ -790,7 +790,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         optimizer.update_strategy(OptimizationStrategyType.SENTINEL)
 
         # create copy of dataset, but change its data source to the validation data source
-        dataset = deepcopy(dataset)
+        dataset = dataset.copy()
         dataset._set_data_source(self.val_datasource)
 
         # get the sentinel plan for the given dataset
@@ -801,14 +801,15 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
 
     def execute(self) -> DataRecordCollection:
+        logger.info("Executing MABSentinelQueryProcessor")
         execution_start_time = time.time()
 
         # for now, enforce that we are using validation data; we can relax this after paper submission
         if self.val_datasource is None:
             raise Exception("Make sure you are using validation data with MABSentinelExecutionEngine")
 
-        # if nocache is True, make sure we do not re-use codegen examples
-        if self.nocache:
+        # if cache is False, make sure we do not re-use codegen examples
+        if not self.cache:
             # self.clear_cached_examples()
             pass
 
@@ -848,7 +849,10 @@ class MABSentinelQueryProcessor(QueryProcessor):
             plan_strs={plan_id: plan_stats.plan_str for plan_id, plan_stats in aggregate_plan_stats.items()},
         )
 
-        return DataRecordCollection(all_records, execution_stats = execution_stats)
+        result = DataRecordCollection(all_records, execution_stats = execution_stats)
+        logger.info("Done executing MABSentinelQueryProcessor")
+        logger.debug(f"Result: {result}")
+        return result
     
 
 
@@ -857,28 +861,31 @@ class MABSentinelSequentialSingleThreadProcessor(MABSentinelQueryProcessor, Sequ
     This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
+        MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
         SequentialSingleThreadExecutionStrategy.__init__(
             self,
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
-            nocache=self.nocache,
-            verbose=self.verbose
+            num_samples=self.num_samples,
+            cache=self.cache,
+            verbose=self.verbose,
         )
         self.progress_manager = None
+        logger.info("Created MABSentinelSequentialSingleThreadProcessor")
 
 
-class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
+class MABSentinelParallelProcessor(MABSentinelQueryProcessor, ParallelExecutionStrategy):
     """
-    This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
+    This class performs sentinel execution while executing plans in a parallel fashion.
     """
     def __init__(self, *args, **kwargs):
         MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
-        PipelinedParallelExecutionStrategy.__init__(
+        ParallelExecutionStrategy.__init__(
             self,
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
-            nocache=self.nocache,
+            cache=self.cache,
             verbose=self.verbose
         )
         self.progress_manager = None
+        logger.info("Created MABSentinelParallelProcessor")

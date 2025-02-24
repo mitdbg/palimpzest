@@ -92,7 +92,7 @@ class BiodexReader(pz.DataReader):
         return label_dict
 
     @staticmethod
-    def rank_precision_at_k(k: int, preds: list | None, targets: list):
+    def rank_precision_at_k(preds: list | None, targets: list, k: int):
         if preds is None:
             return 0.0
 
@@ -171,7 +171,7 @@ class BiodexReader(pz.DataReader):
         rank_precision_at_k = partial(BiodexReader.rank_precision_at_k, k=self.rp_at_k)
         item["score_fn"]["reactions"] = BiodexReader.f1_eval
         item["score_fn"]["reaction_labels"] = BiodexReader.f1_eval
-        item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k,
+        item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k
         if not self.reactions_only:
             item["score_fn"]["drugs"] = BiodexReader.f1_eval
 
@@ -193,9 +193,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--execution_strategy",
-        default="pipelined_parallel",
+        default="parallel",
         type=str,
-        help="The plan executor to use. One of sequential, pipelined_single_thread, pipelined_parallel",
+        help="The plan executor to use. One of sequential, pipelined, parallel",
     )
     parser.add_argument(
         "--policy",
@@ -421,7 +421,7 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
-        nocache=True,
+        cache=False,
         val_datasource=val_datasource,
         available_models=available_models,
         processing_strategy=args.processing_strategy,

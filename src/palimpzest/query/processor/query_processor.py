@@ -11,9 +11,11 @@ from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyTy
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset, Set
+from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.model_helpers import get_models
 
+logger = setup_logger(__name__)
 
 class QueryProcessor:
     """
@@ -47,7 +49,7 @@ class QueryProcessor:
         self.num_samples = self.config.num_samples
         self.val_datasource = self.config.val_datasource
         self.scan_start_idx = self.config.scan_start_idx
-        self.nocache = self.config.nocache
+        self.cache = self.config.cache
         self.verbose = self.config.verbose
         self.max_workers = self.config.max_workers
         self.num_workers_per_plan = self.config.num_workers_per_plan
@@ -67,6 +69,9 @@ class QueryProcessor:
         # In this case, we only use the initialized optimizer. Later after we split the config to multiple configs, there won't be such confusion.
         assert optimizer is not None, "Optimizer is required. Please use QueryProcessorFactory.create_processor() to initialize a QueryProcessor."
         self.optimizer = optimizer
+
+        logger.info(f"Initialized QueryProcessor {self.__class__.__name__}")
+        logger.debug(f"QueryProcessor initialized with config: {self.config}")
 
     def _get_datareader(self, dataset: Set | DataReader) -> DataReader:
         """
@@ -125,6 +130,7 @@ class QueryProcessor:
         Execute a given list of plans for num_samples records each. Plans are executed in parallel.
         If any workers are unused, then additional workers are distributed evenly among plans.
         """
+        logger.info(f"Executing plans: {plans}")
         # compute number of plans
         num_plans = len(plans)
 
@@ -172,6 +178,10 @@ class QueryProcessor:
             if plan.plan_id == max_quality_plan_id:
                 return_records = records
 
+        logger.info(f"Done executing plans number: {len(plans)}")
+        logger.debug(f"All sample execution data number: {len(all_sample_execution_data)}")
+        logger.debug(f"Return records number: {len(return_records)}")
+        logger.debug(f"All plan stats number: {len(all_plan_stats)}")
         return all_sample_execution_data, return_records, all_plan_stats
     
     def _execute_best_plan(
@@ -185,11 +195,8 @@ class QueryProcessor:
         plans = optimizer.optimize(dataset, policy)
         final_plan = plans[0]
         # execute the plan
-        # TODO: for some reason this is not picking up change to self.max_workers from PipelinedParallelPlanExecutor.__init__()
-        records, plan_stats = self.execute_plan(
-            plan=final_plan,
-            plan_workers=self.max_workers,
-        )
+        # TODO: for some reason this is not picking up change to self.max_workers from ParallelPlanExecutor.__init__()
+        records, plan_stats = self.execute_plan(plan=final_plan)
 
         # return the output records and plan stats
         return records, [plan_stats]
