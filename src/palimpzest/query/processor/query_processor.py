@@ -51,6 +51,7 @@ class QueryProcessor:
         self.scan_start_idx = self.config.scan_start_idx
         self.cache = self.config.cache
         self.verbose = self.config.verbose
+        self.progress = self.config.progress
         self.max_workers = self.config.max_workers
         self.num_workers_per_plan = self.config.num_workers_per_plan
         self.min_plans = self.config.min_plans

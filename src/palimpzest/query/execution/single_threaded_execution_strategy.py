@@ -31,7 +31,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         logger.info(f"Plan Details: {plan}")
 
         # initialize progress manager
-        self.progress_manager = create_progress_manager(plan, self.num_samples)
+        self.progress_manager = create_progress_manager(plan, self.num_samples, self.progress)
 
         # initialize plan stats
         plan_stats = PlanStats.from_plan(plan)
@@ -64,18 +64,18 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 num_outputs = sum(record.passed_operator for record in records)
 
                 # update the progress manager
-                self.progress_manager.incr(op_id, num_outputs=num_outputs, display_text="Computed Aggregate")
+                self.progress_manager.incr(op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
             # otherwise, process the records in the input queue for this operator one at a time
             else:
-                for scan_idx, input_record in enumerate(input_queues[op_id]):
+                for input_record in input_queues[op_id]:
                     record_set = operator(input_record)
                     records.extend(record_set.data_records)
                     record_op_stats.extend(record_set.record_op_stats)
                     num_outputs = sum(record.passed_operator for record in record_set.data_records)
 
                     # update the progress manager
-                    self.progress_manager.incr(op_id, num_outputs=num_outputs, display_text=f"Processed ({scan_idx}/{num_inputs}) records")
+                    self.progress_manager.incr(op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                     # finish early if this is a limit
                     if isinstance(operator, LimitScanOp) and len(records) == operator.limit:
@@ -149,7 +149,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         logger.info(f"Plan Details: {plan}")
 
         # initialize progress manager
-        self.progress_manager = create_progress_manager(plan, self.num_samples)
+        self.progress_manager = create_progress_manager(plan, self.num_samples, self.progress)
 
         # initialize plan stats
         plan_stats = PlanStats.from_plan(plan)
@@ -186,7 +186,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     num_outputs = sum(record.passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(op_id, num_outputs=num_outputs, display_text="Computed Aggregate")
+                    self.progress_manager.incr(op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                 # otherwise, process the next record in the input queue for this operator
                 else:
@@ -197,7 +197,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     num_outputs = sum(record.passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(op_id, num_outputs=num_outputs, display_text=f"{operator.op_name()} processed record")
+                    self.progress_manager.incr(op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                 # update plan stats
                 plan_stats.add_record_op_stats(record_op_stats)

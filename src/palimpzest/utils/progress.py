@@ -17,14 +17,8 @@ from rich.progress import Progress as RichProgress
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 
-try:
-    import ipywidgets as widgets
-    from IPython.display import display
-    JUPYTER_AVAILABLE = True
-except ImportError:
-    JUPYTER_AVAILABLE = False
 
 @dataclass
 class ProgressStats:
@@ -37,13 +31,6 @@ class ProgressStats:
     memory_usage_mb: float = 0.0
     recent_text: str = ""
 
-def in_jupyter_notebook():
-    try:
-        from IPython import get_ipython
-        return 'IPKernelApp' in get_ipython().config
-    except Exception:
-        return False
-
 def get_memory_usage() -> float:
     """Get current memory usage in MB"""
     try:
@@ -53,14 +40,15 @@ def get_memory_usage() -> float:
     except Exception:
         return 0.0
 
+# NOTE: right now we only need to support single plan execution; in a multi-plan setting, we will
+#       need to modify the semantics of the progress manager to support multiple plans
 class ProgressManager(ABC):
     """Abstract base class for progress managers for plan execution"""
 
-    def __init__(self, plan: PhysicalPlan, num_samples: int | None = None):
+    def __init__(self, plan: PhysicalPlan | SentinelPlan, num_samples: int | None = None):
         """
         Initialize the progress manager for the given plan. This function takes in a plan,
-        the number of samples to process (if specified), and a boolean indicating whether the
-        execution of plan operators will be in sequence (as opposed to in a pipeline).
+        the number of samples to process (if specified).
 
         If `num_samples` is None, then the entire DataReader will be scanned.
 
@@ -74,13 +62,13 @@ class ProgressManager(ABC):
             TextColumn("[bold blue]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
+            MofNCompleteColumn(),
             TimeElapsedColumn(),
             TimeRemainingColumn(),
-            MofNCompleteColumn(),
-            #TextColumn("[yellow]Cost: ${task.fields[cost]:.4f}"),
             #TextColumn("[green]Success: {task.fields[success]}"),
             #TextColumn("[red]Failed: {task.fields[failed]}"),
-            TextColumn("[cyan]Mem: {task.fields[memory]:.1f}MB"),
+            #TextColumn("[cyan]Mem: {task.fields[memory]:.1f}MB"),
+            TextColumn("[green]Cost: ${task.fields[cost]:.4f}"),
             TextColumn("\n[white]{task.fields[recent]}"),  # Recent text on new line
             refresh_per_second=10,
             expand=True,   # Use full width
@@ -120,9 +108,15 @@ class ProgressManager(ABC):
 
             self.add_task(op_id, op_str, total)
 
-    def get_task_total(self, task) -> int:
+    def get_task_total(self, op_id: str) -> int:
         """Return the current total value for the given task."""
+        task = self.op_id_to_task[op_id]
         return self.progress._tasks[task].total
+
+    def get_task_description(self, op_id: str) -> str:
+        """Return the current description for the given task."""
+        task = self.op_id_to_task[op_id]
+        return self.progress._tasks[task].description
 
     @abstractmethod
     def add_task(self, op_id: str, op_str: str, total: int):
@@ -151,13 +145,36 @@ class ProgressManager(ABC):
         """Update progress statistics"""
         for key, value in kwargs.items():
             if hasattr(self.op_id_to_stats[op_id], key):
-                setattr(self.op_id_to_stats[op_id], key, value)
+                if key != "total_cost":
+                    setattr(self.op_id_to_stats[op_id], key, value)
+                else:
+                    self.op_id_to_stats[op_id].total_cost += value
         self.op_id_to_stats[op_id].memory_usage_mb = get_memory_usage()
 
-class CLIProgressManager(ProgressManager):
+
+class MockProgressManager(ProgressManager):
+    """Mock progress manager for testing purposes"""
+
+    def __init__(self, plan: PhysicalPlan | SentinelPlan, num_samples: int | None = None):
+        pass
+
+    def add_task(self, op_id: str, op_str: str, total: int):
+        pass
+
+    def start(self):
+        pass
+
+    def incr(self, op_id: str, num_outputs: int = 1, display_text: str | None = None, **kwargs):
+        pass
+
+    def finish(self):
+        pass
+
+
+class PZProgressManager(ProgressManager):
     """Progress manager for command line interface using rich"""
     
-    def __init__(self, plan: PhysicalPlan, num_samples: int | None = None):
+    def __init__(self, plan: PhysicalPlan | SentinelPlan, num_samples: int | None = None):
         super().__init__(plan, num_samples)
         self.console = Console()
 
@@ -189,7 +206,6 @@ class CLIProgressManager(ProgressManager):
         # start progress bar
         self.progress.start()
 
-    # TODO: update cost, success, failed
     def incr(self, op_id: str, num_outputs: int = 1, display_text: str | None = None, **kwargs):
         # get the task for the given operation
         task = self.op_id_to_task.get(op_id)
@@ -202,18 +218,6 @@ class CLIProgressManager(ProgressManager):
         if display_text is not None:
             self.op_id_to_stats[op_id].recent_text = display_text
 
-        # advance the progress bar for this task
-        self.progress.update(
-            task,
-            advance=1,
-            description=f"[bold blue]{self.op_id_to_stats[op_id].current_operation}",
-            cost=self.op_id_to_stats[op_id].total_cost,
-            success=self.op_id_to_stats[op_id].success_count,
-            failed=self.op_id_to_stats[op_id].failure_count,
-            memory=get_memory_usage(),
-            recent=f"Recent: {self.op_id_to_stats[op_id].recent_text}",
-        )
-
         # if num_outputs is not 1, update the downstream operators' progress bar total for any
         # operator which is not an AggregateOp or LimitScanOp
         delta = num_outputs - 1
@@ -223,102 +227,43 @@ class CLIProgressManager(ProgressManager):
                 if not isinstance(next_op, (AggregateOp, LimitScanOp)):
                     next_op_id = next_op.get_op_id()
                     next_task = self.op_id_to_task[next_op_id]
-                    self.progress.update(next_task, total=self.get_task_total(next_task) + delta)
+                    self.progress.update(next_task, total=self.get_task_total(next_op_id) + delta)
 
                 next_op = self.op_id_to_next_op[next_op_id]
+
+        # advance the progress bar for this task
+        self.progress.update(
+            task,
+            advance=1,
+            description=f"[bold blue]{self.get_task_description(op_id)}",
+            cost=self.op_id_to_stats[op_id].total_cost,
+            success=self.op_id_to_stats[op_id].success_count,
+            failed=self.op_id_to_stats[op_id].failure_count,
+            memory=get_memory_usage(),
+            recent=f"{self.op_id_to_stats[op_id].recent_text}" if display_text is not None else "",
+            refresh=True,
+        )
 
     def finish(self):
         self.progress.stop()
 
         # compute total cost, success, and failure
         total_cost = sum(stats.total_cost for stats in self.op_id_to_stats.values())
-        success_count = sum(stats.success_count for stats in self.op_id_to_stats.values())
-        failure_count = sum(stats.failure_count for stats in self.op_id_to_stats.values())
+        # success_count = sum(stats.success_count for stats in self.op_id_to_stats.values())
+        # failure_count = sum(stats.failure_count for stats in self.op_id_to_stats.values())
 
         # Print final stats on new lines after progress display
         print(f"Total time: {time.time() - self.start_time:.2f}s")
         print(f"Total cost: ${total_cost:.4f}")
-        print(f"Success rate: {success_count}/{success_count + failure_count}")
+        # print(f"Success rate: {success_count}/{success_count + failure_count}")
 
 
-# TODO: do we need this?
-class NotebookProgressManager(ProgressManager):
-    """Progress manager for Jupyter notebooks using ipywidgets"""
-    
-    def __init__(self, plan: PhysicalPlan, num_samples: int | None = None):
-        super().__init__(plan, num_samples)
-        if not JUPYTER_AVAILABLE:
-            raise ImportError("ipywidgets not available. Install with: pip install ipywidgets")
-            
-        self.progress_bar = widgets.IntProgress(
-            value=0,
-            min=0,
-            description='Processing:',
-            bar_style='info',
-            orientation='horizontal'
-        )
-        
-        self.stats_html = widgets.HTML(
-            value="<pre>Initializing...</pre>"
-        )
-        
-        self.recent_html = widgets.HTML(
-            value="<pre>Recent: </pre>"
-        )
-        
-        self.container = widgets.VBox([
-            self.progress_bar,
-            self.stats_html,
-            self.recent_html
-        ])
-        
-    def start(self, total: int):
-        self.progress_bar.max = total
-        display(self.container)
-        
-    def update(self, current: int, sample: str | None = None, **kwargs):
-        self.update_stats(**kwargs)
-        self.progress_bar.value = current
-        
-        # Update stats display
-#        Total Cost: ${self.stats.total_cost:.4f}
-#        Success/Total: {self.stats.success_count}/{self.stats.success_count + self.stats.failure_count}
-
-
-        stats_text = f"""
-        <pre>
-        Operation: {self.stats.current_operation}
-        Time Elapsed: {time.time() - self.stats.start_time:.1f}s
-        Memory Usage: {self.stats.memory_usage_mb:.1f}MB
-        </pre>
-        """
-        self.stats_html.value = stats_text
-        
-        # Update recent text
-        if sample:
-            self.stats.recent_text = sample
-        self.recent_html.value = f"<pre>Recent: {self.stats.recent_text}</pre>"
-                
-    def finish(self):
-        self.progress_bar.bar_style = 'success'
-        #
-        # Total Cost: ${self.stats.total_cost:.4f}
-        # Final Success Rate: {self.stats.success_count}/{self.stats.success_count + self.stats.failure_count}
-        stats_text = f"""
-        <pre>
-        Completed!
-        Total Time: {time.time() - self.stats.start_time:.1f}s
-        Peak Memory Usage: {self.stats.memory_usage_mb:.1f}MB
-        </pre>
-        """
-        self.stats_html.value = stats_text
-        self.recent_html.value = "<pre>Completed</pre>"
-
-def create_progress_manager(plan: PhysicalPlan, num_samples: int | None = None) -> ProgressManager:
+def create_progress_manager(
+    plan: PhysicalPlan | SentinelPlan,
+    num_samples: int | None = None,
+    progress: bool = True,
+) -> ProgressManager:
     """Factory function to create appropriate progress manager based on environment"""
-    if in_jupyter_notebook():
-        try:
-            return NotebookProgressManager(plan, num_samples)
-        except ImportError:
-            return CLIProgressManager(plan, num_samples)
-    return CLIProgressManager(plan, num_samples)
+    if not progress:
+        return MockProgressManager(plan, num_samples)
+    return PZProgressManager(plan, num_samples)

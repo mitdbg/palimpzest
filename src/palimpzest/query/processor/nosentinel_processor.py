@@ -62,7 +62,8 @@ class NoSentinelSequentialSingleThreadProcessor(NoSentinelQueryProcessor, Sequen
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
             cache=self.cache,
-            verbose=self.verbose
+            verbose=self.verbose,
+            progress=self.progress,
         )
         self.progress_manager = None
         logger.info("Created NoSentinelSequentialSingleThreadProcessor")
@@ -79,7 +80,8 @@ class NoSentinelPipelinedSingleThreadProcessor(NoSentinelQueryProcessor, Pipelin
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
             cache=self.cache,
-            verbose=self.verbose
+            verbose=self.verbose,
+            progress=self.progress,
         )
         self.progress_manager = None
         logger.info("Created NoSentinelPipelinedSingleThreadProcessor")
@@ -96,7 +98,8 @@ class NoSentinelParallelProcessor(NoSentinelQueryProcessor, ParallelExecutionStr
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
             cache=self.cache,
-            verbose=self.verbose
+            verbose=self.verbose,
+            progress=self.progress,
         )
         self.progress_manager = None
         logger.info("Created NoSentinelParallelProcessor")

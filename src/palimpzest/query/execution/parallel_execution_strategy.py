@@ -77,7 +77,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
             num_outputs = sum(record.passed_operator for record in records)
 
             # update the progress manager
-            self.progress_manager.incr(op_id, num_outputs=num_outputs, display_text=f"{operator.op_name()} processed record")
+            self.progress_manager.incr(op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
             # update plan stats
             plan_stats.add_record_op_stats(record_op_stats)
@@ -98,7 +98,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         logger.info(f"Plan Details: {plan}")
 
         # initialize progress manager
-        self.progress_manager = create_progress_manager(plan, self.num_samples)
+        self.progress_manager = create_progress_manager(plan, self.num_samples, self.progress)
 
         # initialize plan stats
         plan_stats = PlanStats.from_plan(plan)
@@ -119,7 +119,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
             # execute the plan until either:
             # 1. all records have been processed, or
             # 2. the final limit operation has completed (we break out of the loop if this happens)
-            final_op = plan.operators[-1].get_op_id()
+            final_op = plan.operators[-1]
             while self._any_queue_not_empty(input_queues) or self._any_queue_not_empty(future_queues, ignore_final_op_id=final_op.get_op_id()):
                 for op_idx, operator in enumerate(plan.operators):
                     op_id = operator.get_op_id()
@@ -151,6 +151,8 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                 if isinstance(final_op, LimitScanOp) and len(future_queues[final_op.get_op_id()]) == final_op.limit:
                     break
 
+            # TODO: the downside of this approach is that the final operator will show 0 progress until it is completely finished;
+            #       perhaps we can come up with a solution that allows us to better show progress for the final operator
             # get final output records from the future queue of the last operator
             output_records = self._process_future_results(final_op, future_queues, plan_stats)
 

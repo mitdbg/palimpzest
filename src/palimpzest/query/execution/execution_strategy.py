@@ -30,12 +30,14 @@ class ExecutionStrategy(ABC):
                  max_workers: int | None = None,
                  num_samples: int | None = None,
                  cache: bool = False,
-                 verbose: bool = False):
+                 verbose: bool = False,
+                 progress: bool = True):
         self.scan_start_idx = scan_start_idx
         self.max_workers = max_workers
         self.num_samples = num_samples
         self.cache = cache
         self.verbose = verbose
+        self.progress = progress
         logger.pz_logger.set_console_level(logging.DEBUG if verbose else logging.ERROR)
         logger.info(f"Initialized ExecutionStrategy {self.__class__.__name__}")
         logger.debug(f"ExecutionStrategy initialized with config: {self.__dict__}")
