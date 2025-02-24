@@ -11,7 +11,7 @@ from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.nosentinel_processor import (
-    NoSentinelPipelinedParallelProcessor,
+    NoSentinelParallelProcessor,
     NoSentinelSequentialSingleThreadProcessor,
 )
 
@@ -20,7 +20,7 @@ from palimpzest.query.processor.nosentinel_processor import (
     argnames=("query_processor",),
     argvalues=[
         pytest.param(NoSentinelSequentialSingleThreadProcessor, id="seq-single-thread"),
-        pytest.param(NoSentinelPipelinedParallelProcessor, id="parallel"),
+        pytest.param(NoSentinelParallelProcessor, id="parallel"),
     ]
 )
 class TestParallelExecutionNoCache:

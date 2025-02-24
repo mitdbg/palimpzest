@@ -13,7 +13,7 @@ from palimpzest.core.data.dataclasses import (
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordCollection, DataRecordSet
 from palimpzest.policy import Policy
-from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
+from palimpzest.query.execution.parallel_execution_strategy import ParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
 from palimpzest.query.operators.convert import ConvertOp, LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
@@ -866,20 +866,21 @@ class MABSentinelSequentialSingleThreadProcessor(MABSentinelQueryProcessor, Sequ
             self,
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
+            num_samples=self.num_samples,
             cache=self.cache,
-            verbose=self.verbose
+            verbose=self.verbose,
         )
         self.progress_manager = None
         logger.info("Created MABSentinelSequentialSingleThreadProcessor")
 
 
-class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
+class MABSentinelParallelProcessor(MABSentinelQueryProcessor, ParallelExecutionStrategy):
     """
-    This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
+    This class performs sentinel execution while executing plans in a parallel fashion.
     """
     def __init__(self, *args, **kwargs):
         MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
-        PipelinedParallelExecutionStrategy.__init__(
+        ParallelExecutionStrategy.__init__(
             self,
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
@@ -887,4 +888,4 @@ class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, Pipelined
             verbose=self.verbose
         )
         self.progress_manager = None
-        logger.info("Created MABSentinelPipelinedParallelProcessor")
+        logger.info("Created MABSentinelParallelProcessor")

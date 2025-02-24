@@ -144,7 +144,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--executor",
         type=str,
-        help="The plan executor to use. One of sequential, pipelined_single_thread, pipelined_parallel",
+        help="The plan executor to use. One of sequential, pipelined, parallel",
         default="sequential",
     )
     parser.add_argument(
