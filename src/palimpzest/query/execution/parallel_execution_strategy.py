@@ -119,8 +119,8 @@ class ParallelExecutionStrategy(ExecutionStrategy):
             # execute the plan until either:
             # 1. all records have been processed, or
             # 2. the final limit operation has completed (we break out of the loop if this happens)
-            final_op_id = plan.operators[-1].get_op_id()
-            while self._any_queue_not_empty(input_queues) or self._any_queue_not_empty(future_queues, ignore_final_op_id=final_op_id):
+            final_op = plan.operators[-1].get_op_id()
+            while self._any_queue_not_empty(input_queues) or self._any_queue_not_empty(future_queues, ignore_final_op_id=final_op.get_op_id()):
                 for op_idx, operator in enumerate(plan.operators):
                     op_id = operator.get_op_id()
 
@@ -148,12 +148,10 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                         future_queues[op_id].append(future)
 
                 # break out of loop if the final operator is a LimitScanOp and we've reached its limit
-                final_op = plan.operators[-1]
-                if isinstance(final_op, LimitScanOp) and len(future_queues[final_op_id]) == final_op.limit:
+                if isinstance(final_op, LimitScanOp) and len(future_queues[final_op.get_op_id()]) == final_op.limit:
                     break
 
             # get final output records from the future queue of the last operator
-            final_op = plan.operators[-1]
             output_records = self._process_future_results(final_op, future_queues, plan_stats)
 
         # close the cache
