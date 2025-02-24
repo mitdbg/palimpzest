@@ -38,10 +38,8 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         # changing the max_workers in response to 429 errors.
         return max(int(0.8 * multiprocessing.cpu_count()), 1)
 
-    def _any_queue_not_empty(self, queues: dict[str, list], ignore_final_op_id: str | None = None) -> bool:
+    def _any_queue_not_empty(self, queues: dict[str, list]) -> bool:
         """Helper function to check if any queue is not empty."""
-        if ignore_final_op_id is not None:
-            queues = {op_id: queue for op_id, queue in queues.items() if op_id != ignore_final_op_id}
         return any(len(queue) > 0 for queue in queues.values())
 
     def _upstream_ops_finished(self, plan: PhysicalPlan, op_idx: int, input_queues: dict[str, list], future_queues: dict[str, list]) -> bool:
@@ -120,7 +118,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
             # 1. all records have been processed, or
             # 2. the final limit operation has completed (we break out of the loop if this happens)
             final_op = plan.operators[-1]
-            while self._any_queue_not_empty(input_queues) or self._any_queue_not_empty(future_queues, ignore_final_op_id=final_op.get_op_id()):
+            while self._any_queue_not_empty(input_queues) or self._any_queue_not_empty(future_queues):
                 for op_idx, operator in enumerate(plan.operators):
                     op_id = operator.get_op_id()
 
@@ -130,13 +128,18 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                         records = self._process_future_results(prev_operator, future_queues, plan_stats)
                         input_queues[op_id].extend(records)
 
+                    # for the final operator, add any finished futures to the output_records
+                    if operator.get_op_id() == final_op.get_op_id():
+                        records = self._process_future_results(operator, future_queues, plan_stats)
+                        output_records.extend(records)
+
                     # if this operator does not have enough inputs to execute, then skip it
                     num_inputs = len(input_queues[op_id])
                     agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, op_idx, input_queues, future_queues)
                     if num_inputs == 0 or agg_op_not_ready:
                         continue
 
-                    # if the next operator is an aggregate, process all the records in the input queue
+                    # if this operator is an aggregate, process all the records in the input queue
                     if isinstance(operator, AggregateOp):
                         input_records = [input_queues[op_id].pop(0) for _ in range(num_inputs)]
                         future = executor.submit(operator, input_records)
@@ -148,13 +151,8 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                         future_queues[op_id].append(future)
 
                 # break out of loop if the final operator is a LimitScanOp and we've reached its limit
-                if isinstance(final_op, LimitScanOp) and len(future_queues[final_op.get_op_id()]) == final_op.limit:
+                if isinstance(final_op, LimitScanOp) and len(output_records) == final_op.limit:
                     break
-
-            # TODO: the downside of this approach is that the final operator will show 0 progress until it is completely finished;
-            #       perhaps we can come up with a solution that allows us to better show progress for the final operator
-            # get final output records from the future queue of the last operator
-            output_records = self._process_future_results(final_op, future_queues, plan_stats)
 
         # close the cache
         self._close_cache([op.target_cache_id for op in plan.operators])
