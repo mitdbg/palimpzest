@@ -83,7 +83,6 @@ class Group:
         self.explored = False
         self.best_physical_expression: PhysicalExpression | None = None
         self.pareto_optimal_physical_expressions: list[PhysicalExpression] | None = None
-        self.ci_best_physical_expressions: list[PhysicalExpression] | None = None
         self.optimized = False
 
         # properties of the Group which distinguish it from groups w/identical fields,

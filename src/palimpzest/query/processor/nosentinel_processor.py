@@ -29,7 +29,7 @@ class NoSentinelQueryProcessor(QueryProcessor):
             pass
 
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, self.optimizer)
+        records, plan_stats = self._execute_best_plan(self.dataset, self.policy, self.optimizer)
 
         # aggregate plan stats
         aggregate_plan_stats = self.aggregate_plan_stats(plan_stats)
