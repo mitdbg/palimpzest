@@ -29,8 +29,6 @@ from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
 from palimpzest.tools.logger import setup_logger
 
-# from palimpzest.utils.progress import create_progress_manager
-
 logger = setup_logger(__name__)
 
 class RandomSamplingSentinelQueryProcessor(QueryProcessor):

@@ -52,11 +52,11 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
             if num_inputs == 0:
                 break
 
-            # begin to process the next operator
+            # begin to process this operator
             records, record_op_stats = [], []
             logger.info(f"Processing operator {operator.op_name()} ({op_id})")
 
-            # if the next operator is an aggregate, process all the records in the input_queue
+            # if this operator is an aggregate, process all the records in the input_queue
             if isinstance(operator, AggregateOp):
                 record_set = operator(candidates=input_queues[op_id])
                 records = record_set.data_records
