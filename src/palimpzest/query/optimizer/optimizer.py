@@ -124,7 +124,8 @@ class Optimizer:
         self.transformation_rules = TRANSFORMATION_RULES
 
         # get the strategy class associated with the optimizer strategy
-        self.strategy = optimizer_strategy.value
+        optimizer_strategy_cls = optimizer_strategy.value
+        self.strategy = optimizer_strategy_cls()
 
         # remove transformation rules for optimization strategies which do not require them
         if optimizer_strategy.no_transformation():
@@ -234,7 +235,8 @@ class Optimizer:
 
     def update_strategy(self, optimizer_strategy: OptimizationStrategyType):
         self.optimizer_strategy = optimizer_strategy
-        self.strategy = optimizer_strategy.value
+        optimizer_strategy_cls = optimizer_strategy.value
+        self.strategy = optimizer_strategy_cls()
 
     def construct_group_tree(self, dataset_nodes: list[Set]) -> tuple[list[int], dict[str, Field], dict[str, set[str]]]:
         # get node, output_schema, and input_schema (if applicable)
@@ -489,5 +491,9 @@ class Optimizer:
         # search the optimization space by applying logical and physical transformations to the initial group tree
         self.search_optimization_space(final_group_id)
         logger.info(f"Getting optimal plans for final group id: {final_group_id}")
-        
-        return self.strategy.get_optimal_plans(self.groups, final_group_id, policy, self.use_final_op_quality)
+        return self.strategy.get_optimal_plans(
+            groups=self.groups,
+            final_group_id=final_group_id,
+            policy=policy,
+            use_final_op_quality=self.use_final_op_quality,
+        )

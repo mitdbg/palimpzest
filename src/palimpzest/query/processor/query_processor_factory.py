@@ -135,10 +135,10 @@ class QueryProcessorFactory:
 
         # create the optimizer, execution strateg(ies), and processor
         optimizer = cls._create_optimizer(config)
-        execution_strategy = cls._create_execution_strategy(config)
-        sentinel_execution_strategy = cls._create_sentinel_execution_strategy(config)
+        config.execution_strategy = cls._create_execution_strategy(config)
+        config.sentinel_execution_strategy = cls._create_sentinel_execution_strategy(config)
         processor_cls = config.processing_strategy.value
-        processor = processor_cls(dataset, optimizer, execution_strategy, sentinel_execution_strategy, **config.to_dict())
+        processor = processor_cls(dataset, optimizer, **config.to_dict())
 
         return processor
 

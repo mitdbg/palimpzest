@@ -639,7 +639,7 @@ class ExecutionStats:
         """
         return sum([plan_stats.sum_op_costs() for _, plan_stats in self.plan_stats.items()])
 
-    def add_plan_stats(self, plan_stats: PlanStats | SentinelPlanStats) -> None:
+    def add_plan_stats(self, plan_stats: PlanStats | SentinelPlanStats | list[PlanStats] | list[SentinelPlanStats]) -> None:
         """
         Add the given PlanStats (or SentinelPlanStats) to this execution's plan stats.
 
@@ -647,16 +647,21 @@ class ExecutionStats:
         i.e. each plan stats object for an individual plan comes from two different (sequential)
         periods in time. Thus, PlanStats objects can be summed.
         """
-        if isinstance(plan_stats, PlanStats) and plan_stats.plan_id not in self.plan_stats:
-            self.plan_stats[plan_stats.plan_id] = plan_stats
-        elif isinstance(plan_stats, PlanStats):
-            self.plan_stats[plan_stats.plan_id] += plan_stats
-        elif isinstance(plan_stats, SentinelPlanStats) and plan_stats.plan_id not in self.sentinel_plan_stats:
-            self.sentinel_plan_stats[plan_stats.plan_id] = plan_stats
-        elif isinstance(plan_stats, SentinelPlanStats):
-            self.sentinel_plan_stats[plan_stats.plan_id] += plan_stats
-        else:
-            raise TypeError(f"Cannot add {type(plan_stats)} to ExecutionStats")
+        # normalize input type to be list[PlanStats] or list[SentinelPlanStats]
+        if isinstance(plan_stats, (PlanStats, SentinelPlanStats)):
+            plan_stats = [plan_stats]
+
+        for plan_stats_obj in plan_stats:
+            if isinstance(plan_stats_obj, PlanStats) and plan_stats_obj.plan_id not in self.plan_stats:
+                self.plan_stats[plan_stats_obj.plan_id] = plan_stats_obj
+            elif isinstance(plan_stats_obj, PlanStats):
+                self.plan_stats[plan_stats_obj.plan_id] += plan_stats_obj
+            elif isinstance(plan_stats_obj, SentinelPlanStats) and plan_stats_obj.plan_id not in self.sentinel_plan_stats:
+                self.sentinel_plan_stats[plan_stats_obj.plan_id] = plan_stats_obj
+            elif isinstance(plan_stats_obj, SentinelPlanStats):
+                self.sentinel_plan_stats[plan_stats_obj.plan_id] += plan_stats_obj
+            else:
+                raise TypeError(f"Cannot add {type(plan_stats)} to ExecutionStats")
 
     def to_json(self):
         return {

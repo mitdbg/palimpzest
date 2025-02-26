@@ -4,9 +4,6 @@ from dataclasses import dataclass, field
 from palimpzest.constants import Model
 from palimpzest.core.data.datareaders import DataReader
 from palimpzest.policy import MaxQuality, Policy
-from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType, SentinelExecutionStrategyType
-from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
-from palimpzest.query.processor.processing_strategy_type import ProcessingStrategyType
 
 
 # TODO: Separate out the config for the Optimizer, ExecutionStrategy, and QueryProcessor
@@ -14,10 +11,10 @@ from palimpzest.query.processor.processing_strategy_type import ProcessingStrate
 @dataclass
 class QueryProcessorConfig:
     """Shared context for query processors"""
-    processing_strategy: str | ProcessingStrategyType = field(default="auto")
-    execution_strategy: str | ExecutionStrategyType = field(default="sequential")
-    sentinel_execution_strategy: str | SentinelExecutionStrategyType | None = field(default="auto")
-    optimizer_strategy: str | OptimizationStrategyType = field(default="pareto")
+    processing_strategy: str = field(default="auto")                 # substituted with ProcessingStrategyType
+    execution_strategy: str = field(default="sequential")            # substituted with ExecutionStrategyType
+    sentinel_execution_strategy: str | None = field(default="auto")  # substituted with SentinelExecutionStrategyType
+    optimizer_strategy: str = field(default="pareto")                # substituted with OptimizationStrategyType
 
     val_datasource: DataReader | None = field(default=None)
 
@@ -49,6 +46,7 @@ class QueryProcessorConfig:
         return {
             "processing_strategy": self.processing_strategy,
             "execution_strategy": self.execution_strategy,
+            "sentinel_execution_strategy": self.sentinel_execution_strategy,
             "optimizer_strategy": self.optimizer_strategy,
             "val_datasource": self.val_datasource,
             "policy": self.policy,

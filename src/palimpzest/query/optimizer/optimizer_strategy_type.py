@@ -9,7 +9,7 @@ from palimpzest.query.optimizer.optimizer_strategy import (
 )
 
 
-class OptimizationStrategyType(str, Enum):
+class OptimizationStrategyType(Enum):
     """
     OptimizationStrategyType determines which (set of) plan(s) the Optimizer
     will return to the Execution layer.

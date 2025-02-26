@@ -9,12 +9,12 @@ from palimpzest.query.execution.single_threaded_execution_strategy import (
 )
 
 
-class ExecutionStrategyType(str, Enum):
+class ExecutionStrategyType(Enum):
     """Available execution strategy types"""
     SEQUENTIAL = SequentialSingleThreadExecutionStrategy
     PIPELINED = PipelinedSingleThreadExecutionStrategy
     PARALLEL = ParallelExecutionStrategy
 
-class SentinelExecutionStrategyType(str, Enum):
+class SentinelExecutionStrategyType(Enum):
     MAB = MABExecutionStrategy
     RANDOM = RandomSamplingExecutionStrategy

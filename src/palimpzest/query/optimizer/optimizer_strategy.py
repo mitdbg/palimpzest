@@ -115,7 +115,7 @@ class ParetoStrategy(OptimizationStrategy):
                             pareto_optimal_plans.append(plan)
 
         return pareto_optimal_plans
-    
+
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
         logger.info(f"Getting pareto optimal plans for final group id: {final_group_id}")
         # compute all of the pareto optimal physical plans
