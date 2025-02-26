@@ -23,7 +23,7 @@ from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
-from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
+from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
@@ -65,7 +65,6 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         self.pick_output_fn = self.pick_ensemble_output
         self.rng = np.random.default_rng(seed=seed)
         self.exp_name = exp_name
-        logger.info(f"Initialized RandomSamplingSentinelQueryProcessor with config: {self.config}")
 
 
     def compute_quality(
@@ -586,46 +585,3 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         logger.info("Done executing RandomSamplingSentinelQueryProcessor")
         logger.debug(f"Result: {result}")
         return result
-
-
-class RandomSamplingSentinelSequentialSingleThreadProcessor(RandomSamplingSentinelQueryProcessor, SequentialSingleThreadExecutionStrategy):
-    """
-    This class performs sentinel execution while executing plans in a sequential, single-threaded fashion.
-    """
-    def __init__(self, *args, **kwargs):
-        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
-        SequentialSingleThreadExecutionStrategy.__init__(
-            self,
-            scan_start_idx=self.scan_start_idx,
-            max_workers=self.max_workers,
-            verbose=self.verbose
-        )
-        logger.info("Created RandomSamplingSentinelSequentialSingleThreadProcessor")
-
-class RandomSamplingSentinelPipelinedSingleThreadProcessor(RandomSamplingSentinelQueryProcessor, PipelinedSingleThreadExecutionStrategy):
-    """
-    This class performs sentinel execution while executing plans in a pipelined fashion.
-    """
-    def __init__(self, *args, **kwargs):
-        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
-        PipelinedSingleThreadExecutionStrategy.__init__(
-            self,
-            scan_start_idx=self.scan_start_idx,
-            max_workers=self.max_workers,
-            verbose=self.verbose
-        )
-        logger.info("Created RandomSamplingSentinelPipelinedSingleThreadProcessor")
-
-class RandomSamplingSentinelParallelProcessor(RandomSamplingSentinelQueryProcessor, ParallelExecutionStrategy):
-    """
-    This class performs sentinel execution while executing plans in a parallel fashion.
-    """
-    def __init__(self, *args, **kwargs):
-        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
-        ParallelExecutionStrategy.__init__(
-            self,
-            scan_start_idx=self.scan_start_idx,
-            max_workers=self.max_workers,
-            verbose=self.verbose
-        )
-        logger.info("Created RandomSamplingSentinelParallelProcessor")

@@ -15,7 +15,7 @@ from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
-from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
+from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
 from palimpzest.sets import Dataset
 
@@ -115,7 +115,7 @@ class TestOptimizer:
             cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy_type=opt_strategy,
+            optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan, policy)
         physical_plan = physical_plans[0]
@@ -134,7 +134,7 @@ class TestOptimizer:
             cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy_type=opt_strategy,
+            optimizer_strategy=opt_strategy,
             allow_code_synth=False,
             allow_conventional_query=False,
             allow_token_reduction=False,
@@ -161,7 +161,7 @@ class TestOptimizer:
             cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy_type=opt_strategy,
+            optimizer_strategy=opt_strategy,
             allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -182,7 +182,7 @@ class TestOptimizer:
             cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy_type=opt_strategy,
+            optimizer_strategy=opt_strategy,
             allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -204,7 +204,7 @@ class TestOptimizer:
             cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy_type=opt_strategy,
+            optimizer_strategy=opt_strategy,
             allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -228,7 +228,7 @@ class TestOptimizer:
             cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            optimization_strategy_type=opt_strategy,
+            optimizer_strategy=opt_strategy,
             allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -255,7 +255,7 @@ class TestOptimizer:
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
-            optimization_strategy_type=opt_strategy,
+            optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(real_estate_workload, policy)
         physical_plan = physical_plans[0]
@@ -288,7 +288,7 @@ class TestOptimizer:
             cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI_V],
-            optimization_strategy_type=opt_strategy,
+            optimizer_strategy=opt_strategy,
             allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan, policy)
@@ -397,7 +397,7 @@ class TestParetoOptimizer:
             cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3],
-            optimization_strategy_type=OptimizationStrategyType.PARETO,
+            optimizer_strategy=OptimizationStrategyType.PARETO,
             allow_code_synth=False,
             allow_conventional_query=False,
             allow_token_reduction=False,

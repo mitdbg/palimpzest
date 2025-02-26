@@ -4,6 +4,9 @@ from dataclasses import dataclass, field
 from palimpzest.constants import Model
 from palimpzest.core.data.datareaders import DataReader
 from palimpzest.policy import MaxQuality, Policy
+from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType, SentinelExecutionStrategyType
+from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
+from palimpzest.query.processor.processing_strategy_type import ProcessingStrategyType
 
 
 # TODO: Separate out the config for the Optimizer, ExecutionStrategy, and QueryProcessor
@@ -11,15 +14,16 @@ from palimpzest.policy import MaxQuality, Policy
 @dataclass
 class QueryProcessorConfig:
     """Shared context for query processors"""
-    processing_strategy: str = field(default="no_sentinel")
-    execution_strategy: str = field(default="sequential")
-    optimizer_strategy: str = field(default="pareto")
+    processing_strategy: str | ProcessingStrategyType = field(default="auto")
+    execution_strategy: str | ExecutionStrategyType = field(default="sequential")
+    sentinel_execution_strategy: str | SentinelExecutionStrategyType | None = field(default="auto")
+    optimizer_strategy: str | OptimizationStrategyType = field(default="pareto")
 
     val_datasource: DataReader | None = field(default=None)
 
     policy: Policy = field(default_factory=MaxQuality)
     scan_start_idx: int = field(default=0)
-    num_samples: int = field(default=float("inf"))
+    num_samples: int = field(default=None)
     cache: bool = field(default=False)  # NOTE: until we properly implement caching, let's set the default to False
     include_baselines: bool = field(default=False)
     min_plans: int | None = field(default=None)
@@ -40,13 +44,14 @@ class QueryProcessorConfig:
     allow_critic: bool = field(default=False)
     use_final_op_quality: bool = field(default=False)
 
-    def to_json_str(self):
-        return json.dumps({
+    def to_dict(self) -> dict:
+        """Convert the config to a dict representation."""
+        return {
             "processing_strategy": self.processing_strategy,
             "execution_strategy": self.execution_strategy,
             "optimizer_strategy": self.optimizer_strategy,
-            "val_datasource": None if self.val_datasource is None else self.val_datasource.serialize(),
-            "policy": self.policy.to_json_str(),
+            "val_datasource": self.val_datasource,
+            "policy": self.policy,
             "scan_start_idx": self.scan_start_idx,
             "num_samples": self.num_samples,
             "cache": self.cache,
@@ -65,8 +70,20 @@ class QueryProcessorConfig:
             "allow_rag_reduction": self.allow_rag_reduction,
             "allow_mixtures": self.allow_mixtures,
             "allow_critic": self.allow_critic,
-            "use_final_op_quality": self.use_final_op_quality,
-        }, indent=2)
+            "use_final_op_quality": self.use_final_op_quality
+        }
+
+    def to_json_str(self):
+        """Convert the config to a JSON string representation."""
+        config_dict = self.to_dict()
+        config_dict["val_datasource"] = (
+            None if self.val_datasource is None else self.val_datasource.serialize()
+        )
+        config_dict["policy"] = self.policy.to_json_str()
+        for strategy in ["processing_strategy", "execution_strategy", "optimizer_strategy"]:
+            config_dict[strategy] = str(config_dict[strategy])
+
+        return json.dumps(config_dict, indent=2)
 
     def update(self, **kwargs) -> None:
         for key, value in kwargs.items():
