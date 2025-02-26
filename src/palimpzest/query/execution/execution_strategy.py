@@ -5,6 +5,7 @@ from enum import Enum
 
 from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 
 logger = logging.getLogger(__name__)
@@ -12,8 +13,8 @@ logger = logging.getLogger(__name__)
 class ExecutionStrategyType(str, Enum):
     """Available execution strategy types"""
     SEQUENTIAL = "sequential"
-    PIPELINED_SINGLE_THREAD = "pipelined"
-    PIPELINED_PARALLEL = "pipelined_parallel"
+    PIPELINED = "pipelined"
+    PARALLEL = "parallel"
     AUTO = "auto"
 
 
@@ -25,13 +26,16 @@ class ExecutionStrategy(ABC):
     def __init__(self, 
                  scan_start_idx: int = 0, 
                  max_workers: int | None = None,
+                 num_samples: int | None = None,
                  cache: bool = False,
-                 verbose: bool = False):
+                 verbose: bool = False,
+                 progress: bool = True):
         self.scan_start_idx = scan_start_idx
+        self.max_workers = max_workers
+        self.num_samples = num_samples
         self.cache = cache
         self.verbose = verbose
-        self.max_workers = max_workers
-        self.execution_stats = []
+        self.progress = progress
 
         logger.info(f"Initialized ExecutionStrategy {self.__class__.__name__}")
         logger.debug(f"ExecutionStrategy initialized with config: {self.__dict__}")
@@ -46,6 +50,36 @@ class ExecutionStrategy(ABC):
         """Execute a single plan according to strategy"""
         pass
 
+    def _add_records_to_cache(self, target_cache_id: str, records: list[DataRecord]) -> None:
+        """Add each record (which isn't filtered) to the cache for the given target_cache_id."""
+        if self.cache:
+            for record in records:
+                if getattr(record, "passed_operator", True):
+                    # self.datadir.append_cache(target_cache_id, record)
+                    pass
+
+    def _close_cache(self, target_cache_ids: list[str]) -> None:
+        """Close the cache for each of the given target_cache_ids"""
+        if self.cache:
+            for target_cache_id in target_cache_ids:  # noqa: B007
+                # self.datadir.close_cache(target_cache_id)
+                pass
+
+    def _create_input_queues(self, plan: PhysicalPlan) -> dict[str, list]:
+        """Initialize input queues for each operator in the plan."""
+        input_queues = {}
+        for op in plan.operators:
+            inputs = []
+            if isinstance(op, ScanPhysicalOp):
+                scan_end_idx = (
+                    len(op.datareader)
+                    if self.num_samples is None
+                    else min(self.scan_start_idx + self.num_samples, len(op.datareader))
+                )
+                inputs = [idx for idx in range(self.scan_start_idx, scan_end_idx)]
+            input_queues[op.get_op_id()] = inputs
+
+        return input_queues
 
     # TODO(chjun): use _create_execution_stats for execution stats setup.
     ## aggregate plan stats

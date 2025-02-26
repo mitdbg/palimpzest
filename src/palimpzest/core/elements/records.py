@@ -306,6 +306,8 @@ class DataRecordSet:
         # set statistics for generating these records
         self.record_op_stats = record_op_stats
 
+    def get_total_cost(self):
+        return sum([record_op_stats.cost_per_record for record_op_stats in self.record_op_stats])
 
     def __getitem__(self, slice):
         return self.data_records[slice]

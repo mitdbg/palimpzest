@@ -8,13 +8,12 @@ from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import (
     ExecutionStats,
     OperatorCostEstimates,
-    OperatorStats,
-    PlanStats,
     RecordOpStats,
+    SentinelPlanStats,
 )
 from palimpzest.core.elements.records import DataRecordCollection, DataRecordSet
 from palimpzest.policy import Policy
-from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
+from palimpzest.query.execution.parallel_execution_strategy import ParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import (
     PipelinedSingleThreadExecutionStrategy,
     SequentialSingleThreadExecutionStrategy,
@@ -23,7 +22,7 @@ from palimpzest.query.operators.convert import ConvertOp, LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
-from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp
+from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
@@ -34,7 +33,6 @@ logger = logging.getLogger(__name__)
 
 class RandomSamplingSentinelQueryProcessor(QueryProcessor):
     """
-
     """
     def __init__(
             self,
@@ -390,32 +388,23 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
     def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict], policy: Policy):
         """
         """
-        if self.verbose:
-            print("----------------------")
-            print(f"PLAN[{plan.plan_id}] (sentinel):")
-            print(plan)
-            print("---")
+        # for now, assert that the first operator in the plan is a ScanPhysicalOp
+        assert all(isinstance(op, ScanPhysicalOp) for op in plan.operator_sets[0]), "First operator in physical plan must be a ScanPhysicalOp"
+        logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
+        logger.info(f"Plan Details: {plan}")
 
-        plan_start_time = time.time()
+        # # initialize progress manager
+        # self.progress_manager = create_progress_manager(plan, self.num_samples)
 
-        # initialize plan stats and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
-        for logical_op_id, logical_op_name, op_set in plan:
-            op_set_details = {
-                op.op_name(): {k: str(v) for k, v in op.get_id_params().items()}
-                for op in op_set
-            }
-            plan_stats.operator_stats[logical_op_id] = OperatorStats(
-                op_id=logical_op_id,
-                op_name=logical_op_name,
-                op_details=op_set_details,
-            )
+        # initialize plan stats
+        plan_stats = SentinelPlanStats.from_plan(plan)
+        plan_stats.start()
 
         # sample validation records
         total_num_samples = len(self.val_datasource)
         source_indices = np.arange(total_num_samples)
         if self.sample_start_idx is not None:
-            assert self.sample_end_idx is not None
+            assert self.sample_end_idx is not None, "Specified `sample_start_idx` without specifying `sample_end_idx`"
             source_indices = source_indices[self.sample_start_idx:self.sample_end_idx]
         elif not self.sample_all_records:
             self.rng.shuffle(source_indices)
@@ -434,7 +423,6 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         #       sentinel execution must be executed one operator at a time (i.e. sequentially)
         # execute operator sets in sequence
         for op_idx, (logical_op_id, _, op_set) in enumerate(plan):
-            prev_logical_op_id = plan.logical_op_ids[op_idx - 1] if op_idx > 0 else None
             next_logical_op_id = plan.logical_op_ids[op_idx + 1] if op_idx + 1 < len(plan) else None
 
             # sample k optimizations
@@ -465,11 +453,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                     all_record_op_stats.extend(record_set.record_op_stats)
 
             # update plan stats
-            plan_stats.operator_stats[logical_op_id].add_record_op_stats(
-                all_record_op_stats,
-                source_op_id=prev_logical_op_id,
-                plan_id=plan.plan_id,
-            )
+            plan_stats.add_record_op_stats(all_record_op_stats)
 
             # add records (which are not filtered) to the cache, if allowed
             if self.cache:
@@ -501,8 +485,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                 pass
 
         # finalize plan stats
-        total_plan_time = time.time() - plan_start_time
-        plan_stats.finalize(total_plan_time)
+        plan_stats.finish()
 
         return all_outputs, plan_stats
 
@@ -580,7 +563,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         total_optimization_time = time.time() - execution_start_time
 
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, optimizer)
+        records, plan_stats = self._execute_best_plan(self.dataset, self.policy, optimizer)
         all_records.extend(records)
         all_plan_stats.extend(plan_stats)
 
@@ -617,24 +600,9 @@ class RandomSamplingSentinelSequentialSingleThreadProcessor(RandomSamplingSentin
         )
         logger.info("Created RandomSamplingSentinelSequentialSingleThreadProcessor")
 
-class RandomSamplingSentinelPipelinedParallelProcessor(RandomSamplingSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
-    """
-    This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
-    """
-    def __init__(self, *args, **kwargs):
-        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
-        PipelinedParallelExecutionStrategy.__init__(
-            self,
-            scan_start_idx=self.scan_start_idx,
-            max_workers=self.max_workers,
-            verbose=self.verbose
-        )
-        logger.info("Created RandomSamplingSentinelPipelinedParallelProcessor")
-
-
 class RandomSamplingSentinelPipelinedSingleThreadProcessor(RandomSamplingSentinelQueryProcessor, PipelinedSingleThreadExecutionStrategy):
     """
-    This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
+    This class performs sentinel execution while executing plans in a pipelined fashion.
     """
     def __init__(self, *args, **kwargs):
         RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
@@ -645,3 +613,17 @@ class RandomSamplingSentinelPipelinedSingleThreadProcessor(RandomSamplingSentine
             verbose=self.verbose
         )
         logger.info("Created RandomSamplingSentinelPipelinedSingleThreadProcessor")
+
+class RandomSamplingSentinelParallelProcessor(RandomSamplingSentinelQueryProcessor, ParallelExecutionStrategy):
+    """
+    This class performs sentinel execution while executing plans in a parallel fashion.
+    """
+    def __init__(self, *args, **kwargs):
+        RandomSamplingSentinelQueryProcessor.__init__(self, *args, **kwargs)
+        ParallelExecutionStrategy.__init__(
+            self,
+            scan_start_idx=self.scan_start_idx,
+            max_workers=self.max_workers,
+            verbose=self.verbose
+        )
+        logger.info("Created RandomSamplingSentinelParallelProcessor")

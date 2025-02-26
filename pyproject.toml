@@ -63,6 +63,7 @@ dependencies = [
     "tqdm~=4.66.1",
     "transformers>=4.11.3",
     "requests-html",
+    "rich[jupyter]>=13.9.2",
     "sphinx>=8.1.3",
     # Add other dependencies as needed
 ]

@@ -25,6 +25,7 @@ class QueryProcessorConfig:
     include_baselines: bool = field(default=False)
     min_plans: int | None = field(default=None)
     verbose: bool = field(default=False)
+    progress: bool = field(default=True)
     available_models: list[Model] | None = field(default=None)
 
     max_workers: int | None = field(default=None)
@@ -53,6 +54,7 @@ class QueryProcessorConfig:
                 "include_baselines": self.include_baselines,
                 "min_plans": self.min_plans,
                 "verbose": self.verbose,
+                "progress": self.progress,
                 "available_models": self.available_models,
                 "max_workers": self.max_workers,
                 "num_workers_per_plan": self.num_workers_per_plan,

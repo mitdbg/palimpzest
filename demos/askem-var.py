@@ -65,15 +65,13 @@ if __name__ == "__main__":
 
         variables = []
         statistics = []
-        start_time = time.time()
         # for idx, (vars, plan, stats) in enumerate(iterable):
         for idx, record in enumerate(input_records):
             print(f"idx: {idx}\n record: {record}")
             index = idx
             vars = processor.execute_opstream(processor.plan, record)
             if idx == len(input_records) - 1:
-                total_plan_time = time.time() - start_time
-                processor.plan_stats.finalize(total_plan_time)
+                processor.plan_stats.finish()
 
             record_time = time.time()
             statistics.append(processor.plan_stats)

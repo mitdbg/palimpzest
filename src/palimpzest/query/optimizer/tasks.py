@@ -260,8 +260,8 @@ class OptimizePhysicalExpression(Task):
 
     This task computes the cost of input groups for the given physical expression (scheduling
     OptimizeGroup tasks if needed), computes the cost of the given expression, and then updates
-    the expression's group depending on whether this expression is its best_physical_expression
-    or in its ci_best_physical_expressions.
+    the expression's group depending on whether this expression is its `best_physical_expression`
+    or in its `pareto_optimal_physical_expressions`.
     """
 
     def __init__(self, physical_expression: Expression, exploring: bool = False):
@@ -400,74 +400,6 @@ class OptimizePhysicalExpression(Task):
 
         return group
 
-
-    def update_ci_best_physical_expressions(self, group: Group, policy: Policy) -> Group:
-        """
-        Update the CI best physical expressions for the given group and policy (if necessary).
-        """
-        # get the primary metric for the policy
-        policy_metric = policy.get_primary_metric()
-
-        # get the PlanCost for this physical expression
-        expr_plan_cost = self.physical_expression.plan_cost
-
-        # pre-compute whether or not this physical expression satisfies the policy constraint
-        expr_satisfies_constraint = policy.constraint(expr_plan_cost)
-
-        # attribute names for lower and upper bounds
-        lower_bound = f"{policy_metric}_lower_bound"
-        upper_bound = f"{policy_metric}_upper_bound"
-
-        # get the expression and plan's upper and lower bounds on the metric of interest
-        expr_lower_bound = getattr(expr_plan_cost, lower_bound)
-        expr_upper_bound = getattr(expr_plan_cost, upper_bound)
-        group_lower_bound = getattr(group, lower_bound)
-
-        # if either of the following is true:
-        # 1) the CI best physical expressions are empty
-        # 2) the group does not satisfy the constrant but this physical expression does 
-        # set the CI best physical expressions to be this expression
-        if (
-            group.ci_best_physical_expressions == []
-            or (not group.satisfies_constraint and expr_satisfies_constraint)
-        ):
-            group.ci_best_physical_expressions = [self.physical_expression]
-            group.satisfies_constraint = expr_satisfies_constraint
-            setattr(group, lower_bound, expr_lower_bound)
-            setattr(group, upper_bound, expr_upper_bound)
-
-        # otherwise, if this expression and the group both satisfy the constraint (or both do not satisfy the constraint),
-        # then update the CI best physical expressions if this expression also has an upper bound on the policy metric
-        # above the group's lower bound on the policy metric
-        elif (
-            (group.satisfies_constraint == expr_satisfies_constraint)
-            and expr_upper_bound > group_lower_bound
-        ):
-            # filter out any current best expressions whose upper bound is below the lower bound of this expression
-            group.ci_best_physical_expressions = [
-                curr_expr
-                for curr_expr in group.ci_best_physical_expressions
-                if not getattr(curr_expr, upper_bound) < expr_lower_bound
-            ]
-
-            # add this expression to the CI best physical expressions
-            group.ci_best_physical_expressions.append(self.physical_expression)
-
-            # compute the upper and lower bounds for the group
-            new_group_upper_bound = max(
-                map(lambda expr: getattr(expr, upper_bound), group.ci_best_physical_expressions)
-            )
-            new_group_lower_bound = max(
-                map(lambda expr: getattr(expr, lower_bound), group.ci_best_physical_expressions)
-            )
-
-            # set the new upper and lower bounds for the group
-            setattr(group, lower_bound, new_group_lower_bound)
-            setattr(group, upper_bound, new_group_upper_bound)
-
-        return group
-
-
     def perform(
         self,
         cost_model: BaseCostModel,
@@ -511,13 +443,6 @@ class OptimizePhysicalExpression(Task):
                 best_input_plan_cost = input_group.best_physical_expression.plan_cost
 
             elif (
-                context['optimization_strategy_type'] == OptimizationStrategyType.CONFIDENCE_INTERVAL
-                and input_group.ci_best_physical_expressions is not None
-            ):
-                # TODO: fix this to properly compute set of potential input plan costs
-                raise Exception("NotImplementedError")
-
-            elif (
                 context['optimization_strategy_type'] == OptimizationStrategyType.PARETO
                 and input_group.pareto_optimal_physical_expressions is not None
             ):
@@ -542,12 +467,7 @@ class OptimizePhysicalExpression(Task):
                 return [self] + new_tasks
 
         group = groups[self.physical_expression.group_id]
-        if context['optimization_strategy_type'] == OptimizationStrategyType.CONFIDENCE_INTERVAL:
-            # TODO: fix this to properly compute and update set of possible plan costs
-            raise Exception("NotImplementedError")
-            group = self.update_ci_best_physical_expressions(group, policy)
-
-        elif context['optimization_strategy_type'] == OptimizationStrategyType.PARETO:
+        if context['optimization_strategy_type'] == OptimizationStrategyType.PARETO:
             # compute all possible plan costs for this physical expression given the pareto optimal input plan costs
             all_possible_plan_costs = []
             for input_plan_cost in input_plan_costs:

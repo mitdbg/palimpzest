@@ -23,7 +23,7 @@ def main():
     parser.add_argument(
         "--execution_strategy",
         type=str,
-        help="The execution strategy to use. One of sequential, pipelined_parallel, pipelined_single_thread",
+        help="The execution strategy to use. One of sequential, pipelined, parallel",
         default="sequential",
     )
     parser.add_argument(

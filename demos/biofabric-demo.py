@@ -84,7 +84,7 @@ if __name__ == "__main__":
     parser.add_argument("--from_xls", action="store_true", help="Start from pre-downloaded excel files", default=False)
     parser.add_argument("--experiment", type=str, help="The experiment to run", default="matching")
     parser.add_argument("--policy", type=str, help="The policy to use", default="cost")
-    parser.add_argument("--executor", type=str, help="The plan executor to use. The avaliable executors are: sequential, pipelined_parallel, pipelined_single_thread", default="pipelined_parallel")
+    parser.add_argument("--executor", type=str, help="The plan executor to use. The avaliable executors are: sequential, pipelined, parallel", default="parallel")
 
     args = parser.parse_args()
     verbose = args.verbose
