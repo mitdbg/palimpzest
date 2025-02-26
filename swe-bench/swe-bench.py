@@ -3,7 +3,8 @@ from palimpzest.constants import Cardinality
 from palimpzest.core.elements.records import DataRecord 
 from palimpzest.core.lib.schemas import RawJSONObject, TextFile
 from palimpzest.core.lib.fields import Field 
-from palimpzest.agents.planner_agent import DebuggerAgent 
+from palimpzest.agents.debugger_agent import DebuggerAgent
+from palimpzest.agents.code_editor_agent import CodeEditorAgent
 from palimpzest.query.processor.config import QueryProcessorConfig
 
 import json
@@ -115,16 +116,18 @@ def remove_irrelevant_fields(candidate: DataRecord):
 
 def buildSweBenchPlan(dataset):
     debugger_agent = DebuggerAgent()
+    code_agent = CodeEditorAgent()
 
     github_issues = pz.Dataset(dataset, schema=GithubIssue, udf=extract_relevant_fields, cardinality=Cardinality.ONE_TO_ONE)
     code_plans = debugger_agent(github_issues)
+    code_patches = code_agent(code_plans)
+    return code_patches
     # code_fixes = github_issues.convert(outputSchema=CodeFix)
-    code_fixes = code_plans.convert(output_schema=CodeFix)
+    # code_fixes = code_plans.convert(output_schema=CodeFix)
     # patches = code_fixes.convert(outputSchema=GithubCodePatch, udf=generate_patch)
-    simplified_code_fixes = code_fixes.convert(output_schema=SimplifiedCodeFix, udf=remove_irrelevant_fields)
-    patches = simplified_code_fixes.convert(output_schema=GithubCodePatch)
+    # simplified_code_fixes = code_fixes.convert(output_schema=SimplifiedCodeFix, udf=remove_irrelevant_fields) patches = simplified_code_fixes.convert(output_schema=GithubCodePatch)
     # verified_patches = patches.verify(run_tests, retries=3)
-    return patches
+    # return patches
 
 def dump_records(filename, records, values, all_values=False):
     # Filter the dictionaries to include only specified columns (keys)
@@ -148,7 +151,6 @@ def dump_records(filename, records, values, all_values=False):
 if __name__ == "__main__":
     plan = buildSweBenchPlan("swe-bench-oracle-lite")
 
-
     # execute pz plan
     config = QueryProcessorConfig(
         nocache=True,
@@ -166,6 +168,7 @@ if __name__ == "__main__":
     #                             verbose=True)
 
     import pdb; pdb.set_trace() 
+    # TO DO: Save the output in JSON file 
 
     # print(f'Record Type: {records}')
     

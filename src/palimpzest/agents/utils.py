@@ -3,19 +3,34 @@ import requests
 import difflib
 import base64
 import ast
+import logging
+import os
+import json
+from datetime import datetime
+from logging.handlers import RotatingFileHandler
 
+# TO DO: Generalize to other repos 
 TEMP_VARS = {
     "owner": "astropy",
     "repo": "astropy", 
     "branch": "main", 
 }
 
+def add_line_numbers(code_str, start_line_no=1):
+    """
+    Takes a code string without line numbers and returns a JSON string
+    where each line is represented as an object with its line number and content.
+    """
+    lines = code_str.splitlines()
+    result = {str(i + 1 + (start_line_no - 1)): line for i, line in enumerate(lines)}
+    return json.dumps(result, indent=2)
+
 def fetch_github_code(file_name: str, base_commit: str = None) -> str:
     """ Fetches the code of a file from the relevant issue code """
     # Customize these variables for your repository.
     token = os.getenv("GITHUB_TOKEN")
 
-    print("Fetching repository file list...")
+    print("Fetching GitHub Code File...")
     ref = base_commit if base_commit else TEMP_VARS["branch"]
     file_paths = get_repo_files(TEMP_VARS["owner"], TEMP_VARS["repo"], ref, token)
     if file_paths is None:
@@ -115,8 +130,7 @@ def search_files(keywords, per_page=30, page=1):
       - A JSON object with search results, or None if an error occurred.
     """
 
-    # TO DO: This might be buggy because it doesn't search over the state at the base commit 
-    import pdb; pdb.set_trace()
+    # TO DO: This might be buggy because it only searches over the most state in main 
 
     base_url = "https://api.github.com/search/code"
     
@@ -191,3 +205,35 @@ def extract_structure(code):
     visitor = FunctionClassVisitor()
     visitor.visit(tree)
     return visitor.structure
+
+# Configure logging
+def setup_logger(log_dir="logs", max_bytes=1_000_000, backup_count=5):
+    """
+    Sets up a rotating file logger.
+
+    Args:
+        log_dir (str): Directory where log files will be stored.
+        log_file (str): Name of the log file.
+        max_bytes (int): Maximum file size before rotating.
+        backup_count (int): Number of backup log files to keep.
+    """
+    # Ensure log directory exists
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Create full log file path
+    log_file = f'app_log_{datetime.now().now.strftime("%Y-%m-%d %H:%M:%S")}.log'
+    log_path = os.path.join(log_dir, log_file)
+    
+    # Set up logging
+    logger = logging.getLogger("AppLogger")
+    logger.setLevel(logging.INFO)
+    
+    # Create rotating file handler
+    handler = RotatingFileHandler(log_path, maxBytes=max_bytes, backupCount=backup_count)
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    
+    # Avoid adding multiple handlers
+    if not logger.hasHandlers():
+        logger.addHandler(handler)
+    
+    return logger
