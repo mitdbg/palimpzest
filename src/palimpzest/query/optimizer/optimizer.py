@@ -321,7 +321,6 @@ class Optimizer:
                 input_schema=input_schema,
                 output_schema=output_schema,
                 udf=node._udf,
-                depends_on=node._depends_on,
                 target_cache_id=uid,
             )
         # some legacy plans may have a useless convert; for now we simply skip it

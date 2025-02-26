@@ -429,14 +429,12 @@ class MapScan(LogicalOperator):
     def __init__(
         self,
         udf: Callable | None = None,
-        depends_on: list[str] | None = None,
         target_cache_id: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.udf = udf
-        self.depends_on = [] if depends_on is None else sorted(depends_on)
         self.target_cache_id = target_cache_id
 
     def __str__(self):
@@ -455,7 +453,6 @@ class MapScan(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "udf": self.udf,
-            "depends_on": self.depends_on,
             "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }

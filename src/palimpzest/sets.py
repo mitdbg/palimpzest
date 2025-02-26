@@ -293,7 +293,7 @@ class Dataset(Set):
             cache=self._cache,
         )
 
-    def map(self, udf: Callable, depends_on: str | list[str] | None = None) -> Dataset:
+    def map(self, udf: Callable) -> Dataset:
         """
         Apply a UDF map function.
 
@@ -303,14 +303,10 @@ class Dataset(Set):
         if udf is None:
             raise ValueError("`udf` must be provided for map.")
 
-        if isinstance(depends_on, str):
-            depends_on = [depends_on]
-
         return Dataset(
             source=self,
             schema=self.schema,
             udf=udf,
-            depends_on=depends_on,
             cache=self._cache,
         )
 
