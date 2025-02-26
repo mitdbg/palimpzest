@@ -198,9 +198,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--execution-strategy",
-        default="pipelined_parallel",
+        default="parallel",
         type=str,
-        help="The plan executor to use. One of sequential, pipelined_single_thread, pipelined_parallel",
+        help="The plan executor to use. One of sequential, pipelined, parallel",
     )
     parser.add_argument(
         "--policy",

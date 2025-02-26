@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import logging
 import os
 import time
 
@@ -7,6 +8,7 @@ from demo_core import execute_task, format_results_table
 from dotenv import load_dotenv
 
 import palimpzest as pz
+from palimpzest.tools.logger import setup_logger
 
 load_dotenv()
 
@@ -21,7 +23,7 @@ def main():
     parser.add_argument(
         "--execution_strategy",
         type=str,
-        help="The execution strategy to use. One of sequential, pipelined_parallel, pipelined_single_thread",
+        help="The execution strategy to use. One of sequential, pipelined, parallel",
         default="sequential",
     )
     parser.add_argument(
@@ -63,6 +65,8 @@ def main():
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     # Execute task
+    logger = setup_logger("palimpzest")
+    logger.pz_logger.set_console_level(logging.DEBUG if verbose else logging.ERROR)
     records, execution_stats, cols = execute_task(
         task=task,
         dataset=dataset,

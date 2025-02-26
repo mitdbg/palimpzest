@@ -1,3 +1,4 @@
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 
@@ -7,27 +8,25 @@ from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import (
     ExecutionStats,
     OperatorCostEstimates,
-    OperatorStats,
-    PlanStats,
     RecordOpStats,
+    SentinelPlanStats,
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordCollection, DataRecordSet
 from palimpzest.policy import Policy
-from palimpzest.query.execution.parallel_execution_strategy import PipelinedParallelExecutionStrategy
+from palimpzest.query.execution.parallel_execution_strategy import ParallelExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
 from palimpzest.query.operators.convert import ConvertOp, LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
-from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp
+from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
-from palimpzest.tools.logger import setup_logger
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class MABSentinelQueryProcessor(QueryProcessor):
     """
@@ -579,24 +578,17 @@ class MABSentinelQueryProcessor(QueryProcessor):
     def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict], policy: Policy):
         """
         """
-        logger.debug(f"Executing plan: {plan.plan_id}")
-        logger.debug(f"Plan: {plan}")
-        logger.debug("---")
+        # for now, assert that the first operator in the plan is a ScanPhysicalOp
+        assert all(isinstance(op, ScanPhysicalOp) for op in plan.operator_sets[0]), "First operator in physical plan must be a ScanPhysicalOp"
+        logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
+        logger.info(f"Plan Details: {plan}")
 
-        plan_start_time = time.time()
+        # # initialize progress manager
+        # self.progress_manager = create_progress_manager(plan, self.num_samples)
 
-        # initialize plan stats and operator stats
-        plan_stats = PlanStats(plan_id=plan.plan_id, plan_str=str(plan))
-        for logical_op_id, logical_op_name, op_set in plan:
-            op_set_details = {
-                op.op_name(): {k: str(v) for k, v in op.get_id_params().items()}
-                for op in op_set
-            }
-            plan_stats.operator_stats[logical_op_id] = OperatorStats(
-                op_id=logical_op_id,
-                op_name=logical_op_name,
-                op_details=op_set_details,
-            )
+        # initialize plan stats
+        plan_stats = SentinelPlanStats.from_plan(plan)
+        plan_stats.start()
 
         # shuffle the indices of records to sample
         total_num_samples = len(self.val_datasource)
@@ -708,11 +700,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
                         all_record_op_stats.extend(record_set.record_op_stats)
 
                 # update plan stats
-                plan_stats.operator_stats[logical_op_id].add_record_op_stats(
-                    all_record_op_stats,
-                    source_op_id=prev_logical_op_id,
-                    plan_id=plan.plan_id,
-                )
+                plan_stats.add_record_op_stats(all_record_op_stats)
 
                 # add records (which are not filtered) to the cache, if allowed
                 if self.cache:
@@ -751,8 +739,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
                 pass
 
         # finalize plan stats
-        total_plan_time = time.time() - plan_start_time
-        plan_stats.finalize(total_plan_time)
+        plan_stats.finish()
 
         return all_outputs, plan_stats
 
@@ -832,7 +819,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         total_optimization_time = time.time() - execution_start_time
 
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, optimizer)
+        records, plan_stats = self._execute_best_plan(self.dataset, self.policy, optimizer)
         all_records.extend(records)
         all_plan_stats.extend(plan_stats)
 
@@ -866,20 +853,21 @@ class MABSentinelSequentialSingleThreadProcessor(MABSentinelQueryProcessor, Sequ
             self,
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
+            num_samples=self.num_samples,
             cache=self.cache,
-            verbose=self.verbose
+            verbose=self.verbose,
         )
         self.progress_manager = None
         logger.info("Created MABSentinelSequentialSingleThreadProcessor")
 
 
-class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, PipelinedParallelExecutionStrategy):
+class MABSentinelParallelProcessor(MABSentinelQueryProcessor, ParallelExecutionStrategy):
     """
-    This class performs sentinel execution while executing plans in a pipelined, parallel fashion.
+    This class performs sentinel execution while executing plans in a parallel fashion.
     """
     def __init__(self, *args, **kwargs):
         MABSentinelQueryProcessor.__init__(self, *args, **kwargs)
-        PipelinedParallelExecutionStrategy.__init__(
+        ParallelExecutionStrategy.__init__(
             self,
             scan_start_idx=self.scan_start_idx,
             max_workers=self.max_workers,
@@ -887,4 +875,4 @@ class MABSentinelPipelinedParallelProcessor(MABSentinelQueryProcessor, Pipelined
             verbose=self.verbose
         )
         self.progress_manager = None
-        logger.info("Created MABSentinelPipelinedParallelProcessor")
+        logger.info("Created MABSentinelParallelProcessor")

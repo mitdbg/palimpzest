@@ -568,7 +568,7 @@ def main():
 
     config = pz.QueryProcessorConfig(
         verbose=args.verbose,
-        execution_strategy="pipelined_parallel",
+        execution_strategy="parallel",
         val_datasource=val_data_reader,
         processing_strategy=args.processing_strategy,
         max_workers=10,

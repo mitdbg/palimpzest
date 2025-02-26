@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 
 from palimpzest.core.elements.records import DataRecordCollection
@@ -7,25 +8,24 @@ from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.mab_sentinel_processor import (
-    MABSentinelPipelinedParallelProcessor,
+    MABSentinelParallelProcessor,
     MABSentinelSequentialSingleThreadProcessor,
 )
 from palimpzest.query.processor.nosentinel_processor import (
-    NoSentinelPipelinedParallelProcessor,
+    NoSentinelParallelProcessor,
     NoSentinelPipelinedSingleThreadProcessor,
     NoSentinelSequentialSingleThreadProcessor,
 )
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.query.processor.random_sampling_sentinel_processor import (
-    RandomSamplingSentinelPipelinedParallelProcessor,
+    RandomSamplingSentinelParallelProcessor,
     RandomSamplingSentinelSequentialSingleThreadProcessor,
 )
 from palimpzest.query.processor.streaming_processor import StreamingQueryProcessor
 from palimpzest.sets import Dataset, Set
-from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.model_helpers import get_models
 
-logger = setup_logger(__name__) 
+logger = logging.getLogger(__name__)
 
 class ProcessingStrategyType(Enum):
     """How to generate and optimize query plans"""
@@ -36,8 +36,6 @@ class ProcessingStrategyType(Enum):
     AUTO = "auto"
 
 def convert_to_enum(enum_type: type[Enum], value: str) -> Enum:
-    if value == "pipelined":
-        value = "pipelined_single_thread"
     value = value.upper().replace('-', '_')
     try:
         return enum_type[value]
@@ -49,22 +47,22 @@ class QueryProcessorFactory:
     PROCESSOR_MAPPING = {
         (ProcessingStrategyType.NO_SENTINEL, ExecutionStrategyType.SEQUENTIAL): 
             NoSentinelSequentialSingleThreadProcessor,
-        (ProcessingStrategyType.NO_SENTINEL, ExecutionStrategyType.PIPELINED_SINGLE_THREAD): 
+        (ProcessingStrategyType.NO_SENTINEL, ExecutionStrategyType.PIPELINED): 
             NoSentinelPipelinedSingleThreadProcessor,
-        (ProcessingStrategyType.NO_SENTINEL, ExecutionStrategyType.PIPELINED_PARALLEL): 
-            NoSentinelPipelinedParallelProcessor,
+        (ProcessingStrategyType.NO_SENTINEL, ExecutionStrategyType.PARALLEL): 
+            NoSentinelParallelProcessor,
         (ProcessingStrategyType.MAB_SENTINEL, ExecutionStrategyType.SEQUENTIAL):
             MABSentinelSequentialSingleThreadProcessor,
-        (ProcessingStrategyType.MAB_SENTINEL, ExecutionStrategyType.PIPELINED_PARALLEL):
-            MABSentinelPipelinedParallelProcessor,
+        (ProcessingStrategyType.MAB_SENTINEL, ExecutionStrategyType.PARALLEL):
+            MABSentinelParallelProcessor,
         (ProcessingStrategyType.STREAMING, ExecutionStrategyType.SEQUENTIAL):
             StreamingQueryProcessor,
-        (ProcessingStrategyType.STREAMING, ExecutionStrategyType.PIPELINED_PARALLEL):
+        (ProcessingStrategyType.STREAMING, ExecutionStrategyType.PARALLEL):
             StreamingQueryProcessor,
         (ProcessingStrategyType.RANDOM_SAMPLING, ExecutionStrategyType.SEQUENTIAL):
             RandomSamplingSentinelSequentialSingleThreadProcessor,
-        (ProcessingStrategyType.RANDOM_SAMPLING, ExecutionStrategyType.PIPELINED_PARALLEL):
-            RandomSamplingSentinelPipelinedParallelProcessor,
+        (ProcessingStrategyType.RANDOM_SAMPLING, ExecutionStrategyType.PARALLEL):
+            RandomSamplingSentinelParallelProcessor,
     }
 
     @classmethod
@@ -126,7 +124,6 @@ class QueryProcessorFactory:
             verbose=config.verbose,
             available_models=available_models,
             allow_bonded_query=config.allow_bonded_query,
-            allow_conventional_query=config.allow_conventional_query,
             allow_code_synth=config.allow_code_synth,
             allow_token_reduction=config.allow_token_reduction,
             allow_rag_reduction=config.allow_rag_reduction,

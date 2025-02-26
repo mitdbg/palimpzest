@@ -9,7 +9,7 @@ from palimpzest.constants import (
     NAIVE_EST_NUM_OUTPUT_TOKENS,
 )
 from palimpzest.core.data.dataclasses import OperatorCostEstimates
-from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded, LLMConvertConventional
+from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.utils.token_reduction_helpers import best_substring_match, find_best_range
 
 
@@ -32,8 +32,8 @@ from palimpzest.utils.token_reduction_helpers import best_substring_match, find_
 #          - this also creates difficulties in properly performing cost-estimation for this operator; e.g. if we use
 #            n <= MAX_HEATMAP_UPDATES samples to cost this operator, then we will never actually measure its performance
 #            in the token reduction phase -- which could have a serious degradation in quality that our optimizer doesn't see
-class TokenReducedConvert(LLMConvert):
-    # NOTE: moving these closer to the TokenReducedConvert class for now (in part to make
+class TokenReducedConvertBonded(LLMConvertBonded):
+    # NOTE: moving these closer to the TokenReducedConvertBonded class for now (in part to make
     #       them easier to mock); we can make these parameterized as well
     MAX_HEATMAP_UPDATES: int = 5
     TOKEN_REDUCTION_SAMPLE: int = 0
@@ -90,9 +90,9 @@ class TokenReducedConvert(LLMConvert):
         naive_op_cost_estimates.quality_upper_bound = naive_op_cost_estimates.quality
 
         return naive_op_cost_estimates
-    
+
     def is_image_conversion(self) -> bool:
-        """TokenReducedConvert is currently disallowed on image conversions, so this must be False."""
+        """TokenReducedConvertBonded is currently disallowed on image conversions, so this must be False."""
         return False
 
     def reduce_context(self, full_context: str) -> str:
@@ -119,7 +119,9 @@ class TokenReducedConvert(LLMConvert):
         return sample
 
     def _dspy_generate_fields(self, prompt: str, content: str | list[str]) -> tuple[list[dict[str, list]] | Any]:
-        raise Exception("TokenReducedConvert is executing despite being deprecated until implementation changes can be made.")
+        raise Exception(
+            "TokenReducedConvertBonded is executing despite being deprecated until implementation changes can be made."
+        )
         answer, query_stats = None, None
         if self.first_execution or self.count < self.MAX_HEATMAP_UPDATES:
             if self.verbose:
@@ -165,11 +167,3 @@ class TokenReducedConvert(LLMConvert):
         self.heatmap[norm_si:norm_ei] = map(lambda x: x + 1, self.heatmap[norm_si:norm_ei])
 
         return answer, query_stats
-
-
-class TokenReducedConvertConventional(TokenReducedConvert, LLMConvertConventional):
-    pass
-
-
-class TokenReducedConvertBonded(TokenReducedConvert, LLMConvertBonded):
-    pass

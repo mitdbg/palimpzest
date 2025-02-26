@@ -7,7 +7,7 @@ from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstima
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.prompts import ADVICEGEN_PROMPT, CODEGEN_PROMPT, EXAMPLE_PROMPT
 from palimpzest.query.generators.generators import code_ensemble_execution, generator_factory
-from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded, LLMConvertConventional
+from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded
 from palimpzest.utils.sandbox import API
 
 # TYPE DEFINITIONS
@@ -24,7 +24,7 @@ class CodeSynthesisConvert(LLMConvert):
         self,
         exemplar_generation_model: Model = Model.GPT_4o,
         code_synth_model: Model = Model.GPT_4o,
-        conventional_fallback_model: Model = Model.GPT_4o_MINI,
+        fallback_model: Model = Model.GPT_4o_MINI,
         *args,
         **kwargs,
     ):
@@ -34,7 +34,7 @@ class CodeSynthesisConvert(LLMConvert):
         # set models
         self.exemplar_generation_model = exemplar_generation_model
         self.code_synth_model = code_synth_model
-        self.conventional_fallback_model = conventional_fallback_model
+        self.fallback_model = fallback_model
 
         # initialize parameters
         self.field_to_code_ensemble = None
@@ -58,7 +58,7 @@ class CodeSynthesisConvert(LLMConvert):
         id_params = {
             "exemplar_generation_model": self.exemplar_generation_model.value,
             "code_synth_model": self.code_synth_model.value,
-            "conventional_fallback_model": self.conventional_fallback_model.value,
+            "fallback_model": self.fallback_model.value,
             **id_params,
         }
 
@@ -69,7 +69,7 @@ class CodeSynthesisConvert(LLMConvert):
         op_params = {
             "exemplar_generation_model": self.exemplar_generation_model,
             "code_synth_model": self.code_synth_model,
-            "conventional_fallback_model": self.conventional_fallback_model,
+            "fallback_model": self.fallback_model,
             **op_params,
         }
 
@@ -89,7 +89,7 @@ class CodeSynthesisConvert(LLMConvert):
         naive_op_cost_estimates.time_per_record = 1e-5
         naive_op_cost_estimates.time_per_record_lower_bound = 1e-5
         naive_op_cost_estimates.time_per_record_upper_bound = 1e-5
-        naive_op_cost_estimates.cost_per_record = 1e-6 # amortize code synth cost across records
+        naive_op_cost_estimates.cost_per_record = 1e-6  # amortize code synth cost across records
         naive_op_cost_estimates.cost_per_record_lower_bound = 1e-6
         naive_op_cost_estimates.cost_per_record_upper_bound = 1e-6
         naive_op_cost_estimates.quality = (naive_op_cost_estimates.quality) * (GPT_4o_MODEL_CARD["code"] / 100.0) * 0.7
@@ -149,7 +149,9 @@ class CodeSynthesisConvert(LLMConvert):
         # set field_to_code_ensemble and code_synthesized to True
         return field_to_code_ensemble, generation_stats
 
-    def _bonded_query_fallback(self, candidate: DataRecord) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
+    def _bonded_query_fallback(
+        self, candidate: DataRecord
+    ) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
         fields_to_generate = self.get_fields_to_generate(candidate)
         projected_candidate = candidate.copy(include_bytes=False, project_cols=self.depends_on)
 
@@ -181,7 +183,9 @@ class CodeSynthesisConvert(LLMConvert):
         """Code synthesis is disallowed on image conversions, so this must be False."""
         return False
 
-    def convert(self, candidate: DataRecord, fields: list[str] | None = None) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
+    def convert(
+        self, candidate: DataRecord, fields: list[str] | None = None
+    ) -> tuple[dict[FieldName, list[Any] | None], GenerationStats]:
         # get the dictionary fields for the candidate
         candidate_dict = candidate.to_dict(include_bytes=False, project_cols=self.depends_on)
 
@@ -220,18 +224,18 @@ class CodeSynthesisConvert(LLMConvert):
                 field_answers[field_name] = [answer]
 
             else:
-                # if there is a failure, run a conventional query
+                # if there is a failure, run a conventional llm convert query for the field
                 if self.verbose:
                     print(f"CODEGEN FALLING BACK TO CONVENTIONAL FOR FIELD {field_name}")
 
-                # execute the conventional convert
-                conventional_op = LLMConvertConventional(
+                # execute the conventional llm convert
+                convert_op = LLMConvertBonded(
                     input_schema=self.input_schema,
                     output_schema=self.output_schema,
-                    model=self.conventional_fallback_model,
+                    model=self.fallback_model,
                     prompt_strategy=self.prompt_strategy,
                 )
-                single_field_answers, single_field_stats = conventional_op.convert(candidate, [field_name])
+                single_field_answers, single_field_stats = convert_op.convert(candidate, [field_name])
 
                 # include code execution time in single_field_stats
                 single_field_stats.fn_call_duration_secs += exec_stats.fn_call_duration_secs
@@ -337,7 +341,9 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
 
         return code, stats
 
-    def _synthesize_field_code(self, candidate: DataRecord, api: API, output_field_name: str, num_exemplars: int = 1, *args, **kwargs):
+    def _synthesize_field_code(
+        self, candidate: DataRecord, api: API, output_field_name: str, num_exemplars: int = 1, *args, **kwargs
+    ):
         code, generation_stats = self._code_synth_single(
             candidate, api, output_field_name, exemplars=self.exemplars[:num_exemplars]
         )
@@ -354,7 +360,9 @@ class CodeSynthesisConvertExampleEnsemble(CodeSynthesisConvertSingle):
             return False
         return not self.code_synthesized
 
-    def _synthesize_field_code(self, candidate: DataRecord, api: API, output_field_name: str, code_ensemble_num: int = 1, *args, **kwargs):
+    def _synthesize_field_code(
+        self, candidate: DataRecord, api: API, output_field_name: str, code_ensemble_num: int = 1, *args, **kwargs
+    ):
         # creates an ensemble of `code_ensemble_num` synthesized functions; each of
         # which uses a different exemplar (modulo the # of exemplars) for its synthesis
         code_ensemble = {}
@@ -431,7 +439,14 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvertSingle):
         return advs, stats
 
     def _synthesize_field_code(
-        self, candidate: DataRecord, api: API, output_field_name: str, code_ensemble_num: int = 1, num_exemplars: int = 1, *args, **kwargs
+        self,
+        candidate: DataRecord,
+        api: API,
+        output_field_name: str,
+        code_ensemble_num: int = 1,
+        num_exemplars: int = 1,
+        *args,
+        **kwargs,
     ):
         # a more advanced approach in which advice is first solicited, and then
         # provided as context when synthesizing the code ensemble
