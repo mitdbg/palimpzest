@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from palimpzest.core.data.dataclasses import PlanCost
@@ -8,9 +9,8 @@ from palimpzest.query.optimizer.cost_model import BaseCostModel
 from palimpzest.query.optimizer.optimizer_strategy import OptimizationStrategyType
 from palimpzest.query.optimizer.primitives import Expression, Group
 from palimpzest.query.optimizer.rules import ImplementationRule, Rule, TransformationRule
-from palimpzest.tools.logger import setup_logger
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class Task:
     """

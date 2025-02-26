@@ -34,28 +34,22 @@ def get_models(include_vision: bool = False) -> list[Model]:
 
     return models
 
-# The order is the priority of the model
-TEXT_MODEL_PRIORITY = [
-    Model.GPT_4o,
-    Model.GPT_4o_MINI,
-    Model.LLAMA3,
-    Model.MIXTRAL
-]
 
-VISION_MODEL_PRIORITY = [
-    Model.GPT_4o_V,
-    Model.GPT_4o_MINI_V,
-    Model.LLAMA3_V
-]
-def get_champion_model(available_models, vision=False):    
+# The order is the priority of the model
+TEXT_MODEL_PRIORITY = [Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3, Model.MIXTRAL]
+
+VISION_MODEL_PRIORITY = [Model.GPT_4o_V, Model.GPT_4o_MINI_V, Model.LLAMA3_V]
+
+
+def get_champion_model(available_models, vision=False):
     # Select appropriate priority list based on task
     model_priority = VISION_MODEL_PRIORITY if vision else TEXT_MODEL_PRIORITY
-    
+
     # Return first available model from priority list
     for model in model_priority:
         if model in available_models:
             return model
-            
+
     # If no suitable model found, raise informative error
     task_type = "vision" if vision else "text"
     raise Exception(
@@ -66,7 +60,7 @@ def get_champion_model(available_models, vision=False):
     )
 
 
-def get_conventional_fallback_model(available_models, vision=False):
+def get_fallback_model(available_models, vision=False):
     return get_champion_model(available_models, vision)
 
 

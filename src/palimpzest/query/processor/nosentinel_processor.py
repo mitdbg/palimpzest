@@ -1,3 +1,4 @@
+import logging
 import time
 
 from palimpzest.core.data.dataclasses import ExecutionStats
@@ -8,9 +9,8 @@ from palimpzest.query.execution.single_threaded_execution_strategy import (
     SequentialSingleThreadExecutionStrategy,
 )
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.tools.logger import setup_logger
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class NoSentinelQueryProcessor(QueryProcessor):
     """

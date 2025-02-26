@@ -4,6 +4,7 @@ This file contains the Generator classes and generator factory.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import time
@@ -35,7 +36,6 @@ from palimpzest.core.data.dataclasses import GenerationStats
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.prompts import PromptFactory
 from palimpzest.query.generators.api_client_factory import APIClientFactory
-from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.generation_helpers import get_json_from_answer
 from palimpzest.utils.sandbox import API
 
@@ -45,7 +45,7 @@ ContextType = TypeVar("ContextType")
 InputType = TypeVar("InputType")
 
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 def generator_factory(
     model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality, verbose: bool = False

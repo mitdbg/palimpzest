@@ -360,71 +360,6 @@ class LLMConvert(ConvertOp):
         )
 
 
-class LLMConvertConventional(LLMConvert):
-    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
-        """
-        Update the cost per record and time per record estimates to account for the additional
-        LLM calls we incur by executing one query per-field.
-        """
-        # get naive cost estimates from LLMConvert
-        naive_op_cost_estimates = super().naive_cost_estimates(source_op_cost_estimates)
-
-        # re-compute cost per record assuming we use fewer input tokens
-        est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
-        est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
-
-        # increase estimates of the input and output tokens by the number of fields generated
-        # NOTE: this may over-estimate the number of fields that need to be generated
-        generate_field_names = []
-        for field_name in self.output_schema.field_names():
-            if field_name not in self.input_schema.field_names():
-                generate_field_names.append(field_name)
-
-        num_fields_to_generate = len(generate_field_names)
-        est_num_input_tokens *= num_fields_to_generate
-        est_num_output_tokens *= num_fields_to_generate
-
-        # get est. of conversion time per record from model card;
-        model_conversion_time_per_record = (
-            MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
-        )
-
-        # get est. of conversion cost (in USD) per record from model card
-        model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
-        )
-
-        # set refined estimate of time and cost per record
-        naive_op_cost_estimates.time_per_record = model_conversion_time_per_record
-        naive_op_cost_estimates.time_per_record_lower_bound = naive_op_cost_estimates.time_per_record
-        naive_op_cost_estimates.time_per_record_upper_bound = naive_op_cost_estimates.time_per_record
-        naive_op_cost_estimates.cost_per_record = model_conversion_usd_per_record
-        naive_op_cost_estimates.cost_per_record_lower_bound = naive_op_cost_estimates.cost_per_record
-        naive_op_cost_estimates.cost_per_record_upper_bound = naive_op_cost_estimates.cost_per_record
-
-        return naive_op_cost_estimates
-
-    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
-        # get the set of input fields to use for the convert operation
-        input_fields = self.get_input_fields()
-
-        # construct kwargs for generation
-        gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema}
-
-        # generate outputs one field at a time
-        field_answers, generation_stats_lst = {}, []
-        for field in fields:
-            single_field_answers, _, single_field_stats, _ = self.generator(candidate, [field], **gen_kwargs)
-            field_answers.update(single_field_answers)
-            generation_stats_lst.append(single_field_stats)
-
-        # aggregate generation stats into single object
-        generation_stats = sum(generation_stats_lst)
-
-        return field_answers, generation_stats
-
-
 class LLMConvertBonded(LLMConvert):
     def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         # get the set of input fields to use for the convert operation
@@ -438,11 +373,12 @@ class LLMConvertBonded(LLMConvert):
             candidate, fields, **gen_kwargs
         )  # TODO: guarantee negative output from generator is None
 
-        # if there was an error for any field, execute a conventional query on that field
-        for field, answers in field_answers.items():
-            if answers is None:
-                single_field_answers, _, single_field_stats, _ = self.generator(candidate, [field], **gen_kwargs)
-                field_answers.update(single_field_answers)
-                generation_stats += single_field_stats
+        # if there are multiple fields to generate, run a separate query for each field that errored in the bonded query
+        if len(field_answers) > 1:
+            for field, answers in field_answers.items():
+                if answers is None:
+                    single_field_answers, _, single_field_stats, _ = self.generator(candidate, [field], **gen_kwargs)
+                    field_answers.update(single_field_answers)
+                    generation_stats += single_field_stats
 
         return field_answers, generation_stats

@@ -25,14 +25,13 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
-from palimpzest.query.operators.token_reduction_convert import TokenReducedConvert
+from palimpzest.query.operators.token_reduction_convert import TokenReducedConvertBonded
 from palimpzest.query.optimizer.plan import SentinelPlan
-from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.model_helpers import get_champion_model_name, get_models
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class BaseCostModel:
     """
@@ -90,7 +89,7 @@ class SampleBasedCostModel:
             for _, phys_op_id_to_stats in self.operator_to_stats.items()
             for phys_op_id, _ in phys_op_id_to_stats.items()
         ])
-        logger.pz_logger.set_console_level(logging.DEBUG if self.verbose else logging.ERROR)
+
         logger.info(f"Initialized SampleBasedCostModel with verbose={self.verbose}")
         logger.debug(f"Initialized SampleBasedCostModel with params: {self.__dict__}")
 
@@ -592,7 +591,7 @@ class CostModel(BaseCostModel):
                     op_estimates.quality = op_estimates.quality * (GPT_4o_MODEL_CARD["code"] / 100.0)
 
                 # token reduction adjustment
-                if isinstance(operator, TokenReducedConvert):
+                if isinstance(operator, TokenReducedConvertBonded):
                     total_input_tokens = operator.token_budget * sample_op_estimates[op_id][model_name]["total_input_tokens"]
                     total_output_tokens = sample_op_estimates[op_id][model_name]["total_output_tokens"]
                     op_estimates.cost_per_record = (
