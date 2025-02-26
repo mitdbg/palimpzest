@@ -95,7 +95,7 @@ def pdf_to_pages(candidate:dict):
     pdf_bytes = candidate["contents"]
     pdf = PdfReader(io.BytesIO(pdf_bytes))
     records = []
-    for idx, page in enumerate(pdf.pages[10:15]):
+    for idx, page in enumerate(pdf.pages):
         dr = {
         "page_number": idx,
         "page_text": page.extract_text()   
