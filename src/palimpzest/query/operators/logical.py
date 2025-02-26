@@ -24,6 +24,7 @@ class LogicalOperator:
     - GroupByAggregate (applies a group by on the Set)
     - Aggregate (applies an aggregation on the Set)
     - RetrieveScan (fetches documents from a provided input for a given query)
+    - Map (applies a function to each record in the Set without adding any new columns)
 
     Every logical operator must declare the get_logical_id_params() and get_logical_op_params() methods,
     which return dictionaries of parameters that are used to compute the logical op id and to implement
@@ -417,6 +418,45 @@ class RetrieveScan(LogicalOperator):
             "search_attr": self.search_attr,
             "output_attr": self.output_attr,
             "k": self.k,
+            "target_cache_id": self.target_cache_id,
+            **logical_op_params,
+        }
+
+        return logical_op_params
+
+
+# TODO: (near-term) maybe we should try to fold this into ConvertScan, and make the internals of PZ
+#       amenable to a convert operator (with a UDF) that does not add new columns?
+class MapScan(LogicalOperator):
+    """A MapScan is a logical operator that applies a UDF to each input record without adding new columns."""
+
+    def __init__(
+        self,
+        udf: Callable | None = None,
+        target_cache_id: str | None = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.udf = udf
+        self.target_cache_id = target_cache_id
+
+    def __str__(self):
+        return f"MapScan({self.output_schema}, {self.udf.__name__})"
+
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {
+            "udf": self.udf,
+            **logical_id_params,
+        }
+
+        return logical_id_params
+
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
+            "udf": self.udf,
             "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }

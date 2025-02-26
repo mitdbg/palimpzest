@@ -322,7 +322,7 @@ class CodeSynthesisConvertSingle(CodeSynthesisConvert):
         gen_kwargs = {"prompt": prompt, "parse_answer": lambda text: text.split("answer:")[-1].split("---")[0].strip()}
 
         # invoke the champion model to generate the code
-        pred, _, stats, _ = self.code_champion_generator(candidate, None, **gen_kwargs)
+        pred, _, stats, _ = self.code_champion_generator(candidate, None, json_output=False, **gen_kwargs)
         ordered_keys = [f"```{language}", f"```{language.lower()}", "```"]
         code = None
         if not pred:
@@ -433,7 +433,7 @@ class CodeSynthesisConvertAdviceEnsemble(CodeSynthesisConvertSingle):
         # set prompt for generator
         gen_kwargs = {"prompt": prompt, "parse_answer": lambda text: text.split("answer:")[-1].split("---")[0].strip()}
 
-        pred, _, stats, _ = self.code_champion_generator(candidate, None, **gen_kwargs)
+        pred, _, stats, _ = self.code_champion_generator(candidate, None, json_output=False, **gen_kwargs)
         advs = self._parse_multiple_outputs(pred, outputs=[f"Idea {i}" for i in range(1, limit + 1)])
 
         return advs, stats

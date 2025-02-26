@@ -205,11 +205,7 @@ class PromptFactory:
         """
         output_fields_desc = ""
         output_schema: Schema = kwargs.get("output_schema")
-        if (
-            self.prompt_strategy.is_cot_qa_prompt()
-            or self.prompt_strategy.is_moa_proposer_prompt()
-            or self.prompt_strategy.is_moa_aggregator_prompt()
-        ):
+        if self.prompt_strategy.is_convert_prompt():
             assert output_schema is not None, "Output schema must be provided for convert prompts."
 
             field_desc_map = output_schema.field_desc_map()
@@ -227,7 +223,7 @@ class PromptFactory:
             str | None: The filter condition (if applicable).
         """
         filter_condition = kwargs.get("filter_condition")
-        if self.prompt_strategy.is_cot_bool_prompt():
+        if self.prompt_strategy.is_bool_prompt():
             assert filter_condition is not None, "Filter condition must be provided for filter operations."
 
         return filter_condition

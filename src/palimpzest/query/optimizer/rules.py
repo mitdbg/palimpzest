@@ -17,9 +17,11 @@ from palimpzest.query.operators.logical import (
     FilteredScan,
     GroupByAggregate,
     LimitScan,
+    MapScan,
     Project,
     RetrieveScan,
 )
+from palimpzest.query.operators.map import MapOp
 from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgentsConvert
 from palimpzest.query.operators.project import ProjectOp
 from palimpzest.query.operators.rag_convert import RAGConvert
@@ -106,8 +108,10 @@ class PushDownFilter(TransformationRule):
                 continue
 
             # iterate over logical expressions
-            logical_exprs = deepcopy(input_group.logical_expressions)
-            for expr in logical_exprs:
+            # NOTE: we previously deepcopy'ed the logical expression to avoid modifying the original;
+            #       I think I've fixed this internally, but I'm leaving this NOTE as a reminder in case
+            #       we see a regression / bug in the future
+            for expr in input_group.logical_expressions:
                 # if the expression operator is not a convert or a filter, we cannot swap
                 if not (isinstance(expr.operator, (ConvertScan, FilteredScan))):
                     continue
@@ -185,7 +189,7 @@ class PushDownFilter(TransformationRule):
 
                 # create final new logical expression with expr's operator pulled up
                 new_expr = LogicalExpression(
-                    expr.operator,
+                    expr.operator.copy(),
                     input_group_ids=[group_id]
                     + [g_id for g_id in logical_expression.input_group_ids if g_id != input_group_id],
                     input_fields=group.fields,
@@ -788,8 +792,7 @@ class RetrieveRule(ImplementationRule):
     """
     Substitute a logical expression for a RetrieveScan with a Retrieve physical implementation.
     """
-
-    k_budgets = [1, 3, 5, 10]
+    k_budgets = [1, 3, 5, 10, 15, 20, 25]
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
@@ -1033,6 +1036,7 @@ class BasicSubstitutionRule(ImplementationRule):
         LimitScan: LimitScanOp,
         Project: ProjectOp,
         GroupByAggregate: ApplyGroupByOp,
+        MapScan: MapOp,
     }
 
     @classmethod

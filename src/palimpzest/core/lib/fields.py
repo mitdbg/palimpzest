@@ -135,6 +135,7 @@ class ListField(Field):
             "element_type": element_type,
             "is_image_field": element_type.is_image_field,
             "type": list,
+            "_desc": desc,
         }
 
         return type(f"List[{element_type.__name__}]", (Field,), attrs)

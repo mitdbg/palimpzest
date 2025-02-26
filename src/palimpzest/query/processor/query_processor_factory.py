@@ -107,6 +107,8 @@ class QueryProcessorFactory:
         logger.info(f"Created processor: {processor}")
         return processor.execute()
 
+    #TODO(Matt): we have to update the config / parameters in a lot of places (e.g. here, Optimizer init, Optimizer.deepcopy_clean, etc.);
+    #            ideally the config created here is all we need
     #TODO(Jun): The all avaliable plans could be generated earlier and outside Optimizer.
     @classmethod
     def _create_optimizer(cls, optimizer_strategy: OptimizationStrategyType, config: QueryProcessorConfig) -> Optimizer:

@@ -10,10 +10,11 @@ class Model(str, Enum):
     which requires invoking an LLM. It does NOT specify whether the model need be executed
     remotely or locally (if applicable).
     """
-
-    LLAMA3 = "meta-llama/Llama-3-8b-chat-hf"
-    LLAMA3_V = "meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo"
+    # LLAMA3 = "meta-llama/Llama-3-8b-chat-hf"
+    LLAMA3 = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    LLAMA3_V = "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo"
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    DEEPSEEK = "deepseek-ai/DeepSeek-V3"
     GPT_4o = "gpt-4o-2024-08-06"
     GPT_4o_V = "gpt-4o-2024-08-06"
     GPT_4o_MINI = "gpt-4o-mini-2024-07-18"
@@ -66,11 +67,11 @@ class PromptStrategy(str, Enum):
     def is_image_prompt(self):
         return "image" in self.value
 
-    def is_cot_bool_prompt(self):
-        return "chain-of-thought-bool" in self.value
+    def is_bool_prompt(self):
+        return "bool" in self.value
 
-    def is_cot_qa_prompt(self):
-        return "chain-of-thought-question" in self.value
+    def is_convert_prompt(self):
+        return "bool" not in self.value
 
     def is_critic_prompt(self):
         return "critic" in self.value
@@ -214,25 +215,45 @@ LOG_LLM_OUTPUT = False
 # values more precisely:
 # - https://artificialanalysis.ai/models/llama-3-1-instruct-8b
 #
-LLAMA3_8B_MODEL_CARD = {
+# LLAMA3_8B_MODEL_CARD = {
+#     ##### Cost in USD #####
+#     "usd_per_input_token": 0.18 / 1E6,
+#     "usd_per_output_token": 0.18 / 1E6,
+#     ##### Time #####
+#     "seconds_per_output_token": 0.0061,
+#     ##### Agg. Benchmark #####
+#     "overall": 71.0,
+#     ##### Code #####
+#     "code": 64.0,
+# }
+LLAMA3_3_70B_INSTRUCT_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 0.18 / 1e6,
-    "usd_per_output_token": 0.18 / 1e6,
+    "usd_per_input_token": 0.88 / 1e6,
+    "usd_per_output_token": 0.88 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0061,
+    "seconds_per_output_token": 0.0139,
     ##### Agg. Benchmark #####
-    "overall": 71.0,
+    "overall": 86.0,
     ##### Code #####
-    "code": 64.0,
+    "code": 88.4,
 }
-LLAMA3_11B_V_MODEL_CARD = {
+# LLAMA3_2_11B_V_MODEL_CARD = {
+#     ##### Cost in USD #####
+#     "usd_per_input_token": 0.18 / 1E6,
+#     "usd_per_output_token": 0.18 / 1E6,
+#     ##### Time #####
+#     "seconds_per_output_token": 0.0061,
+#     ##### Agg. Benchmark #####
+#     "overall": 71.0,
+# }
+LLAMA3_2_90B_V_MODEL_CARD = {
     ##### Cost in USD #####
-    "usd_per_input_token": 0.18 / 1e6,
-    "usd_per_output_token": 0.18 / 1e6,
+    "usd_per_input_token": 1.2 / 1e6,
+    "usd_per_output_token": 1.2 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0061,
+    "seconds_per_output_token": 0.0222,
     ##### Agg. Benchmark #####
-    "overall": 71.0,
+    "overall": 84.0,
 }
 MIXTRAL_8X_7B_MODEL_CARD = {
     ##### Cost in USD #####
@@ -244,6 +265,17 @@ MIXTRAL_8X_7B_MODEL_CARD = {
     "overall": 63.0,
     ##### Code #####
     "code": 40.0,
+}
+DEEPSEEK_V3_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 1.25 / 1E6,
+    "usd_per_output_token": 1.25 / 1E6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0769,
+    ##### Agg. Benchmark #####
+    "overall": 87.0,
+    ##### Code #####
+    "code": 92.0,
 }
 GPT_4o_MODEL_CARD = {
     ##### Cost in USD #####
@@ -299,8 +331,9 @@ TEXT_EMBEDDING_3_SMALL_MODEL_CARD = {
 
 
 MODEL_CARDS = {
-    Model.LLAMA3.value: LLAMA3_8B_MODEL_CARD,
-    Model.LLAMA3_V.value: LLAMA3_11B_V_MODEL_CARD,
+    Model.LLAMA3.value: LLAMA3_3_70B_INSTRUCT_MODEL_CARD,
+    Model.LLAMA3_V.value: LLAMA3_2_90B_V_MODEL_CARD,
+    Model.DEEPSEEK.value: DEEPSEEK_V3_MODEL_CARD,
     Model.MIXTRAL.value: MIXTRAL_8X_7B_MODEL_CARD,
     Model.GPT_4o.value: GPT_4o_MODEL_CARD,
     Model.GPT_4o_V.value: GPT_4o_V_MODEL_CARD,
