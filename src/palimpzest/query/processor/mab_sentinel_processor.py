@@ -607,11 +607,11 @@ class MABSentinelQueryProcessor(QueryProcessor):
             reservoir_ops[logical_op_id] = [op for op in op_set_copy[k:]]
 
         # create mapping from logical and physical op ids to the number of samples drawn
-        logical_op_id_to_num_samples = {logical_op_id: 0 for logical_op_id, _, _ in plan}
-        phys_op_id_to_num_samples = {op.get_op_id(): 0 for _, _, op_set in plan for op in op_set}
+        logical_op_id_to_num_samples = {logical_op_id: 0 for logical_op_id, _ in plan}
+        phys_op_id_to_num_samples = {op.get_op_id(): 0 for _, op_set in plan for op in op_set}
         is_filter_op_dict = {
             logical_op_id: isinstance(op_set[0], FilterOp)
-            for logical_op_id, _, op_set in plan
+            for logical_op_id, op_set in plan
         }
 
         # NOTE: to maintain parity with our count of samples drawn in the random sampling execution,
