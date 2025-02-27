@@ -415,7 +415,7 @@ class PlanStats(BasePlanStats):
             if op_id in self.operator_stats:
                 self.operator_stats[op_id] += record_op_stats
             else:
-                raise ValueError(f"RecordOpStats with op_id {op_id} not found in PlanStats")
+                raise ValueError(f"RecordOpStats with physical_op_id {op_id} not found in PlanStats")
 
     def __iadd__(self, plan_stats: PlanStats) -> None:
         """
@@ -473,7 +473,7 @@ class SentinelPlanStats(BasePlanStats):
                     op_details={k: str(v) for k, v in physical_op.get_id_params().items()},
                 )
     
-        return PlanStats(plan_id=plan.plan_id, plan_str=str(plan), operator_stats=operator_stats)
+        return SentinelPlanStats(plan_id=plan.plan_id, plan_str=str(plan), operator_stats=operator_stats)
 
     def sum_op_costs(self) -> float:
         """
@@ -496,9 +496,9 @@ class SentinelPlanStats(BasePlanStats):
                 if physical_op_id in self.operator_stats[logical_op_id]:
                     self.operator_stats[logical_op_id][physical_op_id] += record_op_stats
                 else:
-                    raise ValueError(f"RecordOpStats with op_id {physical_op_id} not found in PlanStats")
+                    raise ValueError(f"RecordOpStats with physical_op_id {physical_op_id} not found in SentinelPlanStats")
             else:
-                raise ValueError(f"RecordOpStats with logical_op_id {logical_op_id} not found in PlanStats")
+                raise ValueError(f"RecordOpStats with logical_op_id {logical_op_id} not found in SentinelPlanStats")
 
     def __iadd__(self, plan_stats: SentinelPlanStats) -> None:
         """

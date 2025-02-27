@@ -32,7 +32,6 @@ class QueryProcessorConfig:
     num_workers_per_plan: int = field(default=1)
 
     allow_bonded_query: bool = field(default=True)
-    allow_conventional_query: bool = field(default=False)
     allow_model_selection: bool = field(default=True)
     allow_code_synth: bool = field(default=False)
     allow_token_reduction: bool = field(default=False)
@@ -61,7 +60,6 @@ class QueryProcessorConfig:
             "max_workers": self.max_workers,
             "num_workers_per_plan": self.num_workers_per_plan,
             "allow_bonded_query": self.allow_bonded_query,
-            "allow_conventional_query": self.allow_conventional_query,
             "allow_model_selection": self.allow_model_selection,
             "allow_code_synth": self.allow_code_synth,
             "allow_token_reduction": self.allow_token_reduction,
@@ -78,7 +76,7 @@ class QueryProcessorConfig:
             None if self.val_datasource is None else self.val_datasource.serialize()
         )
         config_dict["policy"] = self.policy.to_json_str()
-        for strategy in ["processing_strategy", "execution_strategy", "optimizer_strategy"]:
+        for strategy in ["processing_strategy", "execution_strategy", "sentinel_execution_strategy", "optimizer_strategy"]:
             config_dict[strategy] = str(config_dict[strategy])
 
         return json.dumps(config_dict, indent=2)

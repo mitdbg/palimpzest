@@ -1,3 +1,4 @@
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 
@@ -27,11 +28,8 @@ from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrat
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
-from palimpzest.tools.logger import setup_logger
 
-# from palimpzest.utils.progress import create_progress_manager
-
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class RandomSamplingSentinelQueryProcessor(QueryProcessor):
     """
@@ -333,6 +331,10 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
 
 
     def execute_op_set(self, candidates, op_set):
+        def execute_op_wrapper(operator, candidate):
+            record_set = operator(candidate)
+            return record_set, operator, candidate
+
         # TODO: post-submission we will need to modify this to:
         # - submit all candidates for aggregate operators
         # - handle limits
@@ -342,7 +344,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             futures = []
             for candidate in candidates:
                 for operator in op_set:
-                    future = executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate)
+                    future = executor.submit(execute_op_wrapper, operator, candidate)
                     futures.append(future)
 
             # compute output record_set for each (operator, candidate) pair
@@ -423,7 +425,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         # NOTE: because we need to dynamically create sample matrices for each operator,
         #       sentinel execution must be executed one operator at a time (i.e. sequentially)
         # execute operator sets in sequence
-        for op_idx, (logical_op_id, _, op_set) in enumerate(plan):
+        for op_idx, (logical_op_id, op_set) in enumerate(plan):
             next_logical_op_id = plan.logical_op_ids[op_idx + 1] if op_idx + 1 < len(plan) else None
 
             # sample k optimizations
@@ -481,7 +483,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
 
         # if caching was allowed, close the cache
         if self.cache:
-            for _, _, _ in plan:
+            for _, _ in plan:
                 # self.datadir.close_cache(logical_op_id)
                 pass
 
@@ -564,7 +566,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         total_optimization_time = time.time() - execution_start_time
 
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, optimizer)
+        records, plan_stats = self._execute_best_plan(self.dataset, self.policy, optimizer)
         all_records.extend(records)
         all_plan_stats.extend(plan_stats)
 

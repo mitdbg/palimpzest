@@ -15,6 +15,7 @@ from palimpzest.query.operators.logical import (
     GroupByAggregate,
     LimitScan,
     LogicalOperator,
+    MapScan,
     Project,
     RetrieveScan,
 )
@@ -30,12 +31,9 @@ from palimpzest.query.optimizer.rules import (
     CodeSynthesisConvertRule,
     CriticAndRefineConvertRule,
     LLMConvertBondedRule,
-    LLMConvertConventionalRule,
     MixtureOfAgentsConvertRule,
     RAGConvertRule,
     TokenReducedConvertBondedRule,
-    TokenReducedConvertConventionalRule,
-    TokenReducedConvertRule,
 )
 from palimpzest.query.optimizer.tasks import (
     ApplyRule,
@@ -45,11 +43,10 @@ from palimpzest.query.optimizer.tasks import (
     OptimizePhysicalExpression,
 )
 from palimpzest.sets import Dataset, Set
-from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
-from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_conventional_fallback_model
+from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_fallback_model
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def get_node_uid(node: Dataset | DataReader) -> str:
@@ -91,7 +88,6 @@ class Optimizer:
         cache: bool = False,
         verbose: bool = False,
         allow_bonded_query: bool = True,
-        allow_conventional_query: bool = False,
         allow_code_synth: bool = False,
         allow_token_reduction: bool = False,
         allow_rag_reduction: bool = False,
@@ -135,7 +131,6 @@ class Optimizer:
         # and remove all optimizations (except for bonded queries)
         if optimizer_strategy == OptimizationStrategyType.NONE:
             self.allow_bonded_query = True
-            self.allow_conventional_query = False
             self.allow_code_synth = False
             self.allow_token_reduction = False
             self.allow_rag_reduction = False
@@ -148,7 +143,6 @@ class Optimizer:
         self.verbose = verbose
         self.available_models = available_models
         self.allow_bonded_query = allow_bonded_query
-        self.allow_conventional_query = allow_conventional_query
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.allow_rag_reduction = allow_rag_reduction
@@ -165,13 +159,6 @@ class Optimizer:
                 if rule not in [LLMConvertBondedRule, TokenReducedConvertBondedRule]
             ]
 
-        if not self.allow_conventional_query:
-            self.implementation_rules = [
-                rule
-                for rule in self.implementation_rules
-                if rule not in [LLMConvertConventionalRule, TokenReducedConvertConventionalRule]
-            ]
-
         if not self.allow_code_synth:
             self.implementation_rules = [
                 rule for rule in self.implementation_rules if not issubclass(rule, CodeSynthesisConvertRule)
@@ -179,7 +166,7 @@ class Optimizer:
 
         if not self.allow_token_reduction:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules if not issubclass(rule, TokenReducedConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, TokenReducedConvertBondedRule)
             ]
 
         if not self.allow_rag_reduction:
@@ -189,8 +176,7 @@ class Optimizer:
 
         if not self.allow_mixtures:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules
-                if not issubclass(rule, MixtureOfAgentsConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, MixtureOfAgentsConvertRule)
             ]
 
         if not self.allow_critic:
@@ -198,12 +184,12 @@ class Optimizer:
                 rule for rule in self.implementation_rules if not issubclass(rule, CriticAndRefineConvertRule)
             ]
 
-        logger.pz_logger.set_console_level(logging.DEBUG if self.verbose else logging.ERROR)
         logger.info(f"Initialized Optimizer with verbose={self.verbose}")
         logger.debug(f"Initialized Optimizer with params: {self.__dict__}")
 
     def update_cost_model(self, cost_model: CostModel):
         self.cost_model = cost_model
+        self.costed_phys_op_ids = cost_model.get_costed_phys_op_ids()
 
     def get_physical_op_params(self):
         return {
@@ -211,7 +197,7 @@ class Optimizer:
             "available_models": self.available_models,
             "champion_model": get_champion_model(self.available_models),
             "code_champion_model": get_code_champion_model(self.available_models),
-            "conventional_fallback_model": get_conventional_fallback_model(self.available_models),
+            "fallback_model": get_fallback_model(self.available_models),
         }
 
     def deepcopy_clean(self):
@@ -222,7 +208,6 @@ class Optimizer:
             verbose=self.verbose,
             available_models=self.available_models,
             allow_bonded_query=self.allow_bonded_query,
-            allow_conventional_query=self.allow_conventional_query,
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
             allow_rag_reduction=self.allow_rag_reduction,
@@ -302,7 +287,7 @@ class Optimizer:
                 search_attr=node._search_attr,
                 output_attr=node._output_attr,
                 k=node._k,
-                target_cache_id=uid
+                target_cache_id=uid,
             )
         elif output_schema != input_schema:
             op = ConvertScan(
@@ -311,6 +296,13 @@ class Optimizer:
                 cardinality=node._cardinality,
                 udf=node._udf,
                 depends_on=node._depends_on,
+                target_cache_id=uid,
+            )
+        elif output_schema == input_schema and node._udf is not None:
+            op = MapScan(
+                input_schema=input_schema,
+                output_schema=output_schema,
+                udf=node._udf,
                 target_cache_id=uid,
             )
         # some legacy plans may have a useless convert; for now we simply skip it
@@ -328,7 +320,9 @@ class Optimizer:
         )
 
         # compute the fields added by this operation and all fields
-        input_group_short_field_names = list(map(lambda full_field: full_field.split(".")[-1], input_group_fields.keys()))
+        input_group_short_field_names = list(
+            map(lambda full_field: full_field.split(".")[-1], input_group_fields.keys())
+        )
         new_fields = {
             field_name: field
             for field_name, field in op.output_schema.field_map(unique=True, id=uid).items()
@@ -338,9 +332,7 @@ class Optimizer:
 
         # compute the set of (short) field names this operation depends on
         depends_on_field_names = (
-            {}
-            if isinstance(node, DataReader)
-            else {field_name.split(".")[-1] for field_name in node._depends_on}
+            {} if isinstance(node, DataReader) else {field_name.split(".")[-1] for field_name in node._depends_on}
         )
 
         # compute all properties including this operations'
@@ -367,6 +359,13 @@ class Optimizer:
                 all_properties["projects"].add(op_project_str)
             else:
                 all_properties["projects"] = set([op_project_str])
+
+        elif isinstance(op, MapScan):
+            op_udf_str = op.udf.__name__
+            if "udfs" in all_properties:
+                all_properties["udfs"].add(op_udf_str)
+            else:
+                all_properties["udfs"] = set([op_udf_str])
 
         # construct the logical expression and group
         logical_expression = LogicalExpression(
@@ -466,7 +465,9 @@ class Optimizer:
                 new_tasks = task.perform(self.transformation_rules, self.implementation_rules)
             elif isinstance(task, ApplyRule):
                 context = {"costed_phys_op_ids": self.costed_phys_op_ids}
-                new_tasks = task.perform(self.groups, self.expressions, context=context, **self.get_physical_op_params())
+                new_tasks = task.perform(
+                    self.groups, self.expressions, context=context, **self.get_physical_op_params()
+                )
             elif isinstance(task, OptimizePhysicalExpression):
                 context = {"optimizer_strategy": self.optimizer_strategy}
                 new_tasks = task.perform(self.cost_model, self.groups, self.policy, context=context)
@@ -491,9 +492,5 @@ class Optimizer:
         # search the optimization space by applying logical and physical transformations to the initial group tree
         self.search_optimization_space(final_group_id)
         logger.info(f"Getting optimal plans for final group id: {final_group_id}")
-        return self.strategy.get_optimal_plans(
-            groups=self.groups,
-            final_group_id=final_group_id,
-            policy=policy,
-            use_final_op_quality=self.use_final_op_quality,
-        )
+
+        return self.strategy.get_optimal_plans(self.groups, final_group_id, policy, self.use_final_op_quality)

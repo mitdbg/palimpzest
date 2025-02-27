@@ -1,13 +1,14 @@
+import logging
+
 from palimpzest.core.data.dataclasses import PlanStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
-from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.progress import create_progress_manager
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
     """
@@ -52,11 +53,11 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
             if num_inputs == 0:
                 break
 
-            # begin to process the next operator
+            # begin to process this operator
             records, record_op_stats = [], []
             logger.info(f"Processing operator {operator.op_name()} ({op_id})")
 
-            # if the next operator is an aggregate, process all the records in the input_queue
+            # if this operator is an aggregate, process all the records in the input_queue
             if isinstance(operator, AggregateOp):
                 record_set = operator(candidates=input_queues[op_id])
                 records = record_set.data_records

@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 
 from palimpzest.core.elements.records import DataRecordCollection
@@ -10,10 +11,9 @@ from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.processing_strategy_type import ProcessingStrategyType
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Dataset, Set
-from palimpzest.tools.logger import setup_logger
 from palimpzest.utils.model_helpers import get_models
 
-logger = setup_logger(__name__) 
+logger = logging.getLogger(__name__)
 
 
 class QueryProcessorFactory:

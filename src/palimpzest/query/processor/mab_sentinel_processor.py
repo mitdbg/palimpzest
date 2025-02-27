@@ -1,3 +1,4 @@
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 
@@ -24,11 +25,8 @@ from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrat
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.sets import Set
-from palimpzest.tools.logger import setup_logger
 
-# from palimpzest.utils.progress import create_progress_manager
-
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class MABSentinelQueryProcessor(QueryProcessor):
     """
@@ -57,7 +55,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         self.use_final_op_quality = use_final_op_quality
         self.pick_output_fn = self.pick_champion_output
         self.rng = np.random.default_rng(seed=seed)
-
+        self.exp_name = kwargs.get("exp_name")
 
     def update_frontier_ops(
         self,
@@ -524,6 +522,10 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
 
     def execute_op_set(self, op_candidate_pairs: list[PhysicalOperator, DataRecord | int]):
+        def execute_op_wrapper(operator, candidate):
+            record_set = operator(candidate)
+            return record_set, operator, candidate
+
         # TODO: post-submission we will need to modify this to:
         # - submit all candidates for aggregate operators
         # - handle limits
@@ -532,7 +534,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
             # create futures
             futures = []
             for operator, candidate in op_candidate_pairs:
-                future = executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate)
+                future = executor.submit(execute_op_wrapper, operator, candidate)
                 futures.append(future)
 
             # compute output record_set for each (operator, candidate) pair
@@ -601,7 +603,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         # (operator, next_shuffled_sample_idx, new_operator); new_operator is True when an operator
         # is added to the frontier
         frontier_ops, reservoir_ops = {}, {}
-        for logical_op_id, _, op_set in plan:
+        for logical_op_id, op_set in plan:
             op_set_copy = [op for op in op_set]
             self.rng.shuffle(op_set_copy)
             k = min(self.k, len(op_set_copy))
@@ -609,11 +611,11 @@ class MABSentinelQueryProcessor(QueryProcessor):
             reservoir_ops[logical_op_id] = [op for op in op_set_copy[k:]]
 
         # create mapping from logical and physical op ids to the number of samples drawn
-        logical_op_id_to_num_samples = {logical_op_id: 0 for logical_op_id, _, _ in plan}
-        phys_op_id_to_num_samples = {op.get_op_id(): 0 for _, _, op_set in plan for op in op_set}
+        logical_op_id_to_num_samples = {logical_op_id: 0 for logical_op_id, _ in plan}
+        phys_op_id_to_num_samples = {op.get_op_id(): 0 for _, op_set in plan for op in op_set}
         is_filter_op_dict = {
             logical_op_id: isinstance(op_set[0], FilterOp)
-            for logical_op_id, _, op_set in plan
+            for logical_op_id, op_set in plan
         }
 
         # NOTE: to maintain parity with our count of samples drawn in the random sampling execution,
@@ -623,7 +625,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         all_outputs, champion_outputs = {}, {}
         while samples_drawn < self.sample_budget:
             # execute operator sets in sequence
-            for op_idx, (logical_op_id, _, op_set) in enumerate(plan):
+            for op_idx, (logical_op_id, op_set) in enumerate(plan):
                 prev_logical_op_id = plan.logical_op_ids[op_idx - 1] if op_idx > 0 else None
                 prev_logical_op_is_filter =  prev_logical_op_id is not None and is_filter_op_dict[prev_logical_op_id]
 
@@ -736,7 +738,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
         # if caching was allowed, close the cache
         if self.cache:
-            for _, _, _ in plan:
+            for _, _ in plan:
                 # self.datadir.close_cache(logical_op_id)
                 pass
 
@@ -816,12 +818,12 @@ class MABSentinelQueryProcessor(QueryProcessor):
         optimizer = self.optimizer.deepcopy_clean()
 
         # construct the CostModel with any sample execution data we've gathered
-        cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose)
+        cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose, self.exp_name)
         optimizer.update_cost_model(cost_model)
         total_optimization_time = time.time() - execution_start_time
 
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, optimizer)
+        records, plan_stats = self._execute_best_plan(self.dataset, self.policy, optimizer)
         all_records.extend(records)
         all_plan_stats.extend(plan_stats)
 

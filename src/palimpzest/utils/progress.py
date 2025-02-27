@@ -133,6 +133,14 @@ class ProgressManager(ABC):
         """
         Advance the progress bar for the given operator by one. Modify the downstream operators'
         progress bar `total` to reflect the number of outputs produced by this operator.
+
+        NOTE: The semantics of this function are that every time it is executed we advance the
+        progress bar by 1. This is because the progress bar represents what fraction of the inputs
+        have been processed by the operator. `num_outputs` specifies how many outputs were generated
+        by the operator when processing the input for which `incr()` was called. E.g. a filter which
+        filters an input record will advance its progress bar by 1, but the next operator will now
+        have 1 fewer inputs to process. Alternatively, a convert which generates 3 `num_outputs` will
+        increase the inputs for the next operator by `delta = num_outputs - 1 = 2`.
         """
         pass
 

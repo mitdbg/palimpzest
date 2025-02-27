@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 
 from palimpzest.policy import Policy
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
-from palimpzest.tools.logger import setup_logger
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class OptimizationStrategy(ABC):
@@ -181,51 +181,3 @@ class NoOptimizationStrategy(GreedyStrategy):
     logical transformations or optimizations. It uses the same get_optimal_plans logic as the
     GreedyOptimizationStrategy.
     """
-
-
-class ConfidenceIntervalStrategy(OptimizationStrategy):
-    def _get_confidence_interval_optimal_plans(self, groups: dict, group_id: int) -> list[PhysicalPlan]:
-        """
-        Return all physical plans whose upper bound on the primary policy metric is greater than the
-        best plan's lower bound on the primary policy metric (subject to satisfying the policy constraint).
-
-        The OptimizePhysicalExpression task guarantees that each group's `ci_best_physical_expressions`
-        maintains a list of expressions with overlapping CI's on the primary policy metric (while also
-        satisfying the policy constraint).
-
-        This function computes the cross-product of all such expressions across all groups.
-        """
-        # get all the physical expressions which could be the best for this group
-        best_phys_exprs = groups[group_id].ci_best_physical_expressions
-
-        best_plans = []
-        for phys_expr in best_phys_exprs:
-            # if this expression has no inputs (i.e. it is a BaseScan or CacheScan),
-            # create the physical plan and append it to the best_plans for this group
-            if len(phys_expr.input_group_ids) == 0:
-                plan = PhysicalPlan(operators=[phys_expr.operator], plan_cost=phys_expr.plan_cost)
-                best_plans.append(plan)
-
-            # otherwise, get the best physical plan(s) for this group's inputs
-            else:
-                # TODO: need to handle joins
-                best_phys_subplans = [PhysicalPlan(operators=[])]
-                for input_group_id in phys_expr.input_group_ids:
-                    input_best_phys_plans = self._get_confidence_interval_optimal_plans(groups, input_group_id)
-                    best_phys_subplans = [
-                        PhysicalPlan.from_ops_and_sub_plan(subplan.operators, input_subplan, subplan.plan_cost)
-                        for subplan in best_phys_subplans
-                        for input_subplan in input_best_phys_plans
-                    ]
-
-                # add this operator to best physical plan and return
-                for subplan in best_phys_subplans:
-                    plan = PhysicalPlan.from_ops_and_sub_plan([phys_expr.operator], subplan, phys_expr.plan_cost)
-                    best_plans.append(plan)
-
-        return best_plans
-
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
-        # TODO: fix this to properly handle multiple potential plans
-        raise Exception("NotImplementedError")
-        # plans = self._get_confidence_interval_optimal_plans(final_group_id)

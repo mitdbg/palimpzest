@@ -94,12 +94,12 @@ class CriticAndRefineConvert(LLMConvert):
         # execute the initial model
         original_gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema}
         field_answers, reasoning, original_gen_stats, original_messages = self.generator(candidate, fields, **original_gen_kwargs)
-        original_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
+        original_output = f"REASONING: {reasoning}\nANSWER: {field_answers}\n"
 
         # execute the critic model
         critic_gen_kwargs = {"original_output": original_output, "original_messages": original_messages, **original_gen_kwargs}
-        field_answers, reasoning, critic_gen_stats, _ = self.critic_generator(candidate, fields, **critic_gen_kwargs)
-        critique_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
+        _, reasoning, critic_gen_stats, _ = self.critic_generator(candidate, fields, json_output=False, **critic_gen_kwargs)
+        critique_output = f"CRITIQUE: {reasoning}\n"
 
         # execute the refinement model
         refine_gen_kwargs = {"critique_output": critique_output, **critic_gen_kwargs}

@@ -1,7 +1,6 @@
 from enum import Enum
 
 from palimpzest.query.optimizer.optimizer_strategy import (
-    ConfidenceIntervalStrategy,
     GreedyStrategy,
     NoOptimizationStrategy,
     ParetoStrategy,
@@ -15,7 +14,6 @@ class OptimizationStrategyType(Enum):
     will return to the Execution layer.
     """
     GREEDY = GreedyStrategy
-    CONFIDENCE_INTERVAL = ConfidenceIntervalStrategy
     PARETO = ParetoStrategy
     SENTINEL = SentinelStrategy
     NONE = NoOptimizationStrategy

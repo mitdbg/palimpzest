@@ -1,3 +1,5 @@
+import logging
+
 from palimpzest.constants import Cardinality
 from palimpzest.core.data.datareaders import DataReader
 from palimpzest.policy import (
@@ -13,10 +15,9 @@ from palimpzest.policy import (
 )
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.sets import Dataset
-from palimpzest.tools.logger import setup_logger
 
 # Initialize the root logger
-logger = setup_logger(__name__)
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
     # constants

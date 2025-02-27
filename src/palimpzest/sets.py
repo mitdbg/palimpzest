@@ -84,14 +84,14 @@ class Set:
             "source": self._source.serialize(),
             "desc": repr(self._desc),
             "filter": None if self._filter is None else self._filter.serialize(),
-            "udf": None if self._udf is None else str(self._udf),
+            "udf": None if self._udf is None else self._udf.__name__,
             "agg_func": None if self._agg_func is None else self._agg_func.value,
             "cardinality": self._cardinality,
             "limit": self._limit,
-            "group_by": (None if self._group_by is None else self._group_by.serialize()),
-            "project_cols": (None if self._project_cols is None else self._project_cols),
+            "group_by": None if self._group_by is None else self._group_by.serialize(),
+            "project_cols": None if self._project_cols is None else self._project_cols,
             "index": None if self._index is None else self._index.__class__.__name__,
-            "search_func": None if self._search_func is None else str(self._search_func),
+            "search_func": None if self._search_func is None else self._search_func.__name__,
             "search_attr": self._search_attr,
             "output_attr": self._output_attr,
             "k": self._k,
@@ -293,6 +293,23 @@ class Dataset(Set):
             cache=self._cache,
         )
 
+    def map(self, udf: Callable) -> Dataset:
+        """
+        Apply a UDF map function.
+
+        Examples:
+            map(udf=clean_column_values)
+        """
+        if udf is None:
+            raise ValueError("`udf` must be provided for map.")
+
+        return Dataset(
+            source=self,
+            schema=self.schema,
+            udf=udf,
+            cache=self._cache,
+        )
+
     def count(self) -> Dataset:
         """Apply a count aggregation to this set"""
         return Dataset(
@@ -332,13 +349,14 @@ class Dataset(Set):
         k: int = -1,
     ) -> Dataset:
         """
-        Retrieve the top k nearest neighbors of the value of the `search_attr` from the index and
-        stores it in the `output_attr` field. The output schema is a union of the current schema
-        and the `output_attr` with type ListField(StringField). `search_func` is a function of
-        type (index, query: str | list(str), k: int) -> list[str]. It should implement the lookup
-        logic for the index and return the top k results. The value of the `search_attr` field is
-        used as the query to lookup in the index. The results are stored in the `output_attr`
-        field. `output_attr_desc` is the description of the `output_attr` field.
+        Retrieve the top-k nearest neighbors of the value of the `search_attr` from the index and
+        stores it in the `output_attr` field.
+
+        The output schema is a union of the current schema and the `output_attr` with type ListField(StringField).
+        `search_func` is a function of type (index, query: str | list(str), k: int) -> list[str]. It should
+        implement the lookuplogic for the index and return the top-k results. The value of the `search_attr`
+        field is used as the query to lookup in the index. The results are stored in the `output_attr` field.
+        `output_attr_desc` is the description of the `output_attr` field.
         """
         # Output schema is a union of the current schema and the output_attr
         attributes = {output_attr: ListField(StringField)(desc=output_attr_desc)}

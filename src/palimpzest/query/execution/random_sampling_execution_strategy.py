@@ -109,6 +109,9 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
         return execution_data
 
     def execute_op_set(self, candidates, op_set):
+        def execute_op_wrapper(operator, candidate):
+            record_set = operator(candidate)
+            return record_set, operator, candidate
         # TODO: post-submission we will need to modify this to:
         # - submit all candidates for aggregate operators
         # - handle limits
@@ -118,7 +121,7 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
             futures = []
             for candidate in candidates:
                 for operator in op_set:
-                    future = executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate)
+                    future = executor.submit(execute_op_wrapper, operator, candidate)
                     futures.append(future)
 
             # compute output record_set for each (operator, candidate) pair
@@ -170,8 +173,8 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
-        # # initialize progress manager
-        # self.progress_manager = create_progress_manager(plan, self.num_samples)
+        # initialize progress manager
+        self.progress_manager = create_progress_manager(plan, self.num_samples)
 
         # initialize plan stats
         plan_stats = SentinelPlanStats.from_plan(plan)
@@ -199,7 +202,7 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
         # NOTE: because we need to dynamically create sample matrices for each operator,
         #       sentinel execution must be executed one operator at a time (i.e. sequentially)
         # execute operator sets in sequence
-        for op_idx, (logical_op_id, _, op_set) in enumerate(plan):
+        for op_idx, (logical_op_id, op_set) in enumerate(plan):
             next_logical_op_id = plan.logical_op_ids[op_idx + 1] if op_idx + 1 < len(plan) else None
 
             # sample k optimizations
@@ -257,7 +260,7 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
 
         # if caching was allowed, close the cache
         if self.cache:
-            for _, _, _ in plan:
+            for _, _ in plan:
                 # self.datadir.close_cache(logical_op_id)
                 pass
 

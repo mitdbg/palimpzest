@@ -11,10 +11,8 @@ from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
-from palimpzest.tools.logger import setup_logger
 
-logger = setup_logger(__name__)
-
+logger = logging.getLogger(__name__)
 
 class ExecutionStrategy(ABC):
     """Base strategy for executing query plans. Defines how to execute a PhysicalPlan.
@@ -33,7 +31,6 @@ class ExecutionStrategy(ABC):
         self.cache = cache
         self.verbose = verbose
         self.progress = progress
-        logger.pz_logger.set_console_level(logging.DEBUG if verbose else logging.ERROR)
         logger.info(f"Initialized ExecutionStrategy {self.__class__.__name__}")
         logger.debug(f"ExecutionStrategy initialized with config: {self.__dict__}")
 
