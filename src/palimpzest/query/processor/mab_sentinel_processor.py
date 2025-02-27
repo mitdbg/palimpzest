@@ -599,7 +599,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         # (operator, next_shuffled_sample_idx, new_operator); new_operator is True when an operator
         # is added to the frontier
         frontier_ops, reservoir_ops = {}, {}
-        for logical_op_id, _, op_set in plan:
+        for logical_op_id, op_set in plan:
             op_set_copy = [op for op in op_set]
             self.rng.shuffle(op_set_copy)
             k = min(self.k, len(op_set_copy))
@@ -621,7 +621,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         all_outputs, champion_outputs = {}, {}
         while samples_drawn < self.sample_budget:
             # execute operator sets in sequence
-            for op_idx, (logical_op_id, _, op_set) in enumerate(plan):
+            for op_idx, (logical_op_id, op_set) in enumerate(plan):
                 prev_logical_op_id = plan.logical_op_ids[op_idx - 1] if op_idx > 0 else None
                 prev_logical_op_is_filter =  prev_logical_op_id is not None and is_filter_op_dict[prev_logical_op_id]
 
@@ -734,7 +734,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
         # if caching was allowed, close the cache
         if self.cache:
-            for _, _, _ in plan:
+            for _, _ in plan:
                 # self.datadir.close_cache(logical_op_id)
                 pass
 

@@ -422,7 +422,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         # NOTE: because we need to dynamically create sample matrices for each operator,
         #       sentinel execution must be executed one operator at a time (i.e. sequentially)
         # execute operator sets in sequence
-        for op_idx, (logical_op_id, _, op_set) in enumerate(plan):
+        for op_idx, (logical_op_id, op_set) in enumerate(plan):
             next_logical_op_id = plan.logical_op_ids[op_idx + 1] if op_idx + 1 < len(plan) else None
 
             # sample k optimizations
@@ -480,7 +480,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
 
         # if caching was allowed, close the cache
         if self.cache:
-            for _, _, _ in plan:
+            for _, _ in plan:
                 # self.datadir.close_cache(logical_op_id)
                 pass
 
