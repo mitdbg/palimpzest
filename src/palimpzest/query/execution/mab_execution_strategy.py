@@ -12,8 +12,9 @@ from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.tools.logger import setup_logger
+from palimpzest.utils.progress import create_progress_manager
 
-logger = setup_logger(__name__) # TODO: fix with Jun's changes
+logger = setup_logger(__name__)
 
 class MABExecutionStrategy(SentinelExecutionStrategy):
     """
@@ -254,8 +255,8 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
-        # # initialize progress manager
-        # self.progress_manager = create_progress_manager(plan, self.num_samples)
+        # initialize progress manager
+        self.progress_manager = create_progress_manager(plan, self.num_samples)
 
         # initialize plan stats
         plan_stats = SentinelPlanStats.from_plan(plan)

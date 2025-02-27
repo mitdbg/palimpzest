@@ -85,28 +85,38 @@ class SentinelExecutionStrategy(ABC):
     for coordinating optimization and execution.
     """
     def __init__(
-            self,
-            k: int,
-            j: int,
-            sample_budget: int,
-            sample_all_ops: bool = False,
-            sample_all_records: bool = False,
-            sample_start_idx: int | None = None,
-            sample_end_idx: int | None = None,
-            early_stop_iters: int = 3,
-            use_final_op_quality: bool = False,
-            seed: int = 42,
-            exp_name: str | None = None,
-            *args,
-            **kwargs,
-        ):
-        super().__init__(*args, **kwargs)
+        self,
+        k: int,
+        j: int,
+        sample_budget: int,
+        scan_start_idx: int = 0,
+        max_workers: int | None = None,
+        num_samples: int | None = None,
+        cache: bool = False,
+        verbose: bool = False,
+        progress: bool = True,
+        sample_all_ops: bool = False,
+        sample_all_records: bool = False,
+        sample_start_idx: int | None = None,
+        sample_end_idx: int | None = None,
+        early_stop_iters: int = 3,
+        use_final_op_quality: bool = False,
+        seed: int = 42,
+        exp_name: str | None = None,
+        **kwargs,
+    ):
         # self.max_workers = self.get_parallel_max_workers()
         # TODO: undo
         # self.max_workers = 4
         self.k = k
         self.j = j
         self.sample_budget = sample_budget
+        self.scan_start_idx = scan_start_idx
+        self.max_workers = max_workers
+        self.num_samples = num_samples
+        self.cache = cache
+        self.verbose = verbose
+        self.progress = progress
         self.sample_all_ops = sample_all_ops
         self.sample_all_records = sample_all_records
         self.sample_start_idx = sample_start_idx

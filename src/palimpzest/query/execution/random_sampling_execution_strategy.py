@@ -14,10 +14,9 @@ from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.tools.logger import setup_logger
+from palimpzest.utils.progress import create_progress_manager
 
-# from palimpzest.utils.progress import create_progress_manager
-
-logger = setup_logger(__name__) # TODO: fix with Jun's changes
+logger = setup_logger(__name__)
 
 class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
 
