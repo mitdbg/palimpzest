@@ -1,14 +1,15 @@
+import logging
+
 from palimpzest.core.data.dataclasses import ExecutionStats
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.tools.logger import setup_logger
 
 # from palimpzest.utils.progress import create_progress_manager
 
-logger = setup_logger(__name__) # TODO: fix with Jun's changes
+logger = logging.getLogger(__name__)
 
 class SentinelQueryProcessor(QueryProcessor):
 
