@@ -79,9 +79,6 @@ def parse_arguments():
 
 def build_pneuma_query(pneuma: Pneuma, dataset: QuestionDataReader, k: int):
     questions = pz.Dataset(dataset)
-    questions = questions.sem_add_columns(
-        question_dataset_cols, desc="Extract the question"
-    )
 
     def extract_table_content(df: pd.DataFrame):
         columns = " | ".join(df.columns)
