@@ -332,6 +332,10 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
 
 
     def execute_op_set(self, candidates, op_set):
+        def execute_op_wrapper(operator, candidate):
+            record_set = operator(candidate)
+            return record_set, operator, candidate
+
         # TODO: post-submission we will need to modify this to:
         # - submit all candidates for aggregate operators
         # - handle limits
@@ -341,7 +345,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             futures = []
             for candidate in candidates:
                 for operator in op_set:
-                    future = executor.submit(PhysicalOperator.execute_op_wrapper, operator, candidate)
+                    future = executor.submit(execute_op_wrapper, operator, candidate)
                     futures.append(future)
 
             # compute output record_set for each (operator, candidate) pair
