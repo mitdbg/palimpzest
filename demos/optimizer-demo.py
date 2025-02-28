@@ -192,15 +192,21 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--processing-strategy",
-        default="mab_sentinel",
+        default="sentinel",
         type=str,
-        help="The engine to use. One of mab_sentinel, no_sentinel, random_sampling",
+        help="The engine to use. One of sentinel or no_sentinel",
     )
     parser.add_argument(
         "--execution-strategy",
         default="parallel",
         type=str,
         help="The plan executor to use. One of sequential, pipelined, parallel",
+    )
+    parser.add_argument(
+        "--sentinel-execution-strategy",
+        default="mab",
+        type=str,
+        help="The sentinel execution strategy to use. One of mab or random",
     )
     parser.add_argument(
         "--policy",
@@ -457,7 +463,7 @@ if __name__ == "__main__":
 
     # select optimization strategy and available models based on engine
     optimizer_strategy, available_models = None, None
-    if args.processing_strategy in ["mab_sentinel", "random_sampling"]:
+    if args.processing_strategy == "sentinel":
         optimizer_strategy = "pareto"
         available_models = get_models(include_vision=True)
     else:
@@ -485,6 +491,7 @@ if __name__ == "__main__":
         val_datasource=val_datasource,
         processing_strategy=args.processing_strategy,
         optimizer_strategy=optimizer_strategy,
+        sentinel_execution_strategy=args.sentinel_execution_strategy,
         execution_strategy=args.execution_strategy,
         use_final_op_quality=use_final_op_quality,
         max_workers=1,

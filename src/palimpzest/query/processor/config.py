@@ -40,6 +40,8 @@ class QueryProcessorConfig:
     allow_critic: bool = field(default=False)
     use_final_op_quality: bool = field(default=False)
 
+    kwargs: dict = field(default_factory=dict)
+
     def to_dict(self) -> dict:
         """Convert the config to a dict representation."""
         return {
@@ -66,7 +68,8 @@ class QueryProcessorConfig:
             "allow_rag_reduction": self.allow_rag_reduction,
             "allow_mixtures": self.allow_mixtures,
             "allow_critic": self.allow_critic,
-            "use_final_op_quality": self.use_final_op_quality
+            "use_final_op_quality": self.use_final_op_quality,
+            **self.kwargs,
         }
 
     def to_json_str(self):
@@ -85,3 +88,5 @@ class QueryProcessorConfig:
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
+        
+        self.kwargs.update(kwargs)

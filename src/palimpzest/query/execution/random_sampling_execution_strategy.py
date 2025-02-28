@@ -267,4 +267,4 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
         # finalize plan stats
         plan_stats.finish()
 
-        return all_outputs, plan_stats
+        return plan_stats

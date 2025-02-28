@@ -84,23 +84,6 @@ class QueryProcessor:
 
         return hash_for_id(id_str)
 
-    def aggregate_plan_stats(self, plan_stats: list[PlanStats]) -> dict[str, PlanStats]:
-        """
-        Aggregate a list of plan stats into a dictionary mapping plan_id --> cumulative plan stats.
-
-        NOTE: we make the assumption that the same plan cannot be run more than once in parallel,
-        i.e. each plan stats object for an individual plan comes from two different (sequential)
-        periods in time. Thus, PlanStats' total_plan_time(s) can be summed.
-        """
-        agg_plan_stats = {}
-        for ps in plan_stats:
-            if ps.plan_id in agg_plan_stats:
-                agg_plan_stats[ps.plan_id] += ps
-            else:
-                agg_plan_stats[ps.plan_id] = ps
-
-        return agg_plan_stats
-    
     def _execute_best_plan(
         self,
         dataset: Dataset,

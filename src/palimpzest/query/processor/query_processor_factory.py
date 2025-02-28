@@ -3,7 +3,7 @@ from enum import Enum
 
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
-from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType
+from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType, SentinelExecutionStrategyType
 from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
@@ -35,15 +35,16 @@ class QueryProcessorFactory:
         strategy_types = {
             "processing_strategy": ProcessingStrategyType,
             "execution_strategy": ExecutionStrategyType,
+            "sentinel_execution_strategy": SentinelExecutionStrategyType,
             "optimizer_strategy": OptimizationStrategyType,
         }
-        for strategy in ["processing_strategy", "execution_strategy", "optimizer_strategy"]:
+        for strategy in ["processing_strategy", "execution_strategy", "sentinel_execution_strategy", "optimizer_strategy"]:
             strategy_str = getattr(config, strategy)
             strategy_type = strategy_types[strategy]
             try:
                 strategy_enum = cls._convert_to_enum(strategy_type, strategy_str)
             except ValueError as e:
-                raise ValueError(f"""Unsupported {strategy}: {strategy_enum}.
+                raise ValueError(f"""Unsupported {strategy}: {strategy_str}.
                                     The supported strategies are: {strategy_type.__members__.keys()}""") from e
             setattr(config, strategy, strategy_enum)
             logger.debug(f"Normalized {strategy}: {strategy_enum}")
@@ -108,8 +109,8 @@ class QueryProcessorFactory:
         if config.sentinel_execution_strategy is None:
             return None
 
-        execution_strategy_cls = config.execution_strategy.value
-        return execution_strategy_cls(**config.to_dict())
+        sentinel_execution_strategy_cls = config.sentinel_execution_strategy.value
+        return sentinel_execution_strategy_cls(**config.to_dict())
 
     @classmethod
     def create_processor(

@@ -3,8 +3,10 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats, RecordOpStats
+from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats
+from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.policy import Policy
 from palimpzest.query.operators.convert import ConvertOp, LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
@@ -14,7 +16,23 @@ from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 
 logger = logging.getLogger(__name__)
 
-class ExecutionStrategy(ABC):
+class BaseExecutionStrategy:
+    def _add_records_to_cache(self, target_cache_id: str, records: list[DataRecord]) -> None:
+        """Add each record (which isn't filtered) to the cache for the given target_cache_id."""
+        if self.cache:
+            for record in records:
+                if getattr(record, "passed_operator", True):
+                    # self.datadir.append_cache(target_cache_id, record)
+                    pass
+
+    def _close_cache(self, target_cache_ids: list[str]) -> None:
+        """Close the cache for each of the given target_cache_ids"""
+        if self.cache:
+            for target_cache_id in target_cache_ids:  # noqa: B007
+                # self.datadir.close_cache(target_cache_id)
+                pass
+
+class ExecutionStrategy(BaseExecutionStrategy, ABC):
     """Base strategy for executing query plans. Defines how to execute a PhysicalPlan.
     """
     def __init__(self, 
@@ -35,29 +53,9 @@ class ExecutionStrategy(ABC):
         logger.debug(f"ExecutionStrategy initialized with config: {self.__dict__}")
 
     @abstractmethod
-    def execute_plan(
-        self,
-        plan: PhysicalPlan,
-        num_samples: int | float = float("inf"),
-        workers: int = 1
-    ) -> tuple[list[DataRecord], PlanStats]:
+    def execute_plan(self, plan: PhysicalPlan) -> tuple[list[DataRecord], PlanStats]:
         """Execute a single plan according to strategy"""
         pass
-
-    def _add_records_to_cache(self, target_cache_id: str, records: list[DataRecord]) -> None:
-        """Add each record (which isn't filtered) to the cache for the given target_cache_id."""
-        if self.cache:
-            for record in records:
-                if getattr(record, "passed_operator", True):
-                    # self.datadir.append_cache(target_cache_id, record)
-                    pass
-
-    def _close_cache(self, target_cache_ids: list[str]) -> None:
-        """Close the cache for each of the given target_cache_ids"""
-        if self.cache:
-            for target_cache_id in target_cache_ids:  # noqa: B007
-                # self.datadir.close_cache(target_cache_id)
-                pass
 
     def _create_input_queues(self, plan: PhysicalPlan) -> dict[str, list]:
         """Initialize input queues for each operator in the plan."""
@@ -75,7 +73,7 @@ class ExecutionStrategy(ABC):
 
         return input_queues
 
-class SentinelExecutionStrategy(ABC):
+class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     """Base strategy for executing sentinel query plans. Defines how to execute a SentinelPlan."""
     """
     Specialized query processor that implements MAB sentinel strategy
@@ -83,9 +81,11 @@ class SentinelExecutionStrategy(ABC):
     """
     def __init__(
         self,
+        val_datasource: DataReader,
         k: int,
         j: int,
         sample_budget: int,
+        policy: Policy,
         scan_start_idx: int = 0,
         max_workers: int | None = None,
         num_samples: int | None = None,
@@ -105,9 +105,11 @@ class SentinelExecutionStrategy(ABC):
         # self.max_workers = self.get_parallel_max_workers()
         # TODO: undo
         # self.max_workers = 4
+        self.val_datasource = val_datasource
         self.k = k
         self.j = j
         self.sample_budget = sample_budget
+        self.policy = policy
         self.scan_start_idx = scan_start_idx
         self.max_workers = max_workers
         self.num_samples = num_samples
@@ -120,11 +122,14 @@ class SentinelExecutionStrategy(ABC):
         self.sample_end_idx = sample_end_idx
         self.early_stop_iters = early_stop_iters
         self.use_final_op_quality = use_final_op_quality
+        self.seed = seed
         self.pick_output_fn = self.pick_champion_output
         self.rng = np.random.default_rng(seed=seed)
         self.exp_name = exp_name
+
+        self.champion_output_cache = {}
     
-    def compute_quality(
+    def _compute_quality(
             self,
             record_set: DataRecordSet,
             expected_output: dict | None = None,
@@ -254,15 +259,13 @@ class SentinelExecutionStrategy(ABC):
 
         return record_set
 
-
-    def score_quality(
+    def _score_quality(
         self,
-        op_set: list[PhysicalOperator],
-        logical_op_id: str,
-        execution_data: dict[str, dict[str, list[DataRecordSet]]],
-        champion_outputs: dict[str, dict[str, DataRecordSet]],
-        expected_outputs: dict[str, dict],
-    ) -> list[RecordOpStats]:
+        physical_op_cls: type[PhysicalOperator],
+        source_idx_to_record_sets: dict[int, list[DataRecordSet]],
+        source_idx_to_champion_record_set: dict[int, DataRecordSet],
+        expected_outputs: dict[int, dict] | None,
+    ) -> dict[int, list[DataRecordSet]]:
         """
         NOTE: This approach to cost modeling does not work directly for aggregation queries;
               for these queries, we would ask the user to provide validation data for the step immediately
@@ -287,25 +290,16 @@ class SentinelExecutionStrategy(ABC):
         # NOTE: we can infer these fields from context clues, but in the long-term we should have a more
         #       principled way of getting these directly from attributes either stored in the sentinel_plan
         #       or in the PhysicalOperator
-        physical_op = op_set[0]
-        is_filter_op = isinstance(physical_op, FilterOp)
-        is_convert_op = isinstance(physical_op, ConvertOp)
+        is_filter_op = issubclass(physical_op_cls, FilterOp)
+        is_convert_op = issubclass(physical_op_cls, ConvertOp)
         is_perfect_quality_op = (
-            not isinstance(physical_op, LLMConvert)
-            and not isinstance(physical_op, LLMFilter)
-            and not isinstance(physical_op, RetrieveOp)
+            not issubclass(physical_op_cls, LLMConvert)
+            and not issubclass(physical_op_cls, LLMFilter)
+            and not issubclass(physical_op_cls, RetrieveOp)
         )
 
-        # pull out the execution data from this operator; place the upstream execution data in a new list
-        this_op_execution_data = execution_data[logical_op_id]
-
         # compute quality of each output computed by this operator
-        for source_idx, record_sets in this_op_execution_data.items():
-            # NOTE
-            # source_idx is a particular input, for which we may have computed multiple output record_sets;
-            # each of these record_sets may contain more than one record (b/c one-to-many) and we have one
-            # record_set per operator in the op_set
-
+        for source_idx, record_sets in source_idx_to_record_sets.items():
             # if this operation does not involve an LLM, every record_op_stats object gets perfect quality
             if is_perfect_quality_op:
                 for record_set in record_sets:
@@ -321,14 +315,21 @@ class SentinelExecutionStrategy(ABC):
             )
 
             # extract champion output for this record set
-            champion_record_set = champion_outputs[logical_op_id][source_idx]
+            champion_record_set = source_idx_to_champion_record_set[source_idx]
 
             # for each record_set produced by an operation, compute its quality
             for record_set in record_sets:
-                record_set = self.compute_quality(record_set, expected_output, champion_record_set, is_filter_op, is_convert_op)
+                record_set = self._compute_quality(record_set, expected_output, champion_record_set, is_filter_op, is_convert_op)
 
-        # return the quality annotated record op stats
-        return execution_data
+        # return the quality annotated record sets
+        return source_idx_to_record_sets
+
+    def _get_champion_record_sets(self, source_idx_to_record_sets_and_ops: dict[int, list[tuple[DataRecordSet, PhysicalOperator]]]) -> dict[int, DataRecordSet]:
+        # compute the champion record set for each source_idx
+        return {
+            source_idx: self.pick_output_fn(record_sets_and_ops)
+            for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items()
+        } 
 
     def pick_champion_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
@@ -375,12 +376,10 @@ class SentinelExecutionStrategy(ABC):
         # create and return final DataRecordSet
         return DataRecordSet(out_records, [])
 
-
-    def pick_highest_quality_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
+    def pick_highest_quality_output(self, record_sets: list[DataRecordSet]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
-        if len(op_set_record_sets) == 1:
-            record_set, _ = op_set_record_sets[0]
-            return record_set
+        if len(record_sets) == 1:
+            return record_sets[0]
 
         # NOTE: I don't like that this assumes the models are consistent in
         #       how they order their record outputs for one-to-many converts;
@@ -388,7 +387,7 @@ class SentinelExecutionStrategy(ABC):
         #       differences in ordering
         # aggregate records at each index in the response
         idx_to_records = {}
-        for record_set, _ in op_set_record_sets:
+        for record_set in record_sets:
             for idx in range(len(record_set)):
                 record, record_op_stats = record_set[idx], record_set.record_op_stats[idx]
                 if idx not in idx_to_records:
@@ -416,6 +415,6 @@ class SentinelExecutionStrategy(ABC):
         return DataRecordSet(out_records, out_record_op_stats)
 
     @abstractmethod
-    def execute_sentinel_plan(self, sentinel_plan: SentinelPlan):
+    def execute_sentinel_plan(self, sentinel_plan: SentinelPlan, expected_outputs: dict[str, dict]):
         """Execute a SentinelPlan according to strategy"""
         pass

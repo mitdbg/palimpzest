@@ -30,7 +30,7 @@ class SentinelQueryProcessor(QueryProcessor):
             expected_outputs[source_idx] = expected_output
 
         # execute sentinel plan; returns execution_data and sentinel_plan_stats
-        return self.sentinel_execution_strategy.execute_sentinel_plan(sentinel_plan, expected_outputs, self.policy)
+        return self.sentinel_execution_strategy.execute_sentinel_plan(sentinel_plan, expected_outputs)
 
     def _create_sentinel_plan(self) -> SentinelPlan:
         """
@@ -56,7 +56,7 @@ class SentinelQueryProcessor(QueryProcessor):
         # for now, enforce that we are using validation data; we can relax this after paper submission
         if self.val_datasource is None:
             raise Exception("Make sure you are using validation data with SentinelQueryProcessor")
-        logger.info("Executing RandomSamplingSentinelQueryProcessor")
+        logger.info(f"Executing {self.__class__.__name__}")
 
         # create execution stats
         execution_stats = ExecutionStats(execution_id=self.execution_id())
@@ -66,7 +66,7 @@ class SentinelQueryProcessor(QueryProcessor):
         sentinel_plan = self._create_sentinel_plan()
 
         # generate sample execution data
-        all_execution_data, sentinel_plan_stats = self._generate_sample_observations(sentinel_plan)
+        sentinel_plan_stats = self._generate_sample_observations(sentinel_plan)
 
         # update the execution stats to account for the work done in optimization
         execution_stats.add_plan_stats(sentinel_plan_stats)
@@ -76,11 +76,11 @@ class SentinelQueryProcessor(QueryProcessor):
         optimizer = self.optimizer.deepcopy_clean()
 
         # construct the CostModel with any sample execution data we've gathered
-        cost_model = SampleBasedCostModel(sentinel_plan, all_execution_data, self.verbose)
+        cost_model = SampleBasedCostModel(sentinel_plan_stats, self.verbose)
         optimizer.update_cost_model(cost_model)
 
         # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_with_strategy(self.dataset, self.policy, optimizer)
+        records, plan_stats = self._execute_best_plan(self.dataset, self.policy, optimizer)
 
         # update the execution stats to account for the work to execute the final plan
         execution_stats.add_plan_stats(plan_stats)

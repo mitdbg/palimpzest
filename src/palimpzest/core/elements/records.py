@@ -306,18 +306,16 @@ class DataRecordSet:
         # set statistics for generating these records
         self.record_op_stats = record_op_stats
 
-    def get_total_cost(self):
+    def get_total_cost(self) -> float:
         return sum([record_op_stats.cost_per_record for record_op_stats in self.record_op_stats])
 
-    def __getitem__(self, slice):
+    def __getitem__(self, slice) -> DataRecord | list[DataRecord]:
         return self.data_records[slice]
 
-
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data_records)
 
-
-    def __iter__(self):
+    def __iter__(self) -> Generator[DataRecord]:
         yield from self.data_records
 
 
