@@ -81,7 +81,10 @@ class OpFrontier:
             # construct list of inputs by looking up the input for the given source_idx
             for sample_idx in range(current_num_samples, current_num_samples + num_new_samples):
                 source_idx = self.source_indices[sample_idx]
-                op_input_pairs.extend([(op, input_record) for input_record in self.source_idx_to_input[source_idx]])
+                try:
+                    op_input_pairs.extend([(op, input_record) for input_record in self.source_idx_to_input[source_idx]])
+                except:
+                    import pdb; pdb.set_trace()
                 self.phys_op_id_to_num_samples[op.get_op_id()] += 1
                 self.total_num_samples += 1
 
