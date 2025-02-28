@@ -419,6 +419,8 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
+        print(f"PROMPT:\n{prompt}")
+        print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
         # parse reasoning
         reasoning = None
@@ -426,6 +428,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             reasoning = self._parse_reasoning(completion_text, **kwargs)
         except Exception as e:
             logger.error(f"Error parsing reasoning and answers: {e}")
+            print(f"Error parsing reasoning and answers: {e}")
 
         # parse field answers
         field_answers = None if fields is None else {field_name: None for field_name in fields}
@@ -433,6 +436,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             field_answers = self._parse_answer(completion_text, fields, json_output, **kwargs)
         except Exception as e:
             logger.error(f"Error parsing answers: {e}")
+            print(f"Error parsing answers: {e}")
             os.makedirs("parse-answer-errors", exist_ok=True)
             ts = time.time()
             with open(f"parse-answer-errors/error-{ts}.txt", "w") as f:
