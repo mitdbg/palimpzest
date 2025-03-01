@@ -278,7 +278,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             {"image": "file1.png", "breed": "Golden Retriever"}
             {"image": "file1.png", "breed": "Golden Retriever"}
             {"image": "file1.png", "breed": "Bernedoodle"}
-        
+
         This function would currently give perfect accuracy to the following output:
 
             {"image": "file1.png", "breed": "Golden Retriever"}
@@ -324,12 +324,27 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         # return the quality annotated record sets
         return source_idx_to_record_sets
 
-    def _get_champion_record_sets(self, source_idx_to_record_sets_and_ops: dict[int, list[tuple[DataRecordSet, PhysicalOperator]]]) -> dict[int, DataRecordSet]:
+    def _get_champion_record_sets(
+        self,
+        source_idx_to_record_sets_and_ops: dict[int, list[tuple[DataRecordSet, PhysicalOperator]]],
+        expected_outputs: dict[int, dict] | None,
+    ) -> dict[int, DataRecordSet]:
+        # # if we have a label, return the label
+        # if expected_outputs is not None:
+
+        #     return {
+        #         source_idx: expected_outputs[source_idx]["labels"]
+        #         for source_idx in expected_outputs
+        #     }
+
+        # # if we don't have a label, max_Q (outputs in cache, new outputs)
+        # # update the cache
+        
         # compute the champion record set for each source_idx
         return {
             source_idx: self.pick_output_fn(record_sets_and_ops)
             for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items()
-        } 
+        }
 
     def pick_champion_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
