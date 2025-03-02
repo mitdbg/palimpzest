@@ -34,23 +34,34 @@ class BaseAgent:
         Use this when the entire context of a file is imporant.
         Only set include_line_numbers to True if being used to generate a patch. 
         """
+        print(f'get_file_content {file_name}')
+
         content = utils.fetch_github_code(file_name, GLOBAL_CONTEXT["base_commit"])
         return utils.add_line_numbers(content) if include_line_numbers else content
 
     @staticmethod
-    def search_keyword(keywords: list[str]) -> str:
+    def search_keyword(repo_name : str, keyword: str) -> str:
         """
-        Searches the codebase for keywords and returns the files that contain them.
+        Searches the codebase for the provided keyword and returns the files that contain them.
+        Provide repo_name in "owner/repo" format. 
         """
-        results = utils.search_files(keywords)
+        print(f'search_keyword {keyword}')
 
-        if results and "items" in results:
-            print(f"Found {results['total_count']} matching files:")
-            relevant_files = ', '.join([item['name'] for item in results["items"]])
-            return relevant_files 
-        else:
-            print("No results found.")
-            return "No Results found"
+        local_repo_path = utils.download_repo(repo_name)
+
+        matching_files = utils.search_keyword(local_repo_path, GLOBAL_CONTEXT["base_commit"], keyword)
+
+        return matching_files
+
+        # results = utils.search_files(keyword)
+
+        # if results and "items" in results:
+        #     print(f"Found {results['total_count']} matching files:")
+        #     relevant_files = ', '.join([item['name'] for item in results["items"]])
+        #     return relevant_files 
+        # else:
+        #     print("No results found.")
+        #     return "No Results found"
 
     @staticmethod
     def extract_method(file_name: str, function_name: str, include_line_numbers: bool=False) -> str: 
@@ -59,6 +70,8 @@ class BaseAgent:
         Use this when you only need a single function in the file.
         Only set include_line_numbers to True if being used to generate a patch.
         """
+
+        print(f'extract_method {function_name} from {file_name}')
 
         try:
             # Parse the source code into an AST
@@ -88,9 +101,26 @@ class BaseAgent:
     @staticmethod
     def get_classes_and_methods(file_name: str) -> str:
         """ 
-        Summarizes all the classes and methods in a file, returning a dict where keys are classes and values are a list of method. 
-        Useful for understanding the structure of a file for subsequent method extraction. 
+        Summarizes all the classes and standalone functions in a file.
+        This is use for understanding the structure of a file for subsequent method extraction. 
+
+        The expected output format is: 
+        {
+            "classes": {
+                "<ClassName>": [
+                "<method_or_member_function_name>",
+                "... more methods ..."
+                ],
+                "... more classes ..."
+            },
+            "functions": [
+                "<function_name>",
+                "... more functions ..."
+            ]
+        }
         """
+
+        print(f'get_class_and_methods for {file_name}')
 
         relevant_issue_code = GLOBAL_CONTEXT["relevant_issue_code"]
 

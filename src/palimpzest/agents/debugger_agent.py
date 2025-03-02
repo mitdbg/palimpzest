@@ -7,6 +7,7 @@ from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import RawJSONObject
 from palimpzest.core.lib.schemas import Schema
 import palimpzest.agents.utils as utils
+import json
 import dspy
 from dspy import Tool
 import re
@@ -30,10 +31,10 @@ class FixPlan(Schema):
 
 class DebugGeneration(dspy.Signature): 
     """ 
-        Generates a report on the cause of the code issue and how it can be fixed.
-        The report should include be formatted as a JSON object with two fields: "bug_explanation" and "bug_fix".
-        bug_explanation: A detailed explanation of how the bug occured and what is causing it. 
-        bug_fix: A very detailed description of how the bug can be fixed with code, including the functions and file names where the bug is located.
+    Generates a report on the cause of the code issue and how it can be fixed.
+    The report should include be formatted as a JSON object with two fields: "bug_explanation" and "bug_fix".
+    bug_explanation: A detailed explanation of how the bug occured and what is causing it. 
+    bug_fix: A very detailed description of how the bug can be fixed with code, including the functions and file names where the bug is located.
     """
 
     relevant_code: str = dspy.InputField(desc="The code where the problem is located")
@@ -52,6 +53,8 @@ class DebuggerAgent(BaseAgent):
         )
   
     def generate_debug_plan(self, candidate: DataRecord) -> dict:
+        print('DEBUGGER AGENT START')
+
         BaseAgent.set_globals(candidate['relevant_issue_code'], candidate['base_commit'])
         dspy.configure(lm=GLOBAL_CONTEXT['model'])
 
@@ -82,6 +85,8 @@ class DebuggerAgent(BaseAgent):
 
         result = react(relevant_code=candidate['relevant_issue_code'], problem_statement=problem_statement) 
         plan['bug_report'] = result.fix_report
-        LOGGER.info(f'Debugger Trajectory {plan['instance_id']}: {result.trajectory}')
+
+        pretty_trajectory = json.dumps(result.trajectory, indent=4)
+        LOGGER.info(f'Debugger Trajectory {plan["instance_id"]}: {pretty_trajectory}')
 
         return plan 

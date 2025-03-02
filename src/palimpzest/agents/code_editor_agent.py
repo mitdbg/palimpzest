@@ -7,6 +7,7 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.agents import utils
 from palimpzest.agents.debugger_agent import LOGGER
+import json
 import dspy
 from dspy import Tool
 
@@ -42,6 +43,8 @@ class CodeEditorAgent(BaseAgent):
     def generate_patch(self, candidate: DataRecord) -> dict: 
         # Let the agent navigate the code base with the same tools and provide the bug fix plan
 
+        print(f'CODE EDITOR AGENT START')
+
         patch = {
             'instance_id': candidate['instance_id'],
             'problem_statement': candidate['problem_statement'],
@@ -64,10 +67,11 @@ class CodeEditorAgent(BaseAgent):
             bug_report=candidate['bug_report'],
             problem_statement=candidate['problem_statement'], 
         )
-        LOGGER.info(f'Code Editor Trajectory {patch['instance_id']}: {result.trajectory}')
+
+        pretty_trajectory = json.dumps(result.trajectory, indent=4)
+        LOGGER.info(f'Code Editor Trajectory {patch["instance_id"]}: {pretty_trajectory}')
         patch['model_patch'] = result.code_patch
 
-        import pdb; pdb.set_trace()
         return patch
 
 

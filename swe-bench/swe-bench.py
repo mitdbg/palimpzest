@@ -167,7 +167,8 @@ if __name__ == "__main__":
     #                             execution_engine=execution_engine,
     #                             verbose=True)
 
-    import pdb; pdb.set_trace() 
+    print('COMPLETE')
+    # import pdb; pdb.set_trace()
     # TO DO: Save the output in JSON file 
 
     # print(f'Record Type: {records}')

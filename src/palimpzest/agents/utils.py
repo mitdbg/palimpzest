@@ -4,10 +4,11 @@ import difflib
 import base64
 import ast
 import logging
-import os
 import json
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
+import pygit2
+import re
 
 # TO DO: Generalize to other repos 
 TEMP_VARS = {
@@ -30,7 +31,6 @@ def fetch_github_code(file_name: str, base_commit: str = None) -> str:
     # Customize these variables for your repository.
     token = os.getenv("GITHUB_TOKEN")
 
-    print("Fetching GitHub Code File...")
     ref = base_commit if base_commit else TEMP_VARS["branch"]
     file_paths = get_repo_files(TEMP_VARS["owner"], TEMP_VARS["repo"], ref, token)
     if file_paths is None:
@@ -38,7 +38,6 @@ def fetch_github_code(file_name: str, base_commit: str = None) -> str:
 
     best_match = find_best_match(file_name, file_paths)
     if best_match:
-        print(f"\nBest match found: {best_match}\n")
         content = get_file_content(owner=TEMP_VARS["owner"], repo=TEMP_VARS["repo"], path=best_match, token=token, ref=ref)
         if content:
             return content
@@ -117,53 +116,177 @@ def get_file_content(owner, repo, path, token=None, ref="main"):
         print("Error fetching file content:", response.status_code, response.text)
         return None
     
-def search_files(keywords, per_page=30, page=1):
+# def search_files(keywords, per_page=30, page=1):
+#     """
+#     Search for files on GitHub that contain the provided keywords.
+    
+#     Parameters:
+#       - keywords: a list of strings containing keywords to search for.
+#       - per_page: number of results per page (max 100).
+#       - page: which page of results to retrieve.
+    
+#     Returns:
+#       - A JSON object with search results, or None if an error occurred.
+#     """
+
+#     # TO DO: This might be buggy because it only searches over the most state in main 
+
+#     base_url = "https://api.github.com/search/code"
+    
+#     # Build the query string from keywords.
+#     query = " ".join(keywords)
+    
+#     # Add repository qualifier if provided.
+#     if TEMP_VARS["owner"] and TEMP_VARS["repo"]:
+#         query += f' repo:{TEMP_VARS["owner"]}/{TEMP_VARS["repo"]}'
+    
+#     # Optionally, to ensure we search inside file content rather than just filenames,
+#     # you could add: query += " in:file"
+    
+#     params = {
+#         "q": query,
+#         "per_page": per_page,
+#         "page": page
+#     }
+    
+#     headers = {}
+#     token = os.getenv("GITHUB_TOKEN")
+#     if token:
+#         headers["Authorization"] = f"token {token}"
+    
+#     response = requests.get(base_url, headers=headers, params=params)
+    
+#     if response.status_code == 200:
+#         data = response.json()
+#         file_paths = [item["path"] for item in data.get("tree", []) if item["type"] == "blob"]
+#         return file_paths
+#     else:
+#         print("Error during search:", response.status_code, response.text)
+#         return None
+
+def split_keyword(keyword):
     """
-    Search for files on GitHub that contain the provided keywords.
+    Split a keyword into subtokens based on camelCase, underscores, and periods.
+    For example, "quickSortArray" becomes ["quick", "sort", "array"].
+    """
+    # Replace underscores and periods with spaces
+    keyword = re.sub(r'[_\.]', ' ', keyword)
+    tokens = []
+    for part in keyword.split():
+        # This regex splits camelCase words.
+        tokens.extend(re.findall(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z]|$)', part))
+    return [token.lower() for token in tokens if token]
+
+def generate_candidates(tokens):
+    """
+    Given a list of tokens, generate candidate patterns that
+    represent contiguous groupings of tokens.
+    
+    We generate:
+      - All contiguous subsequences of tokens (of length >= 2)
+      - All cyclic rotations of the full token list (if there is more than one token)
+    
+    These candidates are simply the tokens concatenated together without any delimiters.
+    """
+    candidates = set()
+    n = len(tokens)
+    if n == 0:
+        return candidates
+    if n == 1:
+        candidates.add(tokens[0])
+        return candidates
+    
+    # Generate contiguous subsequences (length at least 2)
+    for i in range(n):
+        for j in range(i+2, n+1):
+            candidate = ''.join(tokens[i:j])
+            candidates.add(candidate)
+    
+    # Generate cyclic rotations of the full token list (e.g., for quickSortArray, add arrayQuickSort)
+    for shift in range(1, n):
+        candidate = ''.join(tokens[shift:] + tokens[:shift])
+        candidates.add(candidate)
+    
+    return candidates
+
+def search_keyword(repo_path, commit_hash, keyword):
+    """
+    Search a commit for files that contain the given keyword or its similar variations.
+    
+    The provided keyword is first split into tokens based on camel case, underscores,
+    and periods. Candidate patterns are generated from contiguous token combinations.
+    
+    The file content is normalized (by removing underscores and periods and converting to lowercase)
+    and then checked for the presence of any candidate string. This ensures that the tokens
+    appear together (as a contiguous substring) rather than scattered throughout the file.
     
     Parameters:
-      - keywords: a list of strings containing keywords to search for.
-      - per_page: number of results per page (max 100).
-      - page: which page of results to retrieve.
+        repo_path (str): Local path to the repository.
+        commit_hash (str): Commit hash to search.
+        keyword (str): The search keyword.
     
     Returns:
-      - A JSON object with search results, or None if an error occurred.
+        list: File paths (relative to the repository root) that match.
     """
 
-    # TO DO: This might be buggy because it only searches over the most state in main 
+    # Split the keyword into tokens.
+    tokens = split_keyword(keyword)
+    # Generate candidate strings.
+    candidates = generate_candidates(tokens)
+    # Also include the full concatenation of tokens in the original order.
+    candidates.add(''.join(tokens))
+    
+    print(f"Candidates for keyword '{keyword}': {candidates}")
 
-    base_url = "https://api.github.com/search/code"
+    repo = pygit2.Repository(repo_path)
+    commit = repo[commit_hash]
+    results = []
+
+    def search_tree(tree, path_prefix=""):
+        import pdb; pdb.set_trace()
+        for entry in tree:
+            full_path = f"{path_prefix}/{entry.name}" if path_prefix else entry.name
+            if entry.type == 'blob':
+                blob = repo[entry.id]
+                try:
+                    content = blob.data.decode('utf-8', errors='ignore')
+                except Exception:
+                    continue
+                # Normalize content by removing underscores and periods and converting to lowercase.
+                normalized_content = re.sub(r'[_\.]', '', content.lower())
+                # A file is a match if any candidate appears as a contiguous substring.
+                if any(candidate in normalized_content for candidate in candidates):
+                    results.append(full_path)
+            elif entry.type == 'tree':
+                search_tree(repo[entry.id], full_path)
     
-    # Build the query string from keywords.
-    query = " ".join(keywords)
+    search_tree(commit.tree)
+    return results
+
+def download_repo(repo_name, dest_dir='repos'):
+    """
+    Download the GitHub repository if not already downloaded.
     
-    # Add repository qualifier if provided.
-    if TEMP_VARS["owner"] and TEMP_VARS["repo"]:
-        query += f' repo:{TEMP_VARS["owner"]}/{TEMP_VARS["repo"]}'
+    Parameters:
+        repo_name (str): Repository name in the format "owner/repo"
+        dest_dir (str): Directory to store repositories (default: 'repos')
     
-    # Optionally, to ensure we search inside file content rather than just filenames,
-    # you could add: query += " in:file"
-    
-    params = {
-        "q": query,
-        "per_page": per_page,
-        "page": page
-    }
-    
-    headers = {}
-    token = os.getenv("GITHUB_TOKEN")
-    if token:
-        headers["Authorization"] = f"token {token}"
-    
-    response = requests.get(base_url, headers=headers, params=params)
-    
-    if response.status_code == 200:
-        data = response.json()
-        file_paths = [item["path"] for item in data.get("tree", []) if item["type"] == "blob"]
-        return file_paths
+    Returns:
+        str: Local path of the repository.
+    """
+
+    owner, repo = repo_name.split('/')
+    repo_url = f"https://github.com/{owner}/{repo}.git"
+    local_path = os.path.join(dest_dir, repo)
+
+    if os.path.isdir(local_path):
+        print(f"Repository '{repo}' is already downloaded at: {local_path}")
     else:
-        print("Error during search:", response.status_code, response.text)
-        return None
+        os.makedirs(dest_dir, exist_ok=True)
+        print(f"Cloning '{repo_url}' into '{local_path}'...")
+        pygit2.clone_repository(repo_url, local_path)
+    
+    return local_path
 
 class FunctionClassVisitor(ast.NodeVisitor):
     def __init__(self):
@@ -221,7 +344,7 @@ def setup_logger(log_dir="logs", max_bytes=1_000_000, backup_count=5):
     os.makedirs(log_dir, exist_ok=True)
     
     # Create full log file path
-    log_file = f'app_log_{datetime.now().now.strftime("%Y-%m-%d %H:%M:%S")}.log'
+    log_file = f'app_log_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
     log_path = os.path.join(log_dir, log_file)
     
     # Set up logging
