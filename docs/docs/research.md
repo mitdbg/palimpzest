@@ -40,13 +40,11 @@ Winter 2025
     We introduce a benchmark dataset comprising manually-annotated variable descriptions and variable values extracted from scientific papers. Based on this dataset, we present several baseline methods for variable extraction based on Large Language Models (LLMs) and rule-based information extraction systems. Our analysis shows that LLM-based solutions perform the best. Despite the incremental benefits of combining rule-based extraction outputs with LLMs, the leap in performance attributed to the transfer-learning and instruction-tuning capabilities of LLMs themselves is far more significant. This investigation demonstrates the potential of LLMs to enhance automatic comprehension of scientific artifacts and for automatic model recovery and simulation.
 
 ```
-@misc{liu2024variableextractionmodelrecovery,
+@inproceedings{liu2024variableextractionmodelrecovery,
     title={Variable Extraction for Model Recovery in Scientific Literature}, 
     author={Chunwei Liu and Enrique Noriega-Atala and Adarsh Pyarelal and Clayton T Morrison and Mike Cafarella},
-    year={2024},
-    eprint={2411.14569},
-    archivePrefix={arXiv},
-    primaryClass={cs.IR},
+    year={2025},
+    booktitle={AI and Scientific Discovery (AISD) Workshop at NAACL},
     url={https://arxiv.org/abs/2411.14569}, 
 }
 ```
