@@ -41,7 +41,7 @@ class QueryProcessor:
         self.config = config or QueryProcessorConfig()
         self.dataset = dataset
         self.num_samples = self.config.num_samples
-        self.val_datasource = self.config.val_datasource
+        self.val_data = self.config.val_data
         self.scan_start_idx = self.config.scan_start_idx
         self.cache = self.config.cache
         self.verbose = self.config.verbose

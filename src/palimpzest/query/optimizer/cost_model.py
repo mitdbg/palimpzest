@@ -104,7 +104,7 @@ class SampleBasedCostModel:
         logger.debug("Computing operator statistics")
         # flatten the nested dictionary of execution data and pull out fields relevant to cost estimation
         execution_record_op_stats = []
-        for idx, (logical_op_id, _, _) in enumerate(self.sentinel_plan):
+        for idx, (logical_op_id, _,) in enumerate(self.sentinel_plan):
             logger.debug(f"Computing operator statistics for sentinel_plan: {idx}, {logical_op_id}")
             # initialize variables
             upstream_logical_op_id = self.sentinel_plan.logical_op_ids[idx - 1] if idx > 0 else None

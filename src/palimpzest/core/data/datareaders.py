@@ -408,7 +408,7 @@ class PDFFileDirectoryReader(DirectoryReader):
             text_content = get_text_from_pdf(pdf_filename, pdf_bytes, pdfprocessor=self.pdfprocessor, file_cache_dir=self.file_cache_dir)
 
         # construct and return item
-        return {"filename": pdf_filename, "contents": pdf_bytes, "text_contents": text_content}
+        return {"filename": filepath, "contents": pdf_bytes, "text_contents": text_content}
 
 
 class TextFileDirectoryReader(DirectoryReader):
@@ -447,7 +447,7 @@ class TextFileDirectoryReader(DirectoryReader):
         with open(filepath) as f:
             contents = f.read()
 
-        return {"filename": filename, "contents": contents}
+        return {"filename": filepath, "contents": contents}
 
 
 class XLSFileDirectoryReader(DirectoryReader):

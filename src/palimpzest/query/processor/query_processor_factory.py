@@ -165,8 +165,13 @@ class QueryProcessorFactory:
         if config.cache:
             raise ValueError("cache=True is not supported yet")
 
-        if config.val_datasource is None and config.processing_strategy in [ProcessingStrategyType.MAB_SENTINEL, ProcessingStrategyType.RANDOM_SAMPLING]:
-            raise ValueError("val_datasource is required for MAB_SENTINEL and RANDOM_SAMPLING processing strategies")
+        # if config.val_datasource is None and config.processing_strategy in ["mab_sentinel", "random_sampling"]:
+        #     raise ValueError("val_datasource is required for MAB_SENTINEL and RANDOM_SAMPLING processing strategies")
+        
+        # TODO(Jun): This is temporary. We will remove this once we integrate val_data with val_datasource.
+        # In the future, we'll use val_data to deside the processing strategy.
+        if config.val_data is not None and config.processing_strategy.lower() not in ["mab_sentinel", "random_sampling"]:
+            raise ValueError("val_data is only supported for MAB_SENTINEL and RANDOM_SAMPLING processing strategies")
 
         available_models = getattr(config, 'available_models', [])
         if available_models is None or len(available_models) == 0:
