@@ -1,8 +1,5 @@
-from palimpzest.core.data.datareaders import DataReader
-from palimpzest.utils.datareader_helpers import get_local_datareader
-import os
-import pandas as pd
 import json
+import os
 
 
 class ValidationData:
