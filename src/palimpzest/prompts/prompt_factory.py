@@ -729,4 +729,7 @@ class PromptFactory:
         user_messages = self._get_user_messages(candidate, input_fields, **kwargs)
         messages.extend(user_messages)
 
+        print("MESSAGES ARE")
+        print(messages)
+        print("---------")
         return messages

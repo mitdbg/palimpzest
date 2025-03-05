@@ -42,11 +42,21 @@ class PromptStrategy(str, Enum):
     COT_QA_CRITIC = "chain-of-thought-question-critic"
     COT_QA_REFINE = "chain-of-thought-question-refine"
 
+    COT_QA_ARCHON_GENERATOR = "chain-of-thought-question-archon-generator"
+    COT_QA_ARCHON_FUSER = "chain-of-thought-question-archon-fuser"
+    COT_QA_ARCHON_CRITIC = "chain-of-thought-question-archon-critic"
+    COT_QA_ARCHON_REFINE = "chain-of-thought-question-archon-refine"
+
+
     # Chain-of-Thought Question with Image Prompt Strategies
     COT_QA_IMAGE = "chain-of-thought-question-image"
     COT_QA_IMAGE_CRITIC = "chain-of-thought-question-critic-image"
     COT_QA_IMAGE_REFINE = "chain-of-thought-question-refine-image"
 
+    COT_QA_IMAGE_ARCHON_GENERATOR = "chain-of-thought-question-image-archon-generator"
+    COT_QA_IMAGE_ARCHON_FUSER = "chain-of-thought-question-image-archon-fuser"
+    COT_QA_IMAGE_ARCHON_CRITIC = "chain-of-thought-question-image-archon-critic"
+    COT_QA_IMAGE_ARCHON_REFINE = "chain-of-thought-question-image-archon-refine"
     # Mixture-of-Agents Prompt Strategies
     COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
     COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
@@ -61,6 +71,12 @@ class PromptStrategy(str, Enum):
     def is_cot_qa_prompt(self):
         return "chain-of-thought-question" in self.value
 
+    def is_generator_prompt(self):
+        return "generator" in self.value
+    
+    def is_fuser_prompt(self):
+        return "fuser" in self.value
+    
     def is_critic_prompt(self):
         return "critic" in self.value
 

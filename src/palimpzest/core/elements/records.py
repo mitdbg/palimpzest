@@ -351,6 +351,10 @@ class DataRecordCollection:
         return len(self.data_records)
 
     def to_df(self, cols: list[str] | None = None):
+        #print("DATA RECORDS")
+        #for dr in self.data_records:
+        #    print(dr.to_json_str())
+        #print(self.data_records)
         return DataRecord.to_df(self.data_records, cols)
 
     def _get_executed_plans(self):
