@@ -1,6 +1,8 @@
 import json
 import os
+import logging
 
+logger = logging.getLogger(__name__)
 
 class ValidationData:
     def __init__(self, file_path: str):
@@ -76,6 +78,20 @@ class ValidationData:
         assert len(input_dataset) == 1, "Only one input dataset (one file or one directory) is supported for now"
         return input_dataset.pop(), cnt
     
+    def set_score_fn(self, field: str, score_fn: callable):
+        """
+        Set the score function for the validation data.
+        """
+        set_score_fn = False
+        for _, op_stats in self.expected_output.items():
+            for _, record_stats in op_stats.items():
+                if field in record_stats["score_fn"]:
+                    record_stats["score_fn"][field] = score_fn
+                    logger.info(f"Set score function for {field} to {score_fn}")
+                    set_score_fn = True
+        
+        if not set_score_fn:
+            logger.warning(f"No field {field} found in expected outputs")
 
     def num_samples(self) -> int:
         return self._num_samples
@@ -88,7 +104,7 @@ class ValidationData:
         Returns the expected outputs for the given logical operator ID.
         Format:
         {
-            record_parent_id: {
+            logical_op_id: {
                 record_source_idx: {
                     "labels": {field1: value1, ...},
                     "score_fn": {field1: "exact", ...}
