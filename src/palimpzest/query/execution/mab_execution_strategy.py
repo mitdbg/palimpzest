@@ -338,6 +338,10 @@ class OpFrontier:
 class MABExecutionStrategy(SentinelExecutionStrategy):
     """
     This class implements the Multi-Armed Bandit (MAB) execution strategy for SentinelQueryProcessors.
+
+    NOTE: the number of samples will slightly exceed the sample_budget if the number of operator
+    calls does not perfectly match the sample_budget. This may cause some minor discrepancies with
+    the progress manager as a result.
     """
 
     def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[int, dict] | None):
@@ -349,8 +353,9 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         logger.info(f"Plan Details: {plan}")
 
         # TODO: add support for multiple plans and sentinel plans
-        # initialize progress manager
-        # self.progress_manager = create_progress_manager(plan, self.num_samples)
+        # initialize and start the progress manager
+        self.progress_manager = create_progress_manager(plan, self.sample_budget)
+        self.progress_manager.start()
 
         # initialize plan stats
         plan_stats = SentinelPlanStats.from_plan(plan)
@@ -387,6 +392,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
                 # run sampled operators on sampled inputs
                 source_idx_to_record_sets_and_ops = self._execute_op_set(frontier_op_input_pairs)
+                samples_drawn += len(frontier_op_input_pairs)
 
                 # FUTURE TODO: have this return the highest quality record set simply based on our posterior (or prior) belief on operator quality
                 # get the target record set for each source_idx
@@ -408,6 +414,10 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 # update plan stats
                 plan_stats.add_record_op_stats(all_record_op_stats)
 
+                # update the progress manager
+                total_cost = sum([record_op_stats.cost_per_record for record_op_stats in all_record_op_stats])
+                self.progress_manager.incr(logical_op_id, num_samples=len(frontier_op_input_pairs), total_cost=total_cost)
+
                 # add records (which are not filtered) to the cache, if allowed
                 self._add_records_to_cache(logical_op_id, all_records)
 
@@ -422,13 +432,16 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
             # FUTURE TODO: score op quality based on final outputs
 
-            # update the number of samples drawn to be the max across all logical operators
-            samples_drawn = max([op_frontier.total_num_samples for op_frontier in op_frontiers.values()])
-
         # close the cache
         self._close_cache(plan.logical_op_ids)
 
         # finalize plan stats
         plan_stats.finish()
+
+        # finish progress tracking
+        self.progress_manager.finish()
+
+        logger.info(f"Done executing sentinel plan: {plan.plan_id}")
+        logger.debug(f"Plan stats: (plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")
 
         return plan_stats

@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats
+from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats, RecordOpStats
 from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.policy import Policy

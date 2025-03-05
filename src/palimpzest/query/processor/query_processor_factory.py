@@ -41,11 +41,13 @@ class QueryProcessorFactory:
         for strategy in ["processing_strategy", "execution_strategy", "sentinel_execution_strategy", "optimizer_strategy"]:
             strategy_str = getattr(config, strategy)
             strategy_type = strategy_types[strategy]
-            try:
-                strategy_enum = cls._convert_to_enum(strategy_type, strategy_str)
-            except ValueError as e:
-                raise ValueError(f"""Unsupported {strategy}: {strategy_str}.
-                                    The supported strategies are: {strategy_type.__members__.keys()}""") from e
+            strategy_enum = None
+            if strategy_str is not None:
+                try:
+                    strategy_enum = cls._convert_to_enum(strategy_type, strategy_str)
+                except ValueError as e:
+                    raise ValueError(f"""Unsupported {strategy}: {strategy_str}.
+                                        The supported strategies are: {strategy_type.__members__.keys()}""") from e
             setattr(config, strategy, strategy_enum)
             logger.debug(f"Normalized {strategy}: {strategy_enum}")
 

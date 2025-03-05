@@ -95,8 +95,9 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
-        # initialize progress manager
+        # initialize and start the progress manager
         self.progress_manager = create_progress_manager(plan, self.num_samples, self.progress)
+        self.progress_manager.start()
 
         # initialize plan stats
         plan_stats = PlanStats.from_plan(plan)
@@ -105,9 +106,6 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         # initialize input queues and future queues for each operation
         input_queues = self._create_input_queues(plan)
         future_queues = {op.get_op_id(): [] for op in plan.operators}
-
-        # start the progress manager
-        self.progress_manager.start()
 
         # process all of the input records using a thread pool
         output_records = []

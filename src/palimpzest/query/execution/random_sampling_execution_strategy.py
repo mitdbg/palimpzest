@@ -153,14 +153,19 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
         """
         NOTE: this function currently requires us to set k and j properly in order to make
               comparison in our research against the corresponding sample budget in MAB.
+
+        NOTE: the number of samples will slightly exceed the sample_budget if the number of operator
+        calls does not perfectly match the sample_budget. This may cause some minor discrepancies with
+        the progress manager as a result.
         """
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
         assert all(isinstance(op, ScanPhysicalOp) for op in plan.operator_sets[0]), "First operator in physical plan must be a ScanPhysicalOp"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
-        # # initialize progress manager
-        # self.progress_manager = create_progress_manager(plan, self.num_samples)
+        # initialize and start the progress manager
+        self.progress_manager = create_progress_manager(plan, self.sample_budget)
+        self.progress_manager.start()
 
         # initialize plan stats
         plan_stats = SentinelPlanStats.from_plan(plan)
@@ -209,6 +214,10 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
             # update plan stats
             plan_stats.add_record_op_stats(all_record_op_stats)
 
+            # update the progress manager
+            total_cost = sum([record_op_stats.cost_per_record for record_op_stats in all_record_op_stats])
+            self.progress_manager.incr(logical_op_id, num_samples=len(op_input_pairs), total_cost=total_cost)
+
             # add records (which are not filtered) to the cache, if allowed
             self._add_records_to_cache(logical_op_id, all_records)
 
@@ -223,5 +232,11 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
 
         # finalize plan stats
         plan_stats.finish()
+
+        # finish progress tracking
+        self.progress_manager.finish()
+
+        logger.info(f"Done executing sentinel plan: {plan.plan_id}")
+        logger.debug(f"Plan stats: (plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")
 
         return plan_stats

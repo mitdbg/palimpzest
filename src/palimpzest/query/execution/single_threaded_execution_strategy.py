@@ -149,18 +149,16 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
-        # initialize progress manager
+        # initialize and start the progress manager
         self.progress_manager = create_progress_manager(plan, self.num_samples, self.progress)
+        self.progress_manager.start()
 
         # initialize plan stats
         plan_stats = PlanStats.from_plan(plan)
         plan_stats.start()
 
         # initialize input queues for each operation
-        input_queues = self._create_input_queues(plan)
-
-        # start the progress manager
-        self.progress_manager.start()
+        input_queues = self._create_input_queues(plan)        
 
         # execute the plan until either:
         # 1. all records have been processed, or
