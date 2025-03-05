@@ -443,7 +443,6 @@ class TextFileDirectoryReader(DirectoryReader):
                 }
         """
         filepath = self.filepaths[idx]
-        filename = os.path.basename(filepath)
         with open(filepath) as f:
             contents = f.read()
 
