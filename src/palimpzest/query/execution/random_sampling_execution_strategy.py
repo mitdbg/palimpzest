@@ -1,268 +1,225 @@
 import logging
-from concurrent.futures import ThreadPoolExecutor, wait
 
 import numpy as np
 
-from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
-from palimpzest.core.data.dataclasses import RecordOpStats, SentinelPlanStats
-from palimpzest.core.elements.records import DataRecordSet
+from palimpzest.core.data.dataclasses import SentinelPlanStats
+from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
-from palimpzest.query.operators.convert import ConvertOp, LLMConvert
-from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.query.operators.retrieve import RetrieveOp
-from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
+from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.progress import create_progress_manager
 
 logger = logging.getLogger(__name__)
 
+class OpSet:
+    """
+    This class represents the set of operators which are currently in the frontier for a given logical operator.
+    Each operator in the frontier is an instance of a PhysicalOperator which either:
+
+    1. lies on the Pareto frontier of the set of sampled operators, or
+    2. has been sampled fewer than j times
+    """
+
+    def __init__(self, op_set: list[PhysicalOperator], source_indices: list[int], k: int, j: int, seed: int, policy: Policy):
+        # set k and j, which are the initial number of operators in the frontier and the
+        # initial number of records to sample for each frontier operator
+        self.k = min(k, len(op_set))
+        self.j = min(j, len(source_indices))
+
+        # store the policy that we are optimizing under
+        self.policy = policy
+
+        # get order in which we will sample physical operators for this logical operator
+        sample_op_indices = self._get_op_index_order(op_set, seed)
+
+        # construct the set of operators
+        self.ops = [op_set[sample_idx] for sample_idx in sample_op_indices[:k]]
+
+        # store the order in which we will sample the source records
+        self.source_indices = source_indices
+
+        # keep track of the number of times each operator has been sampled
+        self.phys_op_id_to_num_samples = {op.get_op_id(): 0 for op in op_set}
+
+        # keep track of the number of times the logical operator has been sampled
+        self.total_num_samples = 0
+
+        # set the initial inputs for this logical operator
+        is_scan_op = isinstance(op_set[0], ScanPhysicalOp)
+        self.source_idx_to_input = {source_idx: [source_idx] for source_idx in self.source_indices} if is_scan_op else {}
+
+
+    def _get_op_index_order(self, op_set: list[PhysicalOperator], seed: int) -> list[int]:
+        """
+        Returns a list of indices for the operators in the op_set.
+        """
+        rng = np.random.default_rng(seed=seed)
+        op_indices = np.arange(len(op_set))
+        rng.shuffle(op_indices)
+        return op_indices
+
+    def get_op_input_pairs(self) -> list[PhysicalOperator, DataRecord | int | None]:
+        """
+        Returns the list of frontier operators and their next input to process. If there are
+        any indices in `source_indices_to_sample` which this operator does not sample on its own, then
+        we also have this frontier process that source_idx's input with its max quality operator.
+        """
+        # get the list of (op, source_idx) pairs which this operator needs to execute
+        op_source_idx_pairs = []
+        for op in self.ops:
+            # construct list of inputs by looking up the input for the given source_idx
+            for sample_idx in range(self.j):
+                source_idx = self.source_indices[sample_idx]
+                op_source_idx_pairs.append((op, source_idx))
+
+        # fetch the corresponding (op, input) pairs
+        op_input_pairs = []
+        for op, source_idx in op_source_idx_pairs:
+            op_input_pairs.extend([(op, input_record) for input_record in self.source_idx_to_input[source_idx]])
+            self.phys_op_id_to_num_samples[op.get_op_id()] += len(op_input_pairs)
+            self.total_num_samples += len(op_input_pairs)
+
+        return op_input_pairs
+
+    def pick_highest_quality_output(self, record_sets: list[DataRecordSet]) -> DataRecordSet:
+        # if there's only one operator in the set, we return its record_set
+        if len(record_sets) == 1:
+            return record_sets[0]
+
+        # NOTE: I don't like that this assumes the models are consistent in
+        #       how they order their record outputs for one-to-many converts;
+        #       eventually we can try out more robust schemes to account for
+        #       differences in ordering
+        # aggregate records at each index in the response
+        idx_to_records = {}
+        for record_set in record_sets:
+            for idx in range(len(record_set)):
+                record, record_op_stats = record_set[idx], record_set.record_op_stats[idx]
+                if idx not in idx_to_records:
+                    idx_to_records[idx] = [(record, record_op_stats)]
+                else:
+                    idx_to_records[idx].append((record, record_op_stats))
+
+        # compute highest quality answer at each index
+        out_records = []
+        out_record_op_stats = []
+        for idx in range(len(idx_to_records)):
+            records_lst, record_op_stats_lst = zip(*idx_to_records[idx])
+            max_quality_record, max_quality = records_lst[0], record_op_stats_lst[0].quality
+            max_quality_stats = record_op_stats_lst[0]
+            for record, record_op_stats in zip(records_lst[1:], record_op_stats_lst[1:]):
+                record_quality = record_op_stats.quality
+                if record_quality > max_quality:
+                    max_quality_record = record
+                    max_quality = record_quality
+                    max_quality_stats = record_op_stats
+            out_records.append(max_quality_record)
+            out_record_op_stats.append(max_quality_stats)
+
+        # create and return final DataRecordSet
+        return DataRecordSet(out_records, out_record_op_stats)
+
+    def update_inputs(self, source_idx_to_record_sets: dict[int, DataRecordSet]):
+        """
+        Update the inputs for this logical operator based on the outputs of the previous logical operator.
+        """
+        input = []
+        for source_idx, record_sets in source_idx_to_record_sets.items():
+            max_quality_record_set = self.pick_highest_quality_output(record_sets)
+            for record in max_quality_record_set:
+                input.append(record if record.passed_operator else None)
+
+            self.source_idx_to_input[source_idx] = input
+
+
 class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
 
-    def score_quality(
-            self,
-            operator_sets: list[list[PhysicalOperator]],
-            execution_data: dict[str, dict[str, list[DataRecordSet]]],
-            champion_outputs: dict[str, dict[str, DataRecordSet]],
-            expected_outputs: dict[str, dict],
-        ) -> list[RecordOpStats]:
-        """
-        NOTE: This approach to cost modeling does not work directly for aggregation queries;
-              for these queries, we would ask the user to provide validation data for the step immediately
-              before a final aggregation
+    def _get_source_indices(self):
+        """Get the list of source indices which the sentinel plan should execute over."""
+        # create list of all source indices and shuffle it
+        total_num_samples = len(self.val_datasource)
+        source_indices = list(np.arange(total_num_samples))
+        self.rng.shuffle(source_indices)
 
-        NOTE: This function currently assumes that one-to-many converts do NOT create duplicate outputs.
-        This assumption would break if, for example, we extracted the breed of every dog in an image.
-        If there were two golden retrievers and a bernoodle in an image and we extracted:
-
-            {"image": "file1.png", "breed": "Golden Retriever"}
-            {"image": "file1.png", "breed": "Golden Retriever"}
-            {"image": "file1.png", "breed": "Bernedoodle"}
+        # slice the list of source indices to get the first j indices
+        j = min(self.j, len(source_indices))
+        source_indices = source_indices[:j]
         
-        This function would currently give perfect accuracy to the following output:
+        return source_indices
 
-            {"image": "file1.png", "breed": "Golden Retriever"}
-            {"image": "file1.png", "breed": "Bernedoodle"}
-
-        Even though it is missing one of the golden retrievers.
+    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[int, dict] | None):
         """
-        # extract information about the logical operation performed at this stage of the sentinel plan;
-        # NOTE: we can infer these fields from context clues, but in the long-term we should have a more
-        #       principled way of getting these directly from attributes either stored in the sentinel_plan
-        #       or in the PhysicalOperator
-        op_set = operator_sets[-1]
-        physical_op = op_set[0]
-        is_source_op = isinstance(physical_op, (MarshalAndScanDataOp, CacheScanDataOp))
-        is_filter_op = isinstance(physical_op, FilterOp)
-        is_convert_op = isinstance(physical_op, ConvertOp)
-        is_perfect_quality_op = (
-            not isinstance(physical_op, LLMConvert)
-            and not isinstance(physical_op, LLMFilter)
-            and not isinstance(physical_op, RetrieveOp)
-        )
-        logical_op_id = physical_op.logical_op_id
-
-        # if this logical_op_id is not in the execution_data (because all upstream records were filtered), return
-        if logical_op_id not in execution_data:
-            return execution_data
-
-        # pull out the execution data from this operator; place the upstream execution data in a new list
-        this_op_execution_data = execution_data[logical_op_id]
-
-        # compute quality of each output computed by this operator
-        for source_idx, record_sets in this_op_execution_data.items():
-            # NOTE
-            # source_idx is a particular input, for which we may have computed multiple output record_sets;
-            # each of these record_sets may contain more than one record (b/c one-to-many) and we have one
-            # record_set per operator in the op_set
-
-            # if this operation does not involve an LLM, every record_op_stats object gets perfect quality
-            if is_perfect_quality_op:
-                for record_set in record_sets:
-                    for record_op_stats in record_set.record_op_stats:
-                        record_op_stats.quality = 1.0
-                continue
-
-            # get the expected output for this source_idx if we have one
-            expected_output = (
-                expected_outputs[source_idx]
-                if expected_outputs is not None and source_idx in expected_outputs
-                else None
-            )
-
-            # extract champion output for this record set
-            champion_record_set = champion_outputs[logical_op_id][source_idx]
-
-            # for each record_set produced by an operation, compute its quality
-            for record_set in record_sets:
-                record_set = self.compute_quality(record_set, expected_output, champion_record_set, is_filter_op, is_convert_op)
-
-        # if this operator is a source op (i.e. has no input logical operator), return the execution data
-        if is_source_op:
-            return execution_data
-
-        # recursively call the function on the next logical operator until you reach a scan
-        execution_data = self.score_quality(operator_sets[:-1], execution_data, champion_outputs, expected_outputs)
-
-        # return the quality annotated record op stats
-        return execution_data
-
-    def execute_op_set(self, candidates, op_set):
-        def execute_op_wrapper(operator, candidate):
-            record_set = operator(candidate)
-            return record_set, operator, candidate
-        # TODO: post-submission we will need to modify this to:
-        # - submit all candidates for aggregate operators
-        # - handle limits
-        # create thread pool w/max workers and run futures over worker pool
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # create futures
-            futures = []
-            for candidate in candidates:
-                for operator in op_set:
-                    future = executor.submit(execute_op_wrapper, operator, candidate)
-                    futures.append(future)
-
-            # compute output record_set for each (operator, candidate) pair
-            output_record_sets = []
-            while len(futures) > 0:
-                # get the set of futures that have (and have not) finished in the last PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
-                done_futures, not_done_futures = wait(futures, timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
-
-                # cast not_done_futures from a set to a list so we can append to it
-                not_done_futures = list(not_done_futures)
-
-                # process finished futures
-                for future in done_futures:
-                    # get the result and add it to the output records set
-                    record_set, operator, candidate = future.result()
-                    output_record_sets.append((record_set, operator, candidate))
-
-                # update list of futures
-                futures = not_done_futures
-
-            # compute mapping from source_idx to record sets for all operators and for champion operator
-            all_record_sets, champion_record_sets = {}, {}
-            for candidate in candidates:
-                candidate_output_record_sets = []
-                for record_set, operator, candidate_ in output_record_sets:
-                    if candidate == candidate_:
-                        candidate_output_record_sets.append((record_set, operator))
-
-                # select the champion (i.e. best) record_set from all the record sets computed for this operator
-                champion_record_set = self.pick_output_fn(candidate_output_record_sets)
-
-                # get the source_idx associated with this input record
-                source_idx = candidate.source_idx
-
-                # add champion record_set to mapping from source_idx --> champion record_set
-                champion_record_sets[source_idx] = champion_record_set
-
-                # add all record_sets computed for this source_idx to mapping from source_idx --> record_sets
-                all_record_sets[source_idx] = [tup[0] for tup in candidate_output_record_sets]
-
-        return all_record_sets, champion_record_sets
-
-    
-    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict], policy: Policy):
-        """
+        NOTE: this function currently requires us to set k and j properly in order to make
+              comparison in our research against the corresponding sample budget in MAB.
         """
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
         assert all(isinstance(op, ScanPhysicalOp) for op in plan.operator_sets[0]), "First operator in physical plan must be a ScanPhysicalOp"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
-        # initialize progress manager
-        self.progress_manager = create_progress_manager(plan, self.num_samples)
+        # # initialize progress manager
+        # self.progress_manager = create_progress_manager(plan, self.num_samples)
 
         # initialize plan stats
         plan_stats = SentinelPlanStats.from_plan(plan)
         plan_stats.start()
 
-        # sample validation records
-        total_num_samples = len(self.val_datasource)
-        source_indices = np.arange(total_num_samples)
-        if self.sample_start_idx is not None:
-            assert self.sample_end_idx is not None, "Specified `sample_start_idx` without specifying `sample_end_idx`"
-            source_indices = source_indices[self.sample_start_idx:self.sample_end_idx]
-        elif not self.sample_all_records:
-            self.rng.shuffle(source_indices)
-            j = min(self.j, len(source_indices))
-            source_indices = source_indices[:j]
+        # get list of source indices which can be sampled from
+        source_indices = self._get_source_indices()
 
-        # initialize output variables
-        all_outputs, champion_outputs = {}, {}
-
-        # create initial set of candidates for source scan operator
-        candidates = []
-        for source_idx in source_indices:
-            candidates.append(source_idx)
+        # initialize set of physical operators for each logical operator
+        op_sets = {
+            logical_op_id: OpSet(op_set, source_indices, self.k, self.j, self.seed, self.policy)
+            for logical_op_id, op_set in plan
+        }
 
         # NOTE: because we need to dynamically create sample matrices for each operator,
         #       sentinel execution must be executed one operator at a time (i.e. sequentially)
         # execute operator sets in sequence
         for op_idx, (logical_op_id, op_set) in enumerate(plan):
-            next_logical_op_id = plan.logical_op_ids[op_idx + 1] if op_idx + 1 < len(plan) else None
+            # get frontier ops and their next input
+            op_input_pairs = op_sets[logical_op_id].get_op_input_pairs()
 
-            # sample k optimizations
-            k = min(self.k, len(op_set)) if not self.sample_all_ops else len(op_set)
-            sampled_ops = self.rng.choice(op_set, size=k, replace=False)
+            # break out of the loop if op_input_pairs is empty, as this means all records have been filtered out
+            if len(op_input_pairs) == 0:
+                break
 
-            # run sampled operators on sampled candidates
-            source_idx_to_record_sets, source_idx_to_champion_record_set = self.execute_op_set(candidates, sampled_ops)
+            # run sampled operators on sampled inputs
+            source_idx_to_record_sets_and_ops = self._execute_op_set(op_input_pairs)
 
-            # update all_outputs and champion_outputs dictionary
-            if logical_op_id not in all_outputs:
-                all_outputs[logical_op_id] = source_idx_to_record_sets
-                champion_outputs[logical_op_id] = source_idx_to_champion_record_set
-            else:
-                for source_idx, record_sets in source_idx_to_record_sets.items():
-                    if source_idx not in all_outputs[logical_op_id]:
-                        all_outputs[logical_op_id][source_idx] = record_sets
-                        champion_outputs[logical_op_id][source_idx] = source_idx_to_champion_record_set[source_idx]
-                    else:
-                        all_outputs[logical_op_id][source_idx].extend(record_sets)
-                        champion_outputs[logical_op_id][source_idx].extend(source_idx_to_champion_record_set[source_idx])
+            # FUTURE TODO: have this return the highest quality record set simply based on our posterior (or prior) belief on operator quality
+            # get the target record set for each source_idx
+            source_idx_to_target_record_set = self._get_target_record_sets(logical_op_id, source_idx_to_record_sets_and_ops, expected_outputs)
 
-            # flatten lists of records and record_op_stats
-            all_records, all_record_op_stats = [], []
-            for _, record_sets in source_idx_to_record_sets.items():
-                for record_set in record_sets:
-                    all_records.extend(record_set.data_records)
-                    all_record_op_stats.extend(record_set.record_op_stats)
+            # TODO: make consistent across here and RandomSampling
+            # FUTURE TODO: move this outside of the loop (i.e. assume we only get quality label(s) after executing full program)
+            # score the quality of each generated output
+            physical_op_cls = op_set[0].__class__
+            source_idx_to_record_sets = {
+                source_idx: list(map(lambda tup: tup[0], record_sets_and_ops))
+                for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items()
+            }
+            source_idx_to_record_sets = self._score_quality(physical_op_cls, source_idx_to_record_sets, source_idx_to_target_record_set)
+
+            # flatten the lists of records and record_op_stats
+            all_records, all_record_op_stats = self._flatten_record_sets(source_idx_to_record_sets)
 
             # update plan stats
             plan_stats.add_record_op_stats(all_record_op_stats)
 
             # add records (which are not filtered) to the cache, if allowed
-            if self.cache:
-                for record in all_records:
-                    if getattr(record, "passed_operator", True):
-                        # self.datadir.append_cache(logical_op_id, record)
-                        pass
+            self._add_records_to_cache(logical_op_id, all_records)
 
-            # update candidates for next operator; we use champion outputs as input
-            candidates = []
-            if next_logical_op_id is not None:
-                for _, record_set in source_idx_to_champion_record_set.items():
-                    for record in record_set:
-                        if isinstance(op_set[0], FilterOp) and not record.passed_operator:
-                            continue
-                        candidates.append(record)
+            # FUTURE TODO: simply set input based on source_idx_to_target_record_set (b/c we won't have scores computed)
+            # provide the champion record sets as inputs to the next logical operator
+            if op_idx + 1 < len(plan):
+                next_logical_op_id = plan.logical_op_ids[op_idx + 1]
+                op_sets[next_logical_op_id].update_inputs(source_idx_to_record_sets)
 
-            # if we've filtered out all records, terminate early
-            if next_logical_op_id is not None and candidates == []:
-                break
-
-        # compute quality for each operator
-        all_outputs = self.score_quality(plan.operator_sets, all_outputs, champion_outputs, expected_outputs)
-
-        # if caching was allowed, close the cache
-        if self.cache:
-            for _, _ in plan:
-                # self.datadir.close_cache(logical_op_id)
-                pass
+        # close the cache
+        self._close_cache(plan.logical_op_ids)
 
         # finalize plan stats
         plan_stats.finish()

@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -91,11 +92,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         j: int,
         sample_budget: int,
         policy: Policy,
-        sample_all_ops: bool = False,
-        sample_all_records: bool = False,
-        sample_start_idx: int | None = None,
-        sample_end_idx: int | None = None,
-        early_stop_iters: int = 3,
         use_final_op_quality: bool = False,
         seed: int = 42,
         exp_name: str | None = None,
@@ -108,11 +104,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         self.j = j
         self.sample_budget = sample_budget
         self.policy = policy
-        self.sample_all_ops = sample_all_ops
-        self.sample_all_records = sample_all_records
-        self.sample_start_idx = sample_start_idx
-        self.sample_end_idx = sample_end_idx
-        self.early_stop_iters = early_stop_iters
         self.use_final_op_quality = use_final_op_quality
         self.seed = seed
         self.rng = np.random.default_rng(seed=seed)
@@ -350,6 +341,50 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 champion_record_set, champion_quality = record_set, est_quality
 
         return champion_record_set, champion_quality
+
+    def _flatten_record_sets(self, source_idx_to_record_sets: dict[int, list[DataRecordSet]]) -> tuple[list[DataRecord], list[RecordOpStats]]:
+        """
+        Flatten the list of record sets and record op stats for each source_idx.
+        """
+        all_records, all_record_op_stats = [], []
+        for _, record_sets in source_idx_to_record_sets.items():
+            for record_set in record_sets:
+                all_records.extend(record_set.data_records)
+                all_record_op_stats.extend(record_set.record_op_stats)
+
+        return all_records, all_record_op_stats
+
+    def _execute_op_set(self, op_input_pairs: list[PhysicalOperator, DataRecord | int]) -> dict[int, list[tuple[DataRecordSet, PhysicalOperator]]]:
+        def execute_op_wrapper(operator, input):
+            record_set = operator(input)
+            return record_set, operator, input
+
+        # TODO: modify unit tests to always have record_op_stats so we can use record_op_stats for source_idx
+        # for scan operators, `input` will be the source_idx
+        def get_source_idx(input):
+            return input.source_idx if isinstance(input, DataRecord) else input
+
+        # initialize mapping from source indices to output record sets
+        source_idx_to_record_sets_and_ops = {get_source_idx(input): [] for _, input in op_input_pairs}
+
+        # create thread pool w/max workers and run futures over worker pool
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            # create futures
+            futures = [
+                executor.submit(execute_op_wrapper, operator, input)
+                for operator, input in op_input_pairs
+            ]
+            output_record_sets = [future.result() for future in futures]
+
+            # compute mapping from source_idx to record sets for all operators and for champion operator
+            for record_set, operator, input in output_record_sets:
+                # get the source_idx associated with this input record;
+                source_idx = get_source_idx(input)
+
+                # add record_set to mapping from source_idx --> record_sets
+                source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator))
+
+        return source_idx_to_record_sets_and_ops
 
     @abstractmethod
     def execute_sentinel_plan(self, sentinel_plan: SentinelPlan, expected_outputs: dict[str, dict]):

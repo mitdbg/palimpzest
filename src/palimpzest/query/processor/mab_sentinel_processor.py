@@ -38,7 +38,6 @@ class MABSentinelQueryProcessor(QueryProcessor):
             k: int,
             j: int,
             sample_budget: int,
-            early_stop_iters: int = 3,
             use_final_op_quality: bool = False,
             seed: int = 42,
             *args,
@@ -51,7 +50,6 @@ class MABSentinelQueryProcessor(QueryProcessor):
         self.k = k
         self.j = j
         self.sample_budget = sample_budget
-        self.early_stop_iters = early_stop_iters
         self.use_final_op_quality = use_final_op_quality
         self.pick_output_fn = self.pick_champion_output
         self.rng = np.random.default_rng(seed=seed)
