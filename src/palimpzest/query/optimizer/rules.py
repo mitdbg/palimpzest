@@ -749,6 +749,8 @@ class ArchonConvertRule(ImplementationRule):
     Implementation rule for the ArchonConvert operator.
     """
 
+    num_generator_models = [1, 2, 3]
+
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
@@ -812,17 +814,16 @@ class ArchonConvertRule(ImplementationRule):
         # TODO: heuristic(s) to narrow the space of critic and refine models we consider using class attributes
         # construct CriticAndRefineConvert operations for every combination of model, critic model, and refinement model
         physical_expressions = []
-        for model in models:
-            for fuser_model in models:
-                for critic_model in models:
-                    for refine_model in models:
+        for k in range(cls.num_generator_models):
+            for model in combinations(models, k):
+                for fuser_model in models:
+                    for critic_model in models:
                         # construct multi-expression
                         op = ArchonConvert(
                             generator_model = model,
-                            fuser_model = fuser_model,
                             critic_model = critic_model,
-                            refine_model = refine_model,
-                            prompt_strategy=PromptStrategy.COT_QA_IMAGE if is_image_conversion else PromptStrategy.COT_QA,
+                            fuser_model = fuser_model,
+                            prompt_strategy = PromptStrategy.COT_QA_IMAGE_ARCHON_GENERATOR if is_image_conversion else PromptStrategy.COT_QA_ARCHON_GENERATOR,
                             **op_kwargs,
                         )
                         expression = PhysicalExpression(

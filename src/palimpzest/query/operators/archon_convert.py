@@ -17,9 +17,8 @@ class ArchonConvert(LLMConvert):
     def __init__(
         self,
         generator_models: list[Model],
-        fuser_model: Model,
         critic_model: Model,
-        refine_model: Model,
+        fuser_model: Model,
         *args,
         **kwargs,
     ):
@@ -27,18 +26,15 @@ class ArchonConvert(LLMConvert):
         self.generator_models = generator_models
         self.fuser_model = fuser_model
         self.critic_model = critic_model
-        self.refine_model = refine_model
         
         if self.prompt_strategy == PromptStrategy.COT_QA:
             self.generator_prompt_strategy = PromptStrategy.COT_QA_ARCHON_GENERATOR
             self.fuser_prompt_strategy = PromptStrategy.COT_QA_ARCHON_FUSER
             self.critic_prompt_strategy = PromptStrategy.COT_QA_ARCHON_CRITIC
-            self.refinement_prompt_strategy = PromptStrategy.COT_QA_ARCHON_REFINE
         elif self.prompt_strategy == PromptStrategy.COT_QA_IMAGE:
             self.generator_prompt_strategy = PromptStrategy.COT_QA_IMAGE_ARCHON_GENERATOR
             self.fuser_prompt_strategy = PromptStrategy.COT_QA_IMAGE_ARCHON_FUSER
             self.critic_prompt_strategy = PromptStrategy.COT_QA_IMAGE_ARCHON_CRITIC
-            self.refinement_prompt_strategy = PromptStrategy.COT_QA_IMAGE_ARCHON_REFINE
         else:
             raise ValueError(f"Unsupported prompt strategy: {self.prompt_strategy}")
 
@@ -47,10 +43,9 @@ class ArchonConvert(LLMConvert):
             generator_factory(model, self.generator_prompt_strategy, self.cardinality, self.verbose)
             for model in generator_models
         ]
-        self.fuser_generator = generator_factory(self.fuser_model, self.fuser_prompt_strategy, self.cardinality, self.verbose)
         self.critic_generator = generator_factory(self.critic_model, self.critic_prompt_strategy, self.cardinality, self.verbose)
-        self.refine_generator = generator_factory(self.refine_model, self.refinement_prompt_strategy, self.cardinality, self.verbose)
-
+        self.fuser_generator = generator_factory(self.fuser_model, self.fuser_prompt_strategy, self.cardinality, self.verbose)
+        
     def __str__(self):
         op = super().__str__()
         op += f"    Generator Models: {self.generator_models}\n"
