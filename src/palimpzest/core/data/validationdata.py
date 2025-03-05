@@ -7,7 +7,7 @@ class ValidationData:
         """
         Initialize ValidationData with a directory path containing execution_stats.updated.json.
         Args:
-            directory: Path to the execution directory containing the stats file
+            file_path: Path to the execution stats file
         """
         self.file_path = file_path
         self.expected_output = {}
@@ -73,7 +73,7 @@ class ValidationData:
                 else:
                     input_dataset.add(os.path.dirname(record_stats["record_state"]["filename"]))
                 cnt += 1
-        assert len(input_dataset) == 1
+        assert len(input_dataset) == 1, "Only one input dataset (one file or one directory) is supported for now"
         return input_dataset.pop(), cnt
     
 

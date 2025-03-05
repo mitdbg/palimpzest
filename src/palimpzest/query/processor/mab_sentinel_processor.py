@@ -577,7 +577,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         plan_stats.start()
 
         # shuffle the indices of records to sample
-        total_num_samples = self.val_data.num_samples()
+        total_num_samples = self.val_data.num_samples() if self.val_data is not None else self.sample_budget
         shuffled_source_indices = [int(idx) for idx in np.arange(total_num_samples)]
         self.rng.shuffle(shuffled_source_indices)
 
@@ -760,7 +760,8 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
         # create copy of dataset, but change its data source to the validation data source
         dataset = dataset.copy()
-        dataset._set_data_source(self.val_data.input_dataset())
+        if self.val_data is not None:
+            dataset._set_data_source(self.val_data.input_dataset())
 
         # get the sentinel plan for the given dataset
         sentinel_plans = optimizer.optimize(dataset, policy)
@@ -772,10 +773,6 @@ class MABSentinelQueryProcessor(QueryProcessor):
     def execute(self) -> DataRecordCollection:
         logger.info("Executing MABSentinelQueryProcessor")
         execution_start_time = time.time()
-
-        # for now, enforce that we are using validation data; we can relax this after paper submission
-        if self.val_data is None:
-            raise Exception("Make sure you are using validation data with MABSentinelExecutionEngine")
 
         # if cache is False, make sure we do not re-use codegen examples
         if not self.cache:

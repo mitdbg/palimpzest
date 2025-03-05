@@ -388,7 +388,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         plan_stats.start()
 
         # sample validation records
-        total_num_samples = self.val_data.num_samples()
+        total_num_samples = self.val_data.num_samples() if self.val_data is not None else self.sample_budget
         source_indices = np.arange(total_num_samples)
         if self.sample_start_idx is not None:
             assert self.sample_end_idx is not None, "Specified `sample_start_idx` without specifying `sample_end_idx`"
@@ -487,7 +487,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         on each record.
         """
         # if we're using validation data, get the set of expected output records
-        expected_outputs = self.val_data.expected_outputs()
+        expected_outputs = self.val_data.expected_outputs() if self.val_data is not None else None
         # run sentinel plan
         execution_data, plan_stats = self.execute_sentinel_plan(sentinel_plan, expected_outputs, policy)
 
@@ -506,7 +506,8 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
 
         # create copy of dataset, but change its data source to the validation data source
         dataset = dataset.copy()
-        dataset._set_data_source(self.val_data.input_dataset())
+        if self.val_data is not None:
+            dataset._set_data_source(self.val_data.input_dataset())
 
         # get the sentinel plan for the given dataset
         sentinel_plans = optimizer.optimize(dataset, policy)
@@ -518,10 +519,6 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
     def execute(self) -> DataRecordCollection:
         logger.info("Executing RandomSamplingSentinelQueryProcessor")
         execution_start_time = time.time()
-
-        # for now, enforce that we are using validation data; we can relax this after paper submission
-        if self.val_data is None:
-            raise Exception("Make sure you are using validation data with MABSentinelExecutionEngine")
 
         # if cache is False, make sure we do not re-use codegen examples
         if not self.cache:
