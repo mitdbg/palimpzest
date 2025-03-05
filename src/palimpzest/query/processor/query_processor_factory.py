@@ -1,4 +1,5 @@
 import logging
+import warnings
 from enum import Enum
 
 from palimpzest.core.elements.records import DataRecordCollection
@@ -60,6 +61,11 @@ class QueryProcessorFactory:
 
         if config.cache:
             raise ValueError("cache=True is not supported yet")
+        
+        # only one of progress or verbose can be set; we will default to progress=True
+        if config.progress and config.verbose:
+            print("WARNING: Both `progress` and `verbose` are set to True, but only one can be True at a time; defaulting to `progress=True`")
+            config.verbose = False
 
         # handle "auto" defaults for processing and sentinel execution strategies
         if config.processing_strategy == "auto":
