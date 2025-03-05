@@ -33,8 +33,6 @@ class QueryProcessor:
         verbose: bool = False,
         progress: bool = True,
         max_workers: int | None = None,
-        num_workers_per_plan: int = 1,
-        min_plans: int = 1,
         policy: Policy | None = None,
         available_models: list[str] | None = None,
         **kwargs,
@@ -58,8 +56,6 @@ class QueryProcessor:
         self.verbose = verbose
         self.progress = progress
         self.max_workers = max_workers
-        self.num_workers_per_plan = num_workers_per_plan
-        self.min_plans = min_plans
 
         self.policy = policy
 
@@ -84,14 +80,9 @@ class QueryProcessor:
 
         return hash_for_id(id_str)
 
-    def _execute_best_plan(
-        self,
-        dataset: Dataset,
-        policy: Policy,
-        optimizer: Optimizer,
-    ) -> tuple[list[DataRecord], list[PlanStats]]:
+    def _execute_best_plan(self, dataset: Dataset, optimizer: Optimizer) -> tuple[list[DataRecord], list[PlanStats]]:
         # get the optimal plan according to the optimizer
-        plans = optimizer.optimize(dataset, policy)
+        plans = optimizer.optimize(dataset)
         final_plan = plans[0]
 
         # execute the plan

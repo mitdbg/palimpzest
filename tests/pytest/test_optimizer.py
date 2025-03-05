@@ -119,7 +119,7 @@ class TestOptimizer:
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
         )
-        physical_plans = optimizer.optimize(plan, policy)
+        physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 1
@@ -143,7 +143,7 @@ class TestOptimizer:
             allow_mixtures=False,
             allow_critic=False,
         )
-        physical_plans = optimizer.optimize(plan, policy)
+        physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 2
@@ -165,7 +165,7 @@ class TestOptimizer:
             optimizer_strategy=opt_strategy,
             allow_code_synth=True,
         )
-        physical_plans = optimizer.optimize(plan, policy)
+        physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 2
@@ -186,7 +186,7 @@ class TestOptimizer:
             optimizer_strategy=opt_strategy,
             allow_code_synth=True,
         )
-        physical_plans = optimizer.optimize(plan, policy)
+        physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 2
@@ -208,7 +208,7 @@ class TestOptimizer:
             optimizer_strategy=opt_strategy,
             allow_code_synth=True,
         )
-        physical_plans = optimizer.optimize(plan, policy)
+        physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 3
@@ -232,7 +232,7 @@ class TestOptimizer:
             optimizer_strategy=opt_strategy,
             allow_code_synth=True,
         )
-        physical_plans = optimizer.optimize(plan, policy)
+        physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 4
@@ -257,7 +257,7 @@ class TestOptimizer:
             allow_critic=False,
             optimizer_strategy=opt_strategy,
         )
-        physical_plans = optimizer.optimize(real_estate_workload, policy)
+        physical_plans = optimizer.optimize(real_estate_workload)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 6
@@ -291,7 +291,7 @@ class TestOptimizer:
             optimizer_strategy=opt_strategy,
             allow_code_synth=True,
         )
-        physical_plans = optimizer.optimize(plan, policy)
+        physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 9
@@ -439,7 +439,7 @@ class TestParetoOptimizer:
             allow_critic=False,
         )
         # run optimizer to get physical plan
-        physical_plans = optimizer.optimize(workload, policy)
+        physical_plans = optimizer.optimize(workload)
         physical_plan = physical_plans[0]
 
         # assert that physical plan matches expected plan

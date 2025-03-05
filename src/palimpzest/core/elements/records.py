@@ -131,6 +131,9 @@ class DataRecord:
             cardinality_idx=self.cardinality_idx,
         )
 
+        # copy the passed_operator attribute
+        new_dr.passed_operator = self.passed_operator
+
         # get the set of fields to copy from the parent record
         copy_field_names = project_cols if project_cols is not None else self.get_field_names()
         copy_field_names = [field.split(".")[-1] for field in copy_field_names]
@@ -290,7 +293,12 @@ class DataRecordSet:
 
     The record_op_stats could be empty if the DataRecordSet is not from executing an operator.
     """
-    def __init__(self, data_records: list[DataRecord], record_op_stats: list[RecordOpStats]):
+    def __init__(
+            self,
+            data_records: list[DataRecord],
+            record_op_stats: list[RecordOpStats],
+            field_to_score_fn: dict[str, str | callable] | None = None,
+        ):
         # check that all data_records are derived from the same parent record
         if len(data_records) > 0:
             parent_id = data_records[0].parent_id
@@ -302,12 +310,19 @@ class DataRecordSet:
         self.data_records = data_records
         self.parent_id = data_records[0].parent_id if len(data_records) > 0 else None
         self.source_idx = data_records[0].source_idx if len(data_records) > 0 else None
+        self.schema = data_records[0].schema if len(data_records) > 0 else None
 
         # set statistics for generating these records
         self.record_op_stats = record_op_stats
 
+        # assign field_to_score_fn if provided
+        self.field_to_score_fn = {} if field_to_score_fn is None else field_to_score_fn
+
     def get_total_cost(self) -> float:
         return sum([record_op_stats.cost_per_record for record_op_stats in self.record_op_stats])
+
+    def get_field_to_score_fn(self) -> dict[str, str | callable]:
+        return self.field_to_score_fn
 
     def __getitem__(self, slice) -> DataRecord | list[DataRecord]:
         return self.data_records[slice]

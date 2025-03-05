@@ -22,14 +22,11 @@ class QueryProcessorConfig:
     scan_start_idx: int = field(default=0)
     num_samples: int = field(default=None)
     cache: bool = field(default=False)  # NOTE: until we properly implement caching, let's set the default to False
-    include_baselines: bool = field(default=False)
-    min_plans: int | None = field(default=None)
     verbose: bool = field(default=False)
     progress: bool = field(default=True)
     available_models: list[Model] | None = field(default=None)
 
     max_workers: int | None = field(default=None)
-    num_workers_per_plan: int = field(default=1)
 
     allow_bonded_query: bool = field(default=True)
     allow_model_selection: bool = field(default=True)
@@ -54,13 +51,10 @@ class QueryProcessorConfig:
             "scan_start_idx": self.scan_start_idx,
             "num_samples": self.num_samples,
             "cache": self.cache,
-            "include_baselines": self.include_baselines,
-            "min_plans": self.min_plans,
             "verbose": self.verbose,
             "progress": self.progress,
             "available_models": self.available_models,
             "max_workers": self.max_workers,
-            "num_workers_per_plan": self.num_workers_per_plan,
             "allow_bonded_query": self.allow_bonded_query,
             "allow_model_selection": self.allow_model_selection,
             "allow_code_synth": self.allow_code_synth,

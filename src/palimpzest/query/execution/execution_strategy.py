@@ -7,7 +7,7 @@ from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats
 from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.policy import Policy
-from palimpzest.query.operators.convert import ConvertOp, LLMConvert
+from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
@@ -17,6 +17,23 @@ from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 logger = logging.getLogger(__name__)
 
 class BaseExecutionStrategy:
+    def __init__(self,
+                 scan_start_idx: int = 0, 
+                 max_workers: int | None = None,
+                 num_samples: int | None = None,
+                 cache: bool = False,
+                 verbose: bool = False,
+                 progress: bool = True,
+                 *args,
+                 **kwargs):
+        self.scan_start_idx = scan_start_idx
+        self.max_workers = max_workers
+        self.num_samples = num_samples
+        self.cache = cache
+        self.verbose = verbose
+        self.progress = progress
+
+
     def _add_records_to_cache(self, target_cache_id: str, records: list[DataRecord]) -> None:
         """Add each record (which isn't filtered) to the cache for the given target_cache_id."""
         if self.cache:
@@ -35,20 +52,8 @@ class BaseExecutionStrategy:
 class ExecutionStrategy(BaseExecutionStrategy, ABC):
     """Base strategy for executing query plans. Defines how to execute a PhysicalPlan.
     """
-    def __init__(self, 
-                 scan_start_idx: int = 0, 
-                 max_workers: int | None = None,
-                 num_samples: int | None = None,
-                 cache: bool = False,
-                 verbose: bool = False,
-                 progress: bool = True,
-                 **kwargs):
-        self.scan_start_idx = scan_start_idx
-        self.max_workers = max_workers
-        self.num_samples = num_samples
-        self.cache = cache
-        self.verbose = verbose
-        self.progress = progress
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         logger.info(f"Initialized ExecutionStrategy {self.__class__.__name__}")
         logger.debug(f"ExecutionStrategy initialized with config: {self.__dict__}")
 
@@ -86,12 +91,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         j: int,
         sample_budget: int,
         policy: Policy,
-        scan_start_idx: int = 0,
-        max_workers: int | None = None,
-        num_samples: int | None = None,
-        cache: bool = False,
-        verbose: bool = False,
-        progress: bool = True,
         sample_all_ops: bool = False,
         sample_all_records: bool = False,
         sample_start_idx: int | None = None,
@@ -100,22 +99,15 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         use_final_op_quality: bool = False,
         seed: int = 42,
         exp_name: str | None = None,
+        *args,
         **kwargs,
     ):
-        # self.max_workers = self.get_parallel_max_workers()
-        # TODO: undo
-        # self.max_workers = 4
+        super().__init__(*args, **kwargs)
         self.val_datasource = val_datasource
         self.k = k
         self.j = j
         self.sample_budget = sample_budget
         self.policy = policy
-        self.scan_start_idx = scan_start_idx
-        self.max_workers = max_workers
-        self.num_samples = num_samples
-        self.cache = cache
-        self.verbose = verbose
-        self.progress = progress
         self.sample_all_ops = sample_all_ops
         self.sample_all_records = sample_all_records
         self.sample_start_idx = sample_start_idx
@@ -123,7 +115,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         self.early_stop_iters = early_stop_iters
         self.use_final_op_quality = use_final_op_quality
         self.seed = seed
-        self.pick_output_fn = self.pick_champion_output
         self.rng = np.random.default_rng(seed=seed)
         self.exp_name = exp_name
 
@@ -131,64 +122,41 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     
     def _compute_quality(
             self,
+            physical_op_cls: type[PhysicalOperator],
             record_set: DataRecordSet,
-            expected_output: dict | None = None,
-            champion_record_set: DataRecordSet | None = None,
-            is_filter_op: bool = False,
-            is_convert_op: bool = False,
+            target_record_set: DataRecordSet,
         ) -> DataRecordSet:
         """
-        Compute the quality for the given `record_set` by comparing it to the `expected_output`.
+        Compute the quality for the given `record_set` by comparing it to the `target_record_set`.
 
         Update the record_set by assigning the quality to each entry in its record_op_stats and
         returning the updated record_set.
         """
-        # compute whether we can only use the champion
-        only_using_champion = expected_output is None
-
-        # if this operation is a failed convert
-        if is_convert_op and len(record_set) == 0:
+        # if this operation failed
+        if len(record_set) == 0:
             record_set.record_op_stats[0].quality = 0.0
 
         # if this operation is a filter:
-        # - we assign a quality of 1.0 if the record is in the expected outputs and it passes this filter
-        # - we assign a quality of 0.0 if the record is in the expected outputs and it does NOT pass this filter
-        # - we assign a quality relative to the champion / ensemble output if the record is not in the expected outputs
-        # we cannot know for certain what the correct behavior is a given filter on a record which is not in the output
-        # (unless it is the only filter in the plan), thus we only evaluate the filter based on its performance on
-        # records which are in the output
-        elif is_filter_op:
-            # NOTE:
-            # - we know that record_set.record_op_stats will contain a single entry for a filter op
-            # - if we are using the champion, then champion_record_set will also contain a single entry for a filter op
-            record_op_stats = record_set.record_op_stats[0]
-            if only_using_champion:
-                champion_record = champion_record_set[0]
-                record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
+        # - return 1.0 if there's a match in the expected output which this operator does not filter out and 0.0 otherwise
+        elif issubclass(physical_op_cls, FilterOp):
+            # NOTE: we know that record_set.data_records will contain a single entry for a filter op
+            record = record_set.data_records[0]
 
-            # - if we are using validation data, we may have multiple expected records in the expected_output for this source_idx,
-            #   thus, if we can identify an exact match, we can use that to evaluate the filter's quality
-            # - if we are using validation data but we *cannot* find an exact match, then we will once again use the champion record set
-            else:
-                # compute number of matches between this record's computed fields and this expected record's outputs
-                found_match_in_output = False
-                labels_dict_lst = expected_output["labels"] if isinstance(expected_output["labels"], list) else [expected_output["labels"]]
-                for labels_dict in labels_dict_lst:
-                    all_correct = True
-                    for field, value in record_op_stats.record_state.items():
-                        if value != labels_dict[field]:
-                            all_correct = False
-                            break
-
-                    if all_correct:
-                        found_match_in_output = True
+            # search for a record in the target with the same set of fields
+            found_match_in_target = False
+            for target_record in target_record_set:
+                all_correct = True
+                for field, value in record.field_values.items():
+                    if value != target_record[field]:
+                        all_correct = False
                         break
 
-                if found_match_in_output:
-                    record_op_stats.quality = int(record_op_stats.passed_operator)
-                else:
-                    champion_record = champion_record_set[0]
-                    record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
+                if all_correct:
+                    found_match_in_target = target_record.passed_operator
+                    break
+
+            # iterate through
+            return int(record.passed_operator == found_match_in_target)
 
         # if this is a successful convert operation
         else:
@@ -198,23 +166,11 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             #       validation dataset and use the champion model (as opposed to the validation
             #       output) for scoring fields which have their values projected out
 
-            # create list of dictionaries of labels for each expected / champion output
-            labels_dict_lst = []
-            if only_using_champion:
-                for champion_record in champion_record_set:
-                    labels_dict_lst.append(champion_record.to_dict())
-            else:
-                labels_dict_lst = (
-                    expected_output["labels"]
-                    if isinstance(expected_output["labels"], list)
-                    else [expected_output["labels"]]
-                )
-
             # GREEDY ALGORITHM
             # for each record in the expected output, we look for the computed record which maximizes the quality metric;
             # once we've identified that computed record we remove it from consideration for the next expected output
-            field_to_score_fn = {} if only_using_champion else expected_output["score_fn"]
-            for labels_dict in labels_dict_lst:
+            field_to_score_fn = target_record_set.get_field_to_score_fn()
+            for target_record_op_stats in target_record_set.record_op_stats:
                 best_quality, best_record_op_stats = 0.0, None
                 for record_op_stats in record_set.record_op_stats:
                     # if we already assigned this record a quality, skip it
@@ -225,7 +181,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     total_quality = 0
                     for field in record_op_stats.generated_fields:
                         computed_value = record_op_stats.record_state.get(field, None)
-                        expected_value = labels_dict[field]
+                        expected_value = target_record_op_stats.record_state.get(field, None)
 
                         # get the metric function for this field
                         score_fn = field_to_score_fn.get(field, "exact")
@@ -263,8 +219,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         self,
         physical_op_cls: type[PhysicalOperator],
         source_idx_to_record_sets: dict[int, list[DataRecordSet]],
-        source_idx_to_champion_record_set: dict[int, DataRecordSet],
-        expected_outputs: dict[int, dict] | None,
+        source_idx_to_target_record_set: dict[int, DataRecordSet],
     ) -> dict[int, list[DataRecordSet]]:
         """
         NOTE: This approach to cost modeling does not work directly for aggregation queries;
@@ -290,8 +245,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         # NOTE: we can infer these fields from context clues, but in the long-term we should have a more
         #       principled way of getting these directly from attributes either stored in the sentinel_plan
         #       or in the PhysicalOperator
-        is_filter_op = issubclass(physical_op_cls, FilterOp)
-        is_convert_op = issubclass(physical_op_cls, ConvertOp)
         is_perfect_quality_op = (
             not issubclass(physical_op_cls, LLMConvert)
             and not issubclass(physical_op_cls, LLMFilter)
@@ -307,127 +260,96 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                         record_op_stats.quality = 1.0
                 continue
 
-            # get the expected output for this source_idx if we have one
-            expected_output = (
-                expected_outputs[source_idx]
-                if expected_outputs is not None and source_idx in expected_outputs
-                else None
-            )
-
-            # extract champion output for this record set
-            champion_record_set = source_idx_to_champion_record_set[source_idx]
+            # extract target output for this record set
+            target_record_set = source_idx_to_target_record_set[source_idx]
 
             # for each record_set produced by an operation, compute its quality
             for record_set in record_sets:
-                record_set = self._compute_quality(record_set, expected_output, champion_record_set, is_filter_op, is_convert_op)
+                record_set = self._compute_quality(physical_op_cls, record_set, target_record_set)
 
         # return the quality annotated record sets
         return source_idx_to_record_sets
 
-    def _get_champion_record_sets(
+    def _get_target_record_sets(
         self,
+        logical_op_id: str,
         source_idx_to_record_sets_and_ops: dict[int, list[tuple[DataRecordSet, PhysicalOperator]]],
         expected_outputs: dict[int, dict] | None,
     ) -> dict[int, DataRecordSet]:
-        # # if we have a label, return the label
-        # if expected_outputs is not None:
+        # initialize mapping from source index to target record sets
+        source_idx_to_target_record_set = {}
 
-        #     return {
-        #         source_idx: expected_outputs[source_idx]["labels"]
-        #         for source_idx in expected_outputs
-        #     }
+        # if we have label(s), return the label(s)
+        if expected_outputs is not None:
+            for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items():
+                # get the first generated output for this source_idx
+                base_target_record = None
+                for record_set, _ in record_sets_and_ops:
+                    if len(record_set) > 0:
+                        base_target_record = record_set[0]
+                        break
 
-        # # if we don't have a label, max_Q (outputs in cache, new outputs)
-        # # update the cache
-        
-        # compute the champion record set for each source_idx
-        return {
-            source_idx: self.pick_output_fn(record_sets_and_ops)
-            for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items()
-        }
+                # if no operations completed successfully, break and let champion logic handle this
+                if base_target_record is None:
+                    break
 
-    def pick_champion_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
-        # if there's only one operator in the set, we return its record_set
-        if len(op_set_record_sets) == 1:
-            record_set, _ = op_set_record_sets[0]
-            return record_set
+                # get the label data
+                labels = expected_outputs[source_idx]["labels"]
+                labels_dict_lst = labels if isinstance(labels, list) else [labels]
 
-        # find the operator with the highest average quality and return its record_set
+                # construct the target record set; we force passed_operator to be True for all target records
+                target_records = []
+                for labels_dict in labels_dict_lst:
+                    target_record = base_target_record.copy()
+                    for field, value in labels_dict.items():
+                        target_record[field] = value
+                    target_record.passed_operator = True
+                    target_records.append(target_record)
+
+                source_idx_to_target_record_set[source_idx] = DataRecordSet(target_records, None)
+
+            return source_idx_to_target_record_set
+
+        # if we don't have a label use the maximum quality record from the union of the cache and new records
+        for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items():
+            # get the best computed output for this (source_idx, logical_op_id) so far (if one exists)
+            champion_record_set, champion_op_quality = None, None
+            if source_idx in self.champion_output_cache and logical_op_id in self.champion_output_cache[source_idx]:
+                champion_record_set, champion_op_quality = self.champion_output_cache[source_idx][logical_op_id]
+
+            # get the highest quality output that we just computed
+            max_quality_record_set, max_op_quality = self._pick_champion_output(record_sets_and_ops)
+
+            # if this new output is of higher quality than our previous champion (or if we didn't have
+            # a previous champion) then we update our champion record set
+            if champion_op_quality is None or (max_op_quality is not None and max_op_quality > champion_op_quality):
+                champion_record_set, champion_op_quality = max_quality_record_set, max_op_quality
+
+            # update the cache with the new champion record set and quality
+            if source_idx not in self.champion_output_cache:
+                self.champion_output_cache[source_idx] = {}
+            self.champion_output_cache[source_idx][logical_op_id] = (champion_record_set, champion_op_quality)
+
+            # set the target
+            source_idx_to_target_record_set[source_idx] = champion_record_set
+
+        return source_idx_to_target_record_set
+
+    def _pick_champion_output(self, record_sets_and_ops: list[tuple[DataRecordSet, PhysicalOperator]]) -> tuple[DataRecordSet, float | None]:
+        # find the operator with the highest estimated quality and return its record_set
         base_op_cost_est = OperatorCostEstimates(cardinality=1.0, cost_per_record=0.0, time_per_record=0.0, quality=1.0)
-        champion_record_set, champion_quality = None, -1.0
-        for record_set, op in op_set_record_sets:
-            op_cost_estimates = op.naive_cost_estimates(base_op_cost_est)
-            if op_cost_estimates.quality > champion_quality:
-                champion_record_set, champion_quality = record_set, op_cost_estimates.quality
+        champion_record_set, champion_quality = None, None
+        for record_set, op in record_sets_and_ops:
+            # skip failed operations
+            if len(record_set) > 0:
+                continue
 
-        return champion_record_set
+            # get the estimated quality of this operator
+            est_quality = op.naive_cost_estimates(base_op_cost_est).quality
+            if champion_quality is None or est_quality > champion_quality:
+                champion_record_set, champion_quality = record_set, est_quality
 
-    def pick_ensemble_output(self, op_set_record_sets: list[tuple[DataRecordSet, PhysicalOperator]]) -> DataRecordSet:
-        # if there's only one operator in the set, we return its record_set
-        if len(op_set_record_sets) == 1:
-            record_set, _ = op_set_record_sets[0]
-            return record_set
-
-        # NOTE: I don't like that this assumes the models are consistent in
-        #       how they order their record outputs for one-to-many converts;
-        #       eventually we can try out more robust schemes to account for
-        #       differences in ordering
-        # aggregate records at each index in the response
-        idx_to_records = {}
-        for record_set, _ in op_set_record_sets:
-            for idx, record in enumerate(record_set):
-                if idx not in idx_to_records:
-                    idx_to_records[idx] = [record]
-                else:
-                    idx_to_records[idx].append(record)
-
-        # compute most common answer at each index
-        out_records = []
-        for idx in range(len(idx_to_records)):
-            records = idx_to_records[idx]
-            most_common_record = max(set(records), key=records.count)
-            out_records.append(most_common_record)
-
-        # create and return final DataRecordSet
-        return DataRecordSet(out_records, [])
-
-    def pick_highest_quality_output(self, record_sets: list[DataRecordSet]) -> DataRecordSet:
-        # if there's only one operator in the set, we return its record_set
-        if len(record_sets) == 1:
-            return record_sets[0]
-
-        # NOTE: I don't like that this assumes the models are consistent in
-        #       how they order their record outputs for one-to-many converts;
-        #       eventually we can try out more robust schemes to account for
-        #       differences in ordering
-        # aggregate records at each index in the response
-        idx_to_records = {}
-        for record_set in record_sets:
-            for idx in range(len(record_set)):
-                record, record_op_stats = record_set[idx], record_set.record_op_stats[idx]
-                if idx not in idx_to_records:
-                    idx_to_records[idx] = [(record, record_op_stats)]
-                else:
-                    idx_to_records[idx].append((record, record_op_stats))
-
-        # compute highest quality answer at each index
-        out_records = []
-        out_record_op_stats = []
-        for idx in range(len(idx_to_records)):
-            records_lst, record_op_stats_lst = zip(*idx_to_records[idx])
-            max_quality_record, max_quality = records_lst[0], record_op_stats_lst[0].quality
-            max_quality_stats = record_op_stats_lst[0]
-            for record, record_op_stats in zip(records_lst[1:], record_op_stats_lst[1:]):
-                record_quality = record_op_stats.quality
-                if record_quality > max_quality:
-                    max_quality_record = record
-                    max_quality = record_quality
-                    max_quality_stats = record_op_stats
-            out_records.append(max_quality_record)
-            out_record_op_stats.append(max_quality_stats)
-
-        # create and return final DataRecordSet
-        return DataRecordSet(out_records, out_record_op_stats)
+        return champion_record_set, champion_quality
 
     @abstractmethod
     def execute_sentinel_plan(self, sentinel_plan: SentinelPlan, expected_outputs: dict[str, dict]):

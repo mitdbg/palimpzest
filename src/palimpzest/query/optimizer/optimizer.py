@@ -476,7 +476,7 @@ class Optimizer:
 
         logger.debug(f"Done searching optimization space for group_id: {group_id}")
 
-    def optimize(self, query_plan: Dataset, policy: Policy | None = None) -> list[PhysicalPlan]:
+    def optimize(self, query_plan: Dataset) -> list[PhysicalPlan]:
         """
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
@@ -493,4 +493,4 @@ class Optimizer:
         self.search_optimization_space(final_group_id)
         logger.info(f"Getting optimal plans for final group id: {final_group_id}")
 
-        return self.strategy.get_optimal_plans(self.groups, final_group_id, policy, self.use_final_op_quality)
+        return self.strategy.get_optimal_plans(self.groups, final_group_id, self.policy, self.use_final_op_quality)
