@@ -78,6 +78,7 @@ from palimpzest.prompts.archon_convert_prompts import (
     BASE_ARCHON_FUSER_PROMPT,
     BASE_ARCHON_CRITIQUE_PROMPT,
     BASE_ARCHON_REFINEMENT_PROMPT,
+    BASE_ARCHON_CRITIQUE_FINISH_INSTRUCTION
 )
 from palimpzest.prompts.util_phrases import (
     ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION,
@@ -364,9 +365,13 @@ class PromptFactory:
         """
         finish_instruction = None
         if self.prompt_strategy.is_critic_prompt():
-            finish_instruction = COT_QA_CRITIQUE_FINISH_INSTRUCTION
+            if self.prompt_strategy.is_archon_prompt:
+                finish_instruction = BASE_ARCHON_CRITIQUE_FINISH_INSTRUCTION
+            else:
+                finish_instruction = COT_QA_CRITIQUE_FINISH_INSTRUCTION
         elif self.prompt_strategy.is_refine_prompt():
             finish_instruction = COT_QA_REFINEMENT_FINISH_INSTRUCTION
+        
 
         return finish_instruction
 

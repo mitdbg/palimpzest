@@ -16,7 +16,7 @@ class ArchonConvert(LLMConvert):
 
     def __init__(
         self,
-        generator_model: Model,
+        generator_models: list[Model],
         fuser_model: Model,
         critic_model: Model,
         refine_model: Model,
@@ -24,6 +24,8 @@ class ArchonConvert(LLMConvert):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+        self.generator_models = generator_models
+        self.fuser_model = fuser_model
         self.critic_model = critic_model
         self.refine_model = refine_model
         
@@ -41,19 +43,22 @@ class ArchonConvert(LLMConvert):
             raise ValueError(f"Unsupported prompt strategy: {self.prompt_strategy}")
 
         # create generators
-        self.generator_generator = generator_factory(self.generator_model, self.generator_prompt_strategy, self.cardinality, self.verbose)
+        self.generator_generators = [
+            generator_factory(model, self.generator_prompt_strategy, self.cardinality, self.verbose)
+            for model in generator_models
+        ]
         self.fuser_generator = generator_factory(self.fuser_model, self.fuser_prompt_strategy, self.cardinality, self.verbose)
         self.critic_generator = generator_factory(self.critic_model, self.critic_prompt_strategy, self.cardinality, self.verbose)
         self.refine_generator = generator_factory(self.refine_model, self.refinement_prompt_strategy, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()
-        op += f"    Generator Model: {self.generator_model}\n"
+        op += f"    Generator Models: {self.generator_models}\n"
         op += f"    Generator Prompt Strategy: {self.generator_prompt_strategy}\n"
-        op += f"    Fuser Model: {self.fuser_model}\n"
-        op += f"    Fuser Prompt Strategy: {self.fuser_prompt_strategy}\n"
         op += f"    Critic Model: {self.critic_model}\n"
         op += f"    Critic Prompt Strategy: {self.critic_prompt_strategy}\n"
+        op += f"    Fuser Model: {self.fuser_model}\n"
+        op += f"    Fuser Prompt Strategy: {self.fuser_prompt_strategy}\n"
         op += f"    Refine Model: {self.refine_model}\n"
         op += f"    Refinement Prompt Strategy: {self.refinement_prompt_strategy}\n"
         return op
@@ -61,9 +66,9 @@ class ArchonConvert(LLMConvert):
     def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {
-            "generator_model": self.generator_model.value,
-            "fuser_model": self.fuser_model.value,
+            "generator_models": [model.value for model in self.generator_models],
             "critic_model": self.critic_model.value,
+            "fuser_model": self.fuser_model.value,
             "refine_model": self.refine_model.value,
             **id_params,
         }
@@ -74,8 +79,8 @@ class ArchonConvert(LLMConvert):
         op_params = super().get_op_params()
         op_params = {
             "generator_model": self.generator_model,
-            "fuser_model": self.fuser_model,
             "critic_model": self.critic_model,
+            "fuser_model": self.fuser_model,
             "refine_model": self.refine_model,
             **op_params,
         }
@@ -92,6 +97,8 @@ class ArchonConvert(LLMConvert):
         # get naive cost estimates for first LLM call and multiply by 3 for now;
         # of course we should sum individual estimates for each model, but this is a rough estimate
         # and in practice we will need to revamp our naive cost estimates in the near future
+
+        #NEED TO EDIT FOR ARCHON
         naive_op_cost_estimates = 3 * super().naive_cost_estimates(source_op_cost_estimates)
 
         # for naive setting, estimate quality as quality of refine model
@@ -108,27 +115,33 @@ class ArchonConvert(LLMConvert):
 
         # NOTE: when I merge in the `abacus` branch, I will want to update this to reflect the changes I made to reasoning extraction
         # execute the generator model
-        original_gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema}
-        field_answers, reasoning, original_gen_stats = self.generator_generator(candidate, fields, **original_gen_kwargs)
-        original_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
-        original_messages = self.generator_generator.get_messages()
+        # execute generator models in sequence
+        generator_final_answers, generator_stats = [], []
+        for generator_generator in self.generator_generators:
+            original_gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema}
+            field_answers, reasoning, original_gen_stats = generator_generator(candidate, fields, **original_gen_kwargs)
+            generator_final_answers.append(f"REASONING: {reasoning}\nANSWER:{field_answers}\n")
+            generator_stats.append(original_gen_stats)
 
-        # execute the fuser model
-        fuser_gen_kwargs = {"original_output": original_output, "original_messages": original_messages, **original_gen_kwargs}
-        field_answers, reasoning, fuser_gen_stats = self.fuser_generator(candidate, fields, **fuser_gen_kwargs)
-        fuser_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
-        fuser_messages = self.fuser_generator.get_messages()
+        formatted_candidates = "\n\n".join(f"[{i+1}] {generator_final_answers[i]}" for i in range(len(generator_final_answers)))
 
         # execute the critic model
-        critic_gen_kwargs = {"original_output": fuser_output, "original_messages": fuser_messages, **fuser_gen_kwargs}
+        critic_gen_kwargs = {"original_output": formatted_candidates, **original_gen_kwargs}
         field_answers, reasoning, critic_gen_stats = self.critic_generator(candidate, fields, **critic_gen_kwargs)
-        critique_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
+        critic_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
+        #critic_messages = self.fuser_generator.get_messages()
+
+        #formatted_candidates_with_critiques = "Responses from Models:" + formatted_candidates + "\n + \n + Respective Critiques: \n + \n" + field_answers
+        # execute the fuser model
+        fuser_gen_kwargs = {"original_output": formatted_candidates, "critique_output": field_answers, **original_gen_kwargs}
+        field_answers, reasoning, fuser_gen_stats = self.fuser_generator(candidate, fields, **fuser_gen_kwargs)
+        fuser_output = f"REASONING: {reasoning}\nANSWER:{field_answers}\n"
 
         # execute the refinement model
-        refine_gen_kwargs = {"critique_output": critique_output, **critic_gen_kwargs}
-        field_answers, reasoning, refine_gen_stats = self.refine_generator(candidate, fields, **refine_gen_kwargs)
+        #refine_gen_kwargs = {"fuser_output": field_answers, **critic_gen_kwargs}
+        #field_answers, reasoning, refine_gen_stats = self.refine_generator(candidate, fields, **refine_gen_kwargs)
 
         # compute the total generation stats
-        generation_stats = original_gen_stats + fuser_gen_stats + critic_gen_stats + refine_gen_stats
+        generation_stats = sum(generator_stats) + critic_gen_stats + fuser_gen_stats 
 
         return field_answers, generation_stats
