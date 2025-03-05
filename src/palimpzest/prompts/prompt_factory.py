@@ -74,6 +74,11 @@ from palimpzest.prompts.moa_proposer_convert_prompts import (
     COT_MOA_PROPOSER_IMAGE_JOB_INSTRUCTION,
     COT_MOA_PROPOSER_JOB_INSTRUCTION,
 )
+from palimpzest.prompts.archon_convert_prompts import (
+    BASE_ARCHON_FUSER_PROMPT,
+    BASE_ARCHON_CRITIQUE_PROMPT,
+    BASE_ARCHON_REFINEMENT_PROMPT,
+)
 from palimpzest.prompts.util_phrases import (
     ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION,
     ONE_TO_ONE_OUTPUT_FORMAT_INSTRUCTION,
@@ -93,6 +98,12 @@ class PromptFactory:
         PromptStrategy.COT_QA_IMAGE_REFINE: None,
         PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_MOA_AGG: COT_MOA_AGG_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_QA_ARCHON_FUSER: None,
+        PromptStrategy.COT_QA_ARCHON_CRITIC: None,
+        PromptStrategy.COT_QA_ARCHON_REFINE: None,
+        PromptStrategy.COT_QA_IMAGE_ARCHON_FUSER: None,
+        PromptStrategy.COT_QA_IMAGE_ARCHON_CRITIC: None,
+        PromptStrategy.COT_QA_IMAGE_ARCHON_REFINE: None,
     }
     BASE_USER_PROMPT_MAP = {
         PromptStrategy.COT_BOOL: COT_BOOL_BASE_USER_PROMPT,
@@ -105,6 +116,12 @@ class PromptFactory:
         PromptStrategy.COT_QA_IMAGE_REFINE: BASE_REFINEMENT_PROMPT,
         PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_BASE_USER_PROMPT,
         PromptStrategy.COT_MOA_AGG: COT_MOA_AGG_BASE_USER_PROMPT,
+        PromptStrategy.COT_QA_ARCHON_FUSER: BASE_ARCHON_FUSER_PROMPT,
+        PromptStrategy.COT_QA_ARCHON_CRITIC: BASE_ARCHON_CRITIQUE_PROMPT,
+        PromptStrategy.COT_QA_ARCHON_REFINE: BASE_ARCHON_REFINEMENT_PROMPT,
+        PromptStrategy.COT_QA_IMAGE_ARCHON_FUSER: BASE_ARCHON_FUSER_PROMPT,
+        PromptStrategy.COT_QA_IMAGE_ARCHON_CRITIC: BASE_ARCHON_CRITIQUE_PROMPT,
+        PromptStrategy.COT_QA_IMAGE_ARCHON_REFINE: BASE_ARCHON_REFINEMENT_PROMPT,
     }
 
     def __init__(self, prompt_strategy: PromptStrategy, model: Model, cardinality: Cardinality) -> None:
@@ -729,7 +746,7 @@ class PromptFactory:
         user_messages = self._get_user_messages(candidate, input_fields, **kwargs)
         messages.extend(user_messages)
 
-        print("MESSAGES ARE")
-        print(messages)
-        print("---------")
+       #print("MESSAGES ARE")
+        #print(messages)
+        #print("---------")
         return messages
