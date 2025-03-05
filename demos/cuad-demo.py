@@ -626,7 +626,7 @@ def main():
     print("Query execution completed")
 
     pred_df = data_record_collection.to_df()
-    label_df = val_data.expected_outputs()
+    label_df = pd.DataFrame.from_dict(val_data.expected_outputs())
 
     prec, recall = compute_precision_recall(label_df, pred_df)
     print(f"Precision: {prec:.3f}, Recall: {recall:.3f}")
