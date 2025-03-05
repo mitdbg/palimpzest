@@ -116,99 +116,6 @@ def get_file_content(owner, repo, path, token=None, ref="main"):
         print("Error fetching file content:", response.status_code, response.text)
         return None
     
-# def search_files(keywords, per_page=30, page=1):
-#     """
-#     Search for files on GitHub that contain the provided keywords.
-    
-#     Parameters:
-#       - keywords: a list of strings containing keywords to search for.
-#       - per_page: number of results per page (max 100).
-#       - page: which page of results to retrieve.
-    
-#     Returns:
-#       - A JSON object with search results, or None if an error occurred.
-#     """
-
-#     # TO DO: This might be buggy because it only searches over the most state in main 
-
-#     base_url = "https://api.github.com/search/code"
-    
-#     # Build the query string from keywords.
-#     query = " ".join(keywords)
-    
-#     # Add repository qualifier if provided.
-#     if TEMP_VARS["owner"] and TEMP_VARS["repo"]:
-#         query += f' repo:{TEMP_VARS["owner"]}/{TEMP_VARS["repo"]}'
-    
-#     # Optionally, to ensure we search inside file content rather than just filenames,
-#     # you could add: query += " in:file"
-    
-#     params = {
-#         "q": query,
-#         "per_page": per_page,
-#         "page": page
-#     }
-    
-#     headers = {}
-#     token = os.getenv("GITHUB_TOKEN")
-#     if token:
-#         headers["Authorization"] = f"token {token}"
-    
-#     response = requests.get(base_url, headers=headers, params=params)
-    
-#     if response.status_code == 200:
-#         data = response.json()
-#         file_paths = [item["path"] for item in data.get("tree", []) if item["type"] == "blob"]
-#         return file_paths
-#     else:
-#         print("Error during search:", response.status_code, response.text)
-#         return None
-
-def split_keyword(keyword):
-    """
-    Split a keyword into subtokens based on camelCase, underscores, and periods.
-    For example, "quickSortArray" becomes ["quick", "sort", "array"].
-    """
-    # Replace underscores and periods with spaces
-    keyword = re.sub(r'[_\.]', ' ', keyword)
-    tokens = []
-    for part in keyword.split():
-        # This regex splits camelCase words.
-        tokens.extend(re.findall(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z]|$)', part))
-    return [token.lower() for token in tokens if token]
-
-def generate_candidates(tokens):
-    """
-    Given a list of tokens, generate candidate patterns that
-    represent contiguous groupings of tokens.
-    
-    We generate:
-      - All contiguous subsequences of tokens (of length >= 2)
-      - All cyclic rotations of the full token list (if there is more than one token)
-    
-    These candidates are simply the tokens concatenated together without any delimiters.
-    """
-    candidates = set()
-    n = len(tokens)
-    if n == 0:
-        return candidates
-    if n == 1:
-        candidates.add(tokens[0])
-        return candidates
-    
-    # Generate contiguous subsequences (length at least 2)
-    for i in range(n):
-        for j in range(i+2, n+1):
-            candidate = ''.join(tokens[i:j])
-            candidates.add(candidate)
-    
-    # Generate cyclic rotations of the full token list (e.g., for quickSortArray, add arrayQuickSort)
-    for shift in range(1, n):
-        candidate = ''.join(tokens[shift:] + tokens[:shift])
-        candidates.add(candidate)
-    
-    return candidates
-
 def search_keyword(repo_path, commit_hash, keyword):
     """
     Search a commit for files that contain the given keyword or its similar variations.
@@ -228,39 +135,32 @@ def search_keyword(repo_path, commit_hash, keyword):
     Returns:
         list: File paths (relative to the repository root) that match.
     """
-
-    # Split the keyword into tokens.
-    tokens = split_keyword(keyword)
-    # Generate candidate strings.
-    candidates = generate_candidates(tokens)
-    # Also include the full concatenation of tokens in the original order.
-    candidates.add(''.join(tokens))
     
-    print(f"Candidates for keyword '{keyword}': {candidates}")
-
     repo = pygit2.Repository(repo_path)
     commit = repo[commit_hash]
     results = []
 
+    # TO DO: Validate that this search is for the correct commit 
+    # TO DO: Maybe implement a more efficient search
     def search_tree(tree, path_prefix=""):
-        import pdb; pdb.set_trace()
         for entry in tree:
             full_path = f"{path_prefix}/{entry.name}" if path_prefix else entry.name
-            if entry.type == 'blob':
+            if entry.type_str == 'blob':
                 blob = repo[entry.id]
                 try:
                     content = blob.data.decode('utf-8', errors='ignore')
                 except Exception:
                     continue
-                # Normalize content by removing underscores and periods and converting to lowercase.
-                normalized_content = re.sub(r'[_\.]', '', content.lower())
                 # A file is a match if any candidate appears as a contiguous substring.
-                if any(candidate in normalized_content for candidate in candidates):
+                if keyword in content: 
                     results.append(full_path)
-            elif entry.type == 'tree':
+            elif entry.type_str == 'tree':
                 search_tree(repo[entry.id], full_path)
     
     search_tree(commit.tree)
+
+    # import pdb; pdb.set_trace()
+
     return results
 
 def download_repo(repo_name, dest_dir='repos'):

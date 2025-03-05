@@ -11,8 +11,8 @@ openai_key = get_api_key("OPENAI_API_KEY")
 
 # GLOBAL VARIABLES
 # TO DO: Find a better way to create state accessible  
+
 GLOBAL_CONTEXT = {
-    "relevant_issue_code": None,
     "model": dspy.LM('openai/gpt-4o', api_key=openai_key),
     "base_commit": None,
 }
@@ -20,18 +20,18 @@ GLOBAL_CONTEXT = {
 class BaseAgent:
 
     @staticmethod
-    def set_globals(relevant_issue_code: str, base_commit: str):
+    def set_globals(base_commit: str):
         """
         Sets the global variables for the agent.
         """
-        GLOBAL_CONTEXT["relevant_issue_code"] = relevant_issue_code
+        # GLOBAL_CONTEXT["relevant_issue_code"] = relevant_issue_code
         GLOBAL_CONTEXT["base_commit"] = base_commit
 
     @staticmethod
     def get_file_content(file_name: str, include_line_numbers: bool) -> str:
         """
         Returns the content of an entire file. 
-        Use this when the entire context of a file is imporant.
+        Only use this when the entire content of a file is required as it may return many tokens.
         Only set include_line_numbers to True if being used to generate a patch. 
         """
         print(f'get_file_content {file_name}')
@@ -42,8 +42,9 @@ class BaseAgent:
     @staticmethod
     def search_keyword(repo_name : str, keyword: str) -> str:
         """
-        Searches the codebase for the provided keyword and returns the files that contain them.
+        Searches the codebase for the provided keyword and returns the files the keyword. 
         Provide repo_name in "owner/repo" format. 
+        If searching for a function or class definition, it may be useful to prefix the keyword with "def " or "class ".
         """
         print(f'search_keyword {keyword}')
 
@@ -96,7 +97,7 @@ class BaseAgent:
                 else:
                     return method_str
 
-        return "function not found in the file"
+        return "Function not found in file. Note: Make sure it is a function, not a class"
 
     @staticmethod
     def get_classes_and_methods(file_name: str) -> str:
@@ -122,20 +123,18 @@ class BaseAgent:
 
         print(f'get_class_and_methods for {file_name}')
 
-        relevant_issue_code = GLOBAL_CONTEXT["relevant_issue_code"]
+        # relevant_issue_code = GLOBAL_CONTEXT["relevant_issue_code"]
 
-        pattern = rf"\[start of ([^\]]*{re.escape(file_name)}[^\]]*)\](.*?)\[end of \1\]"
-        match = re.search(pattern, relevant_issue_code, re.DOTALL)
+        # pattern = rf"\[start of ([^\]]*{re.escape(file_name)}[^\]]*)\](.*?)\[end of \1\]"
+        # match = re.search(pattern, relevant_issue_code, re.DOTALL)
         
-        if match: 
-            code = match.group(2).strip()
-        else: 
-            code = utils.fetch_github_code(file_name, GLOBAL_CONTEXT["base_commit"])
-            if not code: 
-                return "That file is not found in the relevant issue code, please try another file"
+        # if match: 
+        #     code = match.group(2).strip()
+        # else: 
+
+        code = utils.fetch_github_code(file_name, GLOBAL_CONTEXT["base_commit"])
+        if not code: 
+            return "That file is not found in the relevant issue code, please try another file"
 
         code_structure = utils.extract_structure(code)
         return code_structure 
-    
-
-# Add optional line number args, and add them to the output

@@ -6,6 +6,7 @@ from palimpzest.core.lib.fields import Field
 from palimpzest.agents.debugger_agent import DebuggerAgent
 from palimpzest.agents.code_editor_agent import CodeEditorAgent
 from palimpzest.query.processor.config import QueryProcessorConfig
+from datetime import datetime
 
 import json
 import re
@@ -115,19 +116,19 @@ def remove_irrelevant_fields(candidate: DataRecord):
     return code_fix 
 
 def buildSweBenchPlan(dataset):
-    debugger_agent = DebuggerAgent()
-    code_agent = CodeEditorAgent()
 
-    github_issues = pz.Dataset(dataset, schema=GithubIssue, udf=extract_relevant_fields, cardinality=Cardinality.ONE_TO_ONE)
+    # Create agents
+    debugger_agent = DebuggerAgent()
+    code_editor_agent = CodeEditorAgent()
+
+    # Create dataset
+    github_issues = pz.Dataset(dataset, schema=GithubIssue, udf=extract_relevant_fields)
+
+    # Process GitHub Issues
     code_plans = debugger_agent(github_issues)
-    code_patches = code_agent(code_plans)
+    code_patches = code_editor_agent(code_plans)
+
     return code_patches
-    # code_fixes = github_issues.convert(outputSchema=CodeFix)
-    # code_fixes = code_plans.convert(output_schema=CodeFix)
-    # patches = code_fixes.convert(outputSchema=GithubCodePatch, udf=generate_patch)
-    # simplified_code_fixes = code_fixes.convert(output_schema=SimplifiedCodeFix, udf=remove_irrelevant_fields) patches = simplified_code_fixes.convert(output_schema=GithubCodePatch)
-    # verified_patches = patches.verify(run_tests, retries=3)
-    # return patches
 
 def dump_records(filename, records, values, all_values=False):
     # Filter the dictionaries to include only specified columns (keys)
@@ -135,9 +136,9 @@ def dump_records(filename, records, values, all_values=False):
 
     for record in records:
         if all_values: 
-            instance_patch = record._asDict()
+            instance_patch = record.to_dict()
         else: 
-            instance_patch = {key: record._asDict().get(key) for key in values if key in record._asDict()}
+            instance_patch = {key: record.to_dict().get(key) for key in values if key in record.to_dict()}
         instance_patch['model_name_or_path'] = 'palimpzest'
         dict_list.append(instance_patch)
 
@@ -168,7 +169,6 @@ if __name__ == "__main__":
     #                             verbose=True)
 
     print('COMPLETE')
-    # import pdb; pdb.set_trace()
     # TO DO: Save the output in JSON file 
 
     # print(f'Record Type: {records}')
@@ -180,5 +180,5 @@ if __name__ == "__main__":
     # print(plan_str)
 
     # # Output Records into json file
-    # filename = 'output.json'
-    # dump_records(filename, records, values=['instance_id', 'model_patch']) 
+    filename = f'output_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.json' 
+    dump_records(filename, data_record_collection, values=['instance_id', 'model_patch']) 

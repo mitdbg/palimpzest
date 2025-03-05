@@ -14,11 +14,10 @@ dataset = load_dataset("princeton-nlp/SWE-bench_oracle")
 # Access the training set
 test_data = dataset['test']
 
-output_dir = "../testdata/swe-bench-oracle-lite"
+output_dir = "../testdata/swe-bench-oracle"
 os.makedirs(output_dir, exist_ok=True)
 
 for idx, row in enumerate(test_data):
-  # Just do one for testing
   if idx > NUM_INSTANCES: 
     break 
 
