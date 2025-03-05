@@ -245,11 +245,12 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                 continue
 
             # get the expected output for this source_idx if we have one
-            expected_output = (
-                expected_outputs[logical_op_id][source_idx]
-                if expected_outputs is not None and source_idx in expected_outputs[logical_op_id]
-                else None
-            )
+            expected_output = None
+            logical_op_idx = len(operator_sets) - 1
+            if logical_op_id in expected_outputs and source_idx in expected_outputs[logical_op_id]:
+                expected_output = expected_outputs[logical_op_id][source_idx]
+            elif logical_op_idx in expected_outputs and source_idx in expected_outputs[logical_op_idx]:
+                expected_output = expected_outputs[logical_op_idx][source_idx]
 
             # extract champion output for this record set
             champion_record_set = champion_outputs[logical_op_id][source_idx]
@@ -361,7 +362,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                 champion_record_set = self.pick_output_fn(candidate_output_record_sets)
 
                 # get the source_idx associated with this input record
-                source_idx = candidate.source_idx
+                source_idx = candidate
 
                 # add champion record_set to mapping from source_idx --> champion record_set
                 champion_record_sets[source_idx] = champion_record_set

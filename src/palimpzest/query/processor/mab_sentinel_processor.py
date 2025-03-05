@@ -344,6 +344,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
     def score_quality(
         self,
+        op_idx: int,
         op_set: list[PhysicalOperator],
         logical_op_id: str,
         execution_data: dict[str, dict[str, list[DataRecordSet]]],
@@ -401,11 +402,15 @@ class MABSentinelQueryProcessor(QueryProcessor):
                 continue
 
             # get the expected output for this source_idx if we have one
-            expected_output = (
-                expected_outputs[logical_op_id][source_idx]
-                if expected_outputs is not None and source_idx in expected_outputs[logical_op_id]
-                else None
-            )
+            # we use the op_idx to get the expected output since users might use op_idx to specify the expected output
+            expected_output = None
+            if expected_outputs is not None:
+                if logical_op_id in expected_outputs and source_idx in expected_outputs[logical_op_id]:
+                    expected_output = expected_outputs[logical_op_id][source_idx]
+
+                # Fall back to op_idx for backward compatibility with older test data
+                elif op_idx in expected_outputs and source_idx in expected_outputs[op_idx]:
+                    expected_output = expected_outputs[op_idx][source_idx]
 
             # extract champion output for this record set
             champion_record_set = champion_outputs[logical_op_id][source_idx]
@@ -697,6 +702,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
                 # compute quality for each operator
                 all_outputs = self.score_quality(
+                    op_idx,
                     op_set,
                     logical_op_id,
                     all_outputs,

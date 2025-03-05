@@ -1,12 +1,13 @@
 import argparse
 import os
-
+import json 
 import datasets
 import numpy as np
 import pandas as pd
 
 import palimpzest as pz
 from palimpzest.core.lib.fields import ListField, StringField
+from palimpzest.core.data.validationdata import ValidationData
 
 cuad_categories = [
     {
@@ -412,10 +413,9 @@ def score_fn(preds, labels):
 
 
 class CUADDataReader(pz.DataReader):
-    def __init__(self, num_contracts: int = 1, is_validation_source: bool = False):
+    def __init__(self, num_contracts: int = 1):
         self.num_contracts = num_contracts
-        self.is_validation_source = is_validation_source
-        self.dataset = datasets.load_dataset("theatticusproject/cuad-qa", trust_remote_code=True)["test"]
+        self.dataset = datasets.load_dataset("theatticusproject/cuad-qa")["test"]
         self.dataset = self.dataset.select(range(num_contracts * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT))
 
         input_cols = [
@@ -434,21 +434,7 @@ class CUADDataReader(pz.DataReader):
         title = self.dataset[idx * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT]["title"]
         contract = self.dataset[idx * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT]["context"]
 
-        if not self.is_validation_source:
-            return {"contract_id": id, "title": title, "contract": contract}
-
-        item = {"fields": {}, "labels": {}, "score_fn": {}}
-        item["fields"]["contract_id"] = id
-        item["fields"]["title"] = title
-        item["fields"]["contract"] = contract
-
-        for category_idx, category in enumerate(cuad_categories):
-            item["labels"][category["Category"]] = self.dataset[
-                idx * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT + category_idx
-            ]["answers"]["text"]
-            item["score_fn"][category["Category"]] = score_fn
-
-        return item
+        return {"contract_id": id, "title": title, "contract": contract}
 
     def get_label_df(self):
         label = []
@@ -463,6 +449,22 @@ class CUADDataReader(pz.DataReader):
                 ]["text"]
             label.append(row)
         return pd.DataFrame(label)
+
+
+class CUADValidationData(ValidationData):
+    def __init__(self, 
+                 input_dataset: CUADDataReader,
+                 file_path: str | None = None, 
+                 annotations: dict | None = None, 
+                 ):
+        super().__init__(file_path, annotations)
+        self._input_dataset = input_dataset
+
+    def input_dataset(self):
+        return self._input_dataset
+    
+    def num_samples(self):
+        return self._input_dataset.num_contracts
 
 
 def parse_arguments():
@@ -543,6 +545,29 @@ def build_cuad_query(dataset, mode):
 
     return ds
 
+def setup_val_data(num_contracts: int = 5):
+    val_data_reader = CUADDataReader(num_contracts=num_contracts)
+    val_data = CUADValidationData(input_dataset=val_data_reader)
+
+    labels = val_data_reader.get_label_df()
+    for idx in range(num_contracts):
+        row = labels.iloc[idx]
+        val_data.set_field_annotation(logical_op_num=1,record_source_idx=idx, field="contract_id", label=row["contract_id"])
+        val_data.set_field_annotation(logical_op_num=1,record_source_idx=idx, field="title", label=row["title"])
+
+        for category in cuad_categories:
+            val_data.set_field_annotation(
+                logical_op_num=1, # last step
+                record_source_idx=idx,
+                field=category["Category"],
+                label=row[category["Category"]]
+            )
+
+    # This should happen after set field annotations, so that the score_fn is set for all the possible fields.
+    for category in cuad_categories:
+        val_data.set_score_fn(category["Category"], score_fn)
+
+    return val_data
 
 def main():
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
@@ -550,10 +575,10 @@ def main():
 
     args = parse_arguments()
 
-    # Create a data reader for the CUAD dataset
-    data_reader = CUADDataReader(is_validation_source=False, num_contracts=50)
-    val_data_reader = CUADDataReader(is_validation_source=True, num_contracts=5)
-    print("Created data reader")
+    # Create a data reader for the CUAD dataset (only for input data)
+    data_reader = CUADDataReader(num_contracts=10)
+    val_data = setup_val_data(num_contracts=5)
+    print("Created data reader and validation data")
 
     # Build and run the CUAD query
     query = build_cuad_query(data_reader, args.mode)
@@ -569,12 +594,13 @@ def main():
     config = pz.QueryProcessorConfig(
         verbose=args.verbose,
         execution_strategy="parallel",
-        val_datasource=val_data_reader,
+        val_data=val_data,  # Re-enabled validation data
         processing_strategy=args.processing_strategy,
         max_workers=10,
         allow_mixtures=allow_mixtures,
         allow_critic=allow_critic,
     )
+    
     seed = args.seed
     k = args.k
     j = args.j
@@ -584,6 +610,7 @@ def main():
     sample_start_idx = args.sample_start_idx
     sample_end_idx = args.sample_end_idx
     exp_name = f"cuad-demo-{args.mode}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+    
     data_record_collection = query.run(
         config=config,
         k=k,
@@ -599,7 +626,7 @@ def main():
     print("Query execution completed")
 
     pred_df = data_record_collection.to_df()
-    label_df = data_reader.get_label_df()
+    label_df = val_data.expected_outputs()
 
     prec, recall = compute_precision_recall(label_df, pred_df)
     print(f"Precision: {prec:.3f}, Recall: {recall:.3f}")
