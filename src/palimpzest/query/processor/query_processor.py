@@ -86,7 +86,6 @@ class QueryProcessor:
         final_plan = plans[0]
 
         # execute the plan
-        # TODO: for some reason this is not picking up change to self.max_workers from ParallelPlanExecutor.__init__()
         records, plan_stats = self.execution_strategy.execute_plan(plan=final_plan)
 
         # return the output records and plan stats

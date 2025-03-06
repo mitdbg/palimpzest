@@ -1,19 +1,17 @@
 import logging
 
-from palimpzest.core.data.dataclasses import ExecutionStats
+from palimpzest.core.data.dataclasses import ExecutionStats, SentinelPlanStats
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
 
-# from palimpzest.utils.progress import create_progress_manager
-
 logger = logging.getLogger(__name__)
 
 class SentinelQueryProcessor(QueryProcessor):
 
-    def _generate_sample_observations(self, sentinel_plan: SentinelPlan):
+    def _generate_sample_observations(self, sentinel_plan: SentinelPlan) -> SentinelPlanStats:
         """
         This function is responsible for generating sample observation data which can be
         consumed by the CostModel.
@@ -25,11 +23,10 @@ class SentinelQueryProcessor(QueryProcessor):
         # if we're using validation data, get the set of expected output records
         expected_outputs = {}
         for source_idx in range(len(self.val_datasource)):
-            # TODO: make sure execute_op_set uses self.val_datasource
             expected_output = self.val_datasource[source_idx]
             expected_outputs[source_idx] = expected_output
 
-        # execute sentinel plan; returns execution_data and sentinel_plan_stats
+        # execute sentinel plan; returns sentinel_plan_stats
         return self.sentinel_execution_strategy.execute_sentinel_plan(sentinel_plan, expected_outputs)
 
     def _create_sentinel_plan(self) -> SentinelPlan:

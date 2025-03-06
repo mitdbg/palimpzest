@@ -2,6 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from chromadb.api.models.Collection import Collection
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
@@ -18,8 +19,11 @@ from rich.progress import Progress as RichProgress
 from rich.table import Table
 
 from palimpzest.query.operators.aggregate import AggregateOp
+from palimpzest.query.operators.convert import LLMConvert
+from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 
 
@@ -283,7 +287,7 @@ class PZSentinelProgressManager(ProgressManager):
             refresh_per_second=10,
             expand=True,   # Use full width
         )
-        self.overall_task_id = self.overall_progress.add_task("", total=sample_budget)
+        self.overall_task_id = self.overall_progress.add_task("", total=sample_budget, cost=0.0, recent="")
 
         # logical operator progress bars
         self.op_progress = RichProgress(
@@ -305,7 +309,7 @@ class PZSentinelProgressManager(ProgressManager):
         )
         self.progress_table.add_row(
             Panel.fit(
-                self.overall_progress, title="Overall Progress", border_style="green", padding=(2, 2)
+                self.overall_progress, title="Optimization Progress", border_style="green", padding=(2, 2)
             )
         )
         self.live_display = Live(self.progress_table, refresh_per_second=10)
@@ -323,9 +327,21 @@ class PZSentinelProgressManager(ProgressManager):
         for logical_op_id, op_set in plan:
             op_name = op_set[0].op_name()
             op_str = f"{op_name} ({logical_op_id})"
-            self.add_task(logical_op_id, op_str, sample_budget)
+            total = sample_budget if self._is_llm_op(op_set[0]) else 0
+            self.add_task(logical_op_id, op_str, total)
 
         self.console = Console()
+    
+    def _is_llm_op(self, physical_op: PhysicalOperator) -> bool:
+        is_llm_convert = isinstance(physical_op, LLMConvert)
+        is_llm_filter = isinstance(physical_op, LLMFilter)
+        is_llm_retrieve = isinstance(physical_op, RetrieveOp) and isinstance(physical_op.index, Collection)
+        return is_llm_convert or is_llm_filter or is_llm_retrieve
+
+    def get_task_description(self, op_id: str) -> str:
+        """Return the current description for the given task."""
+        task = self.op_id_to_task[op_id]
+        return self.op_progress._tasks[task].description
 
     def add_task(self, op_id: str, op_str: str, total: int):
         """Add a new task to the op progress bars"""
@@ -353,8 +369,7 @@ class PZSentinelProgressManager(ProgressManager):
         self.start_time = time.time()
 
         # start progress bars
-        self.overall_progress.start()
-        self.op_progress.start()
+        self.live_display.start()
 
     def incr(self, op_id: str, num_samples: int, display_text: str | None = None, **kwargs):
         # TODO: (above) organize progress bars into a Live / Table / Panel or something
@@ -383,11 +398,17 @@ class PZSentinelProgressManager(ProgressManager):
         )
 
         # advance the overall progress bar
-        self.overall_progress.update(self.overall_task_id, advance=num_samples, refresh=True)
+        self.overall_progress.update(
+            self.overall_task_id,
+            advance=num_samples,
+            cost=sum(stats.total_cost for _, stats in self.op_id_to_stats.items()),
+            refresh=True,
+        )
+
+        # force the live display to refresh
+        self.live_display.refresh()
 
     def finish(self):
-        self.overall_progress.stop()
-        self.op_progress.stop()
         self.live_display.stop()
 
         # compute total cost, success, and failure

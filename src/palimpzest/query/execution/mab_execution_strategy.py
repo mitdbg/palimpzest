@@ -73,8 +73,10 @@ class OpFrontier:
         """
         max_quality_op, max_avg_quality = None, None
         for op in self.frontier_ops:
-            total_quality = sum([record_op_stats.quality for record_op_stats in self.phys_op_id_to_record_op_stats_lst[op.get_op_id()]])
-            avg_op_quality = total_quality / len(self.phys_op_id_to_num_samples[op.get_op_id()])
+            op_quality_stats = []
+            if op.get_op_id() in self.phys_op_id_to_record_op_stats_lst:
+                op_quality_stats = [record_op_stats.quality for record_op_stats in self.phys_op_id_to_record_op_stats_lst[op.get_op_id()]]
+            avg_op_quality = sum(op_quality_stats) / len(op_quality_stats) if len(op_quality_stats) > 0 else 0.0
             if max_avg_quality is None or avg_op_quality > max_avg_quality:
                 max_quality_op = op
                 max_avg_quality = avg_op_quality
@@ -323,8 +325,8 @@ class OpFrontier:
         """
         Update the inputs for this logical operator based on the outputs of the previous logical operator.
         """
-        input = []
         for source_idx, record_sets in source_idx_to_record_sets.items():
+            input = []
             max_quality_record_set = self.pick_highest_quality_output(record_sets)
             for record in max_quality_record_set:
                 input.append(record if record.passed_operator else None)
@@ -343,35 +345,13 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
     calls does not perfectly match the sample_budget. This may cause some minor discrepancies with
     the progress manager as a result.
     """
-
-    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[int, dict] | None):
-        """
-        """
-        # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert all(isinstance(op, ScanPhysicalOp) for op in plan.operator_sets[0]), "First operator in physical plan must be a ScanPhysicalOp"
-        logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
-        logger.info(f"Plan Details: {plan}")
-
-        # TODO: add support for multiple plans and sentinel plans
-        # initialize and start the progress manager
-        self.progress_manager = create_progress_manager(plan, self.sample_budget)
-        self.progress_manager.start()
-
-        # initialize plan stats
-        plan_stats = SentinelPlanStats.from_plan(plan)
-        plan_stats.start()
-
-        # shuffle the indices of records to sample
-        total_num_samples = len(self.val_datasource)
-        shuffled_source_indices = [int(idx) for idx in np.arange(total_num_samples)]
-        self.rng.shuffle(shuffled_source_indices)
-
-        # initialize frontier for each logical operator
-        op_frontiers = {
-            logical_op_id: OpFrontier(op_set, shuffled_source_indices, self.k, self.j, self.seed, self.policy)
-            for logical_op_id, op_set in plan
-        }
-
+    def _execute_sentinel_plan(
+            self,
+            plan: SentinelPlan,
+            op_frontiers: dict[str, OpFrontier],
+            expected_outputs: dict[int, dict] | None,
+            plan_stats: SentinelPlanStats,
+        ) -> SentinelPlanStats:
         # sample records and operators and update the frontiers
         samples_drawn = 0
         while samples_drawn < self.sample_budget:
@@ -392,7 +372,6 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
                 # run sampled operators on sampled inputs
                 source_idx_to_record_sets_and_ops = self._execute_op_set(frontier_op_input_pairs)
-                samples_drawn += len(frontier_op_input_pairs)
 
                 # FUTURE TODO: have this return the highest quality record set simply based on our posterior (or prior) belief on operator quality
                 # get the target record set for each source_idx
@@ -414,9 +393,13 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 # update plan stats
                 plan_stats.add_record_op_stats(all_record_op_stats)
 
+                # if this operator used an LLM, update the samples drawn
+                new_samples_drawn = len(frontier_op_input_pairs) if self._is_llm_op(op_set[0]) else 0
+                samples_drawn += new_samples_drawn
+
                 # update the progress manager
                 total_cost = sum([record_op_stats.cost_per_record for record_op_stats in all_record_op_stats])
-                self.progress_manager.incr(logical_op_id, num_samples=len(frontier_op_input_pairs), total_cost=total_cost)
+                self.progress_manager.incr(logical_op_id, num_samples=new_samples_drawn, total_cost=total_cost)
 
                 # add records (which are not filtered) to the cache, if allowed
                 self._add_records_to_cache(logical_op_id, all_records)
@@ -438,8 +421,44 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         # finalize plan stats
         plan_stats.finish()
 
-        # finish progress tracking
-        self.progress_manager.finish()
+        return plan_stats
+
+
+    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[int, dict] | None):
+        # for now, assert that the first operator in the plan is a ScanPhysicalOp
+        assert all(isinstance(op, ScanPhysicalOp) for op in plan.operator_sets[0]), "First operator in physical plan must be a ScanPhysicalOp"
+        logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
+        logger.info(f"Plan Details: {plan}")
+
+        # initialize plan stats
+        plan_stats = SentinelPlanStats.from_plan(plan)
+        plan_stats.start()
+
+        # shuffle the indices of records to sample
+        total_num_samples = len(self.val_datasource)
+        shuffled_source_indices = [int(idx) for idx in np.arange(total_num_samples)]
+        self.rng.shuffle(shuffled_source_indices)
+
+        # initialize frontier for each logical operator
+        op_frontiers = {
+            logical_op_id: OpFrontier(op_set, shuffled_source_indices, self.k, self.j, self.seed, self.policy)
+            for logical_op_id, op_set in plan
+        }
+
+        # initialize and start the progress manager
+        self.progress_manager = create_progress_manager(plan, sample_budget=self.sample_budget, progress=self.progress)
+        self.progress_manager.start()
+
+        # NOTE: we must handle progress manager outside of _exeecute_sentinel_plan to ensure that it is shut down correctly;
+        #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail because
+        #       the progress manager cannot get a handle to the console 
+        try:
+            # execute sentinel plan by sampling records and operators
+            plan_stats = self._execute_sentinel_plan(plan, op_frontiers, expected_outputs, plan_stats)
+
+        finally:
+            # finish progress tracking
+            self.progress_manager.finish()
 
         logger.info(f"Done executing sentinel plan: {plan.plan_id}")
         logger.debug(f"Plan stats: (plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")

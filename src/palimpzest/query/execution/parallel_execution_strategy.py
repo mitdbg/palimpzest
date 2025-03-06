@@ -96,7 +96,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         logger.info(f"Plan Details: {plan}")
 
         # initialize and start the progress manager
-        self.progress_manager = create_progress_manager(plan, self.num_samples, self.progress)
+        self.progress_manager = create_progress_manager(plan, num_samples=self.num_samples, progress=self.progress)
         self.progress_manager.start()
 
         # initialize plan stats

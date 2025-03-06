@@ -1,5 +1,4 @@
 import logging
-import warnings
 from enum import Enum
 
 from palimpzest.core.elements.records import DataRecordCollection

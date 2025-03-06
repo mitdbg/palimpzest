@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
+from chromadb.api.models.Collection import Collection
 
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats, RecordOpStats
 from palimpzest.core.data.datareaders import DataReader
@@ -161,7 +162,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             # for each record in the expected output, we look for the computed record which maximizes the quality metric;
             # once we've identified that computed record we remove it from consideration for the next expected output
             field_to_score_fn = target_record_set.get_field_to_score_fn()
-            for target_record_op_stats in target_record_set.record_op_stats:
+            for target_record in target_record_set:
                 best_quality, best_record_op_stats = 0.0, None
                 for record_op_stats in record_set.record_op_stats:
                     # if we already assigned this record a quality, skip it
@@ -172,7 +173,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     total_quality = 0
                     for field in record_op_stats.generated_fields:
                         computed_value = record_op_stats.record_state.get(field, None)
-                        expected_value = target_record_op_stats.record_state.get(field, None)
+                        expected_value = target_record[field]
 
                         # get the metric function for this field
                         score_fn = field_to_score_fn.get(field, "exact")
@@ -385,6 +386,12 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator))
 
         return source_idx_to_record_sets_and_ops
+
+    def _is_llm_op(self, physical_op: PhysicalOperator) -> bool:
+        is_llm_convert = isinstance(physical_op, LLMConvert)
+        is_llm_filter = isinstance(physical_op, LLMFilter)
+        is_llm_retrieve = isinstance(physical_op, RetrieveOp) and isinstance(physical_op.index, Collection)
+        return is_llm_convert or is_llm_filter or is_llm_retrieve
 
     @abstractmethod
     def execute_sentinel_plan(self, sentinel_plan: SentinelPlan, expected_outputs: dict[str, dict]):
