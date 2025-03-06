@@ -161,7 +161,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             # GREEDY ALGORITHM
             # for each record in the expected output, we look for the computed record which maximizes the quality metric;
             # once we've identified that computed record we remove it from consideration for the next expected output
-            import pdb; pdb.set_trace()
             field_to_score_fn = target_record_set.get_field_to_score_fn()
             for target_record in target_record_set:
                 best_quality, best_record_op_stats = 0.0, None
@@ -286,9 +285,10 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 if base_target_record is None:
                     break
 
-                # get the label data
+                # get the label data and field_to_score_fn
                 labels = expected_outputs[source_idx]["labels"]
                 labels_dict_lst = labels if isinstance(labels, list) else [labels]
+                field_to_score_fn = expected_outputs[source_idx]["score_fn"]
 
                 # construct the target record set; we force passed_operator to be True for all target records
                 target_records = []
@@ -299,7 +299,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     target_record.passed_operator = True
                     target_records.append(target_record)
 
-                source_idx_to_target_record_set[source_idx] = DataRecordSet(target_records, None)
+                source_idx_to_target_record_set[source_idx] = DataRecordSet(target_records, None, field_to_score_fn)
 
             return source_idx_to_target_record_set
 
