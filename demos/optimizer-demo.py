@@ -512,6 +512,7 @@ if __name__ == "__main__":
         allow_mixtures=True,
         allow_rag_reduction=True,
         allow_token_reduction=False,
+        progress=False,
     )
 
     data_record_collection = plan.run(
