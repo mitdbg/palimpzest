@@ -245,9 +245,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # The user has to indicate the workload and experiment name
-    if args.workload is None:
-        print("Please provide a workload using --workload")
-        exit(1)
     if args.exp_name is None:
         print("Please provide an experiment name using --exp-name")
         exit(1)
