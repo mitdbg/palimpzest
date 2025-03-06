@@ -153,30 +153,23 @@ class OpFrontier:
                     else:
                         self.phys_op_id_to_record_op_stats_lst[op_id].append(record_op_stats)
 
-        # compute selectivity for each physical operator
-        phys_op_to_num_inputs = {op_id: 0 for op_id in self.phys_op_id_to_record_op_stats_lst}
-        phys_op_to_num_outputs = {op_id: 0 for op_id in self.phys_op_id_to_record_op_stats_lst}
-        for op_id, record_op_stats_lst in self.phys_op_id_to_record_op_stats_lst.items():
-            phys_op_to_num_inputs[op_id] += 1
-            phys_op_to_num_outputs[op_id] += sum([record_op_stats.passed_operator for record_op_stats in record_op_stats_lst])
-
+        # compute avg. selectivity, cost, time, and quality for each physical operator
         phys_op_to_mean_selectivity = {
-            op_id: phys_op_to_num_outputs[op_id] / phys_op_to_num_inputs[op_id]
-            for op_id in phys_op_to_num_inputs
+            op_id: len(record_op_stats_lst) / sum([record_op_stats.passed_operator for record_op_stats in record_op_stats_lst])
+            for op_id, record_op_stats_lst in self.phys_op_id_to_record_op_stats_lst.items()
         }
-
-        # compute average cost, time, and quality
-        phys_op_to_costs = {op_id: [] for op_id in self.phys_op_id_to_record_op_stats_lst}
-        phys_op_to_times = {op_id: [] for op_id in self.phys_op_id_to_record_op_stats_lst}
-        phys_op_to_qualities = {op_id: [] for op_id in self.phys_op_id_to_record_op_stats_lst}
-        for op_id, record_op_stats_lst in self.phys_op_id_to_record_op_stats_lst.items():
-            phys_op_to_costs[op_id].extend([record_op_stats.cost_per_record for record_op_stats in record_op_stats_lst])
-            phys_op_to_times[op_id].extend([record_op_stats.time_per_record for record_op_stats in record_op_stats_lst])
-            phys_op_to_qualities[op_id].extend([record_op_stats.quality for record_op_stats in record_op_stats_lst])
-
-        phys_op_to_mean_cost = {op: np.mean(costs) for op, costs in phys_op_to_costs.items()}
-        phys_op_to_mean_time = {op: np.mean(times) for op, times in phys_op_to_times.items()}
-        phys_op_to_mean_quality = {op: np.mean(qualities) for op, qualities in phys_op_to_qualities.items()}
+        phys_op_to_mean_cost = {
+            op_id: np.mean([record_op_stats.cost_per_record for record_op_stats in record_op_stats_lst])
+            for op_id, record_op_stats_lst in self.phys_op_id_to_record_op_stats_lst.items()
+        }
+        phys_op_to_mean_time = {
+            op_id: np.mean([record_op_stats.time_per_record for record_op_stats in record_op_stats_lst])
+            for op_id, record_op_stats_lst in self.phys_op_id_to_record_op_stats_lst.items()
+        }
+        phys_op_to_mean_quality = {
+            op_id: np.mean([record_op_stats.quality for record_op_stats in record_op_stats_lst])
+            for op_id, record_op_stats_lst in self.phys_op_id_to_record_op_stats_lst.items()
+        }
 
         # compute average, LCB, and UCB of each operator; the confidence bounds depend upon
         # the computation of the alpha parameter, which we scale to be 0.5 * the mean (of means)
@@ -188,7 +181,7 @@ class OpFrontier:
 
         # compute metrics for each physical operator
         op_metrics = {}
-        for op_id in phys_op_to_costs:
+        for op_id in self.phys_op_id_to_record_op_stats_lst:
             sample_ratio = np.sqrt(np.log(self.total_num_samples) / self.phys_op_id_to_num_samples[op_id])
             exploration_terms = np.array([cost_alpha * sample_ratio, time_alpha * sample_ratio, quality_alpha * sample_ratio, selectivity_alpha * sample_ratio])
             mean_terms = (phys_op_to_mean_cost[op_id], phys_op_to_mean_time[op_id], phys_op_to_mean_quality[op_id], phys_op_to_mean_selectivity[op_id])
