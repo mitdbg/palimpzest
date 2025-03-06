@@ -510,7 +510,7 @@ if __name__ == "__main__":
         allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
-        allow_rag_reduction=False,
+        allow_rag_reduction=True,
         allow_token_reduction=False,
     )
 
