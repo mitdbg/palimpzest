@@ -161,6 +161,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             # GREEDY ALGORITHM
             # for each record in the expected output, we look for the computed record which maximizes the quality metric;
             # once we've identified that computed record we remove it from consideration for the next expected output
+            import pdb; pdb.set_trace()
             field_to_score_fn = target_record_set.get_field_to_score_fn()
             for target_record in target_record_set:
                 best_quality, best_record_op_stats = 0.0, None
