@@ -125,6 +125,9 @@ class PhysicalOperator:
         self.op_id = hash_for_id(hash_str)
 
         return self.op_id
+    
+    def get_logical_op_id(self) -> str | None:
+        return self.logical_op_id
 
     def __hash__(self):
         return int(self.op_id, 16)

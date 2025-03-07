@@ -1,10 +1,11 @@
 import logging
 from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 
 import numpy as np
 from chromadb.api.models.Collection import Collection
 
+from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats, RecordOpStats
 from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
@@ -15,6 +16,7 @@ from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
+from palimpzest.utils.progress import PZSentinelProgressManager
 
 logger = logging.getLogger(__name__)
 
@@ -110,8 +112,15 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         self.rng = np.random.default_rng(seed=seed)
         self.exp_name = exp_name
 
-        self.champion_output_cache = {}
-    
+        # special cache which is used for tracking the target record sets for each (source_idx, logical_op_id)
+        self.champion_output_cache: dict[int, dict[str, tuple[DataRecordSet, float]]] = {}
+
+        # general cache which maps hash(logical_op_id, phys_op_id, hash(input)) --> record_set
+        self.cache: dict[int, DataRecordSet] = {}
+
+        # progress manager used to track progress of the execution
+        self.progress_manager: PZSentinelProgressManager | None = None
+
     def _compute_quality(
             self,
             physical_op_cls: type[PhysicalOperator],
@@ -356,8 +365,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
         return all_records, all_record_op_stats
 
-    def _execute_op_set(self, op_input_pairs: list[PhysicalOperator, DataRecord | int]) -> dict[int, list[tuple[DataRecordSet, PhysicalOperator]]]:
-        def execute_op_wrapper(operator, input):
+    def _execute_op_set(self, op_input_pairs: list[tuple[PhysicalOperator, DataRecord | int]]) -> tuple[dict[int, list[tuple[DataRecordSet, PhysicalOperator]]], int]:
+        def execute_op_wrapper(operator, input) -> tuple[DataRecordSet, PhysicalOperator, DataRecord | int]:
             record_set = operator(input)
             return record_set, operator, input
 
@@ -366,19 +375,59 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         def get_source_idx(input):
             return input.source_idx if isinstance(input, DataRecord) else input
 
+        def get_hash(operator, input):
+            logical_op_id = operator.get_logical_op_id()
+            phys_op_id = operator.get_op_id()
+            return hash(f"{logical_op_id}{phys_op_id}{hash(input)}")
+
+
         # initialize mapping from source indices to output record sets
         source_idx_to_record_sets_and_ops = {get_source_idx(input): [] for _, input in op_input_pairs}
+
+        # if any operations were previously executed, read the results from the cache
+        final_op_input_pairs = []
+        for operator, input in op_input_pairs:
+            # compute hash
+            op_input_hash = get_hash(operator, input)
+
+            # get result from cache
+            if op_input_hash in self.cache:
+                source_idx = get_source_idx(input)
+                source_idx_to_record_sets_and_ops[source_idx].append(self.cache[op_input_hash])
+
+            # otherwise, add to final_op_input_pairs
+            else:
+                final_op_input_pairs.append((operator, input))
+
+        # count the number of operations we are going to execute with an llm
+        num_llm_ops = sum(self._is_llm_op(operator) for operator, _ in final_op_input_pairs)
 
         # create thread pool w/max workers and run futures over worker pool
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # create futures
             futures = [
                 executor.submit(execute_op_wrapper, operator, input)
-                for operator, input in op_input_pairs
+                for operator, input in final_op_input_pairs
             ]
-            output_record_sets = [future.result() for future in futures]
+            output_record_sets = []
+            while len(futures) > 0:
+                done_futures, not_done_futures = wait(futures, timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
+                for future in done_futures:
+                    # update output record sets
+                    record_set, operator, input = future.result()
+                    output_record_sets.append((record_set, operator, input))
 
-            # compute mapping from source_idx to record sets for all operators and for champion operator
+                    # update cache
+                    op_input_hash = get_hash(operator, input)
+                    self.cache[op_input_hash] = (record_set, operator)
+
+                    # update progress manager
+                    self.progress_manager.incr(operator.get_logical_op_id(), num_samples=num_llm_ops, total_cost=record_set.get_total_cost())
+
+                # update futures
+                futures = list(not_done_futures)
+
+            # update mapping from source_idx to record sets and operators
             for record_set, operator, input in output_record_sets:
                 # get the source_idx associated with this input record;
                 source_idx = get_source_idx(input)
@@ -386,7 +435,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 # add record_set to mapping from source_idx --> record_sets
                 source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator))
 
-        return source_idx_to_record_sets_and_ops
+        return source_idx_to_record_sets_and_ops, num_llm_ops
 
     def _is_llm_op(self, physical_op: PhysicalOperator) -> bool:
         is_llm_convert = isinstance(physical_op, LLMConvert)

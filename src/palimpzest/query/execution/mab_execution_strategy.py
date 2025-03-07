@@ -2,7 +2,7 @@ import logging
 
 import numpy as np
 
-from palimpzest.core.data.dataclasses import RecordOpStats, SentinelPlanStats
+from palimpzest.core.data.dataclasses import OperatorStats, RecordOpStats, SentinelPlanStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
@@ -36,8 +36,8 @@ class OpFrontier:
         sample_op_indices = self._get_op_index_order(op_set, seed)
 
         # construct the initial set of frontier and reservoir operators
-        self.frontier_ops = [op_set[sample_idx] for sample_idx in sample_op_indices[:k]]
-        self.reservoir_ops = [op_set[sample_idx] for sample_idx in sample_op_indices[k:]]
+        self.frontier_ops = [op_set[sample_idx] for sample_idx in sample_op_indices[:self.k]]
+        self.reservoir_ops = [op_set[sample_idx] for sample_idx in sample_op_indices[self.k:]]
 
         # store the order in which we will sample the source records
         self.source_indices = source_indices
@@ -55,8 +55,11 @@ class OpFrontier:
         # boolean indication of whether this is a logical filter
         self.is_filter_op = isinstance(op_set[0], FilterOp)
 
-        # store all the execution data for this logical operator
-        self.phys_op_id_to_record_op_stats_lst: dict[str, list[RecordOpStats]] = {}
+    def get_frontier_ops(self) -> list[PhysicalOperator]:
+        """
+        Returns the set of frontier operators for this OpFrontier.
+        """
+        return self.frontier_ops
 
     def _get_op_index_order(self, op_set: list[PhysicalOperator], seed: int) -> list[int]:
         """
@@ -66,22 +69,6 @@ class OpFrontier:
         op_indices = np.arange(len(op_set))
         rng.shuffle(op_indices)
         return op_indices
-
-    def _get_max_quality_op(self) -> PhysicalOperator:
-        """
-        Returns the operator in the frontier with the highest (estimated) quality.
-        """
-        max_quality_op, max_avg_quality = None, None
-        for op in self.frontier_ops:
-            op_quality_stats = []
-            if op.get_op_id() in self.phys_op_id_to_record_op_stats_lst:
-                op_quality_stats = [record_op_stats.quality for record_op_stats in self.phys_op_id_to_record_op_stats_lst[op.get_op_id()]]
-            avg_op_quality = sum(op_quality_stats) / len(op_quality_stats) if len(op_quality_stats) > 0 else 0.0
-            if max_avg_quality is None or avg_op_quality > max_avg_quality:
-                max_quality_op = op
-                max_avg_quality = avg_op_quality
-
-        return max_quality_op
 
     def _get_op_source_idx_pairs(self) -> list[tuple[PhysicalOperator, int]]:
         """
@@ -94,12 +81,13 @@ class OpFrontier:
             current_num_samples = self.phys_op_id_to_num_samples[op.get_op_id()]
             num_new_samples = 1 if current_num_samples > 0 else self.j
             num_new_samples = min(num_new_samples, len(self.source_indices) - current_num_samples)
+            assert num_new_samples >= 0, "Number of new samples must be non-negative"
 
             # construct list of inputs by looking up the input for the given source_idx
             for sample_idx in range(current_num_samples, current_num_samples + num_new_samples):
                 source_idx = self.source_indices[sample_idx]
                 op_source_idx_pairs.append((op, source_idx))
-        
+
         return op_source_idx_pairs
 
     def get_source_indices_for_next_iteration(self) -> set[int]:
@@ -109,7 +97,7 @@ class OpFrontier:
         op_source_idx_pairs = self._get_op_source_idx_pairs()
         return set(map(lambda tup: tup[1], op_source_idx_pairs))
 
-    def get_frontier_op_input_pairs(self, source_indices_to_sample: set[int]) -> list[PhysicalOperator, DataRecord | int | None]:
+    def get_frontier_op_input_pairs(self, source_indices_to_sample: set[int], max_quality_op: PhysicalOperator) -> list[PhysicalOperator, DataRecord | int | None]:
         """
         Returns the list of frontier operators and their next input to process. If there are
         any indices in `source_indices_to_sample` which this operator does not sample on its own, then
@@ -118,24 +106,24 @@ class OpFrontier:
         # get the list of (op, source_idx) pairs which this operator needs to execute
         op_source_idx_pairs = self._get_op_source_idx_pairs()
 
-        # if there are any source_idxs in source_indices_to_sample where are not sampled
+        # if there are any source_idxs in source_indices_to_sample which are not sampled
         # by this operator, apply the max quality operator to them
         sampled_source_indices = set(map(lambda tup: tup[1], op_source_idx_pairs))
         unsampled_source_indices = source_indices_to_sample - sampled_source_indices
-        max_quality_op = self._get_max_quality_op()
         for source_idx in unsampled_source_indices:
             op_source_idx_pairs.append((max_quality_op, source_idx))
 
         # fetch the corresponding (op, input) pairs
         op_input_pairs = []
         for op, source_idx in op_source_idx_pairs:
-            op_input_pairs.extend([(op, input_record) for input_record in self.source_idx_to_input[source_idx]])
-            self.phys_op_id_to_num_samples[op.get_op_id()] += len(op_input_pairs)
-            self.total_num_samples += len(op_input_pairs)
+            this_op_input_pairs = [(op, input_record) for input_record in self.source_idx_to_input[source_idx]]
+            op_input_pairs.extend(this_op_input_pairs)
+            self.phys_op_id_to_num_samples[op.get_op_id()] += len(this_op_input_pairs)
+            self.total_num_samples += len(this_op_input_pairs)
 
         return op_input_pairs
 
-    def update_frontier(self, source_idx_to_record_sets: dict[int, list[DataRecordSet]]) -> None:
+    def update_frontier(self, logical_op_id: str, plan_stats: SentinelPlanStats) -> None:
         """
         Update the set of frontier operators, pulling in new ones from the reservoir as needed.
         This function will:
@@ -143,32 +131,29 @@ class OpFrontier:
         2. Compute the pareto optimal set of frontier operators (using the mean values)
         3. Update the frontier and reservoir sets of operators based on their LCB/UCB overlap with the pareto frontier
         """
-        # add the new record_op_stats to the list of record_op_stats for each operator
-        for _, record_sets in source_idx_to_record_sets.items():
-            for record_set in record_sets:
-                for record_op_stats in record_set.record_op_stats:
-                    op_id = record_op_stats.op_id
-                    if op_id not in self.phys_op_id_to_record_op_stats_lst:
-                        self.phys_op_id_to_record_op_stats_lst[op_id] = [record_op_stats]
-                    else:
-                        self.phys_op_id_to_record_op_stats_lst[op_id].append(record_op_stats)
+        # get a mapping from physical_op_id --> list[RecordOpStats]
+        phys_op_id_to_op_stats: dict[str, OperatorStats] = plan_stats.operator_stats.get(logical_op_id, {})
+        phys_op_id_to_record_op_stats = {
+            phys_op_id: op_stats.record_op_stats_lst
+            for phys_op_id, op_stats in phys_op_id_to_op_stats.items()
+        }
 
         # compute avg. selectivity, cost, time, and quality for each physical operator
         phys_op_to_mean_selectivity = {
             op_id: len(record_op_stats_lst) / sum([record_op_stats.passed_operator for record_op_stats in record_op_stats_lst])
-            for op_id, record_op_stats_lst in self.phys_op_id_to_record_op_stats_lst.items()
+            for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
         }
         phys_op_to_mean_cost = {
             op_id: np.mean([record_op_stats.cost_per_record for record_op_stats in record_op_stats_lst])
-            for op_id, record_op_stats_lst in self.phys_op_id_to_record_op_stats_lst.items()
+            for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
         }
         phys_op_to_mean_time = {
             op_id: np.mean([record_op_stats.time_per_record for record_op_stats in record_op_stats_lst])
-            for op_id, record_op_stats_lst in self.phys_op_id_to_record_op_stats_lst.items()
+            for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
         }
         phys_op_to_mean_quality = {
             op_id: np.mean([record_op_stats.quality for record_op_stats in record_op_stats_lst])
-            for op_id, record_op_stats_lst in self.phys_op_id_to_record_op_stats_lst.items()
+            for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
         }
 
         # compute average, LCB, and UCB of each operator; the confidence bounds depend upon
@@ -181,7 +166,7 @@ class OpFrontier:
 
         # compute metrics for each physical operator
         op_metrics = {}
-        for op_id in self.phys_op_id_to_record_op_stats_lst:
+        for op_id in phys_op_id_to_record_op_stats:
             sample_ratio = np.sqrt(np.log(self.total_num_samples) / self.phys_op_id_to_num_samples[op_id])
             exploration_terms = np.array([cost_alpha * sample_ratio, time_alpha * sample_ratio, quality_alpha * sample_ratio, selectivity_alpha * sample_ratio])
             mean_terms = (phys_op_to_mean_cost[op_id], phys_op_to_mean_time[op_id], phys_op_to_mean_quality[op_id], phys_op_to_mean_selectivity[op_id])
@@ -340,6 +325,33 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
     calls does not perfectly match the sample_budget. This may cause some minor discrepancies with
     the progress manager as a result.
     """
+    def _get_max_quality_op(self, logical_op_id: str, op_frontiers: dict[str, OpFrontier], plan_stats: SentinelPlanStats) -> PhysicalOperator:
+        """
+        Returns the operator in the frontier with the highest (estimated) quality.
+        """
+        # get the operators in the frontier set for this logical_op_id
+        frontier_ops = op_frontiers[logical_op_id].get_frontier_ops()
+
+        # get a mapping from physical_op_id --> list[RecordOpStats]
+        phys_op_id_to_op_stats: dict[str, OperatorStats] = plan_stats.operator_stats.get(logical_op_id, {})
+        phys_op_id_to_record_op_stats = {
+            phys_op_id: op_stats.record_op_stats_lst
+            for phys_op_id, op_stats in phys_op_id_to_op_stats.items()
+        }
+
+        # iterate over the frontier ops and return the one with the highest quality
+        max_quality_op, max_avg_quality = None, None
+        for op in frontier_ops:
+            op_quality_stats = []
+            if op.get_op_id() in phys_op_id_to_record_op_stats:
+                op_quality_stats = [record_op_stats.quality for record_op_stats in phys_op_id_to_record_op_stats[op.get_op_id()]]
+            avg_op_quality = sum(op_quality_stats) / len(op_quality_stats) if len(op_quality_stats) > 0 else 0.0
+            if max_avg_quality is None or avg_op_quality > max_avg_quality:
+                max_quality_op = op
+                max_avg_quality = avg_op_quality
+
+        return max_quality_op
+
     def _execute_sentinel_plan(
             self,
             plan: SentinelPlan,
@@ -358,21 +370,24 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
             # execute operator sets in sequence
             for op_idx, (logical_op_id, op_set) in enumerate(plan):
+                # use the execution cache to determine the maximum quality operator for this logical_op_id
+                max_quality_op = self._get_max_quality_op(logical_op_id, op_frontiers, plan_stats)
+
                 # get frontier ops and their next input
-                frontier_op_input_pairs = op_frontiers[logical_op_id].get_frontier_op_input_pairs(source_indices_to_sample)
+                frontier_op_input_pairs = op_frontiers[logical_op_id].get_frontier_op_input_pairs(source_indices_to_sample, max_quality_op)
 
                 # break out of the loop if frontier_op_input_pairs is empty, as this means all records have been filtered out
                 if len(frontier_op_input_pairs) == 0:
                     break
 
-                # run sampled operators on sampled inputs
-                source_idx_to_record_sets_and_ops = self._execute_op_set(frontier_op_input_pairs)
+                # run sampled operators on sampled inputs and update the number of samples drawn
+                source_idx_to_record_sets_and_ops, num_llm_operations = self._execute_op_set(frontier_op_input_pairs)
+                samples_drawn += num_llm_operations
 
                 # FUTURE TODO: have this return the highest quality record set simply based on our posterior (or prior) belief on operator quality
                 # get the target record set for each source_idx
                 source_idx_to_target_record_set = self._get_target_record_sets(logical_op_id, source_idx_to_record_sets_and_ops, expected_outputs)
 
-                # TODO: make consistent across here and RandomSampling
                 # FUTURE TODO: move this outside of the loop (i.e. assume we only get quality label(s) after executing full program)
                 # score the quality of each generated output
                 physical_op_cls = op_set[0].__class__
@@ -388,14 +403,6 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 # update plan stats
                 plan_stats.add_record_op_stats(all_record_op_stats)
 
-                # if this operator used an LLM, update the samples drawn
-                new_samples_drawn = len(frontier_op_input_pairs) if self._is_llm_op(op_set[0]) else 0
-                samples_drawn += new_samples_drawn
-
-                # update the progress manager
-                total_cost = sum([record_op_stats.cost_per_record for record_op_stats in all_record_op_stats])
-                self.progress_manager.incr(logical_op_id, num_samples=new_samples_drawn, total_cost=total_cost)
-
                 # add records (which are not filtered) to the cache, if allowed
                 self._add_records_to_cache(logical_op_id, all_records)
 
@@ -406,7 +413,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     op_frontiers[next_logical_op_id].update_inputs(source_idx_to_record_sets)
 
                 # update the (pareto) frontier for each set of operators
-                op_frontiers[logical_op_id].update_frontier(source_idx_to_record_sets)
+                op_frontiers[logical_op_id].update_frontier(logical_op_id, plan_stats)
 
             # FUTURE TODO: score op quality based on final outputs
 
