@@ -1,10 +1,15 @@
 import argparse
 import json
 import os
+import time
 
 import gradio as gr
 import numpy as np
 from PIL import Image
+import pandas as pd
+import requests
+import urllib
+from typing import List, Dict, Any
 
 import palimpzest as pz
 from palimpzest.core.lib.fields import ImageFilepathField, ListField
@@ -93,6 +98,14 @@ table_cols = [
     {"name": "filename", "type": str, "desc": "The name of the file the table was extracted from"}
 ]
 
+music_knowledge_graph_cols = [
+    {"name": "record_type", "type": str, "desc": "The type of record - artist or song"},
+    {"name": "artist_name", "type": str, "desc": "The name of the artist"},
+    {"name": "artist_wikipedia_summary", "type": str, "desc": "The wikipedia summary of the artist"},
+    {"name": "song_title", "type": str, "desc": "The title of the song"},
+    {"name": "song_length_ms", "type": int | float, "desc": "The length of the song in milliseconds"},
+    {"name": "song_artist_names", "type": list[str], "desc": "The names of the artists who collaborated on the song"}
+]
 
 # class RealEstateListingFiles(Schema):
 #     """The source text and image data for a real estate listing."""
@@ -129,9 +142,206 @@ class RealEstateListingReader(pz.DataReader):
 
         # construct and return dictionary with fields
         return {"listing": listing, "text_content": text_content, "image_filepaths": image_filepaths}
+    
 
 
-if __name__ == "__main__":
+def api_request(url, params=None, headers={"User-Agent": "pz/0.1 (contact: minecraftandcomputers@gmail.com)"}, max_retries=3, session=None):
+    """
+    A wrapper for making API requests with:
+    - Automatic retries (handles 503 errors)
+    - Rate limit handling (respects 'Retry-After' header)
+    - Persistent session support for efficiency
+    """
+    session = session or requests.Session()  # Use provided session or create a new one
+    
+    for attempt in range(max_retries):
+        resp = session.get(url, params=params, headers=headers)
+
+        if resp.status_code == 200:
+            return resp.json()
+        
+        elif resp.status_code == 503:
+            retry_after = int(resp.headers.get("Retry-After", 5))  # Default to 5 seconds
+            print(f"503 error. Retrying in {retry_after} seconds...")
+            time.sleep(retry_after)
+        else:
+            resp.raise_for_status()
+    
+    raise requests.exceptions.HTTPError(f"Failed after {max_retries} retries.")
+
+
+class MusicKnowledgeGraphReader(pz.DataReader):
+    def __init__(self, artist_list: List[str]):
+        """Initialize and build a music knowledge graph for the given artists.
+        
+        Args:
+            artist_list: List of artist names to fetch data for
+        """
+        super().__init__(music_knowledge_graph_cols)
+        self.artist_list = artist_list
+        self.session = requests.Session()
+        
+        # Fetch all data
+        self.data = self._build_knowledge_graph()
+        # print the entries where record_type is artist
+        print(self.data[self.data["record_type"] == "artist"])
+
+    def _build_knowledge_graph(self) -> pd.DataFrame:
+        """Build the complete knowledge graph by fetching all required data."""
+        all_rows = []
+        
+        # Batch fetch artist data and Wikipedia summaries
+        artist_data = self._fetch_multiple_artists(self.artist_list)
+        artist_names = [artist["name"] for artist in artist_data if "name" in artist]
+        wikipedia_summaries = self._fetch_wikipedia_summaries(artist_names)
+
+        # Process each artist and their recordings
+        for artist, wiki_summary in zip(artist_data, wikipedia_summaries):
+            artist_name = artist.get("name", "Unknown Artist")
+            artist_id = artist.get("id")
+            
+            if not artist_id:
+                continue
+
+            # Add artist record
+            all_rows.append({
+                "record_type": "artist",
+                "artist_name": artist_name,
+                "artist_wikipedia_summary": wiki_summary,
+                "song_title": "",
+                "song_length_ms": None,
+                "song_artist_names": []
+            })
+            
+            # Fetch and add song records
+            recordings = self._fetch_recordings_for_artist(artist_id)
+            for recording in recordings:
+                credited_names = [
+                    credit["artist"]["name"]
+                    for credit in recording.get("artist-credit", [])
+                    if isinstance(credit, dict) and "artist" in credit
+                ]
+
+                all_rows.append({
+                    "record_type": "song",
+                    "artist_name": artist_name,
+                    "artist_wikipedia_summary": "",
+                    "song_title": recording.get("title", "Unknown Title"),
+                    "song_length_ms": recording.get("length"),
+                    "song_artist_names": credited_names
+                })
+
+        return pd.DataFrame(all_rows, columns=[
+            "record_type",
+            "artist_name",
+            "artist_wikipedia_summary",
+            "song_title",
+            "song_length_ms",
+            "song_artist_names"
+        ])
+
+    def _fetch_multiple_artists(self, names: List[str]) -> List[Dict[str, Any]]:
+        """Fetch multiple artists from MusicBrainz API."""
+        artists = []
+        
+        for name in names:
+            try:
+                params = {
+                    "query": f"artist:{name}",
+                    "fmt": "json",
+                    "limit": 1
+                }
+                data = api_request(
+                    "https://musicbrainz.org/ws/2/artist",
+                    params=params,
+                    session=self.session
+                )
+                results = data.get("artists", [])
+                if results:
+                    artists.append(results[0])
+                
+            except requests.RequestException as e:
+                print(f"Error fetching artist {name}: {e}")
+                continue
+                
+        return artists
+
+    def _fetch_recordings_for_artist(self, artist_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """Fetch recordings for a given MusicBrainz artist ID."""
+        try:
+            params = {
+                "artist": artist_id,
+                "fmt": "json",
+                "limit": limit
+            }
+            data = api_request(
+                "https://musicbrainz.org/ws/2/recording",
+                params=params,
+                session=self.session
+            )
+            return data.get("recordings", [])
+            
+        except requests.RequestException as e:
+            print(f"Error fetching recordings for artist {artist_id}: {e}")
+            return []
+
+    def _fetch_wikipedia_summaries(self, artist_names: List[str]) -> List[str]:
+        """Fetch Wikipedia summaries for multiple artists."""
+        summaries = []
+        
+        for artist_name in artist_names:
+            try:
+                # First, search for the Wikipedia page
+                search_params = {
+                    "action": "query",
+                    "list": "search",
+                    "srsearch": f"{artist_name} musician",  # Add 'musician' for better results
+                    "format": "json",
+                    "srlimit": 1
+                }
+                
+                search_data = api_request(
+                    "https://en.wikipedia.org/w/api.php",
+                    params=search_params,
+                    session=self.session
+                )
+                
+                search_results = search_data.get("query", {}).get("search", [])
+                if not search_results:
+                    summaries.append("")
+                    continue
+
+                # Then fetch the summary
+                page_title = search_results[0]["title"]
+                encoded_title = urllib.parse.quote(page_title)
+                summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded_title}"
+                
+                summary_data = api_request(
+                    summary_url,
+                    session=self.session
+                )
+                summaries.append(summary_data.get("extract", ""))
+                
+            except requests.RequestException as e:
+                print(f"Error fetching Wikipedia summary for {artist_name}: {e}")
+                summaries.append("")
+                continue
+                
+        return summaries
+    
+    def __repr__(self):
+        return f"DataReader containing {len(self.data)} rows."
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx: int):
+        # return index from self.data dataframe
+        return self.data.iloc[idx]
+
+
+def main():
+
     # parse arguments
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument("--viz", default=False, action="store_true", help="Visualize output in Gradio")
@@ -156,8 +366,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # The user has to indicate the dataset id and the workload
-    if args.dataset is None:
+    # The user has to indicate the workload and the datasetid if the workload is not music-knowledge-graph
+    if args.dataset is None and args.workload != "music-knowledge-graph":
         print("Please provide a dataset id")
         exit(1)
     if args.workload is None:
@@ -213,6 +423,19 @@ if __name__ == "__main__":
         plan = plan.add_columns(xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         plan = plan.sem_filter("The rows of the table contain the patient age")
         plan = plan.sem_add_columns(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
+
+    elif workload == "music-knowledge-graph":
+        # Name of artists who worked w/artist X, and who meets some condition
+        plan = pz.Dataset(MusicKnowledgeGraphReader(["Drake", "Travis Scott", "Kendrick Lamar", "Playboi Carti", "Ed Sheeran", "Taylor Swift", "Justin Bieber", "Selena Gomez", "Megan Thee Stallion"]))
+
+        plan = plan.sem_filter("The row represents an artist who's won more than 5 Grammy awards", depends_on=["record_type", "artist_wikipedia_summary"])
+        
+        # # extract the list of the remaining artists
+        # plan = plan.project(["artist_name"])
+
+        # # use these artists to go through the row records and find the songs where an artist from this list collaborated with Travis Scott
+        # plan2 = plan
+
 
     # construct config and run plan
     config = pz.QueryProcessorConfig(
@@ -275,3 +498,8 @@ if __name__ == "__main__":
                 gr.Textbox(value=plan_str, info="Query Plan")
 
             demo.launch()
+
+if __name__ == "__main__":
+
+    main()
+

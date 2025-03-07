@@ -62,6 +62,9 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 record_set = operator(candidates=input_queues[op_id])
                 records = record_set.data_records
                 record_op_stats = record_set.record_op_stats
+                print(f"record_op_stats: {record_op_stats}")
+                print(f"records: {records}")
+                print(f"{[record.passed_operator for record in records]}")
                 num_outputs = sum(record.passed_operator for record in records)
 
                 # update the progress manager
