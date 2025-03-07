@@ -274,7 +274,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     def _get_target_record_sets(
         self,
         logical_op_id: str,
-        source_idx_to_record_sets_and_ops: dict[int, list[tuple[DataRecordSet, PhysicalOperator]]],
+        source_idx_to_record_set_tuples: dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]],
         expected_outputs: dict[int, dict] | None,
     ) -> dict[int, DataRecordSet]:
         # initialize mapping from source index to target record sets
@@ -282,10 +282,10 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
         # if we have label(s), return the label(s)
         if expected_outputs is not None:
-            for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items():
+            for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items():
                 # get the first generated output for this source_idx
                 base_target_record = None
-                for record_set, _ in record_sets_and_ops:
+                for record_set, _, _ in record_set_tuples:
                     if len(record_set) > 0:
                         base_target_record = record_set[0]
                         break
@@ -313,14 +313,14 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             return source_idx_to_target_record_set
 
         # if we don't have a label use the maximum quality record from the union of the cache and new records
-        for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items():
+        for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items():
             # get the best computed output for this (source_idx, logical_op_id) so far (if one exists)
             champion_record_set, champion_op_quality = None, None
             if source_idx in self.champion_output_cache and logical_op_id in self.champion_output_cache[source_idx]:
                 champion_record_set, champion_op_quality = self.champion_output_cache[source_idx][logical_op_id]
 
             # get the highest quality output that we just computed
-            max_quality_record_set, max_op_quality = self._pick_champion_output(record_sets_and_ops)
+            max_quality_record_set, max_op_quality = self._pick_champion_output(record_set_tuples)
 
             # if this new output is of higher quality than our previous champion (or if we didn't have
             # a previous champion) then we update our champion record set
@@ -337,11 +337,11 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
         return source_idx_to_target_record_set
 
-    def _pick_champion_output(self, record_sets_and_ops: list[tuple[DataRecordSet, PhysicalOperator]]) -> tuple[DataRecordSet, float | None]:
+    def _pick_champion_output(self, record_set_tuples: list[tuple[DataRecordSet, PhysicalOperator, bool]]) -> tuple[DataRecordSet, float | None]:
         # find the operator with the highest estimated quality and return its record_set
         base_op_cost_est = OperatorCostEstimates(cardinality=1.0, cost_per_record=0.0, time_per_record=0.0, quality=1.0)
         champion_record_set, champion_quality = None, None
-        for record_set, op in record_sets_and_ops:
+        for record_set, op, _ in record_set_tuples:
             # skip failed operations
             if len(record_set) > 0:
                 continue
