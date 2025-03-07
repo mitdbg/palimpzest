@@ -279,7 +279,7 @@ class OpFrontier:
                 if cost_dominated and time_dominated and quality_dominated and selectivity_dominated:
                     pareto_frontier = False
                     break
-            
+
             # add op_id to pareto frontier if it's not dominated
             if pareto_frontier:
                 new_frontier_ops.append(op)
@@ -292,8 +292,6 @@ class OpFrontier:
         for _ in range(num_dropped_from_frontier):
             new_op = self.reservoir_ops.pop(0)
             new_frontier_ops.append(new_op)
-        
-        import pdb; pdb.set_trace()
 
         # update the frontier and reservoir ops
         self.frontier_ops = new_frontier_ops
