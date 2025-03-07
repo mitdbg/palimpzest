@@ -250,6 +250,7 @@ class OpFrontier:
             # if this op is fully sampled, remove it from the frontier
             if phys_op_id_to_num_samples[op_id] == len(self.source_indices):
                 num_dropped_from_frontier += 1
+                new_reservoir_ops.append(op)
                 continue
 
             # if this op is pareto optimal keep it in our frontier ops
@@ -284,6 +285,7 @@ class OpFrontier:
                 new_frontier_ops.append(op)
             else:
                 num_dropped_from_frontier += 1
+                new_reservoir_ops.append(op)
 
         # replace the ops dropped from the frontier with new ops from the reservoir
         num_dropped_from_frontier = min(num_dropped_from_frontier, len(self.reservoir_ops))
