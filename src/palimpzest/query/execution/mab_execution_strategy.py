@@ -138,13 +138,29 @@ class OpFrontier:
         2. Compute the pareto optimal set of frontier operators (using the mean values)
         3. Update the frontier and reservoir sets of operators based on their LCB/UCB overlap with the pareto frontier
         """
+        # NOTE: downstream operators may end up re-computing the same record_id with a diff. input as upstream
+        #       upstream operators change; in this case, we de-duplicate record_op_stats with identical record_ids
+        #       and keep the one with the maximum quality
         # get a mapping from physical_op_id --> list[RecordOpStats]
         phys_op_id_to_op_stats: dict[str, OperatorStats] = plan_stats.operator_stats.get(logical_op_id, {})
-        phys_op_id_to_record_op_stats = {
-            phys_op_id: op_stats.record_op_stats_lst
-            for phys_op_id, op_stats in phys_op_id_to_op_stats.items()
-            if len(op_stats.record_op_stats_lst) > 0
-        }
+        phys_op_id_to_record_op_stats = {}
+        for phys_op_id, op_stats in phys_op_id_to_op_stats.items():
+            # skip over operators which have not been sampled
+            if len(op_stats.record_op_stats_lst) == 0:
+                continue
+
+            # keep track of highest quality stats for a given input
+            record_id_to_max_quality_record_op_stats = {}
+            for record_op_stats in op_stats.record_op_stats_lst:
+                record_id = record_op_stats.record_id
+                if record_id not in record_id_to_max_quality_record_op_stats:  # noqa: SIM114
+                    record_id_to_max_quality_record_op_stats[record_id] = record_op_stats
+
+                elif record_op_stats.quality > record_id_to_max_quality_record_op_stats[record_id].quality:
+                    record_id_to_max_quality_record_op_stats[record_id] = record_op_stats
+
+            # compute final list of record op stats
+            phys_op_id_to_record_op_stats[phys_op_id] = list(record_id_to_max_quality_record_op_stats.values())
 
         # compute avg. selectivity, cost, time, and quality for each physical operator
         phys_op_to_mean_selectivity = {
