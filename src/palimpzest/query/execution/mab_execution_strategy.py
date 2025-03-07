@@ -42,8 +42,8 @@ class OpFrontier:
         # store the order in which we will sample the source records
         self.source_indices = source_indices
 
-        # keep track of the current sample index for each physical operator
-        self.phys_op_id_to_current_sample_idx = {op.get_op_id(): 0 for op in op_set}
+        # keep track of the source ids processed by each physical operator
+        self.phys_op_id_to_sources_processed = {op.get_op_id(): set() for op in op_set}
 
         # set the initial inputs for this logical operator
         is_scan_op = isinstance(op_set[0], ScanPhysicalOp)
@@ -75,16 +75,22 @@ class OpFrontier:
         op_source_idx_pairs = []
         for op in self.frontier_ops:
             # execute new operators on first j source indices, and previously sampled operators on one additional source_idx
-            current_sample_idx = self.phys_op_id_to_current_sample_idx[op.get_op_id()]
-            num_new_samples = 1 if current_sample_idx > 0 else self.j
-            num_new_samples = min(num_new_samples, len(self.source_indices) - current_sample_idx)
+            num_processed = len(self.phys_op_id_to_sources_processed[op.get_op_id()])
+            num_new_samples = 1 if num_processed > 0 else self.j
+            num_new_samples = min(num_new_samples, len(self.source_indices) - num_processed)
             assert num_new_samples >= 0, "Number of new samples must be non-negative"
 
             # construct list of inputs by looking up the input for the given source_idx
-            for sample_idx in range(current_sample_idx, current_sample_idx + num_new_samples):
-                source_idx = self.source_indices[sample_idx]
+            samples_added = 0
+            for source_idx in self.source_indices:
+                if source_idx in self.phys_op_id_to_sources_processed[op.get_op_id()]:
+                    continue
+
+                if samples_added == num_new_samples:
+                    break
+
+                # construct the (op, source_idx) for this source_idx
                 op_source_idx_pairs.append((op, source_idx))
-                self.phys_op_id_to_current_sample_idx[op.get_op_id()] += 1
 
         return op_source_idx_pairs
 
@@ -139,7 +145,7 @@ class OpFrontier:
             if len(op_stats.record_op_stats_lst) == 0:
                 continue
 
-            # keep track of highest quality stats for a given input
+            # compute mapping from record_id to highest quality record op stats
             record_id_to_max_quality_record_op_stats = {}
             for record_op_stats in op_stats.record_op_stats_lst:
                 record_id = record_op_stats.record_id
@@ -152,13 +158,18 @@ class OpFrontier:
             # compute final list of record op stats
             phys_op_id_to_record_op_stats[phys_op_id] = list(record_id_to_max_quality_record_op_stats.values())
 
-        # compute the number of samples per physical operator and total samples; here a sample
-        # corresponds to the processing of inputs derived from a single source index
-        phys_op_id_to_num_samples = {
-            phys_op_id: len(set(record_op_stats.record_source_idx for record_op_stats in record_op_stats_lst))
-            for phys_op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
-        }
-        total_num_samples = sum(phys_op_id_to_num_samples.values())
+        # compute mapping of physical op to num samples and total samples drawn;
+        # also update the set of source indices which have been processed by each physical operator
+        phys_op_id_to_num_samples, total_num_samples = {}, 0
+        for phys_op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items():
+            # update teh set of source indices processed
+            for record_op_stats in record_op_stats_lst:
+                self.phys_op_id_to_sources_processed[phys_op_id].add(record_op_stats.record_source_idx)
+
+            # compute the number of samples as the number of source indices processed
+            num_samples = len(self.phys_op_id_to_sources_processed[phys_op_id])
+            phys_op_id_to_num_samples[phys_op_id] = num_samples
+            total_num_samples += num_samples
 
         # compute avg. selectivity, cost, time, and quality for each physical operator
         phys_op_to_mean_selectivity = {
