@@ -408,6 +408,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
                 # get frontier ops and their next input
                 frontier_op_input_pairs = op_frontiers[logical_op_id].get_frontier_op_input_pairs(source_indices_to_sample, max_quality_op)
+                import pdb; pdb.set_trace()
 
                 # break out of the loop if frontier_op_input_pairs is empty, as this means all records have been filtered out
                 if len(frontier_op_input_pairs) == 0:
