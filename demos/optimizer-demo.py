@@ -175,6 +175,7 @@ if __name__ == "__main__":
     # parse arguments
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
+    parser.add_argument("--progress", default=True, action="store_true", help="Print progress output")
     parser.add_argument(
         "--processing-strategy",
         default="sentinel",
@@ -253,12 +254,16 @@ if __name__ == "__main__":
     os.makedirs("opt-profiling-data", exist_ok=True)
 
     verbose = args.verbose
+    progress = args.progress
     seed = args.seed
     val_examples = args.val_examples
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
     exp_name = args.exp_name
+    processing_strategy = args.processing_strategy
+    execution_strategy = args.execution_strategy
+    sentinel_execution_strategy = args.sentinel_execution_strategy
 
     policy = pz.MaxQuality()
     if args.policy == "mincost":
@@ -380,10 +385,10 @@ if __name__ == "__main__":
         policy=policy,
         cache=False,
         val_datasource=val_datasource,
-        processing_strategy=args.processing_strategy,
+        processing_strategy=processing_strategy,
         optimizer_strategy="pareto",
-        sentinel_execution_strategy=args.sentinel_execution_strategy,
-        execution_strategy=args.execution_strategy,
+        sentinel_execution_strategy=sentinel_execution_strategy,
+        execution_strategy=execution_strategy,
         use_final_op_quality=use_final_op_quality,
         max_workers=1,
         verbose=verbose,
@@ -403,7 +408,7 @@ if __name__ == "__main__":
         allow_mixtures=True,
         allow_rag_reduction=True,
         allow_token_reduction=False,
-        progress=False,
+        progress=progress,
     )
 
     data_record_collection = plan.run(
@@ -421,12 +426,12 @@ if __name__ == "__main__":
     # create filepaths for records and stats
     records_path = (
         f"opt-profiling-data/biodex-reactions-{exp_name}-records.json"
-        if args.processing_strategy in ["mab_sentinel", "random_sampling"]
+        if processing_strategy in ["mab_sentinel", "random_sampling"]
         else f"opt-profiling-data/biodex-reactions-{exp_name}-records.json"
     )
     stats_path = (
         f"opt-profiling-data/biodex-reactions-{exp_name}-profiling.json"
-        if args.processing_strategy in ["mab_sentinel", "random_sampling"]
+        if processing_strategy in ["mab_sentinel", "random_sampling"]
         else f"opt-profiling-data/biodex-reactions-{exp_name}-profiling.json"
     )
 
