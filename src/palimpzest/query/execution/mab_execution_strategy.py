@@ -382,36 +382,40 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     break
 
                 # run sampled operators on sampled inputs and update the number of samples drawn
-                source_idx_to_record_sets_and_ops, num_llm_operations = self._execute_op_set(frontier_op_input_pairs)
+                source_idx_to_record_set_tuples, num_llm_operations = self._execute_op_set(frontier_op_input_pairs)
                 samples_drawn += num_llm_operations
 
                 # FUTURE TODO: have this return the highest quality record set simply based on our posterior (or prior) belief on operator quality
                 # get the target record set for each source_idx
-                source_idx_to_target_record_set = self._get_target_record_sets(logical_op_id, source_idx_to_record_sets_and_ops, expected_outputs)
+                source_idx_to_target_record_set = self._get_target_record_sets(logical_op_id, source_idx_to_record_set_tuples, expected_outputs)
 
                 # FUTURE TODO: move this outside of the loop (i.e. assume we only get quality label(s) after executing full program)
                 # score the quality of each generated output
                 physical_op_cls = op_set[0].__class__
-                source_idx_to_record_sets = {
-                    source_idx: list(map(lambda tup: tup[0], record_sets_and_ops))
-                    for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items()
+                source_idx_to_all_record_sets = {
+                    source_idx: [record_set for record_set, _, _ in record_set_tuples]
+                    for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items()
                 }
-                source_idx_to_record_sets = self._score_quality(physical_op_cls, source_idx_to_record_sets, source_idx_to_target_record_set)
+                source_idx_to_all_record_sets = self._score_quality(physical_op_cls, source_idx_to_all_record_sets, source_idx_to_target_record_set)
 
-                # flatten the lists of records and record_op_stats
-                all_records, all_record_op_stats = self._flatten_record_sets(source_idx_to_record_sets)
+                # flatten the lists of newly computed records and record_op_stats
+                source_idx_to_new_record_sets = {
+                    source_idx: [record_set for record_set, _, is_new in record_set_tuples if is_new]
+                    for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items()
+                }
+                new_records, new_record_op_stats = self._flatten_record_sets(source_idx_to_new_record_sets)
 
                 # update plan stats
-                plan_stats.add_record_op_stats(all_record_op_stats)
+                plan_stats.add_record_op_stats(new_record_op_stats)
 
                 # add records (which are not filtered) to the cache, if allowed
-                self._add_records_to_cache(logical_op_id, all_records)
+                self._add_records_to_cache(logical_op_id, new_records)
 
                 # FUTURE TODO: simply set input based on source_idx_to_target_record_set (b/c we won't have scores computed)
                 # provide the champion record sets as inputs to the next logical operator
                 if op_idx + 1 < len(plan):
                     next_logical_op_id = plan.logical_op_ids[op_idx + 1]
-                    op_frontiers[next_logical_op_id].update_inputs(source_idx_to_record_sets)
+                    op_frontiers[next_logical_op_id].update_inputs(source_idx_to_all_record_sets)
 
                 # update the (pareto) frontier for each set of operators
                 op_frontiers[logical_op_id].update_frontier(logical_op_id, plan_stats)

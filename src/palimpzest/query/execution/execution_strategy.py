@@ -365,7 +365,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
         return all_records, all_record_op_stats
 
-    def _execute_op_set(self, op_input_pairs: list[tuple[PhysicalOperator, DataRecord | int]]) -> tuple[dict[int, list[tuple[DataRecordSet, PhysicalOperator]]], int]:
+    def _execute_op_set(self, op_input_pairs: list[tuple[PhysicalOperator, DataRecord | int]]) -> tuple[dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]], int]:
         def execute_op_wrapper(operator, input) -> tuple[DataRecordSet, PhysicalOperator, DataRecord | int]:
             record_set = operator(input)
             return record_set, operator, input
@@ -392,7 +392,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             # get result from cache
             if op_input_hash in self.cache:
                 source_idx = get_source_idx(input)
-                source_idx_to_record_sets_and_ops[source_idx].append(self.cache[op_input_hash])
+                record_set, operator = self.cache[op_input_hash]
+                source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator, False))
 
             # otherwise, add to final_op_input_pairs
             else:
@@ -434,7 +435,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 source_idx = get_source_idx(input)
 
                 # add record_set to mapping from source_idx --> record_sets
-                source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator))
+                source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator, True))
 
         return source_idx_to_record_sets_and_ops, num_llm_ops
 
