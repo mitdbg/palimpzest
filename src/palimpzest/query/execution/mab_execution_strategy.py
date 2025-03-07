@@ -42,11 +42,8 @@ class OpFrontier:
         # store the order in which we will sample the source records
         self.source_indices = source_indices
 
-        # keep track of the number of times each operator has been sampled
-        self.phys_op_id_to_num_samples = {op.get_op_id(): 0 for op in op_set}
-
-        # keep track of the number of times the logical operator has been sampled
-        self.total_num_samples = 0
+        # keep track of the current sample index for each physical operator
+        self.phys_op_id_to_current_sample_idx = {op.get_op_id(): 0 for op in op_set}
 
         # set the initial inputs for this logical operator
         is_scan_op = isinstance(op_set[0], ScanPhysicalOp)
@@ -78,13 +75,13 @@ class OpFrontier:
         op_source_idx_pairs = []
         for op in self.frontier_ops:
             # execute new operators on first j source indices, and previously sampled operators on one additional source_idx
-            current_num_samples = self.phys_op_id_to_num_samples[op.get_op_id()]
-            num_new_samples = 1 if current_num_samples > 0 else self.j
-            num_new_samples = min(num_new_samples, len(self.source_indices) - current_num_samples)
+            current_sample_idx = self.phys_op_id_to_current_sample_idx[op.get_op_id()]
+            num_new_samples = 1 if current_sample_idx > 0 else self.j
+            num_new_samples = min(num_new_samples, len(self.source_indices) - current_sample_idx)
             assert num_new_samples >= 0, "Number of new samples must be non-negative"
 
             # construct list of inputs by looking up the input for the given source_idx
-            for sample_idx in range(current_num_samples, current_num_samples + num_new_samples):
+            for sample_idx in range(current_sample_idx, current_sample_idx + num_new_samples):
                 source_idx = self.source_indices[sample_idx]
                 op_source_idx_pairs.append((op, source_idx))
 
@@ -122,14 +119,6 @@ class OpFrontier:
 
         return op_input_pairs
 
-    def update_sample_counts(self, phys_op_id_to_num_samples: dict[str, int]) -> None:
-        """
-        Update the number of samples which have been drawn for the given physical operator.
-        """
-        for phys_op_id, num_samples in phys_op_id_to_num_samples.items():
-            self.phys_op_id_to_num_samples[phys_op_id] += num_samples
-            self.total_num_samples += num_samples
-
     def update_frontier(self, logical_op_id: str, plan_stats: SentinelPlanStats) -> None:
         """
         Update the set of frontier operators, pulling in new ones from the reservoir as needed.
@@ -162,6 +151,14 @@ class OpFrontier:
             # compute final list of record op stats
             phys_op_id_to_record_op_stats[phys_op_id] = list(record_id_to_max_quality_record_op_stats.values())
 
+        # compute the number of samples per physical operator and total samples; here a sample
+        # corresponds to the processing of inputs derived from a single source index
+        phys_op_id_to_num_samples = {
+            phys_op_id: len(set(record_op_stats.record_source_idx for record_op_stats in record_op_stats_lst))
+            for phys_op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
+        }
+        total_num_samples = sum(phys_op_id_to_num_samples.values())
+
         # compute avg. selectivity, cost, time, and quality for each physical operator
         phys_op_to_mean_selectivity = {
             op_id: len(record_op_stats_lst) / sum([record_op_stats.passed_operator for record_op_stats in record_op_stats_lst])
@@ -191,7 +188,7 @@ class OpFrontier:
         # compute metrics for each physical operator
         op_metrics = {}
         for op_id in phys_op_id_to_record_op_stats:
-            sample_ratio = np.sqrt(np.log(self.total_num_samples) / self.phys_op_id_to_num_samples[op_id])
+            sample_ratio = np.sqrt(np.log(total_num_samples) / phys_op_id_to_num_samples[op_id])
             exploration_terms = np.array([cost_alpha * sample_ratio, time_alpha * sample_ratio, quality_alpha * sample_ratio, selectivity_alpha * sample_ratio])
             mean_terms = (phys_op_to_mean_cost[op_id], phys_op_to_mean_time[op_id], phys_op_to_mean_quality[op_id], phys_op_to_mean_selectivity[op_id])
 
@@ -238,7 +235,7 @@ class OpFrontier:
             op_id = op.get_op_id()
 
             # if this op is fully sampled, remove it from the frontier
-            if self.phys_op_id_to_num_samples[op_id] == len(self.source_indices):
+            if phys_op_id_to_num_samples[op_id] == len(self.source_indices):
                 num_dropped_from_frontier += 1
                 continue
 
@@ -405,10 +402,8 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     break
 
                 # run sampled operators on sampled inputs and update the number of samples drawn
-                source_idx_to_record_set_tuples, phys_op_id_to_num_samples = self._execute_op_set(frontier_op_input_pairs)
-                samples_drawn += sum(phys_op_id_to_num_samples.values())
-                op_frontiers[logical_op_id].update_sample_counts(phys_op_id_to_num_samples)
-
+                source_idx_to_record_set_tuples, num_llm_ops = self._execute_op_set(frontier_op_input_pairs)
+                samples_drawn += num_llm_ops
 
                 # FUTURE TODO: have this return the highest quality record set simply based on our posterior (or prior) belief on operator quality
                 # get the target record set for each source_idx

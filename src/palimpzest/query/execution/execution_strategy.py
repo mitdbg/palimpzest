@@ -399,9 +399,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             else:
                 final_op_input_pairs.append((operator, input))
 
-        # keep track of the number of llm operations we execute with each physical operator
-        final_phys_op_ids = set([operator.get_op_id() for operator, _ in final_op_input_pairs])
-        phys_op_id_to_num_samples = {phys_op_id: 0 for phys_op_id in final_phys_op_ids}
+        # keep track of the number of llm operations
+        num_llm_ops = 0
 
         # create thread pool w/max workers and run futures over worker pool
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -424,7 +423,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
                     # update progress manager
                     if self._is_llm_op(operator):
-                        phys_op_id_to_num_samples[operator.get_op_id()] += 1
+                        num_llm_ops += 1
                         self.progress_manager.incr(operator.get_logical_op_id(), num_samples=1, total_cost=record_set.get_total_cost())
 
                 # update futures
@@ -438,7 +437,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 # add record_set to mapping from source_idx --> record_sets
                 source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator, True))
 
-        return source_idx_to_record_sets_and_ops, phys_op_id_to_num_samples
+        return source_idx_to_record_sets_and_ops, num_llm_ops
 
     def _is_llm_op(self, physical_op: PhysicalOperator) -> bool:
         is_llm_convert = isinstance(physical_op, LLMConvert)
