@@ -84,6 +84,7 @@ class OpFrontier:
             for sample_idx in range(current_sample_idx, current_sample_idx + num_new_samples):
                 source_idx = self.source_indices[sample_idx]
                 op_source_idx_pairs.append((op, source_idx))
+                self.phys_op_id_to_current_sample_idx[op.get_op_id()] += 1
 
         return op_source_idx_pairs
 
