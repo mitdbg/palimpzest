@@ -380,7 +380,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             phys_op_id = operator.get_op_id()
             return hash(f"{logical_op_id}{phys_op_id}{hash(input)}")
 
-
         # initialize mapping from source indices to output record sets
         source_idx_to_record_sets_and_ops = {get_source_idx(input): [] for _, input in op_input_pairs}
 
@@ -399,8 +398,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             else:
                 final_op_input_pairs.append((operator, input))
 
-        # count the number of operations we are going to execute with an llm
-        num_llm_ops = sum(self._is_llm_op(operator) for operator, _ in final_op_input_pairs)
+        # keep track of the number of operations we execute with an llm
+        num_llm_ops = 0
 
         # create thread pool w/max workers and run futures over worker pool
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -422,7 +421,9 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     self.cache[op_input_hash] = (record_set, operator)
 
                     # update progress manager
-                    self.progress_manager.incr(operator.get_logical_op_id(), num_samples=num_llm_ops, total_cost=record_set.get_total_cost())
+                    if self._is_llm_op(operator):
+                        num_llm_ops += 1
+                        self.progress_manager.incr(operator.get_logical_op_id(), num_samples=1, total_cost=record_set.get_total_cost())
 
                 # update futures
                 futures = list(not_done_futures)
