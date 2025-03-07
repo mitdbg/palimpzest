@@ -136,16 +136,14 @@ class OpFrontier:
         phys_op_id_to_record_op_stats = {
             phys_op_id: op_stats.record_op_stats_lst
             for phys_op_id, op_stats in phys_op_id_to_op_stats.items()
+            if len(op_stats.record_op_stats_lst) > 0
         }
 
         # compute avg. selectivity, cost, time, and quality for each physical operator
-        try:
-            phys_op_to_mean_selectivity = {
-                op_id: len(record_op_stats_lst) / sum([record_op_stats.passed_operator for record_op_stats in record_op_stats_lst])
-                for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
-            }
-        except:
-            import pdb; pdb.set_trace()
+        phys_op_to_mean_selectivity = {
+            op_id: len(record_op_stats_lst) / sum([record_op_stats.passed_operator for record_op_stats in record_op_stats_lst])
+            for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
+        }
         phys_op_to_mean_cost = {
             op_id: np.mean([record_op_stats.cost_per_record for record_op_stats in record_op_stats_lst])
             for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
