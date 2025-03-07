@@ -2,7 +2,7 @@ import logging
 
 import numpy as np
 
-from palimpzest.core.data.dataclasses import OperatorStats, RecordOpStats, SentinelPlanStats
+from palimpzest.core.data.dataclasses import OperatorStats, SentinelPlanStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
@@ -114,14 +114,21 @@ class OpFrontier:
             op_source_idx_pairs.append((max_quality_op, source_idx))
 
         # fetch the corresponding (op, input) pairs
-        op_input_pairs = []
-        for op, source_idx in op_source_idx_pairs:
-            this_op_input_pairs = [(op, input_record) for input_record in self.source_idx_to_input[source_idx]]
-            op_input_pairs.extend(this_op_input_pairs)
-            self.phys_op_id_to_num_samples[op.get_op_id()] += len(this_op_input_pairs)
-            self.total_num_samples += len(this_op_input_pairs)
+        op_input_pairs = [
+            (op, input)
+            for op, source_idx in op_source_idx_pairs
+            for input in self.source_idx_to_input[source_idx]
+        ]
 
         return op_input_pairs
+
+    def update_sample_counts(self, phys_op_id_to_num_samples: dict[str, int]) -> None:
+        """
+        Update the number of samples which have been drawn for the given physical operator.
+        """
+        for phys_op_id, num_samples in phys_op_id_to_num_samples.items():
+            self.phys_op_id_to_num_samples[phys_op_id] += num_samples
+            self.total_num_samples += num_samples
 
     def update_frontier(self, logical_op_id: str, plan_stats: SentinelPlanStats) -> None:
         """
@@ -382,8 +389,10 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     break
 
                 # run sampled operators on sampled inputs and update the number of samples drawn
-                source_idx_to_record_set_tuples, num_llm_operations = self._execute_op_set(frontier_op_input_pairs)
-                samples_drawn += num_llm_operations
+                source_idx_to_record_set_tuples, phys_op_id_to_num_samples = self._execute_op_set(frontier_op_input_pairs)
+                samples_drawn += sum(phys_op_id_to_num_samples.values())
+                op_frontiers[logical_op_id].update_sample_counts(phys_op_id_to_num_samples)
+
 
                 # FUTURE TODO: have this return the highest quality record set simply based on our posterior (or prior) belief on operator quality
                 # get the target record set for each source_idx
@@ -404,6 +413,8 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items()
                 }
                 new_records, new_record_op_stats = self._flatten_record_sets(source_idx_to_new_record_sets)
+
+                # update the number of samples drawn for each operator
 
                 # update plan stats
                 plan_stats.add_record_op_stats(new_record_op_stats)

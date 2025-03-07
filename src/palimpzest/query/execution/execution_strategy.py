@@ -365,7 +365,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
         return all_records, all_record_op_stats
 
-    def _execute_op_set(self, op_input_pairs: list[tuple[PhysicalOperator, DataRecord | int]]) -> tuple[dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]], int]:
+    def _execute_op_set(self, op_input_pairs: list[tuple[PhysicalOperator, DataRecord | int]]) -> tuple[dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]], dict[str, int]]:
         def execute_op_wrapper(operator, input) -> tuple[DataRecordSet, PhysicalOperator, DataRecord | int]:
             record_set = operator(input)
             return record_set, operator, input
@@ -399,8 +399,9 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             else:
                 final_op_input_pairs.append((operator, input))
 
-        # keep track of the number of operations we execute with an llm
-        num_llm_ops = 0
+        # keep track of the number of llm operations we execute with each physical operator
+        final_phys_op_ids = set([operator.get_op_id() for operator, _ in final_op_input_pairs])
+        phys_op_id_to_num_samples = {phys_op_id: 0 for phys_op_id in final_phys_op_ids}
 
         # create thread pool w/max workers and run futures over worker pool
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -423,7 +424,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
                     # update progress manager
                     if self._is_llm_op(operator):
-                        num_llm_ops += 1
+                        phys_op_id_to_num_samples[operator.get_op_id()] += 1
                         self.progress_manager.incr(operator.get_logical_op_id(), num_samples=1, total_cost=record_set.get_total_cost())
 
                 # update futures
@@ -437,7 +438,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 # add record_set to mapping from source_idx --> record_sets
                 source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator, True))
 
-        return source_idx_to_record_sets_and_ops, num_llm_ops
+        return source_idx_to_record_sets_and_ops, phys_op_id_to_num_samples
 
     def _is_llm_op(self, physical_op: PhysicalOperator) -> bool:
         is_llm_convert = isinstance(physical_op, LLMConvert)
