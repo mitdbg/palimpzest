@@ -37,7 +37,6 @@ biodex_ranked_reactions_labels_cols = [
 class BiodexReader(pz.DataReader):
     def __init__(
         self,
-        reactions_only: bool = True,
         rp_at_k: int = 5,
         num_samples: int = 5,
         split: str = "test",
@@ -56,7 +55,6 @@ class BiodexReader(pz.DataReader):
 
         # trim to number of samples
         self.dataset = self.dataset[:num_samples]
-        self.reactions_only = reactions_only
         self.rp_at_k = rp_at_k
         self.num_samples = num_samples
         self.shuffle = shuffle
@@ -74,13 +72,6 @@ class BiodexReader(pz.DataReader):
             "reaction_labels": target_reactions,
             "ranked_reaction_labels": target_reactions,
         }
-        if not self.reactions_only:
-            label_dict = {
-                "serious": int(target_lst[0].split(":")[-1]),
-                "patientsex": int(target_lst[1].split(":")[-1]),
-                "drugs": [drug.strip().lower() for drug in target_lst[2].split(":")[-1].split(",")],
-                **label_dict,
-            }
 
         return label_dict
 
@@ -91,8 +82,8 @@ class BiodexReader(pz.DataReader):
 
         try:
             # lower-case each list
-            preds = [pred.lower().replace("'", "").replace("^", "") for pred in preds]
-            targets = set([target.lower().replace("'", "").replace("^", "") for target in targets])
+            preds = [pred.strip().lower().replace("'", "").replace("^", "") for pred in preds]
+            targets = set([target.strip().lower().replace("'", "").replace("^", "") for target in targets])
 
             # compute rank-precision at k
             rn = len(targets)
@@ -111,29 +102,33 @@ class BiodexReader(pz.DataReader):
             return 0.0
 
     @staticmethod
-    def f1_eval(preds: list | None, targets: list):
+    def term_recall(preds: list | None, targets: list):
         if preds is None:
             return 0.0
 
         try:
-            # compute precision and recall
-            s_preds = set([pred.lower().replace("'", "").replace("^", "") for pred in preds])
-            s_targets = set([target.lower().replace("'", "").replace("^", "") for target in targets])
+            # normalize terms in each list
+            pred_terms = set([
+                term.strip()
+                for pred in preds
+                for term in pred.lower().replace("'", "").replace("^", "").split(" ")
+            ])
+            target_terms = ([
+                term.strip()
+                for target in targets
+                for term in target.lower().replace("'", "").replace("^", "").split(" ")
+            ])
 
-            intersect = s_preds.intersection(s_targets)
+            # compute term recall and return
+            intersect = pred_terms.intersection(target_terms)
+            term_recall = len(intersect) / len(target_terms)
 
-            precision = len(intersect) / len(s_preds) if len(s_preds) > 0 else 0.0
-            recall = len(intersect) / len(s_targets)
-
-            # compute f1 score and return
-            f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
-
-            return f1
+            return term_recall
 
         except Exception:
-            os.makedirs("f1-eval-errors", exist_ok=True)
+            os.makedirs("term-recall-eval-errors", exist_ok=True)
             ts = time.time()
-            with open(f"f1-eval-errors/error-{ts}.txt", "w") as f:
+            with open(f"term-recall-eval-errors/error-{ts}.txt", "w") as f:
                 f.write(str(preds))
             return 0.0
 
@@ -162,11 +157,9 @@ class BiodexReader(pz.DataReader):
 
         # add scoring functions for list fields
         rank_precision_at_k = partial(BiodexReader.rank_precision_at_k, k=self.rp_at_k)
-        item["score_fn"]["reactions"] = BiodexReader.f1_eval
-        item["score_fn"]["reaction_labels"] = BiodexReader.f1_eval
+        item["score_fn"]["reactions"] = BiodexReader.term_recall
+        item["score_fn"]["reaction_labels"] = BiodexReader.term_recall
         item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k
-        if not self.reactions_only:
-            item["score_fn"]["drugs"] = BiodexReader.f1_eval
 
         return item
 
@@ -281,7 +274,6 @@ if __name__ == "__main__":
 
     # create data source
     datareader = BiodexReader(
-        reactions_only=True,
         split="test",
         num_samples=250,
         shuffle=False,
@@ -290,7 +282,6 @@ if __name__ == "__main__":
 
     # create validation data source
     val_datasource = BiodexReader(
-        reactions_only=True,
         split="train",
         num_samples=val_examples,
         shuffle=False,
@@ -406,7 +397,7 @@ if __name__ == "__main__":
         allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
-        allow_rag_reduction=False,
+        allow_rag_reduction=True,
         allow_token_reduction=False,
         progress=progress,
     )
