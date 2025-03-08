@@ -428,10 +428,11 @@ def main():
         # Name of artists who worked w/artist X, and who meets some condition
         plan = pz.Dataset(MusicKnowledgeGraphReader(["Drake", "Travis Scott", "Kendrick Lamar", "Playboi Carti", "Ed Sheeran", "Taylor Swift", "Justin Bieber", "Selena Gomez", "Megan Thee Stallion"]))
 
+        plan = plan.filter(lambda x: x["record_type"] == "artist", depends_on=["record_type"])
         plan = plan.sem_filter("The row represents an artist who's won more than 5 Grammy awards", depends_on=["record_type", "artist_wikipedia_summary"])
         
         # # extract the list of the remaining artists
-        # plan = plan.project(["artist_name"])
+        plan = plan.project(["artist_name"])
 
         # # use these artists to go through the row records and find the songs where an artist from this list collaborated with Travis Scott
         # plan2 = plan

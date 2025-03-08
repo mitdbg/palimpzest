@@ -270,6 +270,8 @@ class DataRecord:
         # Better ways to handle this.
         dct = pd.Series(self.field_values).to_dict()
 
+        print(project_cols)
+
         if project_cols is not None and len(project_cols) > 0:
             project_field_names = set(field.split(".")[-1] for field in project_cols)
             dct = {k: v for k, v in dct.items() if k in project_field_names}
