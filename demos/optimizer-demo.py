@@ -22,7 +22,7 @@ biodex_entry_cols = [
 ]
 
 biodex_reactions_cols = [
-    {"name": "reactions", "type": list[str], "desc": "The list of all medical conditions discussed in the report."},
+    {"name": "reactions", "type": list[str], "desc": "The list of all medical conditions experienced by the patient as discussed in the report. Try to provide as many relevant medical conditions as possible."},
 ]
 
 biodex_reaction_labels_cols = [
@@ -332,25 +332,6 @@ if __name__ == "__main__":
         # return the top-k similar results and generation stats
         return final_sorted_results[:k]
 
-    def store_og_reactions(record: dict) -> dict:
-        """Store the original reactions in a separate column."""
-        return {"og_reaction_labels": record["reaction_labels"]}
-
-    def trim_terms(record: dict) -> dict:
-        """Only keep `reaction_labels` for which every word appears in the record's `fulltext`."""
-        reaction_labels = [label.lower().replace("'", "").replace("^", "") for label in record["reaction_labels"]]
-        fulltext = record["fulltext"].lower().replace("'", "").replace("^", "")
-        trimmed_reaction_labels = [
-            label
-            for label in reaction_labels
-            if all(word in fulltext for word in label.split(" "))
-        ]
-        record["reaction_labels"] = trimmed_reaction_labels
-
-        print(f"Trimmed reaction labels: {trimmed_reaction_labels}")
-
-        return record
-
     # construct plan
     plan = pz.Dataset(datareader)
     plan = plan.sem_add_columns(biodex_reactions_cols)
@@ -361,8 +342,6 @@ if __name__ == "__main__":
         output_attr="reaction_labels",
         output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
     )
-    # plan = plan.add_columns(store_og_reactions, cols=[{"name": "og_reaction_labels", "type": list[str], "desc": ""}], depends_on=["reaction_labels"])
-    # plan = plan.map(trim_terms, depends_on=["reaction_labels"])
     plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
     # only use final op quality
