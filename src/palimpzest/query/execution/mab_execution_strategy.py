@@ -292,8 +292,6 @@ class OpFrontier:
         for _ in range(num_dropped_from_frontier):
             new_op = self.reservoir_ops.pop(0)
             new_frontier_ops.append(new_op)
-        
-        import pdb; pdb.set_trace()
 
         # update the frontier and reservoir ops
         self.frontier_ops = new_frontier_ops
