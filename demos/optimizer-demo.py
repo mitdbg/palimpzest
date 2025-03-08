@@ -168,7 +168,7 @@ if __name__ == "__main__":
     # parse arguments
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
-    parser.add_argument("--progress", default=True, action="store_true", help="Print progress output")
+    parser.add_argument("--progress", default=False, action="store_true", help="Print progress output")
     parser.add_argument(
         "--processing-strategy",
         default="sentinel",
