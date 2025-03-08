@@ -30,7 +30,7 @@ biodex_reaction_labels_cols = [
 ]
 
 biodex_ranked_reactions_labels_cols = [
-    {"name": "ranked_reaction_labels", "type": list[str], "desc": "The ranked list of medical conditions experienced by the patient. The most relevant label occurs first in the list."},
+    {"name": "ranked_reaction_labels", "type": list[str], "desc": "The ranked list of medical conditions experienced by the patient. The most relevant label occurs first in the list. Be sure to rank ALL of the inputs."},
 ]
 
 
