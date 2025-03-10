@@ -360,7 +360,7 @@ if __name__ == "__main__":
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
         use_final_op_quality=use_final_op_quality,
-        max_workers=1,
+        max_workers=10,
         verbose=verbose,
         available_models=[
             # Model.GPT_4o,
