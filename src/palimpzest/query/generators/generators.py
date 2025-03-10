@@ -376,7 +376,9 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             field_answers = {field_name: None for field_name in fields}
             reasoning = None
             generation_stats = GenerationStats(
-                model_name=self.model_name, llm_call_duration_secs=time.time() - start_time
+                model_name=self.model_name,
+                llm_call_duration_secs=time.time() - start_time,
+                total_llm_calls=1,
             )
 
             return field_answers, reasoning, generation_stats, messages
@@ -403,6 +405,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 total_input_cost=input_tokens * usd_per_input_token,
                 total_output_cost=output_tokens * usd_per_output_token,
                 cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+                total_llm_calls=1,
                 # "system_prompt": system_prompt,
                 # "prompt": prompt,
                 # "usage": usage,

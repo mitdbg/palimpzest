@@ -171,6 +171,8 @@ class RetrieveOp(PhysicalOperator):
             generated_fields=generated_fields,
             fn_call_duration_secs=total_time - generation_stats.llm_call_duration_secs,
             llm_call_duration_secs=generation_stats.llm_call_duration_secs,
+            total_llm_calls=generation_stats.total_llm_calls,
+            total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
             op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 
@@ -232,6 +234,8 @@ class RetrieveOp(PhysicalOperator):
                     total_output_cost=0.0,
                     cost_per_record=total_input_cost,
                     llm_call_duration_secs=embed_total_time,
+                    total_llm_calls=1,
+                    total_embedding_llm_calls=len(query),
                 )
             except Exception:
                 query = None

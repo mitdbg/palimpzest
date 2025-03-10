@@ -97,6 +97,8 @@ class FilterOp(PhysicalOperator, ABC):
             total_output_cost=generation_stats.total_output_cost,
             llm_call_duration_secs=generation_stats.llm_call_duration_secs,
             fn_call_duration_secs=generation_stats.fn_call_duration_secs,
+            total_llm_calls=generation_stats.total_llm_calls,
+            total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
             answer=answer,
             passed_operator=passed_operator,
             image_operation=self.is_image_filter(),

@@ -40,6 +40,12 @@ class GenerationStats:
     # (if applicable) the time (in seconds) spent executing a call to a function
     fn_call_duration_secs: float = 0.0
 
+    # (if applicable) the total number of LLM calls made by this operator
+    total_llm_calls: int = 0
+
+    # (if applicable) the total number of embedding LLM calls made by this operator
+    total_embedding_llm_calls: int = 0
+
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
         # self.raw_answers.extend(other.raw_answers)
         for dataclass_field in [
@@ -50,6 +56,8 @@ class GenerationStats:
             "cost_per_record",
             "llm_call_duration_secs",
             "fn_call_duration_secs",
+            "total_llm_calls",
+            "total_embedding_llm_calls",
         ]:
             setattr(self, dataclass_field, getattr(self, dataclass_field) + getattr(other, dataclass_field))
         return self
@@ -65,6 +73,8 @@ class GenerationStats:
                 "llm_call_duration_secs",
                 "fn_call_duration_secs",
                 "cost_per_record",
+                "total_llm_calls",
+                "total_embedding_llm_calls",
             ]
         }
         # dct['raw_answers'] = self.raw_answers + other.raw_answers
@@ -85,6 +95,8 @@ class GenerationStats:
             "cost_per_record",
             "llm_call_duration_secs",
             "fn_call_duration_secs",
+            "total_llm_calls",
+            "total_embedding_llm_calls",
         ]:
             setattr(self, dataclass_field, getattr(self, dataclass_field) / quotient)
         return self
@@ -103,6 +115,8 @@ class GenerationStats:
                 "total_output_cost",
                 "llm_call_duration_secs",
                 "fn_call_duration_secs",
+                "total_llm_calls",
+                "total_embedding_llm_calls",
                 "cost_per_record",
             ]
         }
@@ -110,6 +124,7 @@ class GenerationStats:
         return GenerationStats(**dct)
 
     def __radd__(self, other: int) -> GenerationStats:
+        assert not isinstance(other, GenerationStats), "This should not be called with a GenerationStats object"
         return self
 
 
@@ -199,6 +214,12 @@ class RecordOpStats:
 
     # (if applicable) the time (in seconds) spent executing a UDF or calling an external api
     fn_call_duration_secs: float = 0.0
+
+    # (if applicable) the total number of LLM calls made by this operator
+    total_llm_calls: int = 0
+
+    # (if applicable) the total number of embedding LLM calls made by this operator
+    total_embedding_llm_calls: int = 0
 
     # (if applicable) a boolean indicating whether this is the statistics captured from a failed convert operation
     failed_convert: bool | None = None

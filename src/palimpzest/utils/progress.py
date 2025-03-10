@@ -325,13 +325,16 @@ class PZSentinelProgressManager(ProgressManager):
 
         # add a task to the progress manager for each operator in the plan
         for logical_op_id, op_set in plan:
-            op_name = op_set[0].op_name()
+            physical_op = op_set[0]
+            is_llm_convert = isinstance(physical_op, LLMConvert)
+            is_llm_filter = isinstance(physical_op, LLMFilter)
+            op_name = "LLMConvert" if is_llm_convert else "LLMFilter" if is_llm_filter else physical_op.op_name()
             op_str = f"{op_name} ({logical_op_id})"
             total = sample_budget if self._is_llm_op(op_set[0]) else 0
             self.add_task(logical_op_id, op_str, total)
 
         self.console = Console()
-    
+
     def _is_llm_op(self, physical_op: PhysicalOperator) -> bool:
         is_llm_convert = isinstance(physical_op, LLMConvert)
         is_llm_filter = isinstance(physical_op, LLMFilter)

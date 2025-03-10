@@ -122,6 +122,8 @@ class RAGConvert(LLMConvert):
             total_output_cost=0.0,
             cost_per_record=total_input_cost,
             llm_call_duration_secs=total_time,
+            total_llm_calls=1,
+            total_embedding_llm_calls=1,
         )
 
         return embedding, embed_stats
