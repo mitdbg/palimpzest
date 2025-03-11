@@ -308,8 +308,7 @@ if __name__ == "__main__":
 
     def search_func(index: chromadb.Collection, query: list[list[float]], k: int) -> list[str]:
         # execute query with embeddings
-        results_per_query = int(50 / len(query))  # NOTE: 50 is chosen to ~match k=49 in Lotus / DocETL evaluation
-        results = index.query(query, n_results=results_per_query)
+        results = index.query(query, n_results=5)
 
         # get list of result terms with their cosine similarity scores
         final_results = []
