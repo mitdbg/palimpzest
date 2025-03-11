@@ -58,3 +58,18 @@ if __name__ == "__main__":
 
     # print output dataframe
     print(output.to_df())
+
+    # print precision and recall
+    with open("enron-eval-medium-labels.json") as f:
+        filename_to_labels = json.load(f)
+        test_filenames = os.listdir("testdata/enron-eval-medium")[50:150]
+        filename_to_labels = {k: v for k, v in filename_to_labels.items() if k in test_filenames}
+
+    target_filenames = set(filename for filename, labels in filename_to_labels.items() if labels != [])
+    pred_filenames = set(output.to_df()["filename"])
+    tp = sum(filename in target_filenames for filename in pred_filenames)
+    fp = len(pred_filenames) - tp
+    fn = len(target_filenames) - tp
+
+    print(f"PRECISION: {tp/(tp + fp) if tp + fp > 0 else 0.0:.3f}")
+    print(f"RECALL: {tp/(tp + fn) if tp + fn > 0 else 0.0:.3f}")
