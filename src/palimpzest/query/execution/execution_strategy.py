@@ -156,8 +156,10 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     found_match_in_target = target_record.passed_operator
                     break
 
-            # iterate through
-            return int(record.passed_operator == found_match_in_target)
+            # set quality based on whether we found a match in the target and return
+            record_set.record_op_stats[0].quality = int(record.passed_operator == found_match_in_target)
+
+            return record_set
 
         # if this is a successful convert operation
         else:
@@ -280,24 +282,28 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         # initialize mapping from source index to target record sets
         source_idx_to_target_record_set = {}
 
-        # if we have label(s), return the label(s)
-        if expected_outputs is not None:
-            for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items():
-                # get the first generated output for this source_idx
-                base_target_record = None
-                for record_set, _, _ in record_set_tuples:
-                    if len(record_set) > 0:
-                        base_target_record = record_set[0]
-                        break
-
-                # if no operations completed successfully, break and let champion logic handle this
-                if base_target_record is None:
+        # if we don't have a label use the maximum quality record from the union of the cache and new records
+        for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items():
+            # get the first generated output for this source_idx
+            base_target_record = None
+            for record_set, _, _ in record_set_tuples:
+                if len(record_set) > 0:
+                    base_target_record = record_set[0]
                     break
 
-                # get the label data and field_to_score_fn
-                labels = expected_outputs[source_idx]["labels"]
+            # compute availability of data
+            base_target_present = base_target_record is not None
+            labels_present = expected_outputs is not None
+            labels_for_source_present = False
+            if labels_present and source_idx in expected_outputs:
+                labels = expected_outputs[source_idx].get("labels", [])
                 labels_dict_lst = labels if isinstance(labels, list) else [labels]
-                field_to_score_fn = expected_outputs[source_idx]["score_fn"]
+                labels_for_source_present = labels_dict_lst != [] and labels_dict_lst != [None]
+
+            # if we have a base target record and label info, use the label info to construct the target record set
+            if base_target_present and labels_for_source_present:
+                # get the field_to_score_fn                
+                field_to_score_fn = expected_outputs[source_idx].get("score_fn", {})
 
                 # construct the target record set; we force passed_operator to be True for all target records
                 target_records = []
@@ -309,11 +315,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     target_records.append(target_record)
 
                 source_idx_to_target_record_set[source_idx] = DataRecordSet(target_records, None, field_to_score_fn)
+                continue
 
-            return source_idx_to_target_record_set
-
-        # if we don't have a label use the maximum quality record from the union of the cache and new records
-        for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items():
             # get the best computed output for this (source_idx, logical_op_id) so far (if one exists)
             champion_record_set, champion_op_quality = None, None
             if source_idx in self.champion_output_cache and logical_op_id in self.champion_output_cache[source_idx]:
@@ -343,11 +346,11 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         champion_record_set, champion_quality = None, None
         for record_set, op, _ in record_set_tuples:
             # skip failed operations
-            if len(record_set) > 0:
+            if len(record_set) == 0:
                 continue
 
             # get the estimated quality of this operator
-            est_quality = op.naive_cost_estimates(base_op_cost_est).quality
+            est_quality = op.naive_cost_estimates(base_op_cost_est).quality if self._is_llm_op(op) else 1.0
             if champion_quality is None or est_quality > champion_quality:
                 champion_record_set, champion_quality = record_set, est_quality
 

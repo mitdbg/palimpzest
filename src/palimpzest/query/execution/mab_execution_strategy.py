@@ -112,11 +112,15 @@ class OpFrontier:
         op_source_idx_pairs = self._get_op_source_idx_pairs()
 
         # if there are any source_idxs in source_indices_to_sample which are not sampled
-        # by this operator, apply the max quality operator to them
+        # by this operator, apply the max quality operator (and any other frontier operators
+        # with no samples)
         sampled_source_indices = set(map(lambda tup: tup[1], op_source_idx_pairs))
         unsampled_source_indices = source_indices_to_sample - sampled_source_indices
         for source_idx in unsampled_source_indices:
             op_source_idx_pairs.append((max_quality_op, source_idx))
+            for op in self.frontier_ops:
+                if len(self.phys_op_id_to_sources_processed[op.get_op_id()]) == 0:
+                    op_source_idx_pairs.append((op, source_idx))
 
         # fetch the corresponding (op, input) pairs
         op_input_pairs = [
@@ -173,8 +177,14 @@ class OpFrontier:
             total_num_samples += num_samples
 
         # compute avg. selectivity, cost, time, and quality for each physical operator
+        def total_output(record_op_stats_lst):
+            return sum([record_op_stats.passed_operator for record_op_stats in record_op_stats_lst])
+
+        def total_input(record_op_stats_lst):
+            return len(set([record_op_stats.record_parent_id for record_op_stats in record_op_stats_lst]))
+
         phys_op_to_mean_selectivity = {
-            op_id: len(record_op_stats_lst) / sum([record_op_stats.passed_operator for record_op_stats in record_op_stats_lst])
+            op_id: total_output(record_op_stats_lst) / total_input(record_op_stats_lst)
             for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
         }
         phys_op_to_mean_cost = {
@@ -410,6 +420,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 # TODO: can have None as an operator if _get_max_quality_op returns None
                 # get frontier ops and their next input
                 frontier_op_input_pairs = op_frontiers[logical_op_id].get_frontier_op_input_pairs(source_indices_to_sample, max_quality_op)
+                frontier_op_input_pairs = list(filter(lambda tup: tup[1] is not None, frontier_op_input_pairs))
 
                 # break out of the loop if frontier_op_input_pairs is empty, as this means all records have been filtered out
                 if len(frontier_op_input_pairs) == 0:
