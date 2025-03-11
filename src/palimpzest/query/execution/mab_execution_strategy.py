@@ -307,7 +307,7 @@ class OpFrontier:
 
         # finally, if we have fewer than k operators in the frontier, sample new operators
         # from the reservoir and put them in the frontier
-        while len(new_frontier_ops) < self.k:
+        while len(new_frontier_ops) < self.k and len(self.reservoir_ops) > 0:
             new_op = self.reservoir_ops.pop(0)
             new_frontier_ops.append(new_op)
 
