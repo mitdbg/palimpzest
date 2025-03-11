@@ -251,35 +251,27 @@ class OpFrontier:
             if pareto_frontier:
                 pareto_op_set.add(op_id)
 
-        # iterate over frontier ops and replace any which do not overlap with pareto frontier
-        new_frontier_ops, new_reservoir_ops = [], []
-        num_dropped_from_frontier = 0
-        for op in self.frontier_ops:
-            op_id = op.get_op_id()
+        # iterate over op metrics and compute the new frontier set of operators
+        new_frontier_op_ids = set()
+        for op_id, metrics in op_metrics.items():
 
             # if this op is fully sampled, remove it from the frontier
             if phys_op_id_to_num_samples[op_id] == len(self.source_indices):
-                num_dropped_from_frontier += 1
-                new_reservoir_ops.append(op)
                 continue
 
             # if this op is pareto optimal keep it in our frontier ops
             if op_id in pareto_op_set:
-                new_frontier_ops.append(op)
+                new_frontier_op_ids.add(op_id)
                 continue
 
             # otherwise, if this op overlaps with an op on the pareto frontier, keep it in our frontier ops
             # NOTE: for now, we perform an optimistic comparison with the ucb/lcb
             pareto_frontier = True
-            op_cost = op_metrics[op_id]["lcb"][0]
-            op_time = op_metrics[op_id]["lcb"][1]
-            op_quality = op_metrics[op_id]["ucb"][2]
-            op_selectivity = op_metrics[op_id]["lcb"][3]
+            op_cost, op_time, _, op_selectivity = metrics["lcb"]
+            op_quality = metrics["ucb"][2]
             for pareto_op_id in pareto_op_set:
-                pareto_cost = op_metrics[pareto_op_id]["ucb"][0]
-                pareto_time = op_metrics[pareto_op_id]["ucb"][1]
+                pareto_cost, pareto_time, _, pareto_selectivity = op_metrics[pareto_op_id]["ucb"]
                 pareto_quality = op_metrics[pareto_op_id]["lcb"][2]
-                pareto_selectivity = op_metrics[pareto_op_id]["ucb"][3]
 
                 # if op_id is dominated by pareto_op_id, set pareto_frontier = False and break
                 cost_dominated = True if policy_dict["cost"] == 0.0 else pareto_cost <= op_cost
@@ -292,16 +284,33 @@ class OpFrontier:
 
             # add op_id to pareto frontier if it's not dominated
             if pareto_frontier:
+                new_frontier_op_ids.add(op_id)
+
+        # for operators that were in the frontier, keep them in the frontier if they
+        # are still pareto optimal, otherwise, move them to the end of the reservoir
+        new_frontier_ops = []
+        for op in self.frontier_ops:
+            if op.get_op_id() in new_frontier_op_ids:
                 new_frontier_ops.append(op)
             else:
-                num_dropped_from_frontier += 1
+                self.reservoir_ops.append(op)
+
+        # if there are operators we previously sampled which are now back on the frontier
+        # add them to the frontier, otherwise, put them back in the reservoir
+        new_reservoir_ops = []
+        for op in self.reservoir_ops:
+            if op.get_op_id() in new_frontier_op_ids:
+                new_frontier_ops.append(op)
+            else:
                 new_reservoir_ops.append(op)
 
-        # replace the ops dropped from the frontier with new ops from the reservoir
-        num_dropped_from_frontier = min(num_dropped_from_frontier, len(self.reservoir_ops))
-        for _ in range(num_dropped_from_frontier):
-            new_op = self.reservoir_ops.pop(0)
+        # finally, if we have fewer than k operators in the frontier, sample new operators
+        # from the reservoir and put them in the frontier
+        while len(new_frontier_ops) < self.k:
+            new_op = new_reservoir_ops.pop(0)
             new_frontier_ops.append(new_op)
+
+        import pdb; pdb.set_trace()
 
         # update the frontier and reservoir ops
         self.frontier_ops = new_frontier_ops
