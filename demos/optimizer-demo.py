@@ -334,15 +334,13 @@ if __name__ == "__main__":
 
     # construct plan
     plan = pz.Dataset(datareader)
-    # plan = plan.sem_add_columns(biodex_reactions_cols)
+    plan = plan.sem_add_columns(biodex_reactions_cols)
     plan = plan.retrieve(
         index=index,
         search_func=search_func,
-        # search_attr="reactions",
-        search_attr="fulltext",
+        search_attr="reactions",
         output_attr="reaction_labels",
-        # output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
-        output_attr_desc="Most relevant official terms for adverse reactions for the provided `fulltext`",
+        output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
     )
     plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
