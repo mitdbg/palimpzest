@@ -53,8 +53,6 @@ if __name__ == "__main__":
         val_datasource=val_datareader,
         execution_strategy="parallel",
         max_workers=20,
-        # available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.LLAMA3],
-        progress=True,
     )
     output = plan.run(config=config, k=5, j=3, sample_budget=50)
 
