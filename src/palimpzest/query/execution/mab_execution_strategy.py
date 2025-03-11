@@ -311,6 +311,8 @@ class OpFrontier:
             new_op = self.reservoir_ops.pop(0)
             new_frontier_ops.append(new_op)
 
+        import pdb; pdb.set_trace()
+
         # update the frontier and off frontier ops
         self.frontier_ops = new_frontier_ops
         self.off_frontier_ops = new_off_frontier_ops
