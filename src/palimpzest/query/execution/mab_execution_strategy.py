@@ -38,6 +38,7 @@ class OpFrontier:
         # construct the initial set of frontier and reservoir operators
         self.frontier_ops = [op_set[sample_idx] for sample_idx in sample_op_indices[:self.k]]
         self.reservoir_ops = [op_set[sample_idx] for sample_idx in sample_op_indices[self.k:]]
+        self.off_frontier_ops = []
 
         # store the order in which we will sample the source records
         self.source_indices = source_indices
@@ -119,7 +120,7 @@ class OpFrontier:
         for source_idx in unsampled_source_indices:
             op_source_idx_pairs.append((max_quality_op, source_idx))
             for op in self.frontier_ops:
-                if len(self.phys_op_id_to_sources_processed[op.get_op_id()]) == 0:
+                if len(self.phys_op_id_to_sources_processed[op.get_op_id()]) == 0 and op.get_op_id() != max_quality_op.get_op_id():
                     op_source_idx_pairs.append((op, source_idx))
 
         # fetch the corresponding (op, input) pairs
@@ -255,7 +256,7 @@ class OpFrontier:
         new_frontier_op_ids = set()
         for op_id, metrics in op_metrics.items():
 
-            # if this op is fully sampled, remove it from the frontier
+            # if this op is fully sampled, do not keep it on the frontier
             if phys_op_id_to_num_samples[op_id] == len(self.source_indices):
                 continue
 
@@ -293,28 +294,28 @@ class OpFrontier:
             if op.get_op_id() in new_frontier_op_ids:
                 new_frontier_ops.append(op)
             else:
-                self.reservoir_ops.append(op)
+                self.off_frontier_ops.append(op)
 
         # if there are operators we previously sampled which are now back on the frontier
-        # add them to the frontier, otherwise, put them back in the reservoir
-        new_reservoir_ops = []
-        for op in self.reservoir_ops:
+        # add them to the frontier, otherwise, put them back in the off_frontier_ops
+        new_off_frontier_ops = []
+        for op in self.off_frontier_ops:
             if op.get_op_id() in new_frontier_op_ids:
                 new_frontier_ops.append(op)
             else:
-                new_reservoir_ops.append(op)
+                new_off_frontier_ops.append(op)
 
         # finally, if we have fewer than k operators in the frontier, sample new operators
         # from the reservoir and put them in the frontier
         while len(new_frontier_ops) < self.k:
-            new_op = new_reservoir_ops.pop(0)
+            new_op = self.reservoir_ops.pop(0)
             new_frontier_ops.append(new_op)
 
         import pdb; pdb.set_trace()
 
-        # update the frontier and reservoir ops
+        # update the frontier and off frontier ops
         self.frontier_ops = new_frontier_ops
-        self.reservoir_ops = new_reservoir_ops
+        self.off_frontier_ops = new_off_frontier_ops
 
     def pick_highest_quality_output(self, record_sets: list[DataRecordSet]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
