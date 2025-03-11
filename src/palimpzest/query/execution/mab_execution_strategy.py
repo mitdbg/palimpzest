@@ -407,6 +407,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 # use the execution cache to determine the maximum quality operator for this logical_op_id
                 max_quality_op = self._get_max_quality_op(logical_op_id, op_frontiers, plan_stats)
 
+                # TODO: can have None as an operator if _get_max_quality_op returns None
                 # get frontier ops and their next input
                 frontier_op_input_pairs = op_frontiers[logical_op_id].get_frontier_op_input_pairs(source_indices_to_sample, max_quality_op)
 
