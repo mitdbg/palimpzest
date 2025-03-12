@@ -111,7 +111,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         self.seed = seed
         self.rng = np.random.default_rng(seed=seed)
         self.exp_name = exp_name
-        import pdb; pdb.set_trace()
 
         # special cache which is used for tracking the target record sets for each (source_idx, logical_op_id)
         self.champion_output_cache: dict[int, dict[str, tuple[DataRecordSet, float]]] = {}
