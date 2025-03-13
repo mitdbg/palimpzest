@@ -164,6 +164,6 @@ class SplitConvert(LLMConvert):
         field_answers, _, merger_gen_stats, _ = self.split_merge_generator(candidate, fields, **gen_kwargs)
 
         # compute the total generation stats
-        generation_stats = sum(chunk_generation_stats) + merger_gen_stats
+        generation_stats = sum(chunk_generation_stats_lst) + merger_gen_stats
 
         return field_answers, generation_stats
