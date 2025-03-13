@@ -8,8 +8,8 @@ from functools import partial
 import chromadb
 import datasets
 from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
-from ragatouille import RAGPretrainedModel
 
+# from ragatouille import RAGPretrainedModel
 import palimpzest as pz
 from palimpzest.constants import Model
 from palimpzest.utils.model_helpers import get_models
@@ -371,13 +371,14 @@ if __name__ == "__main__":
             # Model.LLAMA3,
             # Model.LLAMA3_V,
         ],
-        allow_bonded_query=True,
+        allow_bonded_query=False, #True,
         allow_code_synth=False,
-        allow_critic=True,
-        allow_mixtures=True,
-        allow_rag_reduction=True,
+        allow_critic=False, #True,
+        allow_mixtures=False, #True,
+        allow_rag_reduction=False, #True,
         allow_token_reduction=False,
-        progress=progress,
+        allow_split_merge=True,
+        progress=False, #progress,
     )
 
     data_record_collection = plan.run(
@@ -411,7 +412,7 @@ if __name__ == "__main__":
         record_dict = {
             k: v
             for k, v in record_dict.items()
-            if k in ["pmid", "reactions", "og_reaction_labels", "reaction_labels", "ranked_reaction_labels"]
+            if k in ["pmid", "reactions", "reaction_labels", "ranked_reaction_labels"]
         }
         record_jsons.append(record_dict)
 

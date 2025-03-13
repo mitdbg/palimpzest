@@ -64,6 +64,10 @@ class PromptStrategy(str, Enum):
     COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
     COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
 
+    # Split Convert Prompt Strategies
+    SPLIT_PROPOSER = "split-proposer"
+    SPLIT_MERGER = "split-merger"
+
     def is_image_prompt(self):
         return "image" in self.value
 
@@ -85,6 +89,11 @@ class PromptStrategy(str, Enum):
     def is_moa_aggregator_prompt(self):
         return "mixture-of-agents-aggregation" in self.value
 
+    def is_split_proposer_prompt(self):
+        return "split-proposer" in self.value
+
+    def is_split_merger_prompt(self):
+        return "split-merger" in self.value
 
 class AggFunc(str, Enum):
     COUNT = "count"
