@@ -112,14 +112,14 @@ class SplitConvert(LLMConvert):
             if is_list_string_field:
                 content = "[" + ", ".join(content) + "]"
 
-            # skip this field if it is a string field and its length is less than the min size to chunk
-            if isinstance(field, str) and len(content) < self.min_size_to_chunk:
+            # skip this field if its length is less than the min size to chunk
+            if len(content) < self.min_size_to_chunk:
                 field_name_to_chunked_content[field_name] = [content]
                 continue
 
             # chunk the content
             field_name_to_chunked_content[field_name] = self.get_text_chunks(content, self.num_chunks)
-        import pdb; pdb.set_trace()
+
         # compute the true number of chunks (may be 1 if all fields are not chunked)
         num_chunks = max(len(chunks) for chunks in field_name_to_chunked_content.values())
 

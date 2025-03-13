@@ -167,7 +167,7 @@ class RAGConvert(LLMConvert):
                 candidate[field_name] = "[" + ", ".join(candidate[field_name]) + "]"
 
             # skip this field if it is a string field and its length is less than the chunk size
-            if isinstance(field, str) and len(candidate[field_name]) < self.chunk_size:
+            if len(candidate[field_name]) < self.chunk_size:
                 continue
 
             # chunk the content
