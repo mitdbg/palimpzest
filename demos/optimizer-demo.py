@@ -359,7 +359,7 @@ if __name__ == "__main__":
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
         use_final_op_quality=use_final_op_quality,
-        max_workers=1, # 20
+        max_workers=20,
         verbose=verbose,
         available_models=[
             # Model.GPT_4o,
@@ -371,14 +371,14 @@ if __name__ == "__main__":
             # Model.LLAMA3,
             # Model.LLAMA3_V,
         ],
-        allow_bonded_query=False, #True,
+        allow_bonded_query=True,
         allow_code_synth=False,
-        allow_critic=False, #True,
-        allow_mixtures=False, #True,
-        allow_rag_reduction=False, #True,
+        allow_critic=True,
+        allow_mixtures=True,
+        allow_rag_reduction=True,
         allow_token_reduction=False,
         allow_split_merge=True,
-        progress=False, #progress,
+        progress=progress,
     )
 
     data_record_collection = plan.run(
