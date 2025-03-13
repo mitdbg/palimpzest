@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from palimpzest.constants import (
     MODEL_CARDS,
     NAIVE_EST_NUM_INPUT_TOKENS,
@@ -80,15 +82,13 @@ class SplitConvert(LLMConvert):
         """
         chunks = []
 
-        idx, chunk_size = 0, len(text) // num_chunks
+        idx, chunk_size = 0, math.ceil(len(text) / num_chunks)
         while idx + chunk_size < len(text):
             chunks.append(text[idx : idx + chunk_size])
             idx += chunk_size
 
         if idx < len(text):
             chunks.append(text[idx:])
-
-        assert len(chunks) == num_chunks, f"Expected {num_chunks} chunks, but got {len(chunks)}, len(text)={len(text)}, idx={idx}, chunk_size={chunk_size}"
 
         return chunks
 
