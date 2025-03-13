@@ -377,7 +377,7 @@ if __name__ == "__main__":
         allow_mixtures=True,
         allow_rag_reduction=True,
         allow_token_reduction=False,
-        allow_split_merge=True,
+        allow_split_merge=False,
         progress=progress,
     )
 
