@@ -88,6 +88,8 @@ class SplitConvert(LLMConvert):
         if idx < len(text):
             chunks.append(text[idx:])
 
+        assert len(chunks) == num_chunks, f"Expected {num_chunks} chunks, but got {len(chunks)}, len(text)={len(text)}, idx={idx}, chunk_size={chunk_size}"
+
         return chunks
 
     def get_chunked_candidate(self, candidate: DataRecord, input_fields: list[str]) -> list[DataRecord]:
