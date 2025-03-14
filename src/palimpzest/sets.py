@@ -71,6 +71,8 @@ class Set:
     def _set_data_source(self, source: DataReader):
         if isinstance(self._source, Set):
             self._source._set_data_source(source)
+        elif isinstance(self._source, str): 
+            self._source = get_local_datareader(self._source)
         else:
             self._source = source
 

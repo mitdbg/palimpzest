@@ -108,24 +108,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             # - if we are using validation data but we *cannot* find an exact match, then we will once again use the champion record set
             else:
                 # compute number of matches between this record's computed fields and this expected record's outputs
-                found_match_in_output = False
-                labels_dict_lst = expected_output["labels"] if isinstance(expected_output["labels"], list) else [expected_output["labels"]]
-                for labels_dict in labels_dict_lst:
-                    all_correct = True
-                    for field, value in record_op_stats.record_state.items():
-                        if value != labels_dict[field]:
-                            all_correct = False
-                            break
-
-                    if all_correct:
-                        found_match_in_output = True
-                        break
-
-                if found_match_in_output:
-                    record_op_stats.quality = int(record_op_stats.passed_operator)
-                else:
-                    champion_record = champion_record_set[0]
-                    record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
+                record_op_stats.quality = int(record_op_stats.passed_operator == expected_output["labels_filtered"])
 
         # if this is a successful convert operation
         else:
@@ -202,7 +185,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
             operator_sets: list[list[PhysicalOperator]],
             execution_data: dict[str, dict[str, list[DataRecordSet]]],
             champion_outputs: dict[str, dict[str, DataRecordSet]],
-            expected_outputs: dict[str, dict],
+            expected_outputs: dict[str, dict[str, dict]],
         ) -> list[RecordOpStats]:
         """
         NOTE: This approach to cost modeling does not work directly for aggregation queries;
@@ -262,11 +245,12 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                 continue
 
             # get the expected output for this source_idx if we have one
-            expected_output = (
-                expected_outputs[source_idx]
-                if expected_outputs is not None and source_idx in expected_outputs
-                else None
-            )
+            expected_output = None
+            logical_op_idx = len(operator_sets) - 1
+            if logical_op_id in expected_outputs and source_idx in expected_outputs[logical_op_id]:
+                expected_output = expected_outputs[logical_op_id][source_idx]
+            elif logical_op_idx in expected_outputs and source_idx in expected_outputs[logical_op_idx]:
+                expected_output = expected_outputs[logical_op_idx][source_idx]
 
             # extract champion output for this record set
             champion_record_set = champion_outputs[logical_op_id][source_idx]
@@ -378,7 +362,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
                 champion_record_set = self.pick_output_fn(candidate_output_record_sets)
 
                 # get the source_idx associated with this input record
-                source_idx = candidate.source_idx
+                source_idx = candidate
 
                 # add champion record_set to mapping from source_idx --> champion record_set
                 champion_record_sets[source_idx] = champion_record_set
@@ -389,7 +373,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         return all_record_sets, champion_record_sets
 
 
-    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict], policy: Policy):
+    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict[str, dict]], policy: Policy):
         """
         """
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
@@ -405,7 +389,7 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         plan_stats.start()
 
         # sample validation records
-        total_num_samples = len(self.val_datasource)
+        total_num_samples = self.val_data.num_samples() if self.val_data is not None else self.sample_budget
         source_indices = np.arange(total_num_samples)
         if self.sample_start_idx is not None:
             assert self.sample_end_idx is not None, "Specified `sample_start_idx` without specifying `sample_end_idx`"
@@ -504,18 +488,13 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
         on each record.
         """
         # if we're using validation data, get the set of expected output records
-        expected_outputs = {}
-        for source_idx in range(len(self.val_datasource)):
-            # TODO: make sure execute_op_set uses self.val_datasource
-            expected_output = self.val_datasource[source_idx]
-            expected_outputs[source_idx] = expected_output
-
+        expected_outputs = self.val_data.expected_outputs() if self.val_data is not None else None
         # run sentinel plan
         execution_data, plan_stats = self.execute_sentinel_plan(sentinel_plan, expected_outputs, policy)
 
         return execution_data, plan_stats
 
-    
+
     def create_sentinel_plan(self, dataset: Set, policy: Policy) -> SentinelPlan:
         """
         Generates and returns a SentinelPlan for the given dataset.
@@ -528,7 +507,8 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
 
         # create copy of dataset, but change its data source to the validation data source
         dataset = dataset.copy()
-        dataset._set_data_source(self.val_datasource)
+        if self.val_data is not None:
+            dataset._set_data_source(self.val_data.input_dataset())
 
         # get the sentinel plan for the given dataset
         sentinel_plans = optimizer.optimize(dataset, policy)
@@ -540,10 +520,6 @@ class RandomSamplingSentinelQueryProcessor(QueryProcessor):
     def execute(self) -> DataRecordCollection:
         logger.info("Executing RandomSamplingSentinelQueryProcessor")
         execution_start_time = time.time()
-
-        # for now, enforce that we are using validation data; we can relax this after paper submission
-        if self.val_datasource is None:
-            raise Exception("Make sure you are using validation data with MABSentinelExecutionEngine")
 
         # if cache is False, make sure we do not re-use codegen examples
         if not self.cache:

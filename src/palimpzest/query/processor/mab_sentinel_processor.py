@@ -270,25 +270,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
             #   thus, if we can identify an exact match, we can use that to evaluate the filter's quality
             # - if we are using validation data but we *cannot* find an exact match, then we will once again use the champion record set
             else:
-                # compute number of matches between this record's computed fields and this expected record's outputs
-                found_match_in_output = False
-                labels_dict_lst = expected_output["labels"] if isinstance(expected_output["labels"], list) else [expected_output["labels"]]
-                for labels_dict in labels_dict_lst:
-                    all_correct = True
-                    for field, value in record_op_stats.record_state.items():
-                        if value != labels_dict[field]:
-                            all_correct = False
-                            break
-
-                    if all_correct:
-                        found_match_in_output = True
-                        break
-
-                if found_match_in_output:
-                    record_op_stats.quality = int(record_op_stats.passed_operator)
-                else:
-                    champion_record = champion_record_set[0]
-                    record_op_stats.quality = int(record_op_stats.passed_operator == champion_record.passed_operator)
+                record_op_stats.quality = int(record_op_stats.passed_operator == expected_output["labels_filtered"])
 
         # if this is a successful convert operation
         else:
@@ -362,11 +344,12 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
     def score_quality(
         self,
+        op_idx: int,
         op_set: list[PhysicalOperator],
         logical_op_id: str,
         execution_data: dict[str, dict[str, list[DataRecordSet]]],
         champion_outputs: dict[str, dict[str, DataRecordSet]],
-        expected_outputs: dict[str, dict],
+        expected_outputs: dict[str, dict[str, dict]],
     ) -> list[RecordOpStats]:
         """
         NOTE: This approach to cost modeling does not work directly for aggregation queries;
@@ -419,11 +402,15 @@ class MABSentinelQueryProcessor(QueryProcessor):
                 continue
 
             # get the expected output for this source_idx if we have one
-            expected_output = (
-                expected_outputs[source_idx]
-                if expected_outputs is not None and source_idx in expected_outputs
-                else None
-            )
+            # we use the op_idx to get the expected output since users might use op_idx to specify the expected output
+            expected_output = None
+            if expected_outputs is not None:
+                if logical_op_id in expected_outputs and source_idx in expected_outputs[logical_op_id]:
+                    expected_output = expected_outputs[logical_op_id][source_idx]
+
+                # Fall back to op_idx for backward compatibility with older test data
+                elif op_idx in expected_outputs and source_idx in expected_outputs[op_idx]:
+                    expected_output = expected_outputs[op_idx][source_idx]
 
             # extract champion output for this record set
             champion_record_set = champion_outputs[logical_op_id][source_idx]
@@ -579,7 +566,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         return all_record_sets, champion_record_sets
 
 
-    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict], policy: Policy):
+    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[str, dict[str, dict]], policy: Policy):
         """
         """
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
@@ -595,7 +582,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         plan_stats.start()
 
         # shuffle the indices of records to sample
-        total_num_samples = len(self.val_datasource)
+        total_num_samples = self.val_data.num_samples() if self.val_data is not None else self.sample_budget
         shuffled_source_indices = [int(idx) for idx in np.arange(total_num_samples)]
         self.rng.shuffle(shuffled_source_indices)
 
@@ -715,6 +702,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
                 # compute quality for each operator
                 all_outputs = self.score_quality(
+                    op_idx,
                     op_set,
                     logical_op_id,
                     all_outputs,
@@ -758,11 +746,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
         on each record.
         """
         # if we're using validation data, get the set of expected output records
-        expected_outputs = {}
-        for source_idx in range(len(self.val_datasource)):
-            # TODO: make sure execute_op_set uses self.val_datasource
-            expected_output = self.val_datasource[source_idx]
-            expected_outputs[source_idx] = expected_output
+        expected_outputs = self.val_data.expected_outputs() if self.val_data is not None else None
 
         # run sentinel plan
         execution_data, plan_stats = self.execute_sentinel_plan(sentinel_plan, expected_outputs, policy)
@@ -782,7 +766,8 @@ class MABSentinelQueryProcessor(QueryProcessor):
 
         # create copy of dataset, but change its data source to the validation data source
         dataset = dataset.copy()
-        dataset._set_data_source(self.val_datasource)
+        if self.val_data is not None:
+            dataset._set_data_source(self.val_data.input_dataset())
 
         # get the sentinel plan for the given dataset
         sentinel_plans = optimizer.optimize(dataset, policy)
@@ -794,10 +779,6 @@ class MABSentinelQueryProcessor(QueryProcessor):
     def execute(self) -> DataRecordCollection:
         logger.info("Executing MABSentinelQueryProcessor")
         execution_start_time = time.time()
-
-        # for now, enforce that we are using validation data; we can relax this after paper submission
-        if self.val_datasource is None:
-            raise Exception("Make sure you are using validation data with MABSentinelExecutionEngine")
 
         # if cache is False, make sure we do not re-use codegen examples
         if not self.cache:
