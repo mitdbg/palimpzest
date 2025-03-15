@@ -220,6 +220,8 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             # extract json from the answer text
             field_answers = get_json_from_answer(answer_text, self.model, self.cardinality)
 
+            # TODO: wrap non-list outputs in a list if expected output is a list
+
             # common error: if the output is a singleton list which contains a list, but the expected field type
             # is a list of strings, or a list of floats, i.e. not a list of lists; then extract the inner list
             for field, field_type in fields.items():

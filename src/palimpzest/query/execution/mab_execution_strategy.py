@@ -201,13 +201,17 @@ class OpFrontier:
             for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
         }
 
-        # compute average, LCB, and UCB of each operator; the confidence bounds depend upon
-        # the computation of the alpha parameter, which we scale to be 0.5 * the mean (of means)
-        # of the metric across all operators in this operator set
-        cost_alpha = 0.5 * np.mean([mean_cost for mean_cost in phys_op_to_mean_cost.values()])
-        time_alpha = 0.5 * np.mean([mean_time for mean_time in phys_op_to_mean_time.values()])
-        quality_alpha = 0.5 * np.mean([mean_quality for mean_quality in phys_op_to_mean_quality.values()])
-        selectivity_alpha = 0.5 * np.mean([mean_selectivity for mean_selectivity in phys_op_to_mean_selectivity.values()])
+        # # compute average, LCB, and UCB of each operator; the confidence bounds depend upon
+        # # the computation of the alpha parameter, which we scale to be 0.5 * the mean (of means)
+        # # of the metric across all operators in this operator set
+        # cost_alpha = 0.5 * np.mean([mean_cost for mean_cost in phys_op_to_mean_cost.values()])
+        # time_alpha = 0.5 * np.mean([mean_time for mean_time in phys_op_to_mean_time.values()])
+        # quality_alpha = 0.5 * np.mean([mean_quality for mean_quality in phys_op_to_mean_quality.values()])
+        # selectivity_alpha = 0.5 * np.mean([mean_selectivity for mean_selectivity in phys_op_to_mean_selectivity.values()])
+        cost_alpha = 0.5 * (np.max(list(phys_op_to_mean_cost.values())) - np.min(list(phys_op_to_mean_cost.values())))
+        time_alpha = 0.5 * (np.max(list(phys_op_to_mean_time.values())) - np.min(list(phys_op_to_mean_time.values())))
+        quality_alpha = 0.5 * (np.max(list(phys_op_to_mean_quality.values())) - np.min(list(phys_op_to_mean_quality.values())))
+        selectivity_alpha = 0.5 * (np.max(list(phys_op_to_mean_selectivity.values())) - np.min(list(phys_op_to_mean_selectivity.values())))
 
         # compute metrics for each physical operator
         op_metrics = {}
