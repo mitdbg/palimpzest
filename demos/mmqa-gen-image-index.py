@@ -14,11 +14,26 @@ if __name__ == "__main__":
     openai_client = OpenAI()
 
     # load image metadata
+    image_title_set = set()
     image_titles, image_ids = [], []
     with open("testdata/MMQA_images.jsonl") as f:
         for line in f:
             dict_line = json.loads(line)
-            image_titles.append(dict_line["title"])
+            image_title = dict_line["title"]
+            if image_title == "":
+                image_title = dict_line["url"]
+
+            if image_title not in image_title_set:
+                image_titles.append(image_title)
+                image_title_set.add(image_title)
+            else:
+                idx = 1
+                while f"{image_title} ({idx})" in image_title_set:
+                    idx += 1
+                image_title = f"{image_title} ({idx})"
+                image_titles.append(image_title)
+                image_title_set.add(image_title)
+
             image_ids.append(dict_line["id"])
 
     # create directory for embeddings
