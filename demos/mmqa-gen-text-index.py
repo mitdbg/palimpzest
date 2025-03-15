@@ -34,7 +34,7 @@ if __name__ == "__main__":
     for iter_idx, start_idx in tqdm(enumerate(indices), total=total_embeds):
         # check if embedding needs to be computed
         end_idx = indices[iter_idx + 1] if iter_idx + 1 < len(indices) else None
-        filename = f"testdata/reaction-term-embeddings/{start_idx}_{end_idx}.npy"
+        filename = f"testdata/mmqa-text-embeddings/{start_idx}_{end_idx}.npy"
         if end_idx is not None and not os.path.exists(filename):
             # generate embeddings
             batch = texts[start_idx:end_idx]
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     print("Done generating embeddings.")
 
     # initialize chroma client
-    chroma_client = chromadb.PersistentClient(".chroma")
+    chroma_client = chromadb.PersistentClient(".chroma-mmqa")
 
     # initialize embedding function
     openai_ef = embedding_functions.OpenAIEmbeddingFunction(
@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     # create a collection
     collection = chroma_client.get_or_create_collection(
-        name="biodex-reaction-terms",
+        name="mmqa-texts",
         embedding_function=openai_ef,
         metadata={"hnsw:space": "cosine"},
     )
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     total_inserts = len(gen_indices)
     print(f"Inserting {total_inserts} batches into the collection...")
     for start_idx, end_idx in tqdm(gen_indices, total=total_inserts):
-        embeddings = np.load(f"testdata/reaction-term-embeddings/{start_idx}_{end_idx}.npy")
+        embeddings = np.load(f"testdata/mmqa-text-embeddings/{start_idx}_{end_idx}.npy")
         collection.add(
             documents=texts[start_idx:end_idx],
             embeddings=embeddings.tolist(),

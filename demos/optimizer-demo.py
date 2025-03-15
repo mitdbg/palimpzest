@@ -299,7 +299,7 @@ if __name__ == "__main__":
     #     return [result["content"] for result in sorted_results[:k]], GenerationStats(model_name="colbert")
 
     # load index [text-embedding-3-small]
-    chroma_client = chromadb.PersistentClient(".chroma")
+    chroma_client = chromadb.PersistentClient(".chroma-biodex")
     openai_ef = OpenAIEmbeddingFunction(
         api_key=os.environ["OPENAI_API_KEY"],
         model_name="text-embedding-3-small",
