@@ -596,12 +596,12 @@ def main():
     query = build_cuad_query(data_reader, args.mode)
     print("Built query; Starting query execution")
 
-    if args.test == "active":
-        allow_mixtures = True
-        allow_critic = True
-    else:
-        allow_mixtures = False
-        allow_critic = False
+    # if args.test == "active":
+    #     allow_mixtures = True
+    #     allow_critic = True
+    # else:
+    #     allow_mixtures = False
+    #     allow_critic = False
 
     config = pz.QueryProcessorConfig(
         verbose=True,

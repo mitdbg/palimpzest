@@ -1,6 +1,5 @@
 import json
 import os
-import time
 
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
@@ -8,6 +7,10 @@ import numpy as np
 from PIL import Image
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
+
+CORRUPTED_IMAGE_IDS = [
+    "17ae0616ac745e70781203267f3a382d"
+]
 
 # NOTE: this script is meant to be run from the root of the repository
 if __name__ == "__main__":
@@ -21,6 +24,12 @@ if __name__ == "__main__":
         for line in f:
             dict_line = json.loads(line)
             image_id = dict_line["id"]
+
+            # skip corrupted images:
+            if image_id in CORRUPTED_IMAGE_IDS:
+                continue
+
+            # add image to image_ids
             image_ids.append(image_id)
 
             # find the correct image file
@@ -28,9 +37,6 @@ if __name__ == "__main__":
                 if os.path.exists(f"testdata/mmqa-images/{image_id}{ending}"):
                     image_id += ending
                     break
-
-            if "." not in image_id:
-                import pdb; pdb.set_trace()
 
             image_filepaths.append(f"testdata/mmqa-images/{image_id}")
 

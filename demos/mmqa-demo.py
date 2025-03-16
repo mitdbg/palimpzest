@@ -313,7 +313,7 @@ if __name__ == "__main__":
     def image_search_func(index: chromadb.Collection, query: list[list[float]], k: int) -> list[str]:
         # execute query with embeddings
         _, result_ids = get_results_and_ids(index, query, n_results=k)
-        possible_endings = {'JPG', 'png', 'jpeg', 'jpg', 'tif', 'JPEG', 'tiff', 'PNG', 'Jpg', 'gif'}
+        possible_endings = {'.JPG', '.png', '.jpeg', '.jpg', '.tif', '.JPEG', '.tiff', '.PNG', '.Jpg', '.gif'}
 
         results = []
         for image_id in result_ids:
