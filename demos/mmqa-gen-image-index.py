@@ -9,7 +9,8 @@ from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
 CORRUPTED_IMAGE_IDS = [
-    "17ae0616ac745e70781203267f3a382d"
+    "17ae0616ac745e70781203267f3a382d",
+    "bf201cbbd058ef51aef89b1be4158c2a",
 ]
 
 # NOTE: this script is meant to be run from the root of the repository
