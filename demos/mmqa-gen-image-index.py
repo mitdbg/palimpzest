@@ -29,13 +29,8 @@ if __name__ == "__main__":
                     image_id += ending
                     break
 
-            # if the image file is not found, try to find it again w/sleeps; it seems sometimes os.path.exists() fails
-            if not image_id.endswith(tuple(possible_endings)):
-                for ending in possible_endings:
-                    time.sleep(0.1)
-                    if os.path.exists(f"testdata/mmqa-images/{image_id}{ending}"):
-                        image_id += ending
-                        break
+            if "." not in image_id:
+                import pdb; pdb.set_trace()
 
             image_filepaths.append(f"testdata/mmqa-images/{image_id}")
 
