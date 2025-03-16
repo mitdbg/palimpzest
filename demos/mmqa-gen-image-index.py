@@ -27,6 +27,8 @@ if __name__ == "__main__":
                 if os.path.exists(f"testdata/mmqa-images/{image_id}{ending}"):
                     image_id += ending
                     break
+            if not image_id.endswith(tuple(possible_endings)):
+                import pdb; pdb.set_trace()
             image_filepaths.append(f"testdata/mmqa-images/{image_id}")
 
     # create directory for embeddings
