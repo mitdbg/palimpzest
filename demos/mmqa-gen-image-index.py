@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
@@ -27,8 +28,15 @@ if __name__ == "__main__":
                 if os.path.exists(f"testdata/mmqa-images/{image_id}{ending}"):
                     image_id += ending
                     break
+
+            # if the image file is not found, try to find it again w/sleeps; it seems sometimes os.path.exists() fails
             if not image_id.endswith(tuple(possible_endings)):
-                import pdb; pdb.set_trace()
+                for ending in possible_endings:
+                    time.sleep(0.1)
+                    if os.path.exists(f"testdata/mmqa-images/{image_id}{ending}"):
+                        image_id += ending
+                        break
+
             image_filepaths.append(f"testdata/mmqa-images/{image_id}")
 
     # create directory for embeddings
