@@ -19,7 +19,8 @@ if __name__ == "__main__":
         possible_endings = [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"]
         for line in f:
             dict_line = json.loads(line)
-            image_id = image_ids.append(dict_line["id"])
+            image_id = dict_line["id"]
+            image_ids.append(image_id)
 
             # find the correct image file
             for ending in possible_endings:
