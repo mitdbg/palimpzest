@@ -17,7 +17,7 @@ if __name__ == "__main__":
     # load image metadata
     image_filepaths, image_ids = [], []
     with open("testdata/MMQA_images.jsonl") as f:
-        possible_endings = {'JPG', 'png', 'jpeg', 'jpg', 'tif', 'JPEG', 'tiff', 'PNG', 'Jpg', 'gif'}
+        possible_endings = {'.JPG', '.png', '.jpeg', '.jpg', '.tif', '.JPEG', '.tiff', '.PNG', '.Jpg', '.gif'}
         for line in f:
             dict_line = json.loads(line)
             image_id = dict_line["id"]
