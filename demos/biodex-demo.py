@@ -59,6 +59,7 @@ class BiodexReader(pz.DataReader):
         self.num_samples = num_samples
         self.shuffle = shuffle
         self.seed = seed
+        self.split = split
 
     def compute_label(self, entry: dict) -> dict:
         """Compute the label for a BioDEX report given its entry in the dataset."""
@@ -152,14 +153,15 @@ class BiodexReader(pz.DataReader):
         item["fields"]["abstract"] = abstract
         item["fields"]["fulltext"] = fulltext
 
-        # add label info
-        item["labels"] = self.compute_label(entry)
+        if self.split == "train":
+            # add label info
+            item["labels"] = self.compute_label(entry)
 
-        # add scoring functions for list fields
-        rank_precision_at_k = partial(BiodexReader.rank_precision_at_k, k=self.rp_at_k)
-        item["score_fn"]["reactions"] = BiodexReader.term_recall
-        item["score_fn"]["reaction_labels"] = BiodexReader.term_recall
-        item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k
+            # add scoring functions for list fields
+            rank_precision_at_k = partial(BiodexReader.rank_precision_at_k, k=self.rp_at_k)
+            item["score_fn"]["reactions"] = BiodexReader.term_recall
+            item["score_fn"]["reaction_labels"] = BiodexReader.term_recall
+            item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k
 
         return item
 
@@ -284,7 +286,7 @@ if __name__ == "__main__":
     val_datasource = BiodexReader(
         split="train",
         num_samples=val_examples,
-        shuffle=False,
+        shuffle=True,
         seed=seed,
     )
 
@@ -296,7 +298,7 @@ if __name__ == "__main__":
     #     results = index.search(query, k=1)
     #     results = [result[0] if isinstance(result, list) else result for result in results]
     #     sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
-    #     return [result["content"] for result in sorted_results[:k]], GenerationStats(model_name="colbert")
+    #     return {"reaction_labels": [result["content"] for result in sorted_results[:k]], GenerationStats(model_name="colbert")}
 
     # load index [text-embedding-3-small]
     chroma_client = chromadb.PersistentClient(".chroma-biodex")
@@ -329,7 +331,7 @@ if __name__ == "__main__":
                 final_sorted_results.append(result["content"])
 
         # return the top-k similar results and generation stats
-        return final_sorted_results[:k]
+        return {"reaction_labels": final_sorted_results[:k]}
 
     # construct plan
     plan = pz.Dataset(datareader)
@@ -338,8 +340,7 @@ if __name__ == "__main__":
         index=index,
         search_func=search_func,
         search_attr="reactions",
-        output_attr="reaction_labels",
-        output_attr_desc="Most relevant official terms for adverse reactions for the provided `reactions`",
+        output_attrs=biodex_reaction_labels_cols,
     )
     plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
@@ -394,16 +395,8 @@ if __name__ == "__main__":
     data_record_collection.to_df().to_csv(f"opt-profiling-data/biodex-reactions-{exp_name}-output.csv", index=False)
 
     # create filepaths for records and stats
-    records_path = (
-        f"opt-profiling-data/biodex-reactions-{exp_name}-records.json"
-        if processing_strategy in ["mab_sentinel", "random_sampling"]
-        else f"opt-profiling-data/biodex-reactions-{exp_name}-records.json"
-    )
-    stats_path = (
-        f"opt-profiling-data/biodex-reactions-{exp_name}-profiling.json"
-        if processing_strategy in ["mab_sentinel", "random_sampling"]
-        else f"opt-profiling-data/biodex-reactions-{exp_name}-profiling.json"
-    )
+    records_path = f"opt-profiling-data/biodex-reactions-{exp_name}-records.json"
+    stats_path = f"opt-profiling-data/biodex-reactions-{exp_name}-profiling.json"
 
     # save record outputs
     record_jsons = []

@@ -29,7 +29,7 @@ if __name__ == "__main__":
     # generate embeddings in batches of 1000 at a time
     indices = np.linspace(0, len(texts), len(texts)//1000, dtype=int)
     total_embeds = len(indices)
-    print(f"Generating {total_embeds} embeddings...")
+    print(f"Generating {total_embeds} batches of embeddings...")
     gen_indices = []
     for iter_idx, start_idx in tqdm(enumerate(indices), total=total_embeds):
         # check if embedding needs to be computed

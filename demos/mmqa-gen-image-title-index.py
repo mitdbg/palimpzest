@@ -13,53 +13,44 @@ if __name__ == "__main__":
     # initialize openai client
     openai_client = OpenAI()
 
-    # load table texts
-    table_texts, table_ids = [], []
-    with open("testdata/MMQA_tables.jsonl") as f:
+    # load image metadata
+    image_title_set = set()
+    image_titles, image_ids = [], []
+    with open("testdata/MMQA_images.jsonl") as f:
         for line in f:
             dict_line = json.loads(line)
-            
-            # get page title and table name
-            page_title = dict_line["title"]
-            table_name = dict_line["table"]["table_name"]
+            image_title = dict_line["title"]
+            if image_title == "":
+                image_title = dict_line["url"]
 
-            # get table column names and empty column indices
-            table_header = dict_line["table"]["header"]
-            column_names = [col["column_name"] for col in table_header if col["column_name"] != ""]
-            empty_col_indices = set([idx for idx, col in enumerate(table_header) if col["column_name"] == ""])
+            if image_title not in image_title_set:
+                image_titles.append(image_title)
+                image_title_set.add(image_title)
+            else:
+                idx = 1
+                while f"{image_title} ({idx})" in image_title_set:
+                    idx += 1
+                image_title = f"{image_title} ({idx})"
+                image_titles.append(image_title)
+                image_title_set.add(image_title)
 
-            # create string for table data
-            text = f"{page_title}: {table_name}\n\n{','.join(column_names)}\n"
-
-            # parse table row data
-            table_rows = dict_line["table"]["table_rows"]
-            for row in table_rows:
-                row_data = []
-                for idx, cell in enumerate(row):
-                    if idx in empty_col_indices:
-                        continue
-                    row_data.append(cell["text"])
-
-                text += ",".join(row_data) + "\n"
-
-            table_texts.append(text)
-            table_ids.append(dict_line["id"])
+            image_ids.append(dict_line["id"])
 
     # create directory for embeddings
-    os.makedirs("testdata/mmqa-table-embeddings/", exist_ok=True)
+    os.makedirs("testdata/mmqa-image-title-embeddings/", exist_ok=True)
 
     # generate embeddings in batches of 1000 at a time
-    indices = np.linspace(0, len(table_texts), len(table_texts)//1000, dtype=int)
+    indices = np.linspace(0, len(image_titles), len(image_titles)//1000, dtype=int)
     total_embeds = len(indices)
     print(f"Generating {total_embeds} batches of embeddings...")
     gen_indices = []
     for iter_idx, start_idx in tqdm(enumerate(indices), total=total_embeds):
         # check if embedding needs to be computed
         end_idx = indices[iter_idx + 1] if iter_idx + 1 < len(indices) else None
-        filename = f"testdata/mmqa-table-embeddings/{start_idx}_{end_idx}.npy"
+        filename = f"testdata/mmqa-image-title-embeddings/{start_idx}_{end_idx}.npy"
         if end_idx is not None and not os.path.exists(filename):
             # generate embeddings
-            batch = table_texts[start_idx:end_idx]
+            batch = image_titles[start_idx:end_idx]
             resp = openai_client.embeddings.create(input=batch, model="text-embedding-3-small")
             embeddings = [item.embedding for item in resp.data]
 
@@ -82,7 +73,7 @@ if __name__ == "__main__":
 
     # create a collection
     collection = chroma_client.get_or_create_collection(
-        name="mmqa-tables",
+        name="mmqa-image-titles",
         embedding_function=openai_ef,
         metadata={"hnsw:space": "cosine"},
     )
@@ -91,9 +82,9 @@ if __name__ == "__main__":
     total_inserts = len(gen_indices)
     print(f"Inserting {total_inserts} batches into the collection...")
     for start_idx, end_idx in tqdm(gen_indices, total=total_inserts):
-        embeddings = np.load(f"testdata/mmqa-table-embeddings/{start_idx}_{end_idx}.npy")
+        embeddings = np.load(f"testdata/mmqa-image-title-embeddings/{start_idx}_{end_idx}.npy")
         collection.add(
-            documents=table_texts[start_idx:end_idx],
+            documents=image_titles[start_idx:end_idx],
             embeddings=embeddings.tolist(),
-            ids=table_ids[start_idx:end_idx],
+            ids=image_ids[start_idx:end_idx],
         )

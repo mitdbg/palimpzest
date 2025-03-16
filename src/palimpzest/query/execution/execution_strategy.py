@@ -282,7 +282,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         # initialize mapping from source index to target record sets
         source_idx_to_target_record_set = {}
 
-        # if we don't have a label use the maximum quality record from the union of the cache and new records
         for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items():
             # get the first generated output for this source_idx
             base_target_record = None

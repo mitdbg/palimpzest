@@ -12,6 +12,7 @@ from ragatouille.RAGPretrainedModel import RAGPretrainedModel
 from palimpzest.constants import MODEL_CARDS, Model
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.lib.schemas import Schema
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
@@ -20,7 +21,7 @@ class RetrieveOp(PhysicalOperator):
         self,
         index: Collection | RAGPretrainedModel,
         search_attr: str,
-        output_attr: str,
+        output_attrs: list[dict] | type[Schema],
         search_func: Callable | None,
         k: int,
         *args,
@@ -32,14 +33,26 @@ class RetrieveOp(PhysicalOperator):
         Args:
             index (Collection | RAGPretrainedModel): The PZ index to use for retrieval.
             search_attr (str): The attribute to search on.
-            output_attr (str): The attribute to output the search results to.
+            output_attrs (list[dict]): The output fields containing the results of the search.
             search_func (Callable | None): The function to use for searching the index. If None, the default search function will be used.
             k (int): The number of top results to retrieve.
         """
         super().__init__(*args, **kwargs)
+
+        # extract the field names from the output_attrs
+        if isinstance(output_attrs, Schema):
+            self.output_field_names = output_attrs.field_names()
+        elif isinstance(output_attrs, list):
+            self.output_field_names = [attr["name"] for attr in output_attrs]
+        else:
+            raise ValueError("`output_attrs` must be a list of dicts or a Schema object.")
+
+        if len(self.output_field_names) != 1 and search_func is None:
+            raise ValueError("If `search_func` is None, `output_attrs` must have a single field.")
+
         self.index = index
         self.search_attr = search_attr
-        self.output_attr = output_attr
+        self.output_attrs = output_attrs
         self.search_func = search_func if search_func is not None else self.default_search_func
         self.k = k
 
@@ -53,7 +66,7 @@ class RetrieveOp(PhysicalOperator):
         id_params = {
             "index": self.index.__class__.__name__,
             "search_attr": self.search_attr,
-            "output_attr": self.output_attr,
+            "output_attrs": self.output_attrs,
             "k": self.k,
             **id_params,
         }
@@ -66,7 +79,7 @@ class RetrieveOp(PhysicalOperator):
             "index": self.index,
             "search_func": self.search_func,
             "search_attr": self.search_attr,
-            "output_attr": self.output_attr,
+            "output_attrs": self.output_attrs,
             "k": self.k,
             **op_params,
         }
@@ -112,7 +125,10 @@ class RetrieveOp(PhysicalOperator):
             # the results["documents"] will be a list[list[str]]; if the input is a singleton list,
             # then we output the list of strings (i.e., the first element of the list), otherwise
             # we output the list of lists
-            return results["documents"][0] if is_singleton_list else results["documents"]
+            final_results = results["documents"][0] if is_singleton_list else results["documents"]
+
+            # NOTE: self.output_field_names must be a singleton for default_search_func to be used
+            return {self.output_field_names[0]: final_results}
 
         elif isinstance(index, RAGPretrainedModel):
             # if the index is a rag model, use the rag model to get the top k results
@@ -127,7 +143,8 @@ class RetrieveOp(PhysicalOperator):
                 for query_results in results:
                     final_results.append([result["content"] for result in query_results])
 
-            return final_results
+            # NOTE: self.output_field_names must be a singleton for default_search_func to be used
+            return {self.output_field_names[0]: final_results}
 
         else:
             raise ValueError("Unsupported index type. Must be either a Collection or RAGPretrainedModel.")
@@ -135,7 +152,7 @@ class RetrieveOp(PhysicalOperator):
     def _create_record_set(
         self,
         candidate: DataRecord,
-        top_k_results: list[str] | list[list[str]] | None,
+        top_k_results: dict[str, list[str] | list[list[str]]] | None,
         generation_stats: GenerationStats,
         total_time: float,
     ) -> DataRecordSet:
@@ -143,17 +160,17 @@ class RetrieveOp(PhysicalOperator):
         Given an input DataRecord and the top_k_results, construct the resulting RecordSet.
         """
         # create output DataRecord an set the output attribute
-        output_dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
-        setattr(output_dr, self.output_attr, top_k_results)
+        output_dr, answer = DataRecord.from_parent(self.output_schema, parent_record=candidate), {}
+        for output_field_name in self.output_field_names:
+            top_k_attr_results = None if top_k_results is None else top_k_results[output_field_name]
+            setattr(output_dr, output_field_name, top_k_attr_results)
+            answer[output_field_name] = top_k_attr_results
 
-        # get the answer, record_state, and generated_fields
-        answer = {self.output_attr: top_k_results}
+        # get the record_state and generated fields
         record_state = output_dr.to_dict(include_bytes=False)
 
-        # NOTE: right now this should be equivalent to [self.output_attr], but in the future we may
-        #       want to support the RetrieveOp generating multiple fields. (Also, the function will
-        #       return the full field name (as opposed to the short field name))
-        generated_fields = self.get_fields_to_generate(candidate)
+        # NOTE: this should be equivalent to self.get_fields_to_generate()
+        generated_fields = self.output_field_names
 
         # construct the RecordOpStats object
         record_op_stats = RecordOpStats(
@@ -186,7 +203,7 @@ class RetrieveOp(PhysicalOperator):
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         start_time = time.time()
 
-        # check that query is a string or list of strings, otherwise return output with self.output_attr as None
+        # check that query is a string or list of strings, otherwise return output with self.output_field_names set to None
         query = getattr(candidate, self.search_attr)
         query_is_str = isinstance(query, str)
         query_is_list_of_str = isinstance(query, list) and all(isinstance(q, str) for q in query)
@@ -202,7 +219,7 @@ class RetrieveOp(PhysicalOperator):
         if query_is_str:
             query = [query]
 
-        # compute embedding(s) if the index is a chromadb collection
+        # compute input/query embedding(s) if the index is a chromadb collection
         gen_stats = GenerationStats()
         if isinstance(self.index, Collection):
             uses_openai_embedding_fcn = isinstance(self.index._embedding_function, OpenAIEmbeddingFunction)
@@ -252,12 +269,16 @@ class RetrieveOp(PhysicalOperator):
 
         # TODO: the user is always right! let's drop this post-processing in the future
         # filter top_results for the top_k_results
-        top_k_results = []
-        if all([isinstance(result, list) for result in top_results]):
-            for result in top_results:
-                top_k_results.append(result[:self.k])
-        else:
-            top_k_results = top_results[:self.k]
+        top_k_results = {output_field_name: [] for output_field_name in self.output_field_names}
+        for output_field_name in self.output_field_names:
+            if output_field_name in top_results:
+                if all([isinstance(result, list) for result in top_results[output_field_name]]):
+                    for result in top_results[output_field_name]:
+                        top_k_results[output_field_name].append(result[:self.k])
+                else:
+                    top_k_results[output_field_name] = top_results[output_field_name][:self.k]
+            else:
+                top_k_results[output_field_name] = []
 
         if self.verbose:
             print(f"Top {self.k} results: {top_k_results}")

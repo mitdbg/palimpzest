@@ -379,7 +379,7 @@ class RetrieveScan(LogicalOperator):
         index,
         search_func,
         search_attr,
-        output_attr,
+        output_attrs,
         k,
         target_cache_id: str = None,
         *args,
@@ -389,7 +389,7 @@ class RetrieveScan(LogicalOperator):
         self.index = index
         self.search_func = search_func
         self.search_attr = search_attr
-        self.output_attr = output_attr
+        self.output_attrs = output_attrs
         self.k = k
         self.target_cache_id = target_cache_id
 
@@ -403,7 +403,7 @@ class RetrieveScan(LogicalOperator):
         logical_id_params = super().get_logical_id_params()
         logical_id_params = {
             "search_attr": self.search_attr,
-            "output_attr": self.output_attr,
+            "output_attrs": self.output_attrs,
             "k": self.k,
             **logical_id_params,
         }
@@ -416,7 +416,7 @@ class RetrieveScan(LogicalOperator):
             "index": self.index,
             "search_func": self.search_func,
             "search_attr": self.search_attr,
-            "output_attr": self.output_attr,
+            "output_attrs": self.output_attrs,
             "k": self.k,
             "target_cache_id": self.target_cache_id,
             **logical_op_params,
