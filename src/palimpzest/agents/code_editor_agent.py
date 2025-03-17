@@ -9,6 +9,7 @@ from palimpzest.agents import utils
 from palimpzest.agents.debugger_agent import LOGGER
 import json
 import dspy
+from datetime import datetime
 from dspy import Tool
 
 PARAMS = {
@@ -40,6 +41,9 @@ class PatchGeneration(dspy.Signature):
 
 class CodeEditorAgent(BaseAgent):
 
+    def __init__(self):
+        self.output_dir = f'output_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.json' 
+
     def __call__(self, data: Dataset) -> Dataset:
       """ Generates a solution plan for the Dataset """
       return Dataset(
@@ -56,8 +60,9 @@ class CodeEditorAgent(BaseAgent):
 
         patch = {
             'instance_id': candidate['instance_id'],
-            'problem_statement': candidate['problem_statement'],
-            'relevant_issue_code': candidate['relevant_issue_code'],
+            'model_name_or_path': 'palimpzest',
+            # 'problem_statement': candidate['problem_statement'],
+            # 'relevant_issue_code': candidate['relevant_issue_code'],
         }
 
         react = dspy.ReAct(
@@ -88,15 +93,19 @@ class CodeEditorAgent(BaseAgent):
         patch['model_patch'] = result.code_patch
 
         cumulative_cost = utils.compute_cost_from_history(dspy.settings.lm.history)
-        print(f'Code Agent Cumulative Cost: {cumulative_cost}')
-        print(f'Number of prompts: {len(dspy.settings.lm.history)}')
+
+        # Save patch 
+        utils.add_patch_to_output_dir(self.output_dir, patch)
+        if BaseAgent.PRINTING_ENABLED: 
+            print(f'Completed Patch Generation for {candidate["instance_id"]} \n')
+            print(f'Code Agent Cumulative Cost: {cumulative_cost} \n')
+            print(f'Number of prompts: {len(dspy.settings.lm.history)} \n')
 
         return patch
 
     def clean_patch(patch: str) -> str:
-
-
-        return patch
+        # TO DO: Implement patch cleaning 
+        pass
 
 
     def create_patch(patch_data: dict, indent_size: str) -> str: 

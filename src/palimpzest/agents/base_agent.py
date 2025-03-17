@@ -3,7 +3,6 @@ import palimpzest.agents.utils as utils
 from palimpzest.query.generators.generators import get_api_key
 import dspy
 import ast
-import re
 
 LOGGER = utils.setup_logger()
 

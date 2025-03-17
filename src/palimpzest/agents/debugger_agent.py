@@ -106,8 +106,9 @@ class DebuggerAgent(BaseAgent):
 
         if BaseAgent.LOGGING_ENABLED:
             LOGGER.info(f'Debugger Trajectory {plan["instance_id"]}: {pretty_trajectory}')
-
-        cumulative_cost = utils.compute_cost_from_history(dspy.settings.lm.history)
-        print(f'Debugger Agent Cumulative Cost: {cumulative_cost}')
+            
+        if BaseAgent.PRINTING_ENABLED:
+            cumulative_cost = utils.compute_cost_from_history(dspy.settings.lm.history)
+            print(f'Debugger Agent Cumulative Cost: {cumulative_cost}')
 
         return plan 

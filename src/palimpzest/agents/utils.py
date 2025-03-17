@@ -278,3 +278,35 @@ def setup_logger(log_dir="logs", max_bytes=1_000_000, backup_count=5):
         logger.addHandler(handler)
     
     return logger
+
+def add_patch_to_output_dir(file_path, new_data, indent=4):
+    """ Adds patch content to output json file to save incremental progress """
+    
+    # Ensure the file exists, if not, create it with an empty JSON list
+    if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+        with open(file_path, "w") as file:
+            json.dump([], file, indent=indent)
+
+    # Open file in read+write binary mode
+    with open(file_path, "rb+") as file:
+        file.seek(-1, os.SEEK_END)  # Move to the last character
+
+        while file.tell() > 0:
+            char = file.read(1).decode("utf-8")
+            if char in "]":  # Find the closing bracket
+                file.seek(-1, os.SEEK_CUR)  # Move back one step
+                break
+            file.seek(-2, os.SEEK_CUR)  # Move back if it's a space or newline
+        
+        if file.tell() > 1:  # If there's already data in the list
+            file.write(b",\n")  # Add a comma and new line before appending
+        else: 
+            file.write(b"\n")
+
+        # Append new data with proper indentation
+        formatted_entry = json.dumps(new_data, indent=indent)
+        formatted_entry = "\n".join([" " * indent + line for line in formatted_entry.splitlines()])  # Indent each line
+
+        file.write(formatted_entry.encode("utf-8"))  # Write new entry
+        file.write(b"\n]")  # Close the JSON list
+

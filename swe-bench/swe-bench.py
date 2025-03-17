@@ -150,17 +150,17 @@ def dump_records(filename, records, values, all_values=False):
         json.dump(dict_list, file, indent=4)
 
 if __name__ == "__main__":
-    plan = buildSweBenchPlan("swe-bench-oracle-lite")
+    plan = buildSweBenchPlan("swe-bench-oracle")
 
     # execute pz plan
     config = QueryProcessorConfig(
         nocache=True,
-        execution_strategy="sequential",
+        execution_strategy="pipelined",
     )
     data_record_collection = plan.run(config)
 
     print('COMPLETE')
 
     # Output Records into json file
-    filename = f'output_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.json' 
-    dump_records(filename, data_record_collection, values=['instance_id', 'model_patch']) 
+    # filename = f'output_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.json' 
+    # dump_records(filename, data_record_collection, values=['instance_id', 'model_patch']) 
