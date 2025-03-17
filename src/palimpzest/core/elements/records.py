@@ -6,7 +6,6 @@ from typing import Any
 
 import pandas as pd
 
-from palimpzest.constants import FROM_DF_PREFIX
 from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats, RecordOpStats
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema
@@ -19,12 +18,12 @@ class DataRecord:
     def __init__(
         self,
         schema: Schema,
-        source_id: int | str,
+        source_idx: int,
         parent_id: str | None = None,
         cardinality_idx: int | None = None,
     ):
-        # check that source_id is provided
-        assert source_id is not None, "Every DataRecord must be constructed with a source_id"
+        # check that source_idx is provided
+        assert source_idx is not None, "Every DataRecord must be constructed with a source_idx"
 
         # schema for the data record
         self.schema = schema
@@ -35,8 +34,8 @@ class DataRecord:
         # mapping from field names to their values
         self.field_values: dict[str, Any] = {}
 
-        # the source record(s) from which this DataRecord is derived
-        self.source_id = str(source_id)
+        # the index in the DataReader from which this DataRecord is derived
+        self.source_idx = source_idx
 
         # the id of the parent record(s) from which this DataRecord is derived
         self.parent_id = parent_id
@@ -49,7 +48,7 @@ class DataRecord:
 
         # NOTE: Record ids are hashed based on:
         # 0. their schema (keys)
-        # 1. their parent record id(s) (or source_id if there is no parent record)
+        # 1. their parent record id(s) (or source_idx if there is no parent record)
         # 2. their index in the fan out (if this is in a one-to-many operation)
         #
         # We currently do NOT hash just based on record content (i.e. schema (key, value) pairs)
@@ -60,15 +59,17 @@ class DataRecord:
 
         # unique identifier for the record
         id_str = (
-            str(schema) + (parent_id if parent_id is not None else self.source_id)
+            str(schema) + (parent_id if parent_id is not None else str(self.source_idx))
             if cardinality_idx is None
-            else str(schema) + str(cardinality_idx) + str(parent_id if parent_id is not None else self.source_id)
+            else str(schema) + str(cardinality_idx) + str(parent_id if parent_id is not None else str(self.source_idx))
         )
+        # TODO(Jun): build-in id should has a special name, the current self.id is too general which would conflict with user defined schema too easily.
+        # the options: built_in_id, generated_id
         self.id = hash_for_id(id_str)
 
 
     def __setattr__(self, name: str, value: Any, /) -> None:
-        if name in ["schema", "field_types", "field_values", "source_id", "parent_id", "cardinality_idx", "passed_operator", "id"]:
+        if name in ["schema", "field_types", "field_values", "source_idx", "parent_id", "cardinality_idx", "passed_operator", "id"]:
             super().__setattr__(name, value)
         else:
             self.field_values[name] = value
@@ -114,7 +115,7 @@ class DataRecord:
 
 
     def get_field_names(self):
-        return list(self.field_types.keys())
+        return list(self.field_values.keys())
 
 
     def get_field_type(self, field_name: str) -> Field:
@@ -122,10 +123,10 @@ class DataRecord:
 
 
     def copy(self, include_bytes: bool = True, project_cols: list[str] | None = None):
-        # make new record which has parent_record as its parent (and the same source_id)
+        # make new record which has parent_record as its parent (and the same source_idx)
         new_dr = DataRecord(
             self.schema,
-            source_id=self.source_id,
+            source_idx=self.source_idx,
             parent_id=self.id,
             cardinality_idx=self.cardinality_idx,
         )
@@ -168,10 +169,10 @@ class DataRecord:
         if project_cols is not None:
             new_schema = new_schema.project(project_cols)
 
-        # make new record which has parent_record as its parent (and the same source_id)
+        # make new record which has parent_record as its parent (and the same source_idx)
         new_dr = DataRecord(
             new_schema,
-            source_id=parent_record.source_id,
+            source_idx=parent_record.source_idx,
             parent_id=parent_record.id,
             cardinality_idx=cardinality_idx,
         )
@@ -211,23 +212,14 @@ class DataRecord:
         # TODO: we can implement this method if/when we add joins
         pass
 
-    @staticmethod
-    def _build_source_id_from_df(source_id: int | str | None = None) -> int | str:
-        updated_source_id = source_id
-        if source_id is None:
-            updated_source_id = "None"
-        elif isinstance(source_id, int):
-            updated_source_id = str(source_id)
-        return f"{FROM_DF_PREFIX}_{updated_source_id}"
 
     @staticmethod
-    def from_df(df: pd.DataFrame, schema: Schema | None = None, source_id: int | str | None = None) -> list[DataRecord]:
+    def from_df(df: pd.DataFrame, schema: Schema | None = None) -> list[DataRecord]:
         """Create a list of DataRecords from a pandas DataFrame
         
         Args:
             df (pd.DataFrame): Input DataFrame
             schema (Schema, optional): Schema for the DataRecords. If None, will be derived from DataFrame  
-            source_id (int | str | None, optional)
         
         Returns:
             list[DataRecord]: List of DataRecord instances
@@ -240,10 +232,9 @@ class DataRecord:
             schema = Schema.from_df(df)
 
         field_map = schema.field_map()
-        source_id = DataRecord._build_source_id_from_df(source_id)
-        for _, row in df.iterrows():
+        for source_idx, row in df.iterrows():
             row_dict = row.to_dict()
-            record = DataRecord(schema=schema, source_id=source_id)
+            record = DataRecord(schema=schema, source_idx=source_idx)
             record.field_values = row_dict
             record.field_types = {field_name: field_map[field_name] for field_name in row_dict}
             records.append(record)
@@ -254,8 +245,8 @@ class DataRecord:
     def to_df(records: list[DataRecord], project_cols: list[str] | None = None) -> pd.DataFrame:
         if len(records) == 0:
             return pd.DataFrame()
-        
-        fields = records[0].schema.field_names()
+
+        fields = records[0].get_field_names()
         if project_cols is not None and len(project_cols) > 0:
             fields = [field for field in fields if field in project_cols]
 
@@ -293,7 +284,7 @@ class DataRecord:
 
 class DataRecordSet:
     """
-    A DataRecordSet contains a list of DataRecords that share the same schema, same parent_id, and same source_id.
+    A DataRecordSet contains a list of DataRecords that share the same schema, same parent_id, and same source_idx.
 
     We explicitly check that this is True.
 
@@ -306,11 +297,11 @@ class DataRecordSet:
             error_msg = "DataRecordSet must be constructed from the output of executing a single operator on a single input."
             assert all([dr.parent_id == parent_id for dr in data_records]), error_msg
 
-        # set data_records, parent_id, and source_id; note that it is possible for
+        # set data_records, parent_id, and source_idx; note that it is possible for
         # data_records to be an empty list in the event of a failed convert
         self.data_records = data_records
         self.parent_id = data_records[0].parent_id if len(data_records) > 0 else None
-        self.source_id = data_records[0].source_id if len(data_records) > 0 else None
+        self.source_idx = data_records[0].source_idx if len(data_records) > 0 else None
 
         # set statistics for generating these records
         self.record_op_stats = record_op_stats
@@ -335,8 +326,9 @@ class DataRecordCollection:
     This is a wrapper class for list[DataRecord] to support more advanced features for output of execute().
 
     The difference between DataRecordSet and DataRecordCollection 
+
     Goal: 
-        DataRecordSet is a set of DataRecords that share the same schema, same parent_id, and same source_id.
+        DataRecordSet is a set of DataRecords that share the same schema, same parent_id, and same source_idx.
         DataRecordCollection is a general wrapper for list[DataRecord].
     
     Usage:
@@ -358,9 +350,9 @@ class DataRecordCollection:
         """Return the number of records in the collection"""
         return len(self.data_records)
 
-    def to_df(self, project_cols: list[str] | None = None):
-        return DataRecord.to_df(self.data_records, project_cols)
-    
+    def to_df(self, cols: list[str] | None = None):
+        return DataRecord.to_df(self.data_records, cols)
+
     def _get_executed_plans(self):
         if self.plan_stats is not None:
             return [self.plan_stats.plan_str]

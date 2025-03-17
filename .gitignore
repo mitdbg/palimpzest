@@ -1,6 +1,10 @@
+docs/site/
+*.zip
+.cache/
 .env
 build/*
 docs/build/*
+docs/source/generated/*
 dist/*
 .vscode/*
 .ragatouille
@@ -8,6 +12,7 @@ plots/
 paper-imgs/
 
 # testdata folders and archive files
+testdata/enron-tiny.csv
 testdata/*/
 testdata/*.tar.gz
 

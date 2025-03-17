@@ -124,8 +124,8 @@ class RecordOpStats:
     # identifier for the parent of this record
     record_parent_id: str
 
-    # idenifier for the source of this record
-    record_source_id: str
+    # idenifier for the source idx of this record
+    record_source_idx: str
 
     # a dictionary with the record state after being processed by the operator
     record_state: dict[str, Any]
@@ -405,6 +405,13 @@ class OperatorCostEstimates:
 
     # upper bound on quality
     quality_upper_bound: float | None = None
+
+    def __rmul__(self, multiplier: float) -> OperatorCostEstimates:
+        """
+        Multiply all fields by a scalar.
+        """
+        dct = {field.name: getattr(self, field.name) * multiplier for field in fields(self)}
+        return OperatorCostEstimates(**dct)
 
     def __post_init__(self):
         if self.cardinality_lower_bound is None and self.cardinality_upper_bound is None:

@@ -77,10 +77,14 @@ class QueryProcessorFactory:
 
         Args:
             dataset: The dataset to process
-            config: Additional configuration parameters:
+            config: The user-provided QueryProcessorConfig; if it is None, the default config will be used
+            kwargs: Additional keyword arguments to pass to the QueryProcessorConfig
         """
         if config is None:
             config = QueryProcessorConfig()
+
+        # apply any additional keyword arguments to the config
+        config.update(**kwargs)
 
         config = cls._config_validation_and_normalization(config)
         processing_strategy, execution_strategy, optimizer_strategy = cls._normalize_strategies(config)
@@ -88,7 +92,7 @@ class QueryProcessorFactory:
 
         processor_key = (processing_strategy, execution_strategy)
         processor_cls = cls.PROCESSOR_MAPPING.get(processor_key)
-        
+
         if processor_cls is None:
             raise ValueError(f"Unsupported combination of processing strategy {processing_strategy} "
                         f"and execution strategy {execution_strategy}")
@@ -96,7 +100,7 @@ class QueryProcessorFactory:
         return processor_cls(dataset=dataset, optimizer=optimizer, config=config, **kwargs)
 
     @classmethod
-    def create_and_run_processor(cls, dataset: Dataset, config: QueryProcessorConfig, **kwargs) -> DataRecordCollection:
+    def create_and_run_processor(cls, dataset: Dataset, config: QueryProcessorConfig | None = None, **kwargs) -> DataRecordCollection:
         # TODO(Jun): Consider to use cache here.
         processor = cls.create_processor(dataset=dataset, config=config, **kwargs)
         return processor.execute()
@@ -119,6 +123,9 @@ class QueryProcessorFactory:
             allow_conventional_query=config.allow_conventional_query,
             allow_code_synth=config.allow_code_synth,
             allow_token_reduction=config.allow_token_reduction,
+            allow_rag_reduction=config.allow_rag_reduction,
+            allow_mixtures=config.allow_mixtures,
+            allow_critic=config.allow_critic,
             optimization_strategy_type=optimizer_strategy,
             use_final_op_quality=config.use_final_op_quality
         )
@@ -153,8 +160,11 @@ class QueryProcessorFactory:
             raise ValueError("Policy is required for optimizer")
 
         if not config.nocache:
-            raise ValueError("nocache=False is not supported yet!!")
-        
+            raise ValueError("nocache=False is not supported yet")
+
+        if config.val_datasource is None and config.processing_strategy in [ProcessingStrategyType.MAB_SENTINEL, ProcessingStrategyType.RANDOM_SAMPLING]:
+            raise ValueError("val_datasource is required for MAB_SENTINEL and RANDOM_SAMPLING processing strategies")
+
         available_models = getattr(config, 'available_models', [])
         if available_models is None or len(available_models) == 0:
             available_models = get_models(include_vision=True)

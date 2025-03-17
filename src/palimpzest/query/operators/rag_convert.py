@@ -12,7 +12,7 @@ from palimpzest.constants import (
 )
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import ListField, StringField
+from palimpzest.core.lib.fields import StringField
 from palimpzest.query.operators.convert import FieldName, LLMConvert
 
 
@@ -20,7 +20,7 @@ class RAGConvert(LLMConvert):
     def __init__(self, num_chunks_per_field: int, chunk_size: int = 1000, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # NOTE: in the future, we should abstract the embedding model to allow for different models
-        self.client = OpenAI()
+        self.client = None
         self.embedding_model = "text-embedding-3-small"
         self.num_chunks_per_field = num_chunks_per_field
         self.chunk_size = chunk_size
@@ -124,7 +124,7 @@ class RAGConvert(LLMConvert):
 
             # skip this field if it is not a string or a list of strings
             is_string_field = isinstance(field, StringField)
-            is_list_string_field = isinstance(field, ListField) and isinstance(field.element_type, StringField)
+            is_list_string_field = hasattr(field, "element_type") and isinstance(field.element_type, StringField)
             if not (is_string_field or is_list_string_field):
                 continue
 
@@ -157,6 +157,9 @@ class RAGConvert(LLMConvert):
         return candidate
 
     def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
+        # set client
+        self.client = OpenAI() if self.client is None else self.client
+
         # get the set of input fields to use for the convert operation
         input_fields = self.get_input_fields()
 
