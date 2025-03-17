@@ -13,6 +13,7 @@ CORRUPTED_IMAGE_IDS = [
     "bf201cbbd058ef51aef89b1be4158c2a",
     "ef457a7b3ab437cd78ab9f82dc083048",
     "225c3db49d60b5ef30ed0bfc649ebf78",
+    "b413cc1dc4969dcbe4cb6a55c0f2e359",
 ]
 
 # NOTE: this script is meant to be run from the root of the repository
