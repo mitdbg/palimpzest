@@ -10,11 +10,11 @@ This directory is dedicated to developing and evaluating PZ programs for the SWE
 ## Generating Patches
 
 1. cd into the `swe-bench` directory and run `python swe-bench.py`. Once complete, the patches will be output into a `output.json` file.
-<<<<<<< Updated upstream
+   <<<<<<< Updated upstream
 
 ## Common Errors
 
 1. If you run into a DSPy ReAct error, as a temporary patch go to the site-packages of DSPy and modify line 100 of react.py to be:
    `tool_args = json.loads(pred.next_tool_args) if isinstance(pred.next_tool_args, str) else pred.next_tool_args`
-=======
->>>>>>> Stashed changes
+   =======
+   > > > > > > > Stashed changes
