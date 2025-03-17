@@ -29,7 +29,7 @@ from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.token_reduction_convert import TokenReducedConvertBonded
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
-from palimpzest.utils.model_helpers import get_models, get_vision_models
+from palimpzest.utils.model_helpers import get_models, get_vision_models,get_audio2text_models,get_audio_embedding_models
 
 logger = logging.getLogger(__name__)
 
@@ -293,8 +293,24 @@ class LLMConvertBondedRule(ImplementationRule):
         text_models = set(get_models())
         pure_text_models = {model for model in text_models if model not in vision_models}
         pure_vision_models = {model for model in vision_models if model not in text_models}
-
+        audio2text_models=set(get_audio2text_models())
+        audio_models=set(get_audio_embedding_models())
+        
+        print(f'FIELDS{[(field_name,field.is_audio_field) for field_name,field in logical_expression.input_fields.items()]}')
         # compute attributes about this convert operation
+        is_audio2text=any (
+            [
+                field.is_audio_field
+                for field_name,field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        print('FIELDS2 ')
+        print( [
+                field.is_audio_field
+                for field_name,field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ])
         is_image_conversion = any(
             [
                 field.is_image_field
@@ -316,18 +332,42 @@ class LLMConvertBondedRule(ImplementationRule):
                 if field_name.split(".")[-1] in logical_expression.depends_on_field_names
             ]
         )
-
         physical_expressions = []
         for model in physical_op_params["available_models"]:
+            #OPAL version
+            #skip this model if:
+            # 1. if we are doing an image conversion, and model is not an image model
+            # 2. if we are doing audio conversion, and model is not an audio model
+            # 3. if we are not doing audio or image conversion, but not a text model 
+            # 4.  this is a vision model hosted by Together (i.e. LLAMA3_V) and there is more than one image field
+
+            first_criteria=is_image_conversion and model not in vision_models
+            second_criteria=is_audio2text and model not in audio2text_models
+            third_criteria=not is_image_conversion and not is_audio2text and model not in text_models
+            fourth_criteria= model == Model.LLAMA3_V and (num_image_fields > 1 or list_image_field)
+            print(f'rules.py, model: {model.value}')
+            print(f'audio2text flag {is_audio2text}')
+            print(f'first_{first_criteria}')
+            print(f'second{second_criteria}')
+            print(f'third{third_criteria}')
+            print(f'fourth{fourth_criteria}')
+            if first_criteria or second_criteria or third_criteria or fourth_criteria:
+                continue
+            '''
+
+            #OLD VERSION
             # skip this model if:
             # 1. this is a pure vision model and we're not doing an image conversion, or
             # 2. this is a pure text model and we're doing an image conversion, or
             # 3. this is a vision model hosted by Together (i.e. LLAMA3_V) and there is more than one image field
+            # 4. this is a vision/text model and we are doing audio2text
             first_criteria = model in pure_vision_models and not is_image_conversion
             second_criteria = model in pure_text_models and is_image_conversion
             third_criteria = model == Model.LLAMA3_V and (num_image_fields > 1 or list_image_field)
+            
             if first_criteria or second_criteria or third_criteria:
                 continue
+            '''
 
             # construct multi-expression
             op = LLMConvertBonded(

@@ -54,7 +54,7 @@ class QueryProcessor:
 
         self.available_models = self.config.available_models
         if self.available_models is None or len(self.available_models) == 0:
-            self.available_models = get_models(include_vision=True)
+            self.available_models = get_models(include_vision=True, include_audio2text=True)
 
         if self.verbose:
             print("Available models: ", self.available_models)

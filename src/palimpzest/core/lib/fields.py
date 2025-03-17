@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import torch
 
 class Field:
     """
@@ -16,6 +16,7 @@ class Field:
     ```
     """
     is_image_field = False
+    is_audio_field= False
 
     def __init__(self, desc: str = "") -> None:
         self._desc = desc
@@ -60,6 +61,12 @@ class BytesField(Field):
             "contentEncoding": "base64",
             "contentMediaType": "application/octet-stream",
         }
+class AudioField(Field):
+    "Ann AudioField is a Field that is a torch tensor representing a processed audio file"
+    is_audio_field=True
+    def __init__(self,desc:str):
+        super().__init__(desc=desc)
+        self.type=torch.Tensor
 
 
 class CallableField(Field):

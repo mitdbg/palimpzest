@@ -112,7 +112,7 @@ class QueryProcessorFactory:
     #TODO(Jun): The all avaliable plans could be generated earlier and outside Optimizer.
     @classmethod
     def _create_optimizer(cls, optimizer_strategy: OptimizationStrategyType, config: QueryProcessorConfig) -> Optimizer:
-        available_models = getattr(config, 'available_models', []) or get_models(include_vision=True)
+        available_models = getattr(config, 'available_models', []) or get_models(include_vision=True, include_audio2text=True)
         
         if config.policy is None:
             raise ValueError("Policy is required for optimizer")
@@ -170,7 +170,7 @@ class QueryProcessorFactory:
 
         available_models = getattr(config, 'available_models', [])
         if available_models is None or len(available_models) == 0:
-            available_models = get_models(include_vision=True)
+            available_models = get_models(include_vision=True, include_audio2text=True)
         config.available_models = available_models
 
         return config

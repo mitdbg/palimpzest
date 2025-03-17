@@ -4,6 +4,7 @@ import json
 from typing import Any as TypingAny
 
 import pandas as pd
+import torch
 
 from palimpzest.constants import MAX_ROWS
 from palimpzest.core.lib.fields import (
@@ -16,6 +17,7 @@ from palimpzest.core.lib.fields import (
     ListField,
     NumericField,
     StringField,
+    AudioField
 )
 from palimpzest.utils.field_helpers import construct_field_type
 

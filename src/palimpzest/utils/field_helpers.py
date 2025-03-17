@@ -1,5 +1,5 @@
 import types
-
+import torch
 from palimpzest.core.lib.fields import (
     BooleanField,
     BytesField,
@@ -9,6 +9,7 @@ from palimpzest.core.lib.fields import (
     ListField,
     NumericField,
     StringField,
+    AudioField
 )
 
 
@@ -60,6 +61,7 @@ def construct_field_type(field_type: type | types.UnionType | types.GenericAlias
     }
 
     if field_type not in supported_types_map:
+        #print('HERE',field_type)
         raise ValueError(f"Unsupported type: {field_type}. Supported types are: {list(supported_types_map.keys())}")
 
     # get the field class and (if applicable) element field class

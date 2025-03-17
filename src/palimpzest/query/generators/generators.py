@@ -13,6 +13,9 @@ from abc import ABC, abstractmethod
 from collections import Counter
 from copy import deepcopy
 from typing import Any, Generic, TypeVar
+from transformers import StoppingCriteria, StoppingCriteriaList
+from transformers import AutoModel, AutoConfig
+import torch
 
 from colorama import Fore, Style
 from openai import OpenAI
@@ -59,7 +62,8 @@ def generator_factory(
 
     elif model in [Model.MIXTRAL, Model.LLAMA3, Model.LLAMA3_V, Model.DEEPSEEK]:
         return TogetherGenerator(model, prompt_strategy, cardinality, verbose)
-
+    elif model in [Model.MUSILINGO_LONG, Model.MUSILINGO_SHORT, Model.MUSILINGO_QA]:
+        return Music2TextGenerator(model,prompt_strategy,cardinality,verbose)
     raise Exception(f"Unsupported model: {model}")
 
 
@@ -448,6 +452,110 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         logger.debug(f"Generated field answers: {field_answers}")
         return field_answers, reasoning, generation_stats, messages
+
+class Music2TextGenerator(BaseGenerator[str | list[str], str]):
+    def __init__(self, model, prompt_strategy, cardinality = Cardinality.ONE_TO_ONE, verbose = False, system_role = "system"):
+        super().__init__(model, prompt_strategy, cardinality, verbose, system_role)
+        self.musilingo_model= AutoModel.from_pretrained(self.model_name, trust_remote_code=True)
+        self.musilingo_model.to('cpu')
+        self.musilingo_model.eval()
+
+    def __call__(self, candidate: DataRecord, fields: dict[str, Field] | None, json_output: bool=True, **kwargs) -> GenerationOutput:
+        song_id=candidate["song_id"]
+        audio_content=candidate['audio_content']
+        prompt='Give me a detailed description of the song, including its genre, instruments, mood/theme, bpm, and what occasion this song would be played at'
+        
+       
+        
+        stopping = StoppingCriteriaList([StoppingCriteriaSub([torch.tensor([835]).cuda(),
+                                  torch.tensor([2277, 29937]).to('cpu')])])
+        response=self.get_musilingo_pred(self.musilingo_model,prompt,audio_content, stopping,length_penalty=100, temperature=0.1)
+        #should be only one field name
+        field_answers = {field_name: response for field_name in fields}
+        reasoning=''
+        messages=[]
+        generation_stats=GenerationStats()
+        return field_answers,reasoning, generation_stats,messages
+    
+    def _get_client_or_model(self, **kwargs) -> OpenAI:
+        """Returns a client (or local model) which can be invoked to perform the generation."""
+        pass
+
+    def _generate_completion(self, client: OpenAI, payload: dict, **kwargs) -> ChatCompletion:
+        """Generates a completion object using the client (or local model)."""
+        pass
+
+    def _get_completion_text(self, completion: ChatCompletion, **kwargs) -> str:
+        """Extract the completion text from the completion object."""
+        pass
+
+    def _get_usage(self, completion: ChatCompletion, **kwargs) -> dict:
+        """Extract the usage statistics from the completion object."""
+        pass
+
+    def _get_finish_reason(self, completion: ChatCompletion, **kwargs) -> str:
+        """Extract the finish reason from the completion object."""
+        pass
+
+    def _get_answer_log_probs(self, completion: ChatCompletion, **kwargs) -> list[float]:
+        """Extract the log probabilities from the completion object."""
+        pass
+
+
+    def get_musilingo_pred(model, text, audio, stopping, length_penalty=1, temperature=0.1,
+        max_new_tokens=300, num_beams=1, min_length=1, top_p=0.5, repetition_penalty=1.0):
+
+        # see https://huggingface.co/m-a-p/MusiLingo-musicqa-v1 for load_audio function definition
+    
+        audio_embeds, atts_audio = model.encode_audio(audio)
+
+
+        prompt = '<Audio><AudioHere></Audio> ' + text
+        instruction_prompt = [model.prompt_template.format(prompt)]
+        audio_embeds, atts_audio = model.instruction_prompt_wrap(audio_embeds, atts_audio, instruction_prompt)
+
+        model.llama_tokenizer.padding_side = "right"
+        batch_size = audio_embeds.shape[0]
+        bos = torch.ones([batch_size, 1],
+                        dtype=torch.long,
+                        device=torch.device('cuda')) * model.llama_tokenizer.bos_token_id
+        bos_embeds = model.llama_model.model.embed_tokens(bos)
+        # atts_bos = atts_audio[:, :1]
+        inputs_embeds = torch.cat([bos_embeds, audio_embeds], dim=1)
+        # attention_mask = torch.cat([atts_bos, atts_audio], dim=1)
+        outputs = model.llama_model.generate(
+            inputs_embeds=inputs_embeds,
+            max_new_tokens=max_new_tokens,
+            stopping_criteria=stopping,
+            num_beams=num_beams,
+            do_sample=True,
+            min_length=min_length,
+            top_p=top_p,
+            repetition_penalty=repetition_penalty,
+            length_penalty=length_penalty,
+            temperature=temperature,
+        )
+        output_token = outputs[0]
+        if output_token[0] == 0:  # the model might output a unknow token <unk> at the beginning. remove it
+            output_token = output_token[1:]
+        if output_token[0] == 1:  # if there is a start token <s> at the beginning. remove it
+            output_token = output_token[1:]
+        output_text = model.llama_tokenizer.decode(output_token, add_special_tokens=False)
+        output_text = output_text.split('###')[0]  # remove the stop sign '###'
+        output_text = output_text.split('Assistant:')[-1].strip()
+        del audio, bos
+        
+        return output_text
+
+class StoppingCriteriaSub(StoppingCriteria):
+    def __init__(self, stops=[], encounters=1):
+        super().__init__()
+        self.stops = stops
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor):
+        for stop in self.stops:
+            if torch.all((stop == input_ids[0][-len(stop):])).item():
+                return True
+        return False
 
 
 class OpenAIGenerator(BaseGenerator[str | list[str], str]):

@@ -463,7 +463,7 @@ class CostModel(BaseCostModel):
             op_name = str(op_df.op_name.iloc[0])
             if model_name is not None:
                 # compute estimates per-model, and add None which forces computation of avg. across all models
-                model_names = [m.value for m in get_models(include_vision=True)] + [None]
+                model_names = [m.value for m in get_models(include_vision=True, include_audio2text=True)] + [None]
                 # model_names = op_df.model_name.unique().tolist()
                 estimates = {model_name: None for model_name in model_names}
                 for model_name in model_names:

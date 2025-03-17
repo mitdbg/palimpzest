@@ -20,6 +20,11 @@ class Model(str, Enum):
     GPT_4o_MINI = "gpt-4o-mini-2024-07-18"
     GPT_4o_MINI_V = "gpt-4o-mini-2024-07-18"
     TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
+    MUSILINGO_LONG='m-a-p/MusiLingo-long-v1'
+    MUSILINGO_SHORT="m-a-p/MusiLingo-short-v1"
+    MUSILINGO_QA="m-a-p/MusiLingo-musicqa-v1"
+    MERT="m-a-p/MERT-v1-330M"
+    
 
     def __repr__(self):
         return f"{self.name}"
@@ -328,7 +333,45 @@ TEXT_EMBEDDING_3_SMALL_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 82.0,  # NOTE: just copying GPT_4o_MINI_MODEL_CARD for now
 }
+MUSILINGO_LONG_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0,
+    "usd_per_output_token": None,
+    ##### Time #####
+    "seconds_per_output_token": 0.02,  
+    ##### Agg. Benchmark #####
+    "overall": 75,  
+}
 
+MUSILINGO_SHORT_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0,
+    "usd_per_output_token": None,
+    ##### Time #####
+    "seconds_per_output_token": 0.018,  
+    ##### Agg. Benchmark #####
+    "overall": 65,  
+}
+
+MUSILINGO_QA_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0,
+    "usd_per_output_token": None,
+    ##### Time #####
+    "seconds_per_output_token": 0.018,  
+    ##### Agg. Benchmark #####
+    "overall": 60,  
+}
+
+MERT_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0,
+    "usd_per_output_token": None,
+    ##### Time #####
+    "seconds_per_output_token": 0.00098,  
+    ##### Agg. Benchmark #####
+    "overall": 80,  
+}
 
 MODEL_CARDS = {
     Model.LLAMA3.value: LLAMA3_3_70B_INSTRUCT_MODEL_CARD,
@@ -340,6 +383,10 @@ MODEL_CARDS = {
     Model.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
     Model.GPT_4o_MINI_V.value: GPT_4o_MINI_V_MODEL_CARD,
     Model.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
+    Model.MUSILINGO_LONG.value: MUSILINGO_LONG_MODEL_CARD,
+    Model.MUSILINGO_SHORT.value: MUSILINGO_SHORT_MODEL_CARD,
+    Model.MUSILINGO_QA.value:MUSILINGO_QA_MODEL_CARD,
+    Model.MERT.value:MERT_MODEL_CARD
     ###
     # Model.GPT_3_5.value: GPT_3_5_MODEL_CARD,
     # Model.GPT_4.value: GPT_4_MODEL_CARD,
