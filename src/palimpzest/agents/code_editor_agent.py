@@ -27,8 +27,12 @@ class GithubCodePatch(Schema):
 class PatchGeneration(dspy.Signature):
     """
     Generates a GitHub code patch representing how the github repository of interest must be modified to implement the provided bug fix. 
-    An example of a GitHub patch format is as follows: diff --git a/astropy/coordinates/angles.py b/astropy/coordinates/angles.py --- a/astropy/coordinates/angles.py +++ b/astropy/coordinates/angles.py @@ -587,7 +587,7 @@ def _validate_angles(self, angles=None): if angles.unit is u.deg: limit = 90 elif angles.unit is u.rad: - limit = 0.5 * np.pi + limit = self.dtype.type(0.5 * np.pi) else: limit = u.degree.to(angles.unit, 90.0)
+    An example of a GitHub patch format is as follows: "diff --git a/astropy/io/ascii/html.py b/astropy/io/ascii/html.py \n--- a/astropy/io/ascii/html.py \n+++ b/astropy/io/ascii/html.py \n@@ -349,11 +349,13 @@ def write(self, table): \n    cols = list(table.columns.values()) \n\n    self.data.header.cols = cols \n+   self.data.cols = cols\n\n    if isinstance(self.data.fill_values, tuple): \n    self.data.fill_values = [self.data.fill_values] \n\n    self.data._set_fill_values(cols) \n+   self.data._set_col_formats() \n\n    lines = []"
+    Only return the diff string without any extra text or explanation. 
+    Make sure the patch has indentation that matches the codebase, no extra syntax, and can be immedietly applied to the git apply command.
     """
+
+    instance_id: str = dspy.InputField(desc="An execution identifier used as an argument for tools")
     bug_report: str = dspy.InputField(desc="The code where the problem is located")
     problem_statement: str = dspy.InputField(desc="A description of the problem causing the bug")
     code_patch: str = dspy.OutputField(desc="A GitHub code patch representing how the github repository of interest must be modified to implement the provided bug fix.")
@@ -48,7 +52,7 @@ class CodeEditorAgent(BaseAgent):
     def generate_patch(self, candidate: DataRecord) -> dict: 
         # Let the agent navigate the code base with the same tools and provide the bug fix plan
 
-        print(f'\n =============== CODE EDITOR AGENT START ===============')
+        print(f'\n =============== CODE EDITOR AGENT START for {candidate["instance_id"]} ===============')
 
         patch = {
             'instance_id': candidate['instance_id'],
@@ -69,53 +73,68 @@ class CodeEditorAgent(BaseAgent):
         )
 
         result = react(
+            instance_id=candidate['instance_id'],
             bug_report=candidate['bug_report'],
             problem_statement=candidate['problem_statement'], 
         )
 
         pretty_trajectory = json.dumps(result.toDict(), indent=4)
-        LOGGER.info(f'Code Editor Trajectory {patch["instance_id"]}: {pretty_trajectory}')
 
+        if BaseAgent.LOGGING_ENABLED:
+            LOGGER.info(f'Code Editor Trajectory {patch["instance_id"]}: {pretty_trajectory}')
+
+        # TO DO: Implement patch/code verification
         # May want to clean patch (new lines, extra tokens, etc)
         patch['model_patch'] = result.code_patch
+
+        cumulative_cost = utils.compute_cost_from_history(dspy.settings.lm.history)
+        print(f'Code Agent Cumulative Cost: {cumulative_cost}')
+        print(f'Number of prompts: {len(dspy.settings.lm.history)}')
+
+        return patch
+
+    def clean_patch(patch: str) -> str:
+
 
         return patch
 
 
-    def create_patch(patch_data: dict) -> str: 
+    def create_patch(patch_data: dict, indent_size: str) -> str: 
         """
         Generate a GitHub patch string from a dictionary representing diff data.
 
-        The expected structure of patch_data is:
-            {
-                "files": [
+        An example patch_data input is: 
+        {
+            "files": [
+                {
+                    "old_path": "old/file.txt",
+                    "new_path": "new/file.txt",
+                    "hunks": [
                     {
-                        "old_path": "path/to/old/file",
-                        "new_path": "path/to/new/file",
-                        "hunks": [
-                            {
-                                "old_start": <int>,
-                                "old_length": <int>,
-                                "new_start": <int>,
-                                "new_length": <int>,
-                                "lines": [
-                                    {"type": "context" | "addition" | "deletion", "content": <str>},
-                                    ...
-                                ]
-                            },
-                            ...
+                        "old_start": 1,
+                        "old_length": 3,
+                        "new_start": 1,
+                        "new_length": 3,
+                        "lines": [
+                            {"type": "context", "content": "unchanged line"},
+                            {"type": "addition", "content": "added line"},
+                            {"type": "deletion", "content": "removed line"}
                         ]
-                    },
-                    ...
-                ]
-            }
-        
+                    }
+                }
+            ]
+        }
+
         Make sure that the lines array contains dictionaries with "type" and "content" keys.
         If a line's content already starts with a prefix (' ', '+', or '-'),
         it will be used as is; otherwise, the prefix is added based on the "type".
         """
 
-        print(f'create_patch')
+        indent_size = int(indent_size)
+
+        if BaseAgent.PRINTING_ENABLED:
+            print(f'create_patch')
+
         patch_lines = []
         
         for file in patch_data.get("files", []):
@@ -134,20 +153,15 @@ class CodeEditorAgent(BaseAgent):
                     
                     for line in hunk.get("lines", []):
                         content = line.get("content", "")
-                        # If content already has a prefix, use it directly.
-                        if content and content[0] in (" ", "+", "-"):
-                            patch_lines.append(content)
+                        if line["type"] == "context":
+                            patch_lines.append(" " * indent_size + content)
+                        elif line["type"] == "addition":
+                            patch_lines.append("+" + " " * (indent_size - 1)  + content)
+                        elif line["type"] == "deletion":
+                            patch_lines.append("-" + " " * (indent_size - 1)  + content)
                         else:
-                            # Otherwise, add a prefix based on the line type.
-                            if line["type"] == "context":
-                                patch_lines.append(" " + content)
-                            elif line["type"] == "addition":
-                                patch_lines.append("+" + content)
-                            elif line["type"] == "deletion":
-                                patch_lines.append("-" + content)
-                            else:
-                                patch_lines.append(content)
-            
+                            patch_lines.append(content)
+                
                 return "\n".join(patch_lines)
 
 

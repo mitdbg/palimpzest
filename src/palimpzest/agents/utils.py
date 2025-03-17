@@ -11,10 +11,18 @@ import pygit2
 import re
 
 # TO DO: Generalize to other repos 
-TEMP_VARS = {
-    "owner": "astropy",
-    "repo": "astropy", 
-    "branch": "main", 
+# TEMP_VARS = {
+#     "owner": "astropy",
+#     "repo": "astropy", 
+#     "branch": "main", 
+# }
+
+# Rates per million tokens
+MODEL_RATES = {
+    "gpt-4o": {
+        "input_rate": 2.5,
+        "output_rate": 10, 
+    },
 }
 
 def add_line_numbers(code_str, start_line_no=1):
@@ -26,19 +34,19 @@ def add_line_numbers(code_str, start_line_no=1):
     result = {str(i + 1 + (start_line_no - 1)): line for i, line in enumerate(lines)}
     return json.dumps(result, indent=2)
 
-def fetch_github_code(file_name: str, base_commit: str = None) -> str:
+def fetch_github_code(file_name: str, owner: str, repo: str, base_commit: str = None, branch: str = "main") -> str:
     """ Fetches the code of a file from the relevant issue code """
     # Customize these variables for your repository.
     token = os.getenv("GITHUB_TOKEN")
 
-    ref = base_commit if base_commit else TEMP_VARS["branch"]
-    file_paths = get_repo_files(TEMP_VARS["owner"], TEMP_VARS["repo"], ref, token)
+    ref = base_commit if base_commit else branch
+    file_paths = get_repo_files(owner, repo, ref, token)
     if file_paths is None:
         return
 
     best_match = find_best_match(file_name, file_paths)
     if best_match:
-        content = get_file_content(owner=TEMP_VARS["owner"], repo=TEMP_VARS["repo"], path=best_match, token=token, ref=ref)
+        content = get_file_content(owner=owner, repo=repo, path=best_match, token=token, ref=ref)
         if content:
             return content
 
@@ -228,6 +236,16 @@ def extract_structure(code):
     visitor = FunctionClassVisitor()
     visitor.visit(tree)
     return visitor.structure
+
+def compute_cost_from_history(history, model='gpt-4o'):
+    total_cost = 0
+    for prompt in history: 
+        output_tokens = prompt['usage']['completion_tokens']
+        input_tokens = prompt['usage']['prompt_tokens']
+        input_rate = MODEL_RATES[model]['input_rate']
+        output_rate = MODEL_RATES[model]['output_rate']
+        total_cost += (output_tokens / 10**6) * output_rate + (input_tokens / 10**6) * input_rate
+    return total_cost 
 
 # Configure logging
 def setup_logger(log_dir="logs", max_bytes=1_000_000, backup_count=5):

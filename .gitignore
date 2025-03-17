@@ -41,3 +41,6 @@ testdata/enron-eval/*.txt
 .venv
 .zed
 pyrightconfig.json
+
+# swe-bench output files
+output*.json

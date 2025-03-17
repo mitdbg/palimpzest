@@ -14,43 +14,46 @@ openai_key = get_api_key("OPENAI_API_KEY")
 
 GLOBAL_CONTEXT = {
     "model": dspy.LM('openai/gpt-4o', api_key=openai_key),
-    "base_commit": None,
 }
 
+
 class BaseAgent:
+    # instance_id -> {"base_commit": <str>, "owner": <str>, "repo": <str>}
+    instance_params = {}
+    PRINTING_ENABLED = True 
+    LOGGING_ENABLED = True
 
     @staticmethod
-    def set_globals(base_commit: str):
-        """
-        Sets the global variables for the agent.
-        """
-        # GLOBAL_CONTEXT["relevant_issue_code"] = relevant_issue_code
-        GLOBAL_CONTEXT["base_commit"] = base_commit
-
-    @staticmethod
-    def get_file_content(file_name: str, include_line_numbers: bool) -> str:
+    def get_file_content(file_name: str, include_line_numbers: bool, instance_id: str) -> str:
         """
         Returns the content of an entire file. 
         Only use this when the entire content of a file is required as it may return many tokens.
         Only set include_line_numbers to True if being used to generate a patch. 
         """
-        print(f'get_file_content {file_name}')
+        if BaseAgent.PRINTING_ENABLED:
+            print(f'get_file_content {file_name}')
 
-        content = utils.fetch_github_code(file_name, GLOBAL_CONTEXT["base_commit"])
+        base_commit = BaseAgent.instance_params[instance_id]["base_commit"]
+        owner = BaseAgent.instance_params[instance_id]["owner"]
+        repo = BaseAgent.instance_params[instance_id]["repo"]
+        content = utils.fetch_github_code(file_name, owner, repo, base_commit)
         return utils.add_line_numbers(content) if include_line_numbers else content
 
     @staticmethod
-    def search_keyword(repo_name : str, keyword: str) -> str:
+    def search_keyword(repo_name : str, keyword: str, instance_id: str) -> str:
         """
         Searches the codebase for the provided keyword and returns the files the keyword. 
         Provide repo_name in "owner/repo" format. 
         If searching for a function or class definition, it may be useful to prefix the keyword with "def " or "class ".
         """
-        print(f'search_keyword {keyword}')
+
+        if BaseAgent.PRINTING_ENABLED:
+            print(f'search_keyword {keyword}')
 
         local_repo_path = utils.download_repo(repo_name)
 
-        matching_files = utils.search_keyword(local_repo_path, GLOBAL_CONTEXT["base_commit"], keyword)
+        base_commit = BaseAgent.instance_params[instance_id]["base_commit"]
+        matching_files = utils.search_keyword(local_repo_path, base_commit, keyword)
 
         return matching_files
 
@@ -65,18 +68,22 @@ class BaseAgent:
         #     return "No Results found"
 
     @staticmethod
-    def extract_method(file_name: str, function_name: str, include_line_numbers: bool=False) -> str: 
+    def extract_method(file_name: str, function_name: str, instance_id: str, include_line_numbers: bool = False) -> str: 
         """
         Extracts the implementation of a function from a file. 
         Use this when you only need a single function in the file.
         Only set include_line_numbers to True if being used to generate a patch.
         """
 
-        print(f'extract_method {function_name} from {file_name}')
+        if BaseAgent.PRINTING_ENABLED:
+            print(f'extract_method {function_name} from {file_name}')
 
         try:
             # Parse the source code into an AST
-            content = utils.fetch_github_code(file_name, GLOBAL_CONTEXT["base_commit"])
+            base_commit = BaseAgent.instance_params[instance_id]["base_commit"]
+            owner = BaseAgent.instance_params[instance_id]["owner"]
+            repo = BaseAgent.instance_params[instance_id]["repo"]
+            content = utils.fetch_github_code(file_name, owner, repo, base_commit)
             tree = ast.parse(content)
         except SyntaxError as e:
             return "extract_method(): Error parsing the code"
@@ -100,7 +107,7 @@ class BaseAgent:
         return "Function not found in file. Note: Make sure it is a function, not a class"
 
     @staticmethod
-    def get_classes_and_methods(file_name: str) -> str:
+    def get_classes_and_methods(file_name: str, instance_id: str) -> str:
         """ 
         Summarizes all the classes and standalone functions in a file.
         This is use for understanding the structure of a file for subsequent method extraction. 
@@ -121,7 +128,8 @@ class BaseAgent:
         }
         """
 
-        print(f'get_class_and_methods for {file_name}')
+        if BaseAgent.PRINTING_ENABLED:
+            print(f'get_class_and_methods for {file_name}')
 
         # relevant_issue_code = GLOBAL_CONTEXT["relevant_issue_code"]
 
@@ -132,7 +140,10 @@ class BaseAgent:
         #     code = match.group(2).strip()
         # else: 
 
-        code = utils.fetch_github_code(file_name, GLOBAL_CONTEXT["base_commit"])
+        base_commit = BaseAgent.instance_params[instance_id]["base_commit"]
+        owner = BaseAgent.instance_params[instance_id]["owner"]
+        repo = BaseAgent.instance_params[instance_id]["repo"]
+        code = utils.fetch_github_code(file_name, owner, repo, base_commit)
         if not code: 
             return "That file is not found in the relevant issue code, please try another file"
 

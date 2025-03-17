@@ -159,26 +159,8 @@ if __name__ == "__main__":
     )
     data_record_collection = plan.run(config)
 
-    # execution_engine = pz.PipelinedParallelNoSentinelExecution
-    # records, plan_stats = pz.Execute(plan, 
-    #                             policy=policy,
-    #                             nocache=True,
-    #                             allow_token_reduction=False,
-    #                             allow_code_synth=False,
-    #                             execution_engine=execution_engine,
-    #                             verbose=True)
-
     print('COMPLETE')
-    # TO DO: Save the output in JSON file 
 
-    # print(f'Record Type: {records}')
-    
-    # print(f"Policy is: {str(policy)}")
-    # print("Executed plan:")
-
-    # plan_str = list(plan_stats.plan_strs.values())[0]
-    # print(plan_str)
-
-    # # Output Records into json file
+    # Output Records into json file
     filename = f'output_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.json' 
     dump_records(filename, data_record_collection, values=['instance_id', 'model_patch']) 
