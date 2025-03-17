@@ -96,6 +96,10 @@ class LogicalOperator:
             raise ValueError("logical_op_id not set, unable to hash")
         return int(self.logical_op_id, 16)
 
+class Agent(LogicalOperator):
+    """
+    Agent is a logical operator that applies an agentic workflow to the input set and yields a single result.
+    """
 
 class Aggregate(LogicalOperator):
     """
