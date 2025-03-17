@@ -14,6 +14,7 @@ CORRUPTED_IMAGE_IDS = [
     "ef457a7b3ab437cd78ab9f82dc083048",
     "225c3db49d60b5ef30ed0bfc649ebf78",
     "b413cc1dc4969dcbe4cb6a55c0f2e359",
+    "e81b2acfd792b171389c8f47a0e14504",
 ]
 
 # NOTE: this script is meant to be run from the root of the repository
@@ -61,7 +62,7 @@ if __name__ == "__main__":
             batch_fps = image_filepaths[start_idx:end_idx]
             batch_images = [Image.open(fp) for fp in batch_fps]
             embeddings = model.encode(batch_images)
-
+            
             # save embeddings to disk
             with open(filename, "wb") as f:
                 np.save(f, embeddings)
