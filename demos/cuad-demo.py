@@ -644,7 +644,7 @@ def main():
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    exp_name = f"cuad-demo-{sentinel_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+    exp_name = f"cuad-demo-no-priors-{sentinel_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
     data_record_collection = query.run(
         config=config,
         k=k,
