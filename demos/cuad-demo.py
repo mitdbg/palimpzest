@@ -657,15 +657,29 @@ def main():
 
     pred_df = data_record_collection.to_df()
     label_df = data_reader.get_label_df()
-    pred_df.to_csv(f"{exp_name}-pred.csv", index=False)
-    label_df.to_csv(f"{exp_name}-label.csv", index=False)
+    # pred_df.to_csv(f"{exp_name}-pred.csv", index=False)
+    # label_df.to_csv(f"{exp_name}-label.csv", index=False)
+    final_plan_id = list(data_record_collection.execution_stats.plan_stats.keys())[0]
+    final_plan_str = data_record_collection.execution_stats.plan_strs[final_plan_id]
 
     prec, recall = compute_precision_recall(label_df, pred_df)
     f1 = 2 * (prec * recall) / (prec + recall) if prec + recall > 0 else 0.0
+    stats_dict = {
+        "precision": prec,
+        "recall": recall,
+        "f1": f1,
+        "optimization_time": data_record_collection.execution_stats.optimization_time,
+        "optimization_cost": data_record_collection.execution_stats.optimization_cost,
+        "plan_execution_time": data_record_collection.execution_stats.plan_execution_time,
+        "plan_execution_cost": data_record_collection.execution_stats.plan_execution_cost,
+        "total_execution_time": data_record_collection.execution_stats.total_execution_time,
+        "total_execution_cost": data_record_collection.execution_stats.total_execution_cost,
+        "plan_str": final_plan_str,
+    }
     with open(f"opt-profiling-data/{exp_name}-metrics.json", "w") as f:
-        json.dump({"precision": prec, "recall": recall, "f1": f1}, f)
-    print(f"Precision: {prec:.3f}, Recall: {recall:.3f}, F1: {f1:.3f}")
+        json.dump(stats_dict, f)
 
+    print(f"Precision: {prec:.3f}, Recall: {recall:.3f}, F1: {f1:.3f}")
     print(f"Optimization time: {data_record_collection.execution_stats.optimization_time}")
     print(f"Optimization cost: {data_record_collection.execution_stats.optimization_cost}")
     print(f"Plan Exec. time: {data_record_collection.execution_stats.plan_execution_time}")
