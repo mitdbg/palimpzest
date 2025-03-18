@@ -614,7 +614,7 @@ def main():
     #     allow_critic = False
     sentinel_strategy = args.sentinel_execution_strategy
     config = pz.QueryProcessorConfig(
-        verbose=True,
+        verbose=False,
         val_datasource=val_data_reader,
         processing_strategy="sentinel",
         optimizer_strategy="pareto",
