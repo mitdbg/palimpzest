@@ -6,7 +6,12 @@ import random
 import time
 
 import chromadb
-from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
+from chromadb.utils.embedding_functions import (
+    SentenceTransformerEmbeddingFunction,
+)
+from chromadb.utils.embedding_functions.openai_embedding_function import (
+    OpenAIEmbeddingFunction,
+)
 
 import palimpzest as pz
 from palimpzest.constants import Model
@@ -270,11 +275,14 @@ if __name__ == "__main__":
         api_key=os.environ["OPENAI_API_KEY"],
         model_name="text-embedding-3-small",
     )
+    sentence_transformer_ef = SentenceTransformerEmbeddingFunction(
+        model_name="clip-ViT-B-32"
+    )
     text_index = chroma_client.get_collection("mmqa-texts", embedding_function=openai_ef)
     table_index = chroma_client.get_collection("mmqa-tables", embedding_function=openai_ef)
-    image_index = chroma_client.get_collection("mmqa-image-titles", embedding_function=openai_ef)
+    image_index = chroma_client.get_collection("mmqa-images", embedding_function=sentence_transformer_ef)
 
-    def get_results_and_ids(index: chromadb.Collection, query: list[list[float]], n_results: int) -> tuple[list[str]]:
+    def get_results_and_ids(index: chromadb.Collection, query: list[list[float]], n_results: int, image=False) -> tuple[list[str]]:
         # execute query with embeddings
         results = index.query(query, n_results=n_results)
 
@@ -298,7 +306,7 @@ if __name__ == "__main__":
                 final_sorted_result_ids.append(result["id"])
 
         # return the top-k similar results and generation stats
-        return final_sorted_results[:k], final_sorted_result_ids[:k]
+        return final_sorted_results[:n_results], final_sorted_result_ids[:n_results]
 
     def text_search_func(index: chromadb.Collection, query: list[list[float]], k: int) -> list[str]:
         # execute query with embeddings
@@ -311,8 +319,11 @@ if __name__ == "__main__":
         return {"supporting_tables": results, "supporting_table_ids": result_ids}
 
     def image_search_func(index: chromadb.Collection, query: list[list[float]], k: int) -> list[str]:
+        # limit max number of results to 5
+        k = min(k, 5)
+
         # execute query with embeddings
-        _, result_ids = get_results_and_ids(index, query, n_results=k)
+        _, result_ids = get_results_and_ids(index, query, n_results=k, image=True)
         possible_endings = {'.JPG', '.png', '.jpeg', '.jpg', '.tif', '.JPEG', '.tiff', '.PNG', '.Jpg', '.gif'}
 
         results = []
@@ -371,10 +382,10 @@ if __name__ == "__main__":
         max_workers=1,
         verbose=verbose,
         available_models=[
-            # Model.GPT_4o,
-            # Model.GPT_4o_V,
-            Model.GPT_4o_MINI,
-            Model.GPT_4o_MINI_V,
+            Model.GPT_4o,
+            Model.GPT_4o_V,
+            # Model.GPT_4o_MINI,
+            # Model.GPT_4o_MINI_V,
             # Model.DEEPSEEK,
             # Model.MIXTRAL,
             # Model.LLAMA3,

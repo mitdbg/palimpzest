@@ -5,9 +5,11 @@ import time
 from typing import Callable
 
 from chromadb.api.models.Collection import Collection
+from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 from openai import OpenAI
 from ragatouille.RAGPretrainedModel import RAGPretrainedModel
+from sentence_transformers import SentenceTransformer
 
 from palimpzest.constants import MODEL_CARDS, Model
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
@@ -220,28 +222,35 @@ class RetrieveOp(PhysicalOperator):
             query = [query]
 
         # compute input/query embedding(s) if the index is a chromadb collection
-        gen_stats = GenerationStats()
+        embeddings, gen_stats = None, GenerationStats()
         if isinstance(self.index, Collection):
             uses_openai_embedding_fcn = isinstance(self.index._embedding_function, OpenAIEmbeddingFunction)
-            assert uses_openai_embedding_fcn, "ChromaDB index must use OpenAI embedding function; see: https://docs.trychroma.com/integrations/embedding-models/openai"
+            uses_sentence_transformer_embedding_fcn = isinstance(self.index._embedding_function, SentenceTransformerEmbeddingFunction)
+            error_msg = "ChromaDB index must use OpenAI or SentenceTransformer embedding function; see: https://docs.trychroma.com/integrations/embedding-models/openai"
+            assert uses_openai_embedding_fcn or uses_sentence_transformer_embedding_fcn, error_msg
 
-            model_name = self.index._embedding_function._model_name
-            err_msg = f"For Chromadb, we currently only support `text-embedding-3-small`; your index uses: {model_name}"
-            assert model_name == Model.TEXT_EMBEDDING_3_SMALL.value, err_msg
+            model_name = self.index._embedding_function._model_name if uses_openai_embedding_fcn else "clip-ViT-B-32"
+            err_msg = f"For Chromadb, we currently only support `text-embedding-3-small` and `clip-ViT-B-32`; your index uses: {model_name}"
+            assert model_name in [Model.TEXT_EMBEDDING_3_SMALL.value, Model.CLIP_VIT_B_32.value], err_msg
 
             # compute embeddings
             try:
-                client = OpenAI()
                 embed_start_time = time.time()
-                response = client.embeddings.create(input=query, model=model_name)
-                embed_total_time = time.time() - embed_start_time
+                total_input_tokens = 0.0
+                if uses_openai_embedding_fcn:
+                    client = OpenAI()
+                    response = client.embeddings.create(input=query, model=model_name)
+                    total_input_tokens = response.usage.total_tokens
+                    embeddings = [item.embedding for item in response.data]
 
-                # extract embedding(s)
-                query = [item.embedding for item in response.data]
+                elif uses_sentence_transformer_embedding_fcn:
+                    model = SentenceTransformer(model_name)
+                    embeddings = model.encode(query)
+
+                embed_total_time = time.time() - embed_start_time
 
                 # compute cost of embedding(s)
                 model_card = MODEL_CARDS[model_name]
-                total_input_tokens = response.usage.total_tokens
                 total_input_cost = model_card["usd_per_input_token"] * total_input_tokens
                 gen_stats = GenerationStats(
                     model_name=model_name,
@@ -258,8 +267,9 @@ class RetrieveOp(PhysicalOperator):
                 query = None
 
         try:
-            assert query is not None, "Error: query is None (likely because embedding generation failed)"
-            top_results = self.search_func(self.index, query, self.k)
+            assert embeddings is not None, "Error: embeddings is None (likely because embedding generation failed)"
+            top_results = self.search_func(self.index, embeddings, self.k)
+
         except Exception:
             top_results = ["error-in-retrieve"]
             os.makedirs("retrieve-errors", exist_ok=True)

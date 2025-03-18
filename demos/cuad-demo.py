@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import string
 from functools import partial
@@ -587,6 +588,9 @@ def main():
 
     args = parse_arguments()
 
+    # create directory for profiling data
+    os.makedirs("opt-profiling-data", exist_ok=True)
+
     # Create a data reader for the CUAD dataset
     data_reader = CUADDataReader(split="test", num_contracts=50)
     val_data_reader = CUADDataReader(split="train", num_contracts=20)
@@ -651,7 +655,10 @@ def main():
     label_df.to_csv(f"{exp_name}-label.csv", index=False)
 
     prec, recall = compute_precision_recall(label_df, pred_df)
-    print(f"Precision: {prec:.3f}, Recall: {recall:.3f}")
+    f1 = 2 * (prec * recall) / (prec + recall) if prec + recall > 0 else 0.0
+    with open(f"opt-profiling-data/{exp_name}-metrics.json", "w") as f:
+        json.dump({"precision": prec, "recall": recall, "f1": f1}, f)
+    print(f"Precision: {prec:.3f}, Recall: {recall:.3f}, F1: {f1:.3f}")
 
     print(f"Optimization time: {data_record_collection.execution_stats.optimization_time}")
     print(f"Optimization cost: {data_record_collection.execution_stats.optimization_cost}")
