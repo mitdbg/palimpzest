@@ -521,10 +521,16 @@ def parse_arguments():
     parser.add_argument("--mode", type=str, help="one-convert or separate-converts", default="one-convert")
     parser.add_argument("--test", type=str, help="test time compute active or inactive", default="active")
     parser.add_argument(
-        "--processing_strategy",
+        "--processing-strategy",
         default="sentinel",
         type=str,
         help="The engine to use. One of sentinel or no_sentinel",
+    )
+    parser.add_argument(
+        "--sentinel-execution-strategy",
+        default="mab",
+        type=str,
+        help="The engine to use. One of mab or random",
     )
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument(
@@ -612,7 +618,7 @@ def main():
         val_datasource=val_data_reader,
         processing_strategy="sentinel",
         optimizer_strategy="pareto",
-        sentinel_execution_strategy="mab",
+        sentinel_execution_strategy=args.sentinel_execution_strategy,
         execution_strategy="parallel",
         max_workers=20,
         available_models=[
