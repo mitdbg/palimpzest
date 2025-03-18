@@ -599,7 +599,7 @@ def main():
 
     # Create a data reader for the CUAD dataset
     data_reader = CUADDataReader(split="test", num_contracts=50)
-    val_data_reader = CUADDataReader(split="train", num_contracts=20)
+    val_data_reader = CUADDataReader(split="train", num_contracts=25)
     print("Created data reader")
 
     # Build and run the CUAD query
