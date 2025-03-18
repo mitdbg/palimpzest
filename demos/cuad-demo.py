@@ -612,13 +612,13 @@ def main():
     # else:
     #     allow_mixtures = False
     #     allow_critic = False
-
+    sentinel_strategy = args.sentinel_execution_strategy
     config = pz.QueryProcessorConfig(
         verbose=True,
         val_datasource=val_data_reader,
         processing_strategy="sentinel",
         optimizer_strategy="pareto",
-        sentinel_execution_strategy=args.sentinel_execution_strategy,
+        sentinel_execution_strategy=sentinel_strategy,
         execution_strategy="parallel",
         max_workers=20,
         available_models=[
@@ -644,7 +644,7 @@ def main():
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    exp_name = f"cuad-demo-{args.mode}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+    exp_name = f"cuad-demo-{sentinel_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
     data_record_collection = query.run(
         config=config,
         k=k,
