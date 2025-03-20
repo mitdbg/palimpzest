@@ -35,7 +35,7 @@ class QueryProcessorConfig:
     allow_rag_reduction: bool = field(default=True)
     allow_mixtures: bool = field(default=True)
     allow_critic: bool = field(default=True)
-    allow_split_merge: bool = field(default=True)
+    allow_split_merge: bool = field(default=False)
     use_final_op_quality: bool = field(default=False)
 
     kwargs: dict = field(default_factory=dict)
