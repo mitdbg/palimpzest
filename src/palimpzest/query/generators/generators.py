@@ -294,8 +294,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                     print(f"PROMPT:\n{prompt}")
                     print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
-                # parse reasoning
-                reasoning = None
                 try:
                     reasoning = self._parse_reasoning(completion_text, **kwargs)
                     reasoning += f"\n\n{reasoning}" if reasoning else ""
@@ -305,7 +303,11 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 # parse field answers
                 try:
                     single_field_answers = self._parse_answer(completion_text, fields, **kwargs)
-                    field_answers = {field: field_answers[field] + single_field_answers[field] for field in fields}
+                    for field in fields:
+                        if field_answers[field] is None:
+                            field_answers[field] = single_field_answers[field]
+                        else:
+                            field_answers[field] = field_answers[field] + single_field_answers[field]
                 except Exception as e:
                     print(f"Error parsing answers: {e}")
 
