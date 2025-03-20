@@ -150,7 +150,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
 
 
     def execute_plan(self, plan: PhysicalPlan):
-        """Initialize the stats and the execute the plan."""
+        """Initialize the stats and execute the plan."""
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
         assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
