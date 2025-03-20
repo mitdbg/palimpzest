@@ -108,7 +108,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
         #       because the progress manager cannot get a handle to the console 
         try:
-            # execute sentinel plan by sampling records and operators
+            # execute plan
             output_records, plan_stats = self._execute_plan(plan, input_queues, plan_stats)
 
         finally:
@@ -241,7 +241,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
         #       because the progress manager cannot get a handle to the console 
         try:
-            # execute sentinel plan by sampling records and operators
+            # execute plan
             output_records, plan_stats = self._execute_plan(plan, input_queues, plan_stats)
 
         finally:
