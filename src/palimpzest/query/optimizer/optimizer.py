@@ -94,7 +94,7 @@ class Optimizer:
         allow_rag_reduction: bool = False,
         allow_mixtures: bool = True,
         allow_critic: bool = False,
-        allow_split_merge: bool = True,
+        allow_split_merge: bool = False,
         optimizer_strategy: OptimizationStrategyType = OptimizationStrategyType.PARETO,
         use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
         **kwargs,
