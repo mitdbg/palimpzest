@@ -44,7 +44,7 @@ web_page_cols = [
 ]
 
 url_cols = [
-    {"name": "url", "type": str, "desc": "The URL of the web page"},
+    {"name": "url", "type": str, "desc": "The URLs of the XLS tables from the page"},
 ]
 
 file_cols = [
@@ -80,14 +80,13 @@ def print_table(output):
 if __name__ == "__main__":
     start_time = time.time()
     parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument("--verbose", action="store_true", help="Do not use cached results", default=True)
+    parser.add_argument("--verbose", action="store_true", help="Print verbose output", default=False)
     parser.add_argument("--from_xls", action="store_true", help="Start from pre-downloaded excel files", default=False)
     parser.add_argument("--experiment", type=str, help="The experiment to run", default="matching")
     parser.add_argument("--policy", type=str, help="The policy to use", default="cost")
     parser.add_argument("--executor", type=str, help="The plan executor to use. The avaliable executors are: sequential, pipelined_parallel, pipelined_single_thread", default="pipelined_parallel")
 
     args = parser.parse_args()
-    no_cache = args.no_cache
     verbose = args.verbose
     from_xls = args.from_xls
     policy = args.policy
@@ -100,8 +99,8 @@ if __name__ == "__main__":
         policy = pz.MaxQuality()
 
     if experiment == "collection":
-        papers_html = pz.Dataset("testdata/biofabric-html")
-        papers_html = papers_html.sem_add_columns(web_page_cols, desc="Extract HTML content")
+        papers_html = pz.Dataset("testdata/biofabric-html-tiny")
+        # papers_html = papers_html.sem_add_columns(web_page_cols, desc="Extract HTML content")
         table_urls = papers_html.sem_add_columns(url_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         output = table_urls
 
@@ -136,12 +135,14 @@ if __name__ == "__main__":
         output = case_data
 
     config = pz.QueryProcessorConfig(
+        verbose=verbose,
         policy=policy,
         nocache=True,
         allow_code_synth=False,
         allow_token_reduction=False,
         processing_strategy="no_sentinel",
         execution_strategy=executor,
+        optimizer_strategy="pareto",
     )
     data_record_collection = output.run(config)
 

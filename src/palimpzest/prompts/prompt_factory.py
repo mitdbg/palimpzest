@@ -641,7 +641,15 @@ class PromptFactory:
 
         else:
             base_prompt = base_prompt.replace("<<image-placeholder>>", "")
-            user_messages.append({"role": "user", "type": "text", "content": base_prompt.format(**kwargs)})
+            chunksize = 350000
+            if len(kwargs['context']) > chunksize:
+                context = kwargs['context']
+                for i in range(0, len(kwargs['context']), chunksize):
+                    format_kwargs = kwargs
+                    format_kwargs['context'] = context[i:i+chunksize]
+                    user_messages.append({"role": "user", "type": "text", "content": base_prompt.format(**format_kwargs)})
+            else:
+                user_messages.append({"role": "user", "type": "text", "content": base_prompt.format(**kwargs)})
 
         return user_messages
 

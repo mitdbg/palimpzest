@@ -289,13 +289,14 @@ class HTMLFileDirectoryReader(DirectoryReader):
             text_content = f.read()
 
         html = text_content
-        tokens = html.split()[: constants.MAX_HTML_ROWS]
+        tokens = html.split()
         item["html"] = " ".join(tokens)
 
         stripped_html = self._html_to_text_with_links(text_content)
-        tokens = stripped_html.split()[: constants.MAX_HTML_ROWS]
+        tokens = stripped_html.split()
         item["text"] = " ".join(tokens)
 
+        item['timestamp'] = os.path.getmtime(filepath)
         return item
 
 

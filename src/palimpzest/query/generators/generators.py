@@ -242,77 +242,89 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         # create the chat payload
         chat_payload = self._generate_payload(self.messages, **kwargs)
-
         # generate the text completion
         start_time = time.time()
-        completion = None
+        completion = []
         try:
-            completion = self._generate_completion(client, chat_payload, **kwargs)
+            completion = [self._generate_completion(client, chat_payload, **kwargs)]
             end_time = time.time()
 
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
         except Exception as e:
-            print(f"Error generating completion: {e}")
-            field_answers = {field_name: None for field_name in fields}
-            reasoning = None
-            generation_stats = GenerationStats(model_name=self.model_name, llm_call_duration_secs=time.time() - start_time)
-
-            return field_answers, reasoning, generation_stats
+            try:
+                if len(self.messages) > 2:
+                    for message in self.messages[1:]:
+                        msg_payload = self._generate_payload([self.messages[0], message], **kwargs)
+                        completion.append(self._generate_completion(client, msg_payload, **kwargs))
+                end_time = time.time()
+            except Exception as e:
+                print(f"Error generating completion: {e}")
+                field_answers = {field_name: None for field_name in fields}
+                reasoning = None
+                generation_stats = GenerationStats(model_name=self.model_name, llm_call_duration_secs=time.time() - start_time)
+                return field_answers, reasoning, generation_stats
 
         # parse usage statistics and create the GenerationStats
+        field_answers = None if fields is None else {field_name: None for field_name in fields}
+        reasoning = ''
         generation_stats = None
-        if completion is not None:
-            usage = self._get_usage(completion, **kwargs)
-            # finish_reason = self._get_finish_reason(completion, **kwargs)
-            # answer_log_probs = self._get_answer_log_probs(completion, **kwargs)
-
-            # get cost per input/output token for the model and parse number of input and output tokens
+        if len(completion) > 0:
             usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
             usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
-            input_tokens = usage["input_tokens"]
-            output_tokens = usage["output_tokens"]
+            input_tokens = 0
+            output_tokens = 0
+            for comp in completion:
+                usage = self._get_usage(comp, **kwargs)
+                # finish_reason = self._get_finish_reason(completion, **kwargs)
+                # answer_log_probs = self._get_answer_log_probs(completion, **kwargs)
 
-            generation_stats = GenerationStats(
-                model_name=self.model_name,
-                llm_call_duration_secs=end_time - start_time,
-                fn_call_duration_secs=0.0,
-                total_input_tokens=input_tokens,
-                total_output_tokens=output_tokens,
-                total_input_cost=input_tokens * usd_per_input_token,
-                total_output_cost=output_tokens * usd_per_output_token,
-                cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
-                # "system_prompt": system_prompt,
-                # "prompt": prompt,
-                # "usage": usage,
-                # "finish_reason": finish_reason,
-                # "answer_log_probs": answer_log_probs,
-                # "answer": answer,
-            )
+                # get cost per input/output token for the model and parse number of input and output tokens
+                input_tokens += usage["input_tokens"]
+                output_tokens += usage["output_tokens"]
 
-        # pretty print prompt + full completion output for debugging
-        completion_text = self._get_completion_text(completion, **kwargs)
-        if self.verbose:
-            prompt = ""
-            for message in self.messages:
-                if message["role"] == "user":
-                    prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
-            print(f"PROMPT:\n{prompt}")
-            print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
+                # pretty print prompt + full completion output for debugging
+                completion_text = self._get_completion_text(comp, **kwargs)
 
-        # parse reasoning
-        reasoning = None
-        try:
-            reasoning = self._parse_reasoning(completion_text, **kwargs)
-        except Exception as e:
-            print(f"Error parsing reasoning and answers: {e}")
+                if self.verbose:
+                    prompt = ""
+                    for message in self.messages:
+                        if message["role"] == "user":
+                            prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
+                    print(f"PROMPT:\n{prompt}")
+                    print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
-        # parse field answers
-        field_answers = None if fields is None else {field_name: None for field_name in fields}
-        try:
-            field_answers = self._parse_answer(completion_text, fields, **kwargs)
-        except Exception as e:
-            print(f"Error parsing answers: {e}")
+                # parse reasoning
+                reasoning = None
+                try:
+                    reasoning = self._parse_reasoning(completion_text, **kwargs)
+                    reasoning += f"\n\n{reasoning}" if reasoning else ""
+                except Exception as e:
+                    print(f"Error parsing reasoning and answers: {e}")
+
+                # parse field answers
+                try:
+                    single_field_answers = self._parse_answer(completion_text, fields, **kwargs)
+                    field_answers = {field: field_answers[field] + single_field_answers[field] for field in fields}
+                except Exception as e:
+                    print(f"Error parsing answers: {e}")
+
+        generation_stats = GenerationStats(
+            model_name=self.model_name,
+            llm_call_duration_secs=end_time - start_time,
+            fn_call_duration_secs=0.0,
+            total_input_tokens=input_tokens,
+            total_output_tokens=output_tokens,
+            total_input_cost=input_tokens * usd_per_input_token,
+            total_output_cost=output_tokens * usd_per_output_token,
+            cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+            # "system_prompt": system_prompt,
+            # "prompt": prompt,
+            # "usage": usage,
+            # "finish_reason": finish_reason,
+            # "answer_log_probs": answer_log_probs,
+            # "answer": answer,
+        )
 
         return field_answers, reasoning, generation_stats
 
