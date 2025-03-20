@@ -211,29 +211,33 @@ class RetrieveOp(PhysicalOperator):
             assert model_name == Model.TEXT_EMBEDDING_3_SMALL.value, err_msg
 
             # compute embeddings
-            client = OpenAI()
-            embed_start_time = time.time()
-            response = client.embeddings.create(input=query, model=model_name)
-            embed_total_time = time.time() - embed_start_time
+            try:
+                client = OpenAI()
+                embed_start_time = time.time()
+                response = client.embeddings.create(input=query, model=model_name)
+                embed_total_time = time.time() - embed_start_time
 
-            # extract embedding(s)
-            query = [item.embedding for item in response.data]
+                # extract embedding(s)
+                query = [item.embedding for item in response.data]
 
-            # compute cost of embedding(s)
-            model_card = MODEL_CARDS[model_name]
-            total_input_tokens = response.usage.total_tokens
-            total_input_cost = model_card["usd_per_input_token"] * total_input_tokens
-            gen_stats = GenerationStats(
-                model_name=model_name,
-                total_input_tokens=total_input_tokens,
-                total_output_tokens=0.0,
-                total_input_cost=total_input_cost,
-                total_output_cost=0.0,
-                cost_per_record=total_input_cost,
-                llm_call_duration_secs=embed_total_time,
-            )
+                # compute cost of embedding(s)
+                model_card = MODEL_CARDS[model_name]
+                total_input_tokens = response.usage.total_tokens
+                total_input_cost = model_card["usd_per_input_token"] * total_input_tokens
+                gen_stats = GenerationStats(
+                    model_name=model_name,
+                    total_input_tokens=total_input_tokens,
+                    total_output_tokens=0.0,
+                    total_input_cost=total_input_cost,
+                    total_output_cost=0.0,
+                    cost_per_record=total_input_cost,
+                    llm_call_duration_secs=embed_total_time,
+                )
+            except Exception:
+                query = None
 
         try:
+            assert query is not None, "Error: query is None (likely because embedding generation failed)"
             top_results = self.search_func(self.index, query, self.k)
         except Exception:
             top_results = ["error-in-retrieve"]

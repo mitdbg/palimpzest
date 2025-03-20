@@ -553,28 +553,130 @@ class ExecutionStats:
     # string for identifying this workload execution
     execution_id: str | None = None
 
+    # dictionary of SentinelPlanStats objects (one for each sentinel plan run during execution)
+    sentinel_plan_stats: dict[str, SentinelPlanStats] = field(default_factory=dict)
+
     # dictionary of PlanStats objects (one for each plan run during execution)
     plan_stats: dict[str, PlanStats] = field(default_factory=dict)
 
     # total time spent optimizing
-    total_optimization_time: float = 0.0
+    optimization_time: float = 0.0
 
-    # total runtime for a plan's execution
+    # total cost of optimizing
+    optimization_cost: float = 0.0
+
+    # total time spent executing the optimized plan
+    plan_execution_time: float = 0.0
+
+    # total cost of executing the optimized plan
+    plan_execution_cost: float = 0.0
+
+    # total runtime for the entire execution
     total_execution_time: float = 0.0
 
-    # total cost for a plan's execution
+    # total cost for the entire execution
     total_execution_cost: float = 0.0
+
+    # dictionary of sentinel plan strings; useful for printing executed sentinel plans in demos
+    sentinel_plan_strs: dict[str, str] = field(default_factory=dict)
 
     # dictionary of plan strings; useful for printing executed plans in demos
     plan_strs: dict[str, str] = field(default_factory=dict)
 
+    # start time for the execution; should be set by calling ExecutionStats.start()
+    start_time: float | None = None
+
+    # end time for the optimization; 
+    optimization_end_time: float | None = None
+
+    def start(self) -> None:
+        """Start the timer for this execution."""
+        self.start_time = time.time()
+
+    def finish_optimization(self) -> None:
+        """Finish the timer for the optimization phase of this execution."""
+        if self.start_time is None:
+            raise RuntimeError("ExecutionStats.start() must be called before ExecutionStats.finish_optimization()")
+
+        # compute optimization time and cost
+        self.optimization_end_time = time.time()
+        self.optimization_time = self.optimization_end_time - self.start_time
+        self.optimization_cost = self.sum_sentinel_plan_costs()
+
+        # compute sentinel_plan_strs
+        self.sentinel_plan_strs = {plan_id: plan_stats.plan_str for plan_id, plan_stats in self.sentinel_plan_stats.items()}
+
+    def finish(self) -> None:
+        """Finish the timer for this execution."""
+        if self.start_time is None:
+            raise RuntimeError("ExecutionStats.start() must be called before ExecutionStats.finish()")
+
+        # compute time for plan and total execution
+        end_time = time.time()
+        self.plan_execution_time = (
+            end_time - self.optimization_end_time
+            if self.optimization_end_time is not None
+            else end_time - self.start_time
+        )
+        self.total_execution_time = end_time - self.start_time
+
+        # compute the cost for plan and total execution
+        self.plan_execution_cost = self.sum_plan_costs()
+        self.total_execution_cost = self.optimization_cost + self.plan_execution_cost
+
+        # compute plan_strs
+        self.plan_strs = {plan_id: plan_stats.plan_str for plan_id, plan_stats in self.plan_stats.items()}
+
+    def sum_sentinel_plan_costs(self) -> float:
+        """
+        Sum the costs of all SentinelPlans in this execution.
+        """
+        return sum([plan_stats.sum_op_costs() for _, plan_stats in self.sentinel_plan_stats.items()])
+
+    def sum_plan_costs(self) -> float:
+        """
+        Sum the costs of all PhysicalPlans in this execution.
+        """
+        return sum([plan_stats.sum_op_costs() for _, plan_stats in self.plan_stats.items()])
+
+    def add_plan_stats(self, plan_stats: PlanStats | SentinelPlanStats | list[PlanStats] | list[SentinelPlanStats]) -> None:
+        """
+        Add the given PlanStats (or SentinelPlanStats) to this execution's plan stats.
+
+        NOTE: we make the assumption that the same plan cannot be run more than once in parallel,
+        i.e. each plan stats object for an individual plan comes from two different (sequential)
+        periods in time. Thus, PlanStats objects can be summed.
+        """
+        # normalize input type to be list[PlanStats] or list[SentinelPlanStats]
+        if isinstance(plan_stats, (PlanStats, SentinelPlanStats)):
+            plan_stats = [plan_stats]
+
+        for plan_stats_obj in plan_stats:
+            if isinstance(plan_stats_obj, PlanStats) and plan_stats_obj.plan_id not in self.plan_stats:
+                self.plan_stats[plan_stats_obj.plan_id] = plan_stats_obj
+            elif isinstance(plan_stats_obj, PlanStats):
+                self.plan_stats[plan_stats_obj.plan_id] += plan_stats_obj
+            elif isinstance(plan_stats_obj, SentinelPlanStats) and plan_stats_obj.plan_id not in self.sentinel_plan_stats:
+                self.sentinel_plan_stats[plan_stats_obj.plan_id] = plan_stats_obj
+            elif isinstance(plan_stats_obj, SentinelPlanStats):
+                self.sentinel_plan_stats[plan_stats_obj.plan_id] += plan_stats_obj
+            else:
+                raise TypeError(f"Cannot add {type(plan_stats)} to ExecutionStats")
+
     def to_json(self):
         return {
             "execution_id": self.execution_id,
+            "sentinel_plan_stats": {
+                plan_id: plan_stats.to_json() for plan_id, plan_stats in self.sentinel_plan_stats.items()
+            },
             "plan_stats": {plan_id: plan_stats.to_json() for plan_id, plan_stats in self.plan_stats.items()},
-            "total_optimization_time": self.total_optimization_time,
+            "optimization_time": self.optimization_time,
+            "optimization_cost": self.optimization_cost,
+            "plan_execution_time": self.plan_execution_time,
+            "plan_execution_cost": self.plan_execution_cost,
             "total_execution_time": self.total_execution_time,
             "total_execution_cost": self.total_execution_cost,
+            "sentinel_plan_strs": self.sentinel_plan_strs,
             "plan_strs": self.plan_strs,
         }
 

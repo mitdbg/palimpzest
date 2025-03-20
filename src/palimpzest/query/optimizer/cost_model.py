@@ -15,8 +15,7 @@ from typing import Any
 import pandas as pd
 
 from palimpzest.constants import MODEL_CARDS, NAIVE_BYTES_PER_RECORD, GPT_4o_MODEL_CARD, Model
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats
-from palimpzest.core.elements.records import DataRecordSet
+from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats, SentinelPlanStats
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvert
@@ -26,7 +25,6 @@ from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.query.operators.token_reduction_convert import TokenReducedConvertBonded
-from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.model_helpers import get_champion_model_name, get_models
 
 warnings.simplefilter(action='ignore', category=UserWarning)
@@ -66,14 +64,13 @@ class SampleBasedCostModel:
     """
     def __init__(
         self,
-        sentinel_plan: SentinelPlan,
-        execution_data: dict[str, dict[str, list[DataRecordSet]]],
+        sentinel_plan_stats: SentinelPlanStats,
         verbose: bool = False,
         exp_name: str | None = None,
     ):
-        # store sentinel plan
-        self.sentinel_plan = sentinel_plan
-
+        """
+        execution_data is: {logical_op_id: {physical_op_id: [DataRecordSet]}}
+        """
         # store verbose argument
         self.verbose = verbose
 
@@ -81,7 +78,7 @@ class SampleBasedCostModel:
         self.exp_name = exp_name
 
         # construct cost, time, quality, and selectivity matrices for each operator set;
-        self.operator_to_stats = self.compute_operator_stats(execution_data)
+        self.operator_to_stats = self.compute_operator_stats(sentinel_plan_stats)
 
         # compute set of costed physical op ids from operator_to_stats
         self.costed_phys_op_ids = set([
@@ -96,28 +93,17 @@ class SampleBasedCostModel:
     def get_costed_phys_op_ids(self):
         return self.costed_phys_op_ids
 
-
-    def compute_operator_stats(
-            self,
-            execution_data: dict[str, dict[str, list[DataRecordSet]]],
-        ):
+    def compute_operator_stats(self, sentinel_plan_stats: SentinelPlanStats) -> dict:
         logger.debug("Computing operator statistics")
         # flatten the nested dictionary of execution data and pull out fields relevant to cost estimation
         execution_record_op_stats = []
-        for idx, (logical_op_id, _, _) in enumerate(self.sentinel_plan):
-            logger.debug(f"Computing operator statistics for sentinel_plan: {idx}, {logical_op_id}")
-            # initialize variables
-            upstream_logical_op_id = self.sentinel_plan.logical_op_ids[idx - 1] if idx > 0 else None
-
-            # filter for the execution data from this operator set
-            op_set_execution_data = execution_data[logical_op_id]
-
+        for logical_op_id, phys_op_id_to_op_stats in sentinel_plan_stats.operator_stats.items():
+            logger.debug(f"Computing operator statistics for logical_op_id: {logical_op_id}")
             # flatten the execution data into a list of RecordOpStats
             op_set_execution_data = [
                 record_op_stats
-                for _, record_sets in op_set_execution_data.items()
-                for record_set in record_sets
-                for record_op_stats in record_set.record_op_stats
+                for _, op_stats in phys_op_id_to_op_stats.items()
+                for record_op_stats in op_stats.record_op_stats_lst
             ]
 
             # add entries from execution data into matrices
@@ -125,7 +111,6 @@ class SampleBasedCostModel:
                 record_op_stats_dict = {
                     "logical_op_id": logical_op_id,
                     "physical_op_id": record_op_stats.op_id,
-                    "upstream_logical_op_id": upstream_logical_op_id,
                     "record_id": record_op_stats.record_id,
                     "record_parent_id": record_op_stats.record_parent_id,
                     "cost_per_record": record_op_stats.cost_per_record,
@@ -147,19 +132,16 @@ class SampleBasedCostModel:
             logger.debug(f"Computing operator statistics for logical_op_id: {logical_op_id}")
             operator_to_stats[logical_op_id] = {}
 
-            # get the logical_op_id of the upstream operator
-            upstream_logical_op_ids = logical_op_df.upstream_logical_op_id.unique()
-            assert len(upstream_logical_op_ids) == 1, "More than one upstream logical_op_id"
-            upstream_logical_op_id = upstream_logical_op_ids[0]
-
             for physical_op_id, physical_op_df in logical_op_df.groupby("physical_op_id"):
-                # find set of parent records for this operator
-                num_upstream_records = len(physical_op_df.record_parent_id.unique())
+                # compute the number of input records processed by this operator; use source_idx for scan operator(s)
+                num_source_records = (
+                    len(physical_op_df.record_parent_id.unique())
+                    if not physical_op_df.record_parent_id.isna().all()
+                    else len(physical_op_df.source_idx.unique())
+                )
 
                 # compute selectivity 
-                selectivity = (
-                    1.0 if upstream_logical_op_id is None else physical_op_df.passed_operator.sum() / num_upstream_records
-                )
+                selectivity = physical_op_df.passed_operator.sum() / num_source_records
 
                 operator_to_stats[logical_op_id][physical_op_id] = {
                     "cost": physical_op_df.cost_per_record.mean(),
@@ -184,7 +166,9 @@ class SampleBasedCostModel:
         # look up physical and logical op ids associated with this physical operator
         phys_op_id = operator.get_op_id()
         logical_op_id = operator.logical_op_id
-        assert self.operator_to_stats.get(logical_op_id).get(phys_op_id) is not None, f"No execution data for {str(operator)}"
+        physical_op_to_stats = self.operator_to_stats.get(logical_op_id)
+        assert physical_op_to_stats is not None, f"No execution data for logical operator: {str(operator)}"
+        assert physical_op_to_stats.get(phys_op_id) is not None, f"No execution data for physical operator: {str(operator)}"
         logger.debug(f"Calling __call__ for {str(operator)}")
 
         # look up stats for this operation

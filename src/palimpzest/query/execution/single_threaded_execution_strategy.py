@@ -1,6 +1,7 @@
 import logging
 
 from palimpzest.core.data.dataclasses import PlanStats
+from palimpzest.core.elements.records import DataRecord
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.limit import LimitScanOp
@@ -24,26 +25,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         super().__init__(*args, **kwargs)
         self.max_workers = 1
 
-    def execute_plan(self, plan: PhysicalPlan):
-        """Initialize the stats and the execute the plan."""
-        # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
-        logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
-        logger.info(f"Plan Details: {plan}")
-
-        # initialize progress manager
-        self.progress_manager = create_progress_manager(plan, self.num_samples, self.progress)
-
-        # initialize plan stats
-        plan_stats = PlanStats.from_plan(plan)
-        plan_stats.start()
-
-        # initialize input queues for each operation
-        input_queues = self._create_input_queues(plan)
-
-        # start the progress manager
-        self.progress_manager.start()
-
+    def _execute_plan(self, plan: PhysicalPlan, input_queues: dict[str, list], plan_stats: PlanStats) -> tuple[list[DataRecord], PlanStats]:
         # execute the plan one operator at a time
         output_records = []
         for op_idx, operator in enumerate(plan.operators):
@@ -102,8 +84,36 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         # finalize plan stats
         plan_stats.finish()
 
-        # finish progress tracking
-        self.progress_manager.finish()
+        return output_records, plan_stats
+
+    def execute_plan(self, plan: PhysicalPlan) -> tuple[list[DataRecord], PlanStats]:
+        """Initialize the stats and the execute the plan."""
+        # for now, assert that the first operator in the plan is a ScanPhysicalOp
+        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
+        logger.info(f"Plan Details: {plan}")
+
+        # initialize plan stats
+        plan_stats = PlanStats.from_plan(plan)
+        plan_stats.start()
+
+        # initialize input queues for each operation
+        input_queues = self._create_input_queues(plan)
+
+        # initialize and start the progress manager
+        self.progress_manager = create_progress_manager(plan, num_samples=self.num_samples, progress=self.progress)
+        self.progress_manager.start()
+
+        # NOTE: we must handle progress manager outside of _exeecute_plan to ensure that it is shut down correctly;
+        #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
+        #       because the progress manager cannot get a handle to the console 
+        try:
+            # execute plan
+            output_records, plan_stats = self._execute_plan(plan, input_queues, plan_stats)
+
+        finally:
+            # finish progress tracking
+            self.progress_manager.finish()
 
         logger.info(f"Done executing plan: {plan.plan_id}")
         logger.debug(f"Plan stats: (plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")
@@ -142,26 +152,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
         return True
 
-    def execute_plan(self, plan: PhysicalPlan):
-        """Initialize the stats and the execute the plan."""
-        # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
-        logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
-        logger.info(f"Plan Details: {plan}")
-
-        # initialize progress manager
-        self.progress_manager = create_progress_manager(plan, self.num_samples, self.progress)
-
-        # initialize plan stats
-        plan_stats = PlanStats.from_plan(plan)
-        plan_stats.start()
-
-        # initialize input queues for each operation
-        input_queues = self._create_input_queues(plan)
-
-        # start the progress manager
-        self.progress_manager.start()
-
+    def _execute_plan(self, plan: PhysicalPlan, input_queues: dict[str, list], plan_stats: PlanStats) -> tuple[list[DataRecord], PlanStats]:
         # execute the plan until either:
         # 1. all records have been processed, or
         # 2. the final limit operation has completed (we break out of the loop if this happens)
@@ -226,10 +217,38 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         # finalize plan stats
         plan_stats.finish()
 
-        # finish progress tracking
-        self.progress_manager.finish()
+        return final_output_records, plan_stats
+
+    def execute_plan(self, plan: PhysicalPlan):
+        """Initialize the stats and the execute the plan."""
+        # for now, assert that the first operator in the plan is a ScanPhysicalOp
+        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
+        logger.info(f"Plan Details: {plan}")
+
+        # initialize plan stats
+        plan_stats = PlanStats.from_plan(plan)
+        plan_stats.start()
+
+        # initialize input queues for each operation
+        input_queues = self._create_input_queues(plan)        
+
+        # initialize and start the progress manager
+        self.progress_manager = create_progress_manager(plan, self.num_samples, self.progress)
+        self.progress_manager.start()
+
+        # NOTE: we must handle progress manager outside of _exeecute_plan to ensure that it is shut down correctly;
+        #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
+        #       because the progress manager cannot get a handle to the console 
+        try:
+            # execute plan
+            output_records, plan_stats = self._execute_plan(plan, input_queues, plan_stats)
+
+        finally:
+            # finish progress tracking
+            self.progress_manager.finish()
 
         logger.info(f"Done executing plan: {plan.plan_id}")
         logger.debug(f"Plan stats: (plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")
 
-        return final_output_records, plan_stats
+        return output_records, plan_stats

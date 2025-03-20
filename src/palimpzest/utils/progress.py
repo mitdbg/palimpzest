@@ -2,7 +2,10 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from chromadb.api.models.Collection import Collection
 from rich.console import Console
+from rich.live import Live
+from rich.panel import Panel
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -13,10 +16,14 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 from rich.progress import Progress as RichProgress
+from rich.table import Table
 
 from palimpzest.query.operators.aggregate import AggregateOp
+from palimpzest.query.operators.convert import LLMConvert
+from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 
 
@@ -178,11 +185,10 @@ class MockProgressManager(ProgressManager):
     def finish(self):
         pass
 
-
 class PZProgressManager(ProgressManager):
     """Progress manager for command line interface using rich"""
     
-    def __init__(self, plan: PhysicalPlan | SentinelPlan, num_samples: int | None = None):
+    def __init__(self, plan: PhysicalPlan, num_samples: int | None = None):
         super().__init__(plan, num_samples)
         self.console = Console()
 
@@ -265,13 +271,168 @@ class PZProgressManager(ProgressManager):
         print(f"Total cost: ${total_cost:.4f}")
         # print(f"Success rate: {success_count}/{success_count + failure_count}")
 
+class PZSentinelProgressManager(ProgressManager):
+    def __init__(self, plan: SentinelPlan, sample_budget: int):
+        # overall progress bar
+        self.overall_progress = RichProgress(
+            SpinnerColumn(),
+            TextColumn("{task.description}"),  # TODO: fixed string?
+            BarColumn(),
+            TaskProgressColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            TextColumn("[green]Cost: ${task.fields[cost]:.4f}"),
+            TextColumn("\n[white]{task.fields[recent]}"),  # Recent text on new line
+            refresh_per_second=10,
+            expand=True,   # Use full width
+        )
+        self.overall_task_id = self.overall_progress.add_task("", total=sample_budget, cost=0.0, recent="")
+
+        # logical operator progress bars
+        self.op_progress = RichProgress(
+            SpinnerColumn(),
+            "{task.description}",
+            BarColumn(),
+            TaskProgressColumn(),
+            MofNCompleteColumn(),
+            TextColumn("[green]Cost: ${task.fields[cost]:.4f}"),
+            TextColumn("\n[white]{task.fields[recent]}"),  # Recent text on new line
+            refresh_per_second=10,
+            expand=True,   # Use full width
+        )
+
+        # organize progress bars into nice display
+        self.progress_table = Table.grid()
+        self.progress_table.add_row(
+            Panel.fit(self.op_progress, title="[b]Sample Allocation", border_style="red", padding=(1, 2)),
+        )
+        self.progress_table.add_row(
+            Panel.fit(
+                self.overall_progress, title="Optimization Progress", border_style="green", padding=(2, 2)
+            )
+        )
+        self.live_display = Live(self.progress_table, refresh_per_second=10)
+
+        # initialize mapping from op_id --> ProgressStats
+        self.op_id_to_stats: dict[str, ProgressStats] = {}
+
+        # initialize mapping from op_id --> task
+        self.op_id_to_task = {}
+
+        # initialize start time
+        self.start_time = None
+
+        # add a task to the progress manager for each operator in the plan
+        for logical_op_id, op_set in plan:
+            op_name = op_set[0].op_name()
+            op_str = f"{op_name} ({logical_op_id})"
+            total = sample_budget if self._is_llm_op(op_set[0]) else 0
+            self.add_task(logical_op_id, op_str, total)
+
+        self.console = Console()
+    
+    def _is_llm_op(self, physical_op: PhysicalOperator) -> bool:
+        is_llm_convert = isinstance(physical_op, LLMConvert)
+        is_llm_filter = isinstance(physical_op, LLMFilter)
+        is_llm_retrieve = isinstance(physical_op, RetrieveOp) and isinstance(physical_op.index, Collection)
+        return is_llm_convert or is_llm_filter or is_llm_retrieve
+
+    def get_task_description(self, op_id: str) -> str:
+        """Return the current description for the given task."""
+        task = self.op_id_to_task[op_id]
+        return self.op_progress._tasks[task].description
+
+    def add_task(self, op_id: str, op_str: str, total: int):
+        """Add a new task to the op progress bars"""
+        task = self.op_progress.add_task(
+            f"[blue]{op_str}", 
+            total=total,
+            cost=0.0,
+            success=0,
+            failed=0,
+            memory=0.0,
+            recent="",
+        )
+
+        # store the mapping of operator ID to task ID
+        self.op_id_to_task[op_id] = task
+
+        # initialize the stats for this operation
+        self.op_id_to_stats[op_id] = ProgressStats(start_time=time.time())
+
+    def start(self):
+        # print a newline before starting to separate from previous output
+        print()
+
+        # set start time
+        self.start_time = time.time()
+
+        # start progress bars
+        self.live_display.start()
+
+    def incr(self, op_id: str, num_samples: int, display_text: str | None = None, **kwargs):
+        # TODO: (above) organize progress bars into a Live / Table / Panel or something
+        # get the task for the given operation
+        task = self.op_id_to_task.get(op_id)
+
+        # update statistics with any additional keyword arguments
+        if kwargs != {}:
+            self.update_stats(op_id, **kwargs)
+
+        # update progress bar and recent text in one update
+        if display_text is not None:
+            self.op_id_to_stats[op_id].recent_text = display_text
+
+        # advance the op progress bar for this op_id
+        self.op_progress.update(
+            task,
+            advance=num_samples,
+            description=f"[bold blue]{self.get_task_description(op_id)}",
+            cost=self.op_id_to_stats[op_id].total_cost,
+            success=self.op_id_to_stats[op_id].success_count,
+            failed=self.op_id_to_stats[op_id].failure_count,
+            memory=get_memory_usage(),
+            recent=f"{self.op_id_to_stats[op_id].recent_text}" if display_text is not None else "",
+            refresh=True,
+        )
+
+        # advance the overall progress bar
+        self.overall_progress.update(
+            self.overall_task_id,
+            advance=num_samples,
+            cost=sum(stats.total_cost for _, stats in self.op_id_to_stats.items()),
+            refresh=True,
+        )
+
+        # force the live display to refresh
+        self.live_display.refresh()
+
+    def finish(self):
+        self.live_display.stop()
+
+        # compute total cost, success, and failure
+        total_cost = sum(stats.total_cost for stats in self.op_id_to_stats.values())
+        # success_count = sum(stats.success_count for stats in self.op_id_to_stats.values())
+        # failure_count = sum(stats.failure_count for stats in self.op_id_to_stats.values())
+
+        # Print final stats on new lines after progress display
+        print(f"Total opt. time: {time.time() - self.start_time:.2f}s")
+        print(f"Total opt. cost: ${total_cost:.4f}")
+        # print(f"Success rate: {success_count}/{success_count + failure_count}")
 
 def create_progress_manager(
     plan: PhysicalPlan | SentinelPlan,
     num_samples: int | None = None,
+    sample_budget: int | None = None,
     progress: bool = True,
 ) -> ProgressManager:
     """Factory function to create appropriate progress manager based on environment"""
     if not progress:
         return MockProgressManager(plan, num_samples)
+
+    if isinstance(plan, SentinelPlan):
+        assert sample_budget is not None, "Sample budget must be specified for SentinelPlan progress manager"
+        return PZSentinelProgressManager(plan, sample_budget)
+
     return PZProgressManager(plan, num_samples)

@@ -372,7 +372,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         # and can only account for the time spent performing the failed generation
         except Exception as e:
             logger.error(f"Error generating completion: {e}")
-            print(f"Error generating completion: {e}")
             field_answers = {field_name: None for field_name in fields}
             reasoning = None
             generation_stats = GenerationStats(
