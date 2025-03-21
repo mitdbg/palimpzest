@@ -395,28 +395,6 @@ def compute_precision_recall(label_df, preds_df):
 
     return precision, recall
 
-
-# # Score function for PZ optimizer.
-# # Compare the predictions and labels for schema field.
-# def score_fn(preds, labels):
-#     assert isinstance(labels, list)
-#     preds = handle_empty_preds(preds)
-
-#     tp, fp, fn = 0, 0, 0
-
-#     for category in cuad_categories:
-#         substr_ok = "Parties" in category["Category"]
-#         entry_tp, entry_fp, entry_fn = evaluate_entry(labels, preds, substr_ok)
-#         tp += entry_tp
-#         fp += entry_fp
-#         fn += entry_fn
-
-#     # precision = tp / (tp + fp) if tp + fp > 0 else np.nan
-#     recall = tp / (tp + fn) if tp + fn > 0 else np.nan
-
-#     return recall
-
-
 class CUADDataReader(pz.DataReader):
     def __init__(self, num_contracts: int = 1, split: str = "train"):
         self.num_contracts = num_contracts

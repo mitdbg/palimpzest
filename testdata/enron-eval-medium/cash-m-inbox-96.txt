@@ -1,0 +1,25 @@
+Message-ID: <33527112.1075853133594.JavaMail.evans@thyme>
+Date: Mon, 29 Oct 2001 18:05:15 -0800 (PST)
+From: ann.hill@enron.com
+To: michelle.cash@enron.com, twanda.sweet@enron.com
+Subject: New Agreement
+Cc: pam.butler@enron.com, frank.stabler@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: pam.butler@enron.com, frank.stabler@enron.com
+X-From: Hill, Jo Ann </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JHILL4>
+X-To: Cash, Michelle </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcash>, Sweet, Twanda </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tsweet>
+X-cc: Butler, Pam </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pbutler>, Stabler, Frank </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=6d85ad5c-391e5dc1-86256a87-777f29>
+X-bcc: 
+X-Folder: \MCASH (Non-Privileged)\Cash, Michelle\Inbox
+X-Origin: Cash-M
+X-FileName: MCASH (Non-Privileged).pst
+
+Michelle -- per our discussion, please prepare a new Separation Agreement and Release for Frank Stabler with the only change being the termination date from November 1, 2001 to December 1, 2001.
+
+Please note that the first lump sum payment has been processed and will be paid on the 10/31/01 paycheck.  In addition, there is the next payment due on 11/15/01.  These severance payments will be paid prior to the termination date.
+
+Please let me know when the documents are ready and I'll arrange to have them sent to Frank for execution.
+Thanks.
+Jo Ann

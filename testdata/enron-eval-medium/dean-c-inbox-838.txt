@@ -1,0 +1,62 @@
+Message-ID: <22854924.1075852157758.JavaMail.evans@thyme>
+Date: Mon, 8 Oct 2001 09:38:47 -0700 (PDT)
+From: pete.davis@enron.com
+To: pete.davis@enron.com
+Subject: Start Date: 10/8/01; HourAhead hour: 12;  <CODESITE>
+Cc: bert.meyers@enron.com, bill.williams@enron.com, craig.dean@enron.com, 
+	eric.linder@enron.com, geir.solberg@enron.com, kate.symes@enron.com, 
+	leaf.harasin@enron.com, monika.causholli@enron.com, 
+	mark.guzman@enron.com, pete.davis@enron.com, ryan.slinger@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: bert.meyers@enron.com, bill.williams@enron.com, craig.dean@enron.com, 
+	eric.linder@enron.com, geir.solberg@enron.com, kate.symes@enron.com, 
+	leaf.harasin@enron.com, monika.causholli@enron.com, 
+	mark.guzman@enron.com, pete.davis@enron.com, ryan.slinger@enron.com
+X-From: Davis, Pete </O=ENRON/OU=NA/CN=RECIPIENTS/CN=PDAVIS1>
+X-To: Davis, Pete </O=ENRON/OU=NA/CN=RECIPIENTS/CN=PDAVIS1>
+X-cc: Meyers, Bert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=BMEYERS>, Williams III, Bill </O=ENRON/OU=NA/CN=RECIPIENTS/CN=BWILLIA5>, Dean, Craig </O=ENRON/OU=NA/CN=RECIPIENTS/CN=CDEAN2>, Linder, Eric </O=ENRON/OU=NA/CN=RECIPIENTS/CN=ELINDER>, Solberg, Geir </O=ENRON/OU=NA/CN=RECIPIENTS/CN=GSOLBER>, Symes, Kate </O=ENRON/OU=NA/CN=RECIPIENTS/CN=KSYMES>, Harasin, Leaf </O=ENRON/OU=NA/CN=RECIPIENTS/CN=LHARASIN>, Causholli, Monika </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MCAUSHOL>, Guzman, Mark </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MGUZMAN3>, Davis, Pete </O=ENRON/OU=NA/CN=RECIPIENTS/CN=PDAVIS1>, Slinger, Ryan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=RSLINGER>, smerris@enron.com
+X-bcc: 
+X-Folder: \CDEAN2 (Non-Privileged)\Dean, Craig\Inbox
+X-Origin: DEAN-C
+X-FileName: CDEAN2 (Non-Privileged).pst
+
+
+
+Start Date: 10/8/01; HourAhead hour: 12;  No ancillary schedules awarded.  No variances detected. 
+
+    LOG MESSAGES:
+
+PARSING FILE -->> O:\Portland\WestDesk\California Scheduling\ISO Final Schedules\2001100812.txt
+
+Error retrieving HourAhead price data - process continuing...
+---- Energy Import/Export Schedule ----
+*** Final schedule not found for preferred schedule.
+     Details:
+
+  TRANS_TYPE: FINAL
+  SC_ID: ECTRT
+  MKT_TYPE: 2
+  TRANS_DATE: 10/8/01
+  TIE_POINT: PVERDE_5_DEVERS
+  INTERCHG_ID: CISO_EPMI_SRP
+  ENGY_TYPE: NFRM
+
+
+
+---- SC Trades Schedule ----
+*** Final schedule not found for preferred schedule.
+     Details:
+
+  TRANS_TYPE: FINAL
+  SC_ID: EPMI
+  MKT_TYPE: 2
+  TRANS_DATE: 10/8/01
+  TRADING_SC: APS1
+  PNT_OF_INTRC: NP15
+  SCHED_TYPE: ENGY
+  PURCH_SALE: 2
+  DEAL_NO: 1
+
+

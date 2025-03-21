@@ -1,0 +1,25 @@
+Message-ID: <28168953.1075855137600.JavaMail.evans@thyme>
+Date: Sat, 22 Dec 2001 23:00:03 -0800 (PST)
+From: system.administrator@enron.com
+To: don.baughman@enron.com
+Subject: Your mailbox is over its size limit
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: System Administrator
+X-To: Baughman Jr., Don </O=ENRON/OU=NA/CN=RECIPIENTS/CN=DBAUGHM>
+X-cc: 
+X-bcc: 
+X-Folder: \Edward_Baughman_Jan2002\Baughman Jr., Don\Inbox
+X-Origin: Baughman-E
+X-FileName: dbaughm (Non-Privileged).pst
+
+Your mailbox has exceeded one or more size limits set by your administrator.
+Your mailbox size is 112191 KB.
+Mailbox size limits:
+	You will receive a warning when your mailbox reaches 75000 KB.
+	You cannot send mail when your mailbox reaches 100000 KB.You may not be able to send or receive new mail until you reduce your mailbox size.
+To make more space available, delete any items that you are no longer using or move them to your personal folder file (.pst). 
+Items in all of your mailbox folders including the Deleted Items and Sent Items folders count against your size limit.  
+You must empty the Deleted Items folder after deleting items or the space will not be freed.
+See client Help for more information.

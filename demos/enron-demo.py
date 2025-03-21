@@ -35,7 +35,7 @@ class EnronReader(pz.DataReader):
 
 if __name__ == "__main__":
     # create validation data source
-    val_datareader = EnronReader(dir="testdata/enron-eval-medium", labels_file="enron-eval-medium-labels.json", split="train")
+    val_datareader = EnronReader(dir="testdata/enron-eval-medium", labels_file="testdata/enron-eval-medium-labels.json", split="train")
     datareader = EnronReader(dir="testdata/enron-eval-medium", split="test")
 
     # construct plan

@@ -1,0 +1,25 @@
+Message-ID: <7182251.1075863149647.JavaMail.evans@thyme>
+Date: Mon, 26 Nov 2001 08:31:11 -0800 (PST)
+From: david.oxley@enron.com
+To: k..allen@enron.com
+Subject: Answer
+Cc: greg.whalley@enron.com, mary.joyce@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: greg.whalley@enron.com, mary.joyce@enron.com
+X-From: Oxley, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=DOXLEY>
+X-To: Allen, Phillip K. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pallen>
+X-cc: Whalley, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gwhalle>, Joyce, Mary </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mjoyce>
+X-bcc: 
+X-Folder: \PALLEN (Non-Privileged)\Allen, Phillip K.\Inbox
+X-Origin: Allen-P
+X-FileName: PALLEN (Non-Privileged).pst
+
+For purposes of an accelerated distribution from the PSA,  a "single sum distribution," in Section 6.2 means that a PSA account is distributed all at once, as distinguished from another form of payout as may have been selected by a participant in his or her deferral agreement.  
+
+Section 6.2 is clear in that the account balance shall be determined as of the last day of the month preceding the date on which the Committee receives the written request of the Participant.  A PSA account balance is reflected in shares of stock since the form of distribution is shares of stock.
+
+Additionally, any portion of a PSA balance attributable to deferral of restricted stock is administered under Sections 3.5 and 3.6 and Exhibit A of the Plan. This section is applicable now as we are accelerating the distribution of PSA balances created with deferrals of restricted stock.  The Plan indicates that upon death, disability, retirement or termination, the share units are converted to shares which are issued to the executive according to the payment election made by the executive at the time of the deferral election.  
+
+      Therefore the distribution you will receive in shares is correct and we do not agree with your interpretation of the plan.

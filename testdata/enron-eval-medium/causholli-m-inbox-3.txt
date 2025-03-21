@@ -1,0 +1,63 @@
+Message-ID: <29404875.1075853164162.JavaMail.evans@thyme>
+Date: Mon, 29 Oct 2001 08:53:56 -0800 (PST)
+From: marilene.listrom@omgroup.com
+To: marilene.listrom@omgroup.com
+Subject: Pulpex Bulletin No. 1099 @ October 29, 2001
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Marilene Listrom <marilene.listrom@omgroup.com>
+X-To: Marilene Listrom <marilene.listrom@omgroup.com>
+X-cc: 
+X-bcc: 
+X-Folder: \MCAUSHOL (Non-Privileged)\Inbox
+X-Origin: Causholli-M
+X-FileName: MCAUSHOL (Non-Privileged).pst
+
+
+
+
+Pulpex Bulletin for Monday, October 29, 2001
+
+Market News:
+
+NBSK ------------------------------------------------------------
+Nov01     420.00   425.00   422.00   422.00   422.00     5    81
+Dec01     425.00   430.00   426.25   426.25   426.25     3   167
+Jan02     430.00   435.00        -        -        -     -    26
+Mar02     428.00   448.00        -        -        -     -   158
+Jun02     452.00   475.00        -        -        -     -    40
+Sep02     470.00   481.00        -        -        -     -    35
+Dec02     480.00   497.00        -        -        -     -    15
+Mar03     480.00        -        -        -        -     -     -
+
+BEK -------------------------------------------------------------
+Nov01     400.00   407.00        -        -        -     -   126
+Dec01     403.00   410.00        -        -        -     -    40
+Jan02     406.00   416.00        -        -        -     -     -
+Mar02          -        -        -        -        -     -     -
+
+Settlement Prices Futures
+          Today      Chg      Prev
+NBSK -------------------------------
+Nov01    422.00     -0.25    422.25
+Dec01    426.25     -5.50    431.75
+Jan02    432.50     -4.00    436.50
+Mar02    438.00     -8.00    446.00
+Jun02    463.50     +1.50    462.00
+Sep02    475.50     +0.00    475.50
+Dec02    488.50     +5.00    483.50
+Mar03    503.50     +5.00    498.50
+
+BEK --------------------------------
+Nov01    403.50     -2.50    406.00
+Dec01    406.50     -2.50    409.00
+Jan02    411.00     -5.00    416.00
+Mar02    418.00     -5.00    423.00
+
+The above tables should ideally be viewed using Courier or other fixed fonts.
+During Pulpex opening hours (0830-1600 UK Time, 0930-1700 CET),prices
+are distributed on our web page: http://www.pulpex.com
+
+If you would like someone else to receive this bulletin or to cancel your own
+please mail: info@pulpex.com or fax: +44 20 7065 8941

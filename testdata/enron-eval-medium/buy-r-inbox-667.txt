@@ -1,0 +1,32 @@
+Message-ID: <32213051.1075863367432.JavaMail.evans@thyme>
+Date: Mon, 20 Aug 2001 07:10:53 -0700 (PDT)
+From: kenneth.thibodeaux@enron.com
+To: mike.mcconnell@enron.com, rick.buy@enron.com, kenneth.lay@enron.com, 
+	a..shankman@enron.com, greg.whalley@enron.com
+Subject: 8/17 Business Unit EOL Crude Violations
+Cc: beth.apollo@enron.com, shona.wilson@enron.com, a..price@enron.com, 
+	jennifer.burns@enron.com, araceli.romero@enron.com, 
+	cassi.wallace@enron.com, m..taylor@enron.com, greg.whalley@enron.com, 
+	todd.hall@enron.com, john.swinney@enron.com, 
+	veronica.valdez@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: beth.apollo@enron.com, shona.wilson@enron.com, a..price@enron.com, 
+	jennifer.burns@enron.com, araceli.romero@enron.com, 
+	cassi.wallace@enron.com, m..taylor@enron.com, greg.whalley@enron.com, 
+	todd.hall@enron.com, john.swinney@enron.com, 
+	veronica.valdez@enron.com
+X-From: Thibodeaux, Kenneth </O=ENRON/OU=NA/CN=RECIPIENTS/CN=KTHIBODE>
+X-To: Mcconnell, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmccon1>, Buy, Rick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbuy>, Lay, Kenneth </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Klay>, Shankman, Jeffrey A. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jshankm>, Whalley, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gwhalle>
+X-cc: Apollo, Beth </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bapollo>, Wilson, Shona </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Swilson5>, Price, Brent A. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bprice>, Burns, Jennifer </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jburns>, Romero, Araceli </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Aromero>, Wallace, Cassi </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cwallac3>, Taylor, Liz M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ltaylor>, Whalley, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gwhalle>, Hall, D. Todd </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Thall>, Swinney, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jswinne>, Valdez, Veronica </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vvaldez>
+X-bcc: 
+X-Folder: \RBUY (Non-Privileged)\Buy, Rick\Inbox
+X-Origin: Buy-R
+X-FileName: RBUY (Non-Privileged).pst
+
+Attached are the Enron Global Markets EOL Crude 24/7 Trading violation memos for  Net Open Position, Maturity Gap Risk and VAR for August 17, 2001.  The Office of the Chairman for Enron Global Markets is responsible for printing out hard copies of these memos, signing and returning the hard copies to Chris Abel at 3560f, who will forward them to RAC to obtain their signature. 
+
+Thank You
+
+ 

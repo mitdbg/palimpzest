@@ -1,0 +1,32 @@
+Message-ID: <24473758.1075858840473.JavaMail.evans@thyme>
+Date: Mon, 29 Oct 2001 06:22:07 -0800 (PST)
+From: james.studebaker@enron.com
+To: shelley.corman@enron.com
+Subject: Draft Notice for reinstating the Sched Qty report
+Cc: gerry.medeles@enron.com, ramona.betancourt@enron.com, 
+	maggie.matheson@enron.com, sheila.nacey@enron.com, 
+	lynn.blair@enron.com, terry.kowalke@enron.com, 
+	john.buchanan@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: gerry.medeles@enron.com, ramona.betancourt@enron.com, 
+	maggie.matheson@enron.com, sheila.nacey@enron.com, 
+	lynn.blair@enron.com, terry.kowalke@enron.com, 
+	john.buchanan@enron.com
+X-From: Studebaker, James  </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JSTUDEB>
+X-To: Corman, Shelley </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Scorman>
+X-cc: Medeles, Gerry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gmedele>, Betancourt, Ramona  </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbetanc>, Matheson, Maggie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmathes>, Nacey, Sheila </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Snacey>, Blair, Lynn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lblair>, Kowalke, Terry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tkowalk>, Buchanan, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jbuchan2>
+X-bcc: 
+X-Folder: \SCORMAN (Non-Privileged)\Inbox
+X-Origin: Corman-S
+X-FileName: SCORMAN (Non-Privileged).pst
+
+Shelley, 
+
+Attached is a draft notice for the reinstatement of the old Shipper Scheduled Quantities report.  I will have Legale post the final notice after your changes and  approval. 
+
+ Thx, Jim
+
+
+				 

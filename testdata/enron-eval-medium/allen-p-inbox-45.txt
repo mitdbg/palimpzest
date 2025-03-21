@@ -1,0 +1,21 @@
+Message-ID: <31239550.1075858645503.JavaMail.evans@thyme>
+Date: Mon, 29 Oct 2001 21:16:58 -0800 (PST)
+From: enron_update@concureworkplace.com
+To: pallen@enron.com
+Subject: Expense Reports Awaiting Your Approval
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: enron_update@concureworkplace.com@ENRON
+X-To: Phillip Allen <pallen@enron.com>
+X-cc: 
+X-bcc: 
+X-Folder: \PALLEN (Non-Privileged)\Allen, Phillip K.\Inbox
+X-Origin: Allen-P
+X-FileName: PALLEN (Non-Privileged).pst
+
+The following reports have been waiting for your approval for more than 4 days.  Please review.
+
+Owner: James W Reitmeyer
+Report Name: JReitmeyer 10/24/01
+Days In Mgr. Queue: 5

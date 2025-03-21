@@ -1,0 +1,95 @@
+Message-ID: <25720629.1075840784427.JavaMail.evans@thyme>
+Date: Fri, 28 Dec 2001 13:12:02 -0800 (PST)
+From: j.kaminski@enron.com
+To: litigation.ljm@enron.com
+Subject: FW: Raptors
+Cc: jan.cooley@enron.com, j.kaminski@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: jan.cooley@enron.com, j.kaminski@enron.com
+X-From: Kaminski, Vince J </O=ENRON/OU=NA/CN=RECIPIENTS/CN=VKAMINS>
+X-To: LJM Litigation </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mbx_ljmlit>
+X-cc: Cooley, Jan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jcooley>, Kaminski, Vince J </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vkamins>
+X-bcc: 
+X-Folder: \vkamins\Inbox
+X-Origin: KAMINSKI-V
+X-FileName: vincent kaminski 1-30-02.pst
+
+I am forwarding a copy of a message I sent some time ago to the same address.
+The lawyer representing the Special Committee (David Cohen) could not locate it.
+The message disappeared as well form my mailbox. Fortunately,
+I have preserved another copy.
+
+Vince Kaminski
+
+ -----Original Message-----
+From: 	VKaminski@aol.com@ENRON  
+Sent:	Wednesday, December 19, 2001 8:12 PM
+To:	dcohen@wilmer.com
+Cc:	srosen@wilmer.com; Bharati, Rakesh; Vasant.Shanhogue@enron.com; VKaminski@aol.com; vkamins@enron.com
+Subject:	Raptors
+
+David, 
+I am forwarding to you, as promised, the text of the 10/04/2001  message to Ryan Siurek regarding Raptor valuations. The message is stored on my PC at home. It disappeared from my mailbox on the Enron system. 
+Vince Kaminski 
+******************************************************************************* 
+Subj:   FW: LJM/Raptor valuations    
+Date:   10/4/01 8:30:17 AM Central Daylight Time     
+From:    Vince.J.Kaminski@ENRON.com (Kaminski, Vince J) 
+To:    vkaminski@aol.com 
+     
+>  -----Original Message----- 
+> From:   Kaminski, Vince J   
+> Sent:    Thursday, October 04, 2001 8:28 AM 
+> To:    Siurek, Ryan 
+> Cc:    Kaminski, Vince J; Buy, Rick; Port, David 
+> Subject:    LJM/Raptor valuations 
+>  
+> Ryan, 
+>  
+> In the follow up to the meeting we had on Wednesday I would like 
+> to reinforce one point I made. I feel strongly that I cannot support 
+> the valuations my group has produced so far for the LJM/Raptor 
+> related transactions without examination of all the related legal 
+> documents. 
+>  
+> I feel that we did solid work based on verbal information,  but I 
+> cannot 
+> guarantee the quality of the final product without looking at the 
+> contracts. 
+> These transactions are too complex and controversial to bypass due 
+> diligence requirements  
+> that you would expect from any professional. 
+>  
+> Vince Kaminski 
+********************************************************************** 
+This e-mail is the property of Enron Corp. and/or its relevant affiliate and may contain confidential and privileged material for the sole use of the intended recipient (s). Any review, use, distribution or disclosure by others is strictly prohibited. If you are not the intended recipient (or authorized to receive for the recipient), please contact the sender or reply to Enron Corp. at enron.messaging.administration@enron.com and delete all copies of the message. This e-mail (and any attachments hereto) are not intended to be an offer (or an acceptance) and do not create or evidence a binding and enforceable contract between Enron Corp. (or any of its affiliates) and the intended recipient or any other party, and may not be relied on by anyone as the basis of a contract by estoppel or otherwise. Thank you.  
+********************************************************************** 
+----------------------- Headers -------------------------------- 
+Return-Path: <Vince.J.Kaminski@enron.com> 
+Received: from  rly-yc05.mx.aol.com (rly-yc05.mail.aol.com [172.18.149.37]) by air-yc04.mail.aol.com (v80.17) with ESMTP id MAILINYC44-1004093017; Thu, 04 Oct 2001 09:30:17 2000 
+Received: from  postmaster.enron.com (outbound5.enron.com [192.152.140.9]) by rly-yc05.mx.aol.com (v80.21) with ESMTP id MAILRELAYINYC51-1004093003; Thu, 04 Oct 2001 09:30:03 -0400 
+Received: from corp.enron.com (nahou-msmsw03p.corp.enron.com [192.168.110.110]) 
+   by postmaster.enron.com (8.10.1/8.10.1/external_corp-1.08) with ESMTP id f94DU2302305 
+   for <vkaminski@aol.com>; Thu, 4 Oct 2001 08:30:02 -0500 (CDT) 
+Received: from nahou-mscnx04p.corp.enron.com (unverified) by corp.enron.com 
+(Content Technologies SMTPRS 4.2.1) with SMTP id <T56633e1d36c0a86e6e7b0@corp.enron.com> for <vkaminski@aol.com>; 
+Thu, 4 Oct 2001 08:30:02 -0500 
+Received: from NAHOU-MSMBX03V.corp.enron.com ([192.168.110.40]) by nahou-mscnx04p.corp.enron.com with Microsoft SMTPSVC(5.0.2195.2966); 
+   Thu, 4 Oct 2001 08:30:02 -0500 
+content-class: urn:content-classes:message 
+MIME-Version: 1.0 
+Content-Type: text/plain; charset="iso-8859-1" 
+Content-Transfer-Encoding: quoted-printable 
+X-MimeOLE: Produced By Microsoft Exchange V6.0.4712.0 
+Subject: FW: LJM/Raptor valuations 
+Date: Thu, 4 Oct 2001 08:28:16 -0500 
+Message-ID: <31738B46B7BD864080808A19977D9F75449525@NAHOU-MSMBX03V.corp.enron.com> 
+X-MS-Has-Attach:  
+X-MS-TNEF-Correlator:  
+Thread-Topic: LJM/Raptor valuations 
+Thread-Index: AcFM2FMHpaiFOfRsQDCq6NwF20YoUQAABKQw 
+From: "Kaminski, Vince J" <Vince.J.Kaminski@ENRON.com> 
+To: <vkaminski@aol.com> 
+X-OriginalArrivalTime: 04 Oct 2001 13:30:02.0949 (UTC) FILETIME=[AC3E3750:01C14CD8] 

@@ -1,0 +1,37 @@
+Message-ID: <32309712.1075855169374.JavaMail.evans@thyme>
+Date: Tue, 18 Dec 2001 07:10:40 -0800 (PST)
+From: announcements.enron@enron.com
+To: dl-ga-all_enron_worldwide1@enron.com
+Subject: URGENT! URGENT! VIRUS ALERT!
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Enron General Announcements </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MBX_ANNCENRON>
+X-To: DL-GA-all_enron_worldwide1 </O=ENRON/OU=NA/CN=RECIPIENTS/CN=DL-GA-all_enron_worldwide1>
+X-cc: 
+X-bcc: 
+X-Folder: \Frank_Ermis_Jan2002_1\Ermis, Frank\Inbox
+X-Origin: Ermis-F
+X-FileName: fermis (Non-Privileged).pst
+
+Please be aware that there is an email circulating the Enron messaging environment !!!
+
+The infected email has the following characteristics :
+Subject :	Hi
+Body :		Hi, I found a cool site! <web link> It's really cool!
+
+An alternative version of the infected email also have an Excel spreadsheet attachment.
+
+If you receive this email, DELETE it immediately. DO NOT CLICK ON THE WEB LINK. DO NOT LAUNCH THE EXCEL ATTACHMENT!
+
+Please note that opening the email automatically via the "preview pane" does NOT launch the virus.
+
+The Enron global messaging service has taken the necessary steps to ensure all internet email sent to your Enron internet address is virus free. But there are ways that you can ensure viruses do not make their way into our environment  :
+
+Always ensure you do not launch attachments or web links received from people you do not know. 
+
+Always ensure that you do not access/launch/download any attachments from external (web-based) email service providers while you are using the Enron network.
+
+Detection + Prevention = Protection!
+
+Thank you.

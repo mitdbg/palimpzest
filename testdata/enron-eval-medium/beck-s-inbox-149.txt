@@ -1,0 +1,47 @@
+Message-ID: <17744967.1075840358477.JavaMail.evans@thyme>
+Date: Tue, 8 Jan 2002 17:06:41 -0800 (PST)
+From: greg.piper@enron.com
+To: sally.beck@enron.com
+Subject: FW: NetCo Issues and bids
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Piper, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=GPIPER>
+X-To: Beck, Sally </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sbeck>
+X-cc: 
+X-bcc: 
+X-Folder: \sbeck\Inbox
+X-Origin: BECK-S
+X-FileName: sally beck 1-28-02.pst
+
+FYI
+ 
+I will send another e-mail with McMahon's response. I am fighting for our stuff.
+ 
+GP
+-----Original Message-----
+From: Piper, Greg 
+Sent: Tuesday, January 08, 2002 6:43 PM
+To: Detmering, Tim
+Cc: Koehler, Anne C.; Delainey, David W.; Muller, Mark S.; Schuler, Lance (Legal); Webb, Jay; McMahon, Jeffrey
+Subject: NetCo Issues and bids
+
+
+We just had a very detailed, productive discussion with one of the bidders on the technical issues associated with transition around all technology.  Jay Webb, Anne Koehler and Bob McAuliffe and the bidder reps are going to try to finalize the discussions we had tonight in to a mutually agreeable transition services agreement.  We will, day one, have the list of IT assets (people, application hardware, Enron developed software) that will transfer.  We will need to finalize Jay's issue around NetCo contract employees related to 3rd party software until we can get that separated.  That will leave the service issues to network and data center.
+ 
+We didn't discuss this in the call with the bidder reps, but if the IP stays with the estate and a license goes to NetCo, the estate can't and won't write NetCo a 2 year call option on the IP so that they have 2 years to decide to call it away.  Take a license and move on and leave Enron the IP.
+ 
+What we did not discuss was what each party can use systems for, etc.  Both the above bidder and the other bidder have put in proposals that would restrict Enron from using the systems or applications for, in my opinion, any use in gas and power in North America, physical or financial, for any trading, market making, origination, marketing, etc. except for Unwinding Activities and in one bid, pipeline business as well.
+ 
+The estate or Enron would like the ability to use the applications and systems not only for the management or unwinding of positions and supporting the pipelines but would also need them for the NewCo or energy business that can grow out of some of the remains in the estate and the ability to sub license the mid and back office applications to a 3rd party that would not compete in trading or marketing, but would use them to build a service company around them that would service gas and power companies in North America.
+ 
+Your thoughts?
+
+Greg Piper 
+ 
+
+
+  
+  _____  
+
+ 
